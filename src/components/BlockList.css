@@ -1,0 +1,120 @@
+.block-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.block-list__block {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.block-list__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.block-list__title {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0 0 4px;
+  color: var(--color-text);
+}
+
+.block-list__meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.block-list__index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-size: 14px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.block-list__lessons {
+  list-style: none;
+  padding: 8px;
+  margin: 0;
+}
+
+.block-list__lesson {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 12px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+
+.block-list__lesson:hover {
+  background: #fafcfa;
+}
+
+.block-list__lesson-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.block-list__status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-bg);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.block-list__status--done {
+  background: var(--color-primary);
+  color: white;
+}
+
+.block-list__lesson-title {
+  display: block;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.block-list__lesson-duration {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+@media (max-width: 600px) {
+  .block-list__lesson {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .block-list__lesson .btn {
+    width: 100%;
+  }
+}

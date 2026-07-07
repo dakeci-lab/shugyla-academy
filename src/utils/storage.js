@@ -38,7 +38,13 @@ export function saveProgress(progress) {
 export function getCourseProgress(userId, courseId) {
   const progress = getProgress()
   const userProgress = progress[userId] || {}
-  return userProgress[courseId] || { completedLessons: [], testPassed: false }
+  return (
+    userProgress[courseId] || {
+      completedLessons: [],
+      testPassed: false,
+      testScore: null,
+    }
+  )
 }
 
 /** Отметить урок как пройденный */
@@ -46,11 +52,27 @@ export function markLessonComplete(userId, courseId, lessonId) {
   const progress = getProgress()
   if (!progress[userId]) progress[userId] = {}
   if (!progress[userId][courseId]) {
-    progress[userId][courseId] = { completedLessons: [], testPassed: false }
+    progress[userId][courseId] = {
+      completedLessons: [],
+      testPassed: false,
+      testScore: null,
+    }
   }
   const completed = progress[userId][courseId].completedLessons
   if (!completed.includes(lessonId)) {
     completed.push(lessonId)
   }
+  saveProgress(progress)
+}
+
+/** Сохранить результат теста */
+export function saveTestResult(userId, courseId, score, passed) {
+  const progress = getProgress()
+  if (!progress[userId]) progress[userId] = {}
+  if (!progress[userId][courseId]) {
+    progress[userId][courseId] = { completedLessons: [], testPassed: false, testScore: null }
+  }
+  progress[userId][courseId].testScore = score
+  progress[userId][courseId].testPassed = passed
   saveProgress(progress)
 }

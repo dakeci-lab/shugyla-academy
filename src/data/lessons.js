@@ -1,54 +1,117 @@
 /**
- * Уроки для каждого курса
- * courseId — ID курса, к которому относится урок
+ * Уроки курсов — привязаны к courseId и blockId
  */
 export const LESSONS = [
   // Курс 1 — Кассиры
-  { id: 101, courseId: 1, title: 'Знакомство с кассовым оборудованием', duration: '30 мин', order: 1 },
-  { id: 102, courseId: 1, title: 'Приём наличных и безналичных платежей', duration: '45 мин', order: 2 },
-  { id: 103, courseId: 1, title: 'Работа со скидками и акциями', duration: '30 мин', order: 3 },
-  { id: 104, courseId: 1, title: 'Возврат товара и оформление чека', duration: '40 мин', order: 4 },
-  { id: 105, courseId: 1, title: 'Работа с очередью и стрессовыми ситуациями', duration: '35 мин', order: 5 },
-  { id: 106, courseId: 1, title: 'Закрытие смены кассира', duration: '40 мин', order: 6 },
+  {
+    id: 101,
+    courseId: 1,
+    blockId: 1101,
+    title: 'Кто такой кассир в Shugyla Market',
+    duration: '20 мин',
+    order: 1,
+    content:
+      'Кассир — лицо компании на линии обслуживания. Вы принимаете оплату, помогаете покупателю и соблюдаете стандарты Shugyla Market.',
+  },
+  {
+    id: 102,
+    courseId: 1,
+    blockId: 1101,
+    title: 'Подготовка кассы к смене',
+    duration: '25 мин',
+    order: 2,
+    content:
+      'Перед открытием смены проверьте кассу, наличие размена, чистоту рабочего места и исправность оборудования.',
+  },
+  {
+    id: 103,
+    courseId: 1,
+    blockId: 1101,
+    title: 'Работа с клиентом',
+    duration: '30 мин',
+    order: 3,
+    content:
+      'Приветствуйте покупателя, быстро обслуживайте, предлагайте помощь и сохраняйте спокойный тон даже в очереди.',
+  },
+  {
+    id: 104,
+    courseId: 1,
+    blockId: 1101,
+    title: 'Ошибки, которых нельзя допускать',
+    duration: '25 мин',
+    order: 4,
+    content:
+      'Нельзя грубить, игнорировать покупателя, принимать оплату без чека или оставлять кассу без присмотра.',
+  },
+  {
+    id: 105,
+    courseId: 1,
+    blockId: 1102,
+    title: 'Приём денег',
+    duration: '30 мин',
+    order: 1,
+    content:
+      'Проверяйте купюры, озвучивайте сумму, корректно пробивайте товар и выдавайте чек каждому покупателю.',
+  },
+  {
+    id: 106,
+    courseId: 1,
+    blockId: 1102,
+    title: 'Сдача смены',
+    duration: '25 мин',
+    order: 2,
+    content:
+      'В конце смены сверьте выручку, оформите Z-отчёт и передайте кассу администратору по установленной процедуре.',
+  },
+  {
+    id: 107,
+    courseId: 1,
+    blockId: 1102,
+    title: 'Что делать при недостаче',
+    duration: '20 мин',
+    order: 3,
+    content:
+      'При недостаче не скрывайте проблему — сразу сообщите администратору и зафиксируйте ситуацию по инструкции.',
+  },
 
-  // Курс 2 — Администраторы зала
-  { id: 201, courseId: 2, title: 'Роль администратора торгового зала', duration: '30 мин', order: 1 },
-  { id: 202, courseId: 2, title: 'Открытие и закрытие смены', duration: '45 мин', order: 2 },
-  { id: 203, courseId: 2, title: 'Контроль работы персонала', duration: '40 мин', order: 3 },
-  { id: 204, courseId: 2, title: 'Решение конфликтных ситуаций', duration: '50 мин', order: 4 },
-  { id: 205, courseId: 2, title: 'Инвентаризация и списание', duration: '45 мин', order: 5 },
-  { id: 206, courseId: 2, title: 'Отчётность и коммуникация с руководством', duration: '35 мин', order: 6 },
-  { id: 207, courseId: 2, title: 'Чрезвычайные ситуации', duration: '35 мин', order: 7 },
+  // Курс 2
+  { id: 201, courseId: 2, blockId: 1201, title: 'Роль администратора торгового зала', duration: '30 мин', order: 1, content: 'Администратор координирует работу зала и персонала.' },
+  { id: 202, courseId: 2, blockId: 1202, title: 'Открытие и закрытие смены', duration: '45 мин', order: 1, content: 'Порядок открытия и закрытия смены в торговом зале.' },
+  { id: 203, courseId: 2, blockId: 1202, title: 'Контроль работы персонала', duration: '40 мин', order: 2, content: 'Как контролировать задачи и качество работы команды.' },
+  { id: 204, courseId: 2, blockId: 1203, title: 'Решение конфликтных ситуаций', duration: '50 мин', order: 1, content: 'Алгоритм работы с жалобами и конфликтами.' },
+  { id: 205, courseId: 2, blockId: 1203, title: 'Инвентаризация и списание', duration: '45 мин', order: 2, content: 'Базовые процедуры инвентаризации и списания.' },
+  { id: 206, courseId: 2, blockId: 1204, title: 'Отчётность и коммуникация с руководством', duration: '35 мин', order: 1, content: 'Какие отчёты сдавать и как эскалировать вопросы.' },
+  { id: 207, courseId: 2, blockId: 1204, title: 'Чрезвычайные ситуации', duration: '35 мин', order: 2, content: 'Действия при форс-мажоре и инструкции безопасности.' },
 
-  // Курс 3 — Сервис
-  { id: 301, courseId: 3, title: 'Стандарты приветствия покупателя', duration: '25 мин', order: 1 },
-  { id: 302, courseId: 3, title: 'Активные продажи и консультация', duration: '35 мин', order: 2 },
-  { id: 303, courseId: 3, title: 'Работа с жалобами', duration: '40 мин', order: 3 },
-  { id: 304, courseId: 3, title: 'Создание лояльности покупателей', duration: '20 мин', order: 4 },
+  // Курс 3
+  { id: 301, courseId: 3, blockId: 1301, title: 'Стандарты приветствия покупателя', duration: '25 мин', order: 1, content: 'Единый стандарт приветствия и первого контакта.' },
+  { id: 302, courseId: 3, blockId: 1301, title: 'Активные продажи и консультация', duration: '35 мин', order: 2, content: 'Как помогать покупателю и предлагать товар.' },
+  { id: 303, courseId: 3, blockId: 1302, title: 'Работа с жалобами', duration: '40 мин', order: 1, content: 'Как принимать и решать жалобы покупателей.' },
+  { id: 304, courseId: 3, blockId: 1302, title: 'Создание лояльности покупателей', duration: '20 мин', order: 2, content: 'Практики для повышения лояльности.' },
 
-  // Курс 4 — Планограмма
-  { id: 401, courseId: 4, title: 'Что такое планограмма', duration: '30 мин', order: 1 },
-  { id: 402, courseId: 4, title: 'Правила выкладки по категориям', duration: '40 мин', order: 2 },
-  { id: 403, courseId: 4, title: 'Контроль сроков годности', duration: '35 мин', order: 3 },
-  { id: 404, courseId: 4, title: 'Ротация товаров (FIFO)', duration: '30 мин', order: 4 },
-  { id: 405, courseId: 4, title: 'Оформление промо-зон', duration: '45 мин', order: 5 },
+  // Курс 4
+  { id: 401, courseId: 4, blockId: 1401, title: 'Что такое планограмма', duration: '30 мин', order: 1, content: 'Основы планограммы и зонирования полки.' },
+  { id: 402, courseId: 4, blockId: 1401, title: 'Правила выкладки по категориям', duration: '40 мин', order: 2, content: 'Стандарты выкладки для разных категорий товара.' },
+  { id: 403, courseId: 4, blockId: 1402, title: 'Контроль сроков годности', duration: '35 мин', order: 1, content: 'Как проверять и ротировать товар по срокам.' },
+  { id: 404, courseId: 4, blockId: 1403, title: 'Ротация товаров (FIFO)', duration: '30 мин', order: 1, content: 'Принцип FIFO на практике.' },
+  { id: 405, courseId: 4, blockId: 1403, title: 'Оформление промо-зон', duration: '45 мин', order: 2, content: 'Как оформлять акционные зоны.' },
 
-  // Курс 5 — Закуп
-  { id: 501, courseId: 5, title: 'Процесс закупа в Shugyla Market', duration: '40 мин', order: 1 },
-  { id: 502, courseId: 5, title: 'Работа с поставщиками', duration: '45 мин', order: 2 },
-  { id: 503, courseId: 5, title: 'Контроль поставок и приёмка', duration: '40 мин', order: 3 },
-  { id: 504, courseId: 5, title: 'Документооборот и учёт', duration: '35 мин', order: 4 },
-  { id: 505, courseId: 5, title: 'Анализ продаж и планирование закупа', duration: '50 мин', order: 5 },
-  { id: 506, courseId: 5, title: 'Работа с дефицитом и излишками', duration: '30 мин', order: 6 },
+  // Курс 5
+  { id: 501, courseId: 5, blockId: 1501, title: 'Процесс закупа в Shugyla Market', duration: '40 мин', order: 1, content: 'Этапы закупа от заявки до поставки.' },
+  { id: 502, courseId: 5, blockId: 1502, title: 'Работа с поставщиками', duration: '45 мин', order: 1, content: 'Коммуникация и переговоры с поставщиками.' },
+  { id: 503, courseId: 5, blockId: 1502, title: 'Контроль поставок и приёмка', duration: '40 мин', order: 2, content: 'Приёмка товара и проверка документов.' },
+  { id: 504, courseId: 5, blockId: 1503, title: 'Документооборот и учёт', duration: '35 мин', order: 1, content: 'Документы закупа и учёт операций.' },
+  { id: 505, courseId: 5, blockId: 1503, title: 'Анализ продаж и планирование закупа', duration: '50 мин', order: 2, content: 'Как планировать закуп по данным продаж.' },
+  { id: 506, courseId: 5, blockId: 1503, title: 'Работа с дефицитом и излишками', duration: '30 мин', order: 3, content: 'Управление дефицитом и излишками.' },
 
-  // Курс 6 — Стандарты
-  { id: 601, courseId: 6, title: 'Ценности и миссия Shugyla Market', duration: '25 мин', order: 1 },
-  { id: 602, courseId: 6, title: 'Дресс-код и внешний вид', duration: '20 мин', order: 2 },
-  { id: 603, courseId: 6, title: 'Правила поведения на рабочем месте', duration: '45 мин', order: 3 },
+  // Курс 6
+  { id: 601, courseId: 6, blockId: 1601, title: 'Ценности и миссия Shugyla Market', duration: '25 мин', order: 1, content: 'Миссия и ценности компании.' },
+  { id: 602, courseId: 6, blockId: 1602, title: 'Дресс-код и внешний вид', duration: '20 мин', order: 1, content: 'Требования к внешнему виду сотрудников.' },
+  { id: 603, courseId: 6, blockId: 1602, title: 'Правила поведения на рабочем месте', duration: '45 мин', order: 2, content: 'Корпоративные правила поведения.' },
 
-  // Курс 7 — Стажёр
-  { id: 701, courseId: 7, title: 'Добро пожаловать в Shugyla Market', duration: '20 мин', order: 1 },
-  { id: 702, courseId: 7, title: 'Знакомство с командой и наставником', duration: '25 мин', order: 2 },
-  { id: 703, courseId: 7, title: 'Базовые процедуры магазина', duration: '35 мин', order: 3 },
-  { id: 704, courseId: 7, title: 'Первые рабочие задачи', duration: '40 мин', order: 4 },
+  // Курс 7
+  { id: 701, courseId: 7, blockId: 1701, title: 'Добро пожаловать в Shugyla Market', duration: '20 мин', order: 1, content: 'Вводная информация для стажёра.' },
+  { id: 702, courseId: 7, blockId: 1701, title: 'Знакомство с командой и наставником', duration: '25 мин', order: 2, content: 'Роль наставника и команда магазина.' },
+  { id: 703, courseId: 7, blockId: 1702, title: 'Базовые процедуры магазина', duration: '35 мин', order: 1, content: 'Ежедневные процедуры для стажёра.' },
+  { id: 704, courseId: 7, blockId: 1702, title: 'Первые рабочие задачи', duration: '40 мин', order: 2, content: 'С чего начать работу стажёру.' },
 ]

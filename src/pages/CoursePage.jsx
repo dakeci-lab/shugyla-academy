@@ -1,18 +1,24 @@
 import { useState } from 'react'
 import { useParams, Link, Navigate, useLocation } from 'react-router-dom'
-import { LESSONS } from '../data/lessons'
-import { TESTS } from '../data/tests'
 import { getUser, getCourseProgress, markLessonComplete } from '../utils/storage'
 import { resolveCourseAccess, ACCESS_REASON } from '../utils/auth'
+import {
+  getCourseStructure,
+  getCourseTest,
+  calcLessonProgress,
+  areAllLessonsComplete,
+} from '../utils/courseStructure'
+import { getCategoryLabel } from '../utils/i18n'
 import Header from '../components/Header'
 import AccessDenied from '../components/AccessDenied'
-import LessonList from '../components/LessonList'
+import BlockList from '../components/BlockList'
+import CourseTest from '../components/CourseTest'
 import ProgressBar from '../components/ProgressBar'
 import './CoursePage.css'
 
 /**
  * Страница курса — /courses/:id
- * Требует авторизацию; проверяет allowedRoles по роли пользователя.
+ * Структура: Курс → Блок → Урок → Тест
  */
 export default function CoursePage() {
   const { id } = useParams()
@@ -23,7 +29,9 @@ export default function CoursePage() {
   const access = resolveCourseAccess(user, courseId)
 
   const [progress, setProgress] = useState(() =>
-    user ? getCourseProgress(user.id, courseId) : { completedLessons: [], testPassed: false }
+    user
+      ? getCourseProgress(user.id, courseId)
+      : { completedLessons: [], testPassed: false, testScore: null }
   )
   const [activeLesson, setActiveLesson] = useState(null)
 
@@ -49,23 +57,21 @@ export default function CoursePage() {
   }
 
   const course = access.course
+  const blocks = getCourseStructure(courseId)
+  const courseTest = getCourseTest(courseId)
+  const totalLessons = blocks.reduce((sum, b) => sum + b.lessons.length, 0)
+  const progressPercent = calcLessonProgress(progress.completedLessons, courseId)
+  const allLessonsDone = areAllLessonsComplete(progress.completedLessons, courseId)
+  const roleLabel = getCategoryLabel(course.category)
 
-  const courseLessons = LESSONS
-    .filter((l) => l.courseId === courseId)
-    .sort((a, b) => a.order - b.order)
-
-  const courseTest = TESTS.find((t) => t.courseId === courseId)
-
-  const progressPercent = courseLessons.length > 0
-    ? Math.round((progress.completedLessons.length / courseLessons.length) * 100)
-    : 0
+  function refreshProgress() {
+    setProgress(getCourseProgress(user.id, courseId))
+  }
 
   function handleStartLesson(lesson) {
     setActiveLesson(lesson)
-    if (user) {
-      markLessonComplete(user.id, courseId, lesson.id)
-      setProgress(getCourseProgress(user.id, courseId))
-    }
+    markLessonComplete(user.id, courseId, lesson.id)
+    refreshProgress()
   }
 
   return (
@@ -74,7 +80,7 @@ export default function CoursePage() {
 
       <main className="course-page__main container">
         <Link to="/dashboard" className="course-page__back">
-          ← Назад
+          ← Назад к моим курсам
         </Link>
 
         <div className="course-page__header">
@@ -83,11 +89,13 @@ export default function CoursePage() {
             style={{ backgroundColor: course.imageColor }}
           />
           <div className="course-page__info">
+            <span className="course-page__role-badge">Для: {roleLabel}</span>
             <h1 className="course-page__title">{course.title}</h1>
             <p className="course-page__desc">{course.description}</p>
             <div className="course-page__meta">
               <span>{course.duration}</span>
-              <span>{courseLessons.length} уроков</span>
+              <span>{blocks.length} блоков</span>
+              <span>{totalLessons} уроков</span>
             </div>
           </div>
         </div>
@@ -95,27 +103,40 @@ export default function CoursePage() {
         <div className="course-page__progress-section">
           <ProgressBar
             percent={progressPercent}
-            label="Прогресс курса"
+            label={`Прогресс: ${progress.completedLessons.length} из ${totalLessons} уроков`}
           />
+          {progress.testPassed && (
+            <p className="course-page__test-status course-page__test-status--passed">
+              ✓ Итоговый тест сдан ({progress.testScore}%)
+            </p>
+          )}
         </div>
 
         {activeLesson && (
           <div className="course-page__active-lesson">
-            <h3>Урок: {activeLesson.title}</h3>
-            <p>Здесь будет содержимое урока. Пока урок отмечен как пройденный.</p>
-            <button
-              className="btn btn--outline btn--sm"
-              onClick={() => setActiveLesson(null)}
-            >
-              Закрыть
-            </button>
+            <div className="course-page__active-lesson-header">
+              <h3>Урок: {activeLesson.title}</h3>
+              <button
+                type="button"
+                className="btn btn--outline btn--sm"
+                onClick={() => setActiveLesson(null)}
+              >
+                Закрыть
+              </button>
+            </div>
+            <p className="course-page__active-lesson-content">
+              {activeLesson.content || 'Содержимое урока будет добавлено позже.'}
+            </p>
+            <p className="course-page__active-lesson-note">
+              Урок отмечен как пройденный.
+            </p>
           </div>
         )}
 
-        <section className="course-page__lessons">
-          <h2 className="course-page__section-title">Уроки</h2>
-          <LessonList
-            lessons={courseLessons}
+        <section className="course-page__blocks">
+          <h2 className="course-page__section-title">Содержание курса</h2>
+          <BlockList
+            blocks={blocks}
             completedLessons={progress.completedLessons}
             onStartLesson={handleStartLesson}
           />
@@ -123,23 +144,13 @@ export default function CoursePage() {
 
         {courseTest && (
           <section className="course-page__test">
-            <h2 className="course-page__section-title">Итоговый тест</h2>
-            <div className="course-page__test-card">
-              <div>
-                <strong>{courseTest.title}</strong>
-                <p className="course-page__test-info">
-                  {courseTest.questions.length} вопросов · проходной балл {courseTest.passingScore}%
-                </p>
-              </div>
-              <button className="btn btn--primary" disabled={progressPercent < 100}>
-                Пройти тест
-              </button>
-            </div>
-            {progressPercent < 100 && (
-              <p className="course-page__test-hint">
-                Пройдите все уроки, чтобы открыть тест.
-              </p>
-            )}
+            <CourseTest
+              test={courseTest}
+              userId={user.id}
+              courseId={courseId}
+              disabled={!allLessonsDone}
+              onComplete={refreshProgress}
+            />
           </section>
         )}
       </main>

@@ -1,0 +1,129 @@
+.course-test {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 24px;
+}
+
+.course-test__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.course-test__title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.course-test__info {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.course-test__badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.course-test__badge--passed {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+}
+
+.course-test__locked {
+  margin: 0 0 16px;
+  padding: 12px 16px;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.course-test__result {
+  padding: 16px 20px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 20px;
+}
+
+.course-test__result strong {
+  display: block;
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.course-test__result p {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.course-test__result--passed {
+  background: var(--color-primary-light);
+  border: 1px solid rgba(42, 157, 92, 0.3);
+  color: var(--color-primary-dark);
+}
+
+.course-test__result--failed {
+  background: #fff3e0;
+  border: 1px solid #ffcc80;
+  color: #e65100;
+}
+
+.course-test__form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.course-test__question {
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.course-test__question legend {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.course-test__options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.course-test__option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.15s;
+}
+
+.course-test__option:hover {
+  border-color: var(--color-primary);
+  background: #fafcfa;
+}
+
+.course-test__option--selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-light);
+}
+
+.course-test__option input {
+  margin-top: 2px;
+  accent-color: var(--color-primary);
+}
