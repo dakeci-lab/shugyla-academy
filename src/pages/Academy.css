@@ -1,0 +1,21 @@
+.academy-page__main {
+  padding: 40px 0 64px;
+}
+
+.academy-page__heading {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 24px;
+}
+
+.academy-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.academy-page__empty {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: 48px 0;
+}

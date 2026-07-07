@@ -1,0 +1,170 @@
+.admin-page {
+  display: flex;
+  min-height: 100vh;
+}
+
+.admin-page__content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-page__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-white);
+}
+
+.admin-page__title {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.admin-page__desc {
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  margin: 0;
+}
+
+.admin-page__user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.admin-page__body {
+  padding: 32px;
+  flex: 1;
+}
+
+/* Статистика */
+.admin-page__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.admin-page__stat-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.admin-page__stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.admin-page__stat-label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  margin-top: 4px;
+}
+
+/* Таблица */
+.admin-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  background: var(--color-white);
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+.admin-page__table th,
+.admin-page__table td {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 14px;
+}
+
+.admin-page__table th {
+  background: var(--color-bg);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.admin-page__table tr:not(:last-child) td {
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* Список */
+.admin-page__list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.admin-page__list-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.admin-page__list-meta {
+  display: block;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.admin-page__badge {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+}
+
+/* Заглушка */
+.admin-page__placeholder {
+  text-align: center;
+  padding: 64px 24px;
+  background: var(--color-white);
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+}
+
+.admin-page__placeholder-icon {
+  font-size: 48px;
+  display: block;
+  margin-bottom: 16px;
+}
+
+.admin-page__placeholder p {
+  color: var(--color-text-secondary);
+  font-size: 15px;
+}
+
+@media (max-width: 768px) {
+  .admin-page {
+    flex-direction: column;
+  }
+
+  .admin-page__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+  }
+
+  .admin-page__body {
+    padding: 16px;
+  }
+}
