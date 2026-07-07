@@ -1,6 +1,11 @@
 import { getProgress, getCourseProgress } from './storage'
 import { getCoursesForRole } from './auth'
 import { getAllCourses, getTrainingEmployees } from './adminData'
+import {
+  getCourseLessonCount,
+  calcLessonProgress,
+  getCourseCompletionStatus,
+} from './courseStructure'
 
 /** Процент прогресса сотрудника по всем доступным курсам */
 export function getEmployeeProgressPercent(userId, role) {
@@ -12,8 +17,10 @@ export function getEmployeeProgressPercent(userId, role) {
 
   courses.forEach((course) => {
     const progress = getCourseProgress(userId, course.id)
-    totalLessons += course.lessonsCount
-    completedLessons += progress.completedLessons.length
+    const count = getCourseLessonCount(course.id)
+    totalLessons += count
+    const completed = progress.completedLessons.length
+    completedLessons += Math.min(completed, count)
   })
 
   return totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
@@ -21,7 +28,11 @@ export function getEmployeeProgressPercent(userId, role) {
 
 /** Завершил ли сотрудник все доступные курсы (100% уроков) */
 export function hasCompletedAllCourses(userId, role) {
-  return getEmployeeProgressPercent(userId, role) === 100
+  const courses = getCoursesForRole(role)
+  return courses.every((course) => {
+    const prog = getCourseProgress(userId, course.id)
+    return calcLessonProgress(prog.completedLessons, course.id) === 100
+  })
 }
 
 /** Статус обучения сотрудника для таблицы «Сотрудники» */
@@ -57,10 +68,10 @@ export function getCertificationStatus(userId, role) {
   const anyPassed = progresses.some(({ progress }) => progress.testPassed)
   if (anyPassed) return 'passed'
 
-  const anyFailed = progresses.some(
-    ({ course, progress }) =>
-      progress.completedLessons.length >= course.lessonsCount && !progress.testPassed
-  )
+  const anyFailed = progresses.some(({ course, progress }) => {
+    const total = getCourseLessonCount(course.id)
+    return progress.completedLessons.length >= total && total > 0 && !progress.testPassed
+  })
   if (anyFailed) return 'failed'
 
   return 'in_progress'
@@ -131,10 +142,9 @@ export function getProgressRows() {
     const courses = getCoursesForRole(emp.role)
     courses.forEach((course) => {
       const prog = getCourseProgress(emp.id, course.id)
-      const percent =
-        course.lessonsCount > 0
-          ? Math.round((prog.completedLessons.length / course.lessonsCount) * 100)
-          : 0
+      const totalLessons = getCourseLessonCount(course.id)
+      const percent = calcLessonProgress(prog.completedLessons, course.id)
+      const status = getCourseCompletionStatus(prog.completedLessons, course.id)
 
       rows.push({
         employeeId: emp.id,
@@ -143,8 +153,9 @@ export function getProgressRows() {
         courseId: course.id,
         courseTitle: course.title,
         completedLessons: prog.completedLessons.length,
-        totalLessons: course.lessonsCount,
+        totalLessons,
         percent,
+        status,
         testPassed: prog.testPassed,
       })
     })

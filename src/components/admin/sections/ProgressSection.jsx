@@ -3,7 +3,7 @@ import { getProgressRows } from '../../../utils/adminStats'
 import StatusBadge from '../StatusBadge'
 import '../admin-shared.css'
 
-/** Раздел «Прогресс» — детальная таблица по сотрудникам и курсам */
+/** Раздел «Прогресс» — таблица по сотрудникам и курсам */
 export default function ProgressSection() {
   const [search, setSearch] = useState('')
   const rows = getProgressRows()
@@ -41,7 +41,7 @@ export default function ProgressSection() {
               <th>Курс</th>
               <th>Уроки</th>
               <th>Прогресс</th>
-              <th>Тест</th>
+              <th>Статус</th>
             </tr>
           </thead>
           <tbody>
@@ -73,13 +73,7 @@ export default function ProgressSection() {
                     </div>
                   </td>
                   <td>
-                    {row.testPassed ? (
-                      <StatusBadge label="Сдал" type="passed" />
-                    ) : row.percent === 100 ? (
-                      <StatusBadge label="Не сдал" type="failed" />
-                    ) : (
-                      <StatusBadge label="—" type="idle" />
-                    )}
+                    <StatusBadge label={row.status.label} type={row.status.type} />
                   </td>
                 </tr>
               ))

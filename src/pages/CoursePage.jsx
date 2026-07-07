@@ -3,22 +3,24 @@ import { useParams, Link, Navigate, useLocation } from 'react-router-dom'
 import { getUser, getCourseProgress, markLessonComplete } from '../utils/storage'
 import { resolveCourseAccess, ACCESS_REASON } from '../utils/auth'
 import {
-  getCourseStructure,
+  getCourseLessons,
   getCourseTest,
   calcLessonProgress,
   areAllLessonsComplete,
+  getCourseCompletionStatus,
 } from '../utils/courseStructure'
 import { getCategoryLabel } from '../utils/i18n'
 import Header from '../components/Header'
 import AccessDenied from '../components/AccessDenied'
-import BlockList from '../components/BlockList'
+import CourseLessonList from '../components/CourseLessonList'
+import LessonVideo from '../components/LessonVideo'
 import CourseTest from '../components/CourseTest'
 import ProgressBar from '../components/ProgressBar'
+import StatusBadge from '../components/admin/StatusBadge'
 import './CoursePage.css'
 
 /**
- * Страница курса — /courses/:id
- * Структура: Курс → Блок → Урок → Тест
+ * Страница курса — список видеоуроков, конспект, прогресс
  */
 export default function CoursePage() {
   const { id } = useParams()
@@ -57,20 +59,23 @@ export default function CoursePage() {
   }
 
   const course = access.course
-  const blocks = getCourseStructure(courseId)
+  const lessons = getCourseLessons(courseId)
   const courseTest = getCourseTest(courseId)
-  const totalLessons = blocks.reduce((sum, b) => sum + b.lessons.length, 0)
   const progressPercent = calcLessonProgress(progress.completedLessons, courseId)
+  const courseStatus = getCourseCompletionStatus(progress.completedLessons, courseId)
   const allLessonsDone = areAllLessonsComplete(progress.completedLessons, courseId)
   const roleLabel = getCategoryLabel(course.category)
+  const isLessonCompleted = activeLesson
+    ? progress.completedLessons.includes(activeLesson.id)
+    : false
 
   function refreshProgress() {
     setProgress(getCourseProgress(user.id, courseId))
   }
 
-  function handleStartLesson(lesson) {
-    setActiveLesson(lesson)
-    markLessonComplete(user.id, courseId, lesson.id)
+  function handleMarkComplete() {
+    if (!activeLesson) return
+    markLessonComplete(user.id, courseId, activeLesson.id)
     refreshProgress()
   }
 
@@ -89,13 +94,15 @@ export default function CoursePage() {
             style={{ backgroundColor: course.imageColor }}
           />
           <div className="course-page__info">
-            <span className="course-page__role-badge">Для: {roleLabel}</span>
+            <div className="course-page__badges">
+              <span className="course-page__role-badge">Для: {roleLabel}</span>
+              <StatusBadge label={courseStatus.label} type={courseStatus.type} />
+            </div>
             <h1 className="course-page__title">{course.title}</h1>
             <p className="course-page__desc">{course.description}</p>
             <div className="course-page__meta">
               <span>{course.duration}</span>
-              <span>{blocks.length} блоков</span>
-              <span>{totalLessons} уроков</span>
+              <span>{lessons.length} уроков</span>
             </div>
           </div>
         </div>
@@ -103,44 +110,67 @@ export default function CoursePage() {
         <div className="course-page__progress-section">
           <ProgressBar
             percent={progressPercent}
-            label={`Прогресс: ${progress.completedLessons.length} из ${totalLessons} уроков`}
+            label={`Прогресс: ${progress.completedLessons.length} из ${lessons.length} уроков (${progressPercent}%)`}
           />
-          {progress.testPassed && (
-            <p className="course-page__test-status course-page__test-status--passed">
-              ✓ Итоговый тест сдан ({progress.testScore}%)
-            </p>
-          )}
         </div>
 
-        {activeLesson && (
-          <div className="course-page__active-lesson">
-            <div className="course-page__active-lesson-header">
-              <h3>Урок: {activeLesson.title}</h3>
-              <button
-                type="button"
-                className="btn btn--outline btn--sm"
-                onClick={() => setActiveLesson(null)}
-              >
-                Закрыть
-              </button>
-            </div>
-            <p className="course-page__active-lesson-content">
-              {activeLesson.content || 'Содержимое урока будет добавлено позже.'}
-            </p>
-            <p className="course-page__active-lesson-note">
-              Урок отмечен как пройденный.
-            </p>
-          </div>
-        )}
+        <div className="course-page__layout">
+          <section className="course-page__sidebar">
+            <h2 className="course-page__section-title">Уроки курса</h2>
+            <CourseLessonList
+              lessons={lessons}
+              completedLessons={progress.completedLessons}
+              activeLessonId={activeLesson?.id}
+              onSelectLesson={setActiveLesson}
+            />
+          </section>
 
-        <section className="course-page__blocks">
-          <h2 className="course-page__section-title">Содержание курса</h2>
-          <BlockList
-            blocks={blocks}
-            completedLessons={progress.completedLessons}
-            onStartLesson={handleStartLesson}
-          />
-        </section>
+          <section className="course-page__content">
+            {activeLesson ? (
+              <div className="course-page__lesson-view">
+                <div className="course-page__lesson-header">
+                  <div>
+                    <h2 className="course-page__lesson-title">{activeLesson.title}</h2>
+                    {activeLesson.description && (
+                      <p className="course-page__lesson-desc">{activeLesson.description}</p>
+                    )}
+                  </div>
+                  <span className="course-page__lesson-duration">
+                    {activeLesson.durationMinutes} мин
+                    {activeLesson.mandatory && ' · Обязательный'}
+                  </span>
+                </div>
+
+                <LessonVideo videoUrl={activeLesson.videoUrl} title={activeLesson.title} />
+
+                {activeLesson.summary && (
+                  <div className="course-page__summary">
+                    <h3>Конспект урока</h3>
+                    <p>{activeLesson.summary}</p>
+                  </div>
+                )}
+
+                <div className="course-page__lesson-actions">
+                  {isLessonCompleted ? (
+                    <span className="course-page__completed-badge">✓ Урок пройден</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="btn btn--primary"
+                      onClick={handleMarkComplete}
+                    >
+                      Отметить урок пройденным
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="course-page__placeholder">
+                <p>Выберите урок из списка слева, чтобы начать обучение.</p>
+              </div>
+            )}
+          </section>
+        </div>
 
         {courseTest && (
           <section className="course-page__test">

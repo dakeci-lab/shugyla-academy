@@ -23,6 +23,10 @@
   max-width: 560px;
 }
 
+.admin-modal--xwide {
+  max-width: 720px;
+}
+
 .admin-modal__header {
   display: flex;
   align-items: center;

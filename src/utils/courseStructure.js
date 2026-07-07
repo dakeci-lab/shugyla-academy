@@ -1,53 +1,73 @@
 import { BLOCKS } from '../data/blocks'
-import { LESSONS } from '../data/lessons'
 import { TESTS } from '../data/tests'
+import { getLessonsForCourse } from './lessonData'
 
-/** Все уроки курса, отсортированные по блокам */
+/** Все уроки курса */
 export function getCourseLessons(courseId) {
-  return LESSONS.filter((l) => l.courseId === courseId).sort((a, b) => {
-    const blockA = BLOCKS.find((bl) => bl.id === a.blockId)?.order ?? 0
-    const blockB = BLOCKS.find((bl) => bl.id === b.blockId)?.order ?? 0
-    if (blockA !== blockB) return blockA - blockB
-    return a.order - b.order
-  })
+  return getLessonsForCourse(courseId)
 }
 
-/** Структура курса: блоки с вложенными уроками */
+/** Структура курса: блоки с уроками (если есть blockId) */
 export function getCourseStructure(courseId) {
+  const lessons = getCourseLessons(courseId)
   const blocks = BLOCKS.filter((b) => b.courseId === courseId).sort(
     (a, b) => a.order - b.order
   )
 
-  return blocks.map((block) => ({
-    ...block,
-    lessons: LESSONS.filter((l) => l.blockId === block.id).sort(
-      (a, b) => a.order - b.order
-    ),
-  }))
+  if (blocks.length === 0) {
+    if (lessons.length === 0) return []
+    return [{ id: `flat-${courseId}`, courseId, title: 'Уроки курса', order: 1, lessons }]
+  }
+
+  const usedBlockIds = new Set(lessons.map((l) => l.blockId).filter(Boolean))
+  const result = blocks
+    .filter((b) => usedBlockIds.has(b.id))
+    .map((block) => ({
+      ...block,
+      lessons: lessons.filter((l) => l.blockId === block.id),
+    }))
+
+  const unassigned = lessons.filter((l) => !l.blockId || !blocks.some((b) => b.id === l.blockId))
+  if (unassigned.length > 0) {
+    result.push({
+      id: `other-${courseId}`,
+      courseId,
+      title: 'Дополнительные уроки',
+      order: 999,
+      lessons: unassigned,
+    })
+  }
+
+  return result
 }
 
-/** Итоговый тест курса */
 export function getCourseTest(courseId) {
   return TESTS.find((t) => t.courseId === courseId) || null
 }
 
-/** Количество уроков в курсе (из структуры данных) */
 export function getCourseLessonCount(courseId) {
   return getCourseLessons(courseId).length
 }
 
-/** Процент прогресса по пройденным урокам */
 export function calcLessonProgress(completedLessons, courseId) {
-  const total = getCourseLessonCount(courseId)
-  if (total === 0) return 0
-  const completed = completedLessons.filter((id) =>
-    LESSONS.some((l) => l.id === id && l.courseId === courseId)
-  ).length
-  return Math.round((completed / total) * 100)
+  const lessons = getCourseLessons(courseId)
+  if (lessons.length === 0) return 0
+  const completed = lessons.filter((l) => completedLessons.includes(l.id)).length
+  return Math.round((completed / lessons.length) * 100)
 }
 
-/** Все уроки пройдены */
 export function areAllLessonsComplete(completedLessons, courseId) {
   const lessons = getCourseLessons(courseId)
-  return lessons.length > 0 && lessons.every((l) => completedLessons.includes(l.id))
+  if (lessons.length === 0) return false
+  const mandatory = lessons.filter((l) => l.mandatory)
+  const target = mandatory.length > 0 ? mandatory : lessons
+  return target.every((l) => completedLessons.includes(l.id))
+}
+
+/** Статус прохождения курса */
+export function getCourseCompletionStatus(completedLessons, courseId) {
+  const percent = calcLessonProgress(completedLessons, courseId)
+  if (percent === 0) return { label: 'Не начат', type: 'idle' }
+  if (percent === 100) return { label: 'Завершён', type: 'done' }
+  return { label: 'В процессе', type: 'progress' }
 }

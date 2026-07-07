@@ -1,6 +1,7 @@
 import { USERS } from '../data/users'
 import { COURSES } from '../data/courses'
 import { getRole } from '../data/roles'
+import { getCourseLessonCount } from './courseStructure'
 
 const STORAGE_KEYS = {
   EXTRA_USERS: 'shugyla_extra_users',
@@ -64,7 +65,11 @@ export function getAllCourses() {
     status: course.status || 'published',
     ...edits[course.id],
   }))
-  return [...base, ...extra]
+  return [...base, ...extra].map((course) => ({
+    ...course,
+    lessonsCount: getCourseLessonCount(course.id),
+    blocksCount: course.blocksCount ?? 1,
+  }))
 }
 
 /** Создать курс в localStorage */
