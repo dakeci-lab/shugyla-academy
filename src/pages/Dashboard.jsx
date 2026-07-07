@@ -1,14 +1,15 @@
 import { useNavigate } from 'react-router-dom'
 import { getUser, clearUser, getCourseProgress } from '../utils/storage'
-import { getCoursesForRole } from '../utils/auth'
+import { getAccessibleCourses, canViewTeamChecklists } from '../utils/auth'
+import { getRole, getPermissionLabel } from '../data/roles'
 import Header from '../components/Header'
 import CourseCard from '../components/CourseCard'
 import ProgressBar from '../components/ProgressBar'
 import './Dashboard.css'
 
 /**
- * Личный кабинет сотрудника — /dashboard
- * Показывает курсы по роли и общий прогресс обучения
+ * Личный кабинет — /dashboard
+ * Показывает только курсы, доступные роли пользователя (admin — все).
  */
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -16,9 +17,9 @@ export default function Dashboard() {
 
   if (!user) return null
 
-  const myCourses = getCoursesForRole(user.role)
+  const role = getRole(user.role)
+  const myCourses = getAccessibleCourses(user.role)
 
-  // Считаем общий прогресс по всем курсам
   let totalLessons = 0
   let completedLessons = 0
 
@@ -54,6 +55,22 @@ export default function Dashboard() {
           </button>
         </div>
 
+        {role?.permissions?.length > 0 && (
+          <section className="dashboard-page__permissions">
+            <h2 className="dashboard-page__permissions-title">Ваши права доступа</h2>
+            <ul className="dashboard-page__permissions-list">
+              {role.permissions.map((perm) => (
+                <li key={perm}>{getPermissionLabel(perm)}</li>
+              ))}
+            </ul>
+            {canViewTeamChecklists(user.role) && (
+              <p className="dashboard-page__permissions-note">
+                Доступны чек-листы команды торгового зала.
+              </p>
+            )}
+          </section>
+        )}
+
         <section className="dashboard-page__section">
           <h2 className="dashboard-page__heading">Прогресс обучения</h2>
           <div className="dashboard-page__progress-card">
@@ -65,7 +82,12 @@ export default function Dashboard() {
         </section>
 
         <section className="dashboard-page__section">
-          <h2 className="dashboard-page__heading">Мои курсы</h2>
+          <div className="dashboard-page__courses-header">
+            <h2 className="dashboard-page__heading">Мои курсы</h2>
+            <span className="dashboard-page__courses-count">
+              {myCourses.length} {myCourses.length === 1 ? 'курс' : 'курсов'}
+            </span>
+          </div>
           <div className="dashboard-page__grid">
             {myCourses.map((course) => {
               const progress = getCourseProgress(user.id, course.id)

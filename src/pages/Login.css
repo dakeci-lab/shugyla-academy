@@ -48,6 +48,28 @@
   margin: 0 0 28px;
 }
 
+.login-page__redirect-hint {
+  margin: -16px 0 20px;
+  padding: 10px 14px;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-size: 13px;
+  border-radius: var(--radius-sm);
+}
+
+.login-page__back {
+  display: block;
+  margin-top: 20px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.login-page__back:hover {
+  color: var(--color-primary);
+}
+
 .login-page__form {
   display: flex;
   flex-direction: column;

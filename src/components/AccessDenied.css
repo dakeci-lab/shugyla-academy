@@ -34,6 +34,13 @@
   margin: 0 0 8px;
 }
 
+.access-denied__allowed {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+
 .access-denied__hint {
   font-size: 13px;
   color: var(--color-text-muted);

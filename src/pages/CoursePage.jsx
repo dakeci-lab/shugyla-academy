@@ -1,10 +1,9 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { getAllCourses } from '../utils/adminData'
+import { useParams, Link, Navigate, useLocation } from 'react-router-dom'
 import { LESSONS } from '../data/lessons'
 import { TESTS } from '../data/tests'
 import { getUser, getCourseProgress, markLessonComplete } from '../utils/storage'
-import { canAccessCourse } from '../utils/auth'
+import { resolveCourseAccess, ACCESS_REASON } from '../utils/auth'
 import Header from '../components/Header'
 import AccessDenied from '../components/AccessDenied'
 import LessonList from '../components/LessonList'
@@ -13,20 +12,22 @@ import './CoursePage.css'
 
 /**
  * Страница курса — /courses/:id
- * Показывает описание, уроки, прогресс и кнопку теста
+ * Требует авторизацию; проверяет allowedRoles по роли пользователя.
  */
 export default function CoursePage() {
   const { id } = useParams()
+  const location = useLocation()
   const courseId = Number(id)
-  const course = getAllCourses().find((c) => c.id === courseId)
   const user = getUser()
+
+  const access = resolveCourseAccess(user, courseId)
 
   const [progress, setProgress] = useState(() =>
     user ? getCourseProgress(user.id, courseId) : { completedLessons: [], testPassed: false }
   )
   const [activeLesson, setActiveLesson] = useState(null)
 
-  if (!course) {
+  if (access.reason === ACCESS_REASON.NOT_FOUND) {
     return (
       <div className="course-page">
         <Header />
@@ -38,10 +39,16 @@ export default function CoursePage() {
     )
   }
 
-  // Проверка доступа по роли — показываем страницу «Нет доступа»
-  if (user && !canAccessCourse(user.role, course)) {
-    return <AccessDenied course={course} userRole={user.role} />
+  if (access.reason === ACCESS_REASON.UNAUTHENTICATED) {
+    const redirect = encodeURIComponent(location.pathname)
+    return <Navigate to={`/login?redirect=${redirect}`} replace />
   }
+
+  if (access.reason === ACCESS_REASON.FORBIDDEN) {
+    return <AccessDenied course={access.course} userRole={user.role} />
+  }
+
+  const course = access.course
 
   const courseLessons = LESSONS
     .filter((l) => l.courseId === courseId)
@@ -53,7 +60,6 @@ export default function CoursePage() {
     ? Math.round((progress.completedLessons.length / courseLessons.length) * 100)
     : 0
 
-  // «Начать урок» — отмечаем урок пройденным (MVP-заглушка)
   function handleStartLesson(lesson) {
     setActiveLesson(lesson)
     if (user) {
@@ -67,7 +73,7 @@ export default function CoursePage() {
       <Header />
 
       <main className="course-page__main container">
-        <Link to={user ? '/dashboard' : '/academy'} className="course-page__back">
+        <Link to="/dashboard" className="course-page__back">
           ← Назад
         </Link>
 
@@ -93,7 +99,6 @@ export default function CoursePage() {
           />
         </div>
 
-        {/* Активный урок (MVP — просто показываем название) */}
         {activeLesson && (
           <div className="course-page__active-lesson">
             <h3>Урок: {activeLesson.title}</h3>

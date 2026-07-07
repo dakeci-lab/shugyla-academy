@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import { getUser } from '../utils/storage'
+import { canManageAdmin } from '../utils/auth'
 import { useLanguage } from '../context/LanguageContext'
 import LangSwitch from './LangSwitch'
 import './Header.css'
@@ -34,7 +35,7 @@ export default function Header({ variant = 'default' }) {
 
           {user ? (
             <>
-              {user.role === 'admin' && (
+              {canManageAdmin(user.role) && (
                 <Link to="/admin" className="header__link">
                   {t.adminPanel}
                 </Link>

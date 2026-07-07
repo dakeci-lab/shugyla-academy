@@ -1,14 +1,19 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { login } from '../utils/auth'
+import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { login, getPostLoginPath } from '../utils/auth'
+import { USERS } from '../data/users'
+import { getRole } from '../data/roles'
 import './Login.css'
 
 /**
  * Страница входа — /login
- * Демо-аккаунты: admin/admin123, kassir/123456, adminzal/123456
+ * Поддерживает ?redirect=/courses/:id для возврата после авторизации
  */
 export default function Login() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const redirect = searchParams.get('redirect')
+
   const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -23,12 +28,7 @@ export default function Login() {
       return
     }
 
-    // Админ идёт в админ-панель, остальные — в личный кабинет
-    if (user.role === 'admin') {
-      navigate('/admin')
-    } else {
-      navigate('/dashboard')
-    }
+    navigate(getPostLoginPath(user, redirect), { replace: true })
   }
 
   return (
@@ -41,6 +41,12 @@ export default function Login() {
 
         <p className="login-page__subtitle">Вход в систему обучения</p>
 
+        {redirect && (
+          <p className="login-page__redirect-hint">
+            Войдите, чтобы продолжить просмотр курса
+          </p>
+        )}
+
         <form className="login-page__form" onSubmit={handleSubmit}>
           <label className="login-page__label">
             Логин
@@ -51,6 +57,7 @@ export default function Login() {
               onChange={(e) => setLoginValue(e.target.value)}
               placeholder="Введите логин"
               required
+              autoComplete="username"
             />
           </label>
 
@@ -63,6 +70,7 @@ export default function Login() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Введите пароль"
               required
+              autoComplete="current-password"
             />
           </label>
 
@@ -74,13 +82,24 @@ export default function Login() {
         </form>
 
         <div className="login-page__demo">
-          <p className="login-page__demo-title">Демо-аккаунты:</p>
+          <p className="login-page__demo-title">Демо-аккаунты (mock data):</p>
           <ul className="login-page__demo-list">
-            <li><code>admin</code> / <code>admin123</code> — Администратор</li>
-            <li><code>kassir</code> / <code>123456</code> — Кассир</li>
-            <li><code>adminzal</code> / <code>123456</code> — Админ зала</li>
+            {USERS.map((u) => {
+              const role = getRole(u.role)
+              return (
+                <li key={u.id}>
+                  <code>{u.login}</code> / <code>{u.password}</code>
+                  {' — '}
+                  {role?.label || u.role}
+                </li>
+              )
+            })}
           </ul>
         </div>
+
+        <Link to="/academy" className="login-page__back">
+          ← На главную
+        </Link>
       </div>
     </div>
   )

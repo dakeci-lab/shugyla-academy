@@ -1,13 +1,15 @@
 import { Link } from 'react-router-dom'
 import { getRole } from '../data/roles'
+import { getCourseAllowedRoleLabels } from '../utils/auth'
 import Header from './Header'
 import './AccessDenied.css'
 
 /**
- * Страница «Нет доступа» — показывается при попытке открыть чужой курс
+ * Страница «Нет доступа» — при попытке открыть курс не своей роли
  */
 export default function AccessDenied({ course, userRole }) {
   const role = getRole(userRole)
+  const allowedLabels = getCourseAllowedRoleLabels(course)
 
   return (
     <div className="access-denied">
@@ -22,6 +24,12 @@ export default function AccessDenied({ course, userRole }) {
             Курс <strong>«{course.title}»</strong> недоступен для вашей роли
             {role && <> — <strong>{role.label}</strong></>}.
           </p>
+
+          {allowedLabels.length > 0 && (
+            <p className="access-denied__allowed">
+              Доступен для: {allowedLabels.join(', ')}
+            </p>
+          )}
 
           {role?.description && (
             <p className="access-denied__hint">{role.description}</p>
