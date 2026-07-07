@@ -1,17 +1,36 @@
+import { useMemo, useState } from 'react'
 import { getProgressRows } from '../../../utils/adminStats'
 import StatusBadge from '../StatusBadge'
 import '../admin-shared.css'
 
 /** Раздел «Прогресс» — детальная таблица по сотрудникам и курсам */
 export default function ProgressSection() {
+  const [search, setSearch] = useState('')
   const rows = getProgressRows()
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return rows
+    return rows.filter(
+      (row) =>
+        row.employeeName.toLowerCase().includes(q) ||
+        row.courseTitle.toLowerCase().includes(q)
+    )
+  }, [rows, search])
 
   return (
     <>
       <div className="admin-toolbar">
         <span className="admin-toolbar__info">
-          {rows.length} записей прогресса
+          {filtered.length} записей прогресса
         </span>
+        <input
+          type="search"
+          className="admin-search"
+          placeholder="Поиск по сотруднику или курсу…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
       </div>
 
       <div className="admin-table-wrap">
@@ -26,14 +45,14 @@ export default function ProgressSection() {
             </tr>
           </thead>
           <tbody>
-            {rows.length === 0 ? (
+            {filtered.length === 0 ? (
               <tr>
                 <td colSpan={5} className="admin-empty">
-                  Пока нет данных о прогрессе
+                  {search ? 'Ничего не найдено' : 'Пока нет данных о прогрессе'}
                 </td>
               </tr>
             ) : (
-              rows.map((row) => (
+              filtered.map((row) => (
                 <tr key={`${row.employeeId}-${row.courseId}`}>
                   <td><strong>{row.employeeName}</strong></td>
                   <td>{row.courseTitle}</td>

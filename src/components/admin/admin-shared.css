@@ -1,6 +1,5 @@
 /* Общие стили админ-панели */
 
-/* Toolbar над таблицами */
 .admin-toolbar {
   display: flex;
   align-items: center;
@@ -13,26 +12,32 @@
 .admin-toolbar__info {
   font-size: 14px;
   color: var(--color-text-secondary);
+  font-weight: 500;
 }
 
 /* Карточки статистики */
 .admin-stat-card {
   background: var(--color-white);
   border: 1px solid var(--color-border);
-  border-radius: 14px;
-  padding: 24px;
+  border-radius: var(--radius-md);
+  padding: 22px 24px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  transition: box-shadow 0.2s;
+  transition: box-shadow 0.2s, border-color 0.2s;
 }
 
 .admin-stat-card:hover {
   box-shadow: var(--shadow-md);
+  border-color: rgba(42, 157, 92, 0.2);
+}
+
+.admin-stat-card--wide {
+  grid-column: 1 / -1;
 }
 
 .admin-stat-card__icon {
-  font-size: 24px;
+  font-size: 22px;
   margin-bottom: 4px;
 }
 
@@ -41,11 +46,20 @@
   font-weight: 700;
   color: var(--color-primary);
   line-height: 1.1;
+  letter-spacing: -0.5px;
 }
 
 .admin-stat-card__label {
-  font-size: 13px;
-  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.admin-stat-card__hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+  line-height: 1.4;
 }
 
 .admin-stat-card--success .admin-stat-card__value {
@@ -53,25 +67,137 @@
 }
 
 .admin-stat-card--warning .admin-stat-card__value {
-  color: #e67e22;
+  color: #c76a1a;
 }
 
 .admin-stat-card--info .admin-stat-card__value {
-  color: #2980b9;
+  color: #2471a3;
 }
 
-/* Сетка статистики */
 .admin-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 16px;
+}
+
+.admin-stats-grid--overview {
+  margin-bottom: 24px;
+}
+
+.admin-overview {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+/* Панель-карточка */
+.admin-panel-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 24px;
+}
+
+.admin-panel-card__header {
+  margin-bottom: 20px;
+}
+
+.admin-panel-card__title {
+  font-size: 17px;
+  font-weight: 700;
+  margin: 0 0 4px;
+}
+
+.admin-panel-card__desc {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.admin-cert-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.admin-cert-item {
+  text-align: center;
+  padding: 16px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+}
+
+.admin-cert-item__value {
+  display: block;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+
+.admin-cert-item__label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.admin-cert-item--idle .admin-cert-item__value { color: #666; }
+.admin-cert-item--progress .admin-cert-item__value { color: #e65100; }
+.admin-cert-item--success .admin-cert-item__value { color: var(--color-primary-dark); }
+.admin-cert-item--warning .admin-cert-item__value { color: #c62828; }
+
+/* Фильтры */
+.admin-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.admin-filter-tabs__btn {
+  padding: 7px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-white);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.admin-filter-tabs__btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.admin-filter-tabs__btn--active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+.admin-search {
+  padding: 9px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-family: inherit;
+  min-width: 240px;
+  background: var(--color-white);
+}
+
+.admin-search:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 /* Таблицы */
 .admin-table-wrap {
   background: var(--color-white);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   overflow: hidden;
 }
 
@@ -82,7 +208,7 @@
 
 .admin-table th,
 .admin-table td {
-  padding: 12px 16px;
+  padding: 14px 18px;
   text-align: left;
   font-size: 14px;
   vertical-align: middle;
@@ -92,9 +218,9 @@
   background: var(--color-bg);
   font-weight: 600;
   color: var(--color-text-secondary);
-  font-size: 12px;
+  font-size: 11px;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.04em;
   white-space: nowrap;
 }
 
@@ -107,9 +233,23 @@
   background: #fafcfa;
 }
 
-.admin-table__actions {
-  display: flex;
-  gap: 8px;
+.admin-table__roles {
+  max-width: 220px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.admin-code {
+  font-size: 12px;
+  background: var(--color-bg);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.admin-score {
+  font-weight: 700;
+  color: var(--color-primary-dark);
 }
 
 /* Бейджи */
@@ -117,8 +257,8 @@
   display: inline-block;
   font-size: 12px;
   font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 12px;
+  padding: 5px 11px;
+  border-radius: 999px;
   white-space: nowrap;
 }
 
@@ -170,6 +310,7 @@
   height: 100%;
   background: var(--color-primary);
   border-radius: 3px;
+  transition: width 0.3s;
 }
 
 .admin-progress-cell__text {
@@ -179,7 +320,6 @@
   min-width: 36px;
 }
 
-/* Пустое состояние */
 .admin-empty {
   text-align: center;
   padding: 48px 24px;
@@ -187,17 +327,24 @@
   font-size: 14px;
 }
 
-/* Детали сотрудника в модалке */
+.admin-detail-heading {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 20px 0 10px;
+  color: var(--color-text);
+}
+
 .admin-detail-list {
   list-style: none;
   padding: 0;
-  margin: 0 0 16px;
+  margin: 0;
 }
 
 .admin-detail-list li {
   display: flex;
   justify-content: space-between;
-  padding: 8px 0;
+  gap: 16px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--color-border);
   font-size: 14px;
 }
@@ -208,14 +355,34 @@
 
 .admin-detail-list span:first-child {
   color: var(--color-text-secondary);
+  flex-shrink: 0;
 }
 
-@media (max-width: 768px) {
+.admin-detail-list span:last-child {
+  text-align: right;
+}
+
+@media (max-width: 900px) {
+  .admin-cert-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
   .admin-table-wrap {
     overflow-x: auto;
   }
 
   .admin-table {
-    min-width: 700px;
+    min-width: 720px;
+  }
+
+  .admin-search {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-cert-grid {
+    grid-template-columns: 1fr;
   }
 }

@@ -1,18 +1,19 @@
 import { useState } from 'react'
 import { getAllCourses, addCourse, updateCourse } from '../../../utils/adminData'
-import { getRole, ROLES, CATEGORIES, ALL_EMPLOYEE_ROLES } from '../../../data/roles'
+import { getRole, ROLES, CATEGORIES, ALL_EMPLOYEE_ROLES, ROLE_IDS } from '../../../data/roles'
 import { getCategoryLabel } from '../../../utils/i18n'
+import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
 import StatusBadge from '../StatusBadge'
 import '../admin-shared.css'
 
-const ROLE_OPTIONS = ['admin', ...ALL_EMPLOYEE_ROLES]
+const ROLE_OPTIONS = [ROLE_IDS.ADMIN, ...ALL_EMPLOYEE_ROLES]
 
 const EMPTY_FORM = {
   title: '',
   description: '',
-  category: 'cashier',
-  allowedRoles: ['cashier'],
+  category: ROLE_IDS.CASHIER,
+  allowedRoles: [ROLE_IDS.CASHIER],
   lessonsCount: 4,
   blocksCount: 2,
   duration: '2 часа',
@@ -26,16 +27,14 @@ const STATUS_LABELS = {
 
 /** Раздел «Курсы» */
 export default function CoursesSection() {
+  const { version, refresh } = useAdminRefresh()
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
-  const [, setTick] = useState(0)
+
+  void version
 
   const courses = getAllCourses()
-
-  function refresh() {
-    setTick((t) => t + 1)
-  }
 
   function openCreate() {
     setEditId(null)
@@ -79,8 +78,8 @@ export default function CoursesSection() {
   return (
     <>
       <div className="admin-toolbar">
-        <span className="admin-toolbar__info">{courses.length} курсов</span>
-        <button className="btn btn--primary btn--sm" onClick={openCreate}>
+        <span className="admin-toolbar__info">{courses.length} курсов в каталоге</span>
+        <button type="button" className="btn btn--primary btn--sm" onClick={openCreate}>
           + Создать курс
         </button>
       </div>
@@ -102,7 +101,7 @@ export default function CoursesSection() {
               <tr key={course.id}>
                 <td><strong>{course.title}</strong></td>
                 <td>{getCategoryLabel(course.category)}</td>
-                <td>
+                <td className="admin-table__roles">
                   {course.allowedRoles
                     .map((r) => getRole(r)?.label || r)
                     .join(', ')}
@@ -116,6 +115,7 @@ export default function CoursesSection() {
                 </td>
                 <td>
                   <button
+                    type="button"
                     className="btn btn--outline btn--sm"
                     onClick={() => openEdit(course)}
                   >
@@ -132,12 +132,13 @@ export default function CoursesSection() {
         <AdminModal
           title={editId ? 'Редактировать курс' : 'Создать курс'}
           onClose={() => setShowForm(false)}
+          wide
           footer={
             <>
-              <button className="btn btn--outline" onClick={() => setShowForm(false)}>
+              <button type="button" className="btn btn--outline" onClick={() => setShowForm(false)}>
                 Отмена
               </button>
-              <button className="btn btn--primary" form="course-form">
+              <button type="submit" className="btn btn--primary" form="course-form">
                 Сохранить
               </button>
             </>
@@ -159,20 +160,34 @@ export default function CoursesSection() {
                 className="admin-form__textarea"
                 value={form.description}
                 onChange={(e) => setForm({ ...form, description: e.target.value })}
+                rows={3}
               />
             </label>
-            <label className="admin-form__label">
-              Категория
-              <select
-                className="admin-form__select"
-                value={form.category}
-                onChange={(e) => setForm({ ...form, category: e.target.value })}
-              >
-                {CATEGORIES.filter((c) => c.id !== 'all').map((cat) => (
-                  <option key={cat.id} value={cat.id}>{cat.label}</option>
-                ))}
-              </select>
-            </label>
+            <div className="admin-form__row">
+              <label className="admin-form__label">
+                Категория
+                <select
+                  className="admin-form__select"
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                >
+                  {CATEGORIES.filter((c) => c.id !== 'all').map((cat) => (
+                    <option key={cat.id} value={cat.id}>{cat.label}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="admin-form__label">
+                Статус
+                <select
+                  className="admin-form__select"
+                  value={form.status}
+                  onChange={(e) => setForm({ ...form, status: e.target.value })}
+                >
+                  <option value="published">Опубликован</option>
+                  <option value="draft">Черновик</option>
+                </select>
+              </label>
+            </div>
             <div className="admin-form__label">
               Доступные роли
               <div className="admin-form__roles">
@@ -195,49 +210,40 @@ export default function CoursesSection() {
                 ))}
               </div>
             </div>
-            <label className="admin-form__label">
-              Количество уроков
-              <input
-                className="admin-form__input"
-                type="number"
-                min="1"
-                value={form.lessonsCount}
-                onChange={(e) =>
-                  setForm({ ...form, lessonsCount: Number(e.target.value) })
-                }
-              />
-            </label>
-            <label className="admin-form__label">
-              Количество блоков
-              <input
-                className="admin-form__input"
-                type="number"
-                min="1"
-                value={form.blocksCount}
-                onChange={(e) =>
-                  setForm({ ...form, blocksCount: Number(e.target.value) })
-                }
-              />
-            </label>
-            <label className="admin-form__label">
-              Длительность
-              <input
-                className="admin-form__input"
-                value={form.duration}
-                onChange={(e) => setForm({ ...form, duration: e.target.value })}
-              />
-            </label>
-            <label className="admin-form__label">
-              Статус
-              <select
-                className="admin-form__select"
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-              >
-                <option value="published">Опубликован</option>
-                <option value="draft">Черновик</option>
-              </select>
-            </label>
+            <div className="admin-form__row admin-form__row--3">
+              <label className="admin-form__label">
+                Уроков
+                <input
+                  className="admin-form__input"
+                  type="number"
+                  min="1"
+                  value={form.lessonsCount}
+                  onChange={(e) =>
+                    setForm({ ...form, lessonsCount: Number(e.target.value) })
+                  }
+                />
+              </label>
+              <label className="admin-form__label">
+                Блоков
+                <input
+                  className="admin-form__input"
+                  type="number"
+                  min="1"
+                  value={form.blocksCount}
+                  onChange={(e) =>
+                    setForm({ ...form, blocksCount: Number(e.target.value) })
+                  }
+                />
+              </label>
+              <label className="admin-form__label">
+                Длительность
+                <input
+                  className="admin-form__input"
+                  value={form.duration}
+                  onChange={(e) => setForm({ ...form, duration: e.target.value })}
+                />
+              </label>
+            </div>
           </form>
         </AdminModal>
       )}

@@ -7,11 +7,10 @@ import {
 import { getRole, ROLES, ALL_EMPLOYEE_ROLES } from '../../../data/roles'
 import { getCoursesForRole } from '../../../utils/auth'
 import { getCourseProgress } from '../../../utils/storage'
+import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
 import StatusBadge from '../StatusBadge'
 import '../admin-shared.css'
-
-const ROLE_OPTIONS = ['admin', ...ALL_EMPLOYEE_ROLES]
 
 const EMPTY_FORM = {
   name: '',
@@ -23,20 +22,28 @@ const EMPTY_FORM = {
 
 /** Раздел «Сотрудники» */
 export default function EmployeesSection() {
+  const { version, refresh } = useAdminRefresh()
   const [showForm, setShowForm] = useState(false)
   const [viewId, setViewId] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
-  const [, setTick] = useState(0)
+  const [formError, setFormError] = useState('')
+
+  // version — триггер перечитывания localStorage
+  void version
 
   const employees = getAllEmployees().filter((u) => u.role !== 'admin')
   const viewed = viewId ? getEmployeeById(viewId) : null
 
-  function refresh() {
-    setTick((t) => t + 1)
-  }
-
   function handleAdd(e) {
     e.preventDefault()
+    setFormError('')
+
+    const exists = getAllEmployees().some((u) => u.login === form.login.trim())
+    if (exists) {
+      setFormError('Сотрудник с таким логином уже существует')
+      return
+    }
+
     addEmployee(form)
     setForm(EMPTY_FORM)
     setShowForm(false)
@@ -47,9 +54,9 @@ export default function EmployeesSection() {
     <>
       <div className="admin-toolbar">
         <span className="admin-toolbar__info">
-          {employees.length} сотрудников
+          {employees.length} сотрудников в системе
         </span>
-        <button className="btn btn--primary btn--sm" onClick={() => setShowForm(true)}>
+        <button type="button" className="btn btn--primary btn--sm" onClick={() => setShowForm(true)}>
           + Добавить сотрудника
         </button>
       </div>
@@ -68,57 +75,66 @@ export default function EmployeesSection() {
             </tr>
           </thead>
           <tbody>
-            {employees.map((emp) => {
-              const status = getEmployeeTrainingStatus(emp.id, emp.role)
-              const percent = getEmployeeProgressPercent(emp.id, emp.role)
-              const role = getRole(emp.role)
+            {employees.length === 0 ? (
+              <tr>
+                <td colSpan={7} className="admin-empty">
+                  Сотрудники не найдены. Добавьте первого сотрудника.
+                </td>
+              </tr>
+            ) : (
+              employees.map((emp) => {
+                const status = getEmployeeTrainingStatus(emp.id, emp.role)
+                const percent = getEmployeeProgressPercent(emp.id, emp.role)
+                const role = getRole(emp.role)
 
-              return (
-                <tr key={emp.id}>
-                  <td><strong>{emp.name}</strong></td>
-                  <td>{emp.position}</td>
-                  <td>{emp.login}</td>
-                  <td>{role?.label || emp.role}</td>
-                  <td>
-                    <StatusBadge label={status.label} type={status.type} />
-                  </td>
-                  <td>
-                    <div className="admin-progress-cell">
-                      <div className="admin-progress-cell__bar">
-                        <div
-                          className="admin-progress-cell__fill"
-                          style={{ width: `${percent}%` }}
-                        />
+                return (
+                  <tr key={emp.id}>
+                    <td><strong>{emp.name}</strong></td>
+                    <td>{emp.position}</td>
+                    <td><code className="admin-code">{emp.login}</code></td>
+                    <td>{role?.label || emp.role}</td>
+                    <td>
+                      <StatusBadge label={status.label} type={status.type} />
+                    </td>
+                    <td>
+                      <div className="admin-progress-cell">
+                        <div className="admin-progress-cell__bar">
+                          <div
+                            className="admin-progress-cell__fill"
+                            style={{ width: `${percent}%` }}
+                          />
+                        </div>
+                        <span className="admin-progress-cell__text">{percent}%</span>
                       </div>
-                      <span className="admin-progress-cell__text">{percent}%</span>
-                    </div>
-                  </td>
-                  <td>
-                    <button
-                      className="btn btn--outline btn--sm"
-                      onClick={() => setViewId(emp.id)}
-                    >
-                      Открыть
-                    </button>
-                  </td>
-                </tr>
-              )
-            })}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn--outline btn--sm"
+                        onClick={() => setViewId(emp.id)}
+                      >
+                        Открыть
+                      </button>
+                    </td>
+                  </tr>
+                )
+              })
+            )}
           </tbody>
         </table>
       </div>
 
-      {/* Форма добавления */}
       {showForm && (
         <AdminModal
           title="Добавить сотрудника"
-          onClose={() => setShowForm(false)}
+          onClose={() => { setShowForm(false); setFormError('') }}
+          wide
           footer={
             <>
-              <button className="btn btn--outline" onClick={() => setShowForm(false)}>
+              <button type="button" className="btn btn--outline" onClick={() => setShowForm(false)}>
                 Отмена
               </button>
-              <button className="btn btn--primary" form="add-employee-form">
+              <button type="submit" className="btn btn--primary" form="add-employee-form">
                 Сохранить
               </button>
             </>
@@ -131,6 +147,7 @@ export default function EmployeesSection() {
                 className="admin-form__input"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
+                placeholder="Иван Иванов"
                 required
               />
             </label>
@@ -149,6 +166,7 @@ export default function EmployeesSection() {
                 className="admin-form__input"
                 value={form.login}
                 onChange={(e) => setForm({ ...form, login: e.target.value })}
+                placeholder="login"
                 required
               />
             </label>
@@ -159,6 +177,7 @@ export default function EmployeesSection() {
                 type="password"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
+                placeholder="••••••"
                 required
               />
             </label>
@@ -169,38 +188,49 @@ export default function EmployeesSection() {
                 value={form.role}
                 onChange={(e) => setForm({ ...form, role: e.target.value })}
               >
-                {ROLE_OPTIONS.filter((r) => r !== 'admin').map((roleId) => (
+                {ALL_EMPLOYEE_ROLES.map((roleId) => (
                   <option key={roleId} value={roleId}>
                     {ROLES[roleId]?.label || roleId}
                   </option>
                 ))}
               </select>
             </label>
+            {formError && <p className="admin-form__error">{formError}</p>}
           </form>
         </AdminModal>
       )}
 
-      {/* Карточка сотрудника */}
       {viewed && (
         <AdminModal
           title={viewed.name}
           onClose={() => setViewId(null)}
+          wide
           footer={
-            <button className="btn btn--outline" onClick={() => setViewId(null)}>
+            <button type="button" className="btn btn--outline" onClick={() => setViewId(null)}>
               Закрыть
             </button>
           }
         >
           <ul className="admin-detail-list">
             <li><span>Должность</span><span>{viewed.position}</span></li>
-            <li><span>Логин</span><span>{viewed.login}</span></li>
+            <li><span>Логин</span><span><code className="admin-code">{viewed.login}</code></span></li>
             <li><span>Роль</span><span>{getRole(viewed.role)?.label}</span></li>
             <li>
-              <span>Прогресс</span>
+              <span>Общий прогресс</span>
               <span>{getEmployeeProgressPercent(viewed.id, viewed.role)}%</span>
             </li>
+            <li>
+              <span>Статус обучения</span>
+              <span>
+                <StatusBadge
+                  label={getEmployeeTrainingStatus(viewed.id, viewed.role).label}
+                  type={getEmployeeTrainingStatus(viewed.id, viewed.role).type}
+                />
+              </span>
+            </li>
           </ul>
-          <p style={{ fontSize: 14, fontWeight: 600, margin: '0 0 8px' }}>Курсы:</p>
+
+          <h3 className="admin-detail-heading">Доступные курсы</h3>
           <ul className="admin-detail-list">
             {getCoursesForRole(viewed.role).map((course) => {
               const prog = getCourseProgress(viewed.id, course.id)
@@ -210,7 +240,7 @@ export default function EmployeesSection() {
               return (
                 <li key={course.id}>
                   <span>{course.title}</span>
-                  <span>{pct}%</span>
+                  <span>{pct}% · {prog.completedLessons.length}/{course.lessonsCount} уроков</span>
                 </li>
               )
             })}

@@ -19,7 +19,12 @@ export function getEmployeeProgressPercent(userId, role) {
   return totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
 }
 
-/** Статус обучения сотрудника для таблицы */
+/** Завершил ли сотрудник все доступные курсы (100% уроков) */
+export function hasCompletedAllCourses(userId, role) {
+  return getEmployeeProgressPercent(userId, role) === 100
+}
+
+/** Статус обучения сотрудника для таблицы «Сотрудники» */
 export function getEmployeeTrainingStatus(userId, role) {
   const percent = getEmployeeProgressPercent(userId, role)
   if (percent === 0) return { label: 'Не начал', type: 'idle' }
@@ -31,8 +36,8 @@ export function getEmployeeTrainingStatus(userId, role) {
  * Статус аттестации:
  * - not_started — не начал
  * - in_progress — в процессе
- * - passed — сдал
- * - failed — не сдал (все уроки пройдены, тест не сдан)
+ * - passed — сдал тест
+ * - failed — все уроки пройдены, тест не сдан
  */
 export function getCertificationStatus(userId, role) {
   const courses = getCoursesForRole(role)
@@ -68,6 +73,24 @@ export const CERTIFICATION_LABELS = {
   failed: 'Не сдал',
 }
 
+/** Сводка по статусам аттестации */
+export function getCertificationSummary() {
+  const employees = getTrainingEmployees()
+  const summary = {
+    not_started: 0,
+    in_progress: 0,
+    passed: 0,
+    failed: 0,
+  }
+
+  employees.forEach((emp) => {
+    const status = getCertificationStatus(emp.id, emp.role)
+    summary[status]++
+  })
+
+  return summary
+}
+
 /** Сводная статистика для раздела «Обзор» */
 export function getOverviewStats() {
   const employees = getTrainingEmployees()
@@ -81,8 +104,7 @@ export function getOverviewStats() {
   employees.forEach((emp) => {
     const percent = getEmployeeProgressPercent(emp.id, emp.role)
     totalPercent += percent
-    const cert = getCertificationStatus(emp.id, emp.role)
-    if (cert === 'passed') completedCount++
+    if (hasCompletedAllCourses(emp.id, emp.role)) completedCount++
     else notCompletedCount++
   })
 
@@ -96,6 +118,7 @@ export function getOverviewStats() {
     notCompletedTraining: notCompletedCount,
     averageProgress: avgProgress,
     activeLearners: Object.keys(progress).length,
+    certification: getCertificationSummary(),
   }
 }
 
@@ -116,6 +139,7 @@ export function getProgressRows() {
       rows.push({
         employeeId: emp.id,
         employeeName: emp.name,
+        employeeRole: emp.role,
         courseId: course.id,
         courseTitle: course.title,
         completedLessons: prog.completedLessons.length,

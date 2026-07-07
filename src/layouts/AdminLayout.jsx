@@ -55,8 +55,8 @@ export default function AdminLayout({
             <p className="admin-layout__desc">{section.description}</p>
           </div>
           <div className="admin-layout__topbar-user">
-            <span>{userName}</span>
-            <button className="btn btn--outline btn--sm" onClick={onLogout}>
+            <span className="admin-layout__user-name">{userName}</span>
+            <button type="button" className="btn btn--outline btn--sm" onClick={onLogout}>
               Выйти
             </button>
           </div>

@@ -11,12 +11,16 @@
 
 .admin-modal {
   background: var(--color-white);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   width: 100%;
   max-width: 480px;
   max-height: 90vh;
   overflow-y: auto;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.15);
+  box-shadow: var(--shadow-lg);
+}
+
+.admin-modal--wide {
+  max-width: 560px;
 }
 
 .admin-modal__header {
@@ -117,4 +121,27 @@
 
 .admin-form__role-chip input {
   display: none;
+}
+
+.admin-form__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.admin-form__row--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.admin-form__error {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+@media (max-width: 600px) {
+  .admin-form__row,
+  .admin-form__row--3 {
+    grid-template-columns: 1fr;
+  }
 }
