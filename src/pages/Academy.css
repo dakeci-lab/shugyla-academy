@@ -3,24 +3,48 @@
   background: var(--color-bg);
 }
 
-/* Белый блок, наезжающий на hero с закруглённым верхом */
 .academy-page__catalog {
   position: relative;
   background: var(--color-white);
-  border-radius: 28px 28px 0 0;
-  margin-top: -28px;
-  padding: 40px 0 72px;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.04);
+  border-radius: 32px 32px 0 0;
+  margin-top: -32px;
+  padding: 48px 0 80px;
+  box-shadow: 0 -8px 32px rgba(20, 40, 28, 0.06);
+}
+
+.academy-page__intro {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
 }
 
 .academy-page__heading {
-  font-size: 26px;
+  font-size: 28px;
   font-weight: 700;
-  margin: 0 0 24px;
-  letter-spacing: -0.3px;
+  margin: 0 0 8px;
+  letter-spacing: -0.4px;
 }
 
-/* Адаптивная сетка: 3 → 2 → 1 */
+.academy-page__subheading {
+  margin: 0;
+  font-size: 15px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.academy-page__count {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
 .academy-page__grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -30,7 +54,7 @@
 .academy-page__empty {
   text-align: center;
   color: var(--color-text-muted);
-  padding: 48px 0;
+  padding: 64px 0;
   font-size: 15px;
 }
 
@@ -42,13 +66,23 @@
 
 @media (max-width: 600px) {
   .academy-page__catalog {
-    border-radius: 20px 20px 0 0;
-    margin-top: -20px;
-    padding: 28px 0 48px;
+    border-radius: 24px 24px 0 0;
+    margin-top: -24px;
+    padding: 32px 0 56px;
+  }
+
+  .academy-page__intro {
+    flex-direction: column;
+    align-items: stretch;
+    margin-bottom: 20px;
   }
 
   .academy-page__heading {
     font-size: 22px;
+  }
+
+  .academy-page__count {
+    align-self: flex-start;
   }
 
   .academy-page__grid {

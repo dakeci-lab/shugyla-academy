@@ -1,17 +1,24 @@
-/* ===== CSS-переменные — зелёная тема Shugyla ===== */
+/* ===== CSS-переменные — зелёная тема Shugyla Academy ===== */
 :root {
-  --color-primary: #2d8f4e;
-  --color-primary-dark: #1a6b3c;
-  --color-primary-light: #e8f5e9;
-  --color-hero-bg: #edf7f0;
+  --color-primary: #2a9d5c;
+  --color-primary-dark: #1f7a47;
+  --color-primary-light: #e6f5ec;
+  --color-primary-soft: rgba(42, 157, 92, 0.12);
+  --color-hero-bg: #eef7f1;
   --color-white: #ffffff;
-  --color-bg: #f5f7f5;
-  --color-text: #1a1a1a;
-  --color-text-secondary: #555;
-  --color-text-muted: #888;
-  --color-border: #e0e4e0;
+  --color-bg: #f4f6f4;
+  --color-text: #141414;
+  --color-text-secondary: #4a524d;
+  --color-text-muted: #7a857c;
+  --color-border: #dde5df;
   --color-danger: #d32f2f;
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 2px 8px rgba(20, 40, 28, 0.06);
+  --shadow-md: 0 8px 24px rgba(20, 40, 28, 0.08);
+  --shadow-lg: 0 16px 40px rgba(20, 40, 28, 0.1);
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --header-height: 68px;
 }
 
 /* ===== Сброс и базовые стили ===== */
@@ -19,6 +26,10 @@
 *::before,
 *::after {
   box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
@@ -64,6 +75,18 @@ body {
 
 .btn--primary:hover {
   background: var(--color-primary-dark);
+  box-shadow: 0 4px 14px rgba(42, 157, 92, 0.28);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+  border: 1px solid transparent;
+}
+
+.btn--ghost:hover {
+  color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
 .btn--primary:disabled {

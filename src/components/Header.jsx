@@ -25,7 +25,7 @@ export default function Header({ variant = 'default' }) {
         <nav className="header__nav">
           {variant === 'landing' && (
             <>
-              <a href="mailto:academy@shugyla.kz" className="header__link">
+              <a href="mailto:academy@shugyla.kz" className="header__link header__link--contact">
                 {t.contact}
               </a>
               <LangSwitch />

@@ -24,10 +24,18 @@ export default function Academy() {
       <Header variant="landing" />
       <Hero />
 
-      {/* Белый блок с закруглённым верхом — каталог курсов */}
-      <section className="academy-page__catalog">
+      <section id="courses" className="academy-page__catalog">
         <div className="container">
-          <h2 className="academy-page__heading">{t.coursesHeading}</h2>
+          <div className="academy-page__intro">
+            <div>
+              <h2 className="academy-page__heading">{t.coursesHeading}</h2>
+              <p className="academy-page__subheading">{t.coursesSubheading}</p>
+            </div>
+            <span className="academy-page__count">
+              {filteredCourses.length} {t.coursesCount}
+            </span>
+          </div>
+
           <CategoryFilter active={activeCategory} onChange={setActiveCategory} />
 
           <div className="academy-page__grid">
