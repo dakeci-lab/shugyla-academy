@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { LanguageProvider } from './context/LanguageContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import Academy from './pages/Academy'
 import Login from './pages/Login'
@@ -11,7 +12,8 @@ import CoursePage from './pages/CoursePage'
  */
 export default function App() {
   return (
-    <BrowserRouter basename="/shugyla-academy">
+    <LanguageProvider>
+      <BrowserRouter basename="/shugyla-academy">
       <Routes>
         {/* Главная — доступна и по /, и по /academy */}
         <Route path="/" element={<Academy />} />
@@ -42,6 +44,7 @@ export default function App() {
         {/* 404 — на главную */}
         <Route path="*" element={<Navigate to="/academy" replace />} />
       </Routes>
-    </BrowserRouter>
+      </BrowserRouter>
+    </LanguageProvider>
   )
 }

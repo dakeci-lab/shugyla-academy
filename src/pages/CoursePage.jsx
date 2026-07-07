@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { useParams, Link, Navigate } from 'react-router-dom'
-import { COURSES } from '../data/courses'
+import { useParams, Link } from 'react-router-dom'
+import { getAllCourses } from '../utils/adminData'
 import { LESSONS } from '../data/lessons'
 import { TESTS } from '../data/tests'
 import { getUser, getCourseProgress, markLessonComplete } from '../utils/storage'
 import { canAccessCourse } from '../utils/auth'
 import Header from '../components/Header'
+import AccessDenied from '../components/AccessDenied'
 import LessonList from '../components/LessonList'
 import ProgressBar from '../components/ProgressBar'
 import './CoursePage.css'
@@ -17,7 +18,7 @@ import './CoursePage.css'
 export default function CoursePage() {
   const { id } = useParams()
   const courseId = Number(id)
-  const course = COURSES.find((c) => c.id === courseId)
+  const course = getAllCourses().find((c) => c.id === courseId)
   const user = getUser()
 
   const [progress, setProgress] = useState(() =>
@@ -37,9 +38,9 @@ export default function CoursePage() {
     )
   }
 
-  // Проверка доступа по роли
-  if (user && !canAccessCourse(user.role, course.category)) {
-    return <Navigate to="/dashboard" replace />
+  // Проверка доступа по роли — показываем страницу «Нет доступа»
+  if (user && !canAccessCourse(user.role, course)) {
+    return <AccessDenied course={course} userRole={user.role} />
   }
 
   const courseLessons = LESSONS

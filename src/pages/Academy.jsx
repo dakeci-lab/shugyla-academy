@@ -1,43 +1,46 @@
 import { useState } from 'react'
-import { COURSES } from '../data/courses'
+import { getAllCourses } from '../utils/adminData'
+import { useLanguage } from '../context/LanguageContext'
 import Header from '../components/Header'
 import Hero from '../components/Hero'
 import CategoryFilter from '../components/CategoryFilter'
 import CourseCard from '../components/CourseCard'
 import './Academy.css'
 
-/**
- * Главная страница академии — /academy
- * Показывает hero-блок, фильтр категорий и сетку курсов
- */
+/** Главная страница академии — hero, фильтры и сетка курсов */
 export default function Academy() {
   const [activeCategory, setActiveCategory] = useState('all')
+  const { t } = useLanguage()
 
-  // Фильтрация курсов по выбранной категории
+  const courses = getAllCourses()
+
   const filteredCourses =
     activeCategory === 'all'
-      ? COURSES
-      : COURSES.filter((c) => c.category === activeCategory)
+      ? courses
+      : courses.filter((c) => c.category === activeCategory)
 
   return (
     <div className="academy-page">
-      <Header />
+      <Header variant="landing" />
       <Hero />
 
-      <main className="academy-page__main container">
-        <h2 className="academy-page__heading">Курсы обучения</h2>
-        <CategoryFilter active={activeCategory} onChange={setActiveCategory} />
+      {/* Белый блок с закруглённым верхом — каталог курсов */}
+      <section className="academy-page__catalog">
+        <div className="container">
+          <h2 className="academy-page__heading">{t.coursesHeading}</h2>
+          <CategoryFilter active={activeCategory} onChange={setActiveCategory} />
 
-        <div className="academy-page__grid">
-          {filteredCourses.map((course) => (
-            <CourseCard key={course.id} course={course} />
-          ))}
+          <div className="academy-page__grid">
+            {filteredCourses.map((course) => (
+              <CourseCard key={course.id} course={course} />
+            ))}
+          </div>
+
+          {filteredCourses.length === 0 && (
+            <p className="academy-page__empty">{t.emptyCourses}</p>
+          )}
         </div>
-
-        {filteredCourses.length === 0 && (
-          <p className="academy-page__empty">Курсы в этой категории пока не добавлены.</p>
-        )}
-      </main>
+      </section>
     </div>
   )
 }

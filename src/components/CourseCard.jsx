@@ -1,40 +1,53 @@
 import { Link } from 'react-router-dom'
-import { CATEGORIES } from '../data/roles'
+import { useLanguage } from '../context/LanguageContext'
+import { getCategoryLabel } from '../utils/i18n'
 import './CourseCard.css'
 
-/** Получить название категории по id */
-function getCategoryLabel(categoryId) {
-  const cat = CATEGORIES.find((c) => c.id === categoryId)
-  return cat ? cat.label : categoryId
-}
-
 /**
- * Карточка курса — отображается в сетке на главной и в личном кабинете
+ * Карточка курса — название, метаданные, описание, кнопка «Открыть курс»
  */
 export default function CourseCard({ course, progress }) {
+  const { lang, t } = useLanguage()
+
   const progressPercent = progress
     ? Math.round((progress.completedLessons.length / course.lessonsCount) * 100)
     : 0
 
   return (
-    <Link to={`/courses/${course.id}`} className="course-card">
-      <div
-        className="course-card__image"
-        style={{ backgroundColor: course.imageColor }}
-      >
+    <article className="course-card">
+      <div className="course-card__top">
         <span className="course-card__badge">
-          {getCategoryLabel(course.category)}
+          {getCategoryLabel(course.category, lang)}
         </span>
+        <div
+          className="course-card__accent"
+          style={{ backgroundColor: course.imageColor }}
+        />
       </div>
 
       <div className="course-card__body">
         <h3 className="course-card__title">{course.title}</h3>
-        <p className="course-card__desc">{course.description}</p>
 
-        <div className="course-card__meta">
-          <span>{course.duration}</span>
-          <span>{course.lessonsCount} уроков</span>
+        <div className="course-card__stats">
+          <span className="course-card__stat">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+            </svg>
+            {course.lessonsCount} {t.lessons}
+          </span>
+          <span className="course-card__stat">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="7" height="7" />
+              <rect x="14" y="3" width="7" height="7" />
+              <rect x="3" y="14" width="7" height="7" />
+              <rect x="14" y="14" width="7" height="7" />
+            </svg>
+            {course.blocksCount} {t.blocks}
+          </span>
         </div>
+
+        <p className="course-card__desc">{course.description}</p>
 
         {progressPercent > 0 && (
           <div className="course-card__progress">
@@ -47,7 +60,11 @@ export default function CourseCard({ course, progress }) {
             <span className="course-card__progress-text">{progressPercent}%</span>
           </div>
         )}
+
+        <Link to={`/courses/${course.id}`} className="btn btn--primary course-card__btn">
+          {t.openCourse}
+        </Link>
       </div>
-    </Link>
+    </article>
   )
 }

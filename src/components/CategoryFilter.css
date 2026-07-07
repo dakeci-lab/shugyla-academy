@@ -6,10 +6,10 @@
 }
 
 .category-filter__btn {
-  padding: 8px 16px;
+  padding: 9px 18px;
   border: 1px solid var(--color-border);
-  border-radius: 20px;
-  background: var(--color-white);
+  border-radius: 24px;
+  background: var(--color-bg);
   color: var(--color-text-secondary);
   font-size: 14px;
   font-weight: 500;
@@ -21,6 +21,7 @@
 .category-filter__btn:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
+  background: var(--color-primary-light);
 }
 
 .category-filter__btn--active {

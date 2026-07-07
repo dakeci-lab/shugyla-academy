@@ -1,6 +1,6 @@
 import { USERS } from '../data/users'
-import { ROLES } from '../data/roles'
-import { COURSES } from '../data/courses'
+import { ROLES, getRole, hasPermission, isAdmin, PERMISSIONS } from '../data/roles'
+import { getAllCourses } from './adminData'
 import { saveUser } from './storage'
 
 /**
@@ -13,13 +13,16 @@ export function login(login, password) {
   )
   if (!user) return null
 
+  const role = getRole(user.role)
+
   // Сохраняем без пароля в localStorage
   const sessionUser = {
     id: user.id,
     login: user.login,
     name: user.name,
     role: user.role,
-    roleName: ROLES[user.role]?.name || user.role,
+    roleName: role?.label || user.role,
+    permissions: role?.permissions || [],
   }
   saveUser(sessionUser)
   return sessionUser
@@ -27,24 +30,32 @@ export function login(login, password) {
 
 /**
  * Получить курсы, доступные для роли пользователя
- * admin видит все курсы, остальные — свои + «для всех»
+ * admin видит все курсы, остальные — только с их ролью в allowedRoles
  */
-export function getCoursesForRole(role) {
-  if (role === 'admin') return COURSES
+export function getCoursesForRole(roleId) {
+  const courses = getAllCourses()
+  if (isAdmin(roleId)) return courses
 
-  const roleCategory = ROLES[role]?.category
-  return COURSES.filter(
-    (course) =>
-      course.category === 'for_all' || course.category === roleCategory
-  )
+  return courses.filter((course) => course.allowedRoles.includes(roleId))
 }
 
 /**
  * Проверить, имеет ли пользователь доступ к курсу
  */
-export function canAccessCourse(role, courseCategory) {
-  if (role === 'admin') return true
-  if (courseCategory === 'for_all') return true
-  const roleCategory = ROLES[role]?.category
-  return courseCategory === roleCategory
+export function canAccessCourse(roleId, course) {
+  if (!course) return false
+  if (isAdmin(roleId)) return true
+  return course.allowedRoles.includes(roleId)
+}
+
+/**
+ * Проверить разрешение текущей роли
+ */
+export function roleHasPermission(roleId, permission) {
+  return hasPermission(roleId, permission)
+}
+
+/** Может ли роль управлять админ-панелью */
+export function canManageAdmin(roleId) {
+  return hasPermission(roleId, PERMISSIONS.MANAGE_USERS)
 }

@@ -1,6 +1,9 @@
+import { ALL_EMPLOYEE_ROLES } from './roles'
+
 /**
  * Курсы обучения Shugyla Academy
- * category — для какой роли предназначен курс ('for_all' = для всех)
+ * category — категория для отображения и фильтрации
+ * allowedRoles — роли, которым разрешён доступ к курсу
  */
 export const COURSES = [
   {
@@ -9,9 +12,12 @@ export const COURSES = [
     description:
       'Базовый курс для новых кассиров: работа с кассой, приём оплаты, возвраты и стандарты обслуживания.',
     category: 'cashier',
+    allowedRoles: ['cashier', 'admin'],
     duration: '4 часа',
     lessonsCount: 6,
+    blocksCount: 3,
     imageColor: '#2d8f4e',
+    status: 'published',
   },
   {
     id: 2,
@@ -19,9 +25,12 @@ export const COURSES = [
     description:
       'Обучение администраторов торгового зала: контроль персонала, открытие/закрытие смены, решение конфликтов.',
     category: 'floor_admin',
+    allowedRoles: ['floor_admin', 'admin'],
     duration: '5 часов',
     lessonsCount: 7,
+    blocksCount: 4,
     imageColor: '#1a6b3c',
+    status: 'published',
   },
   {
     id: 3,
@@ -29,9 +38,12 @@ export const COURSES = [
     description:
       'Универсальный курс по клиентскому сервису: приветствие, помощь покупателю, работа с жалобами.',
     category: 'for_all',
+    allowedRoles: [...ALL_EMPLOYEE_ROLES, 'admin'],
     duration: '2 часа',
     lessonsCount: 4,
+    blocksCount: 2,
     imageColor: '#3cb371',
+    status: 'published',
   },
   {
     id: 4,
@@ -39,9 +51,12 @@ export const COURSES = [
     description:
       'Правила выкладки товаров, работа с планограммой, ротация и контроль сроков годности.',
     category: 'seller',
+    allowedRoles: ['seller', 'admin'],
     duration: '3 часа',
     lessonsCount: 5,
+    blocksCount: 3,
     imageColor: '#228b45',
+    status: 'published',
   },
   {
     id: 5,
@@ -49,9 +64,12 @@ export const COURSES = [
     description:
       'Процесс закупа товаров, ведение переговоров с поставщиками, контроль поставок и документооборот.',
     category: 'buyer',
+    allowedRoles: ['buyer', 'admin'],
     duration: '4 часа',
     lessonsCount: 6,
+    blocksCount: 3,
     imageColor: '#1e7a3a',
+    status: 'published',
   },
   {
     id: 6,
@@ -59,9 +77,12 @@ export const COURSES = [
     description:
       'Корпоративные стандарты, ценности компании, дресс-код и правила поведения на рабочем месте.',
     category: 'for_all',
+    allowedRoles: [...ALL_EMPLOYEE_ROLES, 'admin'],
     duration: '1.5 часа',
     lessonsCount: 3,
+    blocksCount: 2,
     imageColor: '#2d8f4e',
+    status: 'published',
   },
   {
     id: 7,
@@ -69,8 +90,11 @@ export const COURSES = [
     description:
       'Вводный курс для стажёров: знакомство с магазином, базовые процедуры и наставничество.',
     category: 'trainee',
+    allowedRoles: ['trainee', 'admin'],
     duration: '2 часа',
     lessonsCount: 4,
+    blocksCount: 2,
     imageColor: '#4caf50',
+    status: 'published',
   },
 ]

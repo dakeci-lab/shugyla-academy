@@ -1,0 +1,221 @@
+/* Общие стили админ-панели */
+
+/* Toolbar над таблицами */
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.admin-toolbar__info {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+/* Карточки статистики */
+.admin-stat-card {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: box-shadow 0.2s;
+}
+
+.admin-stat-card:hover {
+  box-shadow: var(--shadow-md);
+}
+
+.admin-stat-card__icon {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.admin-stat-card__value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.1;
+}
+
+.admin-stat-card__label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.admin-stat-card--success .admin-stat-card__value {
+  color: #1b7a3d;
+}
+
+.admin-stat-card--warning .admin-stat-card__value {
+  color: #e67e22;
+}
+
+.admin-stat-card--info .admin-stat-card__value {
+  color: #2980b9;
+}
+
+/* Сетка статистики */
+.admin-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+/* Таблицы */
+.admin-table-wrap {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-table th,
+.admin-table td {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: 14px;
+  vertical-align: middle;
+}
+
+.admin-table th {
+  background: var(--color-bg);
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+
+.admin-table tbody tr {
+  border-top: 1px solid var(--color-border);
+  transition: background 0.15s;
+}
+
+.admin-table tbody tr:hover {
+  background: #fafcfa;
+}
+
+.admin-table__actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Бейджи */
+.admin-badge {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.admin-badge--idle {
+  background: #f0f0f0;
+  color: #666;
+}
+
+.admin-badge--progress {
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.admin-badge--done,
+.admin-badge--passed,
+.admin-badge--published,
+.admin-badge--active {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+}
+
+.admin-badge--failed {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.admin-badge--draft {
+  background: #f5f5f5;
+  color: #888;
+}
+
+/* Прогресс-бар в таблице */
+.admin-progress-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 120px;
+}
+
+.admin-progress-cell__bar {
+  flex: 1;
+  height: 6px;
+  background: var(--color-bg);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.admin-progress-cell__fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: 3px;
+}
+
+.admin-progress-cell__text {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-primary);
+  min-width: 36px;
+}
+
+/* Пустое состояние */
+.admin-empty {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+/* Детали сотрудника в модалке */
+.admin-detail-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 16px;
+}
+
+.admin-detail-list li {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+
+.admin-detail-list li:last-child {
+  border-bottom: none;
+}
+
+.admin-detail-list span:first-child {
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .admin-table-wrap {
+    overflow-x: auto;
+  }
+
+  .admin-table {
+    min-width: 700px;
+  }
+}
