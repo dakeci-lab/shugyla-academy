@@ -11,11 +11,10 @@ import CoursePage from './pages/CoursePage'
  */
 export default function App() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/shugyla-academy">
       <Routes>
-        {/* Главная — перенаправление на /academy */}
-        <Route path="/" element={<Navigate to="/academy" replace />} />
-
+        {/* Главная — доступна и по /, и по /academy */}
+        <Route path="/" element={<Academy />} />
         <Route path="/academy" element={<Academy />} />
         <Route path="/login" element={<Login />} />
 
