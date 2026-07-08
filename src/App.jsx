@@ -16,6 +16,7 @@ import PlatformDashboard from './pages/platform/PlatformDashboard'
 import PlatformAcademy from './pages/platform/PlatformAcademy'
 import PlatformSettings from './pages/platform/PlatformSettings'
 import PlatformEmployees from './pages/platform/PlatformEmployees'
+import SuppliersPage, { SupplierDetailPage } from './pages/platform/suppliers/SuppliersPage'
 import ModulePlaceholder from './pages/platform/ModulePlaceholder'
 
 /**
@@ -54,16 +55,8 @@ export default function App() {
               />
             }
           />
-          <Route
-            path="suppliers"
-            element={
-              <ModulePlaceholder
-                title="Поставщики"
-                description="База поставщиков и условия поставок."
-                icon="◫"
-              />
-            }
-          />
+          <Route path="suppliers" element={<SuppliersPage />} />
+          <Route path="suppliers/:id" element={<SupplierDetailPage />} />
           <Route
             path="procurement"
             element={

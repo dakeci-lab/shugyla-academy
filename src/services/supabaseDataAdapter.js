@@ -202,6 +202,14 @@ export async function fetchAllData() {
     recruitmentData = { vacancies: [], questions: [], candidates: [] }
   }
 
+  let suppliersData = { suppliers: [] }
+  try {
+    const { fetchSuppliersData } = await import('./suppliersSupabaseAdapter')
+    suppliersData = await fetchSuppliersData()
+  } catch {
+    suppliersData = { suppliers: [] }
+  }
+
   return {
     employees,
     courses: normalizedCourses,
@@ -220,6 +228,7 @@ export async function fetchAllData() {
     vacancies: recruitmentData.vacancies,
     candidateQuestions: recruitmentData.questions,
     candidates: recruitmentData.candidates,
+    suppliers: suppliersData.suppliers,
   }
 }
 

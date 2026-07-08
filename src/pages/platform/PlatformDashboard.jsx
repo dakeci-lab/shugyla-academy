@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import StatCard from '../../components/admin/StatCard'
 import { getOverviewStats } from '../../utils/adminStats'
+import { getActiveSuppliersCount } from '../../utils/supplierData'
 import { isCloudMode, getDataModeLabel } from '../../lib/dataMode'
 import '../../components/admin/admin-shared.css'
 import './PlatformDashboard.css'
@@ -9,6 +10,7 @@ import './PlatformDashboard.css'
 export default function PlatformDashboard() {
   const stats = getOverviewStats()
   const cloudMode = isCloudMode()
+  const activeSuppliers = getActiveSuppliersCount()
 
   const cards = [
     {
@@ -37,9 +39,9 @@ export default function PlatformDashboard() {
     },
     {
       icon: '◫',
-      value: '—',
+      value: activeSuppliers,
       label: 'Поставщики',
-      hint: 'База поставщиков — скоро',
+      hint: 'Активные поставщики',
       to: '/platform/suppliers',
       variant: 'default',
     },

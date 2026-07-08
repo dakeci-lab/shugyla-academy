@@ -1,0 +1,122 @@
+.supplier-details {
+  max-width: 960px;
+}
+
+.supplier-details--empty {
+  text-align: center;
+  padding: 48px 24px;
+}
+
+.supplier-details__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.supplier-details__back {
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.supplier-details__back:hover {
+  text-decoration: underline;
+}
+
+.supplier-details__title {
+  margin: 0 0 4px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.supplier-details__legal {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.supplier-details__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.supplier-details__section {
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 18px 20px;
+}
+
+.supplier-details__section--wide {
+  grid-column: 1 / -1;
+}
+
+.supplier-details__section h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.supplier-details__row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.supplier-details__row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.supplier-details__label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.supplier-details__value {
+  font-size: 15px;
+  color: var(--color-text);
+  line-height: 1.45;
+  word-break: break-word;
+}
+
+.supplier-details__comment {
+  margin: 0;
+  line-height: 1.55;
+  color: var(--color-text-secondary);
+}
+
+.supplier-details__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.supplier-details__delete {
+  color: var(--color-danger);
+}
+
+@media (max-width: 768px) {
+  .supplier-details__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .supplier-details__header {
+    flex-direction: column;
+  }
+
+  .supplier-details__actions .btn {
+    min-height: 44px;
+  }
+}

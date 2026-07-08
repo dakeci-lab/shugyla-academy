@@ -22,6 +22,8 @@ import * as standardsLocalAdapter from './standardsLocalAdapter'
 import * as standardsSupabaseAdapter from './standardsSupabaseAdapter'
 import * as recruitmentLocalAdapter from './recruitmentLocalAdapter'
 import * as recruitmentSupabaseAdapter from './recruitmentSupabaseAdapter'
+import * as suppliersLocalAdapter from './suppliersLocalAdapter'
+import * as suppliersSupabaseAdapter from './suppliersSupabaseAdapter'
 import {
   getAllLearningPathsSync,
   getLearningPathByIdSync,
@@ -57,6 +59,10 @@ import {
 } from '../utils/recruitmentData'
 import { EMPLOYMENT_STATUS } from '../utils/employeeData'
 import { prepareCandidatePhotoForSubmit } from './candidatePhotoService'
+import {
+  getAllSuppliersSync,
+  getSupplierByIdSync,
+} from '../utils/supplierData'
 
 function getAdapter() {
   return isCloudMode() ? supabaseAdapter : localAdapter
@@ -76,6 +82,10 @@ function getStandardsAdapter() {
 
 function getRecruitmentAdapter() {
   return isCloudMode() ? recruitmentSupabaseAdapter : recruitmentLocalAdapter
+}
+
+function getSuppliersAdapter() {
+  return isCloudMode() ? suppliersSupabaseAdapter : suppliersLocalAdapter
 }
 
 export { isCloudMode, getDataModeLabel, getDataModeVariant }
@@ -830,4 +840,51 @@ export async function hireCandidateAsUser(candidateId, userData, options = {}) {
 
   if (isCloudMode()) await refreshData()
   return newUserId
+}
+
+export {
+  getAllSuppliersSync,
+  getSupplierByIdSync,
+  getActiveSuppliersCount,
+  filterSuppliers,
+  formatSupplierCategories,
+  formatMinOrderAmount,
+  SUPPLIER_STATUS,
+  SUPPLIER_STATUS_LABELS,
+  SUPPLIER_STATUS_BADGE,
+  PAYMENT_TYPE,
+  PAYMENT_TYPE_LABELS,
+  RETURN_POLICY,
+  RETURN_POLICY_LABELS,
+  SUPPLIER_STATUS_FILTER_OPTIONS,
+} from '../utils/supplierData'
+
+export function getSuppliers() {
+  return getAllSuppliersSync()
+}
+
+export function getSupplierById(id) {
+  return getSupplierByIdSync(id)
+}
+
+export async function createSupplier(supplierData) {
+  if (!supplierData.name?.trim()) throw new Error('Укажите название поставщика')
+  const id = await getSuppliersAdapter().createSupplier(supplierData)
+  if (isCloudMode()) await refreshData()
+  return id
+}
+
+export async function updateSupplier(supplierId, updates) {
+  await getSuppliersAdapter().updateSupplier(supplierId, updates)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function deleteSupplier(supplierId) {
+  await getSuppliersAdapter().deleteSupplier(supplierId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function archiveSupplier(supplierId) {
+  await getSuppliersAdapter().archiveSupplier(supplierId)
+  if (isCloudMode()) await refreshData()
 }
