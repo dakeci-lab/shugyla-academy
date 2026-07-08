@@ -520,6 +520,31 @@
   accent-color: var(--color-primary);
 }
 
+.admin-form__label--inline {
+  gap: 10px;
+}
+
+.admin-form__radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.test-question-editor {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.admin-detail-list-wrap p {
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
 .employee-preview-courses {
   margin-top: 20px;
   padding-top: 16px;

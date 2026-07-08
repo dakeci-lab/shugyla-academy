@@ -5,8 +5,14 @@ import { getCoursesForEmployee } from './courseAccess'
 import {
   getCourseLessonCount,
   calcLessonProgress,
-  getCourseCompletionStatus,
 } from './courseStructure'
+import {
+  getDetailedCourseStatus,
+  getCourseTestStatus,
+  getAdminFinalAttestationStatus,
+  isCourseFullyComplete,
+  areAllAssignedCoursesComplete,
+} from './testProgress'
 
 function safeCompletedCount(completedLessons, courseId) {
   const total = getCourseLessonCount(courseId)
@@ -33,15 +39,9 @@ export function getEmployeeProgressPercent(userId) {
 }
 
 export function hasCompletedAllCourses(userId) {
-  const courses = getCoursesForEmployee(userId)
-  if (courses.length === 0) return false
-  return courses.every((course) => {
-    const prog = getCourseProgress(userId, course.id)
-    return calcLessonProgress(prog.completedLessons, course.id) === 100
-  })
+  return areAllAssignedCoursesComplete(userId)
 }
 
-/** @deprecated use getEmployeeProgressPercent(userId) */
 export function getEmployeeProgressPercentByRole(userId, role) {
   void role
   return getEmployeeProgressPercent(userId)
@@ -50,38 +50,18 @@ export function getEmployeeProgressPercentByRole(userId, role) {
 export function getEmployeeTrainingStatus(userId) {
   const percent = getEmployeeProgressPercent(userId)
   if (percent === 0) return { label: 'Не начал', type: 'idle' }
-  if (percent === 100) return { label: 'Завершил', type: 'done' }
+  if (hasCompletedAllCourses(userId)) return { label: 'Завершил', type: 'done' }
   return { label: 'В процессе', type: 'progress' }
 }
 
 export function getCertificationStatus(userId) {
-  const courses = getCoursesForEmployee(userId)
-  if (courses.length === 0) return 'not_started'
-
-  const progresses = courses.map((c) => ({
-    course: c,
-    progress: getCourseProgress(userId, c.id),
-  }))
-
-  const totalCompleted = progresses.reduce(
-    (sum, { progress }) => sum + progress.completedLessons.length,
-    0
-  )
-  if (totalCompleted === 0) return 'not_started'
-
-  const anyPassed = progresses.some(({ progress }) => progress.testPassed)
-  if (anyPassed) return 'passed'
-
-  const anyFailed = progresses.some(({ course, progress }) => {
-    const total = getCourseLessonCount(course.id)
-    return (
-      safeCompletedCount(progress.completedLessons, course.id) >= total &&
-      total > 0 &&
-      !progress.testPassed
-    )
-  })
-  if (anyFailed) return 'failed'
-
+  const employee = getTrainingEmployees().find((e) => e.id === userId)
+  if (!employee) return 'not_started'
+  const att = getAdminFinalAttestationStatus(userId, employee.role)
+  if (att.status === 'not_available') return 'not_started'
+  if (att.status === 'available' || att.status === 'not_started') return 'in_progress'
+  if (att.status === 'passed') return 'passed'
+  if (att.status === 'failed') return 'failed'
   return 'in_progress'
 }
 
@@ -139,6 +119,20 @@ export function getOverviewStats() {
   }
 }
 
+function getAttestationRowStatus(userId, role) {
+  const att = getAdminFinalAttestationStatus(userId, role)
+  if (att.status === 'passed') {
+    return { label: 'Аттестован', type: 'done' }
+  }
+  if (att.status === 'failed') {
+    return { label: 'Не сдана', type: 'failed' }
+  }
+  if (att.status === 'available') {
+    return { label: 'Доступна', type: 'progress' }
+  }
+  return { label: 'Не доступна', type: 'idle' }
+}
+
 /** Детальный прогресс для таблицы «Прогресс» */
 export function getProgressRows() {
   const employees = getActiveEmployees()
@@ -146,6 +140,7 @@ export function getProgressRows() {
 
   employees.forEach((emp) => {
     const courses = getCoursesForEmployee(emp)
+    const attestationStatus = getAttestationRowStatus(emp.id, emp.role)
 
     if (courses.length === 0) {
       rows.push({
@@ -158,7 +153,9 @@ export function getProgressRows() {
         totalLessons: 0,
         percent: 0,
         status: { label: 'Нет курсов', type: 'idle' },
-        testPassed: false,
+        courseTestStatus: { label: '—', type: 'idle' },
+        courseOverallStatus: { label: 'Не начат', type: 'idle' },
+        attestationStatus,
         noCourses: true,
       })
       return
@@ -169,7 +166,12 @@ export function getProgressRows() {
       const totalLessons = getCourseLessonCount(course.id)
       const completedLessons = safeCompletedCount(prog.completedLessons, course.id)
       const percent = calcLessonProgress(prog.completedLessons, course.id)
-      const status = getCourseCompletionStatus(prog.completedLessons, course.id)
+      const courseOverallStatus = getDetailedCourseStatus(
+        emp.id,
+        course.id,
+        prog.completedLessons
+      )
+      const courseTestStatus = getCourseTestStatus(emp.id, course.id)
 
       rows.push({
         employeeId: emp.id,
@@ -180,8 +182,11 @@ export function getProgressRows() {
         completedLessons,
         totalLessons,
         percent,
-        status,
-        testPassed: prog.testPassed,
+        status: courseOverallStatus,
+        courseTestStatus,
+        courseOverallStatus,
+        attestationStatus,
+        courseComplete: isCourseFullyComplete(emp.id, course.id, prog.completedLessons),
         noCourses: false,
       })
     })

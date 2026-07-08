@@ -5,12 +5,12 @@ import { markLessonComplete } from '../services/academyDataService'
 import { useAcademyData } from '../context/AcademyDataContext'
 import { resolveCourseAccess, ACCESS_REASON } from '../utils/auth'
 import {
+  areAllMandatoryLessonsComplete,
+  calcLessonProgress,
   getCourseLessons,
   getCourseTest,
-  calcLessonProgress,
-  areAllLessonsComplete,
-  getCourseCompletionStatus,
 } from '../utils/courseStructure'
+import { getDetailedCourseStatus } from '../utils/testProgress'
 import { getCategoryLabel } from '../utils/i18n'
 import Header from '../components/Header'
 import AccessDenied from '../components/AccessDenied'
@@ -65,8 +65,15 @@ export default function CoursePage() {
   const lessons = getCourseLessons(courseId)
   const courseTest = getCourseTest(courseId)
   const progressPercent = calcLessonProgress(progress.completedLessons, courseId)
-  const courseStatus = getCourseCompletionStatus(progress.completedLessons, courseId)
-  const allLessonsDone = areAllLessonsComplete(progress.completedLessons, courseId)
+  const allMandatoryDone = areAllMandatoryLessonsComplete(
+    progress.completedLessons,
+    courseId
+  )
+  const courseStatus = getDetailedCourseStatus(
+    user.id,
+    courseId,
+    progress.completedLessons
+  )
   const roleLabel = getCategoryLabel(course.category)
   const isLessonCompleted = activeLesson
     ? progress.completedLessons.includes(activeLesson.id)
@@ -178,11 +185,14 @@ export default function CoursePage() {
 
         {courseTest && (
           <section className="course-page__test">
+            <h2 className="course-page__section-title">Итоговый тест курса</h2>
             <CourseTest
               test={courseTest}
               userId={user.id}
               courseId={courseId}
-              disabled={!allLessonsDone}
+              testType="course_test"
+              disabled={!allMandatoryDone}
+              lockedMessage="Тест откроется после прохождения обязательных уроков."
               onComplete={refreshProgress}
             />
           </section>

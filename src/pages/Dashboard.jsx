@@ -8,6 +8,7 @@ import { calcLessonProgress, getCourseCompletionStatus } from '../utils/courseSt
 import Header from '../components/Header'
 import CourseCard from '../components/CourseCard'
 import ProgressBar from '../components/ProgressBar'
+import FinalAttestationBlock from '../components/FinalAttestationBlock'
 import './Dashboard.css'
 
 /**
@@ -141,6 +142,8 @@ export default function Dashboard() {
             </div>
           )}
         </section>
+
+        <FinalAttestationBlock userId={user.id} role={user.role} />
       </main>
     </div>
   )

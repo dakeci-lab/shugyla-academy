@@ -127,3 +127,9 @@
   margin-top: 2px;
   accent-color: var(--color-primary);
 }
+
+.course-test__error {
+  color: var(--color-danger);
+  font-size: 14px;
+  margin: 0 0 12px;
+}

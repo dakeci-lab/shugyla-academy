@@ -3,7 +3,7 @@ import { getProgressRows } from '../../../utils/adminStats'
 import StatusBadge from '../StatusBadge'
 import '../admin-shared.css'
 
-/** Раздел «Прогресс» — таблица по сотрудникам и курсам */
+/** Раздел «Прогресс» */
 export default function ProgressSection() {
   const [search, setSearch] = useState('')
   const rows = getProgressRows()
@@ -21,9 +21,7 @@ export default function ProgressSection() {
   return (
     <>
       <div className="admin-toolbar">
-        <span className="admin-toolbar__info">
-          {filtered.length} записей прогресса
-        </span>
+        <span className="admin-toolbar__info">{filtered.length} записей прогресса</span>
         <input
           type="search"
           className="admin-search"
@@ -40,40 +38,40 @@ export default function ProgressSection() {
               <th>Сотрудник</th>
               <th>Курс</th>
               <th>Уроки</th>
-              <th>Прогресс</th>
-              <th>Статус</th>
+              <th>Тест курса</th>
+              <th>Общий статус</th>
+              <th>Финальная аттестация</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={5} className="admin-empty">
+                <td colSpan={6} className="admin-empty">
                   {search ? 'Ничего не найдено' : 'Пока нет данных о прогрессе'}
                 </td>
               </tr>
             ) : (
               filtered.map((row) => (
-                <tr key={`${row.employeeId}-${row.courseId}`}>
+                <tr key={`${row.employeeId}-${row.courseId ?? 'none'}`}>
                   <td><strong>{row.employeeName}</strong></td>
                   <td>{row.courseTitle}</td>
                   <td>
-                    {row.completedLessons} / {row.totalLessons}
+                    {row.noCourses ? '—' : `${row.completedLessons} / ${row.totalLessons}`}
                   </td>
                   <td>
-                    <div className="admin-progress-cell">
-                      <div className="admin-progress-cell__bar">
-                        <div
-                          className="admin-progress-cell__fill"
-                          style={{ width: `${row.percent}%` }}
-                        />
-                      </div>
-                      <span className="admin-progress-cell__text">
-                        {row.percent}%
-                      </span>
-                    </div>
+                    {row.noCourses ? '—' : (
+                      <StatusBadge label={row.courseTestStatus.label} type={row.courseTestStatus.type} />
+                    )}
                   </td>
                   <td>
-                    <StatusBadge label={row.status.label} type={row.status.type} />
+                    {row.noCourses ? (
+                      <StatusBadge label={row.status.label} type={row.status.type} />
+                    ) : (
+                      <StatusBadge label={row.courseOverallStatus.label} type={row.courseOverallStatus.type} />
+                    )}
+                  </td>
+                  <td>
+                    <StatusBadge label={row.attestationStatus.label} type={row.attestationStatus.type} />
                   </td>
                 </tr>
               ))

@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabaseClient'
 import { normalizeEmployee, canEmployeeLogin } from '../utils/employeeData'
 import { normalizeLesson } from '../utils/lessonData'
+import { fetchTestsData } from './testSupabaseAdapter'
 
 function parseDurationHours(durationLabel) {
   if (!durationLabel) return null
@@ -169,12 +170,22 @@ export async function fetchAllData() {
     normalizedLessons
   )
 
+  let testsData = { tests: [], questions: [], attempts: [] }
+  try {
+    testsData = await fetchTestsData()
+  } catch {
+    testsData = { tests: [], questions: [], attempts: [] }
+  }
+
   return {
     employees,
     courses: normalizedCourses,
     lessons: normalizedLessons,
     assignments,
     progress: buildProgressMap(progressRows),
+    tests: testsData.tests,
+    testQuestions: testsData.questions,
+    testAttempts: testsData.attempts,
   }
 }
 

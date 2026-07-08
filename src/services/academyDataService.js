@@ -1,10 +1,28 @@
 import { isCloudMode, getDataModeLabel, getDataModeVariant } from '../lib/dataMode'
 import { setCloudStore, clearCloudStore } from '../lib/cloudStore'
 import * as supabaseAdapter from './supabaseDataAdapter'
+import * as testSupabaseAdapter from './testSupabaseAdapter'
+import * as testLocalAdapter from './testLocalAdapter'
+import {
+  getAllTestsSync,
+  getTestByIdSync,
+  getTestQuestionsSync,
+  getPublishedCourseTest,
+  getPublishedFinalAttestation,
+  getUserAttemptsSync,
+  getBestAttemptSync,
+  hasPassedTestSync,
+  TEST_TYPE,
+} from '../utils/testData'
+
 import * as localAdapter from './localDataAdapter'
 
 function getAdapter() {
   return isCloudMode() ? supabaseAdapter : localAdapter
+}
+
+function getTestAdapter() {
+  return isCloudMode() ? testSupabaseAdapter : testLocalAdapter
 }
 
 export { isCloudMode, getDataModeLabel, getDataModeVariant }
@@ -182,4 +200,151 @@ export async function migrateLocalDataToCloud() {
   await supabaseAdapter.upsertMigrationBatch(snapshot)
   await refreshData()
   return snapshot.counts
+}
+
+// --- Tests (sync reads for UI) ---
+
+export function getTests() {
+  return getAllTestsSync()
+}
+
+export function getTestById(testId) {
+  return getTestByIdSync(testId)
+}
+
+export function getCourseTest(courseId) {
+  return getPublishedCourseTest(courseId)
+}
+
+export function getFinalAttestationByRole(role) {
+  return getPublishedFinalAttestation(role)
+}
+
+export function getTestQuestions(testId) {
+  return getTestQuestionsSync(testId)
+}
+
+export function getUserTestAttempts(userId) {
+  return getUserAttemptsSync(userId)
+}
+
+export function getUserAttemptsForTest(userId, testId) {
+  return getUserAttemptsSync(userId, testId)
+}
+
+export function getBestAttempt(userId, testId) {
+  return getBestAttemptSync(userId, testId)
+}
+
+export function hasPassedTest(userId, testId) {
+  return hasPassedTestSync(userId, testId)
+}
+
+// --- Tests (async mutations) ---
+
+export async function createTest(testData) {
+  const id = await getTestAdapter().createTest(testData)
+  if (isCloudMode()) await refreshData()
+  return id
+}
+
+export async function updateTest(testId, updates) {
+  await getTestAdapter().updateTest(testId, updates)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function deleteTest(testId) {
+  await getTestAdapter().deleteTest(testId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function publishTest(testId) {
+  await getTestAdapter().publishTest(testId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function unpublishTest(testId) {
+  await getTestAdapter().unpublishTest(testId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function createTestQuestion(testId, questionData) {
+  const id = await getTestAdapter().createTestQuestion(testId, questionData)
+  if (isCloudMode()) await refreshData()
+  return id
+}
+
+export async function updateTestQuestion(questionId, updates) {
+  await getTestAdapter().updateTestQuestion(questionId, updates)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function deleteTestQuestion(questionId) {
+  await getTestAdapter().deleteTestQuestion(questionId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function reorderTestQuestions(testId, orderedQuestionIds) {
+  await getTestAdapter().reorderTestQuestions(testId, orderedQuestionIds)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function submitTestAttempt({ userId, testId, courseId, type, answers }) {
+  const test = getTestByIdSync(testId)
+  if (!test) throw new Error('Тест не найден')
+
+  const questions = getTestQuestionsSync(testId)
+  if (!questions.length) throw new Error('В тесте нет вопросов')
+
+  const previousAttempts = getUserAttemptsSync(userId, testId)
+  if (test.maxAttempts && previousAttempts.length >= test.maxAttempts) {
+    throw new Error('Исчерпано максимальное количество попыток')
+  }
+
+  let correctCount = 0
+  questions.forEach((q) => {
+    if (answers[q.id] === q.correctOptionIndex) correctCount++
+  })
+
+  const totalQuestions = questions.length
+  const scorePercent =
+    totalQuestions > 0 ? Math.round((correctCount / totalQuestions) * 100) : 0
+  const passed = scorePercent >= test.passingScore
+
+  let attempt
+  if (isCloudMode()) {
+    attempt = await testSupabaseAdapter.insertTestAttempt({
+      test_id: testId,
+      user_id: userId,
+      course_id: courseId ?? null,
+      type,
+      answers,
+      score_percent: scorePercent,
+      correct_count: correctCount,
+      total_questions: totalQuestions,
+      passed,
+      submitted_at: new Date().toISOString(),
+      started_at: new Date().toISOString(),
+    })
+  } else {
+    attempt = testLocalAdapter.localSubmitAttempt(
+      { userId, testId, courseId, type, answers },
+      test,
+      questions
+    )
+  }
+
+  if (type === TEST_TYPE.COURSE && courseId) {
+    await saveTestResult(userId, courseId, scorePercent, passed)
+  }
+
+  if (isCloudMode()) await refreshData()
+
+  return {
+    ...attempt,
+    scorePercent,
+    correctCount,
+    totalQuestions,
+    passed,
+  }
 }

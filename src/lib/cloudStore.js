@@ -7,6 +7,9 @@ const emptyStore = {
   lessons: [],
   assignments: [],
   progress: {},
+  tests: [],
+  testQuestions: [],
+  testAttempts: [],
 }
 
 let store = { ...emptyStore }
@@ -27,6 +30,9 @@ export function setCloudStore(data) {
     lessons: data.lessons || [],
     assignments: data.assignments || [],
     progress: data.progress || {},
+    tests: data.tests || [],
+    testQuestions: data.testQuestions || data.questions || [],
+    testAttempts: data.testAttempts || data.attempts || [],
   }
 }
 
@@ -48,4 +54,16 @@ export function getCloudLessons() {
 
 export function getCloudProgress() {
   return store.loaded ? store.progress : null
+}
+
+export function getCloudTests() {
+  return store.loaded ? store.tests : null
+}
+
+export function getCloudTestQuestions() {
+  return store.loaded ? store.testQuestions : null
+}
+
+export function getCloudTestAttempts() {
+  return store.loaded ? store.testAttempts : null
 }

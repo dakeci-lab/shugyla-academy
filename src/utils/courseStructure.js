@@ -1,6 +1,6 @@
 import { BLOCKS } from '../data/blocks'
-import { TESTS } from '../data/tests'
 import { getLessonsForCourse } from './lessonData'
+import { getPublishedCourseTest } from './testData'
 
 /** Все уроки курса */
 export function getCourseLessons(courseId) {
@@ -42,7 +42,7 @@ export function getCourseStructure(courseId) {
 }
 
 export function getCourseTest(courseId) {
-  return TESTS.find((t) => t.courseId === courseId) || null
+  return getPublishedCourseTest(courseId)
 }
 
 export function getCourseLessonCount(courseId) {
@@ -57,6 +57,10 @@ export function calcLessonProgress(completedLessons, courseId) {
 }
 
 export function areAllLessonsComplete(completedLessons, courseId) {
+  return areAllMandatoryLessonsComplete(completedLessons, courseId)
+}
+
+export function areAllMandatoryLessonsComplete(completedLessons, courseId) {
   const lessons = getCourseLessons(courseId)
   if (lessons.length === 0) return false
   const mandatory = lessons.filter((l) => l.mandatory)

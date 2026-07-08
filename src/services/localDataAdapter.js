@@ -27,6 +27,7 @@ import {
 import { normalizeEmployee } from '../utils/employeeData'
 import { normalizeLesson } from '../utils/lessonData'
 import { courseToRow, lessonToRow, parseDurationHours } from './supabaseDataAdapter'
+import { getLocalTestsBundle } from './testLocalAdapter'
 
 /** Collect all data from localStorage for migration */
 export function collectLocalSnapshot() {
@@ -204,12 +205,16 @@ export async function authenticateUser(loginValue, password) {
 }
 
 export async function initializeLocal() {
+  const testsBundle = getLocalTestsBundle()
   return {
     employees: getAllEmployeesLocal(),
     courses: getAllCoursesLocal(),
     lessons: [],
     assignments: [],
     progress: localGetProgress(),
+    tests: testsBundle.tests,
+    testQuestions: testsBundle.questions,
+    testAttempts: testsBundle.attempts,
   }
 }
 
