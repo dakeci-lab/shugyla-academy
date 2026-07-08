@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import DataModeBadge from '../components/admin/DataModeBadge'
 import './AdminLayout.css'
@@ -59,6 +60,9 @@ export default function AdminLayout({
             <p className="admin-layout__desc">{section.description}</p>
           </div>
           <div className="admin-layout__topbar-user">
+            <Link to="/profile" className="admin-layout__profile-link">
+              Профиль
+            </Link>
             <span className="admin-layout__user-name">{userName}</span>
             <button type="button" className="btn btn--outline btn--sm" onClick={onLogout}>
               Выйти

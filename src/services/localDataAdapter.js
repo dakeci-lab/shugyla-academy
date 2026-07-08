@@ -3,6 +3,8 @@ import {
   addEmployee as localAddEmployee,
   updateEmployee as localUpdateEmployee,
   deactivateEmployee as localDeactivateEmployee,
+  restoreEmployee as localRestoreEmployee,
+  permanentlyDeleteEmployee as localPermanentlyDeleteEmployee,
   authenticateEmployee as localAuthenticateEmployee,
 } from '../utils/employeeData'
 import {
@@ -123,6 +125,26 @@ export async function updateEmployee(id, updates) {
 
 export async function deactivateEmployee(id) {
   localDeactivateEmployee(id)
+}
+
+export async function restoreEmployee(id) {
+  localRestoreEmployee(id)
+}
+
+export async function permanentlyDeleteEmployee(id) {
+  localPermanentlyDeleteEmployee(id)
+}
+
+export async function updateProfileName(userId, fullName) {
+  const trimmed = fullName.trim()
+  const parts = trimmed.split(/\s+/).filter(Boolean)
+  const firstName = parts[0] || trimmed
+  const lastName = parts.slice(1).join(' ')
+  localUpdateEmployee(userId, {
+    firstName,
+    lastName,
+    name: trimmed,
+  })
 }
 
 export async function getCourses() {

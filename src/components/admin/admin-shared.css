@@ -525,3 +525,45 @@
   padding-top: 16px;
   border-top: 1px solid var(--color-border);
 }
+
+.admin-toolbar--stack {
+  align-items: flex-start;
+}
+
+.admin-filter-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-filter-tab {
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-white);
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.admin-filter-tab:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary-dark);
+}
+
+.admin-filter-tab--active {
+  background: var(--color-primary-light);
+  border-color: rgba(42, 157, 92, 0.35);
+  color: var(--color-primary-dark);
+}
+
+.admin-table__danger {
+  color: #c0392b;
+  border-color: rgba(192, 57, 43, 0.35);
+}
+
+.admin-table__danger:hover {
+  background: #fff5f5;
+}

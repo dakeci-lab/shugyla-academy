@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { login, getPostLoginPath } from '../utils/auth'
-import { getAllEmployees } from '../utils/employeeData'
-import { getRole } from '../data/roles'
+import { useSession } from '../context/SessionContext'
 import './Login.css'
+
+const DEACTIVATED_MESSAGE = 'Аккаунт деактивирован. Обратитесь к администратору.'
 
 /**
  * Страница входа — /login
@@ -13,22 +14,36 @@ export default function Login() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const redirect = searchParams.get('redirect')
+  const { setSessionUser } = useSession()
 
   const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     setError('')
+    setLoading(true)
 
-    login(loginValue, password).then((user) => {
-      if (!user) {
-        setError('Неверный логин или пароль')
+    try {
+      const result = await login(loginValue, password)
+      if (!result.success) {
+        setError(
+          result.error === 'deactivated'
+            ? DEACTIVATED_MESSAGE
+            : 'Неверный логин или пароль'
+        )
         return
       }
-      navigate(getPostLoginPath(user, redirect), { replace: true })
-    })
+
+      setSessionUser(result.user)
+      navigate(getPostLoginPath(result.user, redirect), { replace: true })
+    } catch {
+      setError('Не удалось выполнить вход. Попробуйте позже.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -76,26 +91,10 @@ export default function Login() {
 
           {error && <p className="login-page__error">{error}</p>}
 
-          <button type="submit" className="btn btn--primary btn--full">
-            Войти
+          <button type="submit" className="btn btn--primary btn--full" disabled={loading}>
+            {loading ? 'Вход…' : 'Войти'}
           </button>
         </form>
-
-        <div className="login-page__demo">
-          <p className="login-page__demo-title">Демо-аккаунты (mock data):</p>
-          <ul className="login-page__demo-list">
-            {getAllEmployees().map((u) => {
-              const role = getRole(u.role)
-              return (
-                <li key={u.id}>
-                  <code>{u.login}</code> / <code>{u.password}</code>
-                  {' — '}
-                  {role?.label || u.role}
-                </li>
-              )
-            })}
-          </ul>
-        </div>
 
         <Link to="/academy" className="login-page__back">
           ← На главную

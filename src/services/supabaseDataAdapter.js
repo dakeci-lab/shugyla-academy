@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
-import { normalizeEmployee } from '../utils/employeeData'
+import { normalizeEmployee, canEmployeeLogin } from '../utils/employeeData'
 import { normalizeLesson } from '../utils/lessonData'
 
 function parseDurationHours(durationLabel) {
@@ -245,7 +245,45 @@ async function updateUser(id, updates) {
 }
 
 export async function deactivateEmployee(id) {
-  await updateUser(id, { employmentStatus: 'terminated' })
+  await updateUser(id, { employmentStatus: 'inactive' })
+}
+
+export async function restoreEmployee(id) {
+  await updateUser(id, { employmentStatus: 'active' })
+}
+
+export async function permanentlyDeleteEmployee(id) {
+  await throwIfError(
+    await supabase.from('academy_course_assignments').delete().eq('user_id', id),
+    'Удаление назначений'
+  )
+  await throwIfError(
+    await supabase.from('academy_progress').delete().eq('user_id', id),
+    'Удаление прогресса'
+  )
+  await throwIfError(
+    await supabase.from('academy_users').delete().eq('id', id),
+    'Удаление сотрудника'
+  )
+}
+
+export async function updateProfileName(userId, fullName) {
+  const trimmed = fullName.trim()
+  const parts = trimmed.split(/\s+/).filter(Boolean)
+  const firstName = parts[0] || trimmed
+  const lastName = parts.slice(1).join(' ')
+
+  await throwIfError(
+    await supabase
+      .from('academy_users')
+      .update({
+        full_name: trimmed,
+        first_name: firstName,
+        last_name: lastName,
+      })
+      .eq('id', userId),
+    'Обновление профиля'
+  )
 }
 
 async function syncAssignments(userId, courseIds) {
@@ -422,7 +460,7 @@ export async function saveTestResult(userId, courseId, score, passed) {
 }
 
 export async function authenticateUser(loginValue, password) {
-  if (!loginValue?.trim()) return null
+  if (!loginValue?.trim()) return { ok: false, reason: 'invalid' }
 
   const result = await supabase
     .from('academy_users')
@@ -431,7 +469,13 @@ export async function authenticateUser(loginValue, password) {
     .maybeSingle()
 
   const row = await throwIfError(result, 'Аутентификация')
-  if (!row || row.password !== password || row.status === 'terminated') return null
+  if (!row || row.password !== password) {
+    return { ok: false, reason: 'invalid' }
+  }
+
+  if (!canEmployeeLogin(row.status)) {
+    return { ok: false, reason: 'deactivated' }
+  }
 
   const assignmentsRes = await supabase
     .from('academy_course_assignments')
@@ -439,18 +483,21 @@ export async function authenticateUser(loginValue, password) {
     .eq('user_id', row.id)
   const assignments = await throwIfError(assignmentsRes, 'Назначения')
 
-  return normalizeEmployee({
-    id: row.id,
-    firstName: row.first_name,
-    lastName: row.last_name,
-    name: row.full_name,
-    login: row.login,
-    password: row.password,
-    role: row.role,
-    position: row.position,
-    employmentStatus: row.status,
-    assignedCourseIds: assignments.map((a) => a.course_id),
-  })
+  return {
+    ok: true,
+    user: normalizeEmployee({
+      id: row.id,
+      firstName: row.first_name,
+      lastName: row.last_name,
+      name: row.full_name,
+      login: row.login,
+      password: row.password,
+      role: row.role,
+      position: row.position,
+      employmentStatus: row.status,
+      assignedCourseIds: assignments.map((a) => a.course_id),
+    }),
+  }
 }
 
 export async function upsertMigrationBatch(payload) {

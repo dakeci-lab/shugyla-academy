@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getUser, clearUser } from '../utils/storage'
+import { useSession } from '../context/SessionContext'
 import AdminLayout from '../layouts/AdminLayout'
 import OverviewSection from '../components/admin/sections/OverviewSection'
 import EmployeesSection from '../components/admin/sections/EmployeesSection'
@@ -35,11 +35,11 @@ function AdminContent({ activeTab }) {
  */
 export default function Admin() {
   const navigate = useNavigate()
-  const user = getUser()
+  const { user, logout } = useSession()
   const [activeTab, setActiveTab] = useState('overview')
 
   function handleLogout() {
-    clearUser()
+    logout()
     navigate('/academy')
   }
 

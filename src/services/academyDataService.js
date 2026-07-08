@@ -61,6 +61,33 @@ export async function deactivateEmployee(id) {
   if (isCloudMode()) await refreshData()
 }
 
+export async function restoreEmployee(id) {
+  await getAdapter().restoreEmployee(id)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function permanentlyDeleteEmployee(id) {
+  await getAdapter().permanentlyDeleteEmployee(id)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function updateProfileName(userId, fullName) {
+  const trimmed = fullName.trim()
+  if (!trimmed) {
+    throw new Error('Укажите ФИО')
+  }
+  if (trimmed.length < 2) {
+    throw new Error('ФИО должно содержать минимум 2 символа')
+  }
+
+  try {
+    await getAdapter().updateProfileName(userId, trimmed)
+    if (isCloudMode()) await refreshData()
+  } catch {
+    throw new Error('Не удалось сохранить профиль. Попробуйте позже.')
+  }
+}
+
 // --- Courses ---
 
 export async function getCourses() {

@@ -1,22 +1,24 @@
 import { useState } from 'react'
 import {
-  getActiveEmployees,
+  getStaffEmployees,
   getEmployeeById,
   EMPTY_EMPLOYEE_FORM,
   employeeToForm,
   validateEmployeeForm,
   EMPLOYMENT_STATUS,
-  EMPLOYMENT_STATUS_LABELS,
-  EMPLOYMENT_STATUS_BADGE,
+  getEmploymentStatusLabel,
+  getEmploymentStatusBadgeType,
+  isDeactivatedStaffEmployee,
+  isActiveStaffEmployee,
 } from '../../../utils/employeeData'
 import {
   createEmployee,
   updateEmployee,
   deactivateEmployee,
+  restoreEmployee,
+  permanentlyDeleteEmployee,
 } from '../../../services/academyDataService'
-import {
-  getEmployeeProgressPercent,
-} from '../../../utils/adminStats'
+import { getEmployeeProgressPercent } from '../../../utils/adminStats'
 import { getRole, ROLES, ALL_EMPLOYEE_ROLES } from '../../../data/roles'
 import { getCoursesForEmployee, getAssignableCourses } from '../../../utils/courseAccess'
 import { getCourseProgress } from '../../../utils/storage'
@@ -26,18 +28,28 @@ import AdminModal from '../AdminModal'
 import StatusBadge from '../StatusBadge'
 import '../admin-shared.css'
 
+const FILTER_TABS = [
+  { id: 'active', label: 'Активные' },
+  { id: 'deactivated', label: 'Деактивированные' },
+  { id: 'all', label: 'Все' },
+]
+
 /** Раздел «Сотрудники» — полное управление и назначение курсов */
 export default function EmployeesSection() {
   const { version, refresh } = useAdminRefresh()
+  const [filter, setFilter] = useState('active')
   const [modalMode, setModalMode] = useState(null)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(EMPTY_EMPLOYEE_FORM)
   const [formError, setFormError] = useState('')
+  const [actionError, setActionError] = useState('')
 
   void version
 
-  const employees = getActiveEmployees()
+  const employees = getStaffEmployees(filter)
   const assignableCourses = getAssignableCourses()
+  const activeCount = getStaffEmployees('active').length
+  const deactivatedCount = getStaffEmployees('deactivated').length
 
   function openAdd() {
     setEditId(null)
@@ -87,8 +99,41 @@ export default function EmployeesSection() {
 
   async function handleDeactivate(emp) {
     if (!window.confirm(`Деактивировать сотрудника «${emp.name}»?`)) return
-    await deactivateEmployee(emp.id)
-    await refresh()
+    setActionError('')
+    try {
+      await deactivateEmployee(emp.id)
+      await refresh()
+    } catch (err) {
+      setActionError(err.message || 'Не удалось деактивировать сотрудника')
+    }
+  }
+
+  async function handleRestore(emp) {
+    setActionError('')
+    try {
+      await restoreEmployee(emp.id)
+      setFilter('active')
+      await refresh()
+    } catch (err) {
+      setActionError(err.message || 'Не удалось восстановить сотрудника')
+    }
+  }
+
+  async function handlePermanentDelete(emp) {
+    const confirmed = window.confirm(
+      'Вы действительно хотите удалить сотрудника навсегда? Это действие нельзя отменить.'
+    )
+    if (!confirmed) return
+
+    setActionError('')
+    try {
+      await permanentlyDeleteEmployee(emp.id)
+      await refresh()
+    } catch (err) {
+      setActionError(
+        err.message || 'Не удалось удалить сотрудника. Попробуйте позже.'
+      )
+    }
   }
 
   function toggleCourse(courseId) {
@@ -102,16 +147,92 @@ export default function EmployeesSection() {
     ? getCoursesForEmployee(getEmployeeById(editId))
     : []
 
+  function renderActions(emp) {
+    if (isActiveStaffEmployee(emp)) {
+      return (
+        <>
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={() => openEdit(emp)}
+          >
+            Редактировать
+          </button>
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={() => handleDeactivate(emp)}
+          >
+            Деактивировать
+          </button>
+        </>
+      )
+    }
+
+    if (isDeactivatedStaffEmployee(emp)) {
+      return (
+        <>
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={() => openEdit(emp)}
+          >
+            Редактировать
+          </button>
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={() => handleRestore(emp)}
+          >
+            Восстановить
+          </button>
+          <button
+            type="button"
+            className="btn btn--outline btn--sm admin-table__danger"
+            onClick={() => handlePermanentDelete(emp)}
+          >
+            Удалить навсегда
+          </button>
+        </>
+      )
+    }
+
+    return (
+      <button
+        type="button"
+        className="btn btn--outline btn--sm"
+        onClick={() => openEdit(emp)}
+      >
+        Редактировать
+      </button>
+    )
+  }
+
   return (
     <>
-      <div className="admin-toolbar">
-        <span className="admin-toolbar__info">
-          {employees.length} активных сотрудников
-        </span>
+      <div className="admin-toolbar admin-toolbar--stack">
+        <div className="admin-filter-tabs">
+          {FILTER_TABS.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`admin-filter-tab ${
+                filter === tab.id ? 'admin-filter-tab--active' : ''
+              }`}
+              onClick={() => setFilter(tab.id)}
+            >
+              {tab.label}
+              {tab.id === 'active' && ` (${activeCount})`}
+              {tab.id === 'deactivated' && ` (${deactivatedCount})`}
+            </button>
+          ))}
+        </div>
         <button type="button" className="btn btn--primary btn--sm" onClick={openAdd}>
           + Добавить сотрудника
         </button>
       </div>
+
+      {actionError && <p className="admin-form__error">{actionError}</p>}
 
       <div className="admin-table-wrap">
         <table className="admin-table">
@@ -131,7 +252,9 @@ export default function EmployeesSection() {
             {employees.length === 0 ? (
               <tr>
                 <td colSpan={8} className="admin-empty">
-                  Активные сотрудники не найдены.
+                  {filter === 'active' && 'Активные сотрудники не найдены.'}
+                  {filter === 'deactivated' && 'Деактивированные сотрудники не найдены.'}
+                  {filter === 'all' && 'Сотрудники не найдены.'}
                 </td>
               </tr>
             ) : (
@@ -153,8 +276,8 @@ export default function EmployeesSection() {
                     <td>{role?.label || emp.role}</td>
                     <td>
                       <StatusBadge
-                        label={EMPLOYMENT_STATUS_LABELS[emp.employmentStatus]}
-                        type={EMPLOYMENT_STATUS_BADGE[emp.employmentStatus]}
+                        label={getEmploymentStatusLabel(emp.employmentStatus)}
+                        type={getEmploymentStatusBadgeType(emp.employmentStatus)}
                       />
                     </td>
                     <td>{courses.length}</td>
@@ -171,20 +294,7 @@ export default function EmployeesSection() {
                     </td>
                     <td>
                       <div className="admin-table__actions">
-                        <button
-                          type="button"
-                          className="btn btn--outline btn--sm"
-                          onClick={() => openEdit(emp)}
-                        >
-                          Редактировать
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn--outline btn--sm"
-                          onClick={() => handleDeactivate(emp)}
-                        >
-                          Деактивировать
-                        </button>
+                        {renderActions(emp)}
                       </div>
                     </td>
                   </tr>
@@ -267,6 +377,7 @@ export default function EmployeesSection() {
                   }
                 >
                   <option value={EMPLOYMENT_STATUS.ACTIVE}>Активен</option>
+                  <option value={EMPLOYMENT_STATUS.INACTIVE}>Деактивирован</option>
                   <option value={EMPLOYMENT_STATUS.INTERNSHIP}>Стажировка</option>
                   <option value={EMPLOYMENT_STATUS.TERMINATED}>Уволен</option>
                 </select>

@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom'
-import { getUser, clearUser } from '../utils/storage'
 import { canManageAdmin } from '../utils/auth'
+import { useSession } from '../context/SessionContext'
 import { useLanguage } from '../context/LanguageContext'
 import LangSwitch from './LangSwitch'
 import './Header.css'
@@ -10,12 +10,12 @@ import './Header.css'
  * variant="landing" — полная навигация для главной страницы
  */
 export default function Header({ variant = 'default' }) {
-  const user = getUser()
+  const { user, logout } = useSession()
   const navigate = useNavigate()
   const { t } = useLanguage()
 
   function handleLogout() {
-    clearUser()
+    logout()
     navigate('/academy')
   }
 
@@ -46,6 +46,9 @@ export default function Header({ variant = 'default' }) {
                   {t.adminPanel}
                 </Link>
               )}
+              <Link to="/profile" className="header__link">
+                Профиль
+              </Link>
               <Link to="/dashboard" className="header__link header__user">
                 {user.name}
               </Link>

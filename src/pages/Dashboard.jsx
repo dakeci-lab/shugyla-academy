@@ -1,5 +1,6 @@
-import { useNavigate } from 'react-router-dom'
-import { getUser, clearUser, getCourseProgress } from '../utils/storage'
+import { useNavigate, Link } from 'react-router-dom'
+import { getCourseProgress } from '../utils/storage'
+import { useSession } from '../context/SessionContext'
 import { getAccessibleCourses, canViewTeamChecklists } from '../utils/auth'
 import { getEmployeeById } from '../utils/employeeData'
 import { getRole, getPermissionLabel } from '../data/roles'
@@ -15,7 +16,7 @@ import './Dashboard.css'
  */
 export default function Dashboard() {
   const navigate = useNavigate()
-  const user = getUser()
+  const { user, logout } = useSession()
 
   if (!user) return null
 
@@ -39,7 +40,7 @@ export default function Dashboard() {
   const hasManualAssignment = (employee.assignedCourseIds?.length ?? 0) > 0
 
   function handleLogout() {
-    clearUser()
+    logout()
     navigate('/academy')
   }
 

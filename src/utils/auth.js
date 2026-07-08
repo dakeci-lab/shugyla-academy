@@ -29,13 +29,18 @@ export const ACCESS_REASON = {
 
 /**
  * Попытка входа по логину и паролю.
+ * @returns {{ success: boolean, user?: object, error?: 'invalid' | 'deactivated' }}
  */
 export async function login(loginValue, password) {
-  const user = isCloudMode()
+  const result = isCloudMode()
     ? await authenticateUser(loginValue, password)
     : authenticateEmployee(loginValue, password)
-  if (!user) return null
 
+  if (!result.ok) {
+    return { success: false, error: result.reason }
+  }
+
+  const user = result.user
   const role = getRole(user.role)
 
   const sessionUser = {
@@ -48,7 +53,7 @@ export async function login(loginValue, password) {
     assignedCourseIds: user.assignedCourseIds || [],
   }
   saveUser(sessionUser)
-  return sessionUser
+  return { success: true, user: sessionUser }
 }
 
 /** Курсы по роли (legacy — для admin stats fallback) */

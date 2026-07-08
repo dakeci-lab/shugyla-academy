@@ -61,6 +61,17 @@
   border-radius: var(--radius-md);
 }
 
+.admin-layout__profile-link {
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.admin-layout__profile-link:hover {
+  text-decoration: underline;
+}
+
 .admin-layout__user-name {
   color: var(--color-text);
 }

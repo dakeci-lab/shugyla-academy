@@ -11,20 +11,87 @@ export const STORAGE_KEYS = {
 
 export const EMPLOYMENT_STATUS = {
   ACTIVE: 'active',
+  INACTIVE: 'inactive',
   INTERNSHIP: 'internship',
   TERMINATED: 'terminated',
 }
 
 export const EMPLOYMENT_STATUS_LABELS = {
   active: 'Активен',
+  inactive: 'Деактивирован',
+  deactivated: 'Деактивирован',
   internship: 'Стажировка',
+  trainee: 'Стажировка',
   terminated: 'Уволен',
+  dismissed: 'Уволен',
 }
 
 export const EMPLOYMENT_STATUS_BADGE = {
   active: 'active',
+  inactive: 'warning',
+  deactivated: 'warning',
   internship: 'progress',
+  trainee: 'progress',
   terminated: 'failed',
+  dismissed: 'failed',
+}
+
+/** Нормализация статуса из базы / legacy-значений */
+export function normalizeEmploymentStatus(status) {
+  if (!status) return EMPLOYMENT_STATUS.ACTIVE
+  if (status === 'deactivated') return EMPLOYMENT_STATUS.INACTIVE
+  if (status === 'dismissed') return EMPLOYMENT_STATUS.TERMINATED
+  if (status === 'trainee') return EMPLOYMENT_STATUS.INTERNSHIP
+  return status
+}
+
+export function canEmployeeLogin(status) {
+  const normalized = normalizeEmploymentStatus(status)
+  return (
+    normalized === EMPLOYMENT_STATUS.ACTIVE ||
+    normalized === EMPLOYMENT_STATUS.INTERNSHIP
+  )
+}
+
+export function isDeactivatedEmployeeStatus(status) {
+  const normalized = normalizeEmploymentStatus(status)
+  return (
+    normalized === EMPLOYMENT_STATUS.INACTIVE ||
+    normalized === EMPLOYMENT_STATUS.TERMINATED
+  )
+}
+
+export function isStaffEmployee(employee) {
+  return employee?.role !== 'admin'
+}
+
+export function isActiveStaffEmployee(employee) {
+  return (
+    isStaffEmployee(employee) &&
+    canEmployeeLogin(employee.employmentStatus)
+  )
+}
+
+export function isDeactivatedStaffEmployee(employee) {
+  return (
+    isStaffEmployee(employee) &&
+    isDeactivatedEmployeeStatus(employee.employmentStatus)
+  )
+}
+
+/** Фильтр списка сотрудников: active | deactivated | all */
+export function getStaffEmployees(filter = 'active') {
+  const staff = getAllEmployees().filter(isStaffEmployee)
+
+  if (filter === 'active') {
+    return staff.filter(isActiveStaffEmployee)
+  }
+
+  if (filter === 'deactivated') {
+    return staff.filter(isDeactivatedStaffEmployee)
+  }
+
+  return staff
 }
 
 function readJson(key, fallback) {
@@ -57,7 +124,9 @@ export function normalizeEmployee(raw) {
     lastName,
     name,
     position: raw.position || role?.label || raw.role,
-    employmentStatus: raw.employmentStatus || raw.status || EMPLOYMENT_STATUS.ACTIVE,
+    employmentStatus: normalizeEmploymentStatus(
+      raw.employmentStatus || raw.status
+    ),
     assignedCourseIds: Array.isArray(raw.assignedCourseIds) ? raw.assignedCourseIds : [],
   }
 }
@@ -95,13 +164,14 @@ export function getAllEmployees() {
   return getAllEmployeesLocal()
 }
 
-/** Активные сотрудники (без admin, без уволенных и удалённых) */
+/** Активные сотрудники (без admin, без деактивированных и уволенных) */
 export function getActiveEmployees() {
-  return getAllEmployees().filter(
-    (u) =>
-      u.role !== 'admin' &&
-      u.employmentStatus !== EMPLOYMENT_STATUS.TERMINATED
-  )
+  return getStaffEmployees('active')
+}
+
+/** Деактивированные и уволенные сотрудники */
+export function getDeactivatedEmployees() {
+  return getStaffEmployees('deactivated')
 }
 
 /** Для статистики обучения — alias */
@@ -169,12 +239,17 @@ export function updateEmployee(id, updates) {
   writeJson(STORAGE_KEYS.USER_EDITS, edits)
 }
 
-/** Деактивировать / уволить сотрудника */
+/** Деактивировать сотрудника (не удаляет из базы) */
 export function deactivateEmployee(id) {
-  updateEmployee(id, { employmentStatus: EMPLOYMENT_STATUS.TERMINATED })
+  updateEmployee(id, { employmentStatus: EMPLOYMENT_STATUS.INACTIVE })
 }
 
-/** Скрыть mock-сотрудника из списка */
+/** Восстановить сотрудника */
+export function restoreEmployee(id) {
+  updateEmployee(id, { employmentStatus: EMPLOYMENT_STATUS.ACTIVE })
+}
+
+/** Скрыть mock-сотрудника из списка / удалить extra-пользователя */
 export function deleteEmployee(id) {
   if (isMockUser(id)) {
     const deleted = getDeletedIds()
@@ -192,12 +267,49 @@ export function deleteEmployee(id) {
   )
 }
 
+/** Полное удаление сотрудника из localStorage */
+export function permanentlyDeleteEmployee(id) {
+  if (isMockUser(id)) {
+    const deleted = getDeletedIds()
+    if (!deleted.includes(id)) {
+      deleted.push(id)
+      writeJson(STORAGE_KEYS.DELETED_USER_IDS, deleted)
+    }
+  } else {
+    const extra = readJson(STORAGE_KEYS.EXTRA_USERS, [])
+    writeJson(
+      STORAGE_KEYS.EXTRA_USERS,
+      extra.filter((u) => u.id !== id)
+    )
+  }
+
+  const edits = readJson(STORAGE_KEYS.USER_EDITS, {})
+  if (edits[id]) {
+    delete edits[id]
+    writeJson(STORAGE_KEYS.USER_EDITS, edits)
+  }
+}
+
 /** Аутентификация по логину и паролю */
 export function authenticateEmployee(loginValue, password) {
   const user = getEmployeeByLogin(loginValue)
-  if (!user || user.password !== password) return null
-  if (user.employmentStatus === EMPLOYMENT_STATUS.TERMINATED) return null
-  return user
+  if (!user || user.password !== password) {
+    return { ok: false, reason: 'invalid' }
+  }
+  if (!canEmployeeLogin(user.employmentStatus)) {
+    return { ok: false, reason: 'deactivated' }
+  }
+  return { ok: true, user }
+}
+
+export function getEmploymentStatusLabel(status) {
+  const normalized = normalizeEmploymentStatus(status)
+  return EMPLOYMENT_STATUS_LABELS[normalized] || normalized
+}
+
+export function getEmploymentStatusBadgeType(status) {
+  const normalized = normalizeEmploymentStatus(status)
+  return EMPLOYMENT_STATUS_BADGE[normalized] || 'idle'
 }
 
 export const EMPTY_EMPLOYEE_FORM = {

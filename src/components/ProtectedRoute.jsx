@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom'
-import { getUser } from '../utils/storage'
+import { useSession } from '../context/SessionContext'
 import { canManageAdmin, roleHasPermission } from '../utils/auth'
 
 /**
@@ -12,7 +12,7 @@ export default function ProtectedRoute({
   requireAdmin = false,
   requiredPermission = null,
 }) {
-  const user = getUser()
+  const { user } = useSession()
 
   if (!user) {
     return <Navigate to="/login" replace />
