@@ -5,6 +5,7 @@ import Header from '../components/Header'
 import Hero from '../components/Hero'
 import CategoryFilter from '../components/CategoryFilter'
 import CourseCard from '../components/CourseCard'
+import VacanciesPublicBlock from '../components/VacanciesPublicBlock'
 import './Academy.css'
 
 /** Главная страница академии — hero, фильтры и сетка курсов */
@@ -49,6 +50,8 @@ export default function Academy() {
           )}
         </div>
       </section>
+
+      <VacanciesPublicBlock />
     </div>
   )
 }

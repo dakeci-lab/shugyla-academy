@@ -193,6 +193,14 @@ export async function fetchAllData() {
     standardsData = { categories: [], articles: [], reads: [] }
   }
 
+  let recruitmentData = { vacancies: [], questions: [], candidates: [] }
+  try {
+    const { fetchRecruitmentData } = await import('./recruitmentSupabaseAdapter')
+    recruitmentData = await fetchRecruitmentData()
+  } catch {
+    recruitmentData = { vacancies: [], questions: [], candidates: [] }
+  }
+
   return {
     employees,
     courses: normalizedCourses,
@@ -208,6 +216,9 @@ export async function fetchAllData() {
     standardCategories: standardsData.categories,
     standardArticles: standardsData.articles,
     standardArticleReads: standardsData.reads,
+    vacancies: recruitmentData.vacancies,
+    candidateQuestions: recruitmentData.questions,
+    candidates: recruitmentData.candidates,
   }
 }
 

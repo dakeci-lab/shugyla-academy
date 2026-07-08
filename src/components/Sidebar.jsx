@@ -8,6 +8,7 @@ export const ADMIN_MENU_ITEMS = [
   { id: 'courses', label: 'Курсы', icon: '▤' },
   { id: 'paths', label: 'Маршруты', icon: '⤳' },
   { id: 'standards', label: 'Стандарты', icon: '◫' },
+  { id: 'recruitment', label: 'Найм', icon: '◑' },
   { id: 'tests', label: 'Тесты', icon: '✎' },
   { id: 'certification', label: 'Аттестация', icon: '◈' },
   { id: 'progress', label: 'Прогресс', icon: '↗' },

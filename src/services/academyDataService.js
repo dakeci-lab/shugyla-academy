@@ -20,6 +20,8 @@ import * as learningPathLocalAdapter from './learningPathLocalAdapter'
 import * as learningPathSupabaseAdapter from './learningPathSupabaseAdapter'
 import * as standardsLocalAdapter from './standardsLocalAdapter'
 import * as standardsSupabaseAdapter from './standardsSupabaseAdapter'
+import * as recruitmentLocalAdapter from './recruitmentLocalAdapter'
+import * as recruitmentSupabaseAdapter from './recruitmentSupabaseAdapter'
 import {
   getAllLearningPathsSync,
   getLearningPathByIdSync,
@@ -38,6 +40,22 @@ import {
   getStandardArticleReadStatsSync,
   generateUniqueSlug,
 } from '../utils/standardsData'
+import {
+  getAllVacanciesSync,
+  getPublishedVacanciesSync,
+  getVacancyByIdSync,
+  getVacancyBySlugSync,
+  getPublishedVacancyBySlugSync,
+  getCandidateQuestionsSync,
+  getAllCandidateQuestionsSync,
+  getAllCandidatesSync,
+  getCandidatesByVacancySync,
+  getCandidateByIdSync,
+  generateUniqueVacancySlug,
+  CANDIDATE_STATUS,
+  getVacancyRoleLabel,
+} from '../utils/recruitmentData'
+import { EMPLOYMENT_STATUS } from '../utils/employeeData'
 
 function getAdapter() {
   return isCloudMode() ? supabaseAdapter : localAdapter
@@ -53,6 +71,10 @@ function getLearningPathAdapter() {
 
 function getStandardsAdapter() {
   return isCloudMode() ? standardsSupabaseAdapter : standardsLocalAdapter
+}
+
+function getRecruitmentAdapter() {
+  return isCloudMode() ? recruitmentSupabaseAdapter : recruitmentLocalAdapter
 }
 
 export { isCloudMode, getDataModeLabel, getDataModeVariant }
@@ -604,4 +626,179 @@ export async function acknowledgeStandardArticle(articleId, userId) {
   const result = await getStandardsAdapter().acknowledgeStandardArticle(articleId, userId)
   if (isCloudMode()) await refreshData()
   return result
+}
+
+// --- Recruitment (sync reads) ---
+
+export function getVacancies() {
+  return getAllVacanciesSync()
+}
+
+export function getPublishedVacancies() {
+  return getPublishedVacanciesSync()
+}
+
+export function getVacancyById(vacancyId) {
+  return getVacancyByIdSync(vacancyId)
+}
+
+export function getVacancyBySlug(slug) {
+  return getVacancyBySlugSync(slug)
+}
+
+export function getPublishedVacancyBySlug(slug) {
+  return getPublishedVacancyBySlugSync(slug)
+}
+
+export function getCandidateQuestions(vacancyId) {
+  return getCandidateQuestionsSync(vacancyId)
+}
+
+export function getAllCandidateQuestions() {
+  return getAllCandidateQuestionsSync()
+}
+
+export function getCandidates() {
+  return getAllCandidatesSync()
+}
+
+export function getCandidatesByVacancy(vacancyId) {
+  return getCandidatesByVacancySync(vacancyId)
+}
+
+export function getCandidateById(candidateId) {
+  return getCandidateByIdSync(candidateId)
+}
+
+// --- Recruitment (async mutations) ---
+
+export async function createVacancy(vacancyData) {
+  if (!vacancyData.title?.trim()) throw new Error('Укажите название вакансии')
+  if (!vacancyData.role) throw new Error('Выберите роль для вакансии')
+  const vacancies = getAllVacanciesSync()
+  const slug = vacancyData.slug || generateUniqueVacancySlug(vacancyData.title, vacancies)
+  const id = await getRecruitmentAdapter().createVacancy({ ...vacancyData, slug })
+  if (isCloudMode()) await refreshData()
+  return id
+}
+
+export async function updateVacancy(vacancyId, updates) {
+  if (updates.title != null && !updates.title.trim()) {
+    throw new Error('Укажите название вакансии')
+  }
+  await getRecruitmentAdapter().updateVacancy(vacancyId, updates)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function publishVacancy(vacancyId) {
+  await getRecruitmentAdapter().publishVacancy(vacancyId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function unpublishVacancy(vacancyId) {
+  await getRecruitmentAdapter().unpublishVacancy(vacancyId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function archiveVacancy(vacancyId) {
+  await getRecruitmentAdapter().archiveVacancy(vacancyId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function deleteVacancy(vacancyId) {
+  await getRecruitmentAdapter().deleteVacancy(vacancyId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function createCandidateQuestion(vacancyId, questionData) {
+  if (!questionData.questionText?.trim()) throw new Error('Укажите текст вопроса')
+  if (!questionData.options?.length || questionData.options.length < 2) {
+    throw new Error('Добавьте минимум 2 варианта ответа')
+  }
+  const id = await getRecruitmentAdapter().createCandidateQuestion(vacancyId, questionData)
+  if (isCloudMode()) await refreshData()
+  return id
+}
+
+export async function updateCandidateQuestion(questionId, updates) {
+  await getRecruitmentAdapter().updateCandidateQuestion(questionId, updates)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function deleteCandidateQuestion(questionId) {
+  await getRecruitmentAdapter().deleteCandidateQuestion(questionId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function reorderCandidateQuestions(vacancyId, orderedQuestionIds) {
+  await getRecruitmentAdapter().reorderCandidateQuestions(vacancyId, orderedQuestionIds)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function submitCandidateApplication(applicationData) {
+  if (!applicationData.firstName?.trim()) throw new Error('Укажите имя')
+  if (!applicationData.phone?.trim()) throw new Error('Укажите телефон')
+  const result = await getRecruitmentAdapter().submitCandidateApplication(applicationData)
+  if (isCloudMode()) await refreshData()
+  return result
+}
+
+export async function updateCandidateStatus(candidateId, status) {
+  await getRecruitmentAdapter().updateCandidateStatus(candidateId, status)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function updateCandidateNotes(candidateId, notes) {
+  await getRecruitmentAdapter().updateCandidateNotes(candidateId, notes)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function rejectCandidate(candidateId) {
+  await getRecruitmentAdapter().rejectCandidate(candidateId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function inviteCandidate(candidateId) {
+  await getRecruitmentAdapter().inviteCandidate(candidateId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function convertCandidateToTrainee(candidateId) {
+  await getRecruitmentAdapter().convertCandidateToTrainee(candidateId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function hireCandidateAsUser(candidateId, userData, options = {}) {
+  const candidate = getCandidateByIdSync(candidateId)
+  if (!candidate) throw new Error('Кандидат не найден')
+
+  const vacancy = candidate.vacancyId ? getVacancyByIdSync(candidate.vacancyId) : null
+  const role = userData.role || vacancy?.role || 'trainee'
+  const asTrainee = options.asTrainee !== false && userData.employmentStatus !== EMPLOYMENT_STATUS.ACTIVE
+
+  const employeePayload = {
+    firstName: userData.firstName || candidate.firstName,
+    lastName: userData.lastName || candidate.lastName,
+    position: userData.position || getVacancyRoleLabel(role),
+    role,
+    login: userData.login,
+    password: userData.password,
+    employmentStatus: userData.employmentStatus || EMPLOYMENT_STATUS.INTERNSHIP,
+    assignedCourseIds: userData.assignedCourseIds || [],
+  }
+
+  const newUserId = await createEmployee(employeePayload)
+
+  if (userData.learningPathId) {
+    await assignLearningPathToUser(newUserId, userData.learningPathId)
+  }
+
+  await getRecruitmentAdapter().markCandidateHired(
+    candidateId,
+    newUserId,
+    asTrainee ? CANDIDATE_STATUS.TRAINEE : CANDIDATE_STATUS.HIRED
+  )
+
+  if (isCloudMode()) await refreshData()
+  return newUserId
 }

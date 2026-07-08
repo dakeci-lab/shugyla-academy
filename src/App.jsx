@@ -10,6 +10,7 @@ import Admin from './pages/Admin'
 import CoursePage from './pages/CoursePage'
 import Profile from './pages/Profile'
 import Standards from './pages/Standards'
+import ApplyPage from './pages/Apply'
 
 /**
  * Маршрутизация приложения Shugyla Academy
@@ -25,6 +26,9 @@ export default function App() {
         <Route path="/" element={<Academy />} />
         <Route path="/academy" element={<Academy />} />
         <Route path="/login" element={<Login />} />
+
+        {/* Публичная анкета кандидата — без авторизации */}
+        <Route path="/apply/:slug" element={<ApplyPage />} />
 
         {/* Защищённые маршруты — нужна авторизация */}
         <Route

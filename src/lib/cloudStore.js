@@ -16,6 +16,9 @@ const emptyStore = {
   standardCategories: [],
   standardArticles: [],
   standardArticleReads: [],
+  vacancies: [],
+  candidateQuestions: [],
+  candidates: [],
 }
 
 let store = { ...emptyStore }
@@ -45,6 +48,9 @@ export function setCloudStore(data) {
     standardCategories: data.standardCategories || [],
     standardArticles: data.standardArticles || [],
     standardArticleReads: data.standardArticleReads || [],
+    vacancies: data.vacancies || [],
+    candidateQuestions: data.candidateQuestions || [],
+    candidates: data.candidates || [],
   }
 }
 
@@ -102,4 +108,16 @@ export function getCloudStandardArticles() {
 
 export function getCloudStandardArticleReads() {
   return store.loaded ? store.standardArticleReads : null
+}
+
+export function getCloudVacancies() {
+  return store.loaded ? store.vacancies : null
+}
+
+export function getCloudCandidateQuestions() {
+  return store.loaded ? store.candidateQuestions : null
+}
+
+export function getCloudCandidates() {
+  return store.loaded ? store.candidates : null
 }

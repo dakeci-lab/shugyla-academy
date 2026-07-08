@@ -25,6 +25,10 @@ export const ADMIN_SECTIONS = {
     title: 'Стандарты',
     description: 'База стандартов Shugyla Market — статьи и ознакомление сотрудников.',
   },
+  recruitment: {
+    title: 'Найм',
+    description: 'Вакансии, фильтр-вопросы и кандидаты на должности.',
+  },
   tests: {
     title: 'Тесты',
     description: 'Управление тестами и вопросами для аттестации.',

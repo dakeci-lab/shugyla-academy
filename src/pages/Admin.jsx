@@ -7,6 +7,7 @@ import EmployeesSection from '../components/admin/sections/EmployeesSection'
 import CoursesSection from '../components/admin/sections/CoursesSection'
 import LearningPathsSection from '../components/admin/sections/LearningPathsSection'
 import StandardsSection from '../components/admin/sections/StandardsSection'
+import RecruitmentSection from '../components/admin/sections/RecruitmentSection'
 import TestsSection from '../components/admin/sections/TestsSection'
 import CertificationSection from '../components/admin/sections/CertificationSection'
 import ProgressSection from '../components/admin/sections/ProgressSection'
@@ -24,6 +25,8 @@ function AdminContent({ activeTab }) {
       return <LearningPathsSection />
     case 'standards':
       return <StandardsSection />
+    case 'recruitment':
+      return <RecruitmentSection />
     case 'tests':
       return <TestsSection />
     case 'certification':

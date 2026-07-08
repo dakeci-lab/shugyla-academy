@@ -210,6 +210,8 @@ export async function initializeLocal() {
   const pathsBundle = getLocalPathsBundle()
   const { getLocalStandardsBundle } = await import('./standardsLocalAdapter')
   const standardsBundle = getLocalStandardsBundle()
+  const { getLocalRecruitmentBundle } = await import('./recruitmentLocalAdapter')
+  const recruitmentBundle = getLocalRecruitmentBundle()
   return {
     employees: getAllEmployeesLocal(),
     courses: getAllCoursesLocal(),
@@ -225,6 +227,9 @@ export async function initializeLocal() {
     standardCategories: standardsBundle.categories,
     standardArticles: standardsBundle.articles,
     standardArticleReads: standardsBundle.reads,
+    vacancies: recruitmentBundle.vacancies,
+    candidateQuestions: recruitmentBundle.questions,
+    candidates: recruitmentBundle.candidates,
   }
 }
 
