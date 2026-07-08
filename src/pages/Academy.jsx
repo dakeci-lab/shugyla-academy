@@ -6,6 +6,7 @@ import Hero from '../components/Hero'
 import CategoryFilter from '../components/CategoryFilter'
 import CourseCard from '../components/CourseCard'
 import VacanciesPublicBlock from '../components/VacanciesPublicBlock'
+import PWAInstallPrompt from '../components/PWAInstallPrompt'
 import './Academy.css'
 
 /** Главная страница академии — hero, фильтры и сетка курсов */
@@ -24,6 +25,10 @@ export default function Academy() {
     <div className="academy-page">
       <Header variant="landing" />
       <Hero />
+
+      <div className="container">
+        <PWAInstallPrompt />
+      </div>
 
       <section id="courses" className="academy-page__catalog">
         <div className="container">

@@ -11,6 +11,7 @@ import ProgressBar from '../components/ProgressBar'
 import FinalAttestationBlock from '../components/FinalAttestationBlock'
 import MyLearningPathBlock from '../components/MyLearningPathBlock'
 import StandardsDashboardBlock from '../components/StandardsDashboardBlock'
+import PWAInstallPrompt from '../components/PWAInstallPrompt'
 import './Dashboard.css'
 
 /**
@@ -52,6 +53,7 @@ export default function Dashboard() {
       <Header />
 
       <main className="dashboard-page__main container">
+        <PWAInstallPrompt />
         <div className="dashboard-page__welcome">
           <div>
             <h1 className="dashboard-page__greeting">

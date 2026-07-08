@@ -14,8 +14,10 @@ function DataLoadingScreen() {
   return (
     <div className="academy-data-loading">
       <div className="academy-data-loading__card">
+        <div className="academy-data-loading__logo" aria-hidden="true">S</div>
+        <h1 className="academy-data-loading__brand">Shugyla Academy</h1>
         <span className="academy-data-loading__spinner" aria-hidden />
-        <p>Загрузка данных из облака…</p>
+        <p>Загрузка…</p>
       </div>
     </div>
   )

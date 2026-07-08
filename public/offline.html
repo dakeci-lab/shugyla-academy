@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#2a9d5c" />
+    <title>Нет сети — Shugyla Academy</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+        background: #f4f6f4;
+        color: #141414;
+        padding: 24px;
+      }
+      .card {
+        max-width: 360px;
+        width: 100%;
+        text-align: center;
+        background: #fff;
+        border: 1px solid #dde5df;
+        border-radius: 14px;
+        padding: 32px 24px;
+        box-shadow: 0 8px 24px rgba(20, 40, 28, 0.08);
+      }
+      .logo {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 16px;
+        border-radius: 16px;
+        background: #2a9d5c;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 28px;
+        font-weight: 700;
+      }
+      h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+      p {
+        margin: 0 0 24px;
+        color: #4a524d;
+        line-height: 1.5;
+      }
+      button {
+        width: 100%;
+        padding: 14px 20px;
+        border: none;
+        border-radius: 8px;
+        background: #2a9d5c;
+        color: #fff;
+        font-size: 15px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:active {
+        background: #1f7a47;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="logo" aria-hidden="true">S</div>
+      <h1>Нет подключения к интернету</h1>
+      <p>Проверьте интернет и попробуйте снова</p>
+      <button type="button" onclick="window.location.reload()">Повторить</button>
+    </div>
+  </body>
+</html>
