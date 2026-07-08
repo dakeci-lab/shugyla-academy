@@ -7,12 +7,15 @@ import {
   calcLessonProgress,
 } from './courseStructure'
 import {
-  getDetailedCourseStatus,
-  getCourseTestStatus,
   getAdminFinalAttestationStatus,
-  isCourseFullyComplete,
   areAllAssignedCoursesComplete,
 } from './testProgress'
+import {
+  getActiveLearningPathForUser,
+} from './learningPathData'
+import {
+  getLearningPathProgress,
+} from './learningPathProgress'
 
 function safeCompletedCount(completedLessons, courseId) {
   const total = getCourseLessonCount(courseId)
@@ -133,64 +136,38 @@ function getAttestationRowStatus(userId, role) {
   return { label: 'Не доступна', type: 'idle' }
 }
 
-/** Детальный прогресс для таблицы «Прогресс» */
+/** Детальный прогресс для таблицы «Прогресс» — по сотрудникам и маршрутам */
 export function getProgressRows() {
   const employees = getActiveEmployees()
-  const rows = []
 
-  employees.forEach((emp) => {
-    const courses = getCoursesForEmployee(emp)
+  return employees.map((emp) => {
+    const pathInfo = getActiveLearningPathForUser(emp.id)
     const attestationStatus = getAttestationRowStatus(emp.id, emp.role)
 
-    if (courses.length === 0) {
-      rows.push({
-        employeeId: emp.id,
-        employeeName: emp.name,
-        employeeRole: emp.role,
-        courseId: null,
-        courseTitle: '—',
-        completedLessons: 0,
-        totalLessons: 0,
-        percent: 0,
-        status: { label: 'Нет курсов', type: 'idle' },
-        courseTestStatus: { label: '—', type: 'idle' },
-        courseOverallStatus: { label: 'Не начат', type: 'idle' },
-        attestationStatus,
-        noCourses: true,
-      })
-      return
+    let pathTitle = 'Без маршрута'
+    let pathProgressPercent = 0
+    let coursesCompletedLabel = '—'
+    let pathStatus = { label: '—', type: 'idle' }
+
+    if (pathInfo?.path) {
+      pathTitle = pathInfo.isArchived ? 'Архивный маршрут' : pathInfo.path.title
+      const progress = getLearningPathProgress(emp.id, pathInfo.path.id)
+      pathProgressPercent = progress.percent
+      coursesCompletedLabel = `${progress.completedCourses} / ${progress.requiredCourses}`
+      pathStatus = progress.status
+    } else if (pathInfo?.label && pathInfo.label !== 'Маршрут не назначен') {
+      pathTitle = pathInfo.label
     }
 
-    courses.forEach((course) => {
-      const prog = getCourseProgress(emp.id, course.id)
-      const totalLessons = getCourseLessonCount(course.id)
-      const completedLessons = safeCompletedCount(prog.completedLessons, course.id)
-      const percent = calcLessonProgress(prog.completedLessons, course.id)
-      const courseOverallStatus = getDetailedCourseStatus(
-        emp.id,
-        course.id,
-        prog.completedLessons
-      )
-      const courseTestStatus = getCourseTestStatus(emp.id, course.id)
-
-      rows.push({
-        employeeId: emp.id,
-        employeeName: emp.name,
-        employeeRole: emp.role,
-        courseId: course.id,
-        courseTitle: course.title,
-        completedLessons,
-        totalLessons,
-        percent,
-        status: courseOverallStatus,
-        courseTestStatus,
-        courseOverallStatus,
-        attestationStatus,
-        courseComplete: isCourseFullyComplete(emp.id, course.id, prog.completedLessons),
-        noCourses: false,
-      })
-    })
+    return {
+      employeeId: emp.id,
+      employeeName: emp.name,
+      employeeRole: emp.role,
+      pathTitle,
+      pathProgressPercent,
+      coursesCompletedLabel,
+      pathStatus,
+      attestationStatus,
+    }
   })
-
-  return rows
 }

@@ -11,6 +11,11 @@ import {
   TEST_TYPE,
 } from './testData'
 import { getEmployeeById } from './employeeData'
+import {
+  getUserLearningPathSync,
+  getLearningPathByIdSync,
+} from './learningPathData'
+import { isLearningPathComplete } from './learningPathProgress'
 
 export function getCourseTestForCourse(courseId) {
   return getPublishedCourseTest(courseId)
@@ -86,15 +91,30 @@ export function getFinalAttestationAvailability(userId, role) {
   if (!attestation) {
     return {
       available: false,
-      reason: 'Для вашей должности финальная аттестация пока не настроена.',
+      reason: 'Для роли не создана аттестация',
       test: null,
+    }
+  }
+
+  const pathAssignment = getUserLearningPathSync(userId)
+  if (pathAssignment) {
+    const path = getLearningPathByIdSync(pathAssignment.learningPathId)
+    if (path && path.status !== 'archived') {
+      if (!isLearningPathComplete(userId, pathAssignment.learningPathId)) {
+        return {
+          available: false,
+          reason: 'Маршрут обучения ещё не завершён',
+          test: attestation,
+        }
+      }
+      return { available: true, reason: null, test: attestation }
     }
   }
 
   if (!areAllAssignedCoursesComplete(userId)) {
     return {
       available: false,
-      reason: 'Сначала нужно завершить назначенные курсы.',
+      reason: 'Назначенные курсы ещё не завершены',
       test: attestation,
     }
   }

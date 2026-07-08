@@ -6,6 +6,7 @@ export const ADMIN_MENU_ITEMS = [
   { id: 'overview', label: 'Обзор', icon: '◉' },
   { id: 'employees', label: 'Сотрудники', icon: '◎' },
   { id: 'courses', label: 'Курсы', icon: '▤' },
+  { id: 'paths', label: 'Маршруты', icon: '⤳' },
   { id: 'tests', label: 'Тесты', icon: '✎' },
   { id: 'certification', label: 'Аттестация', icon: '◈' },
   { id: 'progress', label: 'Прогресс', icon: '↗' },

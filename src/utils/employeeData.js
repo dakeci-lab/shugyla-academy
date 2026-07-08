@@ -321,6 +321,7 @@ export const EMPTY_EMPLOYEE_FORM = {
   password: '',
   employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
   assignedCourseIds: [],
+  learningPathId: '',
 }
 
 export function employeeToForm(employee) {
@@ -333,6 +334,7 @@ export function employeeToForm(employee) {
     password: '',
     employmentStatus: employee.employmentStatus || EMPLOYMENT_STATUS.ACTIVE,
     assignedCourseIds: [...(employee.assignedCourseIds || [])],
+    learningPathId: '',
   }
 }
 

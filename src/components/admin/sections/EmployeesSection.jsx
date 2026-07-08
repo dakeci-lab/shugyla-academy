@@ -17,7 +17,11 @@ import {
   deactivateEmployee,
   restoreEmployee,
   permanentlyDeleteEmployee,
+  assignLearningPathToUser,
+  getLearningPathsByRole,
+  getUserLearningPath,
 } from '../../../services/academyDataService'
+import { getActiveLearningPathForUser } from '../../../utils/learningPathData'
 import { getEmployeeProgressPercent } from '../../../utils/adminStats'
 import { getRole, ROLES, ALL_EMPLOYEE_ROLES } from '../../../data/roles'
 import { getCoursesForEmployee, getAssignableCourses } from '../../../utils/courseAccess'
@@ -44,12 +48,29 @@ export default function EmployeesSection() {
   const [formError, setFormError] = useState('')
   const [actionError, setActionError] = useState('')
 
+  const [pathAssignId, setPathAssignId] = useState(null)
+  const [pathForm, setPathForm] = useState({ learningPathId: '' })
+  const [pathFormError, setPathFormError] = useState('')
+
   void version
 
   const employees = getStaffEmployees(filter)
   const assignableCourses = getAssignableCourses()
   const activeCount = getStaffEmployees('active').length
   const deactivatedCount = getStaffEmployees('deactivated').length
+  const publishedPathsForRole = getLearningPathsByRole(form.role, { publishedOnly: true })
+
+  function currentPathIdForUser(userId) {
+    return getUserLearningPath(userId)?.learningPathId || ''
+  }
+
+  function pathLabelForEmployee(emp) {
+    const info = getActiveLearningPathForUser(emp.id)
+    if (!info) return 'Маршрут не назначен'
+    if (info.isArchived) return 'Архивный маршрут'
+    if (!info.path) return info.label || 'Маршрут удалён'
+    return info.path.title
+  }
 
   function openAdd() {
     setEditId(null)
@@ -60,9 +81,23 @@ export default function EmployeesSection() {
 
   function openEdit(emp) {
     setEditId(emp.id)
-    setForm(employeeToForm(emp))
+    const baseForm = employeeToForm(emp)
+    baseForm.learningPathId = currentPathIdForUser(emp.id)
+    setForm(baseForm)
     setFormError('')
     setModalMode('form')
+  }
+
+  function openPathAssign(emp) {
+    setPathAssignId(emp.id)
+    setPathForm({ learningPathId: currentPathIdForUser(emp.id) })
+    setPathFormError('')
+    setModalMode('path')
+  }
+
+  async function assignPathToEmployee(userId, pathId) {
+    if (!pathId) return null
+    return assignLearningPathToUser(userId, pathId)
   }
 
   async function handleSave(e) {
@@ -85,15 +120,41 @@ export default function EmployeesSection() {
     }
 
     try {
+      const previousPathId = editId ? currentPathIdForUser(editId) : ''
+      const pathChanged = form.learningPathId && form.learningPathId !== previousPathId
+
       if (editId) {
         await updateEmployee(editId, payload)
+        if (pathChanged) {
+          await assignPathToEmployee(editId, form.learningPathId)
+        }
       } else {
-        await createEmployee({ ...payload, password: form.password })
+        const newId = await createEmployee({ ...payload, password: form.password })
+        if (form.learningPathId) {
+          await assignPathToEmployee(newId, form.learningPathId)
+        }
       }
       setModalMode(null)
       await refresh()
     } catch (err) {
       setFormError(err.message || 'Не удалось сохранить сотрудника')
+    }
+  }
+
+  async function handlePathSave(e) {
+    e.preventDefault()
+    if (!pathAssignId) return
+    if (!pathForm.learningPathId) {
+      setPathFormError('Выберите маршрут')
+      return
+    }
+
+    try {
+      await assignPathToEmployee(pathAssignId, pathForm.learningPathId)
+      setModalMode(null)
+      await refresh()
+    } catch (err) {
+      setPathFormError(err.message || 'Не удалось назначить маршрут')
     }
   }
 
@@ -147,6 +208,11 @@ export default function EmployeesSection() {
     ? getCoursesForEmployee(getEmployeeById(editId))
     : []
 
+  const pathChangedOnEdit =
+    editId &&
+    form.learningPathId &&
+    form.learningPathId !== currentPathIdForUser(editId)
+
   function renderActions(emp) {
     if (isActiveStaffEmployee(emp)) {
       return (
@@ -157,6 +223,13 @@ export default function EmployeesSection() {
             onClick={() => openEdit(emp)}
           >
             Редактировать
+          </button>
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={() => openPathAssign(emp)}
+          >
+            {currentPathIdForUser(emp.id) ? 'Сменить маршрут' : 'Назначить маршрут'}
           </button>
           <button
             type="button"
@@ -242,6 +315,7 @@ export default function EmployeesSection() {
               <th>Должность</th>
               <th>Логин</th>
               <th>Роль</th>
+              <th>Маршрут</th>
               <th>Статус</th>
               <th>Курсы</th>
               <th>Прогресс</th>
@@ -251,7 +325,7 @@ export default function EmployeesSection() {
           <tbody>
             {employees.length === 0 ? (
               <tr>
-                <td colSpan={8} className="admin-empty">
+                <td colSpan={9} className="admin-empty">
                   {filter === 'active' && 'Активные сотрудники не найдены.'}
                   {filter === 'deactivated' && 'Деактивированные сотрудники не найдены.'}
                   {filter === 'all' && 'Сотрудники не найдены.'}
@@ -274,6 +348,7 @@ export default function EmployeesSection() {
                     <td>{emp.position}</td>
                     <td><code className="admin-code">{emp.login}</code></td>
                     <td>{role?.label || emp.role}</td>
+                    <td>{pathLabelForEmployee(emp)}</td>
                     <td>
                       <StatusBadge
                         label={getEmploymentStatusLabel(emp.employmentStatus)}
@@ -358,7 +433,9 @@ export default function EmployeesSection() {
                 <select
                   className="admin-form__select"
                   value={form.role}
-                  onChange={(e) => setForm({ ...form, role: e.target.value })}
+                  onChange={(e) =>
+                    setForm({ ...form, role: e.target.value, learningPathId: '' })
+                  }
                 >
                   {ALL_EMPLOYEE_ROLES.map((roleId) => (
                     <option key={roleId} value={roleId}>
@@ -405,6 +482,32 @@ export default function EmployeesSection() {
                 />
               </label>
             </div>
+
+            <label className="admin-form__label">
+              Обучающий маршрут
+              <select
+                className="admin-form__select"
+                value={form.learningPathId}
+                onChange={(e) => setForm({ ...form, learningPathId: e.target.value })}
+              >
+                <option value="">Без маршрута</option>
+                {publishedPathsForRole.map((path) => (
+                  <option key={path.id} value={path.id}>
+                    {path.title}
+                  </option>
+                ))}
+              </select>
+              <p className="admin-form__hint">
+                Показаны только опубликованные маршруты для выбранной роли.
+              </p>
+            </label>
+
+            {pathChangedOnEdit && (
+              <p className="admin-form__hint admin-form__hint--warning">
+                Новый маршрут добавит сотруднику курсы из выбранного маршрута.
+                Старые назначения и прогресс сохранятся.
+              </p>
+            )}
 
             <div className="admin-form__label">
               <span>Назначенные курсы</span>
@@ -456,6 +559,55 @@ export default function EmployeesSection() {
               </ul>
             </div>
           )}
+        </AdminModal>
+      )}
+
+      {modalMode === 'path' && pathAssignId && (
+        <AdminModal
+          title={
+            currentPathIdForUser(pathAssignId)
+              ? 'Сменить маршрут'
+              : 'Назначить маршрут'
+          }
+          onClose={() => setModalMode(null)}
+          footer={
+            <>
+              <button type="button" className="btn btn--outline" onClick={() => setModalMode(null)}>
+                Отмена
+              </button>
+              <button type="submit" className="btn btn--primary" form="path-assign-form">
+                Сохранить
+              </button>
+            </>
+          }
+        >
+          <form id="path-assign-form" className="admin-form" onSubmit={handlePathSave}>
+            <p className="admin-form__hint admin-form__hint--warning">
+              Новый маршрут добавит сотруднику курсы из выбранного маршрута.
+              Старые назначения и прогресс сохранятся.
+            </p>
+            <label className="admin-form__label">
+              Обучающий маршрут
+              <select
+                className="admin-form__select"
+                value={pathForm.learningPathId}
+                onChange={(e) =>
+                  setPathForm({ ...pathForm, learningPathId: e.target.value })
+                }
+                required
+              >
+                <option value="">Выберите маршрут…</option>
+                {getLearningPathsByRole(getEmployeeById(pathAssignId)?.role, {
+                  publishedOnly: true,
+                }).map((path) => (
+                  <option key={path.id} value={path.id}>
+                    {path.title}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {pathFormError && <p className="admin-form__error">{pathFormError}</p>}
+          </form>
         </AdminModal>
       )}
     </>

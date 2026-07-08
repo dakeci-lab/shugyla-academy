@@ -206,6 +206,8 @@ export async function authenticateUser(loginValue, password) {
 
 export async function initializeLocal() {
   const testsBundle = getLocalTestsBundle()
+  const { getLocalPathsBundle } = await import('./learningPathLocalAdapter')
+  const pathsBundle = getLocalPathsBundle()
   return {
     employees: getAllEmployeesLocal(),
     courses: getAllCoursesLocal(),
@@ -215,6 +217,9 @@ export async function initializeLocal() {
     tests: testsBundle.tests,
     testQuestions: testsBundle.questions,
     testAttempts: testsBundle.attempts,
+    learningPaths: pathsBundle.paths,
+    learningPathCourses: pathsBundle.pathCourses,
+    userLearningPaths: pathsBundle.userPaths,
   }
 }
 

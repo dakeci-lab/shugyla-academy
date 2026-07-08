@@ -1,0 +1,97 @@
+.my-learning-path__card {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+}
+
+.my-learning-path__card--empty {
+  color: var(--color-text-muted, #6b7280);
+}
+
+.my-learning-path__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.my-learning-path__title {
+  margin: 0 0 0.35rem;
+  font-size: 1.125rem;
+}
+
+.my-learning-path__desc {
+  margin: 0;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.9375rem;
+}
+
+.my-learning-path__desc--muted {
+  font-style: italic;
+}
+
+.my-learning-path__courses {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.my-learning-path__course {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.my-learning-path__course-index {
+  font-weight: 600;
+  min-width: 1.5rem;
+}
+
+.my-learning-path__course-body {
+  flex: 1;
+}
+
+.my-learning-path__course-link {
+  color: inherit;
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.my-learning-path__course-link:hover {
+  text-decoration: underline;
+}
+
+.my-learning-path__optional {
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.875rem;
+}
+
+.learning-path-courses {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border, #e5e7eb);
+}
+
+.admin-form--inline {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.admin-form--inline .admin-form__label {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.admin-table--compact td,
+.admin-table--compact th {
+  padding: 0.5rem 0.75rem;
+}

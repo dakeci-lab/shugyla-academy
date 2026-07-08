@@ -16,6 +16,16 @@ import {
 } from '../utils/testData'
 
 import * as localAdapter from './localDataAdapter'
+import * as learningPathLocalAdapter from './learningPathLocalAdapter'
+import * as learningPathSupabaseAdapter from './learningPathSupabaseAdapter'
+import {
+  getAllLearningPathsSync,
+  getLearningPathByIdSync,
+  getLearningPathsByRoleSync,
+  getLearningPathCoursesSync,
+  getUserLearningPathSync,
+  getUserLearningPathsSync,
+} from '../utils/learningPathData'
 
 function getAdapter() {
   return isCloudMode() ? supabaseAdapter : localAdapter
@@ -23,6 +33,10 @@ function getAdapter() {
 
 function getTestAdapter() {
   return isCloudMode() ? testSupabaseAdapter : testLocalAdapter
+}
+
+function getLearningPathAdapter() {
+  return isCloudMode() ? learningPathSupabaseAdapter : learningPathLocalAdapter
 }
 
 export { isCloudMode, getDataModeLabel, getDataModeVariant }
@@ -347,4 +361,111 @@ export async function submitTestAttempt({ userId, testId, courseId, type, answer
     totalQuestions,
     passed,
   }
+}
+
+// --- Learning paths (sync reads) ---
+
+export function getLearningPaths() {
+  return getAllLearningPathsSync()
+}
+
+export function getLearningPathById(pathId) {
+  return getLearningPathByIdSync(pathId)
+}
+
+export function getLearningPathsByRole(role, options) {
+  return getLearningPathsByRoleSync(role, options)
+}
+
+export function getLearningPathCourses(pathId) {
+  return getLearningPathCoursesSync(pathId)
+}
+
+export function getUserLearningPath(userId) {
+  return getUserLearningPathSync(userId)
+}
+
+export function getUserLearningPaths(userId) {
+  return getUserLearningPathsSync(userId)
+}
+
+// --- Learning paths (async mutations) ---
+
+export async function createLearningPath(pathData) {
+  if (!pathData.title?.trim()) throw new Error('Укажите название маршрута')
+  if (!pathData.role) throw new Error('Выберите роль для маршрута')
+  const id = await getLearningPathAdapter().createLearningPath(pathData)
+  if (isCloudMode()) await refreshData()
+  return id
+}
+
+export async function updateLearningPath(pathId, updates) {
+  if (updates.title != null && !updates.title.trim()) {
+    throw new Error('Укажите название маршрута')
+  }
+  if (updates.role != null && !updates.role) {
+    throw new Error('Выберите роль для маршрута')
+  }
+  await getLearningPathAdapter().updateLearningPath(pathId, updates)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function deleteLearningPath(pathId) {
+  await getLearningPathAdapter().deleteLearningPath(pathId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function publishLearningPath(pathId) {
+  await getLearningPathAdapter().publishLearningPath(pathId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function unpublishLearningPath(pathId) {
+  await getLearningPathAdapter().unpublishLearningPath(pathId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function archiveLearningPath(pathId) {
+  await getLearningPathAdapter().archiveLearningPath(pathId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function addCourseToLearningPath(pathId, courseId, options) {
+  await getLearningPathAdapter().addCourseToLearningPath(pathId, courseId, options)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function removeCourseFromLearningPath(pathId, courseId) {
+  await getLearningPathAdapter().removeCourseFromLearningPath(pathId, courseId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function reorderLearningPathCourses(pathId, orderedCourseIds) {
+  await getLearningPathAdapter().reorderLearningPathCourses(pathId, orderedCourseIds)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function updateLearningPathCourse(pathCourseId, updates) {
+  await getLearningPathAdapter().updateLearningPathCourse(pathCourseId, updates)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function assignLearningPathToUser(userId, pathId, assignedBy = null) {
+  const result = await getLearningPathAdapter().assignLearningPathToUser(
+    userId,
+    pathId,
+    assignedBy
+  )
+  if (isCloudMode()) await refreshData()
+  return result
+}
+
+export async function cancelUserLearningPath(userId, pathId) {
+  await getLearningPathAdapter().cancelUserLearningPath(userId, pathId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function completeUserLearningPath(userId, pathId) {
+  await getLearningPathAdapter().completeUserLearningPath(userId, pathId)
+  if (isCloudMode()) await refreshData()
 }

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { getProgressRows } from '../../../utils/adminStats'
+import { ROLES } from '../../../data/roles'
 import StatusBadge from '../StatusBadge'
 import '../admin-shared.css'
 
@@ -14,18 +15,18 @@ export default function ProgressSection() {
     return rows.filter(
       (row) =>
         row.employeeName.toLowerCase().includes(q) ||
-        row.courseTitle.toLowerCase().includes(q)
+        row.pathTitle.toLowerCase().includes(q)
     )
   }, [rows, search])
 
   return (
     <>
       <div className="admin-toolbar">
-        <span className="admin-toolbar__info">{filtered.length} записей прогресса</span>
+        <span className="admin-toolbar__info">{filtered.length} сотрудников</span>
         <input
           type="search"
           className="admin-search"
-          placeholder="Поиск по сотруднику или курсу…"
+          placeholder="Поиск по сотруднику или маршруту…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -36,42 +37,57 @@ export default function ProgressSection() {
           <thead>
             <tr>
               <th>Сотрудник</th>
-              <th>Курс</th>
-              <th>Уроки</th>
-              <th>Тест курса</th>
-              <th>Общий статус</th>
+              <th>Роль</th>
+              <th>Маршрут</th>
+              <th>Прогресс маршрута</th>
+              <th>Курсы завершены</th>
+              <th>Статус маршрута</th>
               <th>Финальная аттестация</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="admin-empty">
+                <td colSpan={7} className="admin-empty">
                   {search ? 'Ничего не найдено' : 'Пока нет данных о прогрессе'}
                 </td>
               </tr>
             ) : (
               filtered.map((row) => (
-                <tr key={`${row.employeeId}-${row.courseId ?? 'none'}`}>
+                <tr key={row.employeeId}>
                   <td><strong>{row.employeeName}</strong></td>
-                  <td>{row.courseTitle}</td>
+                  <td>{ROLES[row.employeeRole]?.label || row.employeeRole}</td>
+                  <td>{row.pathTitle}</td>
                   <td>
-                    {row.noCourses ? '—' : `${row.completedLessons} / ${row.totalLessons}`}
-                  </td>
-                  <td>
-                    {row.noCourses ? '—' : (
-                      <StatusBadge label={row.courseTestStatus.label} type={row.courseTestStatus.type} />
-                    )}
-                  </td>
-                  <td>
-                    {row.noCourses ? (
-                      <StatusBadge label={row.status.label} type={row.status.type} />
+                    {row.pathTitle === 'Без маршрута' ? (
+                      '—'
                     ) : (
-                      <StatusBadge label={row.courseOverallStatus.label} type={row.courseOverallStatus.type} />
+                      <div className="admin-progress-cell">
+                        <div className="admin-progress-cell__bar">
+                          <div
+                            className="admin-progress-cell__fill"
+                            style={{ width: `${row.pathProgressPercent}%` }}
+                          />
+                        </div>
+                        <span className="admin-progress-cell__text">
+                          {row.pathProgressPercent}%
+                        </span>
+                      </div>
+                    )}
+                  </td>
+                  <td>{row.coursesCompletedLabel}</td>
+                  <td>
+                    {row.pathTitle === 'Без маршрута' ? (
+                      '—'
+                    ) : (
+                      <StatusBadge label={row.pathStatus.label} type={row.pathStatus.type} />
                     )}
                   </td>
                   <td>
-                    <StatusBadge label={row.attestationStatus.label} type={row.attestationStatus.type} />
+                    <StatusBadge
+                      label={row.attestationStatus.label}
+                      type={row.attestationStatus.type}
+                    />
                   </td>
                 </tr>
               ))

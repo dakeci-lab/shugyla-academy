@@ -5,6 +5,7 @@ import AdminLayout from '../layouts/AdminLayout'
 import OverviewSection from '../components/admin/sections/OverviewSection'
 import EmployeesSection from '../components/admin/sections/EmployeesSection'
 import CoursesSection from '../components/admin/sections/CoursesSection'
+import LearningPathsSection from '../components/admin/sections/LearningPathsSection'
 import TestsSection from '../components/admin/sections/TestsSection'
 import CertificationSection from '../components/admin/sections/CertificationSection'
 import ProgressSection from '../components/admin/sections/ProgressSection'
@@ -18,6 +19,8 @@ function AdminContent({ activeTab }) {
       return <EmployeesSection />
     case 'courses':
       return <CoursesSection />
+    case 'paths':
+      return <LearningPathsSection />
     case 'tests':
       return <TestsSection />
     case 'certification':

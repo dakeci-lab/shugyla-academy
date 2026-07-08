@@ -177,6 +177,14 @@ export async function fetchAllData() {
     testsData = { tests: [], questions: [], attempts: [] }
   }
 
+  let pathsData = { paths: [], pathCourses: [], userPaths: [] }
+  try {
+    const { fetchLearningPathsData } = await import('./learningPathSupabaseAdapter')
+    pathsData = await fetchLearningPathsData()
+  } catch {
+    pathsData = { paths: [], pathCourses: [], userPaths: [] }
+  }
+
   return {
     employees,
     courses: normalizedCourses,
@@ -186,6 +194,9 @@ export async function fetchAllData() {
     tests: testsData.tests,
     testQuestions: testsData.questions,
     testAttempts: testsData.attempts,
+    learningPaths: pathsData.paths,
+    learningPathCourses: pathsData.pathCourses,
+    userLearningPaths: pathsData.userPaths,
   }
 }
 
