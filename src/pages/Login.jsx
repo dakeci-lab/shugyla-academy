@@ -51,10 +51,13 @@ export default function Login() {
       <div className="login-page__card">
         <div className="login-page__logo">
           <span className="login-page__logo-icon">S</span>
-          <h1 className="login-page__title">Shugyla Academy</h1>
+          <div>
+            <h1 className="login-page__title">Shugyla Platform</h1>
+            <p className="login-page__brand-sub">Внутренняя платформа Shugyla Market</p>
+          </div>
         </div>
 
-        <p className="login-page__subtitle">Вход в систему обучения</p>
+        <p className="login-page__subtitle">Вход в систему</p>
 
         {redirect && (
           <p className="login-page__redirect-hint">

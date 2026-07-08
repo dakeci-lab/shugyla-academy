@@ -42,6 +42,12 @@
   margin: 0;
 }
 
+.login-page__brand-sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
 .login-page__subtitle {
   color: var(--color-text-secondary);
   font-size: 14px;

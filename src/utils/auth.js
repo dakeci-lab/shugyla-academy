@@ -142,7 +142,7 @@ export function getPostLoginPath(user, redirectPath) {
   if (redirectPath && redirectPath.startsWith('/')) {
     return redirectPath
   }
-  return canManageAdmin(user.role) ? '/admin' : '/dashboard'
+  return '/platform'
 }
 
 export function getCourseAllowedRoleLabels(course) {

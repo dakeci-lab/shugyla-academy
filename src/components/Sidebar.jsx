@@ -23,8 +23,8 @@ export default function Sidebar({ activeTab, onTabChange }) {
       <div className="sidebar__header">
         <span className="sidebar__logo-icon">S</span>
         <div className="sidebar__brand">
-          <span className="sidebar__title">Shugyla Academy</span>
-          <span className="sidebar__subtitle">Админ-панель</span>
+          <span className="sidebar__title">Shugyla Platform</span>
+          <span className="sidebar__subtitle">Academy · Админ</span>
         </div>
       </div>
 
@@ -43,11 +43,11 @@ export default function Sidebar({ activeTab, onTabChange }) {
       </nav>
 
       <div className="sidebar__footer">
-        <NavLink to="/dashboard" className="sidebar__back">
-          Личный кабинет
+        <NavLink to="/platform" className="sidebar__back">
+          Панель платформы
         </NavLink>
-        <NavLink to="/academy" className="sidebar__back sidebar__back--muted">
-          ← На главную
+        <NavLink to="/dashboard" className="sidebar__back sidebar__back--muted">
+          Личный кабинет Academy
         </NavLink>
       </div>
     </aside>

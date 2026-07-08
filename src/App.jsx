@@ -3,6 +3,7 @@ import { LanguageProvider } from './context/LanguageContext'
 import { AcademyDataProvider } from './context/AcademyDataContext'
 import { SessionProvider } from './context/SessionContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import PlatformLayout from './layouts/PlatformLayout'
 import Academy from './pages/Academy'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -11,9 +12,14 @@ import CoursePage from './pages/CoursePage'
 import Profile from './pages/Profile'
 import Standards from './pages/Standards'
 import ApplyPage from './pages/Apply'
+import PlatformDashboard from './pages/platform/PlatformDashboard'
+import PlatformAcademy from './pages/platform/PlatformAcademy'
+import PlatformSettings from './pages/platform/PlatformSettings'
+import PlatformEmployees from './pages/platform/PlatformEmployees'
+import ModulePlaceholder from './pages/platform/ModulePlaceholder'
 
 /**
- * Маршрутизация приложения Shugyla Academy
+ * Маршрутизация Shugyla Platform
  */
 export default function App() {
   return (
@@ -22,15 +28,96 @@ export default function App() {
       <BrowserRouter basename="/shugyla-academy">
       <SessionProvider>
       <Routes>
-        {/* Главная — доступна и по /, и по /academy */}
-        <Route path="/" element={<Academy />} />
+        {/* Публичные маршруты */}
+        <Route path="/" element={<Navigate to="/academy" replace />} />
         <Route path="/academy" element={<Academy />} />
         <Route path="/login" element={<Login />} />
-
-        {/* Публичная анкета кандидата — без авторизации */}
         <Route path="/apply/:slug" element={<ApplyPage />} />
 
-        {/* Защищённые маршруты — нужна авторизация */}
+        {/* Shugyla Platform — защищённая оболочка */}
+        <Route
+          path="/platform"
+          element={
+            <ProtectedRoute>
+              <PlatformLayout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<PlatformDashboard />} />
+          <Route
+            path="products"
+            element={
+              <ModulePlaceholder
+                title="Товары"
+                description="Каталог товаров, остатки и номенклатура."
+                icon="▦"
+              />
+            }
+          />
+          <Route
+            path="suppliers"
+            element={
+              <ModulePlaceholder
+                title="Поставщики"
+                description="База поставщиков и условия поставок."
+                icon="◫"
+              />
+            }
+          />
+          <Route
+            path="procurement"
+            element={
+              <ModulePlaceholder
+                title="Закуп"
+                description="Закупочные заявки и заказы."
+                icon="⇄"
+              />
+            }
+          />
+          <Route
+            path="receiving"
+            element={
+              <ModulePlaceholder
+                title="Приёмка"
+                description="Приёмка товара и сверка с накладными."
+                icon="↧"
+              />
+            }
+          />
+          <Route
+            path="price-tags"
+            element={
+              <ModulePlaceholder
+                title="Ценники"
+                description="Печать и обновление ценников в торговом зале."
+                icon="▤"
+              />
+            }
+          />
+          <Route path="employees" element={<PlatformEmployees />} />
+          <Route path="academy" element={<PlatformAcademy />} />
+          <Route
+            path="standards"
+            element={<Standards embedded basePath="/platform/standards" />}
+          />
+          <Route
+            path="standards/:slug"
+            element={<Standards embedded basePath="/platform/standards" />}
+          />
+          <Route
+            path="finance"
+            element={
+              <ModulePlaceholder
+                title="Финансы"
+                description="Финансовые показатели, отчёты и аналитика."
+                icon="₸"
+              />
+            }
+          />
+          <Route path="settings" element={<PlatformSettings />} />
+        </Route>
+
+        {/* Legacy / Academy маршруты — сохранены */}
         <Route
           path="/dashboard"
           element={
@@ -78,7 +165,6 @@ export default function App() {
 
         <Route path="/courses/:id" element={<CoursePage />} />
 
-        {/* 404 — на главную */}
         <Route path="*" element={<Navigate to="/academy" replace />} />
       </Routes>
       </SessionProvider>

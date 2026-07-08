@@ -4,6 +4,16 @@
   padding-top: 72px;
 }
 
+.standards-page--embedded {
+  min-height: auto;
+  padding-top: 0;
+  background: transparent;
+}
+
+.standards-page--embedded .standards-page__main {
+  padding-bottom: 1rem;
+}
+
 .standards-page__main {
   padding-bottom: 3rem;
 }

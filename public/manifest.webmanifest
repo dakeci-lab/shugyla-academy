@@ -1,7 +1,7 @@
 {
-  "name": "Shugyla Academy",
+  "name": "Shugyla Platform",
   "short_name": "Shugyla",
-  "description": "Платформа обучения и развития сотрудников Shugyla Market",
+  "description": "Внутренняя платформа Shugyla Market",
   "start_url": "/shugyla-academy/",
   "scope": "/shugyla-academy/",
   "display": "standalone",

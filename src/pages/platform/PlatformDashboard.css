@@ -1,0 +1,22 @@
+.platform-dashboard__intro {
+  margin: 0 0 24px;
+  font-size: 15px;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.platform-dashboard__card-link {
+  text-decoration: none;
+  color: inherit;
+  display: block;
+  transition: transform 0.15s;
+}
+
+.platform-dashboard__card-link:hover {
+  transform: translateY(-2px);
+}
+
+.platform-dashboard__card-link .admin-stat-card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: rgba(42, 157, 92, 0.25);
+}

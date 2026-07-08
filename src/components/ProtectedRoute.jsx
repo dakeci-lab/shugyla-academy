@@ -19,11 +19,11 @@ export default function ProtectedRoute({
   }
 
   if (requireAdmin && !canManageAdmin(user.role)) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to="/platform" replace />
   }
 
   if (requiredPermission && !roleHasPermission(user.role, requiredPermission)) {
-    return <Navigate to="/dashboard" replace />
+    return <Navigate to="/platform" replace />
   }
 
   return children

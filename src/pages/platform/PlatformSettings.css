@@ -1,0 +1,42 @@
+.platform-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 720px;
+}
+
+.platform-settings__section {
+  margin: 0;
+}
+
+.platform-settings__mode {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.platform-settings__mode-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.platform-settings__list {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.platform-settings__hint {
+  margin: 12px 0 0;
+  font-size: 14px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.platform-settings__hint a {
+  color: var(--color-primary);
+}

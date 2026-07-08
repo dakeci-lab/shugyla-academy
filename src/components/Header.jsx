@@ -22,10 +22,10 @@ export default function Header({ variant = 'default' }) {
   return (
     <header className={`header ${variant === 'landing' ? 'header--landing' : ''}`}>
       <div className="header__inner container">
-        <Link to="/academy" className="header__logo">
+        <Link to="/platform" className="header__logo">
           <span className="header__logo-icon">S</span>
           <span className="header__logo-text">
-            Shugyla <strong>Academy</strong>
+            Shugyla <strong>Platform</strong>
           </span>
         </Link>
 
@@ -41,6 +41,9 @@ export default function Header({ variant = 'default' }) {
 
           {user ? (
             <>
+              <Link to="/platform" className="header__link">
+                Платформа
+              </Link>
               {canManageAdmin(user.role) && (
                 <Link to="/admin" className="header__link">
                   {t.adminPanel}

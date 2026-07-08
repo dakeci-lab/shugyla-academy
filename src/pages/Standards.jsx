@@ -32,7 +32,7 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('ru-RU')
 }
 
-function ArticleDetail({ article, userId, onAcknowledged }) {
+function ArticleDetail({ article, userId, onAcknowledged, basePath }) {
   const [submitting, setSubmitting] = useState(false)
   const categories = getStandardCategories()
   const category = categories.find((c) => c.id === article.categoryId)
@@ -64,7 +64,7 @@ function ArticleDetail({ article, userId, onAcknowledged }) {
 
   return (
     <article className={cardClass}>
-      <Link to="/standards" className="standards-article__back">
+      <Link to={basePath} className="standards-article__back">
         ← К списку стандартов
       </Link>
 
@@ -110,7 +110,7 @@ function ArticleDetail({ article, userId, onAcknowledged }) {
   )
 }
 
-function ArticleList({ articles, reads, categoryId, onSelectCategory, categories }) {
+function ArticleList({ articles, reads, categoryId, onSelectCategory, categories, basePath }) {
   return (
     <div className="standards-layout">
       <aside className="standards-categories">
@@ -156,7 +156,7 @@ function ArticleList({ articles, reads, categoryId, onSelectCategory, categories
               .join(' ')
 
             return (
-              <Link key={article.id} to={`/standards/${article.slug}`} className={cardClass}>
+              <Link key={article.id} to={`${basePath}/${article.slug}`} className={cardClass}>
                 <div className="standards-card__head">
                   <h2 className="standards-card__title">{article.title}</h2>
                   <div className="standards-card__badges">
@@ -187,8 +187,8 @@ function ArticleList({ articles, reads, categoryId, onSelectCategory, categories
   )
 }
 
-/** Страница базы стандартов — /standards */
-export default function StandardsPage() {
+/** Страница базы стандартов — /standards или /platform/standards */
+export default function StandardsPage({ embedded = false, basePath = '/standards' }) {
   const { slug } = useParams()
   const navigate = useNavigate()
   const { user } = useSession()
@@ -217,9 +217,9 @@ export default function StandardsPage() {
     if (!slug || !user) return
     const article = getStandardArticleBySlug(slug)
     if (!article || !getPublishedStandardArticlesForUser(user).some((a) => a.id === article.id)) {
-      navigate('/standards', { replace: true })
+      navigate(basePath, { replace: true })
     }
-  }, [slug, user, navigate, version])
+  }, [slug, user, navigate, version, basePath])
 
   const filtered = useMemo(() => {
     let list = allArticles
@@ -235,10 +235,10 @@ export default function StandardsPage() {
   if (!user) return null
 
   return (
-    <div className="standards-page">
-      <Header />
+    <div className={`standards-page ${embedded ? 'standards-page--embedded' : ''}`}>
+      {!embedded && <Header />}
 
-      <main className="standards-page__main container">
+      <main className={`standards-page__main ${embedded ? '' : 'container'}`}>
         {!slug ? (
           <>
             <div className="standards-page__header">
@@ -278,6 +278,7 @@ export default function StandardsPage() {
               categoryId={categoryId}
               onSelectCategory={setCategoryId}
               categories={categories}
+              basePath={basePath}
             />
           </>
         ) : articleBySlug ? (
@@ -285,6 +286,7 @@ export default function StandardsPage() {
             article={articleBySlug}
             userId={user.id}
             onAcknowledged={reload}
+            basePath={basePath}
           />
         ) : (
           <div className="standards-empty">Статья не найдена</div>

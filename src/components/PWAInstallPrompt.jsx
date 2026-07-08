@@ -80,7 +80,7 @@ export default function PWAInstallPrompt() {
   return (
     <aside className="pwa-install" role="region" aria-label="Установка приложения">
       <div className="pwa-install__content">
-        <p className="pwa-install__title">Shugyla Academy на телефоне</p>
+        <p className="pwa-install__title">Shugyla Platform на телефоне</p>
         {deferredPrompt ? (
           <p className="pwa-install__text">Установите приложение для быстрого доступа с главного экрана.</p>
         ) : (
