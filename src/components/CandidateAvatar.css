@@ -1,0 +1,85 @@
+.candidate-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  background: #e5e7eb;
+  color: #374151;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.candidate-avatar--sm {
+  width: 36px;
+  height: 36px;
+  font-size: 0.75rem;
+}
+
+.candidate-avatar--md {
+  width: 48px;
+  height: 48px;
+  font-size: 0.875rem;
+}
+
+.candidate-avatar--lg {
+  width: 120px;
+  height: 120px;
+  font-size: 1.5rem;
+}
+
+.candidate-avatar--placeholder {
+  background: linear-gradient(135deg, #dbeafe, #e0e7ff);
+  color: #1e40af;
+}
+
+.candidate-avatar--clickable {
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+
+.candidate-avatar--clickable:hover {
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.25);
+}
+
+.candidate-table-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.candidate-detail-photo {
+  margin-bottom: 1rem;
+}
+
+.apply-photo-field {
+  margin-top: 0.5rem;
+}
+
+.apply-photo-preview {
+  margin-top: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.apply-photo-preview img {
+  width: 96px;
+  height: 96px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.apply-photo-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.apply-photo-warning {
+  margin-top: 0.5rem;
+  font-size: 0.875rem;
+  color: #b45309;
+}

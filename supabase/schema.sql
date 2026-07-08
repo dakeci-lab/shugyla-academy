@@ -12,6 +12,7 @@ create table if not exists academy_users (
   role text not null default 'cashier',
   position text not null default '',
   status text not null default 'active',
+  avatar_url text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -372,6 +373,8 @@ create table if not exists academy_candidates (
     'interview_passed', 'trainee', 'hired'
   )),
   admin_notes text,
+  photo_url text,
+  photo_path text,
   created_user_id bigint references academy_users(id),
   submitted_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

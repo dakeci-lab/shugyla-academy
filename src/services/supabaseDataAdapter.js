@@ -162,6 +162,7 @@ export async function fetchAllData() {
       position: row.position,
       employmentStatus: row.status,
       assignedCourseIds: assignmentMap.get(row.id) || [],
+      avatarUrl: row.avatar_url,
     })
   )
 
@@ -240,6 +241,7 @@ async function createUser(data) {
     role: employee.role,
     position: employee.position || '',
     status: employee.employmentStatus,
+    avatar_url: employee.avatarUrl || null,
   }
 
   await throwIfError(
@@ -275,6 +277,7 @@ async function updateUser(id, updates) {
   if (updates.position != null) patch.position = updates.position
   if (updates.employmentStatus != null) patch.status = updates.employmentStatus
   if (updates.status != null) patch.status = updates.status
+  if (updates.avatarUrl != null) patch.avatar_url = updates.avatarUrl
 
   if (Object.keys(patch).length > 0) {
     await throwIfError(

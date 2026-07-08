@@ -37,6 +37,8 @@ import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
 import StatusBadge from '../StatusBadge'
 import VacancyQuestionEditor from '../VacancyQuestionEditor'
+import CandidateAvatar from '../../CandidateAvatar'
+import '../../CandidateAvatar.css'
 import '../admin-shared.css'
 import '../../../pages/Apply.css'
 
@@ -410,6 +412,7 @@ export default function RecruitmentSection() {
             <table className="admin-table">
               <thead>
                 <tr>
+                  <th></th>
                   <th>ФИО</th>
                   <th>Телефон</th>
                   <th>Вакансия</th>
@@ -423,11 +426,18 @@ export default function RecruitmentSection() {
               </thead>
               <tbody>
                 {filteredCandidates.length === 0 ? (
-                  <tr><td colSpan={9} className="admin-empty">Кандидаты не найдены</td></tr>
+                  <tr><td colSpan={10} className="admin-empty">Кандидаты не найдены</td></tr>
                 ) : (
                   filteredCandidates.map((c) => (
                     <tr key={c.id}>
-                      <td><strong>{c.fullName}</strong></td>
+                      <td>
+                        <CandidateAvatar fullName={c.fullName} photoUrl={c.photoUrl} size="sm" />
+                      </td>
+                      <td>
+                        <div className="candidate-table-cell">
+                          <strong>{c.fullName}</strong>
+                        </div>
+                      </td>
                       <td>{c.phone}</td>
                       <td>{getVacancyById(c.vacancyId)?.title || '—'}</td>
                       <td>{c.age ?? '—'}</td>
@@ -548,6 +558,24 @@ export default function RecruitmentSection() {
         >
           <div className="apply-detail-grid">
             <div>
+              {detailCandidate.photoUrl && (
+                <div className="candidate-detail-photo">
+                  <a href={detailCandidate.photoUrl} target="_blank" rel="noopener noreferrer" title="Открыть фото">
+                    <CandidateAvatar
+                      fullName={detailCandidate.fullName}
+                      photoUrl={detailCandidate.photoUrl}
+                      size="lg"
+                      className="candidate-avatar--clickable"
+                    />
+                  </a>
+                  <p className="admin-form__hint">Нажмите на фото, чтобы открыть в новой вкладке</p>
+                </div>
+              )}
+              {!detailCandidate.photoUrl && (
+                <div className="candidate-detail-photo">
+                  <CandidateAvatar fullName={detailCandidate.fullName} size="lg" />
+                </div>
+              )}
               <p><strong>Телефон:</strong> {detailCandidate.phone}</p>
               <p><strong>Вакансия:</strong> {detailVacancy?.title || '—'}</p>
               <p><strong>Возраст:</strong> {detailCandidate.age ?? '—'}</p>
@@ -594,7 +622,9 @@ export default function RecruitmentSection() {
               <h3 className="admin-detail-heading">Создание сотрудника</h3>
               <p className="admin-form__hint">
                 Имя: {detailCandidate.firstName} {detailCandidate.lastName}. Роль: {getVacancyRoleLabel(detailVacancy?.role)}.
-                Телефон кандидата не сохраняется в профиль сотрудника (поля phone в academy_users нет).
+                {detailCandidate.photoUrl
+                  ? ' Фото кандидата будет перенесено в avatar_url сотрудника.'
+                  : ' Телефон и фото не сохраняются в academy_users (phone отсутствует в схеме).'}
               </p>
               <div className="admin-form__row">
                 <label className="admin-form__label">

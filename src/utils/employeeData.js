@@ -128,6 +128,7 @@ export function normalizeEmployee(raw) {
       raw.employmentStatus || raw.status
     ),
     assignedCourseIds: Array.isArray(raw.assignedCourseIds) ? raw.assignedCourseIds : [],
+    avatarUrl: raw.avatarUrl ?? raw.avatar_url ?? null,
   }
 }
 

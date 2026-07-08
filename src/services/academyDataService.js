@@ -56,6 +56,7 @@ import {
   getVacancyRoleLabel,
 } from '../utils/recruitmentData'
 import { EMPLOYMENT_STATUS } from '../utils/employeeData'
+import { prepareCandidatePhotoForSubmit } from './candidatePhotoService'
 
 function getAdapter() {
   return isCloudMode() ? supabaseAdapter : localAdapter
@@ -738,9 +739,36 @@ export async function reorderCandidateQuestions(vacancyId, orderedQuestionIds) {
 export async function submitCandidateApplication(applicationData) {
   if (!applicationData.firstName?.trim()) throw new Error('Укажите имя')
   if (!applicationData.phone?.trim()) throw new Error('Укажите телефон')
-  const result = await getRecruitmentAdapter().submitCandidateApplication(applicationData)
+
+  let photoPayload = { photoUrl: null, photoPath: null }
+
+  if (applicationData.photoFile) {
+    try {
+      photoPayload = await prepareCandidatePhotoForSubmit(
+        applicationData.photoFile,
+        applicationData.vacancySlug
+      )
+    } catch (err) {
+      throw new Error(err.message || 'Не удалось загрузить фото')
+    }
+  }
+
+  const { photoFile, vacancySlug, ...rest } = applicationData
+
+  const result = await getRecruitmentAdapter().submitCandidateApplication({
+    ...rest,
+    photoUrl: photoPayload.photoUrl,
+    photoPath: photoPayload.photoPath,
+  })
+
   if (isCloudMode()) await refreshData()
-  return result
+
+  return {
+    ...result,
+    localPhotoWarning: photoPayload.isLocalFallback
+      ? 'В локальном режиме фото сохраняется только для демо-превью.'
+      : null,
+  }
 }
 
 export async function updateCandidateStatus(candidateId, status) {
@@ -785,6 +813,7 @@ export async function hireCandidateAsUser(candidateId, userData, options = {}) {
     password: userData.password,
     employmentStatus: userData.employmentStatus || EMPLOYMENT_STATUS.INTERNSHIP,
     assignedCourseIds: userData.assignedCourseIds || [],
+    avatarUrl: userData.avatarUrl || candidate.photoUrl || null,
   }
 
   const newUserId = await createEmployee(employeePayload)

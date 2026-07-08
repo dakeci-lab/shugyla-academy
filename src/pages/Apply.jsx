@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   getPublishedVacancyBySlug,
@@ -6,7 +6,13 @@ import {
   submitCandidateApplication,
 } from '../services/academyDataService'
 import { getVacancyRoleLabel } from '../utils/recruitmentData'
+import { isCloudMode } from '../lib/dataMode'
+import {
+  validateCandidatePhotoFile,
+  ALLOWED_CANDIDATE_PHOTO_TYPES,
+} from '../services/candidatePhotoService'
 import '../components/admin/admin-shared.css'
+import '../components/CandidateAvatar.css'
 import './Apply.css'
 
 const EMPTY_FORM = {
@@ -30,10 +36,21 @@ export default function ApplyPage() {
 
   const [form, setForm] = useState(EMPTY_FORM)
   const [answers, setAnswers] = useState({})
+  const [photoFile, setPhotoFile] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState('')
+  const [photoWarning, setPhotoWarning] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+
+  useEffect(() => {
+    return () => {
+      if (photoPreview && photoPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(photoPreview)
+      }
+    }
+  }, [photoPreview])
 
   if (!slug || !vacancy) {
     return (
@@ -60,6 +77,39 @@ export default function ApplyPage() {
         </div>
       </div>
     )
+  }
+
+  function handlePhotoChange(e) {
+    const file = e.target.files?.[0]
+    setError('')
+    setPhotoWarning('')
+
+    if (!file) {
+      setPhotoFile(null)
+      if (photoPreview && photoPreview.startsWith('blob:')) {
+        URL.revokeObjectURL(photoPreview)
+      }
+      setPhotoPreview('')
+      return
+    }
+
+    const validationError = validateCandidatePhotoFile(file)
+    if (validationError) {
+      setError(validationError)
+      e.target.value = ''
+      return
+    }
+
+    if (!isCloudMode()) {
+      setPhotoWarning('В локальном режиме фото не сохраняется постоянно.')
+    }
+
+    if (photoPreview && photoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(photoPreview)
+    }
+
+    setPhotoFile(file)
+    setPhotoPreview(URL.createObjectURL(file))
   }
 
   async function handleSubmit(e) {
@@ -90,10 +140,15 @@ export default function ApplyPage() {
     try {
       const result = await submitCandidateApplication({
         vacancyId: vacancy.id,
+        vacancySlug: vacancy.slug,
         ...form,
         answers,
+        photoFile,
       })
       setSuccessMessage(result.message)
+      if (result.localPhotoWarning) {
+        setSuccessMessage(`${result.message} ${result.localPhotoWarning}`)
+      }
       setSubmitted(true)
     } catch (err) {
       setError(err.message || 'Не удалось отправить анкету')
@@ -141,6 +196,29 @@ export default function ApplyPage() {
                 <input className="admin-form__input" type="number" min={16} max={99} value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} />
               </label>
             </div>
+
+            <div className="apply-photo-field">
+              <label className="admin-form__label">
+                Ваша фотография
+                <input
+                  className="admin-form__input"
+                  type="file"
+                  accept={ALLOWED_CANDIDATE_PHOTO_TYPES.join(',')}
+                  onChange={handlePhotoChange}
+                />
+              </label>
+              <p className="apply-photo-hint">
+                Загрузите фото, чтобы мы могли быстрее узнать вас на собеседовании.
+                JPEG, PNG или WebP, до 5 MB.
+              </p>
+              {photoWarning && <p className="apply-photo-warning">{photoWarning}</p>}
+              {photoPreview && (
+                <div className="apply-photo-preview">
+                  <img src={photoPreview} alt="Превью фото" />
+                </div>
+              )}
+            </div>
+
             <label className="admin-form__label">
               Город / район
               <input className="admin-form__input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />

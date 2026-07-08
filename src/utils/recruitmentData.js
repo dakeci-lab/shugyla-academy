@@ -158,6 +158,8 @@ export function normalizeCandidate(raw) {
     maxScore: raw.maxScore ?? raw.max_score ?? 0,
     status: raw.status || CANDIDATE_STATUS.NEW,
     adminNotes: raw.adminNotes ?? raw.admin_notes ?? '',
+    photoUrl: raw.photoUrl ?? raw.photo_url ?? null,
+    photoPath: raw.photoPath ?? raw.photo_path ?? null,
     createdUserId: raw.createdUserId ?? raw.created_user_id ?? null,
     submittedAt: raw.submittedAt ?? raw.submitted_at,
     updatedAt: raw.updatedAt ?? raw.updated_at,

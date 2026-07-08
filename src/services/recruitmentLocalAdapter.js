@@ -167,6 +167,8 @@ function saveCandidates(candidates) {
       max_score: c.maxScore,
       status: c.status,
       admin_notes: c.adminNotes,
+      photo_url: c.photoUrl,
+      photo_path: c.photoPath,
       created_user_id: c.createdUserId,
       submitted_at: c.submittedAt,
     }))
@@ -290,6 +292,8 @@ export async function submitCandidateApplication(applicationData) {
     availableFrom: applicationData.availableFrom?.trim() || '',
     about: applicationData.about?.trim() || '',
     answers: applicationData.answers || {},
+    photoUrl: applicationData.photoUrl || null,
+    photoPath: applicationData.photoPath || null,
     totalScore,
     maxScore,
     scorePercent,
