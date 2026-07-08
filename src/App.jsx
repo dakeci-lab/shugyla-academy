@@ -9,6 +9,7 @@ import Dashboard from './pages/Dashboard'
 import Admin from './pages/Admin'
 import CoursePage from './pages/CoursePage'
 import Profile from './pages/Profile'
+import Standards from './pages/Standards'
 
 /**
  * Маршрутизация приложения Shugyla Academy
@@ -49,6 +50,24 @@ export default function App() {
           element={
             <ProtectedRoute>
               <Profile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/standards"
+          element={
+            <ProtectedRoute>
+              <Standards />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/standards/:slug"
+          element={
+            <ProtectedRoute>
+              <Standards />
             </ProtectedRoute>
           }
         />

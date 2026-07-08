@@ -18,6 +18,8 @@ import {
 import * as localAdapter from './localDataAdapter'
 import * as learningPathLocalAdapter from './learningPathLocalAdapter'
 import * as learningPathSupabaseAdapter from './learningPathSupabaseAdapter'
+import * as standardsLocalAdapter from './standardsLocalAdapter'
+import * as standardsSupabaseAdapter from './standardsSupabaseAdapter'
 import {
   getAllLearningPathsSync,
   getLearningPathByIdSync,
@@ -26,6 +28,16 @@ import {
   getUserLearningPathSync,
   getUserLearningPathsSync,
 } from '../utils/learningPathData'
+import {
+  getAllStandardCategoriesSync,
+  getAllStandardArticlesSync,
+  getStandardArticleByIdSync,
+  getStandardArticleBySlugSync,
+  getPublishedStandardArticlesForUserSync,
+  getUserStandardReadsSync,
+  getStandardArticleReadStatsSync,
+  generateUniqueSlug,
+} from '../utils/standardsData'
 
 function getAdapter() {
   return isCloudMode() ? supabaseAdapter : localAdapter
@@ -37,6 +49,10 @@ function getTestAdapter() {
 
 function getLearningPathAdapter() {
   return isCloudMode() ? learningPathSupabaseAdapter : learningPathLocalAdapter
+}
+
+function getStandardsAdapter() {
+  return isCloudMode() ? standardsSupabaseAdapter : standardsLocalAdapter
 }
 
 export { isCloudMode, getDataModeLabel, getDataModeVariant }
@@ -468,4 +484,124 @@ export async function cancelUserLearningPath(userId, pathId) {
 export async function completeUserLearningPath(userId, pathId) {
   await getLearningPathAdapter().completeUserLearningPath(userId, pathId)
   if (isCloudMode()) await refreshData()
+}
+
+// --- Standards (sync reads) ---
+
+export function getStandardCategories() {
+  return getAllStandardCategoriesSync()
+}
+
+export function getStandardArticles() {
+  return getAllStandardArticlesSync()
+}
+
+export function getStandardArticleById(articleId) {
+  return getStandardArticleByIdSync(articleId)
+}
+
+export function getStandardArticleBySlug(slug) {
+  return getStandardArticleBySlugSync(slug)
+}
+
+export function getPublishedStandardArticlesForUser(user) {
+  return getPublishedStandardArticlesForUserSync(user)
+}
+
+export function getUserStandardReads(userId) {
+  return getUserStandardReadsSync(userId)
+}
+
+export function getStandardArticleReadStats(articleId) {
+  return getStandardArticleReadStatsSync(articleId)
+}
+
+// --- Standards (async mutations) ---
+
+export async function createStandardCategory(categoryData) {
+  if (!categoryData.title?.trim()) throw new Error('Укажите название категории')
+  const id = await getStandardsAdapter().createStandardCategory(categoryData)
+  if (isCloudMode()) await refreshData()
+  return id
+}
+
+export async function updateStandardCategory(categoryId, updates) {
+  if (updates.title != null && !updates.title.trim()) {
+    throw new Error('Укажите название категории')
+  }
+  await getStandardsAdapter().updateStandardCategory(categoryId, updates)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function archiveStandardCategory(categoryId) {
+  await getStandardsAdapter().archiveStandardCategory(categoryId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function deleteStandardCategory(categoryId) {
+  await getStandardsAdapter().deleteStandardCategory(categoryId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function reorderStandardCategories(orderedCategoryIds) {
+  await getStandardsAdapter().reorderStandardCategories(orderedCategoryIds)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function createStandardArticle(articleData) {
+  if (!articleData.title?.trim()) throw new Error('Укажите название статьи')
+  if (!articleData.content?.trim()) throw new Error('Укажите содержание статьи')
+
+  const articles = getAllStandardArticlesSync()
+  const slug = articleData.slug || generateUniqueSlug(articleData.title, articles)
+
+  const id = await getStandardsAdapter().createStandardArticle({
+    ...articleData,
+    slug,
+  })
+  if (isCloudMode()) await refreshData()
+  return id
+}
+
+export async function updateStandardArticle(articleId, updates) {
+  if (updates.title != null && !updates.title.trim()) {
+    throw new Error('Укажите название статьи')
+  }
+  if (updates.content != null && !updates.content.trim()) {
+    throw new Error('Укажите содержание статьи')
+  }
+  await getStandardsAdapter().updateStandardArticle(articleId, updates)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function publishStandardArticle(articleId) {
+  await getStandardsAdapter().publishStandardArticle(articleId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function unpublishStandardArticle(articleId) {
+  await getStandardsAdapter().unpublishStandardArticle(articleId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function archiveStandardArticle(articleId) {
+  await getStandardsAdapter().archiveStandardArticle(articleId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function deleteStandardArticle(articleId) {
+  await getStandardsAdapter().deleteStandardArticle(articleId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function markStandardArticleRead(articleId, userId) {
+  const result = await getStandardsAdapter().markStandardArticleRead(articleId, userId)
+  if (isCloudMode()) await refreshData()
+  return result
+}
+
+export async function acknowledgeStandardArticle(articleId, userId) {
+  const result = await getStandardsAdapter().acknowledgeStandardArticle(articleId, userId)
+  if (isCloudMode()) await refreshData()
+  return result
 }

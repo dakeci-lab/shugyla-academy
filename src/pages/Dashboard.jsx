@@ -10,6 +10,7 @@ import CourseCard from '../components/CourseCard'
 import ProgressBar from '../components/ProgressBar'
 import FinalAttestationBlock from '../components/FinalAttestationBlock'
 import MyLearningPathBlock from '../components/MyLearningPathBlock'
+import StandardsDashboardBlock from '../components/StandardsDashboardBlock'
 import './Dashboard.css'
 
 /**
@@ -90,6 +91,8 @@ export default function Dashboard() {
         </section>
 
         <MyLearningPathBlock userId={user.id} />
+
+        <StandardsDashboardBlock userId={user.id} user={employee} />
 
         <section className="dashboard-page__section">
           <div className="dashboard-page__courses-header">

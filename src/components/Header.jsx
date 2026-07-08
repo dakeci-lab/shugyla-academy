@@ -46,6 +46,9 @@ export default function Header({ variant = 'default' }) {
                   {t.adminPanel}
                 </Link>
               )}
+              <Link to="/standards" className="header__link">
+                Стандарты
+              </Link>
               <Link to="/profile" className="header__link">
                 Профиль
               </Link>

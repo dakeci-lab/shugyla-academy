@@ -185,6 +185,14 @@ export async function fetchAllData() {
     pathsData = { paths: [], pathCourses: [], userPaths: [] }
   }
 
+  let standardsData = { categories: [], articles: [], reads: [] }
+  try {
+    const { fetchStandardsData } = await import('./standardsSupabaseAdapter')
+    standardsData = await fetchStandardsData()
+  } catch {
+    standardsData = { categories: [], articles: [], reads: [] }
+  }
+
   return {
     employees,
     courses: normalizedCourses,
@@ -197,6 +205,9 @@ export async function fetchAllData() {
     learningPaths: pathsData.paths,
     learningPathCourses: pathsData.pathCourses,
     userLearningPaths: pathsData.userPaths,
+    standardCategories: standardsData.categories,
+    standardArticles: standardsData.articles,
+    standardArticleReads: standardsData.reads,
   }
 }
 

@@ -21,6 +21,10 @@ export const ADMIN_SECTIONS = {
     title: 'Маршруты',
     description: 'Обучающие маршруты по должностям и порядок курсов.',
   },
+  standards: {
+    title: 'Стандарты',
+    description: 'База стандартов Shugyla Market — статьи и ознакомление сотрудников.',
+  },
   tests: {
     title: 'Тесты',
     description: 'Управление тестами и вопросами для аттестации.',

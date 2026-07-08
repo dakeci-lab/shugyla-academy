@@ -208,6 +208,8 @@ export async function initializeLocal() {
   const testsBundle = getLocalTestsBundle()
   const { getLocalPathsBundle } = await import('./learningPathLocalAdapter')
   const pathsBundle = getLocalPathsBundle()
+  const { getLocalStandardsBundle } = await import('./standardsLocalAdapter')
+  const standardsBundle = getLocalStandardsBundle()
   return {
     employees: getAllEmployeesLocal(),
     courses: getAllCoursesLocal(),
@@ -220,6 +222,9 @@ export async function initializeLocal() {
     learningPaths: pathsBundle.paths,
     learningPathCourses: pathsBundle.pathCourses,
     userLearningPaths: pathsBundle.userPaths,
+    standardCategories: standardsBundle.categories,
+    standardArticles: standardsBundle.articles,
+    standardArticleReads: standardsBundle.reads,
   }
 }
 

@@ -13,6 +13,9 @@ const emptyStore = {
   learningPaths: [],
   learningPathCourses: [],
   userLearningPaths: [],
+  standardCategories: [],
+  standardArticles: [],
+  standardArticleReads: [],
 }
 
 let store = { ...emptyStore }
@@ -39,6 +42,9 @@ export function setCloudStore(data) {
     learningPaths: data.learningPaths || [],
     learningPathCourses: data.learningPathCourses || [],
     userLearningPaths: data.userLearningPaths || [],
+    standardCategories: data.standardCategories || [],
+    standardArticles: data.standardArticles || [],
+    standardArticleReads: data.standardArticleReads || [],
   }
 }
 
@@ -84,4 +90,16 @@ export function getCloudLearningPathCourses() {
 
 export function getCloudUserLearningPaths() {
   return store.loaded ? store.userLearningPaths : null
+}
+
+export function getCloudStandardCategories() {
+  return store.loaded ? store.standardCategories : null
+}
+
+export function getCloudStandardArticles() {
+  return store.loaded ? store.standardArticles : null
+}
+
+export function getCloudStandardArticleReads() {
+  return store.loaded ? store.standardArticleReads : null
 }
