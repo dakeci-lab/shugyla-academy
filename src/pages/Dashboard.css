@@ -119,10 +119,18 @@
   }
 }
 
-.dashboard-page__empty {
-  text-align: center;
-  color: var(--color-text-muted);
-  padding: 32px 0;
+.dashboard-page__empty--box {
+  padding: 32px 24px;
+  background: var(--color-white);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  line-height: 1.6;
+}
+
+.dashboard-page__assignment-note {
+  margin: -8px 0 16px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 600px) {

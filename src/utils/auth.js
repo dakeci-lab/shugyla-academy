@@ -1,4 +1,3 @@
-import { USERS } from '../data/users'
 import {
   ROLES,
   getRole,
@@ -8,6 +7,14 @@ import {
 } from '../data/roles'
 import { getAllCourses } from './adminData'
 import { saveUser } from './storage'
+import {
+  authenticateEmployee,
+  getEmployeeById,
+} from './employeeData'
+import {
+  getCoursesForEmployee,
+  canEmployeeAccessCourse,
+} from './courseAccess'
 
 /** Причины отказа в доступе к курсу */
 export const ACCESS_REASON = {
@@ -15,16 +22,14 @@ export const ACCESS_REASON = {
   NOT_FOUND: 'not_found',
   UNAUTHENTICATED: 'unauthenticated',
   FORBIDDEN: 'forbidden',
+  DRAFT: 'draft',
 }
 
 /**
  * Попытка входа по логину и паролю.
- * Возвращает объект пользователя сессии или null.
  */
 export function login(loginValue, password) {
-  const user = USERS.find(
-    (u) => u.login === loginValue && u.password === password
-  )
+  const user = authenticateEmployee(loginValue, password)
   if (!user) return null
 
   const role = getRole(user.role)
@@ -36,40 +41,42 @@ export function login(loginValue, password) {
     role: user.role,
     roleName: role?.label || user.role,
     permissions: role?.permissions || [],
+    assignedCourseIds: user.assignedCourseIds || [],
   }
   saveUser(sessionUser)
   return sessionUser
 }
 
-/**
- * Курсы, доступные пользователю по роли.
- * admin — все курсы; остальные — только где role ∈ allowedRoles.
- */
+/** Курсы по роли (legacy — для admin stats fallback) */
 export function getCoursesForRole(roleId) {
-  const courses = getAllCourses()
-  if (isAdmin(roleId)) return courses
-  return courses.filter((course) => course.allowedRoles?.includes(roleId))
+  if (isAdmin(roleId)) return getAllCourses()
+  return getAllCourses().filter(
+    (c) => c.status === 'published' && c.allowedRoles?.includes(roleId)
+  )
 }
 
-/** Алиас для читаемости в компонентах */
-export function getAccessibleCourses(roleId) {
-  return getCoursesForRole(roleId)
+/** Курсы для текущего пользователя (по id или role) */
+export function getAccessibleCourses(userOrRole) {
+  if (typeof userOrRole === 'string') {
+    return getCoursesForRole(userOrRole)
+  }
+  const employee = getEmployeeById(userOrRole.id) || userOrRole
+  return getCoursesForEmployee(employee)
 }
 
-/**
- * Может ли роль открыть конкретный курс.
- * admin всегда true; иначе role должен быть в allowedRoles.
- */
-export function canAccessCourse(roleId, course) {
+export function canAccessCourse(userOrRole, course) {
   if (!course) return false
-  if (isAdmin(roleId)) return true
-  return Array.isArray(course.allowedRoles) && course.allowedRoles.includes(roleId)
+
+  if (typeof userOrRole === 'string') {
+    if (isAdmin(userOrRole)) return true
+    if (course.status !== 'published') return false
+    return course.allowedRoles?.includes(userOrRole)
+  }
+
+  const employee = getEmployeeById(userOrRole.id) || userOrRole
+  return canEmployeeAccessCourse(employee, course)
 }
 
-/**
- * Полная проверка доступа к курсу (с учётом авторизации).
- * @returns {{ allowed: boolean, reason: string, course?: object }}
- */
 export function resolveCourseAccess(user, courseId) {
   const course = getAllCourses().find((c) => c.id === Number(courseId))
 
@@ -81,19 +88,23 @@ export function resolveCourseAccess(user, courseId) {
     return { allowed: false, reason: ACCESS_REASON.UNAUTHENTICATED, course }
   }
 
-  if (!canAccessCourse(user.role, course)) {
+  const employee = getEmployeeById(user.id) || user
+
+  if (!isAdmin(employee.role) && course.status !== 'published') {
+    return { allowed: false, reason: ACCESS_REASON.DRAFT, course }
+  }
+
+  if (!canEmployeeAccessCourse(employee, course)) {
     return { allowed: false, reason: ACCESS_REASON.FORBIDDEN, course }
   }
 
   return { allowed: true, reason: ACCESS_REASON.GRANTED, course }
 }
 
-/** Проверить разрешение роли */
 export function roleHasPermission(roleId, permission) {
   return hasPermission(roleId, permission)
 }
 
-/** Доступ к админ-панели (управление сотрудниками) */
 export function canManageAdmin(roleId) {
   return isAdmin(roleId) || hasPermission(roleId, PERMISSIONS.MANAGE_USERS)
 }
@@ -118,7 +129,6 @@ export function canViewTeamChecklists(roleId) {
   return hasPermission(roleId, PERMISSIONS.VIEW_TEAM_CHECKLISTS)
 }
 
-/** Куда перенаправить пользователя после входа */
 export function getPostLoginPath(user, redirectPath) {
   if (redirectPath && redirectPath.startsWith('/')) {
     return redirectPath
@@ -126,7 +136,6 @@ export function getPostLoginPath(user, redirectPath) {
   return canManageAdmin(user.role) ? '/admin' : '/dashboard'
 }
 
-/** Все роли, которым разрешён доступ к курсу (для UI) */
 export function getCourseAllowedRoleLabels(course) {
   if (!course?.allowedRoles) return []
   return course.allowedRoles

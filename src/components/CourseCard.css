@@ -21,6 +21,8 @@
   justify-content: space-between;
   padding: 18px 20px;
   min-height: 72px;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .course-card__badge {

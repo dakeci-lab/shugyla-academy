@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { getTrainingEmployees } from '../../../utils/adminData'
+import { getTrainingEmployees } from '../../../utils/employeeData'
 import {
   getCertificationStatus,
   CERTIFICATION_LABELS,
@@ -31,7 +31,7 @@ export default function CertificationSection() {
 
   const filtered = employees.filter((emp) => {
     if (filter === 'all') return true
-    return getCertificationStatus(emp.id, emp.role) === filter
+    return getCertificationStatus(emp.id) === filter
   })
 
   return (
@@ -74,8 +74,8 @@ export default function CertificationSection() {
               </tr>
             ) : (
               filtered.map((emp) => {
-                const cert = getCertificationStatus(emp.id, emp.role)
-                const percent = getEmployeeProgressPercent(emp.id, emp.role)
+                const cert = getCertificationStatus(emp.id)
+                const percent = getEmployeeProgressPercent(emp.id)
                 const role = getRole(emp.role)
 
                 return (

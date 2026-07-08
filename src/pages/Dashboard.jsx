@@ -1,7 +1,9 @@
 import { useNavigate } from 'react-router-dom'
 import { getUser, clearUser, getCourseProgress } from '../utils/storage'
 import { getAccessibleCourses, canViewTeamChecklists } from '../utils/auth'
+import { getEmployeeById } from '../utils/employeeData'
 import { getRole, getPermissionLabel } from '../data/roles'
+import { calcLessonProgress, getCourseCompletionStatus } from '../utils/courseStructure'
 import Header from '../components/Header'
 import CourseCard from '../components/CourseCard'
 import ProgressBar from '../components/ProgressBar'
@@ -9,7 +11,7 @@ import './Dashboard.css'
 
 /**
  * Личный кабинет — /dashboard
- * Показывает только курсы, доступные роли пользователя (admin — все).
+ * Показывает назначенные или ролевые опубликованные курсы.
  */
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -17,21 +19,24 @@ export default function Dashboard() {
 
   if (!user) return null
 
+  const employee = getEmployeeById(user.id) || user
   const role = getRole(user.role)
-  const myCourses = getAccessibleCourses(user.role)
+  const myCourses = getAccessibleCourses(employee)
 
   let totalLessons = 0
   let completedLessons = 0
 
   myCourses.forEach((course) => {
     const progress = getCourseProgress(user.id, course.id)
-    totalLessons += course.lessonsCount
+    totalLessons += course.lessonsCount || 0
     completedLessons += progress.completedLessons.length
   })
 
   const overallPercent = totalLessons > 0
     ? Math.round((completedLessons / totalLessons) * 100)
     : 0
+
+  const hasManualAssignment = (employee.assignedCourseIds?.length ?? 0) > 0
 
   function handleLogout() {
     clearUser()
@@ -50,7 +55,7 @@ export default function Dashboard() {
             </h1>
             <p className="dashboard-page__role">{user.roleName}</p>
           </div>
-          <button className="btn btn--outline" onClick={handleLogout}>
+          <button type="button" className="btn btn--outline" onClick={handleLogout}>
             Выйти
           </button>
         </div>
@@ -88,23 +93,51 @@ export default function Dashboard() {
               {myCourses.length} {myCourses.length === 1 ? 'курс' : 'курсов'}
             </span>
           </div>
+
+          {hasManualAssignment && (
+            <p className="dashboard-page__assignment-note">
+              Вам назначены индивидуальные курсы администратором.
+            </p>
+          )}
+
           <div className="dashboard-page__grid">
             {myCourses.map((course) => {
               const progress = getCourseProgress(user.id, course.id)
+              const courseStatus = getCourseCompletionStatus(
+                progress.completedLessons,
+                course.id
+              )
+              const progressPercent = calcLessonProgress(
+                progress.completedLessons,
+                course.id
+              )
+
               return (
                 <CourseCard
                   key={course.id}
                   course={course}
                   progress={progress}
+                  progressPercent={progressPercent}
+                  courseStatus={courseStatus}
                 />
               )
             })}
           </div>
 
           {myCourses.length === 0 && (
-            <p className="dashboard-page__empty">
-              Для вашей роли пока нет назначенных курсов.
-            </p>
+            <div className="dashboard-page__empty dashboard-page__empty--box">
+              {hasManualAssignment ? (
+                <p>
+                  Вам пока не назначены доступные опубликованные курсы.
+                  Обратитесь к администратору.
+                </p>
+              ) : (
+                <p>
+                  Для вашей роли пока нет доступных опубликованных курсов.
+                  Если курсы должны быть — обратитесь к администратору.
+                </p>
+              )}
+            </div>
           )}
         </section>
       </main>

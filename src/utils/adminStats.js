@@ -1,15 +1,22 @@
 import { getProgress, getCourseProgress } from './storage'
-import { getCoursesForRole } from './auth'
-import { getAllCourses, getTrainingEmployees } from './adminData'
+import { getAllCourses } from './adminData'
+import { getActiveEmployees, getTrainingEmployees } from './employeeData'
+import { getCoursesForEmployee } from './courseAccess'
 import {
   getCourseLessonCount,
   calcLessonProgress,
   getCourseCompletionStatus,
 } from './courseStructure'
 
-/** Процент прогресса сотрудника по всем доступным курсам */
-export function getEmployeeProgressPercent(userId, role) {
-  const courses = getCoursesForRole(role)
+function safeCompletedCount(completedLessons, courseId) {
+  const total = getCourseLessonCount(courseId)
+  if (total === 0) return 0
+  return Math.min(completedLessons.length, total)
+}
+
+/** Процент прогресса сотрудника по назначенным / доступным курсам */
+export function getEmployeeProgressPercent(userId) {
+  const courses = getCoursesForEmployee(userId)
   if (courses.length === 0) return 0
 
   let totalLessons = 0
@@ -19,39 +26,36 @@ export function getEmployeeProgressPercent(userId, role) {
     const progress = getCourseProgress(userId, course.id)
     const count = getCourseLessonCount(course.id)
     totalLessons += count
-    const completed = progress.completedLessons.length
-    completedLessons += Math.min(completed, count)
+    completedLessons += safeCompletedCount(progress.completedLessons, course.id)
   })
 
   return totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0
 }
 
-/** Завершил ли сотрудник все доступные курсы (100% уроков) */
-export function hasCompletedAllCourses(userId, role) {
-  const courses = getCoursesForRole(role)
+export function hasCompletedAllCourses(userId) {
+  const courses = getCoursesForEmployee(userId)
+  if (courses.length === 0) return false
   return courses.every((course) => {
     const prog = getCourseProgress(userId, course.id)
     return calcLessonProgress(prog.completedLessons, course.id) === 100
   })
 }
 
-/** Статус обучения сотрудника для таблицы «Сотрудники» */
-export function getEmployeeTrainingStatus(userId, role) {
-  const percent = getEmployeeProgressPercent(userId, role)
+/** @deprecated use getEmployeeProgressPercent(userId) */
+export function getEmployeeProgressPercentByRole(userId, role) {
+  void role
+  return getEmployeeProgressPercent(userId)
+}
+
+export function getEmployeeTrainingStatus(userId) {
+  const percent = getEmployeeProgressPercent(userId)
   if (percent === 0) return { label: 'Не начал', type: 'idle' }
   if (percent === 100) return { label: 'Завершил', type: 'done' }
   return { label: 'В процессе', type: 'progress' }
 }
 
-/**
- * Статус аттестации:
- * - not_started — не начал
- * - in_progress — в процессе
- * - passed — сдал тест
- * - failed — все уроки пройдены, тест не сдан
- */
-export function getCertificationStatus(userId, role) {
-  const courses = getCoursesForRole(role)
+export function getCertificationStatus(userId) {
+  const courses = getCoursesForEmployee(userId)
   if (courses.length === 0) return 'not_started'
 
   const progresses = courses.map((c) => ({
@@ -70,7 +74,11 @@ export function getCertificationStatus(userId, role) {
 
   const anyFailed = progresses.some(({ course, progress }) => {
     const total = getCourseLessonCount(course.id)
-    return progress.completedLessons.length >= total && total > 0 && !progress.testPassed
+    return (
+      safeCompletedCount(progress.completedLessons, course.id) >= total &&
+      total > 0 &&
+      !progress.testPassed
+    )
   })
   if (anyFailed) return 'failed'
 
@@ -84,7 +92,6 @@ export const CERTIFICATION_LABELS = {
   failed: 'Не сдал',
 }
 
-/** Сводка по статусам аттестации */
 export function getCertificationSummary() {
   const employees = getTrainingEmployees()
   const summary = {
@@ -95,14 +102,13 @@ export function getCertificationSummary() {
   }
 
   employees.forEach((emp) => {
-    const status = getCertificationStatus(emp.id, emp.role)
+    const status = getCertificationStatus(emp.id)
     summary[status]++
   })
 
   return summary
 }
 
-/** Сводная статистика для раздела «Обзор» */
 export function getOverviewStats() {
   const employees = getTrainingEmployees()
   const courses = getAllCourses()
@@ -113,9 +119,9 @@ export function getOverviewStats() {
   let totalPercent = 0
 
   employees.forEach((emp) => {
-    const percent = getEmployeeProgressPercent(emp.id, emp.role)
+    const percent = getEmployeeProgressPercent(emp.id)
     totalPercent += percent
-    if (hasCompletedAllCourses(emp.id, emp.role)) completedCount++
+    if (hasCompletedAllCourses(emp.id)) completedCount++
     else notCompletedCount++
   })
 
@@ -133,16 +139,35 @@ export function getOverviewStats() {
   }
 }
 
-/** Детальный прогресс: строки для таблицы «Прогресс» */
+/** Детальный прогресс для таблицы «Прогресс» */
 export function getProgressRows() {
-  const employees = getTrainingEmployees()
+  const employees = getActiveEmployees()
   const rows = []
 
   employees.forEach((emp) => {
-    const courses = getCoursesForRole(emp.role)
+    const courses = getCoursesForEmployee(emp)
+
+    if (courses.length === 0) {
+      rows.push({
+        employeeId: emp.id,
+        employeeName: emp.name,
+        employeeRole: emp.role,
+        courseId: null,
+        courseTitle: '—',
+        completedLessons: 0,
+        totalLessons: 0,
+        percent: 0,
+        status: { label: 'Нет курсов', type: 'idle' },
+        testPassed: false,
+        noCourses: true,
+      })
+      return
+    }
+
     courses.forEach((course) => {
       const prog = getCourseProgress(emp.id, course.id)
       const totalLessons = getCourseLessonCount(course.id)
+      const completedLessons = safeCompletedCount(prog.completedLessons, course.id)
       const percent = calcLessonProgress(prog.completedLessons, course.id)
       const status = getCourseCompletionStatus(prog.completedLessons, course.id)
 
@@ -152,11 +177,12 @@ export function getProgressRows() {
         employeeRole: emp.role,
         courseId: course.id,
         courseTitle: course.title,
-        completedLessons: prog.completedLessons.length,
+        completedLessons,
         totalLessons,
         percent,
         status,
         testPassed: prog.testPassed,
+        noCourses: false,
       })
     })
   })

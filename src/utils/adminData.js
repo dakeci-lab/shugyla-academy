@@ -1,10 +1,33 @@
-import { USERS } from '../data/users'
 import { COURSES } from '../data/courses'
 import { getRole } from '../data/roles'
 import { getCourseLessonCount } from './courseStructure'
+import {
+  getAllEmployees,
+  getActiveEmployees,
+  getTrainingEmployees,
+  getEmployeeById,
+  addEmployee,
+  updateEmployee,
+  deactivateEmployee,
+  deleteEmployee,
+  getEmployeeByLogin,
+  isLoginTaken,
+} from './employeeData'
+
+export {
+  getAllEmployees,
+  getActiveEmployees,
+  getTrainingEmployees,
+  getEmployeeById,
+  addEmployee,
+  updateEmployee,
+  deactivateEmployee,
+  deleteEmployee,
+  getEmployeeByLogin,
+  isLoginTaken,
+}
 
 const STORAGE_KEYS = {
-  EXTRA_USERS: 'shugyla_extra_users',
   EXTRA_COURSES: 'shugyla_extra_courses',
   COURSE_EDITS: 'shugyla_course_edits',
 }
@@ -16,44 +39,6 @@ function readJson(key, fallback) {
 
 function writeJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value))
-}
-
-/** Нормализовать сотрудника — добавить должность из роли, если не указана */
-function normalizeEmployee(user) {
-  const role = getRole(user.role)
-  return {
-    ...user,
-    position: user.position || role?.label || user.role,
-    status: user.status || 'active',
-  }
-}
-
-/** Все сотрудники: mock data + добавленные через админку */
-export function getAllEmployees() {
-  const extra = readJson(STORAGE_KEYS.EXTRA_USERS, [])
-  return [...USERS, ...extra].map(normalizeEmployee)
-}
-
-/** Сотрудники без admin (для статистики обучения) */
-export function getTrainingEmployees() {
-  return getAllEmployees().filter((u) => u.role !== 'admin')
-}
-
-/** Добавить сотрудника в localStorage */
-export function addEmployee(employee) {
-  const extra = readJson(STORAGE_KEYS.EXTRA_USERS, [])
-  const all = getAllEmployees()
-  const newId = all.length > 0 ? Math.max(...all.map((u) => u.id)) + 1 : 1
-
-  extra.push(
-    normalizeEmployee({
-      ...employee,
-      id: newId,
-      status: 'active',
-    })
-  )
-  writeJson(STORAGE_KEYS.EXTRA_USERS, extra)
-  return newId
 }
 
 /** Все курсы: mock data + правки + новые */
@@ -104,11 +89,6 @@ export function updateCourse(courseId, updates) {
   const edits = readJson(STORAGE_KEYS.COURSE_EDITS, {})
   edits[courseId] = { ...edits[courseId], ...updates }
   writeJson(STORAGE_KEYS.COURSE_EDITS, edits)
-}
-
-/** Найти сотрудника по id */
-export function getEmployeeById(id) {
-  return getAllEmployees().find((u) => u.id === id) || null
 }
 
 /** Найти курс по id */

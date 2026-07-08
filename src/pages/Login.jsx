@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
 import { login, getPostLoginPath } from '../utils/auth'
-import { USERS } from '../data/users'
+import { getAllEmployees } from '../utils/employeeData'
 import { getRole } from '../data/roles'
 import './Login.css'
 
@@ -84,7 +84,7 @@ export default function Login() {
         <div className="login-page__demo">
           <p className="login-page__demo-title">Демо-аккаунты (mock data):</p>
           <ul className="login-page__demo-list">
-            {USERS.map((u) => {
+            {getAllEmployees().map((u) => {
               const role = getRole(u.role)
               return (
                 <li key={u.id}>
