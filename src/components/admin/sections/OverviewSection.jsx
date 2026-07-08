@@ -1,5 +1,6 @@
 import { getOverviewStats, CERTIFICATION_LABELS } from '../../../utils/adminStats'
 import StatCard from '../StatCard'
+import MigrateToCloudPanel from '../MigrateToCloudPanel'
 import '../admin-shared.css'
 
 const CERT_VARIANTS = {
@@ -15,6 +16,8 @@ export default function OverviewSection() {
 
   return (
     <div className="admin-overview">
+      <MigrateToCloudPanel />
+
       <div className="admin-stats-grid admin-stats-grid--overview">
         <StatCard
           icon="👥"

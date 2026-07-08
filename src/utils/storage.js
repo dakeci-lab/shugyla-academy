@@ -1,6 +1,9 @@
 /**
- * Утилиты для работы с localStorage
+ * Утилиты для работы с localStorage и облачным кэшем прогресса
  */
+
+import { isCloudMode } from '../lib/dataMode'
+import { getCloudProgress } from '../lib/cloudStore'
 
 const STORAGE_KEYS = {
   USER: 'shugyla_user',
@@ -25,6 +28,11 @@ export function clearUser() {
 
 /** Получить прогресс обучения всех пользователей */
 export function getProgress() {
+  if (isCloudMode()) {
+    const cached = getCloudProgress()
+    if (cached) return cached
+    return {}
+  }
   const data = localStorage.getItem(STORAGE_KEYS.PROGRESS)
   return data ? JSON.parse(data) : {}
 }

@@ -22,13 +22,13 @@ export default function Login() {
     e.preventDefault()
     setError('')
 
-    const user = login(loginValue, password)
-    if (!user) {
-      setError('Неверный логин или пароль')
-      return
-    }
-
-    navigate(getPostLoginPath(user, redirect), { replace: true })
+    login(loginValue, password).then((user) => {
+      if (!user) {
+        setError('Неверный логин или пароль')
+        return
+      }
+      navigate(getPostLoginPath(user, redirect), { replace: true })
+    })
   }
 
   return (

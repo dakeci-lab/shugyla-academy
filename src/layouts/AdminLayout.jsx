@@ -1,4 +1,5 @@
 import Sidebar from '../components/Sidebar'
+import DataModeBadge from '../components/admin/DataModeBadge'
 import './AdminLayout.css'
 
 /** Метаданные разделов админ-панели */
@@ -51,7 +52,10 @@ export default function AdminLayout({
       <div className="admin-layout__main">
         <header className="admin-layout__topbar">
           <div className="admin-layout__topbar-info">
-            <h1 className="admin-layout__title">{section.title}</h1>
+            <div className="admin-layout__title-row">
+              <h1 className="admin-layout__title">{section.title}</h1>
+              <DataModeBadge />
+            </div>
             <p className="admin-layout__desc">{section.description}</p>
           </div>
           <div className="admin-layout__topbar-user">

@@ -1,6 +1,8 @@
 import { COURSES } from '../data/courses'
 import { getRole } from '../data/roles'
 import { getCourseLessonCount } from './courseStructure'
+import { isCloudMode } from '../lib/dataMode'
+import { getCloudCourses } from '../lib/cloudStore'
 import {
   getAllEmployees,
   getActiveEmployees,
@@ -41,8 +43,8 @@ function writeJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value))
 }
 
-/** Все курсы: mock data + правки + новые */
-export function getAllCourses() {
+/** Все курсы из localStorage (без облачного кэша) */
+export function getAllCoursesLocal() {
   const extra = readJson(STORAGE_KEYS.EXTRA_COURSES, [])
   const edits = readJson(STORAGE_KEYS.COURSE_EDITS, {})
   const base = COURSES.map((course) => ({
@@ -57,10 +59,20 @@ export function getAllCourses() {
   }))
 }
 
+/** Все курсы: mock data + правки + новые / облачный кэш */
+export function getAllCourses() {
+  if (isCloudMode()) {
+    const cached = getCloudCourses()
+    if (cached) return cached
+    return []
+  }
+  return getAllCoursesLocal()
+}
+
 /** Создать курс в localStorage */
 export function addCourse(course) {
   const extra = readJson(STORAGE_KEYS.EXTRA_COURSES, [])
-  const all = getAllCourses()
+  const all = getAllCoursesLocal()
   const newId = all.length > 0 ? Math.max(...all.map((c) => c.id)) + 1 : 1
 
   extra.push({

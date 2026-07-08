@@ -1,12 +1,15 @@
 import { useState } from 'react'
+import { isCloudMode } from '../../lib/dataMode'
 import {
   getLessonsForCourse,
-  addLesson,
-  updateLesson,
-  deleteLesson,
   reorderLessons,
   EMPTY_LESSON,
 } from '../../utils/lessonData'
+import {
+  createLesson,
+  updateLesson,
+  deleteLesson,
+} from '../../services/academyDataService'
 import { useAdminRefresh } from '../../hooks/useAdminRefresh'
 import AdminModal from './AdminModal'
 import './admin-shared.css'
@@ -22,9 +25,9 @@ export default function CourseLessonManager({ courseId, onChange }) {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_LESSON_FORM)
 
-  function reload() {
+  async function reload() {
+    await refresh()
     setLessons(getLessonsForCourse(courseId))
-    refresh()
     onChange?.()
   }
 
@@ -47,30 +50,40 @@ export default function CourseLessonManager({ courseId, onChange }) {
     setShowForm(true)
   }
 
-  function handleSave(e) {
+  async function handleSave(e) {
     e.preventDefault()
     if (editLesson) {
-      updateLesson(editLesson.id, form)
+      await updateLesson(editLesson.id, form)
     } else {
-      addLesson(courseId, form)
+      await createLesson(courseId, form)
     }
     setShowForm(false)
-    reload()
+    await reload()
   }
 
-  function handleDelete(lesson) {
+  async function handleDelete(lesson) {
     if (!window.confirm(`Удалить урок «${lesson.title}»?`)) return
-    deleteLesson(lesson.id)
-    reload()
+    await deleteLesson(lesson.id)
+    await reload()
   }
 
-  function moveLesson(index, direction) {
+  async function moveLesson(index, direction) {
     const target = index + direction
     if (target < 0 || target >= lessons.length) return
     const ids = lessons.map((l) => l.id)
     ;[ids[index], ids[target]] = [ids[target], ids[index]]
-    reorderLessons(courseId, ids)
-    reload()
+
+    if (isCloudMode()) {
+      await Promise.all(
+        ids.map((id, orderIndex) =>
+          updateLesson(id, { order: orderIndex + 1, courseId })
+        )
+      )
+    } else {
+      reorderLessons(courseId, ids)
+    }
+
+    await reload()
   }
 
   return (

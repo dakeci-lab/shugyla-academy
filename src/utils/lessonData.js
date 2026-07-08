@@ -1,4 +1,6 @@
 import { LESSONS as MOCK_LESSONS } from '../data/lessons'
+import { isCloudMode } from '../lib/dataMode'
+import { getCloudLessons } from '../lib/cloudStore'
 
 const STORAGE_KEYS = {
   EXTRA_LESSONS: 'shugyla_extra_lessons',
@@ -45,8 +47,8 @@ function isMockLesson(lessonId) {
   return MOCK_LESSONS.some((l) => l.id === lessonId)
 }
 
-/** Все уроки курса: mock + localStorage */
-export function getLessonsForCourse(courseId) {
+/** Все уроки курса из localStorage (без облачного кэша) */
+export function getLessonsForCourseLocal(courseId) {
   const deleted = getDeletedIds()
   const edits = readJson(STORAGE_KEYS.LESSON_EDITS, {})
   const extra = readJson(STORAGE_KEYS.EXTRA_LESSONS, [])
@@ -60,6 +62,20 @@ export function getLessonsForCourse(courseId) {
     .map((l) => normalizeLesson(l))
 
   return [...mock, ...custom].sort((a, b) => a.order - b.order)
+}
+
+/** Все уроки курса: mock + localStorage / облачный кэш */
+export function getLessonsForCourse(courseId) {
+  if (isCloudMode()) {
+    const cached = getCloudLessons()
+    if (cached) {
+      return cached
+        .filter((l) => l.courseId === courseId)
+        .sort((a, b) => a.order - b.order)
+    }
+    return []
+  }
+  return getLessonsForCourseLocal(courseId)
 }
 
 /** Все уроки (для генерации id) */

@@ -1,5 +1,5 @@
-import { Link } from 'react-router-dom'
-import { getUser } from '../utils/storage'
+import { Link, useNavigate } from 'react-router-dom'
+import { getUser, clearUser } from '../utils/storage'
 import { canManageAdmin } from '../utils/auth'
 import { useLanguage } from '../context/LanguageContext'
 import LangSwitch from './LangSwitch'
@@ -11,7 +11,13 @@ import './Header.css'
  */
 export default function Header({ variant = 'default' }) {
   const user = getUser()
+  const navigate = useNavigate()
   const { t } = useLanguage()
+
+  function handleLogout() {
+    clearUser()
+    navigate('/academy')
+  }
 
   return (
     <header className={`header ${variant === 'landing' ? 'header--landing' : ''}`}>
@@ -43,6 +49,13 @@ export default function Header({ variant = 'default' }) {
               <Link to="/dashboard" className="header__link header__user">
                 {user.name}
               </Link>
+              <button
+                type="button"
+                className="btn btn--outline btn--sm header__logout"
+                onClick={handleLogout}
+              >
+                Выйти
+              </button>
             </>
           ) : (
             <Link to="/login" className="btn btn--primary btn--sm">

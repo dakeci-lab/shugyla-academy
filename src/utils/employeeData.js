@@ -1,5 +1,7 @@
 import { USERS } from '../data/users'
 import { getRole } from '../data/roles'
+import { isCloudMode } from '../lib/dataMode'
+import { getCloudEmployees } from '../lib/cloudStore'
 
 export const STORAGE_KEYS = {
   EXTRA_USERS: 'shugyla_extra_users',
@@ -68,8 +70,8 @@ function getDeletedIds() {
   return readJson(STORAGE_KEYS.DELETED_USER_IDS, [])
 }
 
-/** Все сотрудники включая admin */
-export function getAllEmployees() {
+/** Все сотрудники из localStorage (без облачного кэша) */
+export function getAllEmployeesLocal() {
   const extra = readJson(STORAGE_KEYS.EXTRA_USERS, [])
   const edits = readJson(STORAGE_KEYS.USER_EDITS, {})
   const deleted = getDeletedIds()
@@ -81,6 +83,16 @@ export function getAllEmployees() {
   const added = extra.map((u) => normalizeEmployee(u))
 
   return [...base, ...added]
+}
+
+/** Все сотрудники включая admin */
+export function getAllEmployees() {
+  if (isCloudMode()) {
+    const cached = getCloudEmployees()
+    if (cached) return cached
+    return []
+  }
+  return getAllEmployeesLocal()
 }
 
 /** Активные сотрудники (без admin, без уволенных и удалённых) */

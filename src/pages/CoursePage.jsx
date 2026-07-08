@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useParams, Link, Navigate, useLocation } from 'react-router-dom'
-import { getUser, getCourseProgress, markLessonComplete } from '../utils/storage'
+import { getUser, getCourseProgress } from '../utils/storage'
+import { markLessonComplete } from '../services/academyDataService'
+import { useAcademyData } from '../context/AcademyDataContext'
 import { resolveCourseAccess, ACCESS_REASON } from '../utils/auth'
 import {
   getCourseLessons,
@@ -27,6 +29,7 @@ export default function CoursePage() {
   const location = useLocation()
   const courseId = Number(id)
   const user = getUser()
+  const { reload } = useAcademyData()
 
   const access = resolveCourseAccess(user, courseId)
 
@@ -73,9 +76,10 @@ export default function CoursePage() {
     setProgress(getCourseProgress(user.id, courseId))
   }
 
-  function handleMarkComplete() {
+  async function handleMarkComplete() {
     if (!activeLesson) return
-    markLessonComplete(user.id, courseId, activeLesson.id)
+    await markLessonComplete(user.id, courseId, activeLesson.id)
+    await reload()
     refreshProgress()
   }
 

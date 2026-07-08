@@ -2,9 +2,6 @@ import { useState } from 'react'
 import {
   getActiveEmployees,
   getEmployeeById,
-  addEmployee,
-  updateEmployee,
-  deactivateEmployee,
   EMPTY_EMPLOYEE_FORM,
   employeeToForm,
   validateEmployeeForm,
@@ -12,6 +9,11 @@ import {
   EMPLOYMENT_STATUS_LABELS,
   EMPLOYMENT_STATUS_BADGE,
 } from '../../../utils/employeeData'
+import {
+  createEmployee,
+  updateEmployee,
+  deactivateEmployee,
+} from '../../../services/academyDataService'
 import {
   getEmployeeProgressPercent,
 } from '../../../utils/adminStats'
@@ -51,7 +53,7 @@ export default function EmployeesSection() {
     setModalMode('form')
   }
 
-  function handleSave(e) {
+  async function handleSave(e) {
     e.preventDefault()
     const error = validateEmployeeForm(form, editId)
     if (error) {
@@ -70,20 +72,23 @@ export default function EmployeesSection() {
       ...(form.password?.trim() ? { password: form.password } : {}),
     }
 
-    if (editId) {
-      updateEmployee(editId, payload)
-    } else {
-      addEmployee({ ...payload, password: form.password })
+    try {
+      if (editId) {
+        await updateEmployee(editId, payload)
+      } else {
+        await createEmployee({ ...payload, password: form.password })
+      }
+      setModalMode(null)
+      await refresh()
+    } catch (err) {
+      setFormError(err.message || 'Не удалось сохранить сотрудника')
     }
-
-    setModalMode(null)
-    refresh()
   }
 
-  function handleDeactivate(emp) {
+  async function handleDeactivate(emp) {
     if (!window.confirm(`Деактивировать сотрудника «${emp.name}»?`)) return
-    deactivateEmployee(emp.id)
-    refresh()
+    await deactivateEmployee(emp.id)
+    await refresh()
   }
 
   function toggleCourse(courseId) {

@@ -85,6 +85,10 @@
   font-weight: 600;
 }
 
+.header__logout {
+  flex-shrink: 0;
+}
+
 @media (max-width: 600px) {
   .header__logo-text {
     font-size: 14px;

@@ -27,10 +27,18 @@
   min-width: 0;
 }
 
+.admin-layout__title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+
 .admin-layout__title {
   font-size: 24px;
   font-weight: 700;
-  margin: 0 0 4px;
+  margin: 0;
   letter-spacing: -0.4px;
 }
 

@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { getCourseProgress, saveTestResult } from '../utils/storage'
+import { getCourseProgress } from '../utils/storage'
+import { saveTestResult } from '../services/academyDataService'
+import { useAcademyData } from '../context/AcademyDataContext'
 import './CourseTest.css'
 
 /**
@@ -7,6 +9,7 @@ import './CourseTest.css'
  */
 export default function CourseTest({ test, userId, courseId, disabled, onComplete }) {
   const saved = getCourseProgress(userId, courseId)
+  const { reload } = useAcademyData()
 
   const [answers, setAnswers] = useState({})
   const [submitted, setSubmitted] = useState(false)
@@ -20,7 +23,7 @@ export default function CourseTest({ test, userId, courseId, disabled, onComplet
     setAnswers((prev) => ({ ...prev, [questionId]: optionIndex }))
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     if (disabled) return
 
@@ -35,7 +38,8 @@ export default function CourseTest({ test, userId, courseId, disabled, onComplet
     const score = Math.round((correct / test.questions.length) * 100)
     const passed = score >= test.passingScore
 
-    saveTestResult(userId, courseId, score, passed)
+    await saveTestResult(userId, courseId, score, passed)
+    await reload()
     setResult({ score, passed, correct, total: test.questions.length })
     setSubmitted(true)
     setRetrying(false)

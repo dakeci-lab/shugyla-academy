@@ -5,12 +5,14 @@ import {
   isAdmin,
   PERMISSIONS,
 } from '../data/roles'
+import { isCloudMode } from '../lib/dataMode'
 import { getAllCourses } from './adminData'
 import { saveUser } from './storage'
 import {
   authenticateEmployee,
   getEmployeeById,
 } from './employeeData'
+import { authenticateUser } from '../services/academyDataService'
 import {
   getCoursesForEmployee,
   canEmployeeAccessCourse,
@@ -28,8 +30,10 @@ export const ACCESS_REASON = {
 /**
  * Попытка входа по логину и паролю.
  */
-export function login(loginValue, password) {
-  const user = authenticateEmployee(loginValue, password)
+export async function login(loginValue, password) {
+  const user = isCloudMode()
+    ? await authenticateUser(loginValue, password)
+    : authenticateEmployee(loginValue, password)
   if (!user) return null
 
   const role = getRole(user.role)

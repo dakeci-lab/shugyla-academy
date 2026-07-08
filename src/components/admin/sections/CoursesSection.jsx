@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { getAllCourses, addCourse, updateCourse } from '../../../utils/adminData'
+import { getAllCourses } from '../../../utils/adminData'
+import { createCourse, updateCourse } from '../../../services/academyDataService'
 import { getRole, ROLES, CATEGORIES, ALL_EMPLOYEE_ROLES, ROLE_IDS } from '../../../data/roles'
 import { getCategoryLabel } from '../../../utils/i18n'
 import { getLessonsForCourse } from '../../../utils/lessonData'
@@ -62,7 +63,7 @@ export default function CoursesSection() {
     setForm({ ...form, allowedRoles: roles.length ? roles : [roleId] })
   }
 
-  function handleSave(e) {
+  async function handleSave(e) {
     e.preventDefault()
     const lessonCount = editId ? getLessonsForCourse(editId).length : 0
 
@@ -73,22 +74,21 @@ export default function CoursesSection() {
     }
 
     if (editId) {
-      updateCourse(editId, payload)
-    } else {
-      const newId = addCourse(payload)
-      setEditId(newId)
-      refresh()
+      await updateCourse(editId, payload)
+      setShowForm(false)
+      await refresh()
       return
     }
 
-    setShowForm(false)
-    refresh()
+    const newId = await createCourse(payload)
+    setEditId(newId)
+    await refresh()
   }
 
-  function handleCloseForm() {
+  async function handleCloseForm() {
     setShowForm(false)
     setEditId(null)
-    refresh()
+    await refresh()
   }
 
   return (
