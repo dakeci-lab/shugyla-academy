@@ -21,29 +21,45 @@ export default function PlatformAcademy() {
   const { user } = useSession()
   const isAdmin = canManageAcademy(user)
 
-  const links = [
-    ...ACADEMY_LINKS,
-    ...(isAdmin
-      ? [
-          {
-            title: 'Управление Academy',
-            description: 'Курсы, тесты, маршруты, найм и прогресс сотрудников.',
-            to: '/platform/academy/manage',
-          },
-        ]
-      : []),
-  ]
+  const adminLinks = isAdmin
+    ? [
+        {
+          title: 'Назначение обучения',
+          description:
+            'Здесь администратор сможет назначать сотрудникам курсы, маршруты и тесты.',
+          soon: true,
+        },
+        {
+          title: 'Управление Academy',
+          description: 'Курсы, тесты, маршруты, найм и прогресс сотрудников.',
+          to: '/platform/academy/manage',
+        },
+      ]
+    : []
+
+  const links = [...ACADEMY_LINKS, ...adminLinks]
 
   return (
     <div className="platform-academy">
       <div className="platform-academy__grid">
-        {links.map((item) => (
-          <Link key={item.to} to={item.to} className="platform-academy__card">
-            <h3 className="platform-academy__title">{item.title}</h3>
-            <p className="platform-academy__desc">{item.description}</p>
-            <span className="platform-academy__action">Открыть →</span>
-          </Link>
-        ))}
+        {links.map((item) =>
+          item.soon ? (
+            <article
+              key={item.title}
+              className="platform-academy__card platform-academy__card--soon"
+            >
+              <h3 className="platform-academy__title">{item.title}</h3>
+              <p className="platform-academy__desc">{item.description}</p>
+              <span className="platform-academy__badge">Скоро</span>
+            </article>
+          ) : (
+            <Link key={item.to} to={item.to} className="platform-academy__card">
+              <h3 className="platform-academy__title">{item.title}</h3>
+              <p className="platform-academy__desc">{item.description}</p>
+              <span className="platform-academy__action">Открыть →</span>
+            </Link>
+          )
+        )}
       </div>
     </div>
   )

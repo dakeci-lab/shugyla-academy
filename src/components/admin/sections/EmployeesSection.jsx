@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import {
   getStaffEmployees,
-  getEmployeeById,
   EMPTY_EMPLOYEE_FORM,
   employeeToForm,
   validateEmployeeForm,
@@ -16,17 +15,8 @@ import {
   updateEmployee,
   deactivateEmployee,
   restoreEmployee,
-  permanentlyDeleteEmployee,
-  assignLearningPathToUser,
-  getLearningPathsByRole,
-  getUserLearningPath,
 } from '../../../services/academyDataService'
-import { getActiveLearningPathForUser } from '../../../utils/learningPathData'
-import { getEmployeeProgressPercent } from '../../../utils/adminStats'
-import { ROLES, ALL_EMPLOYEE_ROLES, getRoleLabel } from '../../../data/roles'
-import { getCoursesForEmployee, getAssignableCourses } from '../../../utils/courseAccess'
-import { getCourseProgress } from '../../../utils/storage'
-import { calcLessonProgress } from '../../../utils/courseStructure'
+import { ROLES, EMPLOYEE_FORM_ROLES, getRoleLabel } from '../../../data/roles'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
 import StatusBadge from '../StatusBadge'
@@ -38,66 +28,40 @@ const FILTER_TABS = [
   { id: 'all', label: 'Все' },
 ]
 
-/** Раздел «Сотрудники» — полное управление и назначение курсов */
+/** Раздел «Сотрудники» — учётные записи, роли и статус */
 export default function EmployeesSection() {
   const { version, refresh } = useAdminRefresh()
   const [filter, setFilter] = useState('active')
-  const [modalMode, setModalMode] = useState(null)
+  const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(EMPTY_EMPLOYEE_FORM)
   const [formError, setFormError] = useState('')
   const [actionError, setActionError] = useState('')
 
-  const [pathAssignId, setPathAssignId] = useState(null)
-  const [pathForm, setPathForm] = useState({ learningPathId: '' })
-  const [pathFormError, setPathFormError] = useState('')
-
   void version
 
   const employees = getStaffEmployees(filter)
-  const assignableCourses = getAssignableCourses()
   const activeCount = getStaffEmployees('active').length
   const deactivatedCount = getStaffEmployees('deactivated').length
-  const publishedPathsForRole = getLearningPathsByRole(form.role, { publishedOnly: true })
-
-  function currentPathIdForUser(userId) {
-    return getUserLearningPath(userId)?.learningPathId || ''
-  }
-
-  function pathLabelForEmployee(emp) {
-    const info = getActiveLearningPathForUser(emp.id)
-    if (!info) return 'Маршрут не назначен'
-    if (info.isArchived) return 'Архивный маршрут'
-    if (!info.path) return info.label || 'Маршрут удалён'
-    return info.path.title
-  }
 
   function openAdd() {
     setEditId(null)
     setForm(EMPTY_EMPLOYEE_FORM)
     setFormError('')
-    setModalMode('form')
+    setShowForm(true)
   }
 
   function openEdit(emp) {
     setEditId(emp.id)
-    const baseForm = employeeToForm(emp)
-    baseForm.learningPathId = currentPathIdForUser(emp.id)
-    setForm(baseForm)
+    setForm(employeeToForm(emp))
     setFormError('')
-    setModalMode('form')
+    setShowForm(true)
   }
 
-  function openPathAssign(emp) {
-    setPathAssignId(emp.id)
-    setPathForm({ learningPathId: currentPathIdForUser(emp.id) })
-    setPathFormError('')
-    setModalMode('path')
-  }
-
-  async function assignPathToEmployee(userId, pathId) {
-    if (!pathId) return null
-    return assignLearningPathToUser(userId, pathId)
+  function closeForm() {
+    setShowForm(false)
+    setEditId(null)
+    setFormError('')
   }
 
   async function handleSave(e) {
@@ -111,50 +75,22 @@ export default function EmployeesSection() {
     const payload = {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
-      position: form.position.trim(),
       role: form.role,
       login: form.login.trim(),
       employmentStatus: form.employmentStatus,
-      assignedCourseIds: form.assignedCourseIds,
       ...(form.password?.trim() ? { password: form.password } : {}),
     }
 
     try {
-      const previousPathId = editId ? currentPathIdForUser(editId) : ''
-      const pathChanged = form.learningPathId && form.learningPathId !== previousPathId
-
       if (editId) {
         await updateEmployee(editId, payload)
-        if (pathChanged) {
-          await assignPathToEmployee(editId, form.learningPathId)
-        }
       } else {
-        const newId = await createEmployee({ ...payload, password: form.password })
-        if (form.learningPathId) {
-          await assignPathToEmployee(newId, form.learningPathId)
-        }
+        await createEmployee({ ...payload, password: form.password })
       }
-      setModalMode(null)
+      closeForm()
       await refresh()
     } catch (err) {
       setFormError(err.message || 'Не удалось сохранить сотрудника')
-    }
-  }
-
-  async function handlePathSave(e) {
-    e.preventDefault()
-    if (!pathAssignId) return
-    if (!pathForm.learningPathId) {
-      setPathFormError('Выберите маршрут')
-      return
-    }
-
-    try {
-      await assignPathToEmployee(pathAssignId, pathForm.learningPathId)
-      setModalMode(null)
-      await refresh()
-    } catch (err) {
-      setPathFormError(err.message || 'Не удалось назначить маршрут')
     }
   }
 
@@ -169,49 +105,16 @@ export default function EmployeesSection() {
     }
   }
 
-  async function handleRestore(emp) {
+  async function handleActivate(emp) {
     setActionError('')
     try {
       await restoreEmployee(emp.id)
       setFilter('active')
       await refresh()
     } catch (err) {
-      setActionError(err.message || 'Не удалось восстановить сотрудника')
+      setActionError(err.message || 'Не удалось активировать сотрудника')
     }
   }
-
-  async function handlePermanentDelete(emp) {
-    const confirmed = window.confirm(
-      'Вы действительно хотите удалить сотрудника навсегда? Это действие нельзя отменить.'
-    )
-    if (!confirmed) return
-
-    setActionError('')
-    try {
-      await permanentlyDeleteEmployee(emp.id)
-      await refresh()
-    } catch (err) {
-      setActionError(
-        err.message || 'Не удалось удалить сотрудника. Попробуйте позже.'
-      )
-    }
-  }
-
-  function toggleCourse(courseId) {
-    const ids = form.assignedCourseIds.includes(courseId)
-      ? form.assignedCourseIds.filter((id) => id !== courseId)
-      : [...form.assignedCourseIds, courseId]
-    setForm({ ...form, assignedCourseIds: ids })
-  }
-
-  const assignedPreview = editId
-    ? getCoursesForEmployee(getEmployeeById(editId))
-    : []
-
-  const pathChangedOnEdit =
-    editId &&
-    form.learningPathId &&
-    form.learningPathId !== currentPathIdForUser(editId)
 
   function renderActions(emp) {
     if (isActiveStaffEmployee(emp)) {
@@ -223,13 +126,6 @@ export default function EmployeesSection() {
             onClick={() => openEdit(emp)}
           >
             Редактировать
-          </button>
-          <button
-            type="button"
-            className="btn btn--outline btn--sm"
-            onClick={() => openPathAssign(emp)}
-          >
-            {currentPathIdForUser(emp.id) ? 'Сменить маршрут' : 'Назначить маршрут'}
           </button>
           <button
             type="button"
@@ -255,16 +151,9 @@ export default function EmployeesSection() {
           <button
             type="button"
             className="btn btn--outline btn--sm"
-            onClick={() => handleRestore(emp)}
+            onClick={() => handleActivate(emp)}
           >
-            Восстановить
-          </button>
-          <button
-            type="button"
-            className="btn btn--outline btn--sm admin-table__danger"
-            onClick={() => handlePermanentDelete(emp)}
-          >
-            Удалить навсегда
+            Активировать
           </button>
         </>
       )
@@ -312,59 +201,34 @@ export default function EmployeesSection() {
           <thead>
             <tr>
               <th>Сотрудник</th>
-              <th>Должность</th>
               <th>Логин</th>
               <th>Роль</th>
-              <th>Маршрут</th>
               <th>Статус</th>
-              <th>Курсы</th>
-              <th>Прогресс</th>
-              <th></th>
+              <th>Действия</th>
             </tr>
           </thead>
           <tbody>
             {employees.length === 0 ? (
               <tr>
-                <td colSpan={9} className="admin-empty">
+                <td colSpan={5} className="admin-empty">
                   {filter === 'active' && 'Активные сотрудники не найдены.'}
                   {filter === 'deactivated' && 'Деактивированные сотрудники не найдены.'}
                   {filter === 'all' && 'Сотрудники не найдены.'}
                 </td>
               </tr>
             ) : (
-              employees.map((emp) => {
-                const percent = getEmployeeProgressPercent(emp.id)
-                const courses = getCoursesForEmployee(emp)
-
-                return (
+              employees.map((emp) => (
                   <tr key={emp.id}>
                     <td>
                       <strong>{emp.name}</strong>
-                      {emp.assignedCourseIds?.length > 0 && (
-                        <span className="admin-table__hint"> · назначено вручную</span>
-                      )}
                     </td>
-                    <td>{emp.position}</td>
                     <td><code className="admin-code">{emp.login}</code></td>
                     <td>{getRoleLabel(emp.role)}</td>
-                    <td>{pathLabelForEmployee(emp)}</td>
                     <td>
                       <StatusBadge
                         label={getEmploymentStatusLabel(emp.employmentStatus)}
                         type={getEmploymentStatusBadgeType(emp.employmentStatus)}
                       />
-                    </td>
-                    <td>{courses.length}</td>
-                    <td>
-                      <div className="admin-progress-cell">
-                        <div className="admin-progress-cell__bar">
-                          <div
-                            className="admin-progress-cell__fill"
-                            style={{ width: `${percent}%` }}
-                          />
-                        </div>
-                        <span className="admin-progress-cell__text">{percent}%</span>
-                      </div>
                     </td>
                     <td>
                       <div className="admin-table__actions">
@@ -372,21 +236,20 @@ export default function EmployeesSection() {
                       </div>
                     </td>
                   </tr>
-                )
-              })
+                ))
             )}
           </tbody>
         </table>
       </div>
 
-      {modalMode === 'form' && (
+      {showForm && (
         <AdminModal
           title={editId ? 'Редактировать сотрудника' : 'Добавить сотрудника'}
-          onClose={() => setModalMode(null)}
-          xwide
+          onClose={closeForm}
+          wide
           footer={
             <>
-              <button type="button" className="btn btn--outline" onClick={() => setModalMode(null)}>
+              <button type="button" className="btn btn--outline" onClick={closeForm}>
                 Отмена
               </button>
               <button type="submit" className="btn btn--primary" form="employee-form">
@@ -417,48 +280,22 @@ export default function EmployeesSection() {
             </div>
 
             <label className="admin-form__label">
-              Должность
-              <input
-                className="admin-form__input"
-                value={form.position}
-                onChange={(e) => setForm({ ...form, position: e.target.value })}
-                placeholder="Например: Кассир"
-              />
+              Роль в системе *
+              <select
+                className="admin-form__select"
+                value={form.role}
+                onChange={(e) => setForm({ ...form, role: e.target.value })}
+              >
+                {EMPLOYEE_FORM_ROLES.map((roleId) => (
+                  <option key={roleId} value={roleId}>
+                    {ROLES[roleId]?.label || roleId}
+                  </option>
+                ))}
+              </select>
+              <span className="admin-form__hint">
+                Роль определяет доступ к разделам платформы.
+              </span>
             </label>
-
-            <div className="admin-form__row">
-              <label className="admin-form__label">
-                Роль
-                <select
-                  className="admin-form__select"
-                  value={form.role}
-                  onChange={(e) =>
-                    setForm({ ...form, role: e.target.value, learningPathId: '' })
-                  }
-                >
-                  {ALL_EMPLOYEE_ROLES.map((roleId) => (
-                    <option key={roleId} value={roleId}>
-                      {ROLES[roleId]?.label || roleId}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="admin-form__label">
-                Статус
-                <select
-                  className="admin-form__select"
-                  value={form.employmentStatus}
-                  onChange={(e) =>
-                    setForm({ ...form, employmentStatus: e.target.value })
-                  }
-                >
-                  <option value={EMPLOYMENT_STATUS.ACTIVE}>Активен</option>
-                  <option value={EMPLOYMENT_STATUS.INACTIVE}>Деактивирован</option>
-                  <option value={EMPLOYMENT_STATUS.INTERNSHIP}>Стажировка</option>
-                  <option value={EMPLOYMENT_STATUS.TERMINATED}>Уволен</option>
-                </select>
-              </label>
-            </div>
 
             <div className="admin-form__row">
               <label className="admin-form__label">
@@ -483,129 +320,22 @@ export default function EmployeesSection() {
             </div>
 
             <label className="admin-form__label">
-              Обучающий маршрут
+              Статус
               <select
                 className="admin-form__select"
-                value={form.learningPathId}
-                onChange={(e) => setForm({ ...form, learningPathId: e.target.value })}
+                value={form.employmentStatus}
+                onChange={(e) =>
+                  setForm({ ...form, employmentStatus: e.target.value })
+                }
               >
-                <option value="">Без маршрута</option>
-                {publishedPathsForRole.map((path) => (
-                  <option key={path.id} value={path.id}>
-                    {path.title}
-                  </option>
-                ))}
+                <option value={EMPLOYMENT_STATUS.ACTIVE}>Активен</option>
+                <option value={EMPLOYMENT_STATUS.INACTIVE}>Деактивирован</option>
+                <option value={EMPLOYMENT_STATUS.INTERNSHIP}>Стажировка</option>
+                <option value={EMPLOYMENT_STATUS.TERMINATED}>Уволен</option>
               </select>
-              <p className="admin-form__hint">
-                Показаны только опубликованные маршруты для выбранной роли.
-              </p>
             </label>
-
-            {pathChangedOnEdit && (
-              <p className="admin-form__hint admin-form__hint--warning">
-                Новый маршрут добавит сотруднику курсы из выбранного маршрута.
-                Старые назначения и прогресс сохранятся.
-              </p>
-            )}
-
-            <div className="admin-form__label">
-              <span>Назначенные курсы</span>
-              <p className="admin-form__hint">
-                Если ничего не выбрано — сотрудник увидит опубликованные курсы по своей роли.
-              </p>
-              <div className="admin-form__courses">
-                {assignableCourses.length === 0 ? (
-                  <p className="admin-form__hint">Нет опубликованных курсов для назначения.</p>
-                ) : (
-                  assignableCourses.map((course) => (
-                    <label
-                      key={course.id}
-                      className={`admin-form__course-chip ${
-                        form.assignedCourseIds.includes(course.id)
-                          ? 'admin-form__course-chip--active'
-                          : ''
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form.assignedCourseIds.includes(course.id)}
-                        onChange={() => toggleCourse(course.id)}
-                      />
-                      {course.title}
-                    </label>
-                  ))
-                )}
-              </div>
-            </div>
 
             {formError && <p className="admin-form__error">{formError}</p>}
-          </form>
-
-          {editId && assignedPreview.length > 0 && (
-            <div className="employee-preview-courses">
-              <h3 className="admin-detail-heading">Текущие доступные курсы</h3>
-              <ul className="admin-detail-list">
-                {assignedPreview.map((course) => {
-                  const prog = getCourseProgress(editId, course.id)
-                  const pct = calcLessonProgress(prog.completedLessons, course.id)
-                  return (
-                    <li key={course.id}>
-                      <span>{course.title}</span>
-                      <span>{pct}%</span>
-                    </li>
-                  )
-                })}
-              </ul>
-            </div>
-          )}
-        </AdminModal>
-      )}
-
-      {modalMode === 'path' && pathAssignId && (
-        <AdminModal
-          title={
-            currentPathIdForUser(pathAssignId)
-              ? 'Сменить маршрут'
-              : 'Назначить маршрут'
-          }
-          onClose={() => setModalMode(null)}
-          footer={
-            <>
-              <button type="button" className="btn btn--outline" onClick={() => setModalMode(null)}>
-                Отмена
-              </button>
-              <button type="submit" className="btn btn--primary" form="path-assign-form">
-                Сохранить
-              </button>
-            </>
-          }
-        >
-          <form id="path-assign-form" className="admin-form" onSubmit={handlePathSave}>
-            <p className="admin-form__hint admin-form__hint--warning">
-              Новый маршрут добавит сотруднику курсы из выбранного маршрута.
-              Старые назначения и прогресс сохранятся.
-            </p>
-            <label className="admin-form__label">
-              Обучающий маршрут
-              <select
-                className="admin-form__select"
-                value={pathForm.learningPathId}
-                onChange={(e) =>
-                  setPathForm({ ...pathForm, learningPathId: e.target.value })
-                }
-                required
-              >
-                <option value="">Выберите маршрут…</option>
-                {getLearningPathsByRole(getEmployeeById(pathAssignId)?.role, {
-                  publishedOnly: true,
-                }).map((path) => (
-                  <option key={path.id} value={path.id}>
-                    {path.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {pathFormError && <p className="admin-form__error">{pathFormError}</p>}
           </form>
         </AdminModal>
       )}

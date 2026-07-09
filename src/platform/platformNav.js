@@ -16,7 +16,7 @@ export const PLATFORM_NAV = [
     label: 'Сотрудники',
     routeKey: ROUTE_KEYS.EMPLOYEES_GROUP,
     title: 'Сотрудники',
-    description: 'Информация и настройки сотрудников компании.',
+    description: 'Учётные записи, роли и статус сотрудников.',
     children: [
       {
         id: 'employees-list',
@@ -24,7 +24,7 @@ export const PLATFORM_NAV = [
         label: 'Список сотрудников',
         routeKey: ROUTE_KEYS.EMPLOYEES_LIST,
         title: 'Список сотрудников',
-        description: 'Добавление, редактирование и деактивация сотрудников.',
+        description: 'Добавление, редактирование, роли и деактивация сотрудников.',
       },
       {
         id: 'employees-schedule',

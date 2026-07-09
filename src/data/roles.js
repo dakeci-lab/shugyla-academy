@@ -53,6 +53,12 @@ export const ALL_EMPLOYEE_ROLES = [
   ROLE_IDS.SELLER,
 ]
 
+/** Все роли для формы сотрудника (включая admin) */
+export const EMPLOYEE_FORM_ROLES = [
+  ROLE_IDS.ADMIN,
+  ...ALL_EMPLOYEE_ROLES,
+]
+
 export const ROLES = {
   [ROLE_IDS.ADMIN]: {
     id: ROLE_IDS.ADMIN,

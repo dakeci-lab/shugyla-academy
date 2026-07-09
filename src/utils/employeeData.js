@@ -1,5 +1,5 @@
 import { USERS } from '../data/users'
-import { getRole, normalizeRoleId } from '../data/roles'
+import { getRole, normalizeRoleId, ROLE_IDS } from '../data/roles'
 import { isCloudMode } from '../lib/dataMode'
 import { getCloudEmployees } from '../lib/cloudStore'
 
@@ -318,26 +318,20 @@ export function getEmploymentStatusBadgeType(status) {
 export const EMPTY_EMPLOYEE_FORM = {
   firstName: '',
   lastName: '',
-  position: '',
-  role: 'cashier',
+  role: ROLE_IDS.CASHIER,
   login: '',
   password: '',
   employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
-  assignedCourseIds: [],
-  learningPathId: '',
 }
 
 export function employeeToForm(employee) {
   return {
     firstName: employee.firstName || '',
     lastName: employee.lastName || '',
-    position: employee.position || '',
-    role: employee.role || 'cashier',
+    role: employee.role || ROLE_IDS.CASHIER,
     login: employee.login || '',
     password: '',
     employmentStatus: employee.employmentStatus || EMPLOYMENT_STATUS.ACTIVE,
-    assignedCourseIds: [...(employee.assignedCourseIds || [])],
-    learningPathId: '',
   }
 }
 
