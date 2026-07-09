@@ -15,75 +15,136 @@ function ensureClient() {
   if (!supabase) throw new Error('Supabase не настроен')
 }
 
-function rowToItem(row) {
-  return normalizePurchaseItem({
-    id: row.id,
-    purchase_order_id: row.purchase_order_id,
-    product_name: row.product_name,
-    barcode: row.barcode,
-    stock: row.stock,
-    sales_per_day: row.sales_per_day,
-    recommendation: row.recommendation,
-    order_qty: row.order_qty,
-    purchase_price: row.purchase_price,
-    line_total: row.line_total,
-    comment: row.comment,
-  })
-}
-
+/** DB row → доменная модель заказа */
 function rowToOrder(row, items = []) {
   return normalizePurchaseOrder({
     id: row.id,
     number: row.number,
-    date: row.date,
     supplier_id: row.supplier_id,
     supplier_name: row.supplier_name,
     status: row.status,
+    purchase_date: row.purchase_date,
+    expected_delivery_date: row.expected_delivery_date,
     total_amount: row.total_amount,
     items_count: row.items_count,
     created_by: row.created_by,
     created_by_name: row.created_by_name,
-    expected_delivery_date: row.expected_delivery_date,
     comment: row.comment,
+    transferred_to_receiving: row.transferred_to_receiving,
+    receiving_document_id: row.receiving_document_id,
     created_at: row.created_at,
     updated_at: row.updated_at,
     items: items.map(rowToItem),
   })
 }
 
-function itemToRow(item, orderId, sortOrder = 0) {
-  const orderQty = item.orderQty ?? item.order_qty ?? 0
+/** Доменная модель заказа → DB row */
+function orderToRow(order, extras = {}) {
+  const purchaseDate =
+    order.purchaseDate ?? order.date ?? extras.purchaseDate ?? null
+
+  const row = {
+    number: order.number,
+    supplier_id: order.supplierId ?? null,
+    supplier_name: (order.supplierName ?? '').trim(),
+    status: order.status ?? PURCHASE_STATUS.DRAFT,
+    purchase_date: purchaseDate,
+    expected_delivery_date: order.expectedDeliveryDate || null,
+    total_amount: order.totalAmount ?? 0,
+    items_count: order.itemsCount ?? 0,
+    created_by: order.createdBy ?? null,
+    created_by_name: order.createdByName ?? null,
+    comment: (order.comment ?? '').trim(),
+    transferred_to_receiving: order.transferredToReceiving ?? false,
+    receiving_document_id: order.receivingDocumentId ?? null,
+  }
+
+  if (extras.id) row.id = extras.id
+  if (extras.created_at) row.created_at = extras.created_at
+  if (extras.updated_at) row.updated_at = extras.updated_at
+
+  return row
+}
+
+/** Частичное обновление заказа → DB row (только переданные поля) */
+function orderPatchToRow(patch) {
+  const row = {}
+  if (patch.number != null) row.number = patch.number
+  if (patch.supplierId !== undefined) row.supplier_id = patch.supplierId || null
+  if (patch.supplierName !== undefined) {
+    row.supplier_name = (patch.supplierName ?? '').trim()
+  }
+  if (patch.status != null) row.status = patch.status
+  if (patch.date != null || patch.purchaseDate != null) {
+    row.purchase_date = patch.purchaseDate ?? patch.date
+  }
+  if (patch.expectedDeliveryDate !== undefined) {
+    row.expected_delivery_date = patch.expectedDeliveryDate || null
+  }
+  if (patch.totalAmount != null) row.total_amount = patch.totalAmount
+  if (patch.itemsCount != null) row.items_count = patch.itemsCount
+  if (patch.createdBy !== undefined) row.created_by = patch.createdBy || null
+  if (patch.createdByName !== undefined) {
+    row.created_by_name = patch.createdByName || null
+  }
+  if (patch.comment !== undefined) row.comment = (patch.comment ?? '').trim()
+  if (patch.transferredToReceiving !== undefined) {
+    row.transferred_to_receiving = Boolean(patch.transferredToReceiving)
+  }
+  if (patch.receivingDocumentId !== undefined) {
+    row.receiving_document_id = patch.receivingDocumentId || null
+  }
+  return row
+}
+
+/** DB row → доменная модель позиции */
+function rowToItem(row) {
+  return normalizePurchaseItem({
+    id: row.id,
+    purchase_order_id: row.purchase_order_id,
+    product_name: row.product_name,
+    barcode: row.barcode,
+    supplier_id: row.supplier_id,
+    supplier_name: row.supplier_name,
+    stock_qty: row.stock_qty,
+    sales_per_day: row.sales_per_day,
+    recommended_qty: row.recommended_qty,
+    ordered_qty: row.ordered_qty,
+    purchase_price: row.purchase_price,
+    total_amount: row.total_amount,
+    comment: row.comment,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  })
+}
+
+/** Доменная модель позиции → DB row */
+function itemToRow(item, orderId) {
+  const orderedQty = item.orderQty ?? item.orderedQty ?? item.ordered_qty ?? 0
   const purchasePrice = item.purchasePrice ?? item.purchase_price ?? 0
-  return {
+  const now = new Date().toISOString()
+
+  const row = {
     id: item.id || crypto.randomUUID(),
     purchase_order_id: orderId,
     product_name: item.productName ?? item.product_name ?? '',
     barcode: item.barcode ?? '',
-    stock: item.stock ?? 0,
+    supplier_id: item.supplierId ?? item.supplier_id ?? null,
+    supplier_name: item.supplierName ?? item.supplier_name ?? '',
+    stock_qty: item.stock ?? item.stockQty ?? item.stock_qty ?? 0,
     sales_per_day: item.salesPerDay ?? item.sales_per_day ?? 0,
-    recommendation: item.recommendation ?? 0,
-    order_qty: orderQty,
+    recommended_qty: item.recommendation ?? item.recommendedQty ?? item.recommended_qty ?? 0,
+    ordered_qty: orderedQty,
     purchase_price: purchasePrice,
-    line_total: calcLineTotal(orderQty, purchasePrice),
+    total_amount: calcLineTotal(orderedQty, purchasePrice),
     comment: item.comment ?? '',
-    sort_order: sortOrder,
+    updated_at: now,
   }
-}
 
-function orderPatchToRow(patch) {
-  const row = {}
-  if (patch.date != null) row.date = patch.date
-  if (patch.supplierId !== undefined) row.supplier_id = patch.supplierId || null
-  if (patch.supplierName !== undefined) row.supplier_name = patch.supplierName?.trim() || ''
-  if (patch.status != null) row.status = patch.status
-  if (patch.comment !== undefined) row.comment = patch.comment?.trim() || ''
-  if (patch.expectedDeliveryDate !== undefined) {
-    row.expected_delivery_date = patch.expectedDeliveryDate || null
+  if (item.createdAt || item.created_at) {
+    row.created_at = item.createdAt ?? item.created_at
   }
-  if (patch.createdBy !== undefined) row.created_by = patch.createdBy || null
-  if (patch.createdByName !== undefined) row.created_by_name = patch.createdByName || null
-  if (patch.totalAmount != null) row.total_amount = patch.totalAmount
-  if (patch.itemsCount != null) row.items_count = patch.itemsCount
+
   return row
 }
 
@@ -114,13 +175,13 @@ async function recalcOrderTotals(orderId) {
 
   const itemsResult = await supabase
     .from('purchase_order_items')
-    .select('line_total')
+    .select('total_amount')
     .eq('purchase_order_id', orderId)
 
   await throwIfError(itemsResult, 'Загрузка позиций закупа')
 
   const items = itemsResult.data || []
-  const totalAmount = items.reduce((sum, row) => sum + Number(row.line_total || 0), 0)
+  const totalAmount = items.reduce((sum, row) => sum + Number(row.total_amount || 0), 0)
   const itemsCount = items.length
 
   await throwIfError(
@@ -154,7 +215,7 @@ async function fetchOrderById(orderId) {
     .from('purchase_order_items')
     .select('*')
     .eq('purchase_order_id', orderId)
-    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
 
   const items = await throwIfError(itemsResult, 'Загрузка позиций закупа')
   return rowToOrder(orderRow, items || [])
@@ -184,7 +245,7 @@ async function syncOrderItems(orderId, items) {
   }
 
   if (normalized.length > 0) {
-    const rows = normalized.map((item, index) => itemToRow(item, orderId, index))
+    const rows = normalized.map((item) => itemToRow(item, orderId))
     await throwIfError(
       await supabase.from('purchase_order_items').upsert(rows),
       'Сохранение позиций закупа'
@@ -214,7 +275,7 @@ export async function fetchPurchasesDataCloud() {
     .from('purchase_order_items')
     .select('*')
     .in('purchase_order_id', orderIds)
-    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
 
   const items = await throwIfError(itemsResult, 'Загрузка позиций закупов')
 
@@ -240,22 +301,24 @@ export async function createPurchaseOrderCloud(data) {
   const today = now.slice(0, 10)
   const number = await nextPurchaseNumber()
 
-  const row = {
-    id,
-    number,
-    date: data.date || today,
-    supplier_id: data.supplierId || null,
-    supplier_name: data.supplierName?.trim() || '',
-    status: PURCHASE_STATUS.DRAFT,
-    total_amount: 0,
-    items_count: 0,
-    created_by: data.createdBy || null,
-    created_by_name: data.createdByName || null,
-    expected_delivery_date: data.expectedDeliveryDate || null,
-    comment: data.comment?.trim() || '',
-    created_at: now,
-    updated_at: now,
-  }
+  const row = orderToRow(
+    {
+      number,
+      supplierId: data.supplierId,
+      supplierName: data.supplierName,
+      status: PURCHASE_STATUS.DRAFT,
+      date: data.date || today,
+      expectedDeliveryDate: data.expectedDeliveryDate,
+      totalAmount: 0,
+      itemsCount: 0,
+      createdBy: data.createdBy,
+      createdByName: data.createdByName,
+      comment: data.comment,
+      transferredToReceiving: false,
+      receivingDocumentId: null,
+    },
+    { id, created_at: now, updated_at: now }
+  )
 
   await throwIfError(
     await supabase.from('purchase_orders').insert(row),
@@ -301,15 +364,8 @@ export async function deletePurchaseOrderCloud(orderId) {
 export async function addPurchaseOrderItemCloud(orderId, item) {
   ensureClient()
 
-  const countResult = await supabase
-    .from('purchase_order_items')
-    .select('id', { count: 'exact', head: true })
-    .eq('purchase_order_id', orderId)
-
-  await throwIfError(countResult, 'Подсчёт позиций закупа')
-
-  const sortOrder = countResult.count ?? 0
-  const row = itemToRow(item, orderId, sortOrder)
+  const row = itemToRow(item, orderId)
+  if (!row.created_at) row.created_at = new Date().toISOString()
 
   await throwIfError(
     await supabase.from('purchase_order_items').insert(row),
@@ -335,7 +391,8 @@ export async function updatePurchaseOrderItemCloud(orderId, itemId, patch) {
   if (!current) throw new Error('Позиция закупа не найдена')
 
   const merged = normalizePurchaseItem({ ...rowToItem(current), ...patch })
-  const row = itemToRow(merged, orderId, current.sort_order ?? 0)
+  const row = itemToRow(merged, orderId)
+  row.created_at = current.created_at
 
   await throwIfError(
     await supabase.from('purchase_order_items').update(row).eq('id', itemId),
@@ -367,13 +424,15 @@ export async function cancelPurchaseOrderCloud(orderId) {
 }
 
 export async function transferPurchaseToReceivingCloud(orderId) {
-  await updatePurchaseOrderCloud(orderId, { status: PURCHASE_STATUS.AWAITING_RECEIVING })
+  await updatePurchaseOrderCloud(orderId, {
+    status: PURCHASE_STATUS.AWAITING_RECEIVING,
+    transferredToReceiving: true,
+  })
   return { ok: true }
 }
 
-/** Для совместимости с local bundle API */
 export function getCloudPurchasesBundleFromOrders(orders) {
   return { orders: orders || [] }
 }
 
-export { recalcOrderTotals, fetchOrderById }
+export { recalcOrderTotals, fetchOrderById, rowToOrder, orderToRow, rowToItem, itemToRow }

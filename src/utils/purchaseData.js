@@ -62,16 +62,19 @@ export function normalizePurchaseOrder(raw) {
   return {
     id: raw.id,
     number: raw.number,
-    date: raw.date,
+    date: raw.date ?? raw.purchaseDate ?? raw.purchase_date ?? '',
+    purchaseDate: raw.purchaseDate ?? raw.purchase_date ?? raw.date ?? '',
     supplierId: raw.supplierId ?? raw.supplier_id ?? null,
     supplierName: raw.supplierName ?? raw.supplier_name ?? '',
-    itemsCount: raw.itemsCount ?? items.length,
+    itemsCount: raw.itemsCount ?? raw.items_count ?? items.length,
     totalAmount: raw.totalAmount ?? raw.total_amount ?? calcOrderTotal(items),
     status: raw.status ?? PURCHASE_STATUS.DRAFT,
     createdBy: raw.createdBy ?? raw.created_by ?? '',
     createdByName: raw.createdByName ?? raw.created_by_name ?? '',
     expectedDeliveryDate: raw.expectedDeliveryDate ?? raw.expected_delivery_date ?? '',
     comment: raw.comment ?? '',
+    transferredToReceiving: raw.transferredToReceiving ?? raw.transferred_to_receiving ?? false,
+    receivingDocumentId: raw.receivingDocumentId ?? raw.receiving_document_id ?? null,
     items,
     createdAt: raw.createdAt ?? raw.created_at ?? null,
     updatedAt: raw.updatedAt ?? raw.updated_at ?? null,
@@ -80,20 +83,30 @@ export function normalizePurchaseOrder(raw) {
 
 export function normalizePurchaseItem(raw) {
   if (!raw) return null
-  const orderQty = raw.orderQty ?? raw.order_qty ?? 0
+  const orderQty =
+    raw.orderQty ?? raw.order_qty ?? raw.orderedQty ?? raw.ordered_qty ?? 0
   const purchasePrice = raw.purchasePrice ?? raw.purchase_price ?? 0
   return {
     id: raw.id,
     purchaseOrderId: raw.purchaseOrderId ?? raw.purchase_order_id ?? null,
     productName: raw.productName ?? raw.product_name ?? '',
     barcode: raw.barcode ?? '',
-    stock: raw.stock ?? 0,
+    supplierId: raw.supplierId ?? raw.supplier_id ?? null,
+    supplierName: raw.supplierName ?? raw.supplier_name ?? '',
+    stock: raw.stock ?? raw.stockQty ?? raw.stock_qty ?? 0,
     salesPerDay: raw.salesPerDay ?? raw.sales_per_day ?? 0,
-    recommendation: raw.recommendation ?? 0,
+    recommendation: raw.recommendation ?? raw.recommendedQty ?? raw.recommended_qty ?? 0,
     orderQty,
     purchasePrice,
-    lineTotal: raw.lineTotal ?? raw.line_total ?? calcLineTotal(orderQty, purchasePrice),
+    lineTotal:
+      raw.lineTotal ??
+      raw.line_total ??
+      raw.totalAmount ??
+      raw.total_amount ??
+      calcLineTotal(orderQty, purchasePrice),
     comment: raw.comment ?? '',
+    createdAt: raw.createdAt ?? raw.created_at ?? null,
+    updatedAt: raw.updatedAt ?? raw.updated_at ?? null,
   }
 }
 

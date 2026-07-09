@@ -1,22 +1,23 @@
--- Модуль «Закуп» — схема для будущего подключения (пока UI на mock-данных)
--- purchase_orders, purchase_order_items, receiving_documents, receiving_items
+-- Модуль «Закуп» — purchase_orders, purchase_order_items, receiving_documents, receiving_items
 
 CREATE TABLE IF NOT EXISTS purchase_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   number TEXT NOT NULL UNIQUE,
-  date DATE NOT NULL DEFAULT CURRENT_DATE,
   supplier_id UUID REFERENCES platform_suppliers(id) ON DELETE SET NULL,
   supplier_name TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN (
     'draft', 'formed', 'sent', 'awaiting_receiving',
     'partially_received', 'received', 'cancelled'
   )),
+  purchase_date DATE NOT NULL DEFAULT CURRENT_DATE,
+  expected_delivery_date DATE,
   total_amount NUMERIC(14, 2) NOT NULL DEFAULT 0,
   items_count INTEGER NOT NULL DEFAULT 0,
   created_by TEXT,
   created_by_name TEXT,
-  expected_delivery_date DATE,
   comment TEXT DEFAULT '',
+  transferred_to_receiving BOOLEAN NOT NULL DEFAULT false,
+  receiving_document_id UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -26,15 +27,17 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
   purchase_order_id UUID NOT NULL REFERENCES purchase_orders(id) ON DELETE CASCADE,
   product_name TEXT NOT NULL DEFAULT '',
   barcode TEXT DEFAULT '',
-  stock NUMERIC(12, 3) NOT NULL DEFAULT 0,
+  supplier_id UUID REFERENCES platform_suppliers(id) ON DELETE SET NULL,
+  supplier_name TEXT NOT NULL DEFAULT '',
+  stock_qty NUMERIC(12, 3) NOT NULL DEFAULT 0,
   sales_per_day NUMERIC(12, 3) NOT NULL DEFAULT 0,
-  recommendation NUMERIC(12, 3) NOT NULL DEFAULT 0,
-  order_qty NUMERIC(12, 3) NOT NULL DEFAULT 0,
+  recommended_qty NUMERIC(12, 3) NOT NULL DEFAULT 0,
+  ordered_qty NUMERIC(12, 3) NOT NULL DEFAULT 0,
   purchase_price NUMERIC(14, 2) NOT NULL DEFAULT 0,
-  line_total NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  total_amount NUMERIC(14, 2) NOT NULL DEFAULT 0,
   comment TEXT DEFAULT '',
-  sort_order INTEGER NOT NULL DEFAULT 0,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_status ON purchase_orders(status);
