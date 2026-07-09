@@ -6,6 +6,10 @@ import ProtectedRoute from './components/ProtectedRoute'
 import PlatformLayout from './layouts/PlatformLayout'
 import Academy from './pages/Academy'
 import Login from './pages/Login'
+import ForgotPassword from './pages/ForgotPassword'
+import ResetPassword from './pages/ResetPassword'
+import VacanciesPage from './pages/VacanciesPage'
+import VacancyDetailPage from './pages/VacancyDetailPage'
 import Dashboard from './pages/Dashboard'
 import Admin from './pages/Admin'
 import CoursePage from './pages/CoursePage'
@@ -30,10 +34,13 @@ export default function App() {
       <SessionProvider>
       <Routes>
         {/* Публичные маршруты */}
-        <Route path="/" element={<Navigate to="/academy" replace />} />
-        <Route path="/academy" element={<Academy />} />
-        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<Navigate to="/vacancies" replace />} />
+        <Route path="/vacancies" element={<VacanciesPage />} />
+        <Route path="/vacancies/:slug" element={<VacancyDetailPage />} />
         <Route path="/apply/:slug" element={<ApplyPage />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/* Shugyla Platform — защищённая оболочка */}
         <Route
@@ -110,7 +117,16 @@ export default function App() {
           <Route path="settings" element={<PlatformSettings />} />
         </Route>
 
-        {/* Legacy / Academy маршруты — сохранены */}
+        {/* Academy и внутренние маршруты — только после авторизации */}
+        <Route
+          path="/academy"
+          element={
+            <ProtectedRoute>
+              <Academy />
+            </ProtectedRoute>
+          }
+        />
+
         <Route
           path="/dashboard"
           element={
@@ -156,9 +172,16 @@ export default function App() {
           }
         />
 
-        <Route path="/courses/:id" element={<CoursePage />} />
+        <Route
+          path="/courses/:id"
+          element={
+            <ProtectedRoute>
+              <CoursePage />
+            </ProtectedRoute>
+          }
+        />
 
-        <Route path="*" element={<Navigate to="/academy" replace />} />
+        <Route path="*" element={<Navigate to="/vacancies" replace />} />
       </Routes>
       </SessionProvider>
       </BrowserRouter>

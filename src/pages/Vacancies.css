@@ -1,0 +1,130 @@
+.vacancies-page {
+  min-height: 100vh;
+  background: var(--color-bg);
+  padding-top: var(--header-height);
+}
+
+.vacancies-page__main {
+  padding: 32px 0 64px;
+}
+
+.vacancies-page__header {
+  margin-bottom: 24px;
+}
+
+.vacancies-page__title {
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.vacancies-page__subtitle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.vacancies-page__list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.vacancies-page__card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.vacancies-page__card:hover {
+  box-shadow: var(--shadow-md);
+  border-color: rgba(42, 157, 92, 0.25);
+}
+
+.vacancies-page__card h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.vacancies-page__card p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+}
+
+.vacancies-page__desc {
+  flex: 1;
+  line-height: 1.45;
+}
+
+.vacancies-page__cta {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.vacancies-page__empty {
+  padding: 48px 24px;
+  text-align: center;
+  background: var(--color-white);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+}
+
+.vacancies-page__login-hint {
+  margin-top: 28px;
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.vacancies-page__login-link {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+.vacancy-detail {
+  max-width: 720px;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 28px;
+}
+
+.vacancy-detail__back {
+  display: inline-block;
+  margin-bottom: 12px;
+  color: var(--color-primary);
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.vacancy-detail__title {
+  margin: 0 0 8px;
+  font-size: 28px;
+}
+
+.vacancy-detail__role {
+  margin: 0 0 16px;
+  color: var(--color-text-secondary);
+}
+
+.vacancy-detail__description {
+  margin-bottom: 24px;
+  line-height: 1.6;
+  color: var(--color-text);
+  white-space: pre-wrap;
+}
+
+@media (max-width: 600px) {
+  .vacancies-page__list {
+    grid-template-columns: 1fr;
+  }
+}

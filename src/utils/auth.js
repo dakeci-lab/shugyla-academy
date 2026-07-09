@@ -5,14 +5,10 @@ import {
   isAdmin,
   PERMISSIONS,
 } from '../data/roles'
-import { isCloudMode } from '../lib/dataMode'
 import { getAllCourses } from './adminData'
 import { saveUser } from './storage'
-import {
-  authenticateEmployee,
-  getEmployeeById,
-} from './employeeData'
-import { authenticateUser } from '../services/academyDataService'
+import { getEmployeeById } from './employeeData'
+import { signInWithEmail } from '../services/authService'
 import {
   getCoursesForEmployee,
   canEmployeeAccessCourse,
@@ -27,33 +23,36 @@ export const ACCESS_REASON = {
   DRAFT: 'draft',
 }
 
+/** Безопасный redirect после входа */
+export function getSafeRedirectPath(redirectPath) {
+  if (
+    redirectPath &&
+    redirectPath.startsWith('/') &&
+    !redirectPath.startsWith('//') &&
+    !redirectPath.startsWith('/login') &&
+    !redirectPath.startsWith('/forgot-password') &&
+    !redirectPath.startsWith('/reset-password')
+  ) {
+    return redirectPath
+  }
+  return '/platform'
+}
+
+export function getPostLoginPath(_user, redirectPath) {
+  return getSafeRedirectPath(redirectPath)
+}
+
 /**
- * Попытка входа по логину и паролю.
- * @returns {{ success: boolean, user?: object, error?: 'invalid' | 'deactivated' }}
+ * Вход по логину и паролю (Supabase Auth email + password или локальный fallback)
  */
 export async function login(loginValue, password) {
-  const result = isCloudMode()
-    ? await authenticateUser(loginValue, password)
-    : authenticateEmployee(loginValue, password)
-
+  const result = await signInWithEmail(loginValue, password)
   if (!result.ok) {
-    return { success: false, error: result.reason }
+    return { success: false, error: result.error }
   }
 
-  const user = result.user
-  const role = getRole(user.role)
-
-  const sessionUser = {
-    id: user.id,
-    login: user.login,
-    name: user.name,
-    role: user.role,
-    roleName: role?.label || user.role,
-    permissions: role?.permissions || [],
-    assignedCourseIds: user.assignedCourseIds || [],
-  }
-  saveUser(sessionUser)
-  return { success: true, user: sessionUser }
+  saveUser(result.user)
+  return { success: true, user: result.user, session: result.session || null }
 }
 
 /** Курсы по роли (legacy — для admin stats fallback) */
@@ -136,13 +135,6 @@ export function canPassTests(roleId) {
 
 export function canViewTeamChecklists(roleId) {
   return hasPermission(roleId, PERMISSIONS.VIEW_TEAM_CHECKLISTS)
-}
-
-export function getPostLoginPath(user, redirectPath) {
-  if (redirectPath && redirectPath.startsWith('/')) {
-    return redirectPath
-  }
-  return '/platform'
 }
 
 export function getCourseAllowedRoleLabels(course) {

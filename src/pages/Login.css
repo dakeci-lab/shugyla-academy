@@ -76,6 +76,45 @@
   color: var(--color-primary);
 }
 
+.login-page__forgot-note {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.login-page__forgot {
+  display: block;
+  margin-top: 16px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.login-page__forgot:hover {
+  text-decoration: underline;
+}
+
+.login-page__hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.login-page__success {
+  margin: 0 0 20px;
+  padding: 12px 14px;
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
 .login-page__form {
   display: flex;
   flex-direction: column;

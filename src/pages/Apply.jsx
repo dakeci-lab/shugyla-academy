@@ -58,7 +58,7 @@ export default function ApplyPage() {
         <div className="apply-page__card apply-page__closed">
           <h1>Вакансия недоступна или закрыта.</h1>
           <p>
-            <Link to="/academy">← На главную Shugyla Academy</Link>
+            <Link to="/vacancies">← К вакансиям</Link>
           </p>
         </div>
       </div>
@@ -72,7 +72,7 @@ export default function ApplyPage() {
           <h1 className="apply-page__success-title">Анкета отправлена</h1>
           <p>{successMessage}</p>
           <p>
-            <Link to="/academy">← На главную</Link>
+            <Link to="/vacancies">← К вакансиям</Link>
           </p>
         </div>
       </div>

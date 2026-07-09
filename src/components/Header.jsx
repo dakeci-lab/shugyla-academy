@@ -14,15 +14,17 @@ export default function Header({ variant = 'default' }) {
   const navigate = useNavigate()
   const { t } = useLanguage()
 
-  function handleLogout() {
-    logout()
-    navigate('/academy')
+  async function handleLogout() {
+    await logout()
+    navigate('/login')
   }
+
+  const logoTo = user ? '/platform' : variant === 'landing' ? '/vacancies' : '/platform'
 
   return (
     <header className={`header ${variant === 'landing' ? 'header--landing' : ''}`}>
       <div className="header__inner container">
-        <Link to="/platform" className="header__logo">
+        <Link to={logoTo} className="header__logo">
           <span className="header__logo-icon">S</span>
           <span className="header__logo-text">
             Shugyla <strong>Platform</strong>
@@ -32,6 +34,9 @@ export default function Header({ variant = 'default' }) {
         <nav className="header__nav">
           {variant === 'landing' && (
             <>
+              <Link to="/vacancies" className="header__link">
+                Вакансии
+              </Link>
               <a href="mailto:academy@shugyla.kz" className="header__link header__link--contact">
                 {t.contact}
               </a>

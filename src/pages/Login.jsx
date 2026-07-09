@@ -1,25 +1,31 @@
-import { useState } from 'react'
-import { useNavigate, useSearchParams, Link } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams, Link, useLocation } from 'react-router-dom'
 import { login, getPostLoginPath } from '../utils/auth'
 import { useSession } from '../context/SessionContext'
 import './Login.css'
 
-const DEACTIVATED_MESSAGE = 'Аккаунт деактивирован. Обратитесь к администратору.'
-
 /**
  * Страница входа — /login
- * Поддерживает ?redirect=/courses/:id для возврата после авторизации
+ * Визуально «Логин», технически — email для Supabase Auth
  */
 export default function Login() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const redirect = searchParams.get('redirect')
-  const { setSessionUser } = useSession()
+  const location = useLocation()
+  const passwordUpdated = location.state?.passwordUpdated
+  const { completeLogin, isAuthenticated, authLoading } = useSession()
 
   const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      navigate(getPostLoginPath(null, redirect), { replace: true })
+    }
+  }, [authLoading, isAuthenticated, navigate, redirect])
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -29,22 +35,20 @@ export default function Login() {
     try {
       const result = await login(loginValue, password)
       if (!result.success) {
-        setError(
-          result.error === 'deactivated'
-            ? DEACTIVATED_MESSAGE
-            : 'Неверный логин или пароль'
-        )
+        setError(typeof result.error === 'string' ? result.error : 'Не удалось войти. Попробуйте позже.')
         return
       }
 
-      setSessionUser(result.user)
+      completeLogin(result.user, result.session || null)
       navigate(getPostLoginPath(result.user, redirect), { replace: true })
     } catch {
-      setError('Не удалось выполнить вход. Попробуйте позже.')
+      setError('Не удалось войти. Попробуйте позже.')
     } finally {
       setLoading(false)
     }
   }
+
+  if (authLoading) return null
 
   return (
     <div className="login-page">
@@ -59,9 +63,13 @@ export default function Login() {
 
         <p className="login-page__subtitle">Вход в систему</p>
 
+        {passwordUpdated && (
+          <p className="login-page__success">Пароль успешно обновлён. Войдите с новым паролем.</p>
+        )}
+
         {redirect && (
           <p className="login-page__redirect-hint">
-            Войдите, чтобы продолжить просмотр курса
+            Войдите, чтобы открыть запрошенный раздел платформы
           </p>
         )}
 
@@ -77,6 +85,7 @@ export default function Login() {
               required
               autoComplete="username"
             />
+            <span className="login-page__hint">Логин выдаёт администратор.</span>
           </label>
 
           <label className="login-page__label">
@@ -99,8 +108,12 @@ export default function Login() {
           </button>
         </form>
 
-        <Link to="/academy" className="login-page__back">
-          ← На главную
+        <Link to="/forgot-password" className="login-page__forgot">
+          Забыли пароль?
+        </Link>
+
+        <Link to="/vacancies" className="login-page__back">
+          ← К публичным вакансиям
         </Link>
       </div>
     </div>

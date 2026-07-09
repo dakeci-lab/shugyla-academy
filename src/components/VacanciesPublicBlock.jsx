@@ -15,7 +15,7 @@ export default function VacanciesPublicBlock() {
       <p className="academy-page__subheading">Открытые вакансии — заполните анкету онлайн</p>
       <div className="vacancies-public__list">
         {vacancies.map((vacancy) => (
-          <Link key={vacancy.id} to={`/apply/${vacancy.slug}`} className="vacancies-public__link">
+          <Link key={vacancy.id} to={`/vacancies/${vacancy.slug}`} className="vacancies-public__link">
             <strong>{vacancy.title}</strong>
             <span> · {getVacancyRoleLabel(vacancy.role)}</span>
           </Link>

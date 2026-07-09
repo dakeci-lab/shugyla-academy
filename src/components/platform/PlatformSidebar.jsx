@@ -35,8 +35,8 @@ export default function PlatformSidebar() {
 
       <div className="platform-sidebar__footer">
         <DataModeBadge />
-        <NavLink to="/academy" className="platform-sidebar__back">
-          Публичный каталог Academy
+        <NavLink to="/vacancies" className="platform-sidebar__back">
+          Публичные вакансии
         </NavLink>
       </div>
     </aside>
