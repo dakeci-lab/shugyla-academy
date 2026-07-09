@@ -47,8 +47,8 @@ export default function Admin() {
   const { user, logout } = useSession()
   const [activeTab, setActiveTab] = useState('overview')
 
-  async function handleLogout() {
-    await logout()
+  function handleLogout() {
+    logout()
     navigate('/login')
   }
 

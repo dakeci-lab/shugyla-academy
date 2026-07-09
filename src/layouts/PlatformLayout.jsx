@@ -11,8 +11,8 @@ export default function PlatformLayout() {
   const { pathname } = useLocation()
   const section = getPlatformSection(pathname)
 
-  async function handleLogout() {
-    await logout()
+  function handleLogout() {
+    logout()
     navigate('/login')
   }
 

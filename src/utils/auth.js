@@ -7,8 +7,12 @@ import {
 } from '../data/roles'
 import { getAllCourses } from './adminData'
 import { saveUser } from './storage'
-import { getEmployeeById } from './employeeData'
-import { signInWithEmail } from '../services/authService'
+import {
+  authenticateEmployee,
+  getEmployeeById,
+} from './employeeData'
+import { authenticateUser } from '../services/academyDataService'
+import { isCloudMode } from '../lib/dataMode'
 import {
   getCoursesForEmployee,
   canEmployeeAccessCourse,
@@ -42,17 +46,37 @@ export function getPostLoginPath(_user, redirectPath) {
   return getSafeRedirectPath(redirectPath)
 }
 
+const DEACTIVATED_MESSAGE = 'Аккаунт деактивирован. Обратитесь к администратору.'
+
 /**
- * Вход по логину и паролю (Supabase Auth email + password или локальный fallback)
+ * Вход по логину и паролю (academy_users / localStorage)
  */
 export async function login(loginValue, password) {
-  const result = await signInWithEmail(loginValue, password)
+  const result = isCloudMode()
+    ? await authenticateUser(loginValue, password)
+    : authenticateEmployee(loginValue, password)
+
   if (!result.ok) {
-    return { success: false, error: result.error }
+    return {
+      success: false,
+      error: result.reason === 'deactivated' ? DEACTIVATED_MESSAGE : 'invalid',
+    }
   }
 
-  saveUser(result.user)
-  return { success: true, user: result.user, session: result.session || null }
+  const user = result.user
+  const role = getRole(user.role)
+
+  const sessionUser = {
+    id: user.id,
+    login: user.login,
+    name: user.name,
+    role: user.role,
+    roleName: role?.label || user.role,
+    permissions: role?.permissions || [],
+    assignedCourseIds: user.assignedCourseIds || [],
+  }
+  saveUser(sessionUser)
+  return { success: true, user: sessionUser }
 }
 
 /** Курсы по роли (legacy — для admin stats fallback) */

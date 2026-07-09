@@ -14,8 +14,8 @@ export default function Header({ variant = 'default' }) {
   const navigate = useNavigate()
   const { t } = useLanguage()
 
-  async function handleLogout() {
-    await logout()
+  function handleLogout() {
+    logout()
     navigate('/login')
   }
 

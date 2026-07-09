@@ -1,24 +1,19 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 import { canManageAdmin, roleHasPermission } from '../utils/auth'
-import AuthLoadingScreen from './AuthLoadingScreen'
 
 /**
- * Защищённый маршрут — проверяет Supabase Auth session или локальную сессию
+ * Защищённый маршрут — проверяет внутреннюю сессию пользователя
  */
 export default function ProtectedRoute({
   children,
   requireAdmin = false,
   requiredPermission = null,
 }) {
-  const { user, authLoading, isAuthenticated } = useSession()
+  const { user } = useSession()
   const location = useLocation()
 
-  if (authLoading) {
-    return <AuthLoadingScreen />
-  }
-
-  if (!isAuthenticated) {
+  if (!user) {
     const redirect = encodeURIComponent(`${location.pathname}${location.search}`)
     return <Navigate to={`/login?redirect=${redirect}`} replace />
   }

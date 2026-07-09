@@ -34,7 +34,7 @@ export default function App() {
       <SessionProvider>
       <Routes>
         {/* Публичные маршруты */}
-        <Route path="/" element={<Navigate to="/vacancies" replace />} />
+        <Route path="/" element={<Navigate to="/login" replace />} />
         <Route path="/vacancies" element={<VacanciesPage />} />
         <Route path="/vacancies/:slug" element={<VacancyDetailPage />} />
         <Route path="/apply/:slug" element={<ApplyPage />} />
@@ -181,7 +181,7 @@ export default function App() {
           }
         />
 
-        <Route path="*" element={<Navigate to="/vacancies" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
       </SessionProvider>
       </BrowserRouter>
