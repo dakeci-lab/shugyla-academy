@@ -14,6 +14,7 @@ import { getDetailedCourseStatus } from '../utils/testProgress'
 import { getCategoryLabel } from '../utils/i18n'
 import Header from '../components/Header'
 import AccessDenied from '../components/AccessDenied'
+import PlatformAccessDenied from '../components/platform/PlatformAccessDenied'
 import CourseLessonList from '../components/CourseLessonList'
 import LessonVideo from '../components/LessonVideo'
 import CourseTest from '../components/CourseTest'
@@ -23,13 +24,17 @@ import './CoursePage.css'
 
 /**
  * Страница курса — список видеоуроков, конспект, прогресс
+ * embedded=true — внутри PlatformLayout
  */
-export default function CoursePage() {
+export default function CoursePage({ embedded = false }) {
   const { id } = useParams()
   const location = useLocation()
   const courseId = Number(id)
   const user = getUser()
   const { reload } = useAcademyData()
+
+  const backLink = embedded ? '/platform/academy/cabinet' : '/dashboard'
+  const catalogLink = embedded ? '/platform/academy/catalog' : '/academy'
 
   const access = resolveCourseAccess(user, courseId)
 
@@ -42,11 +47,11 @@ export default function CoursePage() {
 
   if (access.reason === ACCESS_REASON.NOT_FOUND) {
     return (
-      <div className="course-page">
-        <Header />
-        <main className="container course-page__not-found">
+      <div className={`course-page ${embedded ? 'course-page--embedded' : ''}`}>
+        {!embedded && <Header />}
+        <main className={`course-page__main ${embedded ? '' : 'container'} course-page__not-found`}>
           <h1>Курс не найден</h1>
-          <Link to="/academy" className="btn btn--primary">На главную</Link>
+          <Link to={catalogLink} className="btn btn--primary">К каталогу</Link>
         </main>
       </div>
     )
@@ -58,6 +63,9 @@ export default function CoursePage() {
   }
 
   if (access.reason === ACCESS_REASON.FORBIDDEN) {
+    if (embedded) {
+      return <PlatformAccessDenied title="Нет доступа к курсу" />
+    }
     return <AccessDenied course={access.course} userRole={user.role} />
   }
 
@@ -91,11 +99,11 @@ export default function CoursePage() {
   }
 
   return (
-    <div className="course-page">
-      <Header />
+    <div className={`course-page ${embedded ? 'course-page--embedded' : ''}`}>
+      {!embedded && <Header />}
 
-      <main className="course-page__main container">
-        <Link to="/dashboard" className="course-page__back">
+      <main className={`course-page__main ${embedded ? '' : 'container'}`}>
+        <Link to={backLink} className="course-page__back">
           ← Назад к моим курсам
         </Link>
 

@@ -1,0 +1,112 @@
+.academy-manage__back {
+  margin-bottom: 16px;
+}
+
+.academy-manage__hub-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.academy-manage__hub-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 16px;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.academy-manage__hub-card:hover {
+  border-color: rgba(42, 157, 92, 0.3);
+  box-shadow: var(--shadow-sm);
+}
+
+.academy-manage__hub-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.academy-manage__hub-desc {
+  margin: 0;
+  flex: 1;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.academy-manage__hub-action {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.academy-manage__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.academy-manage__tabs-back {
+  margin-right: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+}
+
+.academy-manage__tabs-back:hover {
+  color: var(--color-primary);
+}
+
+.academy-manage__tab {
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  background: var(--color-bg);
+  transition: all 0.15s;
+}
+
+.academy-manage__tab:hover {
+  color: var(--color-text);
+}
+
+.academy-manage__tab--active {
+  background: var(--color-primary-light);
+  color: var(--color-primary-dark);
+  font-weight: 600;
+}
+
+.academy-manage__content {
+  min-width: 0;
+}
+
+.academy-manage__invalid {
+  padding: 32px;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 700px) {
+  .academy-manage__tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    padding-bottom: 8px;
+  }
+
+  .academy-manage__tab {
+    flex-shrink: 0;
+  }
+}

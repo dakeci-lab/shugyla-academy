@@ -97,6 +97,7 @@ export const PLATFORM_NAV = [
     id: 'academy',
     path: '/platform/academy',
     label: 'Academy',
+    end: false,
     access: ACCESS.ALL,
     title: 'Academy',
     description: 'Обучение, курсы, тесты и аттестация сотрудников.',
@@ -140,10 +141,15 @@ export function getAutoExpandedGroupIds(pathname, navItems = PLATFORM_NAV) {
     .map((item) => item.id)
 }
 
+import { getAcademySection } from './academyNav'
+
 export function getPlatformSection(pathname) {
   if (pathname === '/platform/profile' || pathname.startsWith('/platform/profile/')) {
     return PROFILE_SECTION
   }
+
+  const academySection = getAcademySection(pathname)
+  if (academySection) return academySection
 
   const flat = flattenNav()
 

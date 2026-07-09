@@ -3,6 +3,27 @@
   background: var(--color-bg);
 }
 
+.academy-page--embedded {
+  min-height: auto;
+  background: transparent;
+}
+
+.academy-page--embedded .academy-page__catalog {
+  margin-top: 0;
+  padding: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+.academy-page__catalog-top {
+  margin-bottom: 16px;
+}
+
+.academy-page--embedded .academy-page__heading {
+  font-size: 22px;
+}
+
 .academy-page__catalog {
   position: relative;
   background: var(--color-white);

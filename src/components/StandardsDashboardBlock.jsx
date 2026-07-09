@@ -20,7 +20,7 @@ export default function StandardsDashboardBlock({ userId, user }) {
             <strong>{summary.importantUnacknowledgedCount}</strong>
           </p>
         </div>
-        <Link to="/standards" className="btn btn--primary btn--sm">
+        <Link to="/platform/academy/standards" className="btn btn--primary btn--sm">
           Открыть
         </Link>
       </div>

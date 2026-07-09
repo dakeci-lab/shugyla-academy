@@ -2,6 +2,10 @@
   padding: 88px 0 64px;
 }
 
+.course-page--embedded .course-page__main {
+  padding: 0 0 32px;
+}
+
 .course-page__back {
   display: inline-block;
   color: var(--color-text-secondary);

@@ -2,6 +2,14 @@
   padding: 96px 0 64px;
 }
 
+.dashboard-page--embedded .dashboard-page__main {
+  padding: 0;
+}
+
+.dashboard-page--embedded .dashboard-page__greeting {
+  font-size: 22px;
+}
+
 .dashboard-page__welcome {
   display: flex;
   align-items: center;

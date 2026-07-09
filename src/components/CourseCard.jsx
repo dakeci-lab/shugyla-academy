@@ -12,6 +12,7 @@ export default function CourseCard({
   progress,
   progressPercent: progressPercentProp,
   courseStatus,
+  courseBasePath = '/platform/courses',
 }) {
   const { lang, t } = useLanguage()
 
@@ -75,7 +76,7 @@ export default function CourseCard({
           <span className="course-card__progress-text">{progressPercent}%</span>
         </div>
 
-        <Link to={`/courses/${course.id}`} className="btn btn--primary course-card__btn">
+        <Link to={`${courseBasePath}/${course.id}`} className="btn btn--primary course-card__btn">
           {t.openCourse}
         </Link>
       </div>

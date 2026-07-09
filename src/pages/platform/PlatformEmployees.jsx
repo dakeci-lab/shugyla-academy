@@ -1,23 +1,11 @@
-import { useSession } from '../../context/SessionContext'
-import { canManageAdmin } from '../../utils/auth'
-import ModulePlaceholder from './ModulePlaceholder'
+import EmployeesSection from '../../components/admin/sections/EmployeesSection'
+import '../../components/admin/admin-shared.css'
 
-/** Сотрудники — заготовка с ссылкой на управление для админов */
+/** Список сотрудников — полный функционал из админки Academy */
 export default function PlatformEmployees() {
-  const { user } = useSession()
-  const isAdmin = canManageAdmin(user?.role)
-
   return (
-    <ModulePlaceholder
-      title="Список сотрудников"
-      description="Добавление, редактирование и деактивация сотрудников магазина."
-      hint={
-        isAdmin
-          ? 'Полное управление сотрудниками доступно в админ-панели Academy. Раздел платформы будет расширен позже.'
-          : 'Раздел в разработке'
-      }
-      actionLabel={isAdmin ? 'Управление сотрудниками' : undefined}
-      actionTo={isAdmin ? '/admin' : undefined}
-    />
+    <div className="platform-employees">
+      <EmployeesSection />
+    </div>
   )
 }
