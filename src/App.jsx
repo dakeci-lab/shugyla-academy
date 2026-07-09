@@ -157,9 +157,10 @@ export default function App() {
               </PlatformRoute>
             }
           />
+          <Route path="profile" element={<Profile />} />
         </Route>
 
-        {/* Academy и внутренние маршруты — только после авторизации */}
+        <Route path="/profile" element={<Navigate to="/platform/profile" replace />} />
         <Route
           path="/academy"
           element={
@@ -187,15 +188,7 @@ export default function App() {
           }
         />
 
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          }
-        />
-
+        {/* Academy и внутренние маршруты — только после авторизации */}
         <Route
           path="/standards"
           element={

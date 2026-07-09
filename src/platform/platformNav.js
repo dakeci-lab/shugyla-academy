@@ -111,6 +111,11 @@ export const PLATFORM_NAV = [
   },
 ]
 
+export const PROFILE_SECTION = {
+  title: 'Профиль',
+  description: 'Личные данные пользователя',
+}
+
 function flattenNav(nav = PLATFORM_NAV) {
   const items = []
   for (const item of nav) {
@@ -120,7 +125,26 @@ function flattenNav(nav = PLATFORM_NAV) {
   return items
 }
 
+export function isPathInGroup(pathname, group) {
+  if (!group.children) return false
+  return group.children.some(
+    (child) =>
+      pathname === child.path ||
+      (child.path !== '/platform' && pathname.startsWith(`${child.path}/`))
+  )
+}
+
+export function getAutoExpandedGroupIds(pathname, navItems = PLATFORM_NAV) {
+  return navItems
+    .filter((item) => item.children && isPathInGroup(pathname, item))
+    .map((item) => item.id)
+}
+
 export function getPlatformSection(pathname) {
+  if (pathname === '/platform/profile' || pathname.startsWith('/platform/profile/')) {
+    return PROFILE_SECTION
+  }
+
   const flat = flattenNav()
 
   const exact = flat.find((item) => item.path === pathname)
@@ -129,13 +153,12 @@ export function getPlatformSection(pathname) {
   const nested = flat
     .filter((item) => item.path !== '/platform')
     .sort((a, b) => b.path.length - a.path.length)
-    .find((item) => pathname.startsWith(item.path))
+    .find(
+      (item) =>
+        pathname === item.path || pathname.startsWith(`${item.path}/`)
+    )
 
   if (nested) return nested
-
-  if (pathname.startsWith('/platform/suppliers/')) {
-    return flat.find((item) => item.id === 'suppliers') || flat[0]
-  }
 
   return flat[0] || { title: 'Shugyla Platform', description: '' }
 }
