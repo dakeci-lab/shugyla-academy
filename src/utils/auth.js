@@ -14,6 +14,11 @@ import {
 import { authenticateUser } from '../services/academyDataService'
 import { isCloudMode } from '../lib/dataMode'
 import {
+  ACCESS,
+  canAccessNavItem,
+  getDefaultPlatformPath,
+} from '../platform/platformAccess'
+import {
   getCoursesForEmployee,
   canEmployeeAccessCourse,
 } from './courseAccess'
@@ -42,8 +47,12 @@ export function getSafeRedirectPath(redirectPath) {
   return '/platform'
 }
 
-export function getPostLoginPath(_user, redirectPath) {
-  return getSafeRedirectPath(redirectPath)
+export function getPostLoginPath(user, redirectPath) {
+  const safe = getSafeRedirectPath(redirectPath)
+  if (safe === '/platform' && user && !canAccessNavItem(user.role, ACCESS.ADMIN)) {
+    return getDefaultPlatformPath(user.role)
+  }
+  return safe
 }
 
 const DEACTIVATED_MESSAGE = 'Аккаунт деактивирован. Обратитесь к администратору.'

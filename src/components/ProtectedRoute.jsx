@@ -1,6 +1,7 @@
 import { Navigate, useLocation } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
 import { canManageAdmin, roleHasPermission } from '../utils/auth'
+import { getDefaultPlatformPath } from '../platform/platformAccess'
 
 /**
  * Защищённый маршрут — проверяет внутреннюю сессию пользователя
@@ -19,11 +20,11 @@ export default function ProtectedRoute({
   }
 
   if (requireAdmin && !canManageAdmin(user.role)) {
-    return <Navigate to="/platform" replace />
+    return <Navigate to={getDefaultPlatformPath(user.role)} replace />
   }
 
   if (requiredPermission && !roleHasPermission(user.role, requiredPermission)) {
-    return <Navigate to="/platform" replace />
+    return <Navigate to={getDefaultPlatformPath(user.role)} replace />
   }
 
   return children

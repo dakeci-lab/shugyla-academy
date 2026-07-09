@@ -3,6 +3,8 @@ import { LanguageProvider } from './context/LanguageContext'
 import { AcademyDataProvider } from './context/AcademyDataContext'
 import { SessionProvider } from './context/SessionContext'
 import ProtectedRoute from './components/ProtectedRoute'
+import PlatformRoute from './components/platform/PlatformRoute'
+import { ACCESS } from './platform/platformAccess'
 import PlatformLayout from './layouts/PlatformLayout'
 import Academy from './pages/Academy'
 import Login from './pages/Login'
@@ -16,7 +18,7 @@ import CoursePage from './pages/CoursePage'
 import Profile from './pages/Profile'
 import Standards from './pages/Standards'
 import ApplyPage from './pages/Apply'
-import PlatformDashboard from './pages/platform/PlatformDashboard'
+import PlatformIndex from './pages/platform/PlatformIndex'
 import PlatformAcademy from './pages/platform/PlatformAcademy'
 import PlatformSettings from './pages/platform/PlatformSettings'
 import PlatformEmployees from './pages/platform/PlatformEmployees'
@@ -51,70 +53,110 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<PlatformDashboard />} />
+          <Route index element={<PlatformIndex />} />
+
+          <Route path="employees" element={<Navigate to="/platform/employees/list" replace />} />
           <Route
-            path="products"
+            path="employees/list"
             element={
-              <ModulePlaceholder
-                title="Товары"
-                description="Каталог товаров, остатки и номенклатура."
-                icon="▦"
-              />
+              <PlatformRoute access={ACCESS.ADMIN}>
+                <PlatformEmployees />
+              </PlatformRoute>
             }
           />
-          <Route path="suppliers" element={<SuppliersPage />} />
-          <Route path="suppliers/:id" element={<SupplierDetailPage />} />
+          <Route
+            path="employees/schedule"
+            element={
+              <PlatformRoute access={ACCESS.ADMIN}>
+                <ModulePlaceholder
+                  title="График работы"
+                  description="Настройки графика персонала магазина."
+                />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="employees/rating"
+            element={
+              <PlatformRoute access={ACCESS.ALL}>
+                <ModulePlaceholder
+                  title="Рейтинг"
+                  description="Рейтинг сотрудников по дисциплине, приходу вовремя и уходу не раньше времени."
+                />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="employees/payroll"
+            element={
+              <PlatformRoute access={ACCESS.ADMIN}>
+                <ModulePlaceholder
+                  title="Подсчёт зарплаты"
+                  description="Расчёт заработной платы сотрудников."
+                />
+              </PlatformRoute>
+            }
+          />
+
           <Route
             path="procurement"
             element={
-              <ModulePlaceholder
-                title="Закуп"
-                description="Закупочные заявки и заказы."
-                icon="⇄"
-              />
+              <PlatformRoute access={ACCESS.PROCUREMENT}>
+                <ModulePlaceholder
+                  title="Закуп"
+                  description="Закупочные заявки и заказы."
+                />
+              </PlatformRoute>
             }
           />
           <Route
             path="receiving"
             element={
-              <ModulePlaceholder
-                title="Приёмка"
-                description="Приёмка товара и сверка с накладными."
-                icon="↧"
-              />
+              <PlatformRoute access={ACCESS.PROCUREMENT}>
+                <ModulePlaceholder
+                  title="Приёмка"
+                  description="Приёмка товара и сверка с накладными."
+                />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="suppliers"
+            element={
+              <PlatformRoute access={ACCESS.PROCUREMENT}>
+                <SuppliersPage />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="suppliers/:id"
+            element={
+              <PlatformRoute access={ACCESS.PROCUREMENT}>
+                <SupplierDetailPage />
+              </PlatformRoute>
             }
           />
           <Route
             path="price-tags"
             element={
-              <ModulePlaceholder
-                title="Ценники"
-                description="Печать и обновление ценников в торговом зале."
-                icon="▤"
-              />
+              <PlatformRoute access={ACCESS.PROCUREMENT}>
+                <ModulePlaceholder
+                  title="Ценники"
+                  description="Настройки печати ценников и виды ценников."
+                />
+              </PlatformRoute>
             }
           />
-          <Route path="employees" element={<PlatformEmployees />} />
+
           <Route path="academy" element={<PlatformAcademy />} />
           <Route
-            path="standards"
-            element={<Standards embedded basePath="/platform/standards" />}
-          />
-          <Route
-            path="standards/:slug"
-            element={<Standards embedded basePath="/platform/standards" />}
-          />
-          <Route
-            path="finance"
+            path="settings"
             element={
-              <ModulePlaceholder
-                title="Финансы"
-                description="Финансовые показатели, отчёты и аналитика."
-                icon="₸"
-              />
+              <PlatformRoute access={ACCESS.ADMIN}>
+                <PlatformSettings />
+              </PlatformRoute>
             }
           />
-          <Route path="settings" element={<PlatformSettings />} />
         </Route>
 
         {/* Academy и внутренние маршруты — только после авторизации */}

@@ -9,13 +9,12 @@ export default function PlatformEmployees() {
 
   return (
     <ModulePlaceholder
-      title="Сотрудники"
-      description="Единый реестр сотрудников магазина."
-      icon="◎"
+      title="Список сотрудников"
+      description="Добавление, редактирование и деактивация сотрудников магазина."
       hint={
         isAdmin
           ? 'Полное управление сотрудниками доступно в админ-панели Academy. Раздел платформы будет расширен позже.'
-          : 'Раздел находится в разработке. Обратитесь к администратору для управления сотрудниками.'
+          : 'Раздел в разработке'
       }
       actionLabel={isAdmin ? 'Управление сотрудниками' : undefined}
       actionTo={isAdmin ? '/admin' : undefined}

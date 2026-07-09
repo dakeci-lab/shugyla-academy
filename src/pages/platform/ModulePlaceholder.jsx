@@ -5,16 +5,18 @@ import './ModulePlaceholder.css'
 export default function ModulePlaceholder({
   title,
   description,
-  icon = '◫',
-  hint = 'Раздел находится в разработке. Скоро здесь появится полный функционал.',
+  icon = null,
+  hint = 'Раздел в разработке',
   actionLabel,
   actionTo,
 }) {
   return (
     <div className="module-placeholder">
-      <div className="module-placeholder__icon" aria-hidden="true">
-        {icon}
-      </div>
+      {icon && (
+        <div className="module-placeholder__icon" aria-hidden="true">
+          {icon}
+        </div>
+      )}
       <h2 className="module-placeholder__title">{title}</h2>
       {description && <p className="module-placeholder__desc">{description}</p>}
       <p className="module-placeholder__hint">{hint}</p>
