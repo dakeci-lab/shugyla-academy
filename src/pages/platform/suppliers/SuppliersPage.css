@@ -21,12 +21,6 @@
   max-width: 100%;
 }
 
-.suppliers-page__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
-}
-
 .suppliers-page__empty {
   padding: 48px 24px;
   text-align: center;
@@ -43,9 +37,5 @@
 
   .suppliers-page__status {
     flex: 1 1 auto;
-  }
-
-  .suppliers-page__grid {
-    grid-template-columns: 1fr;
   }
 }

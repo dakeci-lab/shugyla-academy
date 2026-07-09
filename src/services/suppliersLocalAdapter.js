@@ -1,6 +1,8 @@
 import { normalizeSupplier, SUPPLIER_STATUS, PAYMENT_TYPE, RETURN_POLICY } from '../utils/supplierData'
+import umagSeed from '../data/umagSuppliersSeed.json'
 
 const STORAGE_KEY = 'shugyla_suppliers'
+const UMAG_IMPORT_FLAG = 'shugyla_suppliers_umag_imported_v1'
 
 function readJson(fallback) {
   const data = localStorage.getItem(STORAGE_KEY)
@@ -23,8 +25,12 @@ function saveRows(rows) {
   writeJson(rows)
 }
 
+function normalizeNameKey(name) {
+  return String(name || '').trim().toLowerCase()
+}
+
 export function getLocalSuppliersBundle() {
-  seedMockSuppliersIfEmpty()
+  importUmagSuppliersOnce()
   const suppliers = loadRows().map((row) =>
     normalizeSupplier({
       id: row.id,
@@ -52,56 +58,62 @@ export function getLocalSuppliersBundle() {
   return { suppliers }
 }
 
-export function seedMockSuppliersIfEmpty() {
-  if (loadRows().length > 0) return
+/** Однократный импорт Umag export (без дублей по name) */
+export function importUmagSuppliersOnce() {
+  if (localStorage.getItem(UMAG_IMPORT_FLAG) === '1') return
 
+  const rows = loadRows()
+  const seen = new Set(rows.map((r) => normalizeNameKey(r.name)))
   const now = new Date().toISOString()
-  saveRows([
-    {
+  let added = 0
+
+  for (const item of umagSeed) {
+    const name = String(item.name || '').trim()
+    if (!name) continue
+    const key = normalizeNameKey(name)
+    if (seen.has(key)) continue
+    seen.add(key)
+    added += 1
+
+    rows.push({
       id: genId(),
-      name: 'ТОО «МолКом»',
-      legal_name: 'Товарищество с ограниченной ответственностью «МолКом»',
-      product_categories: ['Молочная продукция', 'Йогурты'],
-      manager_name: 'Айгуль Смагулова',
-      manager_phone: '+7 777 123 45 67',
-      whatsapp: '',
-      order_days: 'Пн, Ср, Пт',
-      delivery_days: 'Вт, Чт, Сб',
-      min_order_amount: 50000,
-      payment_type: PAYMENT_TYPE.TRANSFER,
-      deferral_days: null,
-      return_policy: RETURN_POLICY.PARTIAL,
-      return_comment: 'Возврат просрочки в течение 3 дней',
-      responsible_employee_id: null,
-      responsible_employee_name: 'Закупщик',
-      status: SUPPLIER_STATUS.ACTIVE,
-      comment: 'Основной поставщик молочки',
+      name,
+      legal_name: item.legal_name || null,
+      product_categories: item.product_categories || [],
+      manager_name: item.manager_name || '',
+      manager_phone: item.manager_phone || '',
+      whatsapp: item.whatsapp || null,
+      order_days: item.order_days || '',
+      delivery_days: item.delivery_days || '',
+      min_order_amount: item.min_order_amount ?? 0,
+      payment_type: item.payment_type || PAYMENT_TYPE.CASH,
+      deferral_days: item.deferral_days ?? 0,
+      return_policy: item.return_policy || RETURN_POLICY.NO,
+      return_comment: item.return_comment || null,
+      responsible_employee_id: item.responsible_employee_id || null,
+      responsible_employee_name: item.responsible_employee_name || null,
+      status: item.status || SUPPLIER_STATUS.ACTIVE,
+      comment: item.comment || null,
       created_at: now,
       updated_at: now,
-    },
-    {
-      id: genId(),
-      name: 'ИП «Bakaleya Plus»',
-      legal_name: '',
-      product_categories: ['Бакалея', 'Консервы'],
-      manager_name: 'Ерлан Касымов',
-      manager_phone: '+7 701 987 65 43',
-      whatsapp: '+7 701 987 65 43',
-      order_days: 'Пн–Пт',
-      delivery_days: 'Ср, Сб',
-      min_order_amount: 30000,
-      payment_type: PAYMENT_TYPE.MIXED,
-      deferral_days: 7,
-      return_policy: RETURN_POLICY.YES,
-      return_comment: '',
-      responsible_employee_id: null,
-      responsible_employee_name: '',
-      status: SUPPLIER_STATUS.ACTIVE,
-      comment: '',
-      created_at: now,
-      updated_at: now,
-    },
-  ])
+    })
+  }
+
+  saveRows(rows)
+  localStorage.setItem(UMAG_IMPORT_FLAG, '1')
+  if (added > 0) {
+    console.info(`[Suppliers] Imported ${added} suppliers from Umag seed`)
+  }
+}
+
+/** Первичное наполнение, если хранилище пустое */
+export function seedUmagSuppliersIfEmpty() {
+  importUmagSuppliersOnce()
+}
+
+/** @deprecated используйте seedUmagSuppliersIfEmpty */
+export function seedMockSuppliersIfEmpty() {
+  seedUmagSuppliersIfEmpty()
 }
 
 function rowFromSupplier(supplier) {
@@ -135,6 +147,11 @@ export async function fetchSuppliersData() {
 
 export async function createSupplier(data) {
   const rows = loadRows()
+  const nameKey = normalizeNameKey(data.name)
+  if (rows.some((r) => normalizeNameKey(r.name) === nameKey)) {
+    throw new Error('Поставщик с таким названием уже существует')
+  }
+
   const now = new Date().toISOString()
   const supplier = normalizeSupplier({
     id: genId(),

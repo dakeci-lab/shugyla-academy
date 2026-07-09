@@ -1,10 +1,12 @@
 import { ROLE_IDS } from '../data/roles'
 import { canManageAdmin } from '../utils/auth'
+import { canViewSuppliers } from './supplierAccess'
 
 /** Типы доступа к разделам платформы */
 export const ACCESS = {
   ADMIN: 'admin',
   PROCUREMENT: 'procurement',
+  SUPPLIERS_VIEW: 'suppliers_view',
   ALL: 'all',
 }
 
@@ -21,6 +23,9 @@ export function canAccessNavItem(role, access = ACCESS.ALL) {
   if (access === ACCESS.ADMIN) return canManageAdmin(role)
   if (access === ACCESS.PROCUREMENT) {
     return canManageAdmin(role) || PROCUREMENT_ROLES.has(role)
+  }
+  if (access === ACCESS.SUPPLIERS_VIEW) {
+    return canViewSuppliers({ role })
   }
   return false
 }

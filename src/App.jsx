@@ -123,7 +123,7 @@ export default function App() {
           <Route
             path="suppliers"
             element={
-              <PlatformRoute access={ACCESS.PROCUREMENT}>
+              <PlatformRoute access={ACCESS.SUPPLIERS_VIEW}>
                 <SuppliersPage />
               </PlatformRoute>
             }
@@ -131,7 +131,7 @@ export default function App() {
           <Route
             path="suppliers/:id"
             element={
-              <PlatformRoute access={ACCESS.PROCUREMENT}>
+              <PlatformRoute access={ACCESS.SUPPLIERS_VIEW}>
                 <SupplierDetailPage />
               </PlatformRoute>
             }

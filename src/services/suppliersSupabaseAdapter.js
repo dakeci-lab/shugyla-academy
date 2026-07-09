@@ -70,6 +70,14 @@ export async function fetchSuppliersData() {
 }
 
 export async function createSupplier(data) {
+  const name = data.name?.trim()
+  if (!name) throw new Error('Укажите название поставщика')
+
+  const existing = getAllSuppliersSync().find(
+    (s) => s.name.trim().toLowerCase() === name.toLowerCase()
+  )
+  if (existing) throw new Error('Поставщик с таким названием уже существует')
+
   const row = {
     id: data.id || crypto.randomUUID(),
     ...supplierToRow(data),

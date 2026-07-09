@@ -12,20 +12,29 @@ import {
   filterSuppliers,
   SUPPLIER_STATUS_FILTER_OPTIONS,
 } from '../../../utils/supplierData'
+import { useSession } from '../../../context/SessionContext'
+import {
+  canViewSuppliers,
+  canEditSuppliers,
+  canArchiveSuppliers,
+  canDeleteSuppliers,
+} from '../../../platform/supplierAccess'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../../../components/admin/AdminModal'
+import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
 import SupplierForm, {
   EMPTY_SUPPLIER_FORM,
   supplierToForm,
   formToSupplierPayload,
 } from '../../../components/suppliers/SupplierForm'
-import SupplierCard from '../../../components/suppliers/SupplierCard'
+import SupplierTable from '../../../components/suppliers/SupplierTable'
 import SupplierDetails from '../../../components/suppliers/SupplierDetails'
 import '../../../components/admin/admin-shared.css'
 import './SuppliersPage.css'
 
 /** Страница списка поставщиков — /platform/suppliers */
 export function SuppliersListPage() {
+  const { user } = useSession()
   const { version, refresh } = useAdminRefresh()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -36,6 +45,9 @@ export function SuppliersListPage() {
   const [actionError, setActionError] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const canView = canViewSuppliers(user)
+  const canEdit = canEditSuppliers(user)
+
   void version
 
   const suppliers = getSuppliers()
@@ -43,6 +55,10 @@ export function SuppliersListPage() {
     () => filterSuppliers(suppliers, { search, status: statusFilter }),
     [suppliers, search, statusFilter, version]
   )
+
+  if (!canView) {
+    return <PlatformAccessDenied title="Нет доступа к поставщикам" />
+  }
 
   function openCreate() {
     setEditId(null)
@@ -88,17 +104,6 @@ export function SuppliersListPage() {
     }
   }
 
-  async function handleArchive(supplier) {
-    if (!window.confirm(`Архивировать поставщика «${supplier.name}»?`)) return
-    setActionError('')
-    try {
-      await archiveSupplier(supplier.id)
-      await refresh()
-    } catch (err) {
-      setActionError(err.message || 'Не удалось архивировать')
-    }
-  }
-
   return (
     <div className="suppliers-page">
       <div className="suppliers-page__toolbar admin-toolbar">
@@ -106,9 +111,11 @@ export function SuppliersListPage() {
           <h2 className="suppliers-page__heading">Поставщики</h2>
           <p className="admin-toolbar__info">{filtered.length} из {suppliers.length}</p>
         </div>
-        <button type="button" className="btn btn--primary" onClick={openCreate}>
-          Добавить поставщика
-        </button>
+        {canEdit && (
+          <button type="button" className="btn btn--primary" onClick={openCreate}>
+            Добавить поставщика
+          </button>
+        )}
       </div>
 
       <div className="suppliers-page__filters">
@@ -137,23 +144,18 @@ export function SuppliersListPage() {
       {filtered.length === 0 ? (
         <div className="suppliers-page__empty">
           {suppliers.length === 0
-            ? 'Поставщики ещё не добавлены. Нажмите «Добавить поставщика».'
+            ? 'Поставщики ещё не добавлены.'
             : 'По вашему запросу ничего не найдено.'}
         </div>
       ) : (
-        <div className="suppliers-page__grid">
-          {filtered.map((supplier) => (
-            <SupplierCard
-              key={supplier.id}
-              supplier={supplier}
-              onEdit={openEdit}
-              onArchive={handleArchive}
-            />
-          ))}
-        </div>
+        <SupplierTable
+          suppliers={filtered}
+          canEdit={canEdit}
+          onEdit={openEdit}
+        />
       )}
 
-      {showForm && (
+      {showForm && canEdit && (
         <AdminModal
           title={editId ? 'Редактировать поставщика' : 'Добавить поставщика'}
           onClose={closeForm}
@@ -180,15 +182,25 @@ export function SuppliersListPage() {
 export function SupplierDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useSession()
   const { version, refresh } = useAdminRefresh()
   const [showForm, setShowForm] = useState(false)
   const [form, setForm] = useState(EMPTY_SUPPLIER_FORM)
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
 
+  const canView = canViewSuppliers(user)
+  const canEdit = canEditSuppliers(user)
+  const canArchive = canArchiveSuppliers(user)
+  const canDelete = canDeleteSuppliers(user)
+
   void version
 
   const supplier = id ? getSupplierById(id) : null
+
+  if (!canView) {
+    return <PlatformAccessDenied title="Нет доступа к поставщикам" />
+  }
 
   function openEdit(item) {
     setForm(supplierToForm(item))
@@ -233,12 +245,15 @@ export function SupplierDetailPage() {
     <>
       <SupplierDetails
         supplier={supplier}
+        canEdit={canEdit}
+        canArchive={canArchive}
+        canDelete={canDelete}
         onEdit={openEdit}
         onArchive={handleArchive}
         onDelete={handleDelete}
       />
 
-      {showForm && (
+      {showForm && canEdit && (
         <AdminModal
           title="Редактировать поставщика"
           onClose={() => setShowForm(false)}

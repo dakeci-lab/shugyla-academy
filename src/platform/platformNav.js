@@ -79,7 +79,7 @@ export const PLATFORM_NAV = [
         id: 'suppliers',
         path: '/platform/suppliers',
         label: 'Поставщики',
-        access: ACCESS.PROCUREMENT,
+        access: ACCESS.SUPPLIERS_VIEW,
         title: 'Поставщики',
         description: 'База поставщиков и контактная информация.',
       },
