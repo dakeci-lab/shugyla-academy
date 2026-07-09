@@ -1,13 +1,13 @@
 /** Метаданные подразделов Academy внутри платформы */
 
 export const ACADEMY_HUB_SECTION = {
-  title: 'Academy',
-  description: 'Обучение, курсы, тесты и аттестация сотрудников.',
+  title: 'Академия',
+  description: 'Обучение, курсы, тесты и прогресс сотрудников.',
 }
 
 export const ACADEMY_CABINET_SECTION = {
   title: 'Мой кабинет',
-  description: 'Прогресс обучения, назначенные курсы, маршруты и стандарты.',
+  description: 'Прогресс обучения, назначенные курсы и стандарты.',
 }
 
 export const ACADEMY_CATALOG_SECTION = {
@@ -15,14 +15,14 @@ export const ACADEMY_CATALOG_SECTION = {
   description: 'Доступные обучающие материалы Shugyla Academy.',
 }
 
-export const ACADEMY_STANDARDS_SECTION = {
-  title: 'Стандарты компании',
-  description: 'База стандартов Shugyla Market — правила и регламенты работы.',
+export const ACADEMY_ASSIGNMENT_SECTION = {
+  title: 'Назначение обучения',
+  description: 'Назначение курсов сотрудникам и группам по ролям.',
 }
 
 export const ACADEMY_MANAGE_HUB_SECTION = {
   title: 'Управление Academy',
-  description: 'Курсы, тесты, маршруты, найм и прогресс сотрудников.',
+  description: 'Курсы, тесты и прогресс сотрудников.',
 }
 
 export const ACADEMY_MANAGE_SECTIONS = {
@@ -32,38 +32,18 @@ export const ACADEMY_MANAGE_SECTIONS = {
   },
   tests: {
     title: 'Тесты',
-    description: 'Управление тестами и вопросами для аттестации.',
-  },
-  attestation: {
-    title: 'Аттестация',
-    description: 'Результаты аттестации и выдача сертификатов.',
-  },
-  routes: {
-    title: 'Обучающие маршруты',
-    description: 'Маршруты по должностям и порядок курсов.',
-  },
-  standards: {
-    title: 'Стандарты обучения',
-    description: 'База стандартов — статьи и ознакомление сотрудников.',
+    description: 'Управление тестами и вопросами внутри курсов.',
   },
   progress: {
     title: 'Прогресс сотрудников',
     description: 'Отслеживание прогресса обучения по сотрудникам.',
-  },
-  hiring: {
-    title: 'Найм / кандидаты',
-    description: 'Вакансии, фильтр-вопросы и кандидаты на должности.',
   },
 }
 
 export const ACADEMY_MANAGE_NAV = [
   { id: 'courses', label: 'Курсы' },
   { id: 'tests', label: 'Тесты' },
-  { id: 'attestation', label: 'Аттестация' },
-  { id: 'routes', label: 'Маршруты' },
-  { id: 'standards', label: 'Стандарты' },
   { id: 'progress', label: 'Прогресс' },
-  { id: 'hiring', label: 'Найм' },
 ]
 
 export const ACADEMY_COURSE_SECTION = {
@@ -81,8 +61,8 @@ export function getAcademySection(pathname) {
   if (pathname.startsWith('/platform/academy/catalog')) {
     return ACADEMY_CATALOG_SECTION
   }
-  if (pathname.startsWith('/platform/academy/standards')) {
-    return ACADEMY_STANDARDS_SECTION
+  if (pathname.startsWith('/platform/academy/assignment')) {
+    return ACADEMY_ASSIGNMENT_SECTION
   }
   if (pathname === '/platform/academy/manage') {
     return ACADEMY_MANAGE_HUB_SECTION

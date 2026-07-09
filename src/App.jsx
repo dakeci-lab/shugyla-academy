@@ -19,12 +19,17 @@ import PlatformIndex from './pages/platform/PlatformIndex'
 import PlatformAcademy from './pages/platform/PlatformAcademy'
 import PlatformSettings from './pages/platform/PlatformSettings'
 import PlatformEmployees from './pages/platform/PlatformEmployees'
+import PlatformHiring from './pages/platform/PlatformHiring'
+import PlatformStandardsManage from './pages/platform/PlatformStandardsManage'
 import SuppliersPage, { SupplierDetailPage } from './pages/platform/suppliers/SuppliersPage'
 import ProcurementPage from './pages/platform/procurement/ProcurementPage'
 import PurchaseDetailPage from './pages/platform/procurement/PurchaseDetailPage'
+import ReceivingPage from './pages/platform/receiving/ReceivingPage'
+import ReceivingDetailPage from './pages/platform/receiving/ReceivingDetailPage'
 import ModulePlaceholder from './pages/platform/ModulePlaceholder'
 import AcademyCabinetContent from './components/academy/AcademyCabinetContent'
 import AcademyCatalogContent from './components/academy/AcademyCatalogContent'
+import AcademyAssignmentContent from './components/academy/AcademyAssignmentContent'
 import {
   PlatformAcademyManageHub,
   PlatformAcademyManageLayout,
@@ -42,7 +47,7 @@ function LegacyCourseRedirect() {
 
 function LegacyStandardRedirect() {
   const { slug } = useParams()
-  return <Navigate to={`/platform/academy/standards/${slug}`} replace />
+  return <Navigate to={`/platform/standards/${slug}`} replace />
 }
 
 export default function App() {
@@ -121,6 +126,14 @@ export default function App() {
               </PlatformRoute>
             }
           />
+          <Route
+            path="employees/hiring"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_HIRING}>
+                <PlatformHiring />
+              </PlatformRoute>
+            }
+          />
 
           <Route
             path="procurement"
@@ -142,7 +155,15 @@ export default function App() {
             path="receiving"
             element={
               <PlatformRoute routeKey={ROUTE_KEYS.RECEIVING}>
-                <ModulePlaceholder title="Приёмка" description="Приёмка товара и сверка с накладными." />
+                <ReceivingPage />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="receiving/:id"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.RECEIVING}>
+                <ReceivingDetailPage />
               </PlatformRoute>
             }
           />
@@ -174,6 +195,32 @@ export default function App() {
             }
           />
 
+          {/* База стандартов */}
+          <Route
+            path="standards"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.STANDARDS}>
+                <StandardsPage embedded basePath="/platform/standards" />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="standards/manage"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.STANDARDS_MANAGE}>
+                <PlatformStandardsManage />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="standards/:slug"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.STANDARDS}>
+                <StandardsPage embedded basePath="/platform/standards" />
+              </PlatformRoute>
+            }
+          />
+
           {/* Academy — внутри платформы */}
           <Route path="academy">
             <Route
@@ -187,16 +234,20 @@ export default function App() {
             <Route path="cabinet" element={<AcademyCabinetContent />} />
             <Route path="catalog" element={<AcademyCatalogContent />} />
             <Route
-              path="standards"
+              path="assignment"
               element={
-                <StandardsPage embedded basePath="/platform/academy/standards" />
+                <PlatformRoute routeKey={ROUTE_KEYS.ACADEMY_MANAGE}>
+                  <AcademyAssignmentContent />
+                </PlatformRoute>
               }
             />
             <Route
+              path="standards"
+              element={<Navigate to="/platform/standards" replace />}
+            />
+            <Route
               path="standards/:slug"
-              element={
-                <StandardsPage embedded basePath="/platform/academy/standards" />
-              }
+              element={<LegacyStandardRedirect />}
             />
             <Route
               path="manage"
@@ -207,6 +258,8 @@ export default function App() {
               }
             >
               <Route index element={<PlatformAcademyManageHub />} />
+              <Route path="hiring" element={<Navigate to="/platform/employees/hiring" replace />} />
+              <Route path="standards" element={<Navigate to="/platform/standards/manage" replace />} />
               <Route path=":section" element={<PlatformAcademyManageSection />} />
             </Route>
           </Route>
@@ -231,14 +284,14 @@ export default function App() {
         <Route path="/admin" element={<Navigate to="/platform/academy/manage" replace />} />
         <Route path="/admin/employees" element={<Navigate to="/platform/employees/list" replace />} />
         <Route path="/admin/courses" element={<Navigate to="/platform/academy/manage/courses" replace />} />
-        <Route path="/admin/routes" element={<Navigate to="/platform/academy/manage/routes" replace />} />
-        <Route path="/admin/standards" element={<Navigate to="/platform/academy/manage/standards" replace />} />
-        <Route path="/admin/hiring" element={<Navigate to="/platform/academy/manage/hiring" replace />} />
+        <Route path="/admin/routes" element={<Navigate to="/platform/academy/manage/courses" replace />} />
+        <Route path="/admin/standards" element={<Navigate to="/platform/standards/manage" replace />} />
+        <Route path="/admin/hiring" element={<Navigate to="/platform/employees/hiring" replace />} />
         <Route path="/admin/tests" element={<Navigate to="/platform/academy/manage/tests" replace />} />
-        <Route path="/admin/attestation" element={<Navigate to="/platform/academy/manage/attestation" replace />} />
+        <Route path="/admin/attestation" element={<Navigate to="/platform/academy/manage/courses" replace />} />
         <Route path="/admin/progress" element={<Navigate to="/platform/academy/manage/progress" replace />} />
         <Route path="/courses/:id" element={<LegacyCourseRedirect />} />
-        <Route path="/standards" element={<Navigate to="/platform/academy/standards" replace />} />
+        <Route path="/standards" element={<Navigate to="/platform/standards" replace />} />
         <Route path="/standards/:slug" element={<LegacyStandardRedirect />} />
 
         <Route path="*" element={<Navigate to="/login" replace />} />

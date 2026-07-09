@@ -4,12 +4,25 @@ import {
 } from '../../utils/purchaseData'
 import './PurchaseItemsTable.css'
 
-/** Таблица позиций закупа с редактируемым полем «Заказать» */
-export default function PurchaseItemsTable({ items, canEdit, onItemChange }) {
+/** Таблица позиций закупа */
+export default function PurchaseItemsTable({
+  items,
+  canEditItems = false,
+  onEdit,
+  onDelete,
+  onAdd,
+}) {
   if (!items.length) {
     return (
       <div className="purchase-items__empty">
-        Позиции закупа пока не добавлены. Импортируйте данные из Umag или добавьте товары вручную.
+        <p className="purchase-items__empty-text">
+          Позиции закупа пока не добавлены. Добавьте товар вручную или импортируйте данные из Umag.
+        </p>
+        {canEditItems && onAdd && (
+          <button type="button" className="btn btn--primary btn--sm" onClick={onAdd}>
+            + Добавить товар
+          </button>
+        )}
       </div>
     )
   }
@@ -28,6 +41,7 @@ export default function PurchaseItemsTable({ items, canEdit, onItemChange }) {
             <th>Закупочная цена</th>
             <th>Сумма</th>
             <th>Комментарий</th>
+            {canEditItems && <th>Действия</th>}
           </tr>
         </thead>
         <tbody>
@@ -38,39 +52,28 @@ export default function PurchaseItemsTable({ items, canEdit, onItemChange }) {
               <td>{item.stock}</td>
               <td>{item.salesPerDay}</td>
               <td className="purchase-items__rec">{item.recommendation}</td>
-              <td>
-                {canEdit ? (
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    className="purchase-items__qty-input"
-                    value={item.orderQty}
-                    onChange={(e) =>
-                      onItemChange?.(item.id, {
-                        orderQty: Math.max(0, Number(e.target.value) || 0),
-                      })
-                    }
-                  />
-                ) : (
-                  item.orderQty
-                )}
-              </td>
+              <td>{item.orderQty}</td>
               <td>{formatPurchaseAmount(item.purchasePrice)}</td>
               <td>{formatPurchaseAmount(calcLineTotal(item.orderQty, item.purchasePrice))}</td>
-              <td>
-                {canEdit ? (
-                  <input
-                    type="text"
-                    className="purchase-items__comment-input"
-                    value={item.comment || ''}
-                    placeholder="—"
-                    onChange={(e) => onItemChange?.(item.id, { comment: e.target.value })}
-                  />
-                ) : (
-                  item.comment || '—'
-                )}
-              </td>
+              <td>{item.comment || '—'}</td>
+              {canEditItems && (
+                <td className="purchase-items__actions">
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => onEdit?.(item)}
+                  >
+                    Редактировать
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() => onDelete?.(item)}
+                  >
+                    Удалить
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

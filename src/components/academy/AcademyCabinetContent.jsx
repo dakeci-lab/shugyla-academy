@@ -7,8 +7,6 @@ import { getRole, getPermissionLabel } from '../../data/roles'
 import { calcLessonProgress, getCourseCompletionStatus } from '../../utils/courseStructure'
 import CourseCard from '../CourseCard'
 import ProgressBar from '../ProgressBar'
-import FinalAttestationBlock from '../FinalAttestationBlock'
-import MyLearningPathBlock from '../MyLearningPathBlock'
 import StandardsDashboardBlock from '../StandardsDashboardBlock'
 import '../../pages/Dashboard.css'
 
@@ -76,8 +74,6 @@ export default function AcademyCabinetContent() {
           </div>
         </section>
 
-        <MyLearningPathBlock userId={user.id} />
-
         <StandardsDashboardBlock userId={user.id} user={employee} />
 
         <section className="dashboard-page__section">
@@ -123,20 +119,18 @@ export default function AcademyCabinetContent() {
             <div className="dashboard-page__empty dashboard-page__empty--box">
               {hasManualAssignment ? (
                 <p>
-                  Вам пока не назначены доступные опубликованные курсы.
+                  Вам пока не назначены доступные курсы.
                   Обратитесь к администратору.
                 </p>
               ) : (
                 <p>
-                  Для вашей роли пока нет доступных опубликованных курсов.
+                  Для вашей роли пока нет доступных курсов.
                   Если курсы должны быть — обратитесь к администратору.
                 </p>
               )}
             </div>
           )}
         </section>
-
-        <FinalAttestationBlock userId={user.id} role={user.role} />
       </div>
     </div>
   )

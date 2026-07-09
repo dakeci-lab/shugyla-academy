@@ -47,16 +47,21 @@ CREATE INDEX IF NOT EXISTS idx_purchase_order_items_order ON purchase_order_item
 CREATE TABLE IF NOT EXISTS receiving_documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   purchase_order_id UUID REFERENCES purchase_orders(id) ON DELETE SET NULL,
-  number TEXT NOT NULL,
+  number TEXT NOT NULL UNIQUE,
+  supplier_id UUID REFERENCES platform_suppliers(id) ON DELETE SET NULL,
   supplier_name TEXT NOT NULL DEFAULT '',
-  status TEXT NOT NULL DEFAULT 'awaiting' CHECK (status IN (
-    'awaiting', 'partial', 'received', 'cancelled'
+  status TEXT NOT NULL DEFAULT 'awaiting_receiving' CHECK (status IN (
+    'awaiting_receiving', 'in_progress', 'partially_received', 'received', 'cancelled'
   )),
   expected_delivery_date DATE,
-  received_at TIMESTAMPTZ,
+  received_by TEXT,
+  received_by_name TEXT,
   created_by TEXT,
   created_by_name TEXT,
   comment TEXT DEFAULT '',
+  total_ordered_qty NUMERIC(12, 3) NOT NULL DEFAULT 0,
+  total_received_qty NUMERIC(12, 3) NOT NULL DEFAULT 0,
+  total_difference_qty NUMERIC(12, 3) NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -69,9 +74,13 @@ CREATE TABLE IF NOT EXISTS receiving_items (
   barcode TEXT DEFAULT '',
   ordered_qty NUMERIC(12, 3) NOT NULL DEFAULT 0,
   received_qty NUMERIC(12, 3) NOT NULL DEFAULT 0,
+  difference_qty NUMERIC(12, 3) NOT NULL DEFAULT 0,
   purchase_price NUMERIC(14, 2) NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'pending',
   comment TEXT DEFAULT '',
-  sort_order INTEGER NOT NULL DEFAULT 0
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS idx_receiving_documents_purchase ON receiving_documents(purchase_order_id);

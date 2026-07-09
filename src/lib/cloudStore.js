@@ -21,6 +21,7 @@ const emptyStore = {
   candidates: [],
   suppliers: [],
   purchases: [],
+  receivingDocuments: [],
 }
 
 let store = { ...emptyStore }
@@ -55,6 +56,7 @@ export function setCloudStore(data) {
     candidates: data.candidates || [],
     suppliers: data.suppliers || [],
     purchases: data.purchases || [],
+    receivingDocuments: data.receivingDocuments || [],
   }
 }
 
@@ -132,4 +134,8 @@ export function getCloudSuppliers() {
 
 export function getCloudPurchases() {
   return store.loaded ? store.purchases : null
+}
+
+export function getCloudReceivingDocuments() {
+  return store.loaded ? store.receivingDocuments : null
 }

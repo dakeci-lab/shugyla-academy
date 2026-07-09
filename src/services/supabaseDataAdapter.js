@@ -9,23 +9,27 @@ function parseDurationHours(durationLabel) {
   return match ? Number(match[1].replace(',', '.')) : null
 }
 
+import { normalizeCourse, courseStatusToStorage } from '../utils/courseData'
+
 function rowToCourse(row) {
   const allowedRoles = Array.isArray(row.allowed_roles) && row.allowed_roles.length
     ? row.allowed_roles
     : [row.role || row.category || 'cashier']
 
-  return {
+  return normalizeCourse({
     id: row.id,
     title: row.title,
     description: row.description,
     category: row.category,
     allowedRoles,
-    status: row.status || 'draft',
-    duration: row.duration_label || '—',
-    imageColor: row.image_color || '#2d8f4e',
-    blocksCount: row.blocks_count ?? 1,
+    status: row.status,
+    duration: row.duration_label,
+    imageColor: row.image_color,
+    blocksCount: row.blocks_count,
     lessonsCount: 0,
-  }
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  })
 }
 
 function courseToRow(course) {
@@ -33,13 +37,15 @@ function courseToRow(course) {
     ? course.allowedRoles
     : [course.category || course.role || 'cashier']
 
+  const status = courseStatusToStorage(course.status || 'draft')
+
   return {
     id: course.id,
     title: course.title || '',
     description: course.description || '',
     category: course.category || allowedRoles[0],
     role: allowedRoles[0],
-    status: course.status || 'draft',
+    status,
     duration_hours: parseDurationHours(course.duration),
     duration_label: course.duration || '—',
     allowed_roles: allowedRoles,
@@ -218,6 +224,14 @@ export async function fetchAllData() {
     purchasesData = { orders: [] }
   }
 
+  let receivingData = { documents: [] }
+  try {
+    const { fetchReceivingDataCloud } = await import('./receivingSupabaseAdapter')
+    receivingData = await fetchReceivingDataCloud()
+  } catch {
+    receivingData = { documents: [] }
+  }
+
   return {
     employees,
     courses: normalizedCourses,
@@ -238,6 +252,7 @@ export async function fetchAllData() {
     candidates: recruitmentData.candidates,
     suppliers: suppliersData.suppliers,
     purchases: purchasesData.orders,
+    receivingDocuments: receivingData.documents,
   }
 }
 
@@ -411,7 +426,14 @@ export async function updateCourse(courseId, updates) {
 }
 
 export async function hideCourse(courseId) {
-  await updateCourse(courseId, { status: 'draft' })
+  await updateCourse(courseId, { status: 'archive' })
+}
+
+export async function deleteCourse(courseId) {
+  await throwIfError(
+    await supabase.from('academy_courses').delete().eq('id', courseId),
+    'Удаление курса'
+  )
 }
 
 export async function createLesson(courseId, lessonData) {
@@ -479,6 +501,19 @@ export async function assignCourse(userId, courseId) {
       .upsert({ user_id: userId, course_id: courseId }, { onConflict: 'user_id,course_id' }),
     'Назначение курса'
   )
+}
+
+export async function assignCourseToRole(roleId, courseId) {
+  const usersResult = await supabase
+    .from('academy_users')
+    .select('id')
+    .eq('role', roleId)
+    .eq('status', 'active')
+
+  const users = await throwIfError(usersResult, 'Загрузка сотрудников по роли')
+  for (const user of users || []) {
+    await assignCourse(user.id, courseId)
+  }
 }
 
 export async function getUserProgress(userId) {

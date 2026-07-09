@@ -68,9 +68,18 @@
 }
 
 .purchase-detail__items-title {
-  margin: 0 0 14px;
+  margin: 0;
   font-size: 17px;
   font-weight: 700;
+}
+
+.purchase-detail__items-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
 }
 
 .purchase-detail__message {

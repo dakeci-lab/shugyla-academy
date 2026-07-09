@@ -161,7 +161,12 @@ export async function updateCourse(courseId, updates) {
 }
 
 export async function hideCourse(courseId) {
-  localUpdateCourse(courseId, { status: 'draft' })
+  localUpdateCourse(courseId, { status: 'archive' })
+}
+
+export async function deleteCourse(courseId) {
+  const { deleteCourse: removeCourse } = await import('../utils/adminData')
+  removeCourse(courseId)
 }
 
 export async function getCourseLessons(courseId) {
@@ -186,6 +191,14 @@ export async function assignCourse(userId, courseId) {
   const ids = new Set(emp.assignedCourseIds || [])
   ids.add(courseId)
   localUpdateEmployee(userId, { assignedCourseIds: [...ids] })
+}
+
+export async function assignCourseToRole(roleId, courseId) {
+  const { getEmployeesByRole } = await import('../utils/courseAccess')
+  const employees = getEmployeesByRole(roleId)
+  for (const emp of employees) {
+    await assignCourse(emp.id, courseId)
+  }
 }
 
 export async function getUserProgress(userId) {

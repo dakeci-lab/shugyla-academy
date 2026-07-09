@@ -203,11 +203,55 @@ export async function cancelPurchaseOrder(orderId) {
   await updatePurchaseOrder(orderId, { status: PURCHASE_STATUS.CANCELLED })
 }
 
-export async function transferPurchaseToReceiving(orderId) {
+export async function addPurchaseOrderItem(orderId, item) {
   const orders = readOrders()
-  const order = orders.find((o) => o.id === orderId)
-  if (!order) throw new Error('Закуп не найден')
-  await updatePurchaseOrder(orderId, { status: PURCHASE_STATUS.AWAITING_RECEIVING })
-  // receiving_documents / receiving_items — следующий этап
-  return { ok: true }
+  const idx = orders.findIndex((o) => o.id === orderId)
+  if (idx < 0) throw new Error('Закуп не найден')
+
+  const order = normalizePurchaseOrder(orders[idx])
+  const newItem = normalizePurchaseItem({
+    id: genId(),
+    ...item,
+    purchaseOrderId: orderId,
+    supplierId: item.supplierId ?? order.supplierId ?? null,
+    supplierName: item.supplierName ?? order.supplierName ?? '',
+  })
+
+  const items = [...(order.items || []), newItem]
+  await updatePurchaseOrder(orderId, { items })
+  return newItem.id
 }
+
+export async function updatePurchaseOrderItem(orderId, itemId, patch) {
+  const orders = readOrders()
+  const idx = orders.findIndex((o) => o.id === orderId)
+  if (idx < 0) throw new Error('Закуп не найден')
+
+  const order = normalizePurchaseOrder(orders[idx])
+  const items = (order.items || []).map((item) =>
+    item.id === itemId ? normalizePurchaseItem({ ...item, ...patch }) : item
+  )
+
+  if (!items.some((item) => item.id === itemId)) {
+    throw new Error('Позиция закупа не найдена')
+  }
+
+  await updatePurchaseOrder(orderId, { items })
+  return items.find((item) => item.id === itemId)
+}
+
+export async function deletePurchaseOrderItem(orderId, itemId) {
+  const orders = readOrders()
+  const idx = orders.findIndex((o) => o.id === orderId)
+  if (idx < 0) throw new Error('Закуп не найден')
+
+  const order = normalizePurchaseOrder(orders[idx])
+  const items = (order.items || []).filter((item) => item.id !== itemId)
+
+  if (items.length === (order.items || []).length) {
+    throw new Error('Позиция закупа не найдена')
+  }
+
+  await updatePurchaseOrder(orderId, { items })
+}
+

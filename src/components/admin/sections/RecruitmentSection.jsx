@@ -18,8 +18,8 @@ import {
   inviteCandidate,
   convertCandidateToTrainee,
   hireCandidateAsUser,
-  getLearningPathsByRole,
 } from '../../../services/academyDataService'
+import { getAssignableCourses } from '../../../utils/courseAccess'
 import {
   VACANCY_STATUS,
   VACANCY_STATUS_LABELS,
@@ -98,7 +98,7 @@ export default function RecruitmentSection() {
     password: '',
     position: '',
     employmentStatus: EMPLOYMENT_STATUS.INTERNSHIP,
-    learningPathId: '',
+    initialCourseId: '',
   })
   const [hireError, setHireError] = useState('')
 
@@ -218,7 +218,7 @@ export default function RecruitmentSection() {
       password: '',
       position: getVacancyRoleLabel(role),
       employmentStatus: EMPLOYMENT_STATUS.INTERNSHIP,
-      learningPathId: '',
+      initialCourseId: '',
     })
     setHireError('')
     setShowHireForm(true)
@@ -242,7 +242,7 @@ export default function RecruitmentSection() {
           position: hireForm.position.trim(),
           role: detailVacancy?.role || 'cashier',
           employmentStatus: hireForm.employmentStatus,
-          learningPathId: hireForm.learningPathId || null,
+          initialCourseId: hireForm.initialCourseId ? Number(hireForm.initialCourseId) : null,
         },
         { asTrainee: hireForm.employmentStatus === EMPLOYMENT_STATUS.INTERNSHIP }
       )
@@ -254,8 +254,13 @@ export default function RecruitmentSection() {
     }
   }
 
-  const hirePaths = detailVacancy
-    ? getLearningPathsByRole(detailVacancy.role, { publishedOnly: true })
+  const hireCourses = detailVacancy
+    ? getAssignableCourses().filter(
+        (course) =>
+          course.allowedRoles?.includes(detailVacancy.role) ||
+          course.allowedRoles?.includes('for_all') ||
+          course.allowedRoles?.includes('candidate')
+      )
     : []
 
   return (
@@ -649,11 +654,15 @@ export default function RecruitmentSection() {
                   </select>
                 </label>
                 <label className="admin-form__label">
-                  Обучающий маршрут
-                  <select className="admin-form__select" value={hireForm.learningPathId} onChange={(e) => setHireForm({ ...hireForm, learningPathId: e.target.value })}>
-                    <option value="">Без маршрута</option>
-                    {hirePaths.map((path) => (
-                      <option key={path.id} value={path.id}>{path.title}</option>
+                  Начальный курс
+                  <select
+                    className="admin-form__select"
+                    value={hireForm.initialCourseId}
+                    onChange={(e) => setHireForm({ ...hireForm, initialCourseId: e.target.value })}
+                  >
+                    <option value="">Без назначения</option>
+                    {hireCourses.map((course) => (
+                      <option key={course.id} value={course.id}>{course.title}</option>
                     ))}
                   </select>
                 </label>

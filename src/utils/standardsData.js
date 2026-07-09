@@ -21,7 +21,7 @@ export const ARTICLE_STATUS = {
 
 export const ARTICLE_STATUS_LABELS = {
   draft: 'Черновик',
-  published: 'Опубликовано',
+  published: 'Активный',
   archived: 'Архив',
 }
 
@@ -126,6 +126,7 @@ export function normalizeArticle(raw) {
     createdBy: raw.createdBy ?? raw.created_by ?? null,
     updatedBy: raw.updatedBy ?? raw.updated_by ?? null,
     publishedAt: raw.publishedAt ?? raw.published_at ?? null,
+    sortOrder: raw.sortOrder ?? raw.sort_order ?? 0,
     createdAt: raw.createdAt ?? raw.created_at,
     updatedAt: raw.updatedAt ?? raw.updated_at,
   }
@@ -209,6 +210,9 @@ export function getPublishedStandardArticlesForUserSync(user) {
   return getAllStandardArticlesSync()
     .filter((article) => isArticleVisibleToUser(article, user))
     .sort((a, b) => {
+      const sortA = a.sortOrder ?? 0
+      const sortB = b.sortOrder ?? 0
+      if (sortA !== sortB) return sortA - sortB
       const priorityOrder = { critical: 0, important: 1, normal: 2, low: 3 }
       const pa = priorityOrder[a.priority] ?? 2
       const pb = priorityOrder[b.priority] ?? 2

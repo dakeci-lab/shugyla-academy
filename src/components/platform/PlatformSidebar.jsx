@@ -5,6 +5,7 @@ import { useSession } from '../../context/SessionContext'
 import {
   PLATFORM_NAV,
   getAutoExpandedGroupIds,
+  isNavItemActive,
 } from '../../platform/platformNav'
 import { filterPlatformNav } from '../../platform/platformAccess'
 import './PlatformSidebar.css'
@@ -78,7 +79,14 @@ export default function PlatformSidebar({ isOpen = false, onClose, onNavigate })
                 onClick={() => toggleGroup(item.id)}
                 aria-expanded={expandedGroups.has(item.id)}
               >
-                <span>{item.label}</span>
+                <span className="platform-sidebar__group-label">
+                  {item.icon && (
+                    <span className="platform-sidebar__icon" aria-hidden="true">
+                      {item.icon}
+                    </span>
+                  )}
+                  <span>{item.label}</span>
+                </span>
                 <span className="platform-sidebar__caret" aria-hidden="true" />
               </button>
               {expandedGroups.has(item.id) && (
@@ -89,11 +97,13 @@ export default function PlatformSidebar({ isOpen = false, onClose, onNavigate })
                       to={child.path}
                       end={child.end}
                       onClick={handleNavClick}
-                      className={({ isActive }) =>
+                      className={() =>
                         [
                           'platform-sidebar__link',
                           'platform-sidebar__link--sub',
-                          isActive ? 'platform-sidebar__link--active' : '',
+                          isNavItemActive(pathname, child)
+                            ? 'platform-sidebar__link--active'
+                            : '',
                         ]
                           .filter(Boolean)
                           .join(' ')
@@ -120,6 +130,11 @@ export default function PlatformSidebar({ isOpen = false, onClose, onNavigate })
                   .join(' ')
               }
             >
+              {item.icon && (
+                <span className="platform-sidebar__icon" aria-hidden="true">
+                  {item.icon}
+                </span>
+              )}
               {item.label}
             </NavLink>
           )

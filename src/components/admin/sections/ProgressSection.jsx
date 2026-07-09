@@ -4,7 +4,7 @@ import { ROLES } from '../../../data/roles'
 import StatusBadge from '../StatusBadge'
 import '../admin-shared.css'
 
-/** Раздел «Прогресс» */
+/** Раздел «Прогресс» — по курсам сотрудников */
 export default function ProgressSection() {
   const [search, setSearch] = useState('')
   const rows = getProgressRows()
@@ -15,7 +15,7 @@ export default function ProgressSection() {
     return rows.filter(
       (row) =>
         row.employeeName.toLowerCase().includes(q) ||
-        row.pathTitle.toLowerCase().includes(q)
+        row.coursesLabel.toLowerCase().includes(q)
     )
   }, [rows, search])
 
@@ -26,7 +26,7 @@ export default function ProgressSection() {
         <input
           type="search"
           className="admin-search"
-          placeholder="Поиск по сотруднику или маршруту…"
+          placeholder="Поиск по сотруднику или курсу…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -38,17 +38,15 @@ export default function ProgressSection() {
             <tr>
               <th>Сотрудник</th>
               <th>Роль</th>
-              <th>Маршрут</th>
-              <th>Прогресс маршрута</th>
-              <th>Курсы завершены</th>
-              <th>Статус маршрута</th>
-              <th>Финальная аттестация</th>
+              <th>Курсы</th>
+              <th>Прогресс</th>
+              <th>Статус обучения</th>
             </tr>
           </thead>
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={7} className="admin-empty">
+                <td colSpan={5} className="admin-empty">
                   {search ? 'Ничего не найдено' : 'Пока нет данных о прогрессе'}
                 </td>
               </tr>
@@ -57,37 +55,22 @@ export default function ProgressSection() {
                 <tr key={row.employeeId}>
                   <td><strong>{row.employeeName}</strong></td>
                   <td>{ROLES[row.employeeRole]?.label || row.employeeRole}</td>
-                  <td>{row.pathTitle}</td>
+                  <td>{row.coursesLabel}</td>
                   <td>
-                    {row.pathTitle === 'Без маршрута' ? (
-                      '—'
-                    ) : (
-                      <div className="admin-progress-cell">
-                        <div className="admin-progress-cell__bar">
-                          <div
-                            className="admin-progress-cell__fill"
-                            style={{ width: `${row.pathProgressPercent}%` }}
-                          />
-                        </div>
-                        <span className="admin-progress-cell__text">
-                          {row.pathProgressPercent}%
-                        </span>
+                    <div className="admin-progress-cell">
+                      <div className="admin-progress-cell__bar">
+                        <div
+                          className="admin-progress-cell__fill"
+                          style={{ width: `${row.progressPercent}%` }}
+                        />
                       </div>
-                    )}
-                  </td>
-                  <td>{row.coursesCompletedLabel}</td>
-                  <td>
-                    {row.pathTitle === 'Без маршрута' ? (
-                      '—'
-                    ) : (
-                      <StatusBadge label={row.pathStatus.label} type={row.pathStatus.type} />
-                    )}
+                      <span className="admin-progress-cell__text">
+                        {row.progressPercent}%
+                      </span>
+                    </div>
                   </td>
                   <td>
-                    <StatusBadge
-                      label={row.attestationStatus.label}
-                      type={row.attestationStatus.type}
-                    />
+                    <StatusBadge label={row.trainingStatus.label} type={row.trainingStatus.type} />
                   </td>
                 </tr>
               ))

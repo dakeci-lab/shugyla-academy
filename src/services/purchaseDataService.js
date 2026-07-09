@@ -3,6 +3,7 @@ import { getCloudPurchases } from '../lib/cloudStore'
 import { refreshData } from './academyDataService'
 import * as local from './purchaseLocalAdapter'
 import * as cloud from './purchaseSupabaseAdapter'
+import { transferFromPurchase } from './receivingDataService'
 
 function getAdapter() {
   return isCloudMode() ? cloud : local
@@ -72,37 +73,33 @@ export async function deletePurchaseOrder(orderId) {
   await afterPurchaseMutation()
 }
 
-export async function transferPurchaseToReceiving(orderId) {
-  const result = isCloudMode()
-    ? await cloud.transferPurchaseToReceivingCloud(orderId)
-    : await local.transferPurchaseToReceiving(orderId)
+export async function transferPurchaseToReceiving(orderId, user) {
+  const result = await transferFromPurchase(orderId, user)
   await afterPurchaseMutation()
   return result
 }
 
 export async function addPurchaseOrderItem(orderId, item) {
-  if (isCloudMode()) {
-    const id = await cloud.addPurchaseOrderItemCloud(orderId, item)
-    await afterPurchaseMutation()
-    return id
-  }
-  throw new Error('Добавление позиции через API доступно в облачном режиме')
+  const id = isCloudMode()
+    ? await cloud.addPurchaseOrderItemCloud(orderId, item)
+    : await local.addPurchaseOrderItem(orderId, item)
+  await afterPurchaseMutation()
+  return id
 }
 
 export async function updatePurchaseOrderItem(orderId, itemId, patch) {
-  if (isCloudMode()) {
-    const result = await cloud.updatePurchaseOrderItemCloud(orderId, itemId, patch)
-    await afterPurchaseMutation()
-    return result
-  }
-  throw new Error('Обновление позиции через API доступно в облачном режиме')
+  const result = isCloudMode()
+    ? await cloud.updatePurchaseOrderItemCloud(orderId, itemId, patch)
+    : await local.updatePurchaseOrderItem(orderId, itemId, patch)
+  await afterPurchaseMutation()
+  return result
 }
 
 export async function deletePurchaseOrderItem(orderId, itemId) {
   if (isCloudMode()) {
     await cloud.deletePurchaseOrderItemCloud(orderId, itemId)
-    await afterPurchaseMutation()
-    return
+  } else {
+    await local.deletePurchaseOrderItem(orderId, itemId)
   }
-  throw new Error('Удаление позиции через API доступно в облачном режиме')
+  await afterPurchaseMutation()
 }

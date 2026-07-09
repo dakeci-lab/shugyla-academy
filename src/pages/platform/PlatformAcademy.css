@@ -75,3 +75,36 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
 }
+
+.platform-academy__assignment-title {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.platform-academy__assignment-desc {
+  margin: 0 0 20px;
+  color: var(--color-text-secondary);
+  max-width: 640px;
+  line-height: 1.5;
+}
+
+.platform-academy__assignment-form {
+  max-width: 520px;
+  padding: 20px;
+  background: var(--color-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.academy-page__filters {
+  margin-bottom: 16px;
+}
+
+.academy-page__filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}

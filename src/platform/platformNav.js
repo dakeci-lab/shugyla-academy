@@ -50,6 +50,14 @@ export const PLATFORM_NAV = [
         title: 'Подсчёт зарплаты',
         description: 'Расчёт заработной платы сотрудников.',
       },
+      {
+        id: 'employees-hiring',
+        path: '/platform/employees/hiring',
+        label: 'Найм',
+        routeKey: ROUTE_KEYS.EMPLOYEES_HIRING,
+        title: 'Найм / кандидаты',
+        description: 'Вакансии, фильтр-вопросы и кандидаты на должности.',
+      },
     ],
   },
   {
@@ -94,13 +102,95 @@ export const PLATFORM_NAV = [
     description: 'Настройки печати ценников и виды ценников.',
   },
   {
-    id: 'academy',
-    path: '/platform/academy',
-    label: 'Academy',
-    end: false,
-    routeKey: ROUTE_KEYS.ACADEMY,
-    title: 'Academy',
-    description: 'Обучение, курсы, тесты и аттестация сотрудников.',
+    id: 'standards-group',
+    label: 'База стандартов',
+    icon: '📚',
+    routeKey: ROUTE_KEYS.STANDARDS_GROUP,
+    title: 'База стандартов',
+    description: 'База знаний Shugyla Market — правила и регламенты работы.',
+    pathPrefixes: ['/platform/standards'],
+    children: [
+      {
+        id: 'standards-list',
+        path: '/platform/standards',
+        label: 'Стандарты',
+        standardsReadActive: true,
+        routeKey: ROUTE_KEYS.STANDARDS,
+        title: 'Стандарты',
+        description: 'Опубликованные стандарты компании для ознакомления.',
+      },
+      {
+        id: 'standards-manage',
+        path: '/platform/standards/manage',
+        label: 'Управление стандартами',
+        end: true,
+        routeKey: ROUTE_KEYS.STANDARDS_MANAGE,
+        title: 'Управление стандартами',
+        description: 'Создание, редактирование и архивация стандартов.',
+      },
+    ],
+  },
+  {
+    id: 'academy-group',
+    label: 'Академия',
+    icon: '🎓',
+    routeKey: ROUTE_KEYS.ACADEMY_GROUP,
+    title: 'Академия',
+    description: 'Обучение, курсы, тесты и прогресс сотрудников.',
+    pathPrefixes: ['/platform/academy', '/platform/courses/'],
+    children: [
+      {
+        id: 'academy-cabinet',
+        path: '/platform/academy/cabinet',
+        label: 'Мой кабинет',
+        routeKey: ROUTE_KEYS.ACADEMY,
+        title: 'Мой кабинет',
+        description: 'Прогресс обучения, назначенные курсы и стандарты.',
+      },
+      {
+        id: 'academy-catalog',
+        path: '/platform/academy/catalog',
+        label: 'Каталог курсов',
+        routeKey: ROUTE_KEYS.ACADEMY,
+        title: 'Каталог курсов',
+        description: 'Доступные обучающие материалы Shugyla Academy.',
+        coursePlayerActive: true,
+      },
+      {
+        id: 'academy-assignment',
+        path: '/platform/academy/assignment',
+        label: 'Назначение обучения',
+        routeKey: ROUTE_KEYS.ACADEMY_MANAGE,
+        title: 'Назначение обучения',
+        description: 'Назначение курсов сотрудникам и группам по ролям.',
+      },
+      {
+        id: 'academy-manage',
+        path: '/platform/academy/manage',
+        label: 'Управление академией',
+        end: true,
+        manageHubActive: true,
+        routeKey: ROUTE_KEYS.ACADEMY_MANAGE,
+        title: 'Управление академией',
+        description: 'Курсы, тесты и прогресс сотрудников.',
+      },
+      {
+        id: 'academy-tests',
+        path: '/platform/academy/manage/tests',
+        label: 'Тесты',
+        routeKey: ROUTE_KEYS.ACADEMY_MANAGE,
+        title: 'Тесты',
+        description: 'Управление тестами и вопросами внутри курсов.',
+      },
+      {
+        id: 'academy-progress',
+        path: '/platform/academy/manage/progress',
+        label: 'Прогресс',
+        routeKey: ROUTE_KEYS.ACADEMY_MANAGE,
+        title: 'Прогресс сотрудников',
+        description: 'Отслеживание прогресса обучения по сотрудникам.',
+      },
+    ],
   },
   {
     id: 'settings',
@@ -128,11 +218,41 @@ function flattenNav(nav = PLATFORM_NAV) {
 
 export function isPathInGroup(pathname, group) {
   if (!group.children) return false
-  return group.children.some(
-    (child) =>
-      pathname === child.path ||
-      (child.path !== '/platform' && pathname.startsWith(`${child.path}/`))
-  )
+
+  const prefixes = group.pathPrefixes || []
+  if (prefixes.some((prefix) => pathname === prefix || pathname.startsWith(prefix))) {
+    return true
+  }
+
+  return group.children.some((child) => isNavItemActive(pathname, child))
+}
+
+export function isNavItemActive(pathname, item) {
+  if (!item?.path) return false
+
+  if (pathname.startsWith('/platform/courses/') && item.coursePlayerActive) {
+    return true
+  }
+
+  if (item.standardsReadActive) {
+    if (!pathname.startsWith('/platform/standards')) return false
+    return !pathname.startsWith('/platform/standards/manage')
+  }
+
+  if (item.manageHubActive) {
+    const managePrefix = '/platform/academy/manage'
+    if (!pathname.startsWith(managePrefix)) return false
+    const rest = pathname.slice(managePrefix.length).replace(/^\//, '')
+    if (!rest) return true
+    const section = rest.split('/')[0]
+    return !['tests', 'progress'].includes(section)
+  }
+
+  if (item.end) {
+    return pathname === item.path
+  }
+
+  return pathname === item.path || pathname.startsWith(`${item.path}/`)
 }
 
 export function getAutoExpandedGroupIds(pathname, navItems = PLATFORM_NAV) {
@@ -142,11 +262,15 @@ export function getAutoExpandedGroupIds(pathname, navItems = PLATFORM_NAV) {
 }
 
 import { getAcademySection } from './academyNav'
+import { getStandardsSection } from './standardsNav'
 
 export function getPlatformSection(pathname) {
   if (pathname === '/platform/profile' || pathname.startsWith('/platform/profile/')) {
     return PROFILE_SECTION
   }
+
+  const standardsSection = getStandardsSection(pathname)
+  if (standardsSection) return standardsSection
 
   const academySection = getAcademySection(pathname)
   if (academySection) return academySection

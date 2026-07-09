@@ -364,7 +364,16 @@ export async function deletePurchaseOrderCloud(orderId) {
 export async function addPurchaseOrderItemCloud(orderId, item) {
   ensureClient()
 
-  const row = itemToRow(item, orderId)
+  const order = await fetchOrderById(orderId)
+  if (!order) throw new Error('Закуп не найден')
+
+  const enriched = normalizePurchaseItem({
+    ...item,
+    supplierId: item.supplierId ?? order.supplierId ?? null,
+    supplierName: item.supplierName ?? order.supplierName ?? '',
+  })
+
+  const row = itemToRow(enriched, orderId)
   if (!row.created_at) row.created_at = new Date().toISOString()
 
   await throwIfError(
@@ -421,14 +430,6 @@ export async function deletePurchaseOrderItemCloud(orderId, itemId) {
 
 export async function cancelPurchaseOrderCloud(orderId) {
   return updatePurchaseOrderCloud(orderId, { status: PURCHASE_STATUS.CANCELLED })
-}
-
-export async function transferPurchaseToReceivingCloud(orderId) {
-  await updatePurchaseOrderCloud(orderId, {
-    status: PURCHASE_STATUS.AWAITING_RECEIVING,
-    transferredToReceiving: true,
-  })
-  return { ok: true }
 }
 
 export function getCloudPurchasesBundleFromOrders(orders) {

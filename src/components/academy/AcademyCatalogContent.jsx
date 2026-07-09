@@ -1,22 +1,41 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getAllCourses } from '../../utils/adminData'
+import { getPublishedCourses } from '../../utils/courseAccess'
+import { useSession } from '../../context/SessionContext'
 import { useLanguage } from '../../context/LanguageContext'
+import { normalizeRoleId } from '../../data/roles'
 import CategoryFilter from '../CategoryFilter'
 import CourseCard from '../CourseCard'
 import '../../pages/Academy.css'
 
-/** Каталог курсов — внутри PlatformLayout, без лендинга */
+/** Каталог курсов — только активные курсы */
 export default function AcademyCatalogContent() {
   const [activeCategory, setActiveCategory] = useState('all')
+  const [roleFilter, setRoleFilter] = useState('all')
   const { t } = useLanguage()
+  const { user } = useSession()
 
-  const courses = getAllCourses()
+  const courses = getPublishedCourses()
+  const userRole = normalizeRoleId(user?.role)
 
-  const filteredCourses =
-    activeCategory === 'all'
-      ? courses
-      : courses.filter((c) => c.category === activeCategory)
+  const filteredCourses = useMemo(() => {
+    return courses.filter((course) => {
+      if (activeCategory !== 'all' && course.category !== activeCategory) return false
+
+      if (roleFilter !== 'all') {
+        return course.allowedRoles?.includes(roleFilter)
+      }
+
+      if (userRole) {
+        return (
+          course.allowedRoles?.includes(userRole) ||
+          course.allowedRoles?.includes('for_all')
+        )
+      }
+
+      return true
+    })
+  }, [courses, activeCategory, roleFilter, userRole])
 
   return (
     <div className="academy-page academy-page--embedded">
@@ -38,6 +57,25 @@ export default function AcademyCatalogContent() {
         </div>
 
         <CategoryFilter active={activeCategory} onChange={setActiveCategory} />
+
+        <div className="academy-page__filters">
+          <label className="academy-page__filter-label">
+            Роль:
+            <select
+              className="admin-form__select admin-form__select--sm"
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+            >
+              <option value="all">Моя роль</option>
+              <option value="cashier">Кассир</option>
+              <option value="seller">Продавец</option>
+              <option value="floor_admin">Администратор</option>
+              <option value="receiver">Приёмщик</option>
+              <option value="purchaser">Закупщик</option>
+              <option value="for_all">Для всех</option>
+            </select>
+          </label>
+        </div>
 
         <div className="academy-page__grid">
           {filteredCourses.map((course) => (

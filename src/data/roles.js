@@ -119,7 +119,33 @@ export const CATEGORIES = [
   { id: ROLE_IDS.PURCHASER, label: 'Закупщик' },
   { id: ROLE_IDS.RECEIVER, label: 'Приёмщик' },
   { id: 'for_all', label: 'Для всех' },
+  { id: 'onboarding', label: 'Введение' },
+  { id: 'service', label: 'Сервис' },
+  { id: 'operations', label: 'Операции' },
 ]
+
+/** Роли для назначения курсов (мультивыбор при создании курса) */
+export const ACADEMY_COURSE_ROLES = [
+  { id: ROLE_IDS.CASHIER, label: 'Кассир' },
+  { id: ROLE_IDS.SELLER, label: 'Продавец' },
+  { id: ROLE_IDS.FLOOR_ADMIN, label: 'Администратор торгового зала' },
+  { id: ROLE_IDS.RECEIVER, label: 'Приёмщик' },
+  { id: ROLE_IDS.PURCHASER, label: 'Закупщик' },
+  { id: ROLE_IDS.ADMIN, label: 'Администратор' },
+  { id: 'warehouse', label: 'Кладовщик' },
+  { id: 'security', label: 'Охранник' },
+  { id: 'loader', label: 'Грузчик' },
+  { id: 'cleaner', label: 'Техничка' },
+  { id: 'manager', label: 'Руководитель' },
+  { id: 'candidate', label: 'Кандидат' },
+  { id: 'for_all', label: 'Все сотрудники' },
+]
+
+export function getAcademyCourseRoleLabel(roleId) {
+  const found = ACADEMY_COURSE_ROLES.find((r) => r.id === roleId)
+  if (found) return found.label
+  return getRole(roleId)?.label || roleId || '—'
+}
 
 export function getRole(roleId) {
   const normalized = normalizeRoleId(roleId)

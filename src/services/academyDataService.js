@@ -196,6 +196,19 @@ export async function hideCourse(courseId) {
   if (isCloudMode()) await refreshData()
 }
 
+export async function deleteCourse(courseId) {
+  await getAdapter().deleteCourse(courseId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function restoreCourse(courseId) {
+  await updateCourse(courseId, { status: 'active' })
+}
+
+export async function archiveCourse(courseId) {
+  await hideCourse(courseId)
+}
+
 // --- Lessons ---
 
 export async function getLessonsByCourse(courseId) {
@@ -227,6 +240,11 @@ export async function deleteLesson(lessonId) {
 
 export async function assignCourseToEmployee(userId, courseId) {
   await getAdapter().assignCourse(userId, courseId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function assignCourseToRole(roleId, courseId) {
+  await getAdapter().assignCourseToRole(roleId, courseId)
   if (isCloudMode()) await refreshData()
 }
 
@@ -828,8 +846,8 @@ export async function hireCandidateAsUser(candidateId, userData, options = {}) {
 
   const newUserId = await createEmployee(employeePayload)
 
-  if (userData.learningPathId) {
-    await assignLearningPathToUser(newUserId, userData.learningPathId)
+  if (userData.initialCourseId) {
+    await assignCourseToEmployee(newUserId, userData.initialCourseId)
   }
 
   await getRecruitmentAdapter().markCandidateHired(

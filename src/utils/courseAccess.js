@@ -1,16 +1,17 @@
 import { isAdmin, normalizeRoleId } from '../data/roles'
-import { getAllCourses } from './adminData'
-import { getEmployeeById } from './employeeData'
+import { getAllCourses, getActiveCourses } from './adminData'
+import { getEmployeeById, getActiveEmployees } from './employeeData'
+import { isActiveCourseStatus } from './courseData'
 
-/** Только опубликованные курсы */
+/** Только активные курсы для каталога и сотрудников */
 export function getPublishedCourses() {
-  return getAllCourses().filter((c) => c.status === 'published')
+  return getActiveCourses()
 }
 
 /**
  * Курсы для сотрудника:
- * - admin — все опубликованные (+ черновики для управления в админке отдельно)
- * - если назначены assignedCourseIds — только они (опубликованные)
+ * - admin — все активные
+ * - если назначены assignedCourseIds — только они (активные)
  * - иначе — по роли allowedRoles
  */
 export function getCoursesForEmployee(employeeOrId) {
@@ -22,7 +23,6 @@ export function getCoursesForEmployee(employeeOrId) {
   if (!employee) return []
 
   const published = getPublishedCourses()
-
   const role = normalizeRoleId(employee.role)
 
   if (isAdmin(role)) {
@@ -42,8 +42,8 @@ export function getCoursesForEmployee(employeeOrId) {
 export function canEmployeeAccessCourse(employee, course) {
   if (!employee || !course) return false
   const role = normalizeRoleId(employee.role)
-  if (isAdmin(role)) return true
-  if (course.status !== 'published') return false
+  if (isAdmin(role)) return isActiveCourseStatus(course.status)
+  if (!isActiveCourseStatus(course.status)) return false
 
   const assigned = employee.assignedCourseIds || []
   if (assigned.length > 0) {
@@ -53,9 +53,13 @@ export function canEmployeeAccessCourse(employee, course) {
   return Array.isArray(course.allowedRoles) && course.allowedRoles.includes(role)
 }
 
-/** Опубликованные курсы для назначения в админке */
-export function getAssignableCourses(employeeRole = null) {
-  const published = getPublishedCourses()
-  if (!employeeRole) return published
-  return published
+/** Активные курсы для назначения в админке */
+export function getAssignableCourses() {
+  return getPublishedCourses()
+}
+
+/** Сотрудники с указанной ролью */
+export function getEmployeesByRole(roleId) {
+  const role = normalizeRoleId(roleId)
+  return getActiveEmployees().filter((emp) => normalizeRoleId(emp.role) === role)
 }

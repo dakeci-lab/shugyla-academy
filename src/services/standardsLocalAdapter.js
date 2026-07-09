@@ -150,6 +150,7 @@ function saveArticles(articles) {
       created_by: a.createdBy,
       updated_by: a.updatedBy,
       published_at: a.publishedAt,
+      sort_order: a.sortOrder ?? 0,
     }))
   )
 }

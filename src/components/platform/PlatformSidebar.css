@@ -115,6 +115,21 @@
   background: var(--color-bg);
 }
 
+.platform-sidebar__group-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.platform-sidebar__icon {
+  flex-shrink: 0;
+  width: 20px;
+  font-size: 16px;
+  line-height: 1;
+  text-align: center;
+}
+
 .platform-sidebar__caret {
   width: 8px;
   height: 8px;
@@ -138,7 +153,9 @@
 }
 
 .platform-sidebar__link {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   padding: 10px 14px;
   border-radius: var(--radius-sm);
   color: var(--color-text-secondary);

@@ -52,6 +52,8 @@ const EMPTY_ARTICLE_FORM = {
   priority: PRIORITY.NORMAL,
   allRoles: true,
   visibilityRoles: [],
+  createdBy: '',
+  sortOrder: 0,
 }
 
 const EMPTY_CATEGORY_FORM = {
@@ -131,6 +133,8 @@ export default function StandardsSection() {
       priority: article.priority,
       allRoles: !article.visibilityRoles?.length,
       visibilityRoles: [...(article.visibilityRoles || [])],
+      createdBy: article.createdBy || '',
+      sortOrder: article.sortOrder ?? 0,
     })
     setArticleError('')
     setShowArticleForm(true)
@@ -154,6 +158,8 @@ export default function StandardsSection() {
       status: articleForm.status,
       priority: articleForm.priority,
       visibilityRoles: articleForm.allRoles ? [] : articleForm.visibilityRoles,
+      createdBy: articleForm.createdBy.trim() || null,
+      sortOrder: Number(articleForm.sortOrder) || 0,
     }
 
     try {
@@ -226,13 +232,13 @@ export default function StandardsSection() {
   return (
     <>
       <div className="admin-toolbar admin-toolbar--stack">
-        <span className="admin-toolbar__info">{filteredArticles.length} статей</span>
+        <span className="admin-toolbar__info">{filteredArticles.length} стандартов</span>
         <div className="admin-table__actions">
           <button type="button" className="btn btn--outline btn--sm" onClick={() => setShowCategories(true)}>
             Категории
           </button>
           <button type="button" className="btn btn--primary btn--sm" onClick={openCreateArticle}>
-            + Создать статью
+            + Создать стандарт
           </button>
         </div>
       </div>
@@ -241,7 +247,7 @@ export default function StandardsSection() {
         <input
           type="search"
           className="admin-search"
-          placeholder="Поиск по статьям…"
+          placeholder="Поиск по стандартам…"
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -252,7 +258,7 @@ export default function StandardsSection() {
         >
           <option value="all">Все статусы</option>
           <option value="draft">Черновик</option>
-          <option value="published">Опубликовано</option>
+          <option value="published">Активный</option>
           <option value="archived">Архив</option>
         </select>
         <select
@@ -301,7 +307,7 @@ export default function StandardsSection() {
             {filteredArticles.length === 0 ? (
               <tr>
                 <td colSpan={8} className="admin-empty">
-                  Статьи не найдены
+                  Стандарты не найдены
                 </td>
               </tr>
             ) : (
@@ -358,7 +364,21 @@ export default function StandardsSection() {
                             className="btn btn--outline btn--sm"
                             onClick={() => runArticleAction(unpublishStandardArticle, article.id)}
                           >
-                            Снять с публикации
+                            В черновик
+                          </button>
+                        )}
+                        {article.status === 'archived' && (
+                          <button
+                            type="button"
+                            className="btn btn--outline btn--sm"
+                            onClick={() =>
+                              runArticleAction(
+                                (id) => updateStandardArticle(id, { status: ARTICLE_STATUS.DRAFT }),
+                                article.id
+                              )
+                            }
+                          >
+                            Восстановить
                           </button>
                         )}
                         {article.status !== 'archived' && (
@@ -389,7 +409,7 @@ export default function StandardsSection() {
 
       {showArticleForm && (
         <AdminModal
-          title={editArticleId ? 'Редактировать статью' : 'Создать статью'}
+          title={editArticleId ? 'Редактировать стандарт' : 'Создать стандарт'}
           onClose={() => setShowArticleForm(false)}
           xwide
           footer={
@@ -405,7 +425,7 @@ export default function StandardsSection() {
         >
           <form id="standard-article-form" className="admin-form" onSubmit={handleArticleSave}>
             <label className="admin-form__label">
-              Название статьи *
+              Название стандарта *
               <input
                 className="admin-form__input"
                 value={articleForm.title}
@@ -440,7 +460,7 @@ export default function StandardsSection() {
                   onChange={(e) => setArticleForm({ ...articleForm, status: e.target.value })}
                 >
                   <option value="draft">Черновик</option>
-                  <option value="published">Опубликовано</option>
+                  <option value="published">Активный</option>
                   <option value="archived">Архив</option>
                 </select>
               </label>
@@ -470,7 +490,7 @@ export default function StandardsSection() {
             </label>
 
             <label className="admin-form__label">
-              Содержание статьи *
+              Содержание стандарта *
               <textarea
                 className="admin-form__input"
                 rows={12}
@@ -480,6 +500,30 @@ export default function StandardsSection() {
                 placeholder="Поддерживается простой Markdown: # заголовок, **жирный**, - список, ---"
               />
             </label>
+
+            <div className="admin-form__row">
+              <label className="admin-form__label">
+                Автор
+                <input
+                  className="admin-form__input"
+                  value={articleForm.createdBy}
+                  onChange={(e) => setArticleForm({ ...articleForm, createdBy: e.target.value })}
+                  placeholder="ФИО или должность"
+                />
+              </label>
+              <label className="admin-form__label">
+                Порядок сортировки
+                <input
+                  type="number"
+                  className="admin-form__input"
+                  min={0}
+                  value={articleForm.sortOrder}
+                  onChange={(e) =>
+                    setArticleForm({ ...articleForm, sortOrder: e.target.value })
+                  }
+                />
+              </label>
+            </div>
 
             <div className="admin-form__label">
               <span>Доступно для ролей</span>

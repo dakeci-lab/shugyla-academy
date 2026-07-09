@@ -14,13 +14,18 @@ export const ROUTE_KEYS = {
   EMPLOYEES_SCHEDULE: 'employees_schedule',
   EMPLOYEES_RATING: 'employees_rating',
   EMPLOYEES_PAYROLL: 'employees_payroll',
+  EMPLOYEES_HIRING: 'employees_hiring',
   PROCUREMENT_GROUP: 'procurement_group',
   PROCUREMENT: 'procurement',
   RECEIVING: 'receiving',
   SUPPLIERS: 'suppliers',
   PRICE_TAGS: 'price_tags',
   ACADEMY: 'academy',
+  ACADEMY_GROUP: 'academy_group',
   ACADEMY_MANAGE: 'academy_manage',
+  STANDARDS_GROUP: 'standards_group',
+  STANDARDS: 'standards',
+  STANDARDS_MANAGE: 'standards_manage',
   SETTINGS: 'settings',
 }
 
@@ -50,6 +55,7 @@ const ROUTE_ACCESS = {
     ROLE_IDS.SELLER,
   ],
   [ROUTE_KEYS.EMPLOYEES_PAYROLL]: [ROLE_IDS.ADMIN],
+  [ROUTE_KEYS.EMPLOYEES_HIRING]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.PROCUREMENT_GROUP]: [
     ROLE_IDS.ADMIN,
     ROLE_IDS.PURCHASER,
@@ -69,7 +75,11 @@ const ROUTE_ACCESS = {
     ROLE_IDS.FLOOR_ADMIN,
   ],
   [ROUTE_KEYS.ACADEMY]: ALL_PLATFORM_ROLES,
+  [ROUTE_KEYS.ACADEMY_GROUP]: ALL_PLATFORM_ROLES,
   [ROUTE_KEYS.ACADEMY_MANAGE]: [ROLE_IDS.ADMIN],
+  [ROUTE_KEYS.STANDARDS_GROUP]: ALL_PLATFORM_ROLES,
+  [ROUTE_KEYS.STANDARDS]: ALL_PLATFORM_ROLES,
+  [ROUTE_KEYS.STANDARDS_MANAGE]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SETTINGS]: [ROLE_IDS.ADMIN],
 }
 
@@ -107,9 +117,9 @@ export function getDefaultPlatformPath(userOrRole) {
       ? resolveUserRole(userOrRole)
       : normalizeRoleId(userOrRole)
 
-  if (!role) return '/platform/academy'
+  if (!role) return '/platform/academy/cabinet'
   if (canAccessRoute({ role }, ROUTE_KEYS.HOME)) return '/platform'
-  if (canAccessRoute({ role }, ROUTE_KEYS.ACADEMY)) return '/platform/academy'
+  if (canAccessRoute({ role }, ROUTE_KEYS.ACADEMY)) return '/platform/academy/cabinet'
   return '/platform/profile'
 }
 
@@ -191,6 +201,10 @@ export function canManageSettings(user) {
 
 export function canManageAcademy(user) {
   return canAccessRoute(user, ROUTE_KEYS.ACADEMY_MANAGE)
+}
+
+export function canManageStandards(user) {
+  return canAccessRoute(user, ROUTE_KEYS.STANDARDS_MANAGE)
 }
 
 export function canChangeEmployeeRoles(user) {

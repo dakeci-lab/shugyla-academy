@@ -84,9 +84,9 @@ export default function TestsSection() {
     const payload = {
       title: form.title.trim(),
       description: form.description.trim(),
-      type: form.type,
-      courseId: form.type === TEST_TYPE.COURSE ? Number(form.courseId) : null,
-      role: form.type === TEST_TYPE.FINAL ? form.role : null,
+      type: TEST_TYPE.COURSE,
+      courseId: Number(form.courseId),
+      role: null,
       passingScore: Number(form.passingScore) || 80,
       maxAttempts: form.maxAttempts === '' ? null : Number(form.maxAttempts),
       timeLimitMinutes: form.timeLimitMinutes === '' ? null : Number(form.timeLimitMinutes),
@@ -97,12 +97,8 @@ export default function TestsSection() {
       setError('Укажите название теста')
       return
     }
-    if (payload.type === TEST_TYPE.COURSE && !payload.courseId) {
+    if (!payload.courseId) {
       setError('Выберите курс')
-      return
-    }
-    if (payload.type === TEST_TYPE.FINAL && !payload.role) {
-      setError('Выберите роль')
       return
     }
 
@@ -221,43 +217,23 @@ export default function TestsSection() {
               Описание
               <textarea className="admin-form__textarea" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} />
             </label>
-            <div className="admin-form__row">
-              <label className="admin-form__label">
-                Тип
-                <select className="admin-form__select" value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
-                  <option value={TEST_TYPE.COURSE}>Тест после курса</option>
-                  <option value={TEST_TYPE.FINAL}>Финальная аттестация</option>
-                </select>
-              </label>
-              <label className="admin-form__label">
-                Статус
-                <select className="admin-form__select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-                  <option value="draft">Черновик</option>
-                  <option value="published">Опубликован</option>
-                </select>
-              </label>
-            </div>
+            <label className="admin-form__label">
+              Статус
+              <select className="admin-form__select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+                <option value="draft">Черновик</option>
+                <option value="published">Опубликован</option>
+              </select>
+            </label>
 
-            {form.type === TEST_TYPE.COURSE ? (
-              <label className="admin-form__label">
-                Курс
-                <select className="admin-form__select" value={form.courseId} onChange={(e) => setForm({ ...form, courseId: e.target.value })} required>
-                  <option value="">Выберите курс</option>
-                  {courses.map((c) => (
-                    <option key={c.id} value={c.id}>{c.title}</option>
-                  ))}
-                </select>
-              </label>
-            ) : (
-              <label className="admin-form__label">
-                Роль
-                <select className="admin-form__select" value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })}>
-                  {ROLE_OPTIONS.map((roleId) => (
-                    <option key={roleId} value={roleId}>{ROLES[roleId]?.label || roleId}</option>
-                  ))}
-                </select>
-              </label>
-            )}
+            <label className="admin-form__label">
+              Курс
+              <select className="admin-form__select" value={form.courseId} onChange={(e) => setForm({ ...form, courseId: e.target.value })} required>
+                <option value="">Выберите курс</option>
+                {courses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.title}</option>
+                ))}
+              </select>
+            </label>
 
             <div className="admin-form__row">
               <label className="admin-form__label">
