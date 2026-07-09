@@ -1,60 +1,47 @@
-import { ROLE_IDS } from '../data/roles'
-import { canManageAdmin } from '../utils/auth'
-import { canViewSuppliers, ROLE_RECEIVER } from './supplierAccess'
-import { canViewPurchases } from './purchaseAccess'
+/**
+ * Совместимость: доступ к разделам платформы через config/permissions
+ */
 
-/** Типы доступа к разделам платформы */
+import {
+  ROUTE_KEYS,
+  canAccessRoute,
+  canViewMenuItem,
+  filterPlatformNav as filterNav,
+  getDefaultPlatformPath,
+  resolveUserRole,
+} from '../config/permissions'
+
+/** @deprecated используйте ROUTE_KEYS */
 export const ACCESS = {
-  ADMIN: 'admin',
-  PROCUREMENT: 'procurement',
-  PURCHASE_VIEW: 'purchase_view',
-  SUPPLIERS_VIEW: 'suppliers_view',
-  ALL: 'all',
+  ADMIN: ROUTE_KEYS.EMPLOYEES_LIST,
+  PROCUREMENT: ROUTE_KEYS.PROCUREMENT_GROUP,
+  PURCHASE_VIEW: ROUTE_KEYS.PROCUREMENT,
+  SUPPLIERS_VIEW: ROUTE_KEYS.SUPPLIERS,
+  ALL: ROUTE_KEYS.ACADEMY,
+  HOME: ROUTE_KEYS.HOME,
+  SETTINGS: ROUTE_KEYS.SETTINGS,
+  RECEIVING: ROUTE_KEYS.RECEIVING,
+  PRICE_TAGS: ROUTE_KEYS.PRICE_TAGS,
+  ACADEMY_MANAGE: ROUTE_KEYS.ACADEMY_MANAGE,
+  EMPLOYEES_RATING: ROUTE_KEYS.EMPLOYEES_RATING,
 }
 
-/** Роли с доступом к закупкам, приёмке, поставщикам и ценникам */
-export const PROCUREMENT_ROLES = new Set([
-  ROLE_IDS.ADMIN,
-  ROLE_IDS.BUYER,
-  'receiver',
-])
+export { ROUTE_KEYS, getDefaultPlatformPath, resolveUserRole }
 
-export function canAccessNavItem(role, access = ACCESS.ALL) {
-  if (!role) return false
-  if (access === ACCESS.ALL) return true
-  if (access === ACCESS.ADMIN) return canManageAdmin(role)
-  if (access === ACCESS.PROCUREMENT) {
-    return canManageAdmin(role) || PROCUREMENT_ROLES.has(role)
-  }
-  if (access === ACCESS.SUPPLIERS_VIEW) {
-    return canViewSuppliers({ role })
-  }
-  if (access === ACCESS.PURCHASE_VIEW) {
-    return canViewPurchases({ role })
-  }
-  return false
+export function canAccessNavItem(userOrRole, routeKey = ROUTE_KEYS.ACADEMY) {
+  const user =
+    typeof userOrRole === 'object' && userOrRole !== null
+      ? userOrRole
+      : { role: userOrRole }
+  return canAccessRoute(user, routeKey)
 }
 
-export function getDefaultPlatformPath(role) {
-  if (canManageAdmin(role)) return '/platform'
-  if (role === ROLE_RECEIVER) return '/platform/receiving'
-  if (role === ROLE_IDS.BUYER) return '/platform/procurement'
-  if (PROCUREMENT_ROLES.has(role)) return '/platform/receiving'
-  return '/platform/academy'
+export function filterPlatformNav(nav, userOrRole) {
+  const user =
+    typeof userOrRole === 'object' && userOrRole !== null
+      ? userOrRole
+      : { role: userOrRole }
+  return filterNav(nav, user)
 }
 
-export function filterPlatformNav(nav, role) {
-  return nav
-    .map((item) => {
-      if (item.children) {
-        const children = item.children.filter((child) =>
-          canAccessNavItem(role, child.access)
-        )
-        if (children.length === 0) return null
-        return { ...item, children }
-      }
-      if (!canAccessNavItem(role, item.access)) return null
-      return item
-    })
-    .filter(Boolean)
-}
+export { canViewMenuItem }

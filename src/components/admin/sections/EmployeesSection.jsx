@@ -23,7 +23,7 @@ import {
 } from '../../../services/academyDataService'
 import { getActiveLearningPathForUser } from '../../../utils/learningPathData'
 import { getEmployeeProgressPercent } from '../../../utils/adminStats'
-import { getRole, ROLES, ALL_EMPLOYEE_ROLES } from '../../../data/roles'
+import { ROLES, ALL_EMPLOYEE_ROLES, getRoleLabel } from '../../../data/roles'
 import { getCoursesForEmployee, getAssignableCourses } from '../../../utils/courseAccess'
 import { getCourseProgress } from '../../../utils/storage'
 import { calcLessonProgress } from '../../../utils/courseStructure'
@@ -334,7 +334,6 @@ export default function EmployeesSection() {
             ) : (
               employees.map((emp) => {
                 const percent = getEmployeeProgressPercent(emp.id)
-                const role = getRole(emp.role)
                 const courses = getCoursesForEmployee(emp)
 
                 return (
@@ -347,7 +346,7 @@ export default function EmployeesSection() {
                     </td>
                     <td>{emp.position}</td>
                     <td><code className="admin-code">{emp.login}</code></td>
-                    <td>{role?.label || emp.role}</td>
+                    <td>{getRoleLabel(emp.role)}</td>
                     <td>{pathLabelForEmployee(emp)}</td>
                     <td>
                       <StatusBadge
@@ -429,7 +428,7 @@ export default function EmployeesSection() {
 
             <div className="admin-form__row">
               <label className="admin-form__label">
-                Роль в системе
+                Роль
                 <select
                   className="admin-form__select"
                   value={form.role}

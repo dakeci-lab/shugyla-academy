@@ -212,7 +212,7 @@ export default function RecruitmentSection() {
 
   function openHireModal() {
     if (!detailCandidate) return
-    const role = detailVacancy?.role || 'trainee'
+    const role = detailVacancy?.role || 'cashier'
     setHireForm({
       login: '',
       password: '',
@@ -240,7 +240,7 @@ export default function RecruitmentSection() {
           login: hireForm.login.trim(),
           password: hireForm.password,
           position: hireForm.position.trim(),
-          role: detailVacancy?.role || 'trainee',
+          role: detailVacancy?.role || 'cashier',
           employmentStatus: hireForm.employmentStatus,
           learningPathId: hireForm.learningPathId || null,
         },

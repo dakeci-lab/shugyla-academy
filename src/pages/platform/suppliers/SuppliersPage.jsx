@@ -18,7 +18,7 @@ import {
   canEditSuppliers,
   canArchiveSuppliers,
   canDeleteSuppliers,
-} from '../../../platform/supplierAccess'
+} from '../../../config/permissions'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../../../components/admin/AdminModal'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'

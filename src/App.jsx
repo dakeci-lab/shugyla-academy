@@ -4,7 +4,7 @@ import { AcademyDataProvider } from './context/AcademyDataContext'
 import { SessionProvider } from './context/SessionContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import PlatformRoute from './components/platform/PlatformRoute'
-import { ACCESS } from './platform/platformAccess'
+import { ROUTE_KEYS } from './config/permissions'
 import PlatformLayout from './layouts/PlatformLayout'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
@@ -70,13 +70,20 @@ export default function App() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<PlatformIndex />} />
+          <Route
+            index
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.HOME}>
+                <PlatformIndex />
+              </PlatformRoute>
+            }
+          />
 
           <Route path="employees" element={<Navigate to="/platform/employees/list" replace />} />
           <Route
             path="employees/list"
             element={
-              <PlatformRoute access={ACCESS.ADMIN}>
+              <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_LIST}>
                 <PlatformEmployees />
               </PlatformRoute>
             }
@@ -84,7 +91,7 @@ export default function App() {
           <Route
             path="employees/schedule"
             element={
-              <PlatformRoute access={ACCESS.ADMIN}>
+              <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_SCHEDULE}>
                 <ModulePlaceholder
                   title="График работы"
                   description="Настройки графика персонала магазина."
@@ -95,7 +102,7 @@ export default function App() {
           <Route
             path="employees/rating"
             element={
-              <PlatformRoute access={ACCESS.ALL}>
+              <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_RATING}>
                 <ModulePlaceholder
                   title="Рейтинг"
                   description="Рейтинг сотрудников по дисциплине, приходу вовремя и уходу не раньше времени."
@@ -106,7 +113,7 @@ export default function App() {
           <Route
             path="employees/payroll"
             element={
-              <PlatformRoute access={ACCESS.ADMIN}>
+              <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_PAYROLL}>
                 <ModulePlaceholder
                   title="Подсчёт зарплаты"
                   description="Расчёт заработной платы сотрудников."
@@ -118,7 +125,7 @@ export default function App() {
           <Route
             path="procurement"
             element={
-              <PlatformRoute access={ACCESS.PURCHASE_VIEW}>
+              <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
                 <ProcurementPage />
               </PlatformRoute>
             }
@@ -126,7 +133,7 @@ export default function App() {
           <Route
             path="procurement/:id"
             element={
-              <PlatformRoute access={ACCESS.PURCHASE_VIEW}>
+              <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
                 <PurchaseDetailPage />
               </PlatformRoute>
             }
@@ -134,7 +141,7 @@ export default function App() {
           <Route
             path="receiving"
             element={
-              <PlatformRoute access={ACCESS.PROCUREMENT}>
+              <PlatformRoute routeKey={ROUTE_KEYS.RECEIVING}>
                 <ModulePlaceholder title="Приёмка" description="Приёмка товара и сверка с накладными." />
               </PlatformRoute>
             }
@@ -142,7 +149,7 @@ export default function App() {
           <Route
             path="suppliers"
             element={
-              <PlatformRoute access={ACCESS.SUPPLIERS_VIEW}>
+              <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIERS}>
                 <SuppliersPage />
               </PlatformRoute>
             }
@@ -150,7 +157,7 @@ export default function App() {
           <Route
             path="suppliers/:id"
             element={
-              <PlatformRoute access={ACCESS.SUPPLIERS_VIEW}>
+              <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIERS}>
                 <SupplierDetailPage />
               </PlatformRoute>
             }
@@ -158,7 +165,7 @@ export default function App() {
           <Route
             path="price-tags"
             element={
-              <PlatformRoute access={ACCESS.PROCUREMENT}>
+              <PlatformRoute routeKey={ROUTE_KEYS.PRICE_TAGS}>
                 <ModulePlaceholder
                   title="Ценники"
                   description="Настройки печати ценников и виды ценников."
@@ -169,7 +176,14 @@ export default function App() {
 
           {/* Academy — внутри платформы */}
           <Route path="academy">
-            <Route index element={<PlatformAcademy />} />
+            <Route
+              index
+              element={
+                <PlatformRoute routeKey={ROUTE_KEYS.ACADEMY}>
+                  <PlatformAcademy />
+                </PlatformRoute>
+              }
+            />
             <Route path="cabinet" element={<AcademyCabinetContent />} />
             <Route path="catalog" element={<AcademyCatalogContent />} />
             <Route
@@ -187,7 +201,7 @@ export default function App() {
             <Route
               path="manage"
               element={
-                <PlatformRoute access={ACCESS.ADMIN}>
+                <PlatformRoute routeKey={ROUTE_KEYS.ACADEMY_MANAGE}>
                   <PlatformAcademyManageLayout />
                 </PlatformRoute>
               }
@@ -202,7 +216,7 @@ export default function App() {
           <Route
             path="settings"
             element={
-              <PlatformRoute access={ACCESS.ADMIN}>
+              <PlatformRoute routeKey={ROUTE_KEYS.SETTINGS}>
                 <PlatformSettings />
               </PlatformRoute>
             }

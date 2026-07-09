@@ -1,5 +1,5 @@
 import { USERS } from '../data/users'
-import { getRole } from '../data/roles'
+import { getRole, normalizeRoleId } from '../data/roles'
 import { isCloudMode } from '../lib/dataMode'
 import { getCloudEmployees } from '../lib/cloudStore'
 
@@ -112,7 +112,8 @@ function splitName(fullName) {
 
 /** Нормализация записи сотрудника */
 export function normalizeEmployee(raw) {
-  const role = getRole(raw.role)
+  const roleId = normalizeRoleId(raw.role) || raw.role
+  const role = getRole(roleId)
   const fromName = splitName(raw.name)
   const firstName = raw.firstName ?? fromName.firstName
   const lastName = raw.lastName ?? fromName.lastName
@@ -120,10 +121,11 @@ export function normalizeEmployee(raw) {
 
   return {
     ...raw,
+    role: roleId,
     firstName,
     lastName,
     name,
-    position: raw.position || role?.label || raw.role,
+    position: raw.position || role?.label || roleId,
     employmentStatus: normalizeEmploymentStatus(
       raw.employmentStatus || raw.status
     ),

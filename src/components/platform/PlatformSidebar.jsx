@@ -18,8 +18,8 @@ export default function PlatformSidebar({ isOpen = false, onClose, onNavigate })
   const { user } = useSession()
   const { pathname } = useLocation()
   const navItems = useMemo(
-    () => filterPlatformNav(PLATFORM_NAV, user?.role),
-    [user?.role]
+    () => filterPlatformNav(PLATFORM_NAV, user),
+    [user]
   )
   const [expandedGroups, setExpandedGroups] = useState(() => new Set())
 

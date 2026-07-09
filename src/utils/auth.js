@@ -4,7 +4,10 @@ import {
   hasPermission,
   isAdmin,
   PERMISSIONS,
+  normalizeRoleId,
+  ROLE_IDS,
 } from '../data/roles'
+import { resolveUserRole, getDefaultPlatformPath } from '../config/permissions'
 import { getAllCourses } from './adminData'
 import { saveUser } from './storage'
 import {
@@ -13,11 +16,6 @@ import {
 } from './employeeData'
 import { authenticateUser } from '../services/academyDataService'
 import { isCloudMode } from '../lib/dataMode'
-import {
-  ACCESS,
-  canAccessNavItem,
-  getDefaultPlatformPath,
-} from '../platform/platformAccess'
 import {
   getCoursesForEmployee,
   canEmployeeAccessCourse,
@@ -49,8 +47,8 @@ export function getSafeRedirectPath(redirectPath) {
 
 export function getPostLoginPath(user, redirectPath) {
   const safe = getSafeRedirectPath(redirectPath)
-  if (safe === '/platform' && user && !canAccessNavItem(user.role, ACCESS.ADMIN)) {
-    return getDefaultPlatformPath(user.role)
+  if (safe === '/platform') {
+    return getDefaultPlatformPath(user)
   }
   return safe
 }
@@ -73,14 +71,15 @@ export async function login(loginValue, password) {
   }
 
   const user = result.user
-  const role = getRole(user.role)
+  const roleId = resolveUserRole(user) || normalizeRoleId(user.role) || ROLE_IDS.CASHIER
+  const role = getRole(roleId)
 
   const sessionUser = {
     id: user.id,
     login: user.login,
     name: user.name,
-    role: user.role,
-    roleName: role?.label || user.role,
+    role: roleId,
+    roleName: role?.label || roleId,
     permissions: role?.permissions || [],
     assignedCourseIds: user.assignedCourseIds || [],
   }

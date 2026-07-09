@@ -811,7 +811,7 @@ export async function hireCandidateAsUser(candidateId, userData, options = {}) {
   if (!candidate) throw new Error('Кандидат не найден')
 
   const vacancy = candidate.vacancyId ? getVacancyByIdSync(candidate.vacancyId) : null
-  const role = userData.role || vacancy?.role || 'trainee'
+  const role = userData.role || vacancy?.role || 'cashier'
   const asTrainee = options.asTrainee !== false && userData.employmentStatus !== EMPLOYMENT_STATUS.ACTIVE
 
   const employeePayload = {

@@ -3,9 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import {
   canViewPurchases,
-  canEditPurchases,
+  canEditPurchase,
   canCreatePurchase,
-} from '../../../platform/purchaseAccess'
+} from '../../../config/permissions'
 import {
   getPurchaseOrdersSync,
   createPurchaseOrder,
@@ -37,7 +37,7 @@ export default function ProcurementPage() {
   const [actionError, setActionError] = useState('')
 
   const canView = canViewPurchases(user)
-  const canEdit = canEditPurchases(user)
+  const canEdit = canEditPurchase(user)
   const canCreate = canCreatePurchase(user)
 
   void version

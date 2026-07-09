@@ -63,8 +63,8 @@ export const COURSES = [
     title: 'Система закупа и работа с поставщиками',
     description:
       'Процесс закупа товаров, ведение переговоров с поставщиками, контроль поставок и документооборот.',
-    category: 'buyer',
-    allowedRoles: [ROLE_IDS.BUYER, ROLE_IDS.ADMIN],
+    category: 'purchaser',
+    allowedRoles: [ROLE_IDS.PURCHASER, ROLE_IDS.ADMIN],
     duration: '4 часа',
     lessonsCount: 6,
     blocksCount: 3,
@@ -86,11 +86,11 @@ export const COURSES = [
   },
   {
     id: 7,
-    title: 'Стажировка: первые шаги',
+    title: 'Первые шаги в Shugyla Market',
     description:
-      'Вводный курс для стажёров: знакомство с магазином, базовые процедуры и наставничество.',
-    category: 'trainee',
-    allowedRoles: [ROLE_IDS.TRAINEE, ROLE_IDS.ADMIN],
+      'Вводный курс: знакомство с магазином, базовые процедуры и наставничество.',
+    category: 'for_all',
+    allowedRoles: [...ALL_EMPLOYEE_ROLES, ROLE_IDS.ADMIN],
     duration: '2 часа',
     lessonsCount: 4,
     blocksCount: 2,

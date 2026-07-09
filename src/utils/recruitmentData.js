@@ -56,12 +56,12 @@ export const CANDIDATE_STATUS_BADGE = {
 export const VACANCY_ROLE_LABELS = {
   cashier: 'Кассир',
   seller: 'Продавец',
-  floor_admin: 'Администратор зала',
+  floor_admin: 'Администратор торгового зала',
+  purchaser: 'Закупщик',
   buyer: 'Закупщик',
   receiver: 'Приёмщик',
   loader: 'Грузчик',
-  trainee: 'Стажёр',
-  admin: 'Администратор',
+  admin: 'Админ',
 }
 
 export const VACANCY_ROLES = Object.keys(VACANCY_ROLE_LABELS)

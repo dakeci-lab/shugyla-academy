@@ -3,9 +3,9 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import {
   canViewPurchases,
-  canEditPurchases,
+  canEditPurchase,
   canTransferToReceiving,
-} from '../../../platform/purchaseAccess'
+} from '../../../config/permissions'
 import {
   getPurchaseOrderByIdSync,
   updatePurchaseOrder,
@@ -37,7 +37,7 @@ export default function PurchaseDetailPage() {
   const [items, setItems] = useState(null)
 
   const canView = canViewPurchases(user)
-  const canEdit = canEditPurchases(user)
+  const canEdit = canEditPurchase(user)
   const canTransfer = canTransferToReceiving(user)
 
   void version

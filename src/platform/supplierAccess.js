@@ -1,29 +1,14 @@
-import { ROLE_IDS } from '../data/roles'
-import { canManageAdmin } from '../utils/auth'
+/**
+ * @deprecated Импортируйте из src/config/permissions.js
+ */
+export {
+  canViewSuppliers,
+  canEditSuppliers,
+  canArchiveSuppliers,
+  canDeleteSuppliers,
+} from '../config/permissions'
 
-/** Роль приёмщика (зарезервировано до добавления в roles.js) */
+/** @deprecated используйте ROLE_IDS.RECEIVER из data/roles */
+export { ROLE_IDS } from '../data/roles'
+
 export const ROLE_RECEIVER = 'receiver'
-
-/** Просмотр списка и карточки поставщиков */
-export function canViewSuppliers(user) {
-  if (!user?.role) return false
-  if (canManageAdmin(user.role)) return true
-  return user.role === ROLE_IDS.BUYER || user.role === ROLE_RECEIVER
-}
-
-/** Создание и редактирование поставщиков */
-export function canEditSuppliers(user) {
-  if (!user?.role) return false
-  if (canManageAdmin(user.role)) return true
-  return user.role === ROLE_IDS.BUYER
-}
-
-/** Архивирование поставщиков */
-export function canArchiveSuppliers(user) {
-  return canEditSuppliers(user)
-}
-
-/** Удаление поставщиков — только admin и закупщик */
-export function canDeleteSuppliers(user) {
-  return canEditSuppliers(user)
-}

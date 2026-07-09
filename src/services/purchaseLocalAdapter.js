@@ -133,7 +133,7 @@ function seedIfEmpty() {
       supplierId: null,
       supplierName: 'Прима Nivea',
       status: PURCHASE_STATUS.FORMED,
-      createdBy: 'buyer',
+      createdBy: 'purchaser',
       createdByName: 'Закупщик',
       expectedDeliveryDate: '2026-07-10',
       comment: 'Бакалея — пополнение полки',

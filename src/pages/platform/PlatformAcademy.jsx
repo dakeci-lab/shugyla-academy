@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext'
-import { canManageAdmin } from '../../utils/auth'
+import { canManageAcademy } from '../../config/permissions'
 import './PlatformAcademy.css'
 
 const ACADEMY_LINKS = [
@@ -19,7 +19,7 @@ const ACADEMY_LINKS = [
 /** Раздел Academy — хаб внутри платформы */
 export default function PlatformAcademy() {
   const { user } = useSession()
-  const isAdmin = canManageAdmin(user?.role)
+  const isAdmin = canManageAcademy(user)
 
   const links = [
     ...ACADEMY_LINKS,

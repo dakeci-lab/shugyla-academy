@@ -1,17 +1,13 @@
-import { Navigate } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext'
-import {
-  canAccessNavItem,
-  getDefaultPlatformPath,
-  ACCESS,
-} from '../../platform/platformAccess'
+import { canAccessRoute, ROUTE_KEYS } from '../../config/permissions'
+import PlatformAccessDenied from './PlatformAccessDenied'
 
 /** Маршрут раздела платформы с проверкой доступа по роли */
-export default function PlatformRoute({ children, access = ACCESS.ALL }) {
+export default function PlatformRoute({ children, routeKey = ROUTE_KEYS.ACADEMY }) {
   const { user } = useSession()
 
-  if (!canAccessNavItem(user?.role, access)) {
-    return <Navigate to={getDefaultPlatformPath(user?.role)} replace />
+  if (!canAccessRoute(user, routeKey)) {
+    return <PlatformAccessDenied />
   }
 
   return children

@@ -1,4 +1,4 @@
-import { isAdmin } from '../data/roles'
+import { isAdmin, normalizeRoleId } from '../data/roles'
 import { getAllCourses } from './adminData'
 import { getEmployeeById } from './employeeData'
 
@@ -23,7 +23,9 @@ export function getCoursesForEmployee(employeeOrId) {
 
   const published = getPublishedCourses()
 
-  if (isAdmin(employee.role)) {
+  const role = normalizeRoleId(employee.role)
+
+  if (isAdmin(role)) {
     return published
   }
 
@@ -33,13 +35,14 @@ export function getCoursesForEmployee(employeeOrId) {
     return published.filter((c) => assigned.includes(c.id))
   }
 
-  return published.filter((c) => c.allowedRoles?.includes(employee.role))
+  return published.filter((c) => c.allowedRoles?.includes(role))
 }
 
 /** Может ли сотрудник открыть курс */
 export function canEmployeeAccessCourse(employee, course) {
   if (!employee || !course) return false
-  if (isAdmin(employee.role)) return true
+  const role = normalizeRoleId(employee.role)
+  if (isAdmin(role)) return true
   if (course.status !== 'published') return false
 
   const assigned = employee.assignedCourseIds || []
@@ -47,7 +50,7 @@ export function canEmployeeAccessCourse(employee, course) {
     return assigned.includes(course.id)
   }
 
-  return Array.isArray(course.allowedRoles) && course.allowedRoles.includes(employee.role)
+  return Array.isArray(course.allowedRoles) && course.allowedRoles.includes(role)
 }
 
 /** Опубликованные курсы для назначения в админке */

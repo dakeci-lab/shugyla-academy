@@ -42,7 +42,8 @@ export function getCategoryLabel(categoryId, lang = 'ru') {
       floor_admin: 'Администратор',
       seller: 'Продавец',
       buyer: 'Закупщик',
-      trainee: 'Стажёр',
+      purchaser: 'Закупщик',
+      receiver: 'Приёмщик',
       for_all: 'Для всех',
     },
     kz: {
@@ -51,7 +52,8 @@ export function getCategoryLabel(categoryId, lang = 'ru') {
       floor_admin: 'Әкімші',
       seller: 'Сатушы',
       buyer: 'Сатып алушы',
-      trainee: 'Стажёр',
+      purchaser: 'Сатып алушы',
+      receiver: 'Қабылдаушы',
       for_all: 'Барлығына',
     },
   }
