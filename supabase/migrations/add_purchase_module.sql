@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS purchase_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   number TEXT NOT NULL UNIQUE,
   date DATE NOT NULL DEFAULT CURRENT_DATE,
-  supplier_id UUID REFERENCES suppliers(id) ON DELETE SET NULL,
+  supplier_id UUID REFERENCES platform_suppliers(id) ON DELETE SET NULL,
   supplier_name TEXT NOT NULL DEFAULT '',
   status TEXT NOT NULL DEFAULT 'draft' CHECK (status IN (
     'draft', 'formed', 'sent', 'awaiting_receiving',

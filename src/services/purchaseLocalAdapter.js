@@ -208,27 +208,6 @@ export async function transferPurchaseToReceiving(orderId) {
   const order = orders.find((o) => o.id === orderId)
   if (!order) throw new Error('Закуп не найден')
   await updatePurchaseOrder(orderId, { status: PURCHASE_STATUS.AWAITING_RECEIVING })
-  // receiving_documents / receiving_items — подключение позже
+  // receiving_documents / receiving_items — следующий этап
   return { ok: true }
-}
-
-/** Заглушка Supabase-адаптера */
-export async function fetchPurchasesDataCloud() {
-  return getLocalPurchasesBundle()
-}
-
-export async function createPurchaseOrderCloud(data) {
-  return createPurchaseOrder(data)
-}
-
-export async function updatePurchaseOrderCloud(orderId, updates) {
-  return updatePurchaseOrder(orderId, updates)
-}
-
-export async function cancelPurchaseOrderCloud(orderId) {
-  return cancelPurchaseOrder(orderId)
-}
-
-export async function transferPurchaseToReceivingCloud(orderId) {
-  return transferPurchaseToReceiving(orderId)
 }

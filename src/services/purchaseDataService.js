@@ -1,17 +1,30 @@
 import { isCloudMode } from '../lib/dataMode'
+import { getCloudPurchases } from '../lib/cloudStore'
+import { refreshData } from './academyDataService'
 import * as local from './purchaseLocalAdapter'
-
-/**
- * Сервис закупок — локальный mock, позже purchase_orders / purchase_order_items в Supabase
- */
+import * as cloud from './purchaseSupabaseAdapter'
 
 function getAdapter() {
-  // TODO: подключить purchaseSupabaseAdapter при готовности таблиц
-  return local
+  return isCloudMode() ? cloud : local
+}
+
+function getPurchasesSource() {
+  if (isCloudMode()) {
+    const orders = getCloudPurchases()
+    if (orders) return orders
+    return []
+  }
+  return local.getLocalPurchasesBundle().orders
+}
+
+async function afterPurchaseMutation() {
+  if (isCloudMode()) {
+    await refreshData()
+  }
 }
 
 export function getPurchaseOrdersSync() {
-  return getAdapter().getLocalPurchasesBundle().orders
+  return getPurchasesSource()
 }
 
 export function getPurchaseOrderByIdSync(id) {
@@ -20,39 +33,76 @@ export function getPurchaseOrderByIdSync(id) {
 
 export async function loadPurchases() {
   if (isCloudMode()) {
-    return getAdapter().fetchPurchasesDataCloud()
+    return cloud.fetchPurchasesDataCloud()
   }
-  return getAdapter().fetchPurchasesData()
+  return local.fetchPurchasesData()
 }
 
 export async function createPurchaseOrder(data) {
-  const adapter = getAdapter()
-  if (isCloudMode()) {
-    return adapter.createPurchaseOrderCloud(data)
-  }
-  return adapter.createPurchaseOrder(data)
+  const id = isCloudMode()
+    ? await cloud.createPurchaseOrderCloud(data)
+    : await local.createPurchaseOrder(data)
+  await afterPurchaseMutation()
+  return id
 }
 
 export async function updatePurchaseOrder(orderId, updates) {
-  const adapter = getAdapter()
-  if (isCloudMode()) {
-    return adapter.updatePurchaseOrderCloud(orderId, updates)
-  }
-  return adapter.updatePurchaseOrder(orderId, updates)
+  const result = isCloudMode()
+    ? await cloud.updatePurchaseOrderCloud(orderId, updates)
+    : await local.updatePurchaseOrder(orderId, updates)
+  await afterPurchaseMutation()
+  return result
 }
 
 export async function cancelPurchaseOrder(orderId) {
-  const adapter = getAdapter()
   if (isCloudMode()) {
-    return adapter.cancelPurchaseOrderCloud(orderId)
+    await cloud.cancelPurchaseOrderCloud(orderId)
+  } else {
+    await local.cancelPurchaseOrder(orderId)
   }
-  return adapter.cancelPurchaseOrder(orderId)
+  await afterPurchaseMutation()
+}
+
+export async function deletePurchaseOrder(orderId) {
+  if (isCloudMode()) {
+    await cloud.deletePurchaseOrderCloud(orderId)
+  } else {
+    throw new Error('Удаление закупа доступно только в облачном режиме')
+  }
+  await afterPurchaseMutation()
 }
 
 export async function transferPurchaseToReceiving(orderId) {
-  const adapter = getAdapter()
+  const result = isCloudMode()
+    ? await cloud.transferPurchaseToReceivingCloud(orderId)
+    : await local.transferPurchaseToReceiving(orderId)
+  await afterPurchaseMutation()
+  return result
+}
+
+export async function addPurchaseOrderItem(orderId, item) {
   if (isCloudMode()) {
-    return adapter.transferPurchaseToReceivingCloud(orderId)
+    const id = await cloud.addPurchaseOrderItemCloud(orderId, item)
+    await afterPurchaseMutation()
+    return id
   }
-  return adapter.transferPurchaseToReceiving(orderId)
+  throw new Error('Добавление позиции через API доступно в облачном режиме')
+}
+
+export async function updatePurchaseOrderItem(orderId, itemId, patch) {
+  if (isCloudMode()) {
+    const result = await cloud.updatePurchaseOrderItemCloud(orderId, itemId, patch)
+    await afterPurchaseMutation()
+    return result
+  }
+  throw new Error('Обновление позиции через API доступно в облачном режиме')
+}
+
+export async function deletePurchaseOrderItem(orderId, itemId) {
+  if (isCloudMode()) {
+    await cloud.deletePurchaseOrderItemCloud(orderId, itemId)
+    await afterPurchaseMutation()
+    return
+  }
+  throw new Error('Удаление позиции через API доступно в облачном режиме')
 }
