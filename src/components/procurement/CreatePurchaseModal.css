@@ -1,0 +1,4 @@
+.create-purchase-form .admin-form__textarea {
+  resize: vertical;
+  min-height: 72px;
+}

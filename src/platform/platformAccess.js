@@ -1,11 +1,13 @@
 import { ROLE_IDS } from '../data/roles'
 import { canManageAdmin } from '../utils/auth'
-import { canViewSuppliers } from './supplierAccess'
+import { canViewSuppliers, ROLE_RECEIVER } from './supplierAccess'
+import { canViewPurchases } from './purchaseAccess'
 
 /** Типы доступа к разделам платформы */
 export const ACCESS = {
   ADMIN: 'admin',
   PROCUREMENT: 'procurement',
+  PURCHASE_VIEW: 'purchase_view',
   SUPPLIERS_VIEW: 'suppliers_view',
   ALL: 'all',
 }
@@ -27,12 +29,17 @@ export function canAccessNavItem(role, access = ACCESS.ALL) {
   if (access === ACCESS.SUPPLIERS_VIEW) {
     return canViewSuppliers({ role })
   }
+  if (access === ACCESS.PURCHASE_VIEW) {
+    return canViewPurchases({ role })
+  }
   return false
 }
 
 export function getDefaultPlatformPath(role) {
   if (canManageAdmin(role)) return '/platform'
-  if (PROCUREMENT_ROLES.has(role)) return '/platform/procurement'
+  if (role === ROLE_RECEIVER) return '/platform/receiving'
+  if (role === ROLE_IDS.BUYER) return '/platform/procurement'
+  if (PROCUREMENT_ROLES.has(role)) return '/platform/receiving'
   return '/platform/academy'
 }
 

@@ -1,0 +1,30 @@
+.purchase-history-wrap {
+  overflow-x: auto;
+}
+
+.purchase-history {
+  width: 100%;
+  min-width: 640px;
+  border-collapse: collapse;
+}
+
+.purchase-history th,
+.purchase-history td {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 14px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.purchase-history th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  background: var(--color-bg);
+}
+
+.purchase-history__empty {
+  margin: 0;
+  color: var(--color-text-secondary);
+}

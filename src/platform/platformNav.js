@@ -63,9 +63,9 @@ export const PLATFORM_NAV = [
         id: 'procurement',
         path: '/platform/procurement',
         label: 'Закуп',
-        access: ACCESS.PROCUREMENT,
+        access: ACCESS.PURCHASE_VIEW,
         title: 'Закуп',
-        description: 'Закупочные заявки и заказы.',
+        description: 'Формирование заказов поставщикам на основе остатков и продаж.',
       },
       {
         id: 'receiving',

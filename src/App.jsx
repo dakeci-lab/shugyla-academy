@@ -20,6 +20,8 @@ import PlatformAcademy from './pages/platform/PlatformAcademy'
 import PlatformSettings from './pages/platform/PlatformSettings'
 import PlatformEmployees from './pages/platform/PlatformEmployees'
 import SuppliersPage, { SupplierDetailPage } from './pages/platform/suppliers/SuppliersPage'
+import ProcurementPage from './pages/platform/procurement/ProcurementPage'
+import PurchaseDetailPage from './pages/platform/procurement/PurchaseDetailPage'
 import ModulePlaceholder from './pages/platform/ModulePlaceholder'
 import AcademyCabinetContent from './components/academy/AcademyCabinetContent'
 import AcademyCatalogContent from './components/academy/AcademyCatalogContent'
@@ -116,8 +118,16 @@ export default function App() {
           <Route
             path="procurement"
             element={
-              <PlatformRoute access={ACCESS.PROCUREMENT}>
-                <ModulePlaceholder title="Закуп" description="Закупочные заявки и заказы." />
+              <PlatformRoute access={ACCESS.PURCHASE_VIEW}>
+                <ProcurementPage />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="procurement/:id"
+            element={
+              <PlatformRoute access={ACCESS.PURCHASE_VIEW}>
+                <PurchaseDetailPage />
               </PlatformRoute>
             }
           />
