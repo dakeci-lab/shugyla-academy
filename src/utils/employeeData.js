@@ -12,6 +12,7 @@ export const STORAGE_KEYS = {
 export const EMPLOYMENT_STATUS = {
   ACTIVE: 'active',
   INACTIVE: 'inactive',
+  /** @deprecated legacy — при чтении маппится в active */
   INTERNSHIP: 'internship',
   TERMINATED: 'terminated',
 }
@@ -20,8 +21,8 @@ export const EMPLOYMENT_STATUS_LABELS = {
   active: 'Активен',
   inactive: 'Деактивирован',
   deactivated: 'Деактивирован',
-  internship: 'Стажировка',
-  trainee: 'Стажировка',
+  internship: 'Активен',
+  trainee: 'Активен',
   terminated: 'Уволен',
   dismissed: 'Уволен',
 }
@@ -30,27 +31,44 @@ export const EMPLOYMENT_STATUS_BADGE = {
   active: 'active',
   inactive: 'warning',
   deactivated: 'warning',
-  internship: 'progress',
-  trainee: 'progress',
+  internship: 'active',
+  trainee: 'active',
   terminated: 'failed',
   dismissed: 'failed',
 }
+
+/** Варианты статуса в формах сотрудников */
+export const EMPLOYEE_STATUS_OPTIONS = [
+  { value: EMPLOYMENT_STATUS.ACTIVE, label: 'Активен' },
+  { value: EMPLOYMENT_STATUS.INACTIVE, label: 'Деактивирован' },
+  { value: EMPLOYMENT_STATUS.TERMINATED, label: 'Уволен' },
+]
 
 /** Нормализация статуса из базы / legacy-значений */
 export function normalizeEmploymentStatus(status) {
   if (!status) return EMPLOYMENT_STATUS.ACTIVE
   if (status === 'deactivated') return EMPLOYMENT_STATUS.INACTIVE
   if (status === 'dismissed') return EMPLOYMENT_STATUS.TERMINATED
-  if (status === 'trainee') return EMPLOYMENT_STATUS.INTERNSHIP
+  if (status === 'trainee' || status === 'internship') return EMPLOYMENT_STATUS.ACTIVE
   return status
+}
+
+/** Статус для select в форме (без стажировки) */
+export function employmentStatusForForm(status) {
+  const normalized = normalizeEmploymentStatus(status)
+  if (
+    normalized === EMPLOYMENT_STATUS.ACTIVE ||
+    normalized === EMPLOYMENT_STATUS.INACTIVE ||
+    normalized === EMPLOYMENT_STATUS.TERMINATED
+  ) {
+    return normalized
+  }
+  return EMPLOYMENT_STATUS.ACTIVE
 }
 
 export function canEmployeeLogin(status) {
   const normalized = normalizeEmploymentStatus(status)
-  return (
-    normalized === EMPLOYMENT_STATUS.ACTIVE ||
-    normalized === EMPLOYMENT_STATUS.INTERNSHIP
-  )
+  return normalized === EMPLOYMENT_STATUS.ACTIVE
 }
 
 export function isDeactivatedEmployeeStatus(status) {
@@ -321,6 +339,7 @@ export const EMPTY_EMPLOYEE_FORM = {
   role: ROLE_IDS.CASHIER,
   login: '',
   password: '',
+  avatarUrl: '',
   employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
 }
 
@@ -331,7 +350,8 @@ export function employeeToForm(employee) {
     role: employee.role || ROLE_IDS.CASHIER,
     login: employee.login || '',
     password: '',
-    employmentStatus: employee.employmentStatus || EMPLOYMENT_STATUS.ACTIVE,
+    avatarUrl: employee.avatarUrl || '',
+    employmentStatus: employmentStatusForForm(employee.employmentStatus),
   }
 }
 

@@ -6,6 +6,7 @@ import {
   generateUniqueVacancySlug,
   calculateApplicationScore,
   getAllVacanciesSync,
+  getAllCandidatesSync,
   VACANCY_STATUS,
   CANDIDATE_STATUS,
 } from '../utils/recruitmentData'
@@ -22,6 +23,7 @@ function rowToVacancy(row) {
     slug: row.slug,
     description: row.description,
     role: row.role,
+    employeeRole: row.employee_role,
     status: row.status,
     passingScore: row.passing_score,
     createdBy: row.created_by,
@@ -69,6 +71,12 @@ function rowToCandidate(row) {
     photoUrl: row.photo_url,
     photoPath: row.photo_path,
     createdUserId: row.created_user_id,
+    interviewSalutation: row.interview_salutation,
+    interviewDate: row.interview_date,
+    interviewTime: row.interview_time,
+    interviewAddress: row.interview_address,
+    interviewComment: row.interview_comment,
+    invitationSentAt: row.invitation_sent_at,
     submittedAt: row.submitted_at,
     updatedAt: row.updated_at,
   })
@@ -109,6 +117,7 @@ export async function createVacancy(data) {
     slug,
     description: data.description || '',
     role: data.role,
+    employee_role: data.employeeRole ?? data.role ?? null,
     status: data.status || VACANCY_STATUS.DRAFT,
     passing_score: data.passingScore ?? 80,
     created_by: data.createdBy ?? null,
@@ -123,6 +132,7 @@ export async function updateVacancy(vacancyId, updates) {
   if (updates.slug != null) patch.slug = updates.slug
   if (updates.description != null) patch.description = updates.description
   if (updates.role != null) patch.role = updates.role
+  if (updates.employeeRole != null) patch.employee_role = updates.employeeRole
   if (updates.status != null) patch.status = updates.status
   if (updates.passingScore != null) patch.passing_score = updates.passingScore
   if (updates.title && updates.slug == null) {
@@ -280,6 +290,12 @@ export async function updateCandidate(candidateId, updates) {
   if (updates.status != null) patch.status = updates.status
   if (updates.adminNotes != null) patch.admin_notes = updates.adminNotes
   if (updates.createdUserId != null) patch.created_user_id = updates.createdUserId
+  if (updates.interviewSalutation != null) patch.interview_salutation = updates.interviewSalutation
+  if (updates.interviewDate != null) patch.interview_date = updates.interviewDate
+  if (updates.interviewTime != null) patch.interview_time = updates.interviewTime
+  if (updates.interviewAddress != null) patch.interview_address = updates.interviewAddress
+  if (updates.interviewComment != null) patch.interview_comment = updates.interviewComment
+  if (updates.invitationSentAt != null) patch.invitation_sent_at = updates.invitationSentAt
   if (Object.keys(patch).length) {
     await throwIfError(
       await supabase.from('academy_candidates').update(patch).eq('id', candidateId),
@@ -304,8 +320,27 @@ export async function inviteCandidate(candidateId) {
   await updateCandidateStatus(candidateId, CANDIDATE_STATUS.INVITED)
 }
 
+export async function saveCandidateInterviewInvitation(candidateId, invitation) {
+  await updateCandidate(candidateId, {
+    status: CANDIDATE_STATUS.INVITED,
+    interviewSalutation: invitation.salutation || 'neutral',
+    interviewDate: invitation.date,
+    interviewTime: invitation.time,
+    interviewAddress: invitation.address.trim(),
+    interviewComment: invitation.comment?.trim() || '',
+    invitationSentAt: new Date().toISOString(),
+  })
+}
+
 export async function convertCandidateToTrainee(candidateId) {
   await updateCandidateStatus(candidateId, CANDIDATE_STATUS.TRAINEE)
+}
+
+export async function linkCandidateToEmployee(candidateId, userId) {
+  const candidate = getAllCandidatesSync().find((c) => c.id === candidateId)
+  if (!candidate) throw new Error('Кандидат не найден')
+  if (candidate.createdUserId) throw new Error('Сотрудник уже создан для этого кандидата')
+  await markCandidateHired(candidateId, userId, CANDIDATE_STATUS.HIRED)
 }
 
 export async function markCandidateHired(candidateId, userId, status) {

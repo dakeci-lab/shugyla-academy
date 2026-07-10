@@ -121,6 +121,7 @@ function saveVacancies(vacancies) {
       slug: v.slug,
       description: v.description,
       role: v.role,
+      employee_role: v.employeeRole ?? v.role,
       status: v.status,
       passing_score: v.passingScore,
       created_by: v.createdBy,
@@ -170,6 +171,12 @@ function saveCandidates(candidates) {
       photo_url: c.photoUrl,
       photo_path: c.photoPath,
       created_user_id: c.createdUserId,
+      interview_salutation: c.interviewSalutation,
+      interview_date: c.interviewDate,
+      interview_time: c.interviewTime,
+      interview_address: c.interviewAddress,
+      interview_comment: c.interviewComment || '',
+      invitation_sent_at: c.invitationSentAt,
       submitted_at: c.submittedAt,
     }))
   )
@@ -335,8 +342,28 @@ export async function inviteCandidate(candidateId) {
   await updateCandidateStatus(candidateId, CANDIDATE_STATUS.INVITED)
 }
 
+export async function saveCandidateInterviewInvitation(candidateId, invitation) {
+  await updateCandidate(candidateId, {
+    status: CANDIDATE_STATUS.INVITED,
+    interviewSalutation: invitation.salutation || 'neutral',
+    interviewDate: invitation.date,
+    interviewTime: invitation.time,
+    interviewAddress: invitation.address.trim(),
+    interviewComment: invitation.comment?.trim() || '',
+    invitationSentAt: new Date().toISOString(),
+  })
+}
+
 export async function convertCandidateToTrainee(candidateId) {
   await updateCandidateStatus(candidateId, CANDIDATE_STATUS.TRAINEE)
+}
+
+export async function linkCandidateToEmployee(candidateId, userId) {
+  const bundle = getLocalRecruitmentBundle()
+  const candidate = bundle.candidates.find((c) => c.id === candidateId)
+  if (!candidate) throw new Error('Кандидат не найден')
+  if (candidate.createdUserId) throw new Error('Сотрудник уже создан для этого кандидата')
+  await markCandidateHired(candidateId, userId, CANDIDATE_STATUS.HIRED)
 }
 
 export async function markCandidateHired(candidateId, userId, status) {

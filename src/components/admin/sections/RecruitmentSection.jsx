@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   getVacancies,
   getCandidates,
-  getAllCandidateQuestions,
   getVacancyById,
   getCandidateById,
   getCandidateQuestions,
@@ -15,37 +15,47 @@ import {
   updateCandidateNotes,
   updateCandidateStatus,
   rejectCandidate,
-  inviteCandidate,
+  saveCandidateInterviewInvitation,
   convertCandidateToTrainee,
-  hireCandidateAsUser,
 } from '../../../services/academyDataService'
-import { getAssignableCourses } from '../../../utils/courseAccess'
 import {
   VACANCY_STATUS,
   VACANCY_STATUS_LABELS,
   VACANCY_ROLES,
   getVacancyRoleLabel,
   getApplyUrl,
+  CANDIDATE_STATUS,
   CANDIDATE_STATUS_LABELS,
   CANDIDATE_STATUS_BADGE,
   getCandidateAnswerBreakdown,
   matchesScoreFilter,
   SCORE_FILTER_OPTIONS,
+  CANDIDATE_STATUS_FILTER_OPTIONS,
+  canCreateEmployeeForCandidate,
+  isCandidateEmployeeCreated,
+  hasInterviewInvitation,
+  buildInterviewInvitationFromCandidate,
+  formatInterviewDateLabel,
+  formatInterviewTimeLabel,
 } from '../../../utils/recruitmentData'
-import { EMPLOYMENT_STATUS } from '../../../utils/employeeData'
+import { EMPLOYEE_FORM_ROLES, ROLES } from '../../../data/roles'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
 import StatusBadge from '../StatusBadge'
 import VacancyQuestionEditor from '../VacancyQuestionEditor'
 import CandidateAvatar from '../../CandidateAvatar'
+import CandidatePhotoPreviewModal from '../../CandidatePhotoPreviewModal'
+import CandidateInterviewInviteModal, {
+  copyTextToClipboard,
+} from '../CandidateInterviewInviteModal'
 import '../../CandidateAvatar.css'
 import '../admin-shared.css'
+import '../RecruitmentSection.css'
 import '../../../pages/Apply.css'
 
 const TABS = [
   { id: 'vacancies', label: 'Вакансии' },
   { id: 'candidates', label: 'Кандидаты' },
-  { id: 'questions', label: 'Вопросы' },
 ]
 
 const STATUS_BADGE = {
@@ -58,13 +68,18 @@ const EMPTY_VACANCY = {
   title: '',
   description: '',
   role: 'cashier',
+  employeeRole: 'cashier',
   passingScore: 80,
   status: 'draft',
 }
 
 function formatDate(value) {
   if (!value) return '—'
-  return new Date(value).toLocaleDateString('ru-RU')
+  const d = new Date(value)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yy = String(d.getFullYear()).slice(-2)
+  return `${dd}.${mm}.${yy}`
 }
 
 function copyApplyLink(slug) {
@@ -75,6 +90,7 @@ function copyApplyLink(slug) {
 
 /** Раздел «Найм» */
 export default function RecruitmentSection() {
+  const navigate = useNavigate()
   const { version, refresh } = useAdminRefresh()
   const [tab, setTab] = useState('vacancies')
   const [showVacancyForm, setShowVacancyForm] = useState(false)
@@ -92,21 +108,15 @@ export default function RecruitmentSection() {
   })
   const [detailCandidateId, setDetailCandidateId] = useState(null)
   const [notesDraft, setNotesDraft] = useState('')
-  const [showHireForm, setShowHireForm] = useState(false)
-  const [hireForm, setHireForm] = useState({
-    login: '',
-    password: '',
-    position: '',
-    employmentStatus: EMPLOYMENT_STATUS.INTERNSHIP,
-    initialCourseId: '',
-  })
-  const [hireError, setHireError] = useState('')
+  const [previewPhoto, setPreviewPhoto] = useState(null)
+  const [inviteModalOpen, setInviteModalOpen] = useState(false)
+  const [inviteSubmitting, setInviteSubmitting] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
 
   void version
 
   const vacancies = getVacancies()
   const candidates = getCandidates()
-  const allQuestions = getAllCandidateQuestions()
 
   const filteredCandidates = useMemo(() => {
     const q = candidateFilters.search.trim().toLowerCase()
@@ -114,7 +124,15 @@ export default function RecruitmentSection() {
       if (candidateFilters.vacancyId !== 'all' && c.vacancyId !== candidateFilters.vacancyId) {
         return false
       }
-      if (candidateFilters.status !== 'all' && c.status !== candidateFilters.status) return false
+      if (candidateFilters.status !== 'all') {
+        const status = c.status
+        const filterStatus = candidateFilters.status
+        if (filterStatus === CANDIDATE_STATUS.QUESTIONABLE) {
+          if (status !== 'questionable' && status !== 'maybe') return false
+        } else if (status !== filterStatus) {
+          return false
+        }
+      }
       if (!matchesScoreFilter(c, candidateFilters.score)) return false
       if (q) {
         const hay = `${c.fullName} ${c.phone}`.toLowerCase()
@@ -148,11 +166,20 @@ export default function RecruitmentSection() {
       title: vacancy.title,
       description: vacancy.description || '',
       role: vacancy.role,
+      employeeRole: vacancy.employeeRole || vacancy.role,
       passingScore: vacancy.passingScore,
       status: vacancy.status,
     })
     setVacancyError('')
     setShowVacancyForm(true)
+  }
+
+  function updateVacancyRole(role) {
+    setVacancyForm((prev) => ({
+      ...prev,
+      role,
+      employeeRole: prev.employeeRole === prev.role ? role : prev.employeeRole,
+    }))
   }
 
   async function handleVacancySave(e) {
@@ -166,6 +193,7 @@ export default function RecruitmentSection() {
         title: vacancyForm.title.trim(),
         description: vacancyForm.description.trim(),
         role: vacancyForm.role,
+        employeeRole: vacancyForm.employeeRole || vacancyForm.role,
         passingScore: Number(vacancyForm.passingScore) || 80,
         status: vacancyForm.status,
       }
@@ -195,7 +223,8 @@ export default function RecruitmentSection() {
   function openCandidateDetail(candidate) {
     setDetailCandidateId(candidate.id)
     setNotesDraft(candidate.adminNotes || '')
-    setShowHireForm(false)
+    setSuccessMessage('')
+    setActionError('')
   }
 
   async function saveNotes() {
@@ -204,64 +233,53 @@ export default function RecruitmentSection() {
     await refresh()
   }
 
-  async function setStatus(status) {
+  async function runCandidateAction(action) {
     if (!detailCandidateId) return
-    await updateCandidateStatus(detailCandidateId, status)
-    await refresh()
-  }
-
-  function openHireModal() {
-    if (!detailCandidate) return
-    const role = detailVacancy?.role || 'cashier'
-    setHireForm({
-      login: '',
-      password: '',
-      position: getVacancyRoleLabel(role),
-      employmentStatus: EMPLOYMENT_STATUS.INTERNSHIP,
-      initialCourseId: '',
-    })
-    setHireError('')
-    setShowHireForm(true)
-  }
-
-  async function handleHire(e) {
-    e.preventDefault()
-    if (!detailCandidateId || !detailCandidate) return
-    if (!hireForm.login.trim() || !hireForm.password.trim()) {
-      setHireError('Укажите логин и пароль')
-      return
-    }
+    setActionError('')
     try {
-      await hireCandidateAsUser(
-        detailCandidateId,
-        {
-          firstName: detailCandidate.firstName,
-          lastName: detailCandidate.lastName,
-          login: hireForm.login.trim(),
-          password: hireForm.password,
-          position: hireForm.position.trim(),
-          role: detailVacancy?.role || 'cashier',
-          employmentStatus: hireForm.employmentStatus,
-          initialCourseId: hireForm.initialCourseId ? Number(hireForm.initialCourseId) : null,
-        },
-        { asTrainee: hireForm.employmentStatus === EMPLOYMENT_STATUS.INTERNSHIP }
-      )
-      setShowHireForm(false)
-      setDetailCandidateId(null)
+      await action(detailCandidateId)
       await refresh()
     } catch (err) {
-      setHireError(err.message || 'Не удалось создать сотрудника')
+      setActionError(err.message || 'Не удалось выполнить действие')
     }
   }
 
-  const hireCourses = detailVacancy
-    ? getAssignableCourses().filter(
-        (course) =>
-          course.allowedRoles?.includes(detailVacancy.role) ||
-          course.allowedRoles?.includes('for_all') ||
-          course.allowedRoles?.includes('candidate')
-      )
-    : []
+  function goCreateEmployee(candidate) {
+    navigate(`/platform/employees/list?createFromCandidate=${candidate.id}`)
+    setDetailCandidateId(null)
+  }
+
+  function openInviteModal() {
+    setActionError('')
+    setInviteModalOpen(true)
+  }
+
+  async function handleInterviewInviteSubmit(invitation) {
+    if (!detailCandidateId) return
+    setInviteSubmitting(true)
+    setActionError('')
+    try {
+      await saveCandidateInterviewInvitation(detailCandidateId, invitation)
+      await refresh()
+      setInviteModalOpen(false)
+      setSuccessMessage('Текст приглашения скопирован. Кандидат отмечен как приглашённый.')
+    } catch (err) {
+      throw err
+    } finally {
+      setInviteSubmitting(false)
+    }
+  }
+
+  async function handleReCopyInvitation() {
+    if (!detailCandidate) return
+    const text = buildInterviewInvitationFromCandidate(detailCandidate)
+    const copied = await copyTextToClipboard(text)
+    if (copied) {
+      setSuccessMessage('Текст приглашения скопирован.')
+    } else {
+      setActionError('Не удалось скопировать текст в буфер обмена')
+    }
+  }
 
   return (
     <>
@@ -277,6 +295,12 @@ export default function RecruitmentSection() {
           </button>
         ))}
       </div>
+
+      {successMessage && (
+        <p className="admin-success-banner" role="status">
+          {successMessage}
+        </p>
+      )}
 
       {actionError && <p className="admin-form__error">{actionError}</p>}
 
@@ -310,7 +334,7 @@ export default function RecruitmentSection() {
                   vacancies.map((v) => (
                     <tr key={v.id}>
                       <td><strong>{v.title}</strong></td>
-                      <td>{getVacancyRoleLabel(v.role)}</td>
+                      <td>{getVacancyRoleLabel(v.employeeRole || v.role)}</td>
                       <td>
                         <StatusBadge label={VACANCY_STATUS_LABELS[v.status]} type={STATUS_BADGE[v.status]} />
                       </td>
@@ -398,8 +422,8 @@ export default function RecruitmentSection() {
               onChange={(e) => setCandidateFilters({ ...candidateFilters, status: e.target.value })}
             >
               <option value="all">Все статусы</option>
-              {Object.entries(CANDIDATE_STATUS_LABELS).map(([id, label]) => (
-                <option key={id} value={id}>{label}</option>
+              {CANDIDATE_STATUS_FILTER_OPTIONS.map((id) => (
+                <option key={id} value={id}>{CANDIDATE_STATUS_LABELS[id]}</option>
               ))}
             </select>
             <select
@@ -413,61 +437,48 @@ export default function RecruitmentSection() {
             </select>
           </div>
 
-          <div className="admin-table-wrap">
-            <table className="admin-table">
+          <div className="admin-table-wrap recruitment-candidates-wrap">
+            <table className="admin-table admin-table--compact recruitment-candidates-table">
               <thead>
                 <tr>
-                  <th></th>
-                  <th>ФИО</th>
-                  <th>Телефон</th>
-                  <th>Вакансия</th>
-                  <th>Возраст</th>
-                  <th>Опыт</th>
-                  <th>Результат</th>
-                  <th>Статус</th>
-                  <th>Дата</th>
-                  <th></th>
+                  <th className="col-name">ФИО</th>
+                  <th className="col-vacancy">Вакансия</th>
+                  <th className="col-age">Возраст</th>
+                  <th className="col-experience">Опыт</th>
+                  <th className="col-score">Результат</th>
+                  <th className="col-status">Статус</th>
+                  <th className="col-date">Дата</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredCandidates.length === 0 ? (
-                  <tr><td colSpan={10} className="admin-empty">Кандидаты не найдены</td></tr>
+                  <tr><td colSpan={7} className="admin-empty">Кандидаты не найдены</td></tr>
                 ) : (
                   filteredCandidates.map((c) => (
                     <tr key={c.id}>
-                      <td>
-                        <CandidateAvatar fullName={c.fullName} photoUrl={c.photoUrl} size="sm" />
+                      <td className="col-name">
+                        <button
+                          type="button"
+                          className="candidate-row-link"
+                          onClick={() => openCandidateDetail(c)}
+                        >
+                          <CandidateAvatar fullName={c.fullName} photoUrl={c.photoUrl} size="sm" />
+                          <span className="candidate-row-link__name">{c.fullName}</span>
+                        </button>
                       </td>
-                      <td>
-                        <div className="candidate-table-cell">
-                          <strong>{c.fullName}</strong>
-                        </div>
+                      <td className="col-vacancy">{getVacancyById(c.vacancyId)?.title || '—'}</td>
+                      <td className="col-age">{c.age ?? '—'}</td>
+                      <td className="col-experience" title={c.experience || undefined}>
+                        {c.experience || '—'}
                       </td>
-                      <td>{c.phone}</td>
-                      <td>{getVacancyById(c.vacancyId)?.title || '—'}</td>
-                      <td>{c.age ?? '—'}</td>
-                      <td>{c.experience || '—'}</td>
-                      <td>{c.scorePercent}%</td>
-                      <td>
+                      <td className="col-score">{c.scorePercent}%</td>
+                      <td className="col-status">
                         <StatusBadge
                           label={CANDIDATE_STATUS_LABELS[c.status]}
                           type={CANDIDATE_STATUS_BADGE[c.status]}
                         />
                       </td>
-                      <td>{formatDate(c.submittedAt)}</td>
-                      <td>
-                        <div className="admin-table__actions">
-                          <button type="button" className="btn btn--outline btn--sm" onClick={() => openCandidateDetail(c)}>
-                            Подробнее
-                          </button>
-                          <button type="button" className="btn btn--outline btn--sm" onClick={async () => { await inviteCandidate(c.id); await refresh() }}>
-                            Пригласить
-                          </button>
-                          <button type="button" className="btn btn--outline btn--sm admin-table__danger" onClick={async () => { await rejectCandidate(c.id); await refresh() }}>
-                            Отклонить
-                          </button>
-                        </div>
-                      </td>
+                      <td className="col-date">{formatDate(c.submittedAt)}</td>
                     </tr>
                   ))
                 )}
@@ -475,35 +486,6 @@ export default function RecruitmentSection() {
             </table>
           </div>
         </>
-      )}
-
-      {tab === 'questions' && (
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>Вакансия</th>
-                <th>Вопрос</th>
-                <th>Вариантов</th>
-                <th>Обязательный</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allQuestions.length === 0 ? (
-                <tr><td colSpan={4} className="admin-empty">Вопросы не добавлены</td></tr>
-              ) : (
-                allQuestions.map((q) => (
-                  <tr key={q.id}>
-                    <td>{getVacancyById(q.vacancyId)?.title || '—'}</td>
-                    <td>{q.questionText}</td>
-                    <td>{q.options.length}</td>
-                    <td>{q.required ? 'Да' : 'Нет'}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
       )}
 
       {showVacancyForm && (
@@ -529,10 +511,24 @@ export default function RecruitmentSection() {
             </label>
             <div className="admin-form__row">
               <label className="admin-form__label">
-                Роль / должность
-                <select className="admin-form__select" value={vacancyForm.role} onChange={(e) => setVacancyForm({ ...vacancyForm, role: e.target.value })}>
+                Роль вакансии
+                <select className="admin-form__select" value={vacancyForm.role} onChange={(e) => updateVacancyRole(e.target.value)}>
                   {VACANCY_ROLES.map((roleId) => (
                     <option key={roleId} value={roleId}>{getVacancyRoleLabel(roleId)}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="admin-form__label">
+                Роль сотрудника после найма
+                <select
+                  className="admin-form__select"
+                  value={vacancyForm.employeeRole}
+                  onChange={(e) => setVacancyForm({ ...vacancyForm, employeeRole: e.target.value })}
+                >
+                  {EMPLOYEE_FORM_ROLES.map((roleId) => (
+                    <option key={roleId} value={roleId}>
+                      {ROLES[roleId]?.label || roleId}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -551,36 +547,52 @@ export default function RecruitmentSection() {
             </div>
             {vacancyError && <p className="admin-form__error">{vacancyError}</p>}
           </form>
-          {editVacancyId && <VacancyQuestionEditor vacancyId={editVacancyId} />}
+
+          <div className="vacancy-questions-block">
+            {editVacancyId ? (
+              <VacancyQuestionEditor vacancyId={editVacancyId} />
+            ) : (
+              <p className="admin-form__hint">
+                Сохраните вакансию, чтобы добавить фильтр-вопросы для кандидата.
+              </p>
+            )}
+          </div>
         </AdminModal>
       )}
 
       {detailCandidate && (
         <AdminModal
           title={`Кандидат: ${detailCandidate.fullName}`}
-          onClose={() => { setDetailCandidateId(null); setShowHireForm(false) }}
+          onClose={() => {
+            setDetailCandidateId(null)
+            setPreviewPhoto(null)
+            setInviteModalOpen(false)
+          }}
           xwide
         >
           <div className="apply-detail-grid">
             <div>
-              {detailCandidate.photoUrl && (
-                <div className="candidate-detail-photo">
-                  <a href={detailCandidate.photoUrl} target="_blank" rel="noopener noreferrer" title="Открыть фото">
+              <div className="candidate-detail-photo">
+                {detailCandidate.photoUrl ? (
+                  <button
+                    type="button"
+                    className="candidate-detail-photo-btn"
+                    onClick={() => setPreviewPhoto(detailCandidate.photoUrl)}
+                    aria-label="Открыть фотографию кандидата"
+                  >
                     <CandidateAvatar
                       fullName={detailCandidate.fullName}
                       photoUrl={detailCandidate.photoUrl}
                       size="lg"
-                      className="candidate-avatar--clickable"
                     />
-                  </a>
-                  <p className="admin-form__hint">Нажмите на фото, чтобы открыть в новой вкладке</p>
-                </div>
-              )}
-              {!detailCandidate.photoUrl && (
-                <div className="candidate-detail-photo">
-                  <CandidateAvatar fullName={detailCandidate.fullName} size="lg" />
-                </div>
-              )}
+                  </button>
+                ) : (
+                  <CandidateAvatar
+                    fullName={detailCandidate.fullName}
+                    size="lg"
+                  />
+                )}
+              </div>
               <p><strong>Телефон:</strong> {detailCandidate.phone}</p>
               <p><strong>Вакансия:</strong> {detailVacancy?.title || '—'}</p>
               <p><strong>Возраст:</strong> {detailCandidate.age ?? '—'}</p>
@@ -595,6 +607,9 @@ export default function RecruitmentSection() {
               <p><strong>Результат:</strong> {detailCandidate.scorePercent}% ({detailCandidate.totalScore}/{detailCandidate.maxScore})</p>
               <StatusBadge label={CANDIDATE_STATUS_LABELS[detailCandidate.status]} type={CANDIDATE_STATUS_BADGE[detailCandidate.status]} />
               <p className="admin-form__hint">Дата заявки: {formatDate(detailCandidate.submittedAt)}</p>
+              {isCandidateEmployeeCreated(detailCandidate) && (
+                <p className="candidate-hire-badge">Сотрудник создан</p>
+              )}
             </div>
           </div>
 
@@ -614,64 +629,83 @@ export default function RecruitmentSection() {
           </label>
           <button type="button" className="btn btn--outline btn--sm" onClick={saveNotes}>Сохранить заметку</button>
 
-          <div className="admin-table__actions" style={{ marginTop: '1rem' }}>
-            <button type="button" className="btn btn--outline btn--sm" onClick={async () => { await inviteCandidate(detailCandidate.id); await refresh() }}>Пригласить на собеседование</button>
-            <button type="button" className="btn btn--outline btn--sm admin-table__danger" onClick={async () => { await rejectCandidate(detailCandidate.id); await refresh() }}>Отклонить</button>
-            <button type="button" className="btn btn--outline btn--sm" onClick={async () => { await setStatus('interview_passed'); await refresh() }}>Собеседование пройдено</button>
-            <button type="button" className="btn btn--outline btn--sm" onClick={async () => { await convertCandidateToTrainee(detailCandidate.id); await refresh() }}>Перевести в стажёры</button>
-            <button type="button" className="btn btn--primary btn--sm" onClick={openHireModal}>Создать сотрудника</button>
-          </div>
-
-          {showHireForm && (
-            <form className="admin-form apply-hire-form" onSubmit={handleHire}>
-              <h3 className="admin-detail-heading">Создание сотрудника</h3>
-              <p className="admin-form__hint">
-                Имя: {detailCandidate.firstName} {detailCandidate.lastName}. Роль: {getVacancyRoleLabel(detailVacancy?.role)}.
-                {detailCandidate.photoUrl
-                  ? ' Фото кандидата будет перенесено в avatar_url сотрудника.'
-                  : ' Телефон и фото не сохраняются в academy_users (phone отсутствует в схеме).'}
-              </p>
-              <div className="admin-form__row">
-                <label className="admin-form__label">
-                  Логин *
-                  <input className="admin-form__input" value={hireForm.login} onChange={(e) => setHireForm({ ...hireForm, login: e.target.value })} required />
-                </label>
-                <label className="admin-form__label">
-                  Пароль *
-                  <input className="admin-form__input" type="password" value={hireForm.password} onChange={(e) => setHireForm({ ...hireForm, password: e.target.value })} required />
-                </label>
-              </div>
-              <label className="admin-form__label">
-                Должность
-                <input className="admin-form__input" value={hireForm.position} onChange={(e) => setHireForm({ ...hireForm, position: e.target.value })} />
-              </label>
-              <div className="admin-form__row">
-                <label className="admin-form__label">
-                  Статус сотрудника
-                  <select className="admin-form__select" value={hireForm.employmentStatus} onChange={(e) => setHireForm({ ...hireForm, employmentStatus: e.target.value })}>
-                    <option value={EMPLOYMENT_STATUS.INTERNSHIP}>Стажировка</option>
-                    <option value={EMPLOYMENT_STATUS.ACTIVE}>Активен</option>
-                  </select>
-                </label>
-                <label className="admin-form__label">
-                  Начальный курс
-                  <select
-                    className="admin-form__select"
-                    value={hireForm.initialCourseId}
-                    onChange={(e) => setHireForm({ ...hireForm, initialCourseId: e.target.value })}
-                  >
-                    <option value="">Без назначения</option>
-                    {hireCourses.map((course) => (
-                      <option key={course.id} value={course.id}>{course.title}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              {hireError && <p className="admin-form__error">{hireError}</p>}
-              <button type="submit" className="btn btn--primary btn--sm">Создать сотрудника</button>
-            </form>
+          {hasInterviewInvitation(detailCandidate) && (
+            <div className="candidate-interview-block">
+              <h3 className="candidate-interview-block__title">Собеседование</h3>
+              <p><strong>Дата:</strong> {formatInterviewDateLabel(detailCandidate.interviewDate)}</p>
+              <p><strong>Время:</strong> {formatInterviewTimeLabel(detailCandidate.interviewTime)}</p>
+              <p><strong>Адрес:</strong> {detailCandidate.interviewAddress}</p>
+              <p><strong>Статус:</strong> {CANDIDATE_STATUS_LABELS[detailCandidate.status]}</p>
+              {detailCandidate.interviewComment && (
+                <p><strong>Комментарий:</strong> {detailCandidate.interviewComment}</p>
+              )}
+              <button
+                type="button"
+                className="btn btn--outline btn--sm"
+                onClick={handleReCopyInvitation}
+              >
+                Скопировать приглашение повторно
+              </button>
+            </div>
           )}
+
+          <div className="candidate-detail-actions">
+            <button
+              type="button"
+              className="btn btn--outline btn--sm"
+              onClick={openInviteModal}
+            >
+              Пригласить на собеседование
+            </button>
+            <button
+              type="button"
+              className="btn btn--outline btn--sm admin-table__danger"
+              onClick={() => runCandidateAction(rejectCandidate)}
+            >
+              Отклонить
+            </button>
+            <button
+              type="button"
+              className="btn btn--outline btn--sm"
+              onClick={() => runCandidateAction((id) => updateCandidateStatus(id, CANDIDATE_STATUS.INTERVIEW_PASSED))}
+            >
+              Собеседование пройдено
+            </button>
+            <button
+              type="button"
+              className="btn btn--outline btn--sm"
+              onClick={() => runCandidateAction(convertCandidateToTrainee)}
+            >
+              Перевести в стажёры
+            </button>
+            {isCandidateEmployeeCreated(detailCandidate) ? (
+              <span className="candidate-hire-badge">Сотрудник создан</span>
+            ) : canCreateEmployeeForCandidate(detailCandidate) ? (
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={() => goCreateEmployee(detailCandidate)}
+              >
+                Создать сотрудника
+              </button>
+            ) : null}
+          </div>
         </AdminModal>
+      )}
+
+      <CandidatePhotoPreviewModal
+        photoUrl={previewPhoto}
+        alt={detailCandidate ? `Фотография ${detailCandidate.fullName}` : 'Фотография кандидата'}
+        onClose={() => setPreviewPhoto(null)}
+      />
+
+      {inviteModalOpen && detailCandidate && (
+        <CandidateInterviewInviteModal
+          candidate={detailCandidate}
+          onClose={() => setInviteModalOpen(false)}
+          onSubmit={handleInterviewInviteSubmit}
+          submitting={inviteSubmitting}
+        />
       )}
     </>
   )

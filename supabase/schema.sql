@@ -330,6 +330,7 @@ create table if not exists academy_vacancies (
   slug text unique not null,
   description text,
   role text not null,
+  employee_role text,
   status text not null default 'draft' check (status in ('draft', 'published', 'archived')),
   passing_score integer not null default 80,
   created_by bigint references academy_users(id),
@@ -369,12 +370,18 @@ create table if not exists academy_candidates (
   total_score integer not null default 0,
   max_score integer not null default 0,
   status text not null default 'new' check (status in (
-    'new', 'suitable', 'maybe', 'rejected', 'invited',
-    'interview_passed', 'trainee', 'hired'
+    'new', 'suitable', 'questionable', 'maybe', 'rejected', 'invited',
+    'interview_passed', 'intern', 'trainee', 'hired'
   )),
   admin_notes text,
   photo_url text,
   photo_path text,
+  interview_salutation text,
+  interview_date date,
+  interview_time time,
+  interview_address text,
+  interview_comment text,
+  invitation_sent_at timestamptz,
   created_user_id bigint references academy_users(id),
   submitted_at timestamptz not null default now(),
   updated_at timestamptz not null default now()

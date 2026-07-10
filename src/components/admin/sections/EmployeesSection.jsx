@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   getStaffEmployees,
   EMPTY_EMPLOYEE_FORM,
   employeeToForm,
   validateEmployeeForm,
   EMPLOYMENT_STATUS,
+  EMPLOYEE_STATUS_OPTIONS,
   getEmploymentStatusLabel,
   getEmploymentStatusBadgeType,
   isDeactivatedStaffEmployee,
@@ -15,12 +17,23 @@ import {
   updateEmployee,
   deactivateEmployee,
   restoreEmployee,
+  getCandidateById,
+  getVacancyById,
+  linkCandidateToEmployee,
 } from '../../../services/academyDataService'
+import {
+  getVacancyEmployeeRole,
+  canCreateEmployeeForCandidate,
+  isCandidateEmployeeCreated,
+} from '../../../utils/recruitmentData'
 import { ROLES, EMPLOYEE_FORM_ROLES, getRoleLabel } from '../../../data/roles'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
 import StatusBadge from '../StatusBadge'
+import CandidateAvatar from '../../CandidateAvatar'
+import '../../CandidateAvatar.css'
 import '../admin-shared.css'
+import '../RecruitmentSection.css'
 
 const FILTER_TABS = [
   { id: 'active', label: 'Активные' },
@@ -31,12 +44,17 @@ const FILTER_TABS = [
 /** Раздел «Сотрудники» — учётные записи, роли и статус */
 export default function EmployeesSection() {
   const { version, refresh } = useAdminRefresh()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [filter, setFilter] = useState('active')
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(EMPTY_EMPLOYEE_FORM)
   const [formError, setFormError] = useState('')
   const [actionError, setActionError] = useState('')
+  const [successMessage, setSuccessMessage] = useState('')
+  const [sourceCandidateId, setSourceCandidateId] = useState(null)
+  const [candidatePhone, setCandidatePhone] = useState('')
 
   void version
 
@@ -44,17 +62,68 @@ export default function EmployeesSection() {
   const activeCount = getStaffEmployees('active').length
   const deactivatedCount = getStaffEmployees('deactivated').length
 
+  useEffect(() => {
+    const candidateId = searchParams.get('createFromCandidate')
+    if (!candidateId) return
+
+    const candidate = getCandidateById(candidateId)
+    if (!candidate) {
+      setActionError('Кандидат не найден')
+      return
+    }
+
+    if (isCandidateEmployeeCreated(candidate)) {
+      setActionError('Сотрудник уже создан для этого кандидата')
+      return
+    }
+
+    if (!canCreateEmployeeForCandidate(candidate)) {
+      setActionError('Создание сотрудника доступно после собеседования или для стажёра')
+      return
+    }
+
+    const vacancy = candidate.vacancyId ? getVacancyById(candidate.vacancyId) : null
+    const role = getVacancyEmployeeRole(vacancy) || EMPTY_EMPLOYEE_FORM.role
+
+    setSourceCandidateId(candidateId)
+    setCandidatePhone(candidate.phone || '')
+    setEditId(null)
+    setForm({
+      ...EMPTY_EMPLOYEE_FORM,
+      firstName: candidate.firstName || '',
+      lastName: candidate.lastName || '',
+      role,
+      avatarUrl: candidate.photoUrl || '',
+      employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
+    })
+    setFormError('')
+    setShowForm(true)
+  }, [searchParams, version])
+
+  function clearCandidateQuery() {
+    if (searchParams.get('createFromCandidate')) {
+      navigate('/platform/employees/list', { replace: true })
+    }
+  }
+
   function openAdd() {
+    setSuccessMessage('')
+    setSourceCandidateId(null)
+    setCandidatePhone('')
     setEditId(null)
     setForm(EMPTY_EMPLOYEE_FORM)
     setFormError('')
+    clearCandidateQuery()
     setShowForm(true)
   }
 
   function openEdit(emp) {
+    setSourceCandidateId(null)
+    setCandidatePhone('')
     setEditId(emp.id)
     setForm(employeeToForm(emp))
     setFormError('')
+    clearCandidateQuery()
     setShowForm(true)
   }
 
@@ -62,6 +131,9 @@ export default function EmployeesSection() {
     setShowForm(false)
     setEditId(null)
     setFormError('')
+    setSourceCandidateId(null)
+    setCandidatePhone('')
+    clearCandidateQuery()
   }
 
   async function handleSave(e) {
@@ -77,17 +149,24 @@ export default function EmployeesSection() {
       lastName: form.lastName.trim(),
       role: form.role,
       login: form.login.trim(),
+      position: getRoleLabel(form.role),
       employmentStatus: form.employmentStatus,
+      ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
       ...(form.password?.trim() ? { password: form.password } : {}),
     }
 
     try {
       if (editId) {
         await updateEmployee(editId, payload)
+        closeForm()
       } else {
-        await createEmployee({ ...payload, password: form.password })
+        const newUserId = await createEmployee({ ...payload, password: form.password })
+        if (sourceCandidateId) {
+          await linkCandidateToEmployee(sourceCandidateId, newUserId)
+          setSuccessMessage('Сотрудник успешно создан')
+        }
+        closeForm()
       }
-      closeForm()
       await refresh()
     } catch (err) {
       setFormError(err.message || 'Не удалось сохранить сотрудника')
@@ -194,6 +273,12 @@ export default function EmployeesSection() {
         </button>
       </div>
 
+      {successMessage && (
+        <p className="admin-success-banner" role="status">
+          {successMessage}
+        </p>
+      )}
+
       {actionError && <p className="admin-form__error">{actionError}</p>}
 
       <div className="admin-table-wrap">
@@ -218,25 +303,25 @@ export default function EmployeesSection() {
               </tr>
             ) : (
               employees.map((emp) => (
-                  <tr key={emp.id}>
-                    <td>
-                      <strong>{emp.name}</strong>
-                    </td>
-                    <td><code className="admin-code">{emp.login}</code></td>
-                    <td>{getRoleLabel(emp.role)}</td>
-                    <td>
-                      <StatusBadge
-                        label={getEmploymentStatusLabel(emp.employmentStatus)}
-                        type={getEmploymentStatusBadgeType(emp.employmentStatus)}
-                      />
-                    </td>
-                    <td>
-                      <div className="admin-table__actions">
-                        {renderActions(emp)}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                <tr key={emp.id}>
+                  <td>
+                    <strong>{emp.name}</strong>
+                  </td>
+                  <td><code className="admin-code">{emp.login}</code></td>
+                  <td>{getRoleLabel(emp.role)}</td>
+                  <td>
+                    <StatusBadge
+                      label={getEmploymentStatusLabel(emp.employmentStatus)}
+                      type={getEmploymentStatusBadgeType(emp.employmentStatus)}
+                    />
+                  </td>
+                  <td>
+                    <div className="admin-table__actions">
+                      {renderActions(emp)}
+                    </div>
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
@@ -253,12 +338,32 @@ export default function EmployeesSection() {
                 Отмена
               </button>
               <button type="submit" className="btn btn--primary" form="employee-form">
-                Сохранить
+                {sourceCandidateId ? 'Создать сотрудника' : 'Сохранить'}
               </button>
             </>
           }
         >
           <form id="employee-form" className="admin-form" onSubmit={handleSave}>
+            {sourceCandidateId && (
+              <div className="employee-form-candidate-meta">
+                {form.avatarUrl && (
+                  <CandidateAvatar
+                    fullName={`${form.firstName} ${form.lastName}`.trim()}
+                    photoUrl={form.avatarUrl}
+                    size="lg"
+                  />
+                )}
+                <div className="employee-form-candidate-meta__info">
+                  <p className="admin-form__hint">
+                    Данные заполнены из карточки кандидата. Логин и пароль укажите вручную.
+                  </p>
+                  {candidatePhone && (
+                    <p><strong>Телефон:</strong> {candidatePhone}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="admin-form__row">
               <label className="admin-form__label">
                 Имя *
@@ -328,10 +433,11 @@ export default function EmployeesSection() {
                   setForm({ ...form, employmentStatus: e.target.value })
                 }
               >
-                <option value={EMPLOYMENT_STATUS.ACTIVE}>Активен</option>
-                <option value={EMPLOYMENT_STATUS.INACTIVE}>Деактивирован</option>
-                <option value={EMPLOYMENT_STATUS.INTERNSHIP}>Стажировка</option>
-                <option value={EMPLOYMENT_STATUS.TERMINATED}>Уволен</option>
+                {EMPLOYEE_STATUS_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
               </select>
             </label>
 

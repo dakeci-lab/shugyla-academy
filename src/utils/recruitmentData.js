@@ -5,7 +5,7 @@ import {
   getCloudCandidates,
 } from '../lib/cloudStore'
 import { getLocalRecruitmentBundle } from '../services/recruitmentLocalAdapter'
-import { ROLES } from '../data/roles'
+import { ROLES, normalizeRoleId } from '../data/roles'
 import { slugify } from './standardsData'
 
 export const VACANCY_STATUS = {
@@ -23,21 +23,34 @@ export const VACANCY_STATUS_LABELS = {
 export const CANDIDATE_STATUS = {
   NEW: 'new',
   SUITABLE: 'suitable',
-  MAYBE: 'maybe',
+  QUESTIONABLE: 'questionable',
   REJECTED: 'rejected',
   INVITED: 'invited',
   INTERVIEW_PASSED: 'interview_passed',
+  INTERN: 'intern',
   TRAINEE: 'trainee',
   HIRED: 'hired',
+}
+
+/** @deprecated используйте CANDIDATE_STATUS.QUESTIONABLE */
+export const CANDIDATE_STATUS_LEGACY = {
+  MAYBE: 'maybe',
+}
+
+export function normalizeCandidateStatus(status) {
+  if (status === 'maybe') return CANDIDATE_STATUS.QUESTIONABLE
+  return status || CANDIDATE_STATUS.NEW
 }
 
 export const CANDIDATE_STATUS_LABELS = {
   new: 'Новая',
   suitable: 'Подходит',
+  questionable: 'Под вопросом',
   maybe: 'Под вопросом',
   rejected: 'Отклонён',
   invited: 'Приглашён',
   interview_passed: 'Собеседование пройдено',
+  intern: 'Стажёр',
   trainee: 'Стажёр',
   hired: 'Принят',
 }
@@ -45,10 +58,12 @@ export const CANDIDATE_STATUS_LABELS = {
 export const CANDIDATE_STATUS_BADGE = {
   new: 'idle',
   suitable: 'done',
+  questionable: 'warning',
   maybe: 'warning',
   rejected: 'failed',
   invited: 'progress',
   interview_passed: 'done',
+  intern: 'progress',
   trainee: 'progress',
   hired: 'done',
 }
@@ -94,6 +109,7 @@ export function normalizeVacancy(raw) {
     slug: raw.slug || '',
     description: raw.description || '',
     role: raw.role,
+    employeeRole: raw.employeeRole ?? raw.employee_role ?? raw.role,
     status: raw.status || VACANCY_STATUS.DRAFT,
     passingScore: raw.passingScore ?? raw.passing_score ?? 80,
     createdBy: raw.createdBy ?? raw.created_by ?? null,
@@ -156,11 +172,17 @@ export function normalizeCandidate(raw) {
     scorePercent: raw.scorePercent ?? raw.score_percent ?? 0,
     totalScore: raw.totalScore ?? raw.total_score ?? 0,
     maxScore: raw.maxScore ?? raw.max_score ?? 0,
-    status: raw.status || CANDIDATE_STATUS.NEW,
+    status: normalizeCandidateStatus(raw.status),
     adminNotes: raw.adminNotes ?? raw.admin_notes ?? '',
     photoUrl: raw.photoUrl ?? raw.photo_url ?? null,
     photoPath: raw.photoPath ?? raw.photo_path ?? null,
     createdUserId: raw.createdUserId ?? raw.created_user_id ?? null,
+    interviewSalutation: raw.interviewSalutation ?? raw.interview_salutation ?? null,
+    interviewDate: raw.interviewDate ?? raw.interview_date ?? null,
+    interviewTime: raw.interviewTime ?? raw.interview_time ?? null,
+    interviewAddress: raw.interviewAddress ?? raw.interview_address ?? null,
+    interviewComment: raw.interviewComment ?? raw.interview_comment ?? '',
+    invitationSentAt: raw.invitationSentAt ?? raw.invitation_sent_at ?? null,
     submittedAt: raw.submittedAt ?? raw.submitted_at,
     updatedAt: raw.updatedAt ?? raw.updated_at,
   }
@@ -257,7 +279,7 @@ export function calculateApplicationScore(questions, answers, passingScore) {
 
   let status = CANDIDATE_STATUS.NEW
   if (scorePercent >= passingScore) status = CANDIDATE_STATUS.SUITABLE
-  else if (scorePercent >= 50) status = CANDIDATE_STATUS.MAYBE
+  else if (scorePercent >= 50) status = CANDIDATE_STATUS.QUESTIONABLE
   else status = CANDIDATE_STATUS.REJECTED
 
   return { totalScore, maxScore, scorePercent, status }
@@ -324,6 +346,36 @@ export const SCORE_FILTER_OPTIONS = [
   { id: 'low', label: 'Ниже 50%' },
 ]
 
+export const CANDIDATE_STATUS_FILTER_OPTIONS = [
+  CANDIDATE_STATUS.NEW,
+  CANDIDATE_STATUS.SUITABLE,
+  CANDIDATE_STATUS.QUESTIONABLE,
+  CANDIDATE_STATUS.REJECTED,
+  CANDIDATE_STATUS.INVITED,
+  CANDIDATE_STATUS.INTERVIEW_PASSED,
+  CANDIDATE_STATUS.TRAINEE,
+  CANDIDATE_STATUS.HIRED,
+]
+
+export function getVacancyEmployeeRole(vacancy) {
+  if (!vacancy) return null
+  const raw = vacancy.employeeRole || vacancy.role
+  return normalizeRoleId(raw) || raw
+}
+
+export function canCreateEmployeeForCandidate(candidate) {
+  if (!candidate || candidate.createdUserId) return false
+  return [
+    CANDIDATE_STATUS.INTERVIEW_PASSED,
+    CANDIDATE_STATUS.TRAINEE,
+    CANDIDATE_STATUS.INTERN,
+  ].includes(candidate.status)
+}
+
+export function isCandidateEmployeeCreated(candidate) {
+  return Boolean(candidate?.createdUserId)
+}
+
 export function matchesScoreFilter(candidate, filterId) {
   if (filterId === 'all') return true
   const p = candidate.scorePercent
@@ -331,4 +383,88 @@ export function matchesScoreFilter(candidate, filterId) {
   if (filterId === 'mid') return p >= 50 && p <= 79
   if (filterId === 'low') return p < 50
   return true
+}
+
+export const INTERVIEW_SALUTATION_OPTIONS = [
+  { id: 'neutral', label: 'Уважаемый(ая)' },
+  { id: 'male', label: 'Уважаемый' },
+  { id: 'female', label: 'Уважаемая' },
+]
+
+export function getInterviewSalutationLabel(salutationId) {
+  return (
+    INTERVIEW_SALUTATION_OPTIONS.find((item) => item.id === salutationId)?.label ||
+    'Уважаемый(ая)'
+  )
+}
+
+export function formatInterviewDateLabel(dateValue) {
+  if (!dateValue) return ''
+  const parts = dateValue.split('-')
+  if (parts.length !== 3) return dateValue
+  const [year, month, day] = parts
+  return `${day}.${month}.${year}`
+}
+
+export function formatInterviewTimeLabel(timeValue) {
+  if (!timeValue) return ''
+  return timeValue.slice(0, 5)
+}
+
+export function buildInterviewInvitationText({
+  salutation = 'neutral',
+  candidateName,
+  date,
+  time,
+  address,
+  comment,
+}) {
+  const greeting = getInterviewSalutationLabel(salutation)
+  const dateLabel = formatInterviewDateLabel(date)
+  const timeLabel = formatInterviewTimeLabel(time)
+
+  let text = `${greeting} ${candidateName}!
+
+Приглашаем вас на собеседование в Shugyla Market.
+
+Дата: ${dateLabel}
+Время: ${timeLabel}
+Адрес: ${address}
+
+Ждём вас в указанное время.`
+
+  if (comment?.trim()) {
+    text += `\n\n${comment.trim()}`
+  }
+
+  return text
+}
+
+export function buildInterviewInvitationFromCandidate(candidate) {
+  if (!candidate) return ''
+  const name = candidate.firstName || candidate.fullName || 'кандидат'
+  return buildInterviewInvitationText({
+    salutation: candidate.interviewSalutation || 'neutral',
+    candidateName: name,
+    date: candidate.interviewDate,
+    time: candidate.interviewTime,
+    address: candidate.interviewAddress,
+    comment: candidate.interviewComment,
+  })
+}
+
+export function hasInterviewInvitation(candidate) {
+  return Boolean(
+    candidate?.interviewDate &&
+      candidate?.interviewTime &&
+      candidate?.interviewAddress
+  )
+}
+
+export function validateInterviewInviteForm(form) {
+  const errors = {}
+  if (!form.date?.trim()) errors.date = 'Укажите дату собеседования'
+  if (!form.time?.trim()) errors.time = 'Укажите время собеседования'
+  if (!form.address?.trim()) errors.address = 'Укажите адрес'
+  return errors
 }

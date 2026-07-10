@@ -1,0 +1,107 @@
+.photo-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.photo-preview-modal {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.photo-preview-close {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #111827;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
+  transition: background 0.15s, transform 0.15s;
+}
+
+.photo-preview-close:hover {
+  background: #fff;
+  transform: scale(1.05);
+}
+
+.candidate-photo-preview {
+  display: block;
+  max-width: 90vw;
+  max-height: 85vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  cursor: default;
+}
+
+.candidate-detail-photo-btn {
+  position: relative;
+  display: inline-flex;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.candidate-detail-photo-btn::after {
+  content: '⤢';
+  position: absolute;
+  right: 0.35rem;
+  bottom: 0.35rem;
+  width: 1.75rem;
+  height: 1.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 0.9rem;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+.candidate-detail-photo-btn:hover::after,
+.candidate-detail-photo-btn:focus-visible::after {
+  opacity: 1;
+}
+
+.candidate-detail-photo-btn:hover .candidate-avatar,
+.candidate-detail-photo-btn:focus-visible .candidate-avatar {
+  filter: brightness(0.92);
+}
+
+.candidate-detail-photo-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #059669);
+  outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+  .photo-preview-close {
+    top: 0.5rem;
+    right: 0.5rem;
+    position: fixed;
+  }
+}

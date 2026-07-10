@@ -108,7 +108,7 @@ export default function VacancyQuestionEditor({ vacancyId }) {
   return (
     <div className="learning-path-courses">
       <div className="admin-toolbar">
-        <h3 className="admin-detail-heading">Фильтр-вопросы</h3>
+        <h3 className="admin-detail-heading">Фильтр-вопросы для кандидата</h3>
         <button type="button" className="btn btn--primary btn--sm" onClick={openCreate}>
           + Добавить вопрос
         </button>

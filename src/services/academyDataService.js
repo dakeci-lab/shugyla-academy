@@ -56,6 +56,7 @@ import {
   generateUniqueVacancySlug,
   CANDIDATE_STATUS,
   getVacancyRoleLabel,
+  getVacancyEmployeeRole,
 } from '../utils/recruitmentData'
 import { EMPLOYMENT_STATUS } from '../utils/employeeData'
 import { prepareCandidatePhotoForSubmit } from './candidatePhotoService'
@@ -819,8 +820,22 @@ export async function inviteCandidate(candidateId) {
   if (isCloudMode()) await refreshData()
 }
 
+export async function saveCandidateInterviewInvitation(candidateId, invitation) {
+  await getRecruitmentAdapter().saveCandidateInterviewInvitation(candidateId, invitation)
+  if (isCloudMode()) await refreshData()
+}
+
 export async function convertCandidateToTrainee(candidateId) {
   await getRecruitmentAdapter().convertCandidateToTrainee(candidateId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function linkCandidateToEmployee(candidateId, userId) {
+  const candidate = getCandidateByIdSync(candidateId)
+  if (!candidate) throw new Error('Кандидат не найден')
+  if (candidate.createdUserId) throw new Error('Сотрудник уже создан для этого кандидата')
+
+  await getRecruitmentAdapter().linkCandidateToEmployee(candidateId, userId)
   if (isCloudMode()) await refreshData()
 }
 
@@ -829,17 +844,17 @@ export async function hireCandidateAsUser(candidateId, userData, options = {}) {
   if (!candidate) throw new Error('Кандидат не найден')
 
   const vacancy = candidate.vacancyId ? getVacancyByIdSync(candidate.vacancyId) : null
-  const role = userData.role || vacancy?.role || 'cashier'
+  const role = userData.role || getVacancyEmployeeRole(vacancy) || 'cashier'
   const asTrainee = options.asTrainee !== false && userData.employmentStatus !== EMPLOYMENT_STATUS.ACTIVE
 
   const employeePayload = {
     firstName: userData.firstName || candidate.firstName,
     lastName: userData.lastName || candidate.lastName,
-    position: userData.position || getVacancyRoleLabel(role),
+    position: getVacancyRoleLabel(role),
     role,
     login: userData.login,
     password: userData.password,
-    employmentStatus: userData.employmentStatus || EMPLOYMENT_STATUS.INTERNSHIP,
+    employmentStatus: userData.employmentStatus || EMPLOYMENT_STATUS.ACTIVE,
     assignedCourseIds: userData.assignedCourseIds || [],
     avatarUrl: userData.avatarUrl || candidate.photoUrl || null,
   }
@@ -853,7 +868,7 @@ export async function hireCandidateAsUser(candidateId, userData, options = {}) {
   await getRecruitmentAdapter().markCandidateHired(
     candidateId,
     newUserId,
-    asTrainee ? CANDIDATE_STATUS.TRAINEE : CANDIDATE_STATUS.HIRED
+    CANDIDATE_STATUS.HIRED
   )
 
   if (isCloudMode()) await refreshData()
