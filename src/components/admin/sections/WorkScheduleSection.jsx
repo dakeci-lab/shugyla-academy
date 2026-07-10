@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getStaffEmployees } from '../../../utils/employeeData'
-import { getRoleLabel, EMPLOYEE_FORM_ROLES } from '../../../data/roles'
 import {
   shiftsToMap,
   toDateKey,
@@ -13,12 +12,12 @@ import {
   getMonthsForWeek,
 } from '../../../utils/shiftData'
 import { getTeamShiftsForMonth } from '../../../services/academyDataService'
-import { ChevronLeftIcon, ChevronRightIcon } from '../../icons/PlatformIcons'
 import AdminModal from '../AdminModal'
 import TeamScheduleCell from '../TeamScheduleCell'
+import SchedulePeriodBar from '../SchedulePeriodBar'
+import EmployeeSearchToolbar from '../EmployeeSearchToolbar'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
-import '../RecruitmentSection.css'
 
 /** Общий график всех сотрудников (недельный вид) */
 export default function WorkScheduleSection() {
@@ -27,7 +26,6 @@ export default function WorkScheduleSection() {
   const [shifts, setShifts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [roleFilter, setRoleFilter] = useState('all')
   const [search, setSearch] = useState('')
   const [commentPreview, setCommentPreview] = useState(null)
 
@@ -39,16 +37,12 @@ export default function WorkScheduleSection() {
     : formatWeekRangeLabel(weekStartKey)
 
   const employees = useMemo(() => {
-    let list = getStaffEmployees('active')
-    if (roleFilter !== 'all') {
-      list = list.filter((emp) => emp.role === roleFilter)
-    }
     const q = search.trim().toLowerCase()
-    if (q) {
-      list = list.filter((emp) => emp.name.toLowerCase().includes(q))
-    }
-    return list
-  }, [roleFilter, search])
+    return getStaffEmployees('active').filter((emp) => {
+      if (!q) return true
+      return emp.name.toLowerCase().includes(q)
+    })
+  }, [search])
 
   const employeeIds = useMemo(() => employees.map((emp) => emp.id), [employees])
   const employeeIdsKey = employeeIds.join(',')
@@ -96,57 +90,16 @@ export default function WorkScheduleSection() {
 
   return (
     <>
-      <div className="schedule-week-bar">
-        <button
-          type="button"
-          className="schedule-week-bar__nav"
-          onClick={() => changeWeek(-1)}
-          aria-label="Предыдущая неделя"
-        >
-          <ChevronLeftIcon />
-        </button>
+      <SchedulePeriodBar
+        title={weekTitle}
+        onPrev={() => changeWeek(-1)}
+        onNext={() => changeWeek(1)}
+        onToday={goToday}
+        prevLabel="Предыдущая неделя"
+        nextLabel="Следующая неделя"
+      />
 
-        <div className="schedule-week-bar__main">
-          <h2 className="schedule-week-bar__title">{weekTitle}</h2>
-          <button type="button" className="schedule-week-bar__today" onClick={goToday}>
-            Сегодня
-          </button>
-        </div>
-
-        <button
-          type="button"
-          className="schedule-week-bar__nav"
-          onClick={() => changeWeek(1)}
-          aria-label="Следующая неделя"
-        >
-          <ChevronRightIcon />
-        </button>
-      </div>
-
-      <div className="admin-toolbar admin-toolbar--stack">
-        <div className="admin-form__row">
-          <label className="admin-form__label">
-            Должность
-            <select className="admin-form__select" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
-              <option value="all">Все</option>
-              {EMPLOYEE_FORM_ROLES.map((roleId) => (
-                <option key={roleId} value={roleId}>
-                  {getRoleLabel(roleId)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="admin-form__label">
-            Поиск сотрудника
-            <input
-              className="admin-form__input"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Имя или фамилия"
-            />
-          </label>
-        </div>
-      </div>
+      <EmployeeSearchToolbar value={search} onChange={(e) => setSearch(e.target.value)} />
 
       {error && <p className="admin-form__error">{error}</p>}
 

@@ -11,8 +11,10 @@ import { computeEmployeeRatingsForMonth } from '../../../services/academyDataSer
 import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeRatingDetailModal from '../EmployeeRatingDetailModal'
 import RatingScoreBar from '../RatingScoreBar'
-import { ChevronLeftIcon, ChevronRightIcon } from '../../icons/PlatformIcons'
+import SchedulePeriodBar from '../SchedulePeriodBar'
+import EmployeeSearchToolbar from '../EmployeeSearchToolbar'
 import '../admin-shared.css'
+import '../EmployeeSchedule.css'
 import '../EmployeeRating.css'
 
 const PLACE_CLASS = {
@@ -79,6 +81,11 @@ export default function EmployeeRatingSection() {
       .map((row, index) => ({ ...row, place: index + 1 }))
   }, [employees, ratingsByEmployee])
 
+  const currentMonth = getCurrentMonthState()
+  const isCurrentMonth = year === currentMonth.year && month === currentMonth.month
+  const monthLabel = formatMonthYearLabel(year, month)
+  const monthTitle = isCurrentMonth ? `Текущий месяц (${monthLabel})` : monthLabel
+
   function changeMonth(delta) {
     setMonthState((prev) => {
       const date = new Date(prev.year, prev.month - 1 + delta, 1)
@@ -86,36 +93,22 @@ export default function EmployeeRatingSection() {
     })
   }
 
+  function goToday() {
+    setMonthState(getCurrentMonthState())
+  }
+
   return (
     <>
-      <div className="schedule-month-nav">
-        <h2 className="schedule-month-nav__title">{formatMonthYearLabel(year, month)}</h2>
-        <div className="schedule-month-nav__controls">
-          <button type="button" className="btn btn--outline btn--sm" onClick={() => changeMonth(-1)}>
-            <ChevronLeftIcon />
-          </button>
-          <button
-            type="button"
-            className="btn btn--outline btn--sm"
-            onClick={() => setMonthState(getCurrentMonthState())}
-          >
-            Текущий месяц
-          </button>
-          <button type="button" className="btn btn--outline btn--sm" onClick={() => changeMonth(1)}>
-            <ChevronRightIcon />
-          </button>
-        </div>
-      </div>
+      <SchedulePeriodBar
+        title={monthTitle}
+        onPrev={() => changeMonth(-1)}
+        onNext={() => changeMonth(1)}
+        onToday={goToday}
+        prevLabel="Предыдущий месяц"
+        nextLabel="Следующий месяц"
+      />
 
-      <label className="admin-form__label rating-page__search">
-        Поиск сотрудника
-        <input
-          className="admin-form__input"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Имя или фамилия"
-        />
-      </label>
+      <EmployeeSearchToolbar value={search} onChange={(e) => setSearch(e.target.value)} />
 
       {error && <p className="admin-form__error">{error}</p>}
 
