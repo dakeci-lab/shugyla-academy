@@ -15,8 +15,6 @@ const EMPTY_BULK_FORM = {
   weekdays: [1, 2, 3, 4, 5],
   plannedStartTime: '09:00',
   plannedEndTime: '19:00',
-  plannedBreakStart: '',
-  plannedBreakEnd: '',
   setWorking: true,
   markOthersDayOff: false,
   overwrite: false,
@@ -145,27 +143,6 @@ export default function BulkScheduleModal({ onClose, onApply, applying = false }
               {errors.plannedEndTime && (
                 <span className="admin-form__error">{errors.plannedEndTime}</span>
               )}
-            </label>
-          </div>
-
-          <div className="admin-form__row">
-            <label className="admin-form__label">
-              Начало перерыва
-              <input
-                type="time"
-                className="admin-form__input"
-                value={form.plannedBreakStart}
-                onChange={(e) => setForm({ ...form, plannedBreakStart: e.target.value })}
-              />
-            </label>
-            <label className="admin-form__label">
-              Конец перерыва
-              <input
-                type="time"
-                className="admin-form__input"
-                value={form.plannedBreakEnd}
-                onChange={(e) => setForm({ ...form, plannedBreakEnd: e.target.value })}
-              />
             </label>
           </div>
 

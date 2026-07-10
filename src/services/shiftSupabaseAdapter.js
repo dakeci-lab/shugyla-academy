@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
-import { normalizeShift } from '../utils/shiftData'
+import { normalizeShift, SHIFT_ATTENDANCE_DEFAULTS } from '../utils/shiftData'
 
 async function throwIfError(result, context) {
   if (result.error) {
@@ -50,35 +50,108 @@ function rowToShift(row) {
   })
 }
 
-function payloadToRow(employeeId, payload, createdBy = null) {
+function pickExistingValue(payloadValue, existingValue, defaultValue) {
+  if (payloadValue !== undefined) return payloadValue
+  if (existingValue !== undefined && existingValue !== null) return existingValue
+  return defaultValue
+}
+
+function payloadToRow(employeeId, payload, createdBy = null, existing = null) {
+  const defaults = SHIFT_ATTENDANCE_DEFAULTS
+
   return {
     employee_id: employeeId,
     shift_date: payload.shiftDate,
     status: payload.status,
     planned_start_time: payload.plannedStartTime,
     planned_end_time: payload.plannedEndTime,
-    planned_break_start: payload.plannedBreakStart,
-    planned_break_end: payload.plannedBreakEnd,
-    actual_start_time: payload.actualStartTime,
-    actual_end_time: payload.actualEndTime,
-    actual_break_start: payload.actualBreakStart,
-    actual_break_end: payload.actualBreakEnd,
-    comment: payload.comment || '',
-    created_by: createdBy,
-    check_in_latitude: payload.checkInLatitude,
-    check_in_longitude: payload.checkInLongitude,
-    check_in_accuracy: payload.checkInAccuracy,
-    check_out_latitude: payload.checkOutLatitude,
-    check_out_longitude: payload.checkOutLongitude,
-    check_out_accuracy: payload.checkOutAccuracy,
-    late_minutes: payload.lateMinutes,
-    early_leave_minutes: payload.earlyLeaveMinutes,
-    worked_minutes: payload.workedMinutes,
-    missing_check_in: payload.missingCheckIn,
-    missing_check_out: payload.missingCheckOut,
-    attendance_status: payload.attendanceStatus,
-    work_location_id: payload.workLocationId,
+    planned_break_start: pickExistingValue(
+      payload.plannedBreakStart,
+      existing?.planned_break_start,
+      null
+    ),
+    planned_break_end: pickExistingValue(payload.plannedBreakEnd, existing?.planned_break_end, null),
+    actual_start_time: pickExistingValue(
+      payload.actualStartTime,
+      existing?.actual_start_time,
+      null
+    ),
+    actual_end_time: pickExistingValue(payload.actualEndTime, existing?.actual_end_time, null),
+    actual_break_start: pickExistingValue(
+      payload.actualBreakStart,
+      existing?.actual_break_start,
+      null
+    ),
+    actual_break_end: pickExistingValue(payload.actualBreakEnd, existing?.actual_break_end, null),
+    comment: payload.comment ?? existing?.comment ?? '',
+    created_by: existing?.created_by ?? createdBy,
+    check_in_latitude: pickExistingValue(
+      payload.checkInLatitude,
+      existing?.check_in_latitude,
+      null
+    ),
+    check_in_longitude: pickExistingValue(
+      payload.checkInLongitude,
+      existing?.check_in_longitude,
+      null
+    ),
+    check_in_accuracy: pickExistingValue(payload.checkInAccuracy, existing?.check_in_accuracy, null),
+    check_out_latitude: pickExistingValue(
+      payload.checkOutLatitude,
+      existing?.check_out_latitude,
+      null
+    ),
+    check_out_longitude: pickExistingValue(
+      payload.checkOutLongitude,
+      existing?.check_out_longitude,
+      null
+    ),
+    check_out_accuracy: pickExistingValue(
+      payload.checkOutAccuracy,
+      existing?.check_out_accuracy,
+      null
+    ),
+    late_minutes: pickExistingValue(payload.lateMinutes, existing?.late_minutes, defaults.lateMinutes),
+    early_leave_minutes: pickExistingValue(
+      payload.earlyLeaveMinutes,
+      existing?.early_leave_minutes,
+      defaults.earlyLeaveMinutes
+    ),
+    worked_minutes: pickExistingValue(
+      payload.workedMinutes,
+      existing?.worked_minutes,
+      defaults.workedMinutes
+    ),
+    missing_check_in: pickExistingValue(
+      payload.missingCheckIn,
+      existing?.missing_check_in,
+      defaults.missingCheckIn
+    ),
+    missing_check_out: pickExistingValue(
+      payload.missingCheckOut,
+      existing?.missing_check_out,
+      defaults.missingCheckOut
+    ),
+    attendance_status: pickExistingValue(
+      payload.attendanceStatus,
+      existing?.attendance_status,
+      defaults.attendanceStatus
+    ),
+    work_location_id: pickExistingValue(payload.workLocationId, existing?.work_location_id, null),
   }
+}
+
+async function fetchExistingShiftsByDates(employeeId, dates) {
+  if (!dates.length) return new Map()
+  const rows = await throwIfError(
+    await supabase
+      .from('academy_employee_shifts')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .in('shift_date', dates),
+    'Загрузка существующих смен'
+  )
+  return new Map(rows.map((row) => [row.shift_date, row]))
 }
 
 export async function getShiftsForEmployeeMonth(employeeId, year, month) {
@@ -114,7 +187,9 @@ export async function getShiftsForMonth(year, month, employeeIds = null) {
 }
 
 export async function upsertEmployeeShift(employeeId, payload, createdBy = null) {
-  const row = payloadToRow(employeeId, payload, createdBy)
+  const existingMap = await fetchExistingShiftsByDates(employeeId, [payload.shiftDate])
+  const existing = existingMap.get(payload.shiftDate) || null
+  const row = payloadToRow(employeeId, payload, createdBy, existing)
   const inserted = await throwIfError(
     await supabase
       .from('academy_employee_shifts')
@@ -133,24 +208,17 @@ export async function bulkApplyEmployeeShifts(
 ) {
   if (!entries.length) return 0
 
+  const dates = entries.map((entry) => entry.shiftDate)
+  const existingMap = await fetchExistingShiftsByDates(employeeId, dates)
+
   if (!overwrite) {
-    const dates = entries.map((entry) => entry.shiftDate)
-    const existing = await throwIfError(
-      await supabase
-        .from('academy_employee_shifts')
-        .select('shift_date')
-        .eq('employee_id', employeeId)
-        .in('shift_date', dates),
-      'Проверка существующих смен'
-    )
-    const existingDates = new Set(existing.map((row) => row.shift_date))
-    entries = entries.filter((entry) => !existingDates.has(entry.shiftDate))
+    entries = entries.filter((entry) => !existingMap.has(entry.shiftDate))
   }
 
   if (!entries.length) return 0
 
   const rows = entries.map((entry) =>
-    payloadToRow(employeeId, entry, createdBy)
+    payloadToRow(employeeId, entry, createdBy, existingMap.get(entry.shiftDate) || null)
   )
 
   await throwIfError(

@@ -8,6 +8,16 @@ export const SHIFT_STATUS = {
   ABSENCE: 'absence',
 }
 
+/** Стартовые значения полей attendance при создании графика (до тайм-трекера) */
+export const SHIFT_ATTENDANCE_DEFAULTS = {
+  lateMinutes: 0,
+  earlyLeaveMinutes: 0,
+  workedMinutes: 0,
+  missingCheckIn: false,
+  missingCheckOut: false,
+  attendanceStatus: 'scheduled',
+}
+
 export const SHIFT_STATUS_LABELS = {
   working: 'Рабочий день',
   day_off: 'Выходной',
@@ -93,6 +103,17 @@ export function formatTimeValue(value) {
     return value.slice(0, 5)
   }
   return ''
+}
+
+/** Собирает timestamptz из даты смены и локального времени HH:MM (без сдвига часового пояса) */
+export function combineDateAndTime(dateKey, timeValue) {
+  const time = formatTimeValue(timeValue)
+  if (!dateKey || !time) return null
+  const [year, month, day] = dateKey.split('-').map(Number)
+  const [hours, minutes] = time.split(':').map(Number)
+  const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0)
+  if (Number.isNaN(localDate.getTime())) return null
+  return localDate.toISOString()
 }
 
 export function formatTimeRange(start, end) {
@@ -198,8 +219,6 @@ export function calculateShiftMetrics(shift) {
 
   const plannedStart = timeToMinutes(normalized.plannedStartTime)
   const plannedEnd = timeToMinutes(normalized.plannedEndTime)
-  const plannedBreakStart = timeToMinutes(normalized.plannedBreakStart)
-  const plannedBreakEnd = timeToMinutes(normalized.plannedBreakEnd)
 
   const actualStart = normalized.actualStartTime
     ? timeToMinutes(formatTimeValue(normalized.actualStartTime))
@@ -207,27 +226,15 @@ export function calculateShiftMetrics(shift) {
   const actualEnd = normalized.actualEndTime
     ? timeToMinutes(formatTimeValue(normalized.actualEndTime))
     : null
-  const actualBreakStart = normalized.actualBreakStart
-    ? timeToMinutes(formatTimeValue(normalized.actualBreakStart))
-    : null
-  const actualBreakEnd = normalized.actualBreakEnd
-    ? timeToMinutes(formatTimeValue(normalized.actualBreakEnd))
-    : null
 
   let plannedWorkMinutes = null
   if (plannedStart != null && plannedEnd != null && plannedEnd > plannedStart) {
     plannedWorkMinutes = plannedEnd - plannedStart
-    if (plannedBreakStart != null && plannedBreakEnd != null && plannedBreakEnd > plannedBreakStart) {
-      plannedWorkMinutes -= plannedBreakEnd - plannedBreakStart
-    }
   }
 
   let actualWorkMinutes = null
   if (actualStart != null && actualEnd != null && actualEnd > actualStart) {
     actualWorkMinutes = actualEnd - actualStart
-    if (actualBreakStart != null && actualBreakEnd != null && actualBreakEnd > actualBreakStart) {
-      actualWorkMinutes -= actualBreakEnd - actualBreakStart
-    }
   }
 
   const latenessMinutes =
@@ -277,12 +284,8 @@ export function emptyShiftForm(dateKey) {
     status: SHIFT_STATUS.WORKING,
     plannedStartTime: '09:00',
     plannedEndTime: '19:00',
-    plannedBreakStart: '',
-    plannedBreakEnd: '',
     actualStartTime: '',
     actualEndTime: '',
-    actualBreakStart: '',
-    actualBreakEnd: '',
     comment: '',
     shiftDate: dateKey,
   }
@@ -295,12 +298,8 @@ export function shiftToForm(shift, dateKey) {
     status: normalized.status,
     plannedStartTime: formatTimeValue(normalized.plannedStartTime),
     plannedEndTime: formatTimeValue(normalized.plannedEndTime),
-    plannedBreakStart: formatTimeValue(normalized.plannedBreakStart),
-    plannedBreakEnd: formatTimeValue(normalized.plannedBreakEnd),
     actualStartTime: formatTimeValue(normalized.actualStartTime),
     actualEndTime: formatTimeValue(normalized.actualEndTime),
-    actualBreakStart: formatTimeValue(normalized.actualBreakStart),
-    actualBreakEnd: formatTimeValue(normalized.actualBreakEnd),
     comment: normalized.comment || '',
     shiftDate: dateKey,
   }
@@ -356,8 +355,6 @@ export function buildBulkShiftEntries(form) {
         status: SHIFT_STATUS.WORKING,
         plannedStartTime: form.plannedStartTime,
         plannedEndTime: form.plannedEndTime,
-        plannedBreakStart: form.plannedBreakStart || null,
-        plannedBreakEnd: form.plannedBreakEnd || null,
       })
     } else if (!isSelected && form.markOthersDayOff) {
       entries.push({
@@ -365,8 +362,6 @@ export function buildBulkShiftEntries(form) {
         status: SHIFT_STATUS.DAY_OFF,
         plannedStartTime: null,
         plannedEndTime: null,
-        plannedBreakStart: null,
-        plannedBreakEnd: null,
       })
     } else if (isSelected && !form.setWorking) {
       entries.push({
@@ -374,19 +369,11 @@ export function buildBulkShiftEntries(form) {
         status: SHIFT_STATUS.DAY_OFF,
         plannedStartTime: null,
         plannedEndTime: null,
-        plannedBreakStart: null,
-        plannedBreakEnd: null,
       })
     }
   })
 
   return entries
-}
-
-export function combineDateAndTime(dateKey, timeValue) {
-  const time = formatTimeValue(timeValue)
-  if (!dateKey || !time) return null
-  return `${dateKey}T${time}:00`
 }
 
 export function formToShiftPayload(form) {
@@ -396,12 +383,12 @@ export function formToShiftPayload(form) {
     status: form.status,
     plannedStartTime: working ? form.plannedStartTime || null : null,
     plannedEndTime: working ? form.plannedEndTime || null : null,
-    plannedBreakStart: working ? form.plannedBreakStart || null : null,
-    plannedBreakEnd: working ? form.plannedBreakEnd || null : null,
+    plannedBreakStart: null,
+    plannedBreakEnd: null,
     actualStartTime: combineDateAndTime(form.shiftDate, form.actualStartTime),
     actualEndTime: combineDateAndTime(form.shiftDate, form.actualEndTime),
-    actualBreakStart: combineDateAndTime(form.shiftDate, form.actualBreakStart),
-    actualBreakEnd: combineDateAndTime(form.shiftDate, form.actualBreakEnd),
+    actualBreakStart: null,
+    actualBreakEnd: null,
     comment: form.comment?.trim() || '',
   }
 }

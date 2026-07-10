@@ -101,72 +101,27 @@ export default function ShiftDayEditModal({
           </div>
         )}
 
-        {showShiftTimes && (
+        {canEditActual && (
           <div className="admin-form__row">
             <label className="admin-form__label">
-              Начало перерыва
+              Фактическое время прихода
               <input
                 type="time"
                 className="admin-form__input"
-                value={form.plannedBreakStart}
-                onChange={(e) => setForm({ ...form, plannedBreakStart: e.target.value })}
+                value={form.actualStartTime}
+                onChange={(e) => setForm({ ...form, actualStartTime: e.target.value })}
               />
             </label>
             <label className="admin-form__label">
-              Конец перерыва
+              Фактическое время ухода
               <input
                 type="time"
                 className="admin-form__input"
-                value={form.plannedBreakEnd}
-                onChange={(e) => setForm({ ...form, plannedBreakEnd: e.target.value })}
+                value={form.actualEndTime}
+                onChange={(e) => setForm({ ...form, actualEndTime: e.target.value })}
               />
             </label>
           </div>
-        )}
-
-        {canEditActual && (
-          <>
-            <div className="admin-form__row">
-              <label className="admin-form__label">
-                Фактическое время прихода
-                <input
-                  type="time"
-                  className="admin-form__input"
-                  value={form.actualStartTime}
-                  onChange={(e) => setForm({ ...form, actualStartTime: e.target.value })}
-                />
-              </label>
-              <label className="admin-form__label">
-                Фактическое время ухода
-                <input
-                  type="time"
-                  className="admin-form__input"
-                  value={form.actualEndTime}
-                  onChange={(e) => setForm({ ...form, actualEndTime: e.target.value })}
-                />
-              </label>
-            </div>
-            <div className="admin-form__row">
-              <label className="admin-form__label">
-                Фактическое начало перерыва
-                <input
-                  type="time"
-                  className="admin-form__input"
-                  value={form.actualBreakStart}
-                  onChange={(e) => setForm({ ...form, actualBreakStart: e.target.value })}
-                />
-              </label>
-              <label className="admin-form__label">
-                Фактическое окончание перерыва
-                <input
-                  type="time"
-                  className="admin-form__input"
-                  value={form.actualBreakEnd}
-                  onChange={(e) => setForm({ ...form, actualBreakEnd: e.target.value })}
-                />
-              </label>
-            </div>
-          </>
         )}
 
         {shift && (shift.lateMinutes > 0 || shift.earlyLeaveMinutes > 0 || shift.workedMinutes > 0) && (

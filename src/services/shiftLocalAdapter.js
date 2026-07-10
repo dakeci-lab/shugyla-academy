@@ -1,4 +1,4 @@
-import { normalizeShift } from '../utils/shiftData'
+import { normalizeShift, SHIFT_ATTENDANCE_DEFAULTS } from '../utils/shiftData'
 
 const STORAGE_KEY = 'shugyla_employee_shifts'
 
@@ -53,6 +53,7 @@ export async function upsertEmployeeShift(employeeId, payload, createdBy = null)
   )
 
   const existing = idx >= 0 ? shifts[idx] : null
+  const defaults = SHIFT_ATTENDANCE_DEFAULTS
 
   const row = {
     id: existing?.id || genId(),
@@ -77,12 +78,12 @@ export async function upsertEmployeeShift(employeeId, payload, createdBy = null)
     check_out_latitude: existing?.check_out_latitude ?? null,
     check_out_longitude: existing?.check_out_longitude ?? null,
     check_out_accuracy: existing?.check_out_accuracy ?? null,
-    late_minutes: existing?.late_minutes ?? 0,
-    early_leave_minutes: existing?.early_leave_minutes ?? 0,
-    worked_minutes: existing?.worked_minutes ?? 0,
-    missing_check_in: existing?.missing_check_in ?? false,
-    missing_check_out: existing?.missing_check_out ?? false,
-    attendance_status: existing?.attendance_status ?? null,
+    late_minutes: existing?.late_minutes ?? defaults.lateMinutes,
+    early_leave_minutes: existing?.early_leave_minutes ?? defaults.earlyLeaveMinutes,
+    worked_minutes: existing?.worked_minutes ?? defaults.workedMinutes,
+    missing_check_in: existing?.missing_check_in ?? defaults.missingCheckIn,
+    missing_check_out: existing?.missing_check_out ?? defaults.missingCheckOut,
+    attendance_status: existing?.attendance_status ?? defaults.attendanceStatus,
     work_location_id: existing?.work_location_id ?? null,
   }
 
@@ -110,8 +111,11 @@ export async function bulkApplyEmployeeShifts(
     )
     if (idx >= 0 && !overwrite) return
 
+    const existing = idx >= 0 ? shifts[idx] : null
+    const defaults = SHIFT_ATTENDANCE_DEFAULTS
+
     const row = {
-      id: idx >= 0 ? shifts[idx].id : genId(),
+      id: existing?.id || genId(),
       employee_id: employeeId,
       shift_date: entry.shiftDate,
       status: entry.status,
@@ -119,14 +123,27 @@ export async function bulkApplyEmployeeShifts(
       planned_end_time: entry.plannedEndTime,
       planned_break_start: entry.plannedBreakStart,
       planned_break_end: entry.plannedBreakEnd,
-      actual_start_time: idx >= 0 ? shifts[idx].actual_start_time : null,
-      actual_end_time: idx >= 0 ? shifts[idx].actual_end_time : null,
-      actual_break_start: idx >= 0 ? shifts[idx].actual_break_start : null,
-      actual_break_end: idx >= 0 ? shifts[idx].actual_break_end : null,
-      comment: idx >= 0 ? shifts[idx].comment : '',
-      created_by: idx >= 0 ? shifts[idx].created_by : createdBy,
-      created_at: idx >= 0 ? shifts[idx].created_at : now,
+      actual_start_time: existing?.actual_start_time ?? null,
+      actual_end_time: existing?.actual_end_time ?? null,
+      actual_break_start: existing?.actual_break_start ?? null,
+      actual_break_end: existing?.actual_break_end ?? null,
+      comment: existing?.comment ?? '',
+      created_by: existing?.created_by ?? createdBy,
+      created_at: existing?.created_at ?? now,
       updated_at: now,
+      check_in_latitude: existing?.check_in_latitude ?? null,
+      check_in_longitude: existing?.check_in_longitude ?? null,
+      check_in_accuracy: existing?.check_in_accuracy ?? null,
+      check_out_latitude: existing?.check_out_latitude ?? null,
+      check_out_longitude: existing?.check_out_longitude ?? null,
+      check_out_accuracy: existing?.check_out_accuracy ?? null,
+      late_minutes: existing?.late_minutes ?? defaults.lateMinutes,
+      early_leave_minutes: existing?.early_leave_minutes ?? defaults.earlyLeaveMinutes,
+      worked_minutes: existing?.worked_minutes ?? defaults.workedMinutes,
+      missing_check_in: existing?.missing_check_in ?? defaults.missingCheckIn,
+      missing_check_out: existing?.missing_check_out ?? defaults.missingCheckOut,
+      attendance_status: existing?.attendance_status ?? defaults.attendanceStatus,
+      work_location_id: existing?.work_location_id ?? null,
     }
 
     if (idx >= 0) {
