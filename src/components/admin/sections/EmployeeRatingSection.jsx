@@ -1,16 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getStaffEmployees } from '../../../utils/employeeData'
 import { getRoleLabel } from '../../../data/roles'
 import {
-  aggregateEmployeeRating,
   compareRatingRows,
   getCurrentMonthState,
+  RATING_UPDATED_EVENT,
 } from '../../../utils/attendanceData'
 import { formatMonthYearLabel } from '../../../utils/shiftData'
-import {
-  getScoreEventsForMonth,
-  recalculateAttendanceForMonth,
-} from '../../../services/academyDataService'
+import { computeEmployeeRatingsForMonth } from '../../../services/academyDataService'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeRatingDetailModal from '../EmployeeRatingDetailModal'
 import RatingScoreBar from '../RatingScoreBar'
@@ -24,13 +21,13 @@ const PLACE_CLASS = {
   3: 'rating-list__place--bronze',
 }
 
-/** Страница рейтинга сотрудников */
+/** Страница рейтинга сотрудников (расчёт на лету по сменам) */
 export default function EmployeeRatingSection() {
   const [{ year, month }, setMonthState] = useState(getCurrentMonthState)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [events, setEvents] = useState([])
+  const [ratingsByEmployee, setRatingsByEmployee] = useState(new Map())
   const [detailEmployee, setDetailEmployee] = useState(null)
 
   const employees = useMemo(() => {
@@ -41,36 +38,46 @@ export default function EmployeeRatingSection() {
     })
   }, [search])
 
+  const employeeIdsKey = employees.map((e) => e.id).join(',')
+
+  const loadRating = useCallback(async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const employeeIds = employees.map((emp) => emp.id)
+      const ratings = await computeEmployeeRatingsForMonth(year, month, employeeIds)
+      setRatingsByEmployee(ratings)
+    } catch (err) {
+      setError(err.message || 'Не удалось загрузить рейтинг')
+    } finally {
+      setLoading(false)
+    }
+  }, [year, month, employeeIdsKey])
+
   useEffect(() => {
-    async function load() {
-      setLoading(true)
-      setError('')
-      try {
-        await recalculateAttendanceForMonth(year, month)
-        const employeeIds = employees.map((emp) => emp.id)
-        const monthEvents = await getScoreEventsForMonth(year, month, employeeIds)
-        setEvents(monthEvents)
-      } catch (err) {
-        setError(err.message || 'Не удалось загрузить рейтинг')
-      } finally {
-        setLoading(false)
+    loadRating()
+  }, [loadRating])
+
+  useEffect(() => {
+    function handleRatingUpdated(event) {
+      const { year: eventYear, month: eventMonth } = event.detail || {}
+      if (Number(eventYear) === year && Number(eventMonth) === month) {
+        loadRating()
       }
     }
-    load()
-  }, [year, month, employees.map((e) => e.id).join(',')])
+    window.addEventListener(RATING_UPDATED_EVENT, handleRatingUpdated)
+    return () => window.removeEventListener(RATING_UPDATED_EVENT, handleRatingUpdated)
+  }, [year, month, loadRating])
 
   const rows = useMemo(() => {
     return employees
       .map((employee) => {
-        const empEvents = events.filter((event) => Number(event.employeeId) === Number(employee.id))
-        const stats = aggregateEmployeeRating(empEvents)
-        return { employee, ...stats }
+        const rating = ratingsByEmployee.get(Number(employee.id))
+        return { employee, ...(rating?.stats || { totalPoints: 100 }) }
       })
       .sort(compareRatingRows)
       .map((row, index) => ({ ...row, place: index + 1 }))
-  }, [employees, events])
-
-  const hasRatingData = events.length > 0
+  }, [employees, ratingsByEmployee])
 
   function changeMonth(delta) {
     setMonthState((prev) => {
@@ -114,8 +121,8 @@ export default function EmployeeRatingSection() {
 
       {loading ? (
         <p className="schedule-loading">Загрузка рейтинга…</p>
-      ) : !hasRatingData || rows.length === 0 ? (
-        <p className="schedule-empty">За выбранный период рейтинг ещё не сформирован</p>
+      ) : rows.length === 0 ? (
+        <p className="schedule-empty">Сотрудники не найдены</p>
       ) : (
         <div className="rating-list">
           <div className="rating-list__head" aria-hidden="true">

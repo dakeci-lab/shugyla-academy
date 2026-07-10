@@ -3,11 +3,8 @@ import { normalizeShift } from '../utils/shiftData'
 import {
   normalizeWorkLocation,
   normalizeAttendanceSettings,
-  normalizeScoreEvent,
   DEFAULT_ATTENDANCE_SETTINGS,
   clampRadiusMeters,
-  getMonthRange,
-  deriveShiftAttendanceFlags,
 } from '../utils/attendanceData'
 
 async function throwIfError(result, context) {
@@ -95,49 +92,6 @@ export async function saveAttendanceSettings(settings, updatedBy = null) {
   return normalizeAttendanceSettings(saved)
 }
 
-export async function getScoreEventsForMonth(year, month, employeeIds = null) {
-  const { start, end } = getMonthRange(year, month)
-  let query = supabase
-    .from('platform_employee_score_events')
-    .select('*')
-    .gte('event_date', start)
-    .lte('event_date', end)
-    .order('event_date', { ascending: false })
-
-  if (employeeIds?.length) {
-    query = query.in('employee_id', employeeIds.map(Number))
-  }
-
-  const rows = await throwIfError(await query, 'Загрузка событий рейтинга')
-  return rows.map(normalizeScoreEvent)
-}
-
-export async function getEmployeeScoreEvents(employeeId, year, month) {
-  const events = await getScoreEventsForMonth(year, month, [employeeId])
-  return events.filter((event) => Number(event.employeeId) === Number(employeeId))
-}
-
-export async function addManualScoreEvent({ employeeId, eventDate, points, description, createdBy }) {
-  const eventType = points >= 0 ? 'manual_bonus' : 'manual_penalty'
-  const saved = await throwIfError(
-    await supabase
-      .from('platform_employee_score_events')
-      .insert({
-        employee_id: employeeId,
-        event_date: eventDate,
-        event_type: eventType,
-        points,
-        description,
-        is_manual: true,
-        created_by: createdBy,
-      })
-      .select()
-      .single(),
-    'Сохранение корректировки'
-  )
-  return normalizeScoreEvent(saved)
-}
-
 export async function checkInEmployee(employeeId, coords) {
   const row = await throwIfError(
     await supabase.rpc('attendance_check_in', {
@@ -176,54 +130,4 @@ export async function getTodayShiftForEmployee(employeeId) {
     'Загрузка смены на сегодня'
   )
   return rows ? rowToShift(rows) : null
-}
-
-export async function recalculateAttendanceForMonth(year, month) {
-  const { start, end } = getMonthRange(year, month)
-  const settings = await getAttendanceSettings()
-  const rows = await throwIfError(
-    await supabase
-      .from('academy_employee_shifts')
-      .select('*')
-      .gte('shift_date', start)
-      .lte('shift_date', end)
-      .eq('status', 'working'),
-    'Пересчёт смен'
-  )
-
-  for (const row of rows) {
-    const shift = rowToShift(row)
-    const flags = deriveShiftAttendanceFlags(shift, settings)
-
-    if (!flags.missingCheckIn && !flags.missingCheckOut) continue
-
-    if (flags.missingCheckIn) {
-      await supabase.from('platform_employee_score_events').upsert(
-        {
-          employee_id: shift.employeeId,
-          shift_id: shift.id,
-          event_date: shift.shiftDate,
-          event_type: 'missing_check_in',
-          points: settings.missingCheckInPenalty,
-          description: 'Отсутствие отметки прихода',
-          is_manual: false,
-        },
-        { onConflict: 'employee_id,shift_id,event_type', ignoreDuplicates: false }
-      )
-    }
-    if (flags.missingCheckOut) {
-      await supabase.from('platform_employee_score_events').upsert(
-        {
-          employee_id: shift.employeeId,
-          shift_id: shift.id,
-          event_date: shift.shiftDate,
-          event_type: 'missing_check_out',
-          points: settings.missingCheckOutPenalty,
-          description: 'Не отмечен уход',
-          is_manual: false,
-        },
-        { onConflict: 'employee_id,shift_id,event_type', ignoreDuplicates: false }
-      )
-    }
-  }
 }

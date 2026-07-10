@@ -3,24 +3,14 @@ import { getEmployeeById } from '../utils/employeeData'
 import {
   normalizeWorkLocation,
   normalizeAttendanceSettings,
-  normalizeScoreEvent,
   DEFAULT_ATTENDANCE_SETTINGS,
   isWithinWorkLocation,
-  calculateLateMinutes,
-  calculateEarlyLeaveMinutes,
-  calculateWorkedMinutes,
-  deriveShiftAttendanceFlags,
-  buildAutoScoreEvents,
-  getMonthRange,
-  SCORE_EVENT_TYPE,
-  SCORE_EVENT_LABELS,
   clampRadiusMeters,
 } from '../utils/attendanceData'
 
 const STORAGE_KEYS = {
   LOCATIONS: 'shugyla_work_locations',
   SETTINGS: 'shugyla_attendance_settings',
-  SCORE_EVENTS: 'shugyla_score_events',
   SHIFTS: 'shugyla_employee_shifts',
 }
 
@@ -45,14 +35,6 @@ function writeShifts(shifts) {
   writeJson(STORAGE_KEYS.SHIFTS, shifts)
 }
 
-function readScoreEvents() {
-  return readJson(STORAGE_KEYS.SCORE_EVENTS, [])
-}
-
-function writeScoreEvents(events) {
-  writeJson(STORAGE_KEYS.SCORE_EVENTS, events)
-}
-
 function getEmployeeLocation(employeeId) {
   const employee = getEmployeeById(Number(employeeId))
   const locations = getWorkLocations()
@@ -60,27 +42,6 @@ function getEmployeeLocation(employeeId) {
     return locations.find((loc) => loc.id === employee.workLocationId && loc.isActive) || null
   }
   return locations.find((loc) => loc.isActive) || null
-}
-
-function upsertAutoScoreEvents(employeeId, shiftId, events, createdBy) {
-  const all = readScoreEvents().filter(
-    (event) => !(event.employee_id === employeeId && event.shift_id === shiftId && !event.is_manual)
-  )
-  events.forEach((event) => {
-    all.push({
-      id: genId(),
-      employee_id: employeeId,
-      shift_id: shiftId,
-      event_date: event.eventDate,
-      event_type: event.eventType,
-      points: event.points,
-      description: event.description,
-      is_manual: false,
-      created_by: createdBy,
-      created_at: new Date().toISOString(),
-    })
-  })
-  writeScoreEvents(all)
 }
 
 export function getWorkLocations() {
@@ -135,44 +96,6 @@ export function saveAttendanceSettings(settings, updatedBy = null) {
   return normalizeAttendanceSettings(row)
 }
 
-export function getScoreEventsForMonth(year, month, employeeIds = null) {
-  const { start, end } = getMonthRange(year, month)
-  const idSet = employeeIds ? new Set(employeeIds.map(Number)) : null
-  return readScoreEvents()
-    .filter((event) => {
-      if (event.event_date < start || event.event_date > end) return false
-      if (idSet && !idSet.has(Number(event.employee_id))) return false
-      return true
-    })
-    .map(normalizeScoreEvent)
-}
-
-export function getEmployeeScoreEvents(employeeId, year, month) {
-  return getScoreEventsForMonth(year, month, [employeeId]).filter(
-    (event) => Number(event.employeeId) === Number(employeeId)
-  )
-}
-
-export function addManualScoreEvent({ employeeId, eventDate, points, description, createdBy }) {
-  const eventType = points >= 0 ? SCORE_EVENT_TYPE.MANUAL_BONUS : SCORE_EVENT_TYPE.MANUAL_PENALTY
-  const row = {
-    id: genId(),
-    employee_id: employeeId,
-    shift_id: null,
-    event_date: eventDate,
-    event_type: eventType,
-    points,
-    description,
-    is_manual: true,
-    created_by: createdBy,
-    created_at: new Date().toISOString(),
-  }
-  const all = readScoreEvents()
-  all.push(row)
-  writeScoreEvents(all)
-  return normalizeScoreEvent(row)
-}
-
 function getTodayShift(employeeId) {
   const today = toDateKey(new Date())
   const row = readShifts().find(
@@ -193,10 +116,7 @@ export async function checkInEmployee(employeeId, coords) {
   }
   if (shift.actualStartTime) throw new Error('Приход уже отмечен')
 
-  const settings = getAttendanceSettings()
   const nowIso = new Date().toISOString()
-  const lateMinutes = calculateLateMinutes(shift, nowIso)
-
   const shifts = readShifts()
   const idx = shifts.findIndex((row) => row.id === shift.id)
   const updated = {
@@ -210,26 +130,7 @@ export async function checkInEmployee(employeeId, coords) {
   }
   shifts[idx] = updated
   writeShifts(shifts)
-
-  const normalized = normalizeShift(updated)
-  const autoEvents = []
-  if (lateMinutes > settings.lateGraceMinutes) {
-    autoEvents.push({
-      eventDate: normalized.shiftDate,
-      eventType: SCORE_EVENT_TYPE.LATE,
-      points: settings.latePenalty,
-      description: `Опоздание на ${lateMinutes} минут`,
-    })
-  } else {
-    autoEvents.push({
-      eventDate: normalized.shiftDate,
-      eventType: SCORE_EVENT_TYPE.ON_TIME,
-      points: settings.onTimePoints,
-      description: SCORE_EVENT_LABELS.on_time,
-    })
-  }
-  upsertAutoScoreEvents(employeeId, normalized.id, autoEvents, employeeId)
-  return normalized
+  return normalizeShift(updated)
 }
 
 export async function checkOutEmployee(employeeId, coords) {
@@ -242,10 +143,7 @@ export async function checkOutEmployee(employeeId, coords) {
   if (!shift.actualStartTime) throw new Error('Сначала отметьте приход')
   if (shift.actualEndTime) throw new Error('Уход уже отмечен')
 
-  const settings = getAttendanceSettings()
   const nowIso = new Date().toISOString()
-  const earlyLeaveMinutes = calculateEarlyLeaveMinutes(shift, nowIso)
-
   const shifts = readShifts()
   const idx = shifts.findIndex((row) => row.id === shift.id)
   const updated = {
@@ -258,69 +156,7 @@ export async function checkOutEmployee(employeeId, coords) {
   }
   shifts[idx] = updated
   writeShifts(shifts)
-
-  const normalized = normalizeShift(updated)
-  const existingAuto = readScoreEvents().filter(
-    (event) => event.employee_id === employeeId && event.shift_id === normalized.id && !event.is_manual
-  )
-  const keep = existingAuto.filter((event) => event.event_type === SCORE_EVENT_TYPE.ON_TIME || event.event_type === SCORE_EVENT_TYPE.LATE)
-  const autoEvents = keep.map((event) => ({
-    eventDate: event.event_date,
-    eventType: event.event_type,
-    points: event.points,
-    description: event.description,
-  }))
-
-  if (earlyLeaveMinutes > settings.earlyLeaveGraceMinutes) {
-    autoEvents.push({
-      eventDate: normalized.shiftDate,
-      eventType: SCORE_EVENT_TYPE.EARLY_LEAVE,
-      points: settings.earlyLeavePenalty,
-      description: `Ранний уход на ${earlyLeaveMinutes} минут`,
-    })
-  }
-  autoEvents.push({
-    eventDate: normalized.shiftDate,
-    eventType: SCORE_EVENT_TYPE.COMPLETED_SHIFT,
-    points: settings.completedShiftPoints,
-    description: SCORE_EVENT_LABELS.completed_shift,
-  })
-  upsertAutoScoreEvents(employeeId, normalized.id, autoEvents, employeeId)
-  return normalized
-}
-
-export async function recalculateAttendanceForMonth(year, month) {
-  const settings = getAttendanceSettings()
-  const { start, end } = getMonthRange(year, month)
-  const shifts = readShifts().filter(
-    (row) => row.shift_date >= start && row.shift_date <= end && row.status === 'working'
-  )
-
-  shifts.forEach((row) => {
-    const normalized = normalizeShift(row)
-    const flags = deriveShiftAttendanceFlags(normalized, settings)
-
-    if (flags.missingCheckIn) {
-      upsertAutoScoreEvents(row.employee_id, row.id, [
-        {
-          eventDate: row.shift_date,
-          eventType: SCORE_EVENT_TYPE.MISSING_CHECK_IN,
-          points: settings.missingCheckInPenalty,
-          description: SCORE_EVENT_LABELS.missing_check_in,
-        },
-      ], null)
-    }
-    if (flags.missingCheckOut) {
-      upsertAutoScoreEvents(row.employee_id, row.id, [
-        {
-          eventDate: row.shift_date,
-          eventType: SCORE_EVENT_TYPE.MISSING_CHECK_OUT,
-          points: settings.missingCheckOutPenalty,
-          description: SCORE_EVENT_LABELS.missing_check_out,
-        },
-      ], null)
-    }
-  })
+  return normalizeShift(updated)
 }
 
 export async function getTodayShiftForEmployee(employeeId) {
