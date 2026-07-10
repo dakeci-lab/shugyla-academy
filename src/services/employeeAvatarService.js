@@ -1,19 +1,28 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
 import { readPhotoAsDataUrl } from './candidatePhotoService'
+import {
+  normalizeAvatarImage,
+  isAllowedAvatarInputFile,
+  AVATAR_OUTPUT_MIME,
+} from '../utils/normalizeAvatarImage'
 
 export const EMPLOYEE_AVATAR_BUCKET = 'employee-avatars'
 export const MAX_EMPLOYEE_AVATAR_BYTES = 5 * 1024 * 1024
+
+/** @deprecated Используйте isAllowedAvatarInputFile */
 export const ALLOWED_EMPLOYEE_AVATAR_TYPES = [
   'image/jpeg',
   'image/jpg',
   'image/png',
   'image/webp',
+  'image/heic',
+  'image/heif',
 ]
 
 export function validateEmployeeAvatarFile(file) {
   if (!file) return null
-  if (!ALLOWED_EMPLOYEE_AVATAR_TYPES.includes(file.type)) {
+  if (!isAllowedAvatarInputFile(file)) {
     return 'Не удалось загрузить изображение'
   }
   if (file.size > MAX_EMPLOYEE_AVATAR_BYTES) {
@@ -22,19 +31,8 @@ export function validateEmployeeAvatarFile(file) {
   return null
 }
 
-function getFileExtension(file) {
-  const fromName = file.name?.split('.').pop()?.toLowerCase()
-  if (fromName && ['jpg', 'jpeg', 'png', 'webp'].includes(fromName)) {
-    return fromName === 'jpg' ? 'jpeg' : fromName
-  }
-  if (file.type === 'image/png') return 'png'
-  if (file.type === 'image/webp') return 'webp'
-  return 'jpeg'
-}
-
-export function buildEmployeeAvatarPath(employeeId, file) {
-  const ext = getFileExtension(file)
-  return `${employeeId}/avatar-${Date.now()}.${ext}`
+export function buildEmployeeAvatarPath(employeeId) {
+  return `${employeeId}/avatar-${Date.now()}.jpg`
 }
 
 export function extractEmployeeAvatarPath(avatarUrl) {
@@ -49,18 +47,24 @@ export async function uploadEmployeeAvatarFile(employeeId, file) {
   const validationError = validateEmployeeAvatarFile(file)
   if (validationError) throw new Error(validationError)
 
+  const normalizedFile = await normalizeAvatarImage(file)
+
+  if (normalizedFile.size > MAX_EMPLOYEE_AVATAR_BYTES) {
+    throw new Error('Размер файла не должен превышать 5 МБ')
+  }
+
   if (!isCloudMode() || !isSupabaseConfigured() || !supabase) {
-    const dataUrl = await readPhotoAsDataUrl(file)
+    const dataUrl = await readPhotoAsDataUrl(normalizedFile)
     return { avatarUrl: dataUrl, avatarPath: null }
   }
 
-  const path = buildEmployeeAvatarPath(employeeId, file)
+  const path = buildEmployeeAvatarPath(employeeId)
   const { error } = await supabase.storage
     .from(EMPLOYEE_AVATAR_BUCKET)
-    .upload(path, file, {
+    .upload(path, normalizedFile, {
       cacheControl: '3600',
       upsert: false,
-      contentType: file.type,
+      contentType: AVATAR_OUTPUT_MIME,
     })
 
   if (error) {
