@@ -1,18 +1,3 @@
-.rating-page__header {
-  margin-bottom: 1.25rem;
-}
-
-.rating-page__header h1 {
-  margin: 0 0 0.35rem;
-  font-size: 1.5rem;
-}
-
-.rating-page__header p {
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: 0.9rem;
-}
-
 .rating-page__search {
   max-width: 320px;
   margin-bottom: 1rem;
@@ -73,11 +58,13 @@
   align-items: center;
   gap: 0.65rem;
   min-width: 0;
+  flex-wrap: nowrap;
 }
 
 .rating-list__name {
   font-weight: 600;
   font-size: 0.95rem;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -282,9 +269,10 @@
   }
 
   .rating-list__row {
-    grid-template-columns: 40px minmax(0, 1fr) minmax(120px, 160px);
+    grid-template-columns: 40px minmax(0, 1fr) minmax(108px, 140px);
     grid-template-rows: auto auto;
-    padding: 0.85rem 0.75rem;
+    padding: 0.75rem;
+    align-items: center;
   }
 
   .rating-list__col--place {
@@ -295,14 +283,22 @@
   .rating-list__col--employee {
     grid-column: 2;
     grid-row: 1;
-    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .rating-list__name {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: unset;
+    line-height: 1.3;
   }
 
   .rating-list__col--position {
     grid-column: 2;
     grid-row: 2;
     font-size: 0.8rem;
-    padding-left: calc(32px + 0.65rem);
+    padding-left: calc(40px + 0.65rem);
+    line-height: 1.3;
   }
 
   .rating-list__col--score {
@@ -318,7 +314,7 @@
   }
 
   .rating-list__row {
-    grid-template-columns: 36px minmax(0, 1fr) minmax(100px, 140px);
+    grid-template-columns: 36px minmax(0, 1fr) minmax(96px, 128px);
   }
 }
 

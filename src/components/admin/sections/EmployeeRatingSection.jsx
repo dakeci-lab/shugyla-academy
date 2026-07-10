@@ -81,11 +81,6 @@ export default function EmployeeRatingSection() {
 
   return (
     <>
-      <div className="rating-page__header">
-        <h1>Рейтинг сотрудников</h1>
-        <p>Итоговые баллы за выбранный период.</p>
-      </div>
-
       <div className="schedule-month-nav">
         <h2 className="schedule-month-nav__title">{formatMonthYearLabel(year, month)}</h2>
         <div className="schedule-month-nav__controls">

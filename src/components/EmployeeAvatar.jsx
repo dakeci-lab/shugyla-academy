@@ -42,9 +42,10 @@ export default function EmployeeAvatar({
   const content = showImage ? (
     <img
       src={src}
-      alt={alt || displayName}
+      alt=""
       className="employee-avatar__image"
       onError={() => setImageFailed(true)}
+      draggable={false}
     />
   ) : (
     initials
@@ -64,20 +65,13 @@ export default function EmployeeAvatar({
     )
   }
 
-  if (showImage) {
-    return (
-      <img
-        src={src}
-        alt={alt || displayName}
-        className={classes}
-        onError={() => setImageFailed(true)}
-        {...rest}
-      />
-    )
-  }
-
   return (
-    <span className={classes} aria-hidden={!alt} {...rest}>
+    <span
+      className={classes}
+      role={alt ? 'img' : undefined}
+      aria-label={alt || undefined}
+      {...rest}
+    >
       {content}
     </span>
   )

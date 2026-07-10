@@ -40,7 +40,7 @@ export const PLATFORM_NAV = [
         label: 'Рейтинг',
         routeKey: ROUTE_KEYS.EMPLOYEES_RATING,
         title: 'Рейтинг сотрудников',
-        description: 'Рейтинг по дисциплине, приходу вовремя и уходу не раньше времени.',
+        description: 'Итоговые баллы за выбранный период.',
       },
       {
         id: 'employees-payroll',
