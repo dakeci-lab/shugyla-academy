@@ -169,6 +169,7 @@ export async function fetchAllData() {
       employmentStatus: row.status,
       assignedCourseIds: assignmentMap.get(row.id) || [],
       avatarUrl: row.avatar_url,
+      workLocationId: row.work_location_id,
     })
   )
 
@@ -275,6 +276,7 @@ async function createUser(data) {
     position: employee.position || '',
     status: employee.employmentStatus,
     avatar_url: employee.avatarUrl || null,
+    work_location_id: employee.workLocationId || null,
   }
 
   await throwIfError(
@@ -311,6 +313,7 @@ async function updateUser(id, updates) {
   if (updates.employmentStatus != null) patch.status = updates.employmentStatus
   if (updates.status != null) patch.status = updates.status
   if (updates.avatarUrl != null) patch.avatar_url = updates.avatarUrl
+  if (updates.workLocationId != null) patch.work_location_id = updates.workLocationId
 
   if (Object.keys(patch).length > 0) {
     await throwIfError(

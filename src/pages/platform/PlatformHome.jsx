@@ -1,11 +1,14 @@
-import ModulePlaceholder from './ModulePlaceholder'
+import { useSession } from '../../context/SessionContext'
+import TimeTrackerSection from '../../components/admin/sections/TimeTrackerSection'
+import './PlatformHome.css'
 
 /** Главная страница платформы */
 export default function PlatformHome() {
+  const { user } = useSession()
+
   return (
-    <ModulePlaceholder
-      title="Главная"
-      description="Сводная панель магазина: финансы, сотрудники, заказы и ключевые показатели."
-    />
+    <div className="platform-home">
+      <TimeTrackerSection variant="home" employeeId={user?.id} />
+    </div>
   )
 }

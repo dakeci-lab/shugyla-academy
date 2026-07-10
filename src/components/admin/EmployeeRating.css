@@ -1,0 +1,334 @@
+.rating-page__header {
+  margin-bottom: 1.25rem;
+}
+
+.rating-page__header h1 {
+  margin: 0 0 0.35rem;
+  font-size: 1.5rem;
+}
+
+.rating-page__header p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.rating-page__search {
+  max-width: 320px;
+  margin-bottom: 1rem;
+}
+
+.rating-list {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-white);
+  overflow: hidden;
+}
+
+.rating-list__head,
+.rating-list__row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1.4fr) minmax(0, 1fr) minmax(140px, 200px);
+  align-items: center;
+  gap: 0.75rem 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.rating-list__head {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+  background: var(--color-bg-subtle, #f8fafc);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.rating-list__body {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.rating-list__body li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+.rating-list__row {
+  width: 100%;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.rating-list__row:hover {
+  background: var(--color-bg-subtle, rgba(0, 0, 0, 0.02));
+}
+
+.rating-list__col--employee {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+}
+
+.rating-list__name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rating-list__col--position {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rating-list__place {
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-align: center;
+}
+
+.rating-list__place--gold {
+  color: #b45309;
+}
+
+.rating-list__place--silver {
+  color: #64748b;
+}
+
+.rating-list__place--bronze {
+  color: #c2410c;
+}
+
+.rating-score-bar {
+  position: relative;
+  height: 32px;
+  width: 100%;
+  background: #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.rating-score-bar__fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  min-width: 0;
+  border-radius: 8px;
+  transition: width 0.25s ease;
+}
+
+.rating-score-bar__value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+  z-index: 1;
+}
+
+.time-tracker-card {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: var(--color-white);
+  margin-bottom: 1rem;
+}
+
+.time-tracker-card--home {
+  padding: 1.5rem;
+}
+
+.time-tracker-card__welcome {
+  margin-bottom: 1rem;
+}
+
+.time-tracker-card__welcome-title {
+  margin: 0;
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.time-tracker-card__section-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.time-tracker-card__date {
+  margin-bottom: 0.25rem;
+}
+
+.time-tracker-card__status {
+  font-size: 1rem;
+}
+
+.time-tracker-card__clock {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.time-tracker-card__meta p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.time-tracker-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.time-tracker-card__action-btn {
+  min-height: 48px;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.time-tracker-card__load-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.time-tracker-card__load-error p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+
+.time-tracker-card__skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.25rem 0 0.5rem;
+}
+
+.time-tracker-card__skeleton-line {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    var(--color-border) 25%,
+    rgba(0, 0, 0, 0.04) 50%,
+    var(--color-border) 75%
+  );
+  background-size: 200% 100%;
+  animation: time-tracker-shimmer 1.2s ease-in-out infinite;
+}
+
+.time-tracker-card__skeleton-line--wide {
+  width: 70%;
+}
+
+.time-tracker-card__skeleton-actions {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.time-tracker-card__skeleton-btn {
+  flex: 1;
+  min-height: 48px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(
+    90deg,
+    var(--color-border) 25%,
+    rgba(0, 0, 0, 0.04) 50%,
+    var(--color-border) 75%
+  );
+  background-size: 200% 100%;
+  animation: time-tracker-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes time-tracker-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.attendance-settings-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+@media (max-width: 768px) {
+  .rating-list__head {
+    display: none;
+  }
+
+  .rating-list__row {
+    grid-template-columns: 40px minmax(0, 1fr) minmax(120px, 160px);
+    grid-template-rows: auto auto;
+    padding: 0.85rem 0.75rem;
+  }
+
+  .rating-list__col--place {
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+
+  .rating-list__col--employee {
+    grid-column: 2;
+    grid-row: 1;
+    flex-wrap: wrap;
+  }
+
+  .rating-list__col--position {
+    grid-column: 2;
+    grid-row: 2;
+    font-size: 0.8rem;
+    padding-left: calc(32px + 0.65rem);
+  }
+
+  .rating-list__col--score {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+    align-self: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .rating-list__col--position {
+    display: none;
+  }
+
+  .rating-list__row {
+    grid-template-columns: 36px minmax(0, 1fr) minmax(100px, 140px);
+  }
+}
+
+@media (max-width: 600px) {
+  .time-tracker-card__actions .btn,
+  .time-tracker-card__action-btn {
+    width: 100%;
+  }
+
+  .time-tracker-card--home {
+    padding: 1.25rem 1rem;
+  }
+}

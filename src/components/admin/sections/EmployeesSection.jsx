@@ -20,6 +20,7 @@ import {
   getCandidateById,
   getVacancyById,
   linkCandidateToEmployee,
+  getWorkLocations,
 } from '../../../services/academyDataService'
 import {
   getVacancyEmployeeRole,
@@ -30,10 +31,15 @@ import { ROLES, EMPLOYEE_FORM_ROLES, getRoleLabel } from '../../../data/roles'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
 import StatusBadge from '../StatusBadge'
-import CandidateAvatar from '../../CandidateAvatar'
-import '../../CandidateAvatar.css'
+import EmployeeAvatar from '../../EmployeeAvatar'
+import IconActionButton from '../IconActionButton'
+import ConfirmDialog from '../ConfirmDialog'
+import { PencilIcon, TrashIcon } from '../../icons/PlatformIcons'
+import ProfileAvatarEditor from '../../ProfileAvatarEditor'
+import '../../EmployeeAvatar.css'
 import '../admin-shared.css'
 import '../RecruitmentSection.css'
+import '../IconActionButton.css'
 
 const FILTER_TABS = [
   { id: 'active', label: 'Активные' },
@@ -55,8 +61,17 @@ export default function EmployeesSection() {
   const [successMessage, setSuccessMessage] = useState('')
   const [sourceCandidateId, setSourceCandidateId] = useState(null)
   const [candidatePhone, setCandidatePhone] = useState('')
+  const [deactivateTarget, setDeactivateTarget] = useState(null)
+  const [deactivating, setDeactivating] = useState(false)
+  const [workLocations, setWorkLocations] = useState([])
 
   void version
+
+  useEffect(() => {
+    getWorkLocations()
+      .then(setWorkLocations)
+      .catch(() => setWorkLocations([]))
+  }, [version])
 
   const employees = getStaffEmployees(filter)
   const activeCount = getStaffEmployees('active').length
@@ -151,6 +166,7 @@ export default function EmployeesSection() {
       login: form.login.trim(),
       position: getRoleLabel(form.role),
       employmentStatus: form.employmentStatus,
+      workLocationId: form.workLocationId || null,
       ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
       ...(form.password?.trim() ? { password: form.password } : {}),
     }
@@ -174,13 +190,21 @@ export default function EmployeesSection() {
   }
 
   async function handleDeactivate(emp) {
-    if (!window.confirm(`Деактивировать сотрудника «${emp.name}»?`)) return
+    setDeactivateTarget(emp)
+  }
+
+  async function confirmDeactivate() {
+    if (!deactivateTarget) return
+    setDeactivating(true)
     setActionError('')
     try {
-      await deactivateEmployee(emp.id)
+      await deactivateEmployee(deactivateTarget.id)
+      setDeactivateTarget(null)
       await refresh()
     } catch (err) {
       setActionError(err.message || 'Не удалось деактивировать сотрудника')
+    } finally {
+      setDeactivating(false)
     }
   }
 
@@ -195,24 +219,34 @@ export default function EmployeesSection() {
     }
   }
 
+  function openSchedule(emp) {
+    navigate(`/platform/employees/${emp.id}/schedule`)
+  }
+
   function renderActions(emp) {
     if (isActiveStaffEmployee(emp)) {
       return (
         <>
-          <button
-            type="button"
-            className="btn btn--outline btn--sm"
-            onClick={() => openEdit(emp)}
+          <IconActionButton
+            label="Редактировать сотрудника"
+            variant="primary"
+            onClick={(event) => {
+              event.stopPropagation()
+              openEdit(emp)
+            }}
           >
-            Редактировать
-          </button>
-          <button
-            type="button"
-            className="btn btn--outline btn--sm"
-            onClick={() => handleDeactivate(emp)}
+            <PencilIcon />
+          </IconActionButton>
+          <IconActionButton
+            label="Деактивировать сотрудника"
+            variant="danger"
+            onClick={(event) => {
+              event.stopPropagation()
+              handleDeactivate(emp)
+            }}
           >
-            Деактивировать
-          </button>
+            <TrashIcon />
+          </IconActionButton>
         </>
       )
     }
@@ -220,17 +254,23 @@ export default function EmployeesSection() {
     if (isDeactivatedStaffEmployee(emp)) {
       return (
         <>
-          <button
-            type="button"
-            className="btn btn--outline btn--sm"
-            onClick={() => openEdit(emp)}
+          <IconActionButton
+            label="Редактировать сотрудника"
+            variant="primary"
+            onClick={(event) => {
+              event.stopPropagation()
+              openEdit(emp)
+            }}
           >
-            Редактировать
-          </button>
+            <PencilIcon />
+          </IconActionButton>
           <button
             type="button"
             className="btn btn--outline btn--sm"
-            onClick={() => handleActivate(emp)}
+            onClick={(event) => {
+              event.stopPropagation()
+              handleActivate(emp)
+            }}
           >
             Активировать
           </button>
@@ -239,13 +279,16 @@ export default function EmployeesSection() {
     }
 
     return (
-      <button
-        type="button"
-        className="btn btn--outline btn--sm"
-        onClick={() => openEdit(emp)}
+      <IconActionButton
+        label="Редактировать сотрудника"
+        variant="primary"
+        onClick={(event) => {
+          event.stopPropagation()
+          openEdit(emp)
+        }}
       >
-        Редактировать
-      </button>
+        <PencilIcon />
+      </IconActionButton>
     )
   }
 
@@ -303,9 +346,20 @@ export default function EmployeesSection() {
               </tr>
             ) : (
               employees.map((emp) => (
-                <tr key={emp.id}>
+                <tr
+                  key={emp.id}
+                  className="employee-row-link"
+                  onClick={() => openSchedule(emp)}
+                >
                   <td>
-                    <strong>{emp.name}</strong>
+                    <span className="employee-table-cell">
+                      <EmployeeAvatar
+                        name={emp.name}
+                        avatarUrl={emp.avatarUrl}
+                        size="sm"
+                      />
+                      <strong>{emp.name}</strong>
+                    </span>
                   </td>
                   <td><code className="admin-code">{emp.login}</code></td>
                   <td>{getRoleLabel(emp.role)}</td>
@@ -315,7 +369,7 @@ export default function EmployeesSection() {
                       type={getEmploymentStatusBadgeType(emp.employmentStatus)}
                     />
                   </td>
-                  <td>
+                  <td onClick={(event) => event.stopPropagation()}>
                     <div className="admin-table__actions">
                       {renderActions(emp)}
                     </div>
@@ -326,6 +380,17 @@ export default function EmployeesSection() {
           </tbody>
         </table>
       </div>
+
+      {deactivateTarget && (
+        <ConfirmDialog
+          title="Деактивировать сотрудника?"
+          message="Сотрудник больше не будет отображаться среди активных сотрудников, но его данные, история смен и результаты обучения сохранятся."
+          confirmLabel="Деактивировать"
+          onCancel={() => setDeactivateTarget(null)}
+          onConfirm={confirmDeactivate}
+          loading={deactivating}
+        />
+      )}
 
       {showForm && (
         <AdminModal
@@ -347,9 +412,9 @@ export default function EmployeesSection() {
             {sourceCandidateId && (
               <div className="employee-form-candidate-meta">
                 {form.avatarUrl && (
-                  <CandidateAvatar
-                    fullName={`${form.firstName} ${form.lastName}`.trim()}
-                    photoUrl={form.avatarUrl}
+                  <EmployeeAvatar
+                    name={`${form.firstName} ${form.lastName}`.trim()}
+                    avatarUrl={form.avatarUrl}
                     size="lg"
                   />
                 )}
@@ -362,6 +427,20 @@ export default function EmployeesSection() {
                   )}
                 </div>
               </div>
+            )}
+
+            {editId && (
+              <ProfileAvatarEditor
+                employeeId={editId}
+                employee={{
+                  ...form,
+                  name: `${form.firstName} ${form.lastName}`.trim(),
+                  avatarUrl: getStaffEmployees('all').find((item) => item.id === editId)?.avatarUrl || form.avatarUrl,
+                }}
+                onAvatarChange={async () => {
+                  await refresh()
+                }}
+              />
             )}
 
             <div className="admin-form__row">
@@ -401,6 +480,24 @@ export default function EmployeesSection() {
                 Роль определяет доступ к разделам платформы.
               </span>
             </label>
+
+            {workLocations.length > 0 && (
+              <label className="admin-form__label">
+                Рабочая точка
+                <select
+                  className="admin-form__select"
+                  value={form.workLocationId || ''}
+                  onChange={(e) => setForm({ ...form, workLocationId: e.target.value })}
+                >
+                  <option value="">По умолчанию (активная точка)</option>
+                  {workLocations.filter((loc) => loc.isActive).map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {loc.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             <div className="admin-form__row">
               <label className="admin-form__label">

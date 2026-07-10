@@ -1,0 +1,7 @@
+.platform-home {
+  max-width: 720px;
+}
+
+.platform-home .time-tracker-card--home {
+  margin-bottom: 0;
+}

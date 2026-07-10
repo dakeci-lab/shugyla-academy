@@ -19,6 +19,10 @@ import PlatformIndex from './pages/platform/PlatformIndex'
 import PlatformAcademy from './pages/platform/PlatformAcademy'
 import PlatformSettings from './pages/platform/PlatformSettings'
 import PlatformEmployees from './pages/platform/PlatformEmployees'
+import PlatformWorkSchedule from './pages/platform/PlatformWorkSchedule'
+import PlatformEmployeeSchedule from './pages/platform/PlatformEmployeeSchedule'
+import PlatformEmployeeRating from './pages/platform/PlatformEmployeeRating'
+import PlatformTimeTracker from './pages/platform/PlatformTimeTracker'
 import PlatformHiring from './pages/platform/PlatformHiring'
 import PlatformStandardsManage from './pages/platform/PlatformStandardsManage'
 import SuppliersPage, { SupplierDetailPage } from './pages/platform/suppliers/SuppliersPage'
@@ -97,10 +101,15 @@ export default function App() {
             path="employees/schedule"
             element={
               <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_SCHEDULE}>
-                <ModulePlaceholder
-                  title="График работы"
-                  description="Настройки графика персонала магазина."
-                />
+                <PlatformWorkSchedule />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="employees/:employeeId/schedule"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_SCHEDULE}>
+                <PlatformEmployeeSchedule />
               </PlatformRoute>
             }
           />
@@ -108,10 +117,15 @@ export default function App() {
             path="employees/rating"
             element={
               <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_RATING}>
-                <ModulePlaceholder
-                  title="Рейтинг"
-                  description="Рейтинг сотрудников по дисциплине, приходу вовремя и уходу не раньше времени."
-                />
+                <PlatformEmployeeRating />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="time-tracker"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_RATING}>
+                <PlatformTimeTracker />
               </PlatformRoute>
             }
           />

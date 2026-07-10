@@ -9,7 +9,7 @@ export const PLATFORM_NAV = [
     end: true,
     routeKey: ROUTE_KEYS.HOME,
     title: 'Главная',
-    description: 'Сводная панель магазина: финансы, сотрудники, заказы и ключевые показатели.',
+    description: 'Отметка прихода и ухода, статус сегодняшней смены.',
   },
   {
     id: 'employees',

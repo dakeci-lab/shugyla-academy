@@ -149,6 +149,7 @@ export function normalizeEmployee(raw) {
     ),
     assignedCourseIds: Array.isArray(raw.assignedCourseIds) ? raw.assignedCourseIds : [],
     avatarUrl: raw.avatarUrl ?? raw.avatar_url ?? null,
+    workLocationId: raw.workLocationId ?? raw.work_location_id ?? null,
   }
 }
 
@@ -341,6 +342,7 @@ export const EMPTY_EMPLOYEE_FORM = {
   password: '',
   avatarUrl: '',
   employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
+  workLocationId: '',
 }
 
 export function employeeToForm(employee) {
@@ -352,6 +354,7 @@ export function employeeToForm(employee) {
     password: '',
     avatarUrl: employee.avatarUrl || '',
     employmentStatus: employmentStatusForForm(employee.employmentStatus),
+    workLocationId: employee.workLocationId || '',
   }
 }
 

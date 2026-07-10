@@ -3,6 +3,7 @@ import DataModeBadge from '../../components/admin/DataModeBadge'
 import MigrateToCloudPanel from '../../components/admin/MigrateToCloudPanel'
 import { isCloudMode, getDataModeLabel } from '../../lib/dataMode'
 import { isSupabaseConfigured } from '../../lib/supabaseClient'
+import AttendanceSettingsPanel from '../../components/admin/AttendanceSettingsPanel'
 import '../../components/admin/admin-shared.css'
 import './PlatformSettings.css'
 
@@ -37,6 +38,8 @@ export default function PlatformSettings() {
           <MigrateToCloudPanel />
         </section>
       )}
+
+      <AttendanceSettingsPanel />
 
       <section className="admin-panel-card platform-settings__section">
         <h2 className="admin-panel-card__title">Платформа</h2>

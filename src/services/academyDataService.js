@@ -24,6 +24,10 @@ import * as recruitmentLocalAdapter from './recruitmentLocalAdapter'
 import * as recruitmentSupabaseAdapter from './recruitmentSupabaseAdapter'
 import * as suppliersLocalAdapter from './suppliersLocalAdapter'
 import * as suppliersSupabaseAdapter from './suppliersSupabaseAdapter'
+import * as shiftLocalAdapter from './shiftLocalAdapter'
+import * as shiftSupabaseAdapter from './shiftSupabaseAdapter'
+import * as attendanceLocalAdapter from './attendanceLocalAdapter'
+import * as attendanceSupabaseAdapter from './attendanceSupabaseAdapter'
 import {
   getAllLearningPathsSync,
   getLearningPathByIdSync,
@@ -58,7 +62,7 @@ import {
   getVacancyRoleLabel,
   getVacancyEmployeeRole,
 } from '../utils/recruitmentData'
-import { EMPLOYMENT_STATUS } from '../utils/employeeData'
+import { EMPLOYMENT_STATUS, getEmployeeById } from '../utils/employeeData'
 import { prepareCandidatePhotoForSubmit } from './candidatePhotoService'
 import {
   getAllSuppliersSync,
@@ -87,6 +91,14 @@ function getRecruitmentAdapter() {
 
 function getSuppliersAdapter() {
   return isCloudMode() ? suppliersSupabaseAdapter : suppliersLocalAdapter
+}
+
+function getShiftAdapter() {
+  return isCloudMode() ? shiftSupabaseAdapter : shiftLocalAdapter
+}
+
+function getAttendanceAdapter() {
+  return isCloudMode() ? attendanceSupabaseAdapter : attendanceLocalAdapter
 }
 
 export { isCloudMode, getDataModeLabel, getDataModeVariant }
@@ -168,6 +180,25 @@ export async function updateProfileName(userId, fullName) {
   } catch {
     throw new Error('Не удалось сохранить профиль. Попробуйте позже.')
   }
+}
+
+export async function updateEmployeeAvatar(userId, avatarUrl, { previousAvatarUrl } = {}) {
+  if (previousAvatarUrl && previousAvatarUrl !== avatarUrl) {
+    const { deleteEmployeeAvatarFile } = await import('./employeeAvatarService')
+    await deleteEmployeeAvatarFile(previousAvatarUrl)
+  }
+
+  await updateEmployee(userId, { avatarUrl: avatarUrl || null })
+}
+
+export async function removeEmployeeAvatar(userId) {
+  const employee = getEmployeeById(userId)
+  if (employee?.avatarUrl) {
+    const { deleteEmployeeAvatarFile } = await import('./employeeAvatarService')
+    await deleteEmployeeAvatarFile(employee.avatarUrl)
+  }
+
+  await updateEmployee(userId, { avatarUrl: null })
 }
 
 // --- Courses ---
@@ -920,4 +951,68 @@ export async function deleteSupplier(supplierId) {
 export async function archiveSupplier(supplierId) {
   await getSuppliersAdapter().archiveSupplier(supplierId)
   if (isCloudMode()) await refreshData()
+}
+
+// --- Employee shifts / schedule ---
+
+export async function getEmployeeShiftsForMonth(employeeId, year, month) {
+  return getShiftAdapter().getShiftsForEmployeeMonth(Number(employeeId), year, month)
+}
+
+export async function getTeamShiftsForMonth(year, month, employeeIds = null) {
+  return getShiftAdapter().getShiftsForMonth(year, month, employeeIds)
+}
+
+export async function saveEmployeeShift(employeeId, payload, createdBy = null) {
+  return getShiftAdapter().upsertEmployeeShift(Number(employeeId), payload, createdBy)
+}
+
+export async function applyBulkEmployeeShifts(employeeId, entries, options = {}) {
+  return getShiftAdapter().bulkApplyEmployeeShifts(Number(employeeId), entries, options)
+}
+
+// --- Attendance / rating ---
+
+export async function getWorkLocations() {
+  return getAttendanceAdapter().getWorkLocations()
+}
+
+export async function saveWorkLocation(location) {
+  return getAttendanceAdapter().saveWorkLocation(location)
+}
+
+export async function getAttendanceSettings() {
+  return getAttendanceAdapter().getAttendanceSettings()
+}
+
+export async function saveAttendanceSettings(settings, updatedBy = null) {
+  return getAttendanceAdapter().saveAttendanceSettings(settings, updatedBy)
+}
+
+export async function getScoreEventsForMonth(year, month, employeeIds = null) {
+  return getAttendanceAdapter().getScoreEventsForMonth(year, month, employeeIds)
+}
+
+export async function getEmployeeScoreEvents(employeeId, year, month) {
+  return getAttendanceAdapter().getEmployeeScoreEvents(Number(employeeId), year, month)
+}
+
+export async function addManualScoreEvent(payload) {
+  return getAttendanceAdapter().addManualScoreEvent(payload)
+}
+
+export async function checkInEmployee(employeeId, coords) {
+  return getAttendanceAdapter().checkInEmployee(Number(employeeId), coords)
+}
+
+export async function checkOutEmployee(employeeId, coords) {
+  return getAttendanceAdapter().checkOutEmployee(Number(employeeId), coords)
+}
+
+export async function getTodayShiftForEmployee(employeeId) {
+  return getAttendanceAdapter().getTodayShiftForEmployee(Number(employeeId))
+}
+
+export async function recalculateAttendanceForMonth(year, month) {
+  return getAttendanceAdapter().recalculateAttendanceForMonth(year, month)
 }

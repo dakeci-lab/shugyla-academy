@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
-import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import PlatformSidebar from '../components/platform/PlatformSidebar'
+import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { signOut } from '../services/authService'
+import PlatformUserMenu from '../components/platform/PlatformUserMenu'
 import PlatformMobileHeader from '../components/platform/PlatformMobileHeader'
 import AppInstallBanner from '../components/platform/AppInstallBanner'
+import PlatformSidebar from '../components/platform/PlatformSidebar'
 import { getPlatformSection } from '../platform/platformNav'
 import { useSession } from '../context/SessionContext'
 import './PlatformLayout.css'
@@ -30,7 +32,12 @@ export default function PlatformLayout() {
     }
   }, [drawerOpen])
 
-  function handleLogout() {
+  async function handleLogout() {
+    try {
+      await signOut()
+    } catch (err) {
+      console.warn('Supabase signOut failed:', err)
+    }
     logout()
     navigate('/login')
   }
@@ -62,6 +69,7 @@ export default function PlatformLayout() {
         <PlatformMobileHeader
           user={user}
           onMenuOpen={() => setDrawerOpen(true)}
+          onLogout={handleLogout}
         />
 
         <header className="platform-layout__topbar">
@@ -69,15 +77,7 @@ export default function PlatformLayout() {
             <h1 className="platform-layout__title">{section.title}</h1>
             <p className="platform-layout__desc">{section.description}</p>
           </div>
-          <div className="platform-layout__topbar-user">
-            <Link to="/platform/profile" className="platform-layout__profile-link">
-              Профиль
-            </Link>
-            <span className="platform-layout__user-name">{user?.name}</span>
-            <button type="button" className="btn btn--outline btn--sm" onClick={handleLogout}>
-              Выйти
-            </button>
-          </div>
+          <PlatformUserMenu user={user} onLogout={handleLogout} />
         </header>
 
         <div className="platform-layout__mobile-head">

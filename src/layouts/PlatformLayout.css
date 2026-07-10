@@ -58,23 +58,11 @@
   font-size: 14px;
   font-weight: 500;
   flex-shrink: 0;
-  padding: 8px 14px;
-  background: var(--color-bg);
-  border-radius: var(--radius-md);
 }
 
-.platform-layout__profile-link {
-  color: var(--color-primary);
-  text-decoration: none;
-  font-weight: 500;
-}
-
-.platform-layout__profile-link:hover {
-  text-decoration: underline;
-}
-
+.platform-layout__profile-link,
 .platform-layout__user-name {
-  color: var(--color-text);
+  display: none;
 }
 
 .platform-layout__content {

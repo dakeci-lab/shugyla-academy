@@ -1,5 +1,8 @@
 .profile-page {
   max-width: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .profile-page__hint {
@@ -75,4 +78,28 @@
   .profile-page__actions .btn {
     width: 100%;
   }
+}
+
+.profile-avatar-editor__title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.profile-avatar-editor__preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.profile-avatar-editor__loading {
+  font-size: 14px;
+  color: var(--color-text-secondary);
+}
+
+.profile-avatar-editor__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }

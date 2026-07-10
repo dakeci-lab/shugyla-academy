@@ -47,7 +47,12 @@ const ROUTE_ACCESS = {
     ROLE_IDS.SELLER,
   ],
   [ROUTE_KEYS.EMPLOYEES_LIST]: [ROLE_IDS.ADMIN],
-  [ROUTE_KEYS.EMPLOYEES_SCHEDULE]: [ROLE_IDS.ADMIN],
+  [ROUTE_KEYS.EMPLOYEES_SCHEDULE]: [
+    ROLE_IDS.ADMIN,
+    ROLE_IDS.FLOOR_ADMIN,
+    ROLE_IDS.CASHIER,
+    ROLE_IDS.SELLER,
+  ],
   [ROUTE_KEYS.EMPLOYEES_RATING]: [
     ROLE_IDS.ADMIN,
     ROLE_IDS.FLOOR_ADMIN,
@@ -209,6 +214,34 @@ export function canManageStandards(user) {
 
 export function canChangeEmployeeRoles(user) {
   return canManageEmployees(user)
+}
+
+export function canViewTeamSchedule(user) {
+  return canManageEmployees(user)
+}
+
+export function canViewEmployeeSchedule(user, employeeId) {
+  if (canManageEmployees(user)) return true
+  return Number(user?.id) === Number(employeeId)
+}
+
+export function canEditEmployeeSchedule(user) {
+  return canManageEmployees(user)
+}
+
+export function getEmployeeSchedulePath(user, employeeId = null) {
+  if (canViewTeamSchedule(user)) {
+    return employeeId
+      ? `/platform/employees/${employeeId}/schedule`
+      : '/platform/employees/schedule'
+  }
+  if (user?.id) return `/platform/employees/${user.id}/schedule`
+  return '/platform/academy/cabinet'
+}
+
+export function canEditEmployeeAvatar(user, employeeId) {
+  if (canManageEmployees(user)) return true
+  return Number(user?.id) === Number(employeeId)
 }
 
 export function getRoleDisplayName(user) {

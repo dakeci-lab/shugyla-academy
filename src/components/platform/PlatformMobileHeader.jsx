@@ -1,10 +1,8 @@
-import { Link } from 'react-router-dom'
+import PlatformUserMenu from './PlatformUserMenu'
 import './PlatformMobileHeader.css'
 
 /** Компактный header для mobile/PWA */
-export default function PlatformMobileHeader({ user, onMenuOpen }) {
-  const shortName = user?.name?.split(' ')[0] || 'Профиль'
-
+export default function PlatformMobileHeader({ user, onMenuOpen, onLogout }) {
   return (
     <header className="platform-mobile-header">
       <button
@@ -23,9 +21,7 @@ export default function PlatformMobileHeader({ user, onMenuOpen }) {
         <span className="platform-mobile-header__name">Shugyla Platform</span>
       </div>
 
-      <Link to="/platform/profile" className="platform-mobile-header__profile">
-        {shortName}
-      </Link>
+      <PlatformUserMenu user={user} onLogout={onLogout} compact />
     </header>
   )
 }

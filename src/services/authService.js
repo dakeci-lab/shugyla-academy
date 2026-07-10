@@ -37,6 +37,8 @@ function buildSessionUser(employee, phone = null) {
     name: employee.name,
     role: employee.role,
     roleName: role?.label || employee.role,
+    position: employee.position || role?.label || employee.role,
+    avatarUrl: employee.avatarUrl || null,
     permissions: role?.permissions || [],
     assignedCourseIds: employee.assignedCourseIds || [],
   }
@@ -148,7 +150,99 @@ export function mapAuthError(error) {
   return message || 'Произошла ошибка. Попробуйте позже.'
 }
 
-/** @deprecated Используйте signInWithEmail */
+export function mapPasswordChangeError(error) {
+  if (!error) return 'Произошла ошибка. Попробуйте ещё раз'
+
+  const message = error.message || ''
+  const code = error.code || error.status || ''
+
+  if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
+    return 'Не удалось изменить пароль. Проверьте подключение к интернету'
+  }
+
+  if (
+    code === 'invalid_credentials' ||
+    message.includes('Invalid login credentials') ||
+    message.includes('Invalid email or password')
+  ) {
+    return 'Текущий пароль указан неверно'
+  }
+
+  if (
+    message.includes('Auth session missing') ||
+    message.includes('JWT') ||
+    (message.includes('session') && message.includes('expired')) ||
+    code === 'session_not_found'
+  ) {
+    return 'Сессия истекла. Войдите в аккаунт заново'
+  }
+
+  if (
+    message.includes('Password should be at least') ||
+    message.includes('weak password') ||
+    message.includes('same as the old') ||
+    message.includes('different from the old') ||
+    code === 'weak_password'
+  ) {
+    return 'Новый пароль не соответствует требованиям безопасности'
+  }
+
+  return 'Произошла ошибка. Попробуйте ещё раз'
+}
+
+function resolveAuthEmail(session, fallbackLogin) {
+  if (session?.user?.email) return session.user.email
+
+  const login = fallbackLogin?.trim()
+  if (!login) return null
+
+  if (login.includes('@')) return login
+
+  const phone = normalizePhone(login)
+  if (phone) return phoneToTechnicalEmail(phone)
+
+  return login
+}
+
+/**
+ * Смена пароля: повторная авторизация + updateUser.
+ * Пароль обрабатывается только через Supabase Auth.
+ */
+export async function changePasswordWithVerification({
+  currentPassword,
+  newPassword,
+  fallbackLogin,
+}) {
+  if (!usesSupabaseAuth() || !supabase) {
+    throw new Error('Смена пароля доступна только в облачном режиме с Supabase Auth.')
+  }
+
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+  if (sessionError) {
+    throw new Error(mapPasswordChangeError(sessionError))
+  }
+
+  const email = resolveAuthEmail(sessionData.session, fallbackLogin)
+  if (!email) {
+    throw new Error('Сессия истекла. Войдите в аккаунт заново')
+  }
+
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password: currentPassword,
+  })
+
+  if (signInError) {
+    throw new Error(mapPasswordChangeError(signInError))
+  }
+
+  const { error: updateError } = await supabase.auth.updateUser({ password: newPassword })
+  if (updateError) {
+    throw new Error(mapPasswordChangeError(updateError))
+  }
+}
+
+/** @deprecated Используйте signInWithPhone */
 export async function signInWithPhone(phoneInput, password) {
   const phone = normalizePhone(phoneInput)
   if (!phone) {
@@ -212,6 +306,8 @@ export async function signInWithEmail(email, password) {
       name: legacy.user.name,
       role: legacy.user.role,
       roleName: role?.label || legacy.user.role,
+      position: legacy.user.position || role?.label || legacy.user.role,
+      avatarUrl: legacy.user.avatarUrl || null,
       permissions: role?.permissions || [],
       assignedCourseIds: legacy.user.assignedCourseIds || [],
     },

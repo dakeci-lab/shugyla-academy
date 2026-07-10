@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { updateProfileName } from '../services/academyDataService'
 import { useSession } from '../context/SessionContext'
+import { getEmployeeById } from '../utils/employeeData'
+import ProfileAvatarEditor from '../components/ProfileAvatarEditor'
+import ProfileChangePasswordForm from '../components/ProfileChangePasswordForm'
 import './Profile.css'
 
 /** Страница профиля — внутри PlatformLayout */
@@ -12,6 +15,12 @@ export default function Profile() {
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [saving, setSaving] = useState(false)
+  const [avatarVersion, setAvatarVersion] = useState(0)
+
+  const employee = useMemo(() => {
+    void avatarVersion
+    return user?.id ? getEmployeeById(user.id) : null
+  }, [user?.id, avatarVersion])
 
   if (!user) return null
 
@@ -48,6 +57,14 @@ export default function Profile() {
 
   return (
     <div className="profile-page">
+      <section className="profile-page__card profile-page__card--avatar">
+        <ProfileAvatarEditor
+          employeeId={user.id}
+          employee={employee || user}
+          onAvatarChange={() => setAvatarVersion((value) => value + 1)}
+        />
+      </section>
+
       <section className="profile-page__card">
         <p className="profile-page__hint">
           Вы можете изменить только своё ФИО. Остальные данные редактирует администратор.
@@ -86,6 +103,10 @@ export default function Profile() {
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="profile-page__card">
+        <ProfileChangePasswordForm userLogin={user.login} />
       </section>
     </div>
   )
