@@ -205,9 +205,6 @@ export async function checkInEmployee(employeeId, coords) {
     check_in_latitude: coords.latitude,
     check_in_longitude: coords.longitude,
     check_in_accuracy: coords.accuracy,
-    late_minutes: lateMinutes,
-    missing_check_in: false,
-    attendance_status: 'in_progress',
     work_location_id: location?.id || null,
     updated_at: nowIso,
   }
@@ -248,7 +245,6 @@ export async function checkOutEmployee(employeeId, coords) {
   const settings = getAttendanceSettings()
   const nowIso = new Date().toISOString()
   const earlyLeaveMinutes = calculateEarlyLeaveMinutes(shift, nowIso)
-  const workedMinutes = calculateWorkedMinutes(shift, shift.actualStartTime, nowIso)
 
   const shifts = readShifts()
   const idx = shifts.findIndex((row) => row.id === shift.id)
@@ -258,10 +254,6 @@ export async function checkOutEmployee(employeeId, coords) {
     check_out_latitude: coords.latitude,
     check_out_longitude: coords.longitude,
     check_out_accuracy: coords.accuracy,
-    early_leave_minutes: earlyLeaveMinutes,
-    worked_minutes: workedMinutes,
-    missing_check_out: false,
-    attendance_status: 'completed',
     updated_at: nowIso,
   }
   shifts[idx] = updated
@@ -304,40 +296,31 @@ export async function recalculateAttendanceForMonth(year, month) {
     (row) => row.shift_date >= start && row.shift_date <= end && row.status === 'working'
   )
 
-  shifts.forEach((row, index) => {
+  shifts.forEach((row) => {
     const normalized = normalizeShift(row)
     const flags = deriveShiftAttendanceFlags(normalized, settings)
-    const updated = {
-      ...row,
-      missing_check_in: flags.missingCheckIn,
-      missing_check_out: flags.missingCheckOut,
-      attendance_status: flags.attendanceStatus,
-    }
-    shifts[index] = updated
 
-    if (flags.missingCheckIn || flags.missingCheckOut) {
-      const autoEvents = []
-      if (flags.missingCheckIn) {
-        autoEvents.push({
+    if (flags.missingCheckIn) {
+      upsertAutoScoreEvents(row.employee_id, row.id, [
+        {
           eventDate: row.shift_date,
           eventType: SCORE_EVENT_TYPE.MISSING_CHECK_IN,
           points: settings.missingCheckInPenalty,
           description: SCORE_EVENT_LABELS.missing_check_in,
-        })
-      }
-      if (flags.missingCheckOut) {
-        autoEvents.push({
+        },
+      ], null)
+    }
+    if (flags.missingCheckOut) {
+      upsertAutoScoreEvents(row.employee_id, row.id, [
+        {
           eventDate: row.shift_date,
           eventType: SCORE_EVENT_TYPE.MISSING_CHECK_OUT,
           points: settings.missingCheckOutPenalty,
           description: SCORE_EVENT_LABELS.missing_check_out,
-        })
-      }
-      upsertAutoScoreEvents(row.employee_id, row.id, autoEvents, null)
+        },
+      ], null)
     }
   })
-
-  writeShifts(shifts)
 }
 
 export async function getTodayShiftForEmployee(employeeId) {

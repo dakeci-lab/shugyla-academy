@@ -7,6 +7,7 @@ import {
   DEFAULT_ATTENDANCE_SETTINGS,
   clampRadiusMeters,
   getMonthRange,
+  deriveShiftAttendanceFlags,
 } from '../utils/attendanceData'
 
 async function throwIfError(result, context) {
@@ -192,34 +193,11 @@ export async function recalculateAttendanceForMonth(year, month) {
 
   for (const row of rows) {
     const shift = rowToShift(row)
-    const now = new Date()
-    const plannedEnd = shift.plannedEndTime
-      ? new Date(`${shift.shiftDate}T${shift.plannedEndTime.slice(0, 5)}:00`)
-      : null
-    const checkoutExpired =
-      plannedEnd &&
-      now.getTime() >= plannedEnd.getTime() + (settings.checkoutWaitMinutes || 0) * 60000
-    const ended = plannedEnd ? now >= plannedEnd : false
+    const flags = deriveShiftAttendanceFlags(shift, settings)
 
-    const missingCheckIn = ended && !shift.actualStartTime
-    const missingCheckOut = Boolean(shift.actualStartTime) && !shift.actualEndTime && checkoutExpired
+    if (!flags.missingCheckIn && !flags.missingCheckOut) continue
 
-    if (!missingCheckIn && !missingCheckOut) continue
-
-    await supabase
-      .from('academy_employee_shifts')
-      .update({
-        missing_check_in: missingCheckIn,
-        missing_check_out: missingCheckOut,
-        attendance_status: missingCheckIn
-          ? 'missing_check_in'
-          : missingCheckOut
-            ? 'missing_check_out'
-            : shift.attendanceStatus,
-      })
-      .eq('id', shift.id)
-
-    if (missingCheckIn) {
+    if (flags.missingCheckIn) {
       await supabase.from('platform_employee_score_events').upsert(
         {
           employee_id: shift.employeeId,
@@ -233,7 +211,7 @@ export async function recalculateAttendanceForMonth(year, month) {
         { onConflict: 'employee_id,shift_id,event_type', ignoreDuplicates: false }
       )
     }
-    if (missingCheckOut) {
+    if (flags.missingCheckOut) {
       await supabase.from('platform_employee_score_events').upsert(
         {
           employee_id: shift.employeeId,

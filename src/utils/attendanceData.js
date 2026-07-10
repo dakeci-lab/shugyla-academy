@@ -1,4 +1,12 @@
-import { timeToMinutes, formatTimeValue, isWorkingShiftStatus, toDateKey } from './shiftData'
+import {
+  formatTimeValue,
+  isWorkingShiftStatus,
+  toDateKey,
+  computeShiftStatus,
+  SHIFT_RESULT_CODE,
+  computeLateMinutesFromTimes,
+  computeEarlyLeaveMinutesFromTimes,
+} from './shiftData'
 
 /** Модель тайм-трекера, рейтинга и рабочих точек */
 
@@ -202,14 +210,28 @@ export function getTodayShiftState(shift, settings, now = new Date()) {
   return { code: 'ready_check_in', message: 'Можно отметить приход' }
 }
 
-export function buildAutoScoreEvents(shift, settings) {
+export function buildAutoScoreEvents(shift, settings, now = new Date()) {
   if (!shift?.id || !isWorkingShiftStatus(shift.status)) return []
+
+  const result = computeShiftStatus(shift, now)
+  if (!result) return []
 
   const events = []
   const date = shift.shiftDate
 
+  if (result.code === SHIFT_RESULT_CODE.ABSENCE) {
+    events.push({
+      shiftId: shift.id,
+      eventDate: date,
+      eventType: SCORE_EVENT_TYPE.ABSENCE,
+      points: settings.absencePenalty,
+      description: SCORE_EVENT_LABELS.absence,
+    })
+    return events
+  }
+
   if (shift.actualStartTime) {
-    const lateMinutes = shift.lateMinutes ?? calculateLateMinutes(shift, shift.actualStartTime)
+    const lateMinutes = result.lateMinutes ?? computeLateMinutesFromTimes(shift)
     if (lateMinutes > (settings.lateGraceMinutes || 0)) {
       events.push({
         shiftId: shift.id,
@@ -229,9 +251,20 @@ export function buildAutoScoreEvents(shift, settings) {
     }
   }
 
+  if (result.code === SHIFT_RESULT_CODE.MISSING_CHECKOUT) {
+    events.push({
+      shiftId: shift.id,
+      eventDate: date,
+      eventType: SCORE_EVENT_TYPE.MISSING_CHECK_OUT,
+      points: settings.missingCheckOutPenalty,
+      description: SCORE_EVENT_LABELS.missing_check_out,
+    })
+    return events
+  }
+
   if (shift.actualEndTime) {
     const earlyMinutes =
-      shift.earlyLeaveMinutes ?? calculateEarlyLeaveMinutes(shift, shift.actualEndTime)
+      result.earlyLeaveMinutes ?? computeEarlyLeaveMinutesFromTimes(shift)
     if (earlyMinutes > (settings.earlyLeaveGraceMinutes || 0)) {
       events.push({
         shiftId: shift.id,
@@ -250,61 +283,15 @@ export function buildAutoScoreEvents(shift, settings) {
     })
   }
 
-  if (shift.missingCheckIn) {
-    events.push({
-      shiftId: shift.id,
-      eventDate: date,
-      eventType: SCORE_EVENT_TYPE.MISSING_CHECK_IN,
-      points: settings.missingCheckInPenalty,
-      description: SCORE_EVENT_LABELS.missing_check_in,
-    })
-  }
-
-  if (shift.missingCheckOut) {
-    events.push({
-      shiftId: shift.id,
-      eventDate: date,
-      eventType: SCORE_EVENT_TYPE.MISSING_CHECK_OUT,
-      points: settings.missingCheckOutPenalty,
-      description: SCORE_EVENT_LABELS.missing_check_out,
-    })
-  }
-
-  if (shift.attendanceStatus === 'absence' || shift.status === 'absence') {
-    events.push({
-      shiftId: shift.id,
-      eventDate: date,
-      eventType: SCORE_EVENT_TYPE.ABSENCE,
-      points: settings.absencePenalty,
-      description: SCORE_EVENT_LABELS.absence,
-    })
-  }
-
   return events
 }
 
 export function deriveShiftAttendanceFlags(shift, settings, now = new Date()) {
-  if (!shift || !isWorkingShiftStatus(shift.status)) {
-    return {
-      missingCheckIn: false,
-      missingCheckOut: false,
-      attendanceStatus: shift?.attendanceStatus || null,
-    }
+  const result = computeShiftStatus(shift, now)
+  return {
+    missingCheckIn: result?.code === SHIFT_RESULT_CODE.ABSENCE,
+    missingCheckOut: result?.code === SHIFT_RESULT_CODE.MISSING_CHECKOUT,
   }
-
-  const ended = isShiftEnded(shift, now)
-  const checkoutExpired = isCheckoutWaitExpired(shift, settings, now)
-  const missingCheckIn = ended && !shift.actualStartTime
-  const missingCheckOut =
-    Boolean(shift.actualStartTime) && !shift.actualEndTime && checkoutExpired
-
-  let attendanceStatus = shift.attendanceStatus || 'scheduled'
-  if (missingCheckIn) attendanceStatus = 'missing_check_in'
-  else if (missingCheckOut) attendanceStatus = 'missing_check_out'
-  else if (shift.actualEndTime) attendanceStatus = 'completed'
-  else if (shift.actualStartTime) attendanceStatus = 'in_progress'
-
-  return { missingCheckIn, missingCheckOut, attendanceStatus }
 }
 
 /** Базовый рейтинг до начислений и штрафов за период */

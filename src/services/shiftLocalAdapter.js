@@ -1,4 +1,4 @@
-import { normalizeShift, SHIFT_ATTENDANCE_DEFAULTS } from '../utils/shiftData'
+import { normalizeShift } from '../utils/shiftData'
 
 const STORAGE_KEY = 'shugyla_employee_shifts'
 
@@ -46,46 +46,41 @@ function getMonthRange(year, month) {
   }
 }
 
-export async function upsertEmployeeShift(employeeId, payload, createdBy = null) {
-  const shifts = readShifts()
-  const idx = shifts.findIndex(
-    (row) => row.employee_id === employeeId && row.shift_date === payload.shiftDate
-  )
-
-  const existing = idx >= 0 ? shifts[idx] : null
-  const defaults = SHIFT_ATTENDANCE_DEFAULTS
-
-  const row = {
+function buildFactualRow(employeeId, payload, existing, createdBy) {
+  return {
     id: existing?.id || genId(),
     employee_id: employeeId,
     shift_date: payload.shiftDate,
     status: payload.status,
     planned_start_time: payload.plannedStartTime,
     planned_end_time: payload.plannedEndTime,
-    planned_break_start: payload.plannedBreakStart,
-    planned_break_end: payload.plannedBreakEnd,
+    planned_break_start: payload.plannedBreakStart ?? existing?.planned_break_start ?? null,
+    planned_break_end: payload.plannedBreakEnd ?? existing?.planned_break_end ?? null,
     actual_start_time: payload.actualStartTime ?? existing?.actual_start_time ?? null,
     actual_end_time: payload.actualEndTime ?? existing?.actual_end_time ?? null,
     actual_break_start: payload.actualBreakStart ?? existing?.actual_break_start ?? null,
     actual_break_end: payload.actualBreakEnd ?? existing?.actual_break_end ?? null,
-    comment: payload.comment || existing?.comment || '',
+    comment: payload.comment ?? existing?.comment ?? '',
     created_by: existing?.created_by ?? createdBy,
     created_at: existing?.created_at ?? new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    check_in_latitude: existing?.check_in_latitude ?? null,
-    check_in_longitude: existing?.check_in_longitude ?? null,
-    check_in_accuracy: existing?.check_in_accuracy ?? null,
-    check_out_latitude: existing?.check_out_latitude ?? null,
-    check_out_longitude: existing?.check_out_longitude ?? null,
-    check_out_accuracy: existing?.check_out_accuracy ?? null,
-    late_minutes: existing?.late_minutes ?? defaults.lateMinutes,
-    early_leave_minutes: existing?.early_leave_minutes ?? defaults.earlyLeaveMinutes,
-    worked_minutes: existing?.worked_minutes ?? defaults.workedMinutes,
-    missing_check_in: existing?.missing_check_in ?? defaults.missingCheckIn,
-    missing_check_out: existing?.missing_check_out ?? defaults.missingCheckOut,
-    attendance_status: existing?.attendance_status ?? defaults.attendanceStatus,
-    work_location_id: existing?.work_location_id ?? null,
+    check_in_latitude: payload.checkInLatitude ?? existing?.check_in_latitude ?? null,
+    check_in_longitude: payload.checkInLongitude ?? existing?.check_in_longitude ?? null,
+    check_in_accuracy: payload.checkInAccuracy ?? existing?.check_in_accuracy ?? null,
+    check_out_latitude: payload.checkOutLatitude ?? existing?.check_out_latitude ?? null,
+    check_out_longitude: payload.checkOutLongitude ?? existing?.check_out_longitude ?? null,
+    check_out_accuracy: payload.checkOutAccuracy ?? existing?.check_out_accuracy ?? null,
+    work_location_id: payload.workLocationId ?? existing?.work_location_id ?? null,
   }
+}
+
+export async function upsertEmployeeShift(employeeId, payload, createdBy = null) {
+  const shifts = readShifts()
+  const idx = shifts.findIndex(
+    (row) => row.employee_id === employeeId && row.shift_date === payload.shiftDate
+  )
+  const existing = idx >= 0 ? shifts[idx] : null
+  const row = buildFactualRow(employeeId, payload, existing, createdBy)
 
   if (idx >= 0) {
     shifts[idx] = row
@@ -103,7 +98,6 @@ export async function bulkApplyEmployeeShifts(
   { overwrite = false, createdBy = null } = {}
 ) {
   const shifts = readShifts()
-  const now = new Date().toISOString()
 
   entries.forEach((entry) => {
     const idx = shifts.findIndex(
@@ -112,39 +106,7 @@ export async function bulkApplyEmployeeShifts(
     if (idx >= 0 && !overwrite) return
 
     const existing = idx >= 0 ? shifts[idx] : null
-    const defaults = SHIFT_ATTENDANCE_DEFAULTS
-
-    const row = {
-      id: existing?.id || genId(),
-      employee_id: employeeId,
-      shift_date: entry.shiftDate,
-      status: entry.status,
-      planned_start_time: entry.plannedStartTime,
-      planned_end_time: entry.plannedEndTime,
-      planned_break_start: entry.plannedBreakStart,
-      planned_break_end: entry.plannedBreakEnd,
-      actual_start_time: existing?.actual_start_time ?? null,
-      actual_end_time: existing?.actual_end_time ?? null,
-      actual_break_start: existing?.actual_break_start ?? null,
-      actual_break_end: existing?.actual_break_end ?? null,
-      comment: existing?.comment ?? '',
-      created_by: existing?.created_by ?? createdBy,
-      created_at: existing?.created_at ?? now,
-      updated_at: now,
-      check_in_latitude: existing?.check_in_latitude ?? null,
-      check_in_longitude: existing?.check_in_longitude ?? null,
-      check_in_accuracy: existing?.check_in_accuracy ?? null,
-      check_out_latitude: existing?.check_out_latitude ?? null,
-      check_out_longitude: existing?.check_out_longitude ?? null,
-      check_out_accuracy: existing?.check_out_accuracy ?? null,
-      late_minutes: existing?.late_minutes ?? defaults.lateMinutes,
-      early_leave_minutes: existing?.early_leave_minutes ?? defaults.earlyLeaveMinutes,
-      worked_minutes: existing?.worked_minutes ?? defaults.workedMinutes,
-      missing_check_in: existing?.missing_check_in ?? defaults.missingCheckIn,
-      missing_check_out: existing?.missing_check_out ?? defaults.missingCheckOut,
-      attendance_status: existing?.attendance_status ?? defaults.attendanceStatus,
-      work_location_id: existing?.work_location_id ?? null,
-    }
+    const row = buildFactualRow(employeeId, entry, existing, createdBy)
 
     if (idx >= 0) {
       shifts[idx] = row

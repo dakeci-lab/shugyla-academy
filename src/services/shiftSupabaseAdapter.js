@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
-import { normalizeShift, SHIFT_ATTENDANCE_DEFAULTS } from '../utils/shiftData'
+import { normalizeShift } from '../utils/shiftData'
 
 async function throwIfError(result, context) {
   if (result.error) {
@@ -40,12 +40,6 @@ function rowToShift(row) {
     check_out_latitude: row.check_out_latitude,
     check_out_longitude: row.check_out_longitude,
     check_out_accuracy: row.check_out_accuracy,
-    late_minutes: row.late_minutes,
-    early_leave_minutes: row.early_leave_minutes,
-    worked_minutes: row.worked_minutes,
-    missing_check_in: row.missing_check_in,
-    missing_check_out: row.missing_check_out,
-    attendance_status: row.attendance_status,
     work_location_id: row.work_location_id,
   })
 }
@@ -57,8 +51,6 @@ function pickExistingValue(payloadValue, existingValue, defaultValue) {
 }
 
 function payloadToRow(employeeId, payload, createdBy = null, existing = null) {
-  const defaults = SHIFT_ATTENDANCE_DEFAULTS
-
   return {
     employee_id: employeeId,
     shift_date: payload.shiftDate,
@@ -110,32 +102,6 @@ function payloadToRow(employeeId, payload, createdBy = null, existing = null) {
       payload.checkOutAccuracy,
       existing?.check_out_accuracy,
       null
-    ),
-    late_minutes: pickExistingValue(payload.lateMinutes, existing?.late_minutes, defaults.lateMinutes),
-    early_leave_minutes: pickExistingValue(
-      payload.earlyLeaveMinutes,
-      existing?.early_leave_minutes,
-      defaults.earlyLeaveMinutes
-    ),
-    worked_minutes: pickExistingValue(
-      payload.workedMinutes,
-      existing?.worked_minutes,
-      defaults.workedMinutes
-    ),
-    missing_check_in: pickExistingValue(
-      payload.missingCheckIn,
-      existing?.missing_check_in,
-      defaults.missingCheckIn
-    ),
-    missing_check_out: pickExistingValue(
-      payload.missingCheckOut,
-      existing?.missing_check_out,
-      defaults.missingCheckOut
-    ),
-    attendance_status: pickExistingValue(
-      payload.attendanceStatus,
-      existing?.attendance_status,
-      defaults.attendanceStatus
     ),
     work_location_id: pickExistingValue(payload.workLocationId, existing?.work_location_id, null),
   }

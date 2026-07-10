@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getCurrentPosition, extractCoords, validatePositionAccuracy } from '../../../utils/geolocation'
-import { formatTimeRange, SHIFT_STATUS, SHIFT_STATUS_LABELS } from '../../../utils/shiftData'
+import { formatTimeRange, SHIFT_STATUS, SHIFT_STATUS_LABELS, isWorkingShiftStatus } from '../../../utils/shiftData'
 import {
   getTodayShiftState,
   formatTodayLabel,
@@ -83,7 +83,13 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
     return getTodayShiftState(shift)
   }, [shift, loading])
 
-  const displayStatus = useMemo(() => getDisplayStatus(shift, state), [shift, state])
+  const displayStatus = useMemo(() => {
+    if (loading) return ''
+    if (shift?.computedStatus?.label && isWorkingShiftStatus(shift.status)) {
+      return shift.computedStatus.label
+    }
+    return getDisplayStatus(shift, state)
+  }, [shift, state, loading])
 
   async function runWithGeolocation(action) {
     setActing(true)

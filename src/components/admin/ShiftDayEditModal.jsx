@@ -124,10 +124,14 @@ export default function ShiftDayEditModal({
           </div>
         )}
 
-        {shift && (shift.lateMinutes > 0 || shift.earlyLeaveMinutes > 0 || shift.workedMinutes > 0) && (
+        {shift && (shift.computedStatus?.lateMinutes > 0 || shift.computedStatus?.earlyLeaveMinutes > 0 || shift.workedMinutes > 0) && (
           <div className="admin-form__hint">
-            {shift.lateMinutes > 0 && <p>Опоздание: {shift.lateMinutes} мин</p>}
-            {shift.earlyLeaveMinutes > 0 && <p>Ранний уход: {shift.earlyLeaveMinutes} мин</p>}
+            {shift.computedStatus?.lateMinutes > 0 && (
+              <p>Опоздание: {shift.computedStatus.lateMinutes} мин</p>
+            )}
+            {shift.computedStatus?.earlyLeaveMinutes > 0 && (
+              <p>Ранний уход: {shift.computedStatus.earlyLeaveMinutes} мин</p>
+            )}
             {shift.workedMinutes > 0 && <p>Отработано: {shift.workedMinutes} мин</p>}
           </div>
         )}

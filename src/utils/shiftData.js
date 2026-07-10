@@ -8,7 +8,7 @@ export const SHIFT_STATUS = {
   ABSENCE: 'absence',
 }
 
-/** Стартовые значения полей attendance при создании графика (до тайм-трекера) */
+/** @deprecated Вычисляемые поля больше не сохраняются в БД */
 export const SHIFT_ATTENDANCE_DEFAULTS = {
   lateMinutes: 0,
   earlyLeaveMinutes: 0,
@@ -53,11 +53,25 @@ export const SHIFT_STATUS_OPTIONS = [
   { value: SHIFT_STATUS.ABSENCE, label: SHIFT_STATUS_LABELS.absence },
 ]
 
+/** Коды вычисляемого статуса attendance (не хранятся в БД) */
+export const SHIFT_RESULT_CODE = {
+  DAY_OFF: 'day_off',
+  VACATION: 'vacation',
+  SICK_LEAVE: 'sick_leave',
+  ABSENCE: 'absence',
+  ON_TIME: 'on_time',
+  LATE: 'late',
+  MISSING_CHECKOUT: 'missing_checkout',
+  EARLY_LEAVE: 'early_leave',
+  SCHEDULED: 'scheduled',
+}
+
 export function isWorkingShiftStatus(status) {
   return status === SHIFT_STATUS.WORKING
 }
 
-export function normalizeShift(raw) {
+/** Только фактические поля из БД — без вычисляемых метрик */
+function normalizeShiftFacts(raw) {
   if (!raw) return null
   return {
     id: raw.id,
@@ -82,13 +96,23 @@ export function normalizeShift(raw) {
     checkOutLatitude: raw.checkOutLatitude ?? raw.check_out_latitude ?? null,
     checkOutLongitude: raw.checkOutLongitude ?? raw.check_out_longitude ?? null,
     checkOutAccuracy: raw.checkOutAccuracy ?? raw.check_out_accuracy ?? null,
-    lateMinutes: raw.lateMinutes ?? raw.late_minutes ?? 0,
-    earlyLeaveMinutes: raw.earlyLeaveMinutes ?? raw.early_leave_minutes ?? 0,
-    workedMinutes: raw.workedMinutes ?? raw.worked_minutes ?? 0,
-    missingCheckIn: Boolean(raw.missingCheckIn ?? raw.missing_check_in),
-    missingCheckOut: Boolean(raw.missingCheckOut ?? raw.missing_check_out),
-    attendanceStatus: raw.attendanceStatus ?? raw.attendance_status ?? null,
     workLocationId: raw.workLocationId ?? raw.work_location_id ?? null,
+  }
+}
+
+/** Нормализация смены: факты из БД + динамически вычисленный статус */
+export function normalizeShift(raw) {
+  const facts = normalizeShiftFacts(raw)
+  if (!facts) return null
+  const computed = computeShiftStatus(facts)
+  return {
+    ...facts,
+    lateMinutes: computed.lateMinutes,
+    earlyLeaveMinutes: computed.earlyLeaveMinutes,
+    workedMinutes: computed.workedMinutes,
+    missingCheckIn: computed.code === SHIFT_RESULT_CODE.ABSENCE,
+    missingCheckOut: computed.code === SHIFT_RESULT_CODE.MISSING_CHECKOUT,
+    computedStatus: computed,
   }
 }
 
@@ -131,6 +155,266 @@ export function formatShiftCellLabel(shift) {
   return formatTimeRange(shift.plannedStartTime, shift.plannedEndTime) || '—'
 }
 
+/** Есть ли фактическое время (приход или уход) */
+function hasActualTime(value) {
+  return Boolean(formatTimeValue(value))
+}
+
+function buildShiftPlannedDateTime(shiftDate, timeValue) {
+  const time = formatTimeValue(timeValue)
+  if (!shiftDate || !time) return null
+  return new Date(`${shiftDate}T${time}:00`)
+}
+
+function isShiftPlannedEndPassed(shift, now = new Date()) {
+  const plannedEnd = buildShiftPlannedDateTime(shift.shiftDate, shift.plannedEndTime)
+  return plannedEnd ? now >= plannedEnd : false
+}
+
+function isPastShiftDay(shift, now = new Date()) {
+  const day = parseDateKey(shift.shiftDate)
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  return day < today
+}
+
+/** Минуты опоздания по плановому и фактическому приходу */
+export function computeLateMinutesFromTimes(shift) {
+  const facts = normalizeShiftFacts(shift)
+  if (!facts?.actualStartTime) return 0
+  const plannedStart = timeToMinutes(facts.plannedStartTime)
+  const actualStart = timeToMinutes(formatTimeValue(facts.actualStartTime))
+  if (plannedStart == null || actualStart == null) return 0
+  return Math.max(0, actualStart - plannedStart)
+}
+
+/** Минуты раннего ухода по плановому и фактическому уходу */
+export function computeEarlyLeaveMinutesFromTimes(shift) {
+  const facts = normalizeShiftFacts(shift)
+  if (!facts?.actualEndTime) return 0
+  const plannedEnd = timeToMinutes(facts.plannedEndTime)
+  const actualEnd = timeToMinutes(formatTimeValue(facts.actualEndTime))
+  if (plannedEnd == null || actualEnd == null) return 0
+  return Math.max(0, plannedEnd - actualEnd)
+}
+
+export function computeWorkedMinutesFromTimes(shift) {
+  const facts = normalizeShiftFacts(shift)
+  if (!hasActualTime(facts?.actualStartTime) || !hasActualTime(facts?.actualEndTime)) {
+    return 0
+  }
+  const start = timeToMinutes(formatTimeValue(facts.actualStartTime))
+  const end = timeToMinutes(formatTimeValue(facts.actualEndTime))
+  if (start == null || end == null || end <= start) return 0
+  return end - start
+}
+
+/**
+ * Единая функция вычисления статуса смены.
+ * Использует только тип дня, плановое и фактическое время. Ничего не читает из БД-кэша.
+ */
+export function computeShiftStatus(shift, now = new Date()) {
+  const facts = normalizeShiftFacts(shift)
+  if (!facts) return null
+
+  const workedMinutes = computeWorkedMinutesFromTimes(facts)
+
+  if (facts.status === SHIFT_STATUS.DAY_OFF) {
+    return {
+      code: SHIFT_RESULT_CODE.DAY_OFF,
+      label: 'Выходной',
+      variant: 'day-off',
+      lateMinutes: 0,
+      earlyLeaveMinutes: 0,
+      workedMinutes: 0,
+    }
+  }
+  if (facts.status === SHIFT_STATUS.VACATION) {
+    return {
+      code: SHIFT_RESULT_CODE.VACATION,
+      label: SHIFT_STATUS_LABELS.vacation,
+      variant: 'vacation',
+      lateMinutes: 0,
+      earlyLeaveMinutes: 0,
+      workedMinutes: 0,
+    }
+  }
+  if (facts.status === SHIFT_STATUS.SICK_LEAVE) {
+    return {
+      code: SHIFT_RESULT_CODE.SICK_LEAVE,
+      label: SHIFT_STATUS_LABELS.sick_leave,
+      variant: 'sick-leave',
+      lateMinutes: 0,
+      earlyLeaveMinutes: 0,
+      workedMinutes: 0,
+    }
+  }
+  if (facts.status === SHIFT_STATUS.ABSENCE) {
+    return {
+      code: SHIFT_RESULT_CODE.ABSENCE,
+      label: 'Отсутствие',
+      variant: 'absence',
+      lateMinutes: 0,
+      earlyLeaveMinutes: 0,
+      workedMinutes: 0,
+    }
+  }
+
+  if (!isWorkingShiftStatus(facts.status)) return null
+
+  const hasCheckIn = hasActualTime(facts.actualStartTime)
+  const hasCheckOut = hasActualTime(facts.actualEndTime)
+  const lateMinutes = computeLateMinutesFromTimes(facts)
+  const earlyLeaveMinutes = computeEarlyLeaveMinutesFromTimes(facts)
+
+  if (!hasCheckIn && !hasCheckOut) {
+    if (isPastShiftDay(facts, now) || isShiftPlannedEndPassed(facts, now)) {
+      return {
+        code: SHIFT_RESULT_CODE.ABSENCE,
+        label: 'Отсутствие',
+        variant: 'absence',
+        lateMinutes: 0,
+        earlyLeaveMinutes: 0,
+        workedMinutes: 0,
+      }
+    }
+    return {
+      code: SHIFT_RESULT_CODE.SCHEDULED,
+      label: '',
+      variant: 'scheduled',
+      lateMinutes: 0,
+      earlyLeaveMinutes: 0,
+      workedMinutes: 0,
+    }
+  }
+
+  if (hasCheckIn && !hasCheckOut && isShiftPlannedEndPassed(facts, now)) {
+    return {
+      code: SHIFT_RESULT_CODE.MISSING_CHECKOUT,
+      label: 'Не отметил уход',
+      variant: 'missing-checkout',
+      lateMinutes,
+      earlyLeaveMinutes: 0,
+      workedMinutes: 0,
+    }
+  }
+
+  if (hasCheckOut && earlyLeaveMinutes > 0) {
+    return {
+      code: SHIFT_RESULT_CODE.EARLY_LEAVE,
+      label: 'Ранний уход',
+      variant: 'early-leave',
+      lateMinutes,
+      earlyLeaveMinutes,
+      workedMinutes,
+    }
+  }
+
+  if (lateMinutes > 0) {
+    return {
+      code: SHIFT_RESULT_CODE.LATE,
+      label: 'Опоздание',
+      variant: 'late',
+      lateMinutes,
+      earlyLeaveMinutes: 0,
+      workedMinutes,
+    }
+  }
+
+  return {
+    code: SHIFT_RESULT_CODE.ON_TIME,
+    label: 'Вовремя',
+    variant: 'on-time',
+    lateMinutes: 0,
+    earlyLeaveMinutes: 0,
+    workedMinutes,
+  }
+}
+
+/** @deprecated Используйте computeShiftStatus */
+export const computeShiftDisplayStatus = computeShiftStatus
+
+/** Компактное содержимое ячейки общего графика: время и бейдж статуса */
+export function getTeamScheduleBadge(shift, now = new Date()) {
+  const display = computeShiftStatus(shift, now)
+  if (!display?.label) return null
+  return { label: display.label, variant: display.variant }
+}
+
+function formatActualTimeRange(start, end) {
+  const startLabel = formatTimeValue(start)
+  const endLabel = formatTimeValue(end)
+  if (!startLabel && !endLabel) return null
+  if (startLabel && endLabel) return `${startLabel}–${endLabel}`
+  return startLabel || endLabel
+}
+
+/** Компактное содержимое ячейки общего недельного графика */
+export function formatTeamScheduleCell(shift, now = new Date()) {
+  if (!shift) {
+    return {
+      plannedTime: '',
+      actualTime: null,
+      showPlan: false,
+      showActual: false,
+      badge: null,
+      comment: '',
+    }
+  }
+
+  const facts = normalizeShiftFacts(shift)
+  const badge = getTeamScheduleBadge(shift, now)
+  const comment = facts.comment?.trim() || ''
+  const working = isWorkingShiftStatus(facts.status)
+
+  if (!working) {
+    return {
+      plannedTime: '',
+      actualTime: null,
+      showPlan: false,
+      showActual: false,
+      badge,
+      comment,
+    }
+  }
+
+  const plannedTime = formatTimeRange(facts.plannedStartTime, facts.plannedEndTime)
+  const actualTime = formatActualTimeRange(facts.actualStartTime, facts.actualEndTime)
+
+  return {
+    plannedTime,
+    actualTime,
+    showPlan: Boolean(plannedTime),
+    showActual: true,
+    badge,
+    comment,
+  }
+}
+
+/** @deprecated Tooltip удалён из UI; используйте formatTeamScheduleCell */
+export function buildTeamScheduleTooltip(shift, now = new Date()) {
+  const facts = normalizeShiftFacts(shift)
+  if (!facts) return ''
+
+  const planned = formatTimeRange(facts.plannedStartTime, facts.plannedEndTime)
+  const actualIn = formatTimeValue(facts.actualStartTime)
+  const actualOut = formatTimeValue(facts.actualEndTime)
+  const display = computeShiftStatus(facts, now)
+
+  const lines = [
+    `• Плановая смена: ${planned || '—'}`,
+    `• Фактический приход: ${actualIn || '—'}`,
+    `• Фактический уход: ${actualOut || '—'}`,
+    `• Статус: ${display?.label || SHIFT_STATUS_LABELS[facts.status] || '—'}`,
+    `• Минут опоздания: ${display?.lateMinutes ?? 0}`,
+  ]
+
+  if (facts.comment?.trim()) {
+    lines.push(`• Комментарий: ${facts.comment.trim()}`)
+  }
+
+  return lines.join('\n')
+}
+
 export function formatMonthYearLabel(year, month) {
   const date = new Date(year, month - 1, 1)
   const label = date.toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
@@ -147,6 +431,71 @@ export function toDateKey(date) {
 export function parseDateKey(dateKey) {
   const [year, month, day] = dateKey.split('-').map(Number)
   return new Date(year, month - 1, day)
+}
+
+/** Понедельник недели, в которую попадает date (неделя с Пн) */
+export function getMondayOfWeek(date = new Date()) {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+  const weekday = d.getDay()
+  const diff = weekday === 0 ? -6 : 1 - weekday
+  d.setDate(d.getDate() + diff)
+  return d
+}
+
+export function getInitialWeekStartKey() {
+  return toDateKey(getMondayOfWeek(new Date()))
+}
+
+export function buildWeekDates(weekStartKey) {
+  const start = parseDateKey(weekStartKey)
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start)
+    date.setDate(start.getDate() + index)
+    return date
+  })
+}
+
+export function addWeeks(weekStartKey, weeksDelta) {
+  const date = parseDateKey(weekStartKey)
+  date.setDate(date.getDate() + weeksDelta * 7)
+  return toDateKey(date)
+}
+
+export function formatWeekRangeLabel(weekStartKey) {
+  const dates = buildWeekDates(weekStartKey)
+  const start = dates[0]
+  const end = dates[6]
+  const sameMonth =
+    start.getMonth() === end.getMonth() && start.getFullYear() === end.getFullYear()
+
+  const monthLabel = start
+    .toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+    .replace(/^\d+\s*/, '')
+
+  if (sameMonth) {
+    return `${start.getDate()}–${end.getDate()} ${monthLabel} ${start.getFullYear()}`
+  }
+
+  const startLabel = start.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })
+  const endLabel = end
+    .toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
+    .replace(/\s?г\.?$/, '')
+  return `${startLabel} – ${endLabel}`
+}
+
+export function formatWeekDayHeader(date) {
+  const weekday = WEEKDAY_LABELS[(date.getDay() + 6) % 7]
+  return { weekday, day: date.getDate() }
+}
+
+/** Уникальные пары year/month, которые пересекает неделя */
+export function getMonthsForWeek(weekStartKey) {
+  const months = new Map()
+  buildWeekDates(weekStartKey).forEach((date) => {
+    const key = `${date.getFullYear()}-${date.getMonth() + 1}`
+    months.set(key, { year: date.getFullYear(), month: date.getMonth() + 1 })
+  })
+  return [...months.values()]
 }
 
 export function getMonthBounds(year, month) {
@@ -263,7 +612,8 @@ export function calculateShiftMetrics(shift) {
 export function buildShiftTooltip(shift) {
   const normalized = normalizeShift(shift)
   if (!normalized) return ''
-  const lines = [SHIFT_STATUS_LABELS[normalized.status] || normalized.status]
+  const display = normalized.computedStatus
+  const lines = [display?.label || SHIFT_STATUS_LABELS[normalized.status] || normalized.status]
   if (isWorkingShiftStatus(normalized.status)) {
     const range = formatTimeRange(normalized.plannedStartTime, normalized.plannedEndTime)
     if (range) lines.push(`Смена: ${range}`)
@@ -273,8 +623,8 @@ export function buildShiftTooltip(shift) {
   if (normalized.lateMinutes > 0) lines.push(`Опоздание: ${normalized.lateMinutes} мин`)
   if (normalized.earlyLeaveMinutes > 0) lines.push(`Ранний уход: ${normalized.earlyLeaveMinutes} мин`)
   if (normalized.workedMinutes > 0) lines.push(`Отработано: ${normalized.workedMinutes} мин`)
-  if (normalized.missingCheckOut) lines.push('Пропущена отметка ухода')
-  if (normalized.missingCheckIn) lines.push('Пропущена отметка прихода')
+  if (normalized.missingCheckOut) lines.push('Не отметил уход')
+  if (normalized.missingCheckIn) lines.push('Отсутствие')
   if (normalized.comment?.trim()) lines.push(normalized.comment.trim())
   return lines.join('\n')
 }

@@ -4,32 +4,39 @@ import { getStaffEmployees } from '../../../utils/employeeData'
 import { getRoleLabel, EMPLOYEE_FORM_ROLES } from '../../../data/roles'
 import {
   shiftsToMap,
-  formatMonthYearLabel,
-  getMonthBounds,
-  formatShiftCellLabel,
-  buildShiftTooltip,
-  SHIFT_STATUS_CSS,
+  toDateKey,
+  formatWeekRangeLabel,
+  formatWeekDayHeader,
+  getInitialWeekStartKey,
+  addWeeks,
+  buildWeekDates,
+  getMonthsForWeek,
 } from '../../../utils/shiftData'
 import { getTeamShiftsForMonth } from '../../../services/academyDataService'
 import { ChevronLeftIcon, ChevronRightIcon } from '../../icons/PlatformIcons'
+import AdminModal from '../AdminModal'
+import TeamScheduleCell from '../TeamScheduleCell'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
 import '../RecruitmentSection.css'
 
-function getInitialMonth() {
-  const now = new Date()
-  return { year: now.getFullYear(), month: now.getMonth() + 1 }
-}
-
-/** Общий график всех сотрудников */
+/** Общий график всех сотрудников (недельный вид) */
 export default function WorkScheduleSection() {
   const navigate = useNavigate()
-  const [{ year, month }, setMonthState] = useState(getInitialMonth)
+  const [weekStartKey, setWeekStartKey] = useState(getInitialWeekStartKey)
   const [shifts, setShifts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [search, setSearch] = useState('')
+  const [commentPreview, setCommentPreview] = useState(null)
+
+  const weekDates = useMemo(() => buildWeekDates(weekStartKey), [weekStartKey])
+  const todayKey = toDateKey(new Date())
+  const isCurrentWeek = weekDates.some((date) => toDateKey(date) === todayKey)
+  const weekTitle = isCurrentWeek
+    ? `Текущая неделя (${formatWeekRangeLabel(weekStartKey)})`
+    : formatWeekRangeLabel(weekStartKey)
 
   const employees = useMemo(() => {
     let list = getStaffEmployees('active')
@@ -43,21 +50,25 @@ export default function WorkScheduleSection() {
     return list
   }, [roleFilter, search])
 
-  const employeeIds = employees.map((emp) => emp.id)
-  const { daysInMonth } = getMonthBounds(year, month)
+  const employeeIds = useMemo(() => employees.map((emp) => emp.id), [employees])
+  const employeeIdsKey = employeeIds.join(',')
 
   const loadShifts = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const rows = await getTeamShiftsForMonth(year, month, employeeIds.length ? employeeIds : null)
-      setShifts(rows)
+      const months = getMonthsForWeek(weekStartKey)
+      const ids = employeeIds.length ? employeeIds : null
+      const monthResults = await Promise.all(
+        months.map(({ year, month }) => getTeamShiftsForMonth(year, month, ids))
+      )
+      setShifts(monthResults.flat())
     } catch (err) {
       setError(err.message || 'Не удалось загрузить график')
     } finally {
       setLoading(false)
     }
-  }, [year, month, employeeIds.join(',')])
+  }, [weekStartKey, employeeIdsKey])
 
   useEffect(() => {
     loadShifts()
@@ -65,19 +76,18 @@ export default function WorkScheduleSection() {
 
   const shiftsByEmployee = useMemo(() => {
     const map = new Map()
-    employees.forEach((emp) => map.set(emp.id, shiftsToMap(shifts.filter((s) => s.employeeId === emp.id))))
+    employees.forEach((emp) =>
+      map.set(emp.id, shiftsToMap(shifts.filter((s) => s.employeeId === emp.id)))
+    )
     return map
   }, [employees, shifts])
 
-  function changeMonth(delta) {
-    setMonthState((prev) => {
-      const date = new Date(prev.year, prev.month - 1 + delta, 1)
-      return { year: date.getFullYear(), month: date.getMonth() + 1 }
-    })
+  function changeWeek(delta) {
+    setWeekStartKey((prev) => addWeeks(prev, delta))
   }
 
   function goToday() {
-    setMonthState(getInitialMonth())
+    setWeekStartKey(getInitialWeekStartKey())
   }
 
   function openEmployeeSchedule(employeeId) {
@@ -86,23 +96,35 @@ export default function WorkScheduleSection() {
 
   return (
     <>
-      <div className="admin-toolbar admin-toolbar--stack">
-        <div className="schedule-month-nav" style={{ marginBottom: 0 }}>
-          <h2 className="schedule-month-nav__title">{formatMonthYearLabel(year, month)}</h2>
-          <div className="schedule-month-nav__controls">
-            <button type="button" className="btn btn--outline btn--sm" onClick={() => changeMonth(-1)}>
-              <ChevronLeftIcon />
-            </button>
-            <button type="button" className="btn btn--outline btn--sm" onClick={goToday}>
-              Сегодня
-            </button>
-            <button type="button" className="btn btn--outline btn--sm" onClick={() => changeMonth(1)}>
-              <ChevronRightIcon />
-            </button>
-          </div>
+      <div className="schedule-week-bar">
+        <button
+          type="button"
+          className="schedule-week-bar__nav"
+          onClick={() => changeWeek(-1)}
+          aria-label="Предыдущая неделя"
+        >
+          <ChevronLeftIcon />
+        </button>
+
+        <div className="schedule-week-bar__main">
+          <h2 className="schedule-week-bar__title">{weekTitle}</h2>
+          <button type="button" className="schedule-week-bar__today" onClick={goToday}>
+            Сегодня
+          </button>
         </div>
 
-        <div className="admin-form__row" style={{ marginTop: '0.75rem' }}>
+        <button
+          type="button"
+          className="schedule-week-bar__nav"
+          onClick={() => changeWeek(1)}
+          aria-label="Следующая неделя"
+        >
+          <ChevronRightIcon />
+        </button>
+      </div>
+
+      <div className="admin-toolbar admin-toolbar--stack">
+        <div className="admin-form__row">
           <label className="admin-form__label">
             Должность
             <select className="admin-form__select" value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
@@ -134,20 +156,43 @@ export default function WorkScheduleSection() {
         <p className="schedule-empty">Сотрудники не найдены</p>
       ) : (
         <div className="team-schedule-wrap">
-          <table className="team-schedule-table">
+          <table className="team-schedule-table team-schedule-table--week">
             <thead>
               <tr>
-                <th className="team-schedule-table__employee">Сотрудник</th>
-                {Array.from({ length: daysInMonth }, (_, index) => (
-                  <th key={index + 1}>{index + 1}</th>
-                ))}
+                <th className="team-schedule-table__index" scope="col">
+                  №
+                </th>
+                <th className="team-schedule-table__employee" scope="col">
+                  Сотрудник
+                </th>
+                {weekDates.map((date) => {
+                  const dateKey = toDateKey(date)
+                  const { weekday, day } = formatWeekDayHeader(date)
+                  const isToday = dateKey === todayKey
+                  return (
+                    <th key={dateKey} scope="col" className="team-schedule-table__day">
+                      {isToday ? (
+                        <span className="team-schedule-table__today-badge">
+                          <span className="team-schedule-table__day-weekday">{weekday}</span>
+                          <span className="team-schedule-table__day-number">{day}</span>
+                        </span>
+                      ) : (
+                        <>
+                          <span className="team-schedule-table__day-weekday">{weekday}</span>
+                          <span className="team-schedule-table__day-number">{day}</span>
+                        </>
+                      )}
+                    </th>
+                  )
+                })}
               </tr>
             </thead>
             <tbody>
-              {employees.map((emp) => {
+              {employees.map((emp, index) => {
                 const empShifts = shiftsByEmployee.get(emp.id) || new Map()
                 return (
                   <tr key={emp.id}>
+                    <td className="team-schedule-table__index">{index + 1}</td>
                     <td className="team-schedule-table__employee">
                       <button
                         type="button"
@@ -157,18 +202,18 @@ export default function WorkScheduleSection() {
                         {emp.name}
                       </button>
                     </td>
-                    {Array.from({ length: daysInMonth }, (_, index) => {
-                      const day = index + 1
-                      const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                    {weekDates.map((date) => {
+                      const dateKey = toDateKey(date)
                       const shift = empShifts.get(dateKey)
-                      const statusClass = shift ? SHIFT_STATUS_CSS[shift.status]?.replace('shift-day', 'team-schedule-cell') : ''
+
                       return (
-                        <td
-                          key={dateKey}
-                          className={`team-schedule-cell ${statusClass || ''}`}
-                          title={shift ? buildShiftTooltip(shift) : ''}
-                        >
-                          {shift ? formatShiftCellLabel(shift) || '—' : ''}
+                        <td key={dateKey} className="team-schedule-table__day team-schedule-cell">
+                          <TeamScheduleCell
+                            shift={shift}
+                            onCommentClick={(text) =>
+                              setCommentPreview({ text, employeeName: emp.name, dateKey })
+                            }
+                          />
                         </td>
                       )
                     })}
@@ -178,6 +223,23 @@ export default function WorkScheduleSection() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {commentPreview && (
+        <AdminModal
+          title="Комментарий"
+          onClose={() => setCommentPreview(null)}
+          footer={
+            <button type="button" className="btn btn--primary" onClick={() => setCommentPreview(null)}>
+              Закрыть
+            </button>
+          }
+        >
+          <p className="admin-form__hint">
+            {commentPreview.employeeName} · {commentPreview.dateKey}
+          </p>
+          <p className="team-schedule-comment-preview">{commentPreview.text}</p>
+        </AdminModal>
       )}
     </>
   )
