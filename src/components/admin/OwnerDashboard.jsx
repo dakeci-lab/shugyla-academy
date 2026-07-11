@@ -19,6 +19,7 @@ import {
   toDateKey,
 } from '../../utils/shiftData'
 import { getAttendanceSettings, getTeamShiftsForMonth } from '../../services/academyDataService'
+import { usePlatformPageRefresh } from '../../context/PullToRefreshContext'
 import CompanyHealthGauge from './CompanyHealthGauge'
 import './admin-shared.css'
 import './OwnerDashboard.css'
@@ -91,6 +92,8 @@ export default function OwnerDashboard() {
       setLoading(false)
     }
   }, [weekStartKey, year, month, employeeIdsKey])
+
+  usePlatformPageRefresh(loadData)
 
   useEffect(() => {
     loadData()

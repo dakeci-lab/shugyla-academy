@@ -8,6 +8,7 @@ import {
 } from '../../../utils/attendanceData'
 import { formatMonthYearLabel } from '../../../utils/shiftData'
 import { computeEmployeeRatingsForMonth } from '../../../services/academyDataService'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeRatingDetailModal from '../EmployeeRatingDetailModal'
 import RatingScoreBar from '../RatingScoreBar'
@@ -55,6 +56,8 @@ export default function EmployeeRatingSection() {
       setLoading(false)
     }
   }, [year, month, employeeIdsKey])
+
+  usePlatformPageRefresh(loadRating)
 
   useEffect(() => {
     loadRating()

@@ -14,6 +14,7 @@ import {
   getMonthsForWeek,
 } from '../../../utils/shiftData'
 import { getTeamShiftsForMonth } from '../../../services/academyDataService'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import AdminModal from '../AdminModal'
 import TeamScheduleCell from '../TeamScheduleCell'
 import SchedulePeriodBar from '../SchedulePeriodBar'
@@ -72,6 +73,8 @@ export default function WorkScheduleSection() {
       setLoading(false)
     }
   }, [weekStartKey, employeeIdsKey])
+
+  usePlatformPageRefresh(loadShifts)
 
   useEffect(() => {
     loadShifts()

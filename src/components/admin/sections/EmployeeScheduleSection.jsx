@@ -12,6 +12,7 @@ import {
   saveEmployeeShift,
   applyBulkEmployeeShifts,
 } from '../../../services/academyDataService'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { canEditEmployeeSchedule } from '../../../config/permissions'
 import { useSession } from '../../../context/SessionContext'
 import EmployeeAvatar from '../../EmployeeAvatar'
@@ -68,6 +69,8 @@ export default function EmployeeScheduleSection({ employeeId }) {
       setLoading(false)
     }
   }, [employeeId, year, month])
+
+  usePlatformPageRefresh(loadShifts)
 
   useEffect(() => {
     loadShifts()

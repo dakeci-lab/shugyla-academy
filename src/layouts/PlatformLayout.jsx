@@ -5,6 +5,9 @@ import PlatformUserMenu from '../components/platform/PlatformUserMenu'
 import PlatformMobileHeader from '../components/platform/PlatformMobileHeader'
 import AppInstallBanner from '../components/platform/AppInstallBanner'
 import PlatformSidebar from '../components/platform/PlatformSidebar'
+import PullToRefresh from '../components/platform/PullToRefresh'
+import { PullToRefreshProvider } from '../context/PullToRefreshContext'
+import { useAcademyData } from '../context/AcademyDataContext'
 import { getPlatformSection } from '../platform/platformNav'
 import { useSession } from '../context/SessionContext'
 import './PlatformLayout.css'
@@ -12,6 +15,7 @@ import './PlatformLayout.css'
 /** Оболочка Shugyla Platform — sidebar + контент */
 export default function PlatformLayout() {
   const { user, logout } = useSession()
+  const { reload } = useAcademyData()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const section = getPlatformSection(pathname)
@@ -63,32 +67,34 @@ export default function PlatformLayout() {
         onNavigate={closeDrawer}
       />
 
-      <div className="platform-layout__main">
-        <AppInstallBanner />
+      <PullToRefreshProvider onGlobalRefresh={reload}>
+        <PullToRefresh disabled={drawerOpen} className="platform-layout__main">
+          <AppInstallBanner />
 
-        <PlatformMobileHeader
-          user={user}
-          onMenuOpen={() => setDrawerOpen(true)}
-          onLogout={handleLogout}
-        />
+          <PlatformMobileHeader
+            user={user}
+            onMenuOpen={() => setDrawerOpen(true)}
+            onLogout={handleLogout}
+          />
 
-        <header className="platform-layout__topbar">
-          <div className="platform-layout__topbar-info">
+          <header className="platform-layout__topbar">
+            <div className="platform-layout__topbar-info">
+              <h1 className="platform-layout__title">{section.title}</h1>
+              <p className="platform-layout__desc">{section.description}</p>
+            </div>
+            <PlatformUserMenu user={user} onLogout={handleLogout} />
+          </header>
+
+          <div className="platform-layout__mobile-head">
             <h1 className="platform-layout__title">{section.title}</h1>
             <p className="platform-layout__desc">{section.description}</p>
           </div>
-          <PlatformUserMenu user={user} onLogout={handleLogout} />
-        </header>
 
-        <div className="platform-layout__mobile-head">
-          <h1 className="platform-layout__title">{section.title}</h1>
-          <p className="platform-layout__desc">{section.description}</p>
-        </div>
-
-        <div className="platform-layout__content">
-          <Outlet />
-        </div>
-      </div>
+          <div className="platform-layout__content">
+            <Outlet />
+          </div>
+        </PullToRefresh>
+      </PullToRefreshProvider>
     </div>
   )
 }

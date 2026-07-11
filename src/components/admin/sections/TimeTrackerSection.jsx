@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getCurrentPosition, extractCoords, validatePositionAccuracy } from '../../../utils/geolocation'
 import { formatTimeRange, SHIFT_STATUS, SHIFT_STATUS_LABELS, isWorkingShiftStatus } from '../../../utils/shiftData'
 import {
@@ -12,6 +12,7 @@ import {
   checkOutEmployee,
 } from '../../../services/academyDataService'
 import { useSession } from '../../../context/SessionContext'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import '../admin-shared.css'
 import '../EmployeeRating.css'
 
@@ -58,7 +59,7 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
     return () => clearInterval(timer)
   }, [])
 
-  async function loadShift() {
+  const loadShift = useCallback(async () => {
     if (!employeeId) return
     setLoading(true)
     setLoadError(false)
@@ -72,11 +73,13 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
     } finally {
       setLoading(false)
     }
-  }
+  }, [employeeId])
+
+  usePlatformPageRefresh(loadShift)
 
   useEffect(() => {
     loadShift()
-  }, [employeeId])
+  }, [loadShift])
 
   const state = useMemo(() => {
     if (loading) return { code: 'loading', message: '' }
