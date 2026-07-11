@@ -6,6 +6,7 @@ const THRESHOLD = 72
 const MAX_PULL = 120
 const RESISTANCE = 0.5
 const REFRESHING_HEIGHT = 52
+const HIDE_DURATION_MS = 320
 const MOBILE_QUERY = '(max-width: 900px)'
 
 function getScrollTop() {
@@ -21,6 +22,8 @@ export default function PullToRefresh({ children, disabled = false, className = 
   const { performRefresh } = usePullToRefresh()
   const [pull, setPull] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  const [hiding, setHiding] = useState(false)
+  const [dragging, setDragging] = useState(false)
   const [animating, setAnimating] = useState(false)
 
   const startYRef = useRef(0)
@@ -40,7 +43,9 @@ export default function PullToRefresh({ children, disabled = false, className = 
   const triggerRefresh = useCallback(async () => {
     if (refreshingRef.current) return
 
+    setDragging(false)
     setRefreshing(true)
+    setHiding(false)
     setAnimating(true)
     setPullDistance(REFRESHING_HEIGHT)
 
@@ -50,8 +55,12 @@ export default function PullToRefresh({ children, disabled = false, className = 
       console.error('[PullToRefresh] refresh failed:', error)
     } finally {
       setRefreshing(false)
+      setHiding(true)
       setPullDistance(0)
-      window.setTimeout(() => setAnimating(false), 280)
+      window.setTimeout(() => {
+        setHiding(false)
+        setAnimating(false)
+      }, HIDE_DURATION_MS)
     }
   }, [performRefresh, setPullDistance])
 
@@ -82,6 +91,7 @@ export default function PullToRefresh({ children, disabled = false, className = 
       if (!pullingRef.current) {
         if (delta <= 0 || getScrollTop() > 0) return
         pullingRef.current = true
+        setDragging(true)
       }
 
       if (!pullingRef.current) return
@@ -97,6 +107,7 @@ export default function PullToRefresh({ children, disabled = false, className = 
 
       if (!pullingRef.current) return
       pullingRef.current = false
+      setDragging(false)
 
       if (pullRef.current >= THRESHOLD) {
         triggerRefresh()
@@ -105,7 +116,7 @@ export default function PullToRefresh({ children, disabled = false, className = 
 
       setAnimating(true)
       setPullDistance(0)
-      window.setTimeout(() => setAnimating(false), 280)
+      window.setTimeout(() => setAnimating(false), HIDE_DURATION_MS)
     }
 
     document.addEventListener('touchstart', onTouchStart, { passive: true })
@@ -123,19 +134,42 @@ export default function PullToRefresh({ children, disabled = false, className = 
   }, [disabled, setPullDistance, triggerRefresh])
 
   const offset = refreshing ? REFRESHING_HEIGHT : pull
-  const showIndicator = offset > 0 || refreshing
+  const showIndicator = offset > 0 || refreshing || hiding
+  const pullProgress = Math.min(1, pull / THRESHOLD)
+  const pullRotation = pullProgress * 240
+
+  const indicatorClassName = [
+    'pull-to-refresh__indicator',
+    showIndicator ? 'pull-to-refresh__indicator--visible' : '',
+    dragging ? 'pull-to-refresh__indicator--dragging' : '',
+    refreshing ? 'pull-to-refresh__indicator--refreshing' : '',
+    hiding ? 'pull-to-refresh__indicator--hiding' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div className={`pull-to-refresh ${className}`.trim()}>
       <div
-        className={`pull-to-refresh__indicator${showIndicator ? ' pull-to-refresh__indicator--visible' : ''}`}
+        className={indicatorClassName}
         aria-hidden={!showIndicator}
-        style={{ height: showIndicator ? offset : 0 }}
+        style={{ height: showIndicator ? (refreshing ? REFRESHING_HEIGHT : offset) : 0 }}
       >
-        <span
-          className={`pull-to-refresh__spinner${refreshing ? ' pull-to-refresh__spinner--spinning' : ''}`}
-          style={{ opacity: showIndicator ? Math.min(1, offset / THRESHOLD) : 0 }}
-        />
+        <div
+          className="pull-to-refresh__spinner-wrap"
+          style={{ '--pull-opacity': refreshing || hiding ? 1 : pullProgress }}
+        >
+          <span
+            className={`pull-to-refresh__spinner${refreshing ? ' pull-to-refresh__spinner--loading' : ''}`}
+            style={refreshing ? undefined : { '--pull-rotation': pullRotation }}
+            aria-hidden="true"
+          />
+        </div>
+        {refreshing && (
+          <span className="pull-to-refresh__status" role="status" aria-live="polite">
+            Обновление…
+          </span>
+        )}
       </div>
 
       <div
