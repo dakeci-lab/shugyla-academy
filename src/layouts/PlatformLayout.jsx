@@ -8,6 +8,7 @@ import PlatformSidebar from '../components/platform/PlatformSidebar'
 import PullToRefresh from '../components/platform/PullToRefresh'
 import { PullToRefreshProvider } from '../context/PullToRefreshContext'
 import { useAcademyData } from '../context/AcademyDataContext'
+import { useProcurementRealtime } from '../hooks/useProcurementRealtime'
 import { getPlatformSection } from '../platform/platformNav'
 import { useSession } from '../context/SessionContext'
 import './PlatformLayout.css'
@@ -16,6 +17,7 @@ import './PlatformLayout.css'
 export default function PlatformLayout() {
   const { user, logout } = useSession()
   const { reload } = useAcademyData()
+  useProcurementRealtime(Boolean(user))
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const section = getPlatformSection(pathname)

@@ -36,6 +36,7 @@ import {
   upsertOptimisticPurchase,
   mergePurchaseOrders,
   mergeReceivingDocuments,
+  clearOptimisticReceivingSyncState,
 } from './purchaseOptimisticStore'
 
 const DELETE_SUCCESS_MESSAGE = 'Закупка успешно удалена'
@@ -120,8 +121,15 @@ async function persistSimpleDeliveryChecklistState({
 
   const existing = await receivingCloud.fetchDocumentById(documentId)
   if (!existing) {
+    if (document && order) {
+      await receivingCloud.syncSimpleReceivingDocumentCloud(document, order)
+    }
+  }
+
+  const syncedDocument = await receivingCloud.fetchDocumentById(documentId)
+  if (!syncedDocument) {
     console.warn(
-      '[SimpleDeliveryChecklist] document not in Supabase yet, status kept in overlay',
+      '[SimpleDeliveryChecklist] document not in Supabase, status kept in overlay',
       documentId
     )
     return
@@ -131,6 +139,20 @@ async function persistSimpleDeliveryChecklistState({
     await receivingCloud.acceptSimpleDeliveryCloud(documentId, user)
   } else {
     await receivingCloud.unacceptSimpleDeliveryCloud(documentId)
+  }
+
+  clearOptimisticReceivingSyncState(documentId, order?.id)
+
+  const freshDocument = await receivingCloud.fetchDocumentById(documentId)
+  if (freshDocument) {
+    upsertCloudReceivingDocument(freshDocument)
+  }
+
+  if (order?.id) {
+    const freshOrder = await cloud.fetchOrderById(order.id)
+    if (freshOrder) {
+      upsertCloudPurchase(freshOrder)
+    }
   }
 }
 
