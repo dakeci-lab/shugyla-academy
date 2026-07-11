@@ -34,6 +34,14 @@ export function isCloudStoreLoaded() {
   return store.loaded
 }
 
+export function patchCloudStore(patch) {
+  if (!store.loaded || !patch) return
+  if (patch.purchases !== undefined) store.purchases = patch.purchases
+  if (patch.receivingDocuments !== undefined) {
+    store.receivingDocuments = patch.receivingDocuments
+  }
+}
+
 export function setCloudStore(data) {
   store = {
     loaded: true,

@@ -1,9 +1,8 @@
 import { isCloudMode } from '../lib/dataMode'
-import { getCloudPurchases } from '../lib/cloudStore'
+import { getCloudPurchases, isCloudStoreLoaded } from '../lib/cloudStore'
 import { refreshData } from './academyDataService'
 import * as local from './purchaseLocalAdapter'
 import * as cloud from './purchaseSupabaseAdapter'
-import { transferFromPurchase } from './receivingDataService'
 import {
   getOptimisticOverlayForMerge,
   getOptimisticDeletedOrderIds,
@@ -16,13 +15,11 @@ function getAdapter() {
 
 function getPurchasesSource() {
   if (isCloudMode()) {
-    const orders = getCloudPurchases()
+    if (!isCloudStoreLoaded()) return []
+    const orders = getCloudPurchases() || []
     const overlay = getOptimisticOverlayForMerge()
     const deletedOrderIds = getOptimisticDeletedOrderIds()
-    if (orders || overlay.orders.length || deletedOrderIds.length) {
-      return mergePurchaseOrders(orders || [], overlay.orders, deletedOrderIds)
-    }
-    return []
+    return mergePurchaseOrders(orders, overlay.orders, deletedOrderIds)
   }
   return local.getLocalPurchasesBundle().orders
 }
@@ -91,6 +88,7 @@ export async function createSimplePurchase(data, user) {
 }
 
 export async function transferPurchaseToReceiving(orderId, user) {
+  const { transferFromPurchase } = await import('./receivingDataService')
   const result = await transferFromPurchase(orderId, user)
   await afterPurchaseMutation()
   return result

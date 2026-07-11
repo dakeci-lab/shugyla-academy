@@ -8,7 +8,6 @@ import {
   unacceptSimpleDeliveryOptimistic,
 } from '../../services/purchaseOptimisticService'
 import { useAdminRefresh } from '../../hooks/useAdminRefresh'
-import { useProcurementRealtime } from '../../hooks/useProcurementRealtime'
 import {
   buildSimpleReceivingEntries,
   isSimpleReceivingEntryDone,
@@ -44,7 +43,6 @@ function getWeekNavigationSelectedDateKey(weekStartKey) {
 export default function SimpleReceivingWeekView() {
   const { user } = useSession()
   const { version, notifyChange } = useAdminRefresh()
-  useProcurementRealtime(true)
   const [weekStartKey, setWeekStartKey] = useState(getInitialWeekStartKey)
   const [selectedDateKey, setSelectedDateKey] = useState(() =>
     getInitialPageSelectedDateKey(getInitialWeekStartKey())

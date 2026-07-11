@@ -1,5 +1,5 @@
 import { isCloudMode } from '../lib/dataMode'
-import { getCloudReceivingDocuments } from '../lib/cloudStore'
+import { getCloudReceivingDocuments, isCloudStoreLoaded } from '../lib/cloudStore'
 import { refreshData } from './academyDataService'
 import * as local from './receivingLocalAdapter'
 import * as cloud from './receivingSupabaseAdapter'
@@ -11,13 +11,11 @@ import {
 
 function getReceivingSource() {
   if (isCloudMode()) {
-    const documents = getCloudReceivingDocuments()
+    if (!isCloudStoreLoaded()) return []
+    const documents = getCloudReceivingDocuments() || []
     const overlay = getOptimisticOverlayForMerge()
     const deletedOrderIds = getOptimisticDeletedOrderIds()
-    if (documents || overlay.documents.length || deletedOrderIds.length) {
-      return mergeReceivingDocuments(documents || [], overlay.documents, deletedOrderIds)
-    }
-    return []
+    return mergeReceivingDocuments(documents, overlay.documents, deletedOrderIds)
   }
   return local.getLocalReceivingBundle().documents
 }

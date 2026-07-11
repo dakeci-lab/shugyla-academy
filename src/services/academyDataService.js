@@ -1,5 +1,5 @@
 import { isCloudMode, getDataModeLabel, getDataModeVariant } from '../lib/dataMode'
-import { setCloudStore, clearCloudStore } from '../lib/cloudStore'
+import { setCloudStore, clearCloudStore, patchCloudStore } from '../lib/cloudStore'
 import * as supabaseAdapter from './supabaseDataAdapter'
 import * as testSupabaseAdapter from './testSupabaseAdapter'
 import * as testLocalAdapter from './testLocalAdapter'
@@ -112,6 +112,8 @@ function getAttendanceAdapter() {
 
 export { isCloudMode, getDataModeLabel, getDataModeVariant }
 
+let pendingInitialize = null
+
 /** Load all academy data into memory (cloud) or no-op (local) */
 export async function initializeData() {
   if (!isCloudMode()) {
@@ -119,9 +121,44 @@ export async function initializeData() {
     return localAdapter.initializeLocal()
   }
 
-  const data = await supabaseAdapter.fetchAllData()
-  setCloudStore(data)
-  return data
+  if (pendingInitialize) return pendingInitialize
+
+  pendingInitialize = (async () => {
+    try {
+      const data = await supabaseAdapter.fetchAllData()
+      setCloudStore(data)
+      return data
+    } finally {
+      pendingInitialize = null
+    }
+  })()
+
+  return pendingInitialize
+}
+
+/** Обновить только закуп и приёмку (Realtime / polling) */
+export async function refreshProcurementData() {
+  if (!isCloudMode()) return null
+
+  const [{ fetchPurchasesDataCloud }, { fetchReceivingDataCloud }] = await Promise.all([
+    import('./purchaseSupabaseAdapter'),
+    import('./receivingSupabaseAdapter'),
+  ])
+
+  const [purchasesData, receivingData] = await Promise.all([
+    fetchPurchasesDataCloud(),
+    fetchReceivingDataCloud(),
+  ])
+
+  patchCloudStore({
+    purchases: purchasesData.orders,
+    receivingDocuments: receivingData.documents,
+  })
+
+  return {
+    purchases: purchasesData.orders,
+    receivingDocuments: receivingData.documents,
+  }
 }
 
 export async function refreshData() {

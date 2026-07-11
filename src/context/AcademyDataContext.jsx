@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { isCloudMode } from '../lib/dataMode'
-import { initializeData } from '../services/academyDataService'
+import { initializeData, refreshProcurementData } from '../services/academyDataService'
 import './AcademyDataContext.css'
 
 const AcademyDataContext = createContext({
@@ -8,6 +8,7 @@ const AcademyDataContext = createContext({
   loading: false,
   version: 0,
   reload: async () => {},
+  reloadProcurement: async () => {},
   notifyChange: () => {},
 })
 
@@ -36,14 +37,23 @@ export function AcademyDataProvider({ children }) {
     setVersion((v) => v + 1)
   }, [])
 
+  const reloadProcurement = useCallback(async () => {
+    if (isCloudMode()) {
+      await refreshProcurementData()
+    }
+    setVersion((v) => v + 1)
+  }, [])
+
   const notifyChange = useCallback(() => {
     setVersion((v) => v + 1)
   }, [])
 
   useEffect(() => {
-    let cancelled = false
+    let loadId = 0
 
     async function load() {
+      const currentLoadId = ++loadId
+
       if (!isCloudMode()) {
         setReady(true)
         setLoading(false)
@@ -53,19 +63,17 @@ export function AcademyDataProvider({ children }) {
       setLoading(true)
       try {
         await initializeData()
-        if (!cancelled) setReady(true)
       } catch (error) {
         console.error('Academy data load failed:', error)
-        if (!cancelled) setReady(true)
       } finally {
-        if (!cancelled) setLoading(false)
+        if (currentLoadId === loadId) {
+          setReady(true)
+          setLoading(false)
+        }
       }
     }
 
     load()
-    return () => {
-      cancelled = true
-    }
   }, [])
 
   if (loading || !ready) {
@@ -73,7 +81,9 @@ export function AcademyDataProvider({ children }) {
   }
 
   return (
-    <AcademyDataContext.Provider value={{ ready, loading, version, reload, notifyChange }}>
+    <AcademyDataContext.Provider
+      value={{ ready, loading, version, reload, reloadProcurement, notifyChange }}
+    >
       {children}
     </AcademyDataContext.Provider>
   )

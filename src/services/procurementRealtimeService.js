@@ -3,7 +3,9 @@ import { isCloudMode } from '../lib/dataMode'
 
 const DEBOUNCE_MS = 350
 const POLL_INTERVAL_MS = 15000
-const CHANNEL_NAME = 'procurement-sync'
+const CHANNEL_PREFIX = 'procurement-sync'
+
+let channelCounter = 0
 
 /**
  * Подписка на изменения закупов и приёмки через Supabase Realtime.
@@ -14,6 +16,7 @@ export function subscribeProcurementRealtime(onSync) {
     return () => {}
   }
 
+  const channelName = `${CHANNEL_PREFIX}-${++channelCounter}`
   let debounceTimer = null
   let pollTimer = null
   let disposed = false
@@ -44,7 +47,7 @@ export function subscribeProcurementRealtime(onSync) {
   startPolling()
 
   const channel = supabase
-    .channel(CHANNEL_NAME)
+    .channel(channelName)
     .on(
       'postgres_changes',
       { event: '*', schema: 'public', table: 'purchase_orders' },
