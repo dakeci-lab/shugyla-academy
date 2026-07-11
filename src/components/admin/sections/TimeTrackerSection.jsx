@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getCurrentPosition, extractCoords, validatePositionAccuracy } from '../../../utils/geolocation'
 import {
   formatTimeRange,
-  SHIFT_STATUS,
   SHIFT_STATUS_LABELS,
   isWorkingShiftStatus,
   computeShiftStatus,
@@ -26,9 +25,9 @@ import {
 } from '../../../services/academyDataService'
 import { useSession } from '../../../context/SessionContext'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
+import TimeTrackerHomeCard from './TimeTrackerHomeCard'
 import '../admin-shared.css'
 import '../EmployeeRating.css'
-
 
 function TimeTrackerSkeleton() {
   return (
@@ -41,6 +40,107 @@ function TimeTrackerSkeleton() {
         <div className="time-tracker-card__skeleton-btn" />
       </div>
     </div>
+  )
+}
+
+function TimeTrackerLegacyCard({
+  isHome,
+  shift,
+  loading,
+  loadError,
+  loadShift,
+  displayStatus,
+  computedStatus,
+  canCheckIn,
+  canCheckOut,
+  acting,
+  handleCheckIn,
+  handleCheckOut,
+  success,
+  actionError,
+}) {
+  return (
+    <section className={`time-tracker-card ${isHome ? 'time-tracker-card--home' : ''}`}>
+      <h3 className={isHome ? 'time-tracker-card__section-title' : 'admin-panel-card__title'}>
+        {isHome ? 'Сегодняшняя смена' : 'Тайм-трекер'}
+      </h3>
+
+      <p className="admin-form__hint time-tracker-card__date">{formatTodayLabel()}</p>
+
+      {loading ? (
+        <TimeTrackerSkeleton />
+      ) : loadError ? (
+        <div className="time-tracker-card__load-error">
+          <p>Не удалось загрузить данные смены</p>
+          <button type="button" className="btn btn--outline btn--sm" onClick={loadShift}>
+            Повторить
+          </button>
+        </div>
+      ) : (
+        <div className="time-tracker-card__meta">
+          {shift && isWorkingShiftStatus(shift.status) && (
+            <p>
+              <strong>Плановая смена:</strong>{' '}
+              {formatTimeRange(shift.plannedStartTime, shift.plannedEndTime) || '—'}
+            </p>
+          )}
+          {shift && !isWorkingShiftStatus(shift.status) && (
+            <p>
+              <strong>Статус дня:</strong> {SHIFT_STATUS_LABELS[shift.status]}
+            </p>
+          )}
+          <p className="time-tracker-card__status">
+            <strong>Текущий статус:</strong> {displayStatus}
+          </p>
+          {shift?.actualStartTime && (
+            <p>
+              <strong>Приход:</strong>{' '}
+              {new Date(shift.actualStartTime).toLocaleTimeString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </p>
+          )}
+          {shift?.actualEndTime && (
+            <p>
+              <strong>Уход:</strong>{' '}
+              {new Date(shift.actualEndTime).toLocaleTimeString('ru-RU', {
+                hour: '2-digit',
+                minute: '2-digit',
+              })}
+            </p>
+          )}
+          {(computedStatus?.workedMinutes ?? shift?.workedMinutes) > 0 && (
+            <p>
+              <strong>Отработано:</strong>{' '}
+              {formatDurationMinutes(computedStatus?.workedMinutes ?? shift.workedMinutes)}
+            </p>
+          )}
+        </div>
+      )}
+
+      <div className="time-tracker-card__actions">
+        <button
+          type="button"
+          className="btn btn--primary time-tracker-card__action-btn"
+          disabled={!canCheckIn || acting || loading || loadError}
+          onClick={handleCheckIn}
+        >
+          {acting ? 'Проверка…' : 'Я на работе'}
+        </button>
+        <button
+          type="button"
+          className="btn btn--outline time-tracker-card__action-btn"
+          disabled={!canCheckOut || acting || loading || loadError}
+          onClick={handleCheckOut}
+        >
+          {acting ? 'Проверка…' : 'Я ухожу'}
+        </button>
+      </div>
+
+      {success && <p className="admin-success-banner">{success}</p>}
+      {actionError && <p className="admin-form__error">{actionError}</p>}
+    </section>
   )
 }
 
@@ -58,9 +158,11 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
   const [now, setNow] = useState(new Date())
 
   useEffect(() => {
-    const timer = setInterval(() => setNow(new Date()), 1000)
+    const intervalMs =
+      shift?.actualStartTime && !shift?.actualEndTime ? 30000 : 60000
+    const timer = setInterval(() => setNow(new Date()), intervalMs)
     return () => clearInterval(timer)
-  }, [])
+  }, [shift?.actualStartTime, shift?.actualEndTime])
 
   const loadShift = useCallback(async () => {
     if (!employeeId) return
@@ -169,102 +271,46 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
 
   const welcomeName = user?.name?.split(/\s+/)[0] || user?.name || 'сотрудник'
 
+  if (isHome) {
+    return (
+      <TimeTrackerHomeCard
+        welcomeName={welcomeName}
+        shift={shift}
+        state={state}
+        computedStatus={computedStatus}
+        displayStatus={displayStatus}
+        canCheckIn={canCheckIn}
+        canCheckOut={canCheckOut}
+        acting={acting}
+        loading={loading}
+        loadError={loadError}
+        onCheckIn={handleCheckIn}
+        onCheckOut={handleCheckOut}
+        onRetry={loadShift}
+        now={now}
+        isWorkingShift={Boolean(shift && isWorkingShiftStatus(shift.status))}
+        actionError={actionError}
+        success={success}
+      />
+    )
+  }
+
   return (
-    <section className={`time-tracker-card ${isHome ? 'time-tracker-card--home' : ''}`}>
-      {isHome && (
-        <header className="time-tracker-card__welcome">
-          <h2 className="time-tracker-card__welcome-title">
-            Добро пожаловать, {welcomeName}
-          </h2>
-        </header>
-      )}
-
-      <h3 className={isHome ? 'time-tracker-card__section-title' : 'admin-panel-card__title'}>
-        {isHome ? 'Сегодняшняя смена' : 'Тайм-трекер'}
-      </h3>
-
-      <p className="admin-form__hint time-tracker-card__date">{formatTodayLabel()}</p>
-      <p className="time-tracker-card__clock">
-        {now.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-      </p>
-
-      {loading ? (
-        <TimeTrackerSkeleton />
-      ) : loadError ? (
-        <div className="time-tracker-card__load-error">
-          <p>Не удалось загрузить данные смены</p>
-          <button type="button" className="btn btn--outline btn--sm" onClick={loadShift}>
-            Повторить
-          </button>
-        </div>
-      ) : (
-        <div className="time-tracker-card__meta">
-          {shift && isWorkingShiftVisible(shift) && (
-            <p>
-              <strong>Плановая смена:</strong>{' '}
-              {formatTimeRange(shift.plannedStartTime, shift.plannedEndTime) || '—'}
-            </p>
-          )}
-          {shift && !isWorkingShiftVisible(shift) && (
-            <p>
-              <strong>Статус дня:</strong> {SHIFT_STATUS_LABELS[shift.status]}
-            </p>
-          )}
-          <p className="time-tracker-card__status">
-            <strong>Текущий статус:</strong> {displayStatus}
-          </p>
-          {shift?.actualStartTime && (
-            <p>
-              <strong>Приход:</strong>{' '}
-              {new Date(shift.actualStartTime).toLocaleTimeString('ru-RU', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </p>
-          )}
-          {shift?.actualEndTime && (
-            <p>
-              <strong>Уход:</strong>{' '}
-              {new Date(shift.actualEndTime).toLocaleTimeString('ru-RU', {
-                hour: '2-digit',
-                minute: '2-digit',
-              })}
-            </p>
-          )}
-          {(computedStatus?.workedMinutes ?? shift?.workedMinutes) > 0 && (
-            <p>
-              <strong>Отработано:</strong>{' '}
-              {formatDurationMinutes(computedStatus?.workedMinutes ?? shift.workedMinutes)}
-            </p>
-          )}
-        </div>
-      )}
-
-      <div className="time-tracker-card__actions">
-        <button
-          type="button"
-          className="btn btn--primary time-tracker-card__action-btn"
-          disabled={!canCheckIn || acting || loading || loadError}
-          onClick={handleCheckIn}
-        >
-          {acting ? 'Проверка…' : 'Я на работе'}
-        </button>
-        <button
-          type="button"
-          className="btn btn--outline time-tracker-card__action-btn"
-          disabled={!canCheckOut || acting || loading || loadError}
-          onClick={handleCheckOut}
-        >
-          {acting ? 'Проверка…' : 'Я ухожу'}
-        </button>
-      </div>
-
-      {success && <p className="admin-success-banner">{success}</p>}
-      {actionError && <p className="admin-form__error">{actionError}</p>}
-    </section>
+    <TimeTrackerLegacyCard
+      isHome={isHome}
+      shift={shift}
+      loading={loading}
+      loadError={loadError}
+      loadShift={loadShift}
+      displayStatus={displayStatus}
+      computedStatus={computedStatus}
+      canCheckIn={canCheckIn}
+      canCheckOut={canCheckOut}
+      acting={acting}
+      handleCheckIn={handleCheckIn}
+      handleCheckOut={handleCheckOut}
+      success={success}
+      actionError={actionError}
+    />
   )
-}
-
-function isWorkingShiftVisible(shift) {
-  return shift.status === SHIFT_STATUS.WORKING
 }

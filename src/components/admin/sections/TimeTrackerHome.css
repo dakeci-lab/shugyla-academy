@@ -1,0 +1,418 @@
+/* Главная карточка тайм-трекера — только UI */
+
+.tt-home {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+.tt-home-header {
+  margin-bottom: 1.25rem;
+}
+
+.tt-home-header__welcome {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.375rem, 4.5vw, 1.625rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+.tt-home-header__section {
+  margin: 0 0 0.25rem;
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.tt-home-header__date {
+  margin: 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.tt-home-card {
+  background: #fff;
+  border-radius: 22px;
+  padding: 1.75rem 1.5rem 1.5rem;
+  box-shadow:
+    0 4px 6px -1px rgba(15, 23, 42, 0.06),
+    0 12px 28px -8px rgba(15, 23, 42, 0.1);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  transition:
+    box-shadow 0.25s ease,
+    border-color 0.25s ease,
+    background-color 0.25s ease;
+}
+
+.tt-home-card--animate {
+  animation: tt-home-enter 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes tt-home-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.tt-home-card--waiting,
+.tt-home-card--working {
+  border-color: rgba(34, 197, 94, 0.18);
+  background: linear-gradient(180deg, #fff 0%, rgba(240, 253, 244, 0.45) 100%);
+}
+
+.tt-home-card--late {
+  border-color: rgba(249, 115, 22, 0.28);
+  background: linear-gradient(180deg, #fff 0%, rgba(255, 247, 237, 0.65) 100%);
+}
+
+.tt-home-card--completed {
+  border-color: rgba(34, 197, 94, 0.22);
+  background: linear-gradient(180deg, #fff 0%, rgba(240, 253, 244, 0.55) 100%);
+}
+
+.tt-home-card--absence {
+  border-color: rgba(239, 68, 68, 0.22);
+  background: linear-gradient(180deg, #fff 0%, rgba(254, 242, 242, 0.55) 100%);
+}
+
+.tt-home-card--error,
+.tt-home-card--empty,
+.tt-home-card--dayoff,
+.tt-home-card--idle {
+  border-color: rgba(148, 163, 184, 0.2);
+}
+
+.tt-home-status-icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+  background: rgba(241, 245, 249, 0.9);
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+
+.tt-home-status-icon__emoji {
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.tt-home-status-icon--waiting,
+.tt-home-status-icon--working,
+.tt-home-status-icon--completed {
+  background: rgba(220, 252, 231, 0.85);
+}
+
+.tt-home-status-icon--late {
+  background: rgba(255, 237, 213, 0.9);
+}
+
+.tt-home-status-icon--absence {
+  background: rgba(254, 226, 226, 0.9);
+}
+
+.tt-home-card__status {
+  margin: 0 0 0.35rem;
+  font-size: clamp(1.25rem, 4vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-text);
+  letter-spacing: -0.02em;
+}
+
+.tt-home-card__hint {
+  margin: 0 0 1.125rem;
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+  max-width: 28ch;
+}
+
+.tt-home-info {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.tt-home-info-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 0.875rem;
+  background: rgba(248, 250, 252, 0.95);
+  border-radius: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  text-align: left;
+}
+
+.tt-home-card--late .tt-home-info-row {
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.tt-home-card--absence .tt-home-info-row {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.tt-home-info-row__icon {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.125rem;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.tt-home-info-row__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.tt-home-info-row__label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-secondary);
+}
+
+.tt-home-info-row__value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+
+.tt-home-actions {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.5rem;
+}
+
+.tt-home-actions__hint {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.tt-home-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.625rem;
+  width: 100%;
+  min-height: 58px;
+  padding: 0.875rem 1.25rem;
+  border: none;
+  border-radius: 16px;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.tt-home-btn__icon {
+  font-size: 1rem;
+  opacity: 0.95;
+}
+
+.tt-home-btn--start {
+  color: #fff;
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  box-shadow:
+    0 4px 14px rgba(34, 197, 94, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.tt-home-btn--start:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 6px 18px rgba(34, 197, 94, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.tt-home-btn--start:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.tt-home-btn--end {
+  color: #fff;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  box-shadow:
+    0 4px 14px rgba(59, 130, 246, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.tt-home-btn--end-late {
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+  box-shadow:
+    0 4px 14px rgba(249, 115, 22, 0.32),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+}
+
+.tt-home-btn--end:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.tt-home-btn--end:active:not(:disabled) {
+  transform: translateY(0) scale(0.98);
+}
+
+.tt-home-btn--secondary {
+  color: var(--color-text);
+  background: #fff;
+  border: 1px solid var(--color-border);
+  box-shadow: none;
+  margin-top: 0.5rem;
+}
+
+.tt-home-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.tt-home-banner {
+  width: 100%;
+  margin-top: 0.25rem;
+  padding: 0.875rem 1rem;
+  border-radius: 14px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.tt-home-banner--success {
+  color: #166534;
+  background: rgba(220, 252, 231, 0.95);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+}
+
+.tt-home-toast {
+  margin: 0.875rem 0 0;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
+.tt-home-toast--success {
+  color: #166534;
+  background: rgba(220, 252, 231, 0.85);
+}
+
+.tt-home-toast--error {
+  color: #991b1b;
+  background: rgba(254, 226, 226, 0.9);
+}
+
+/* Skeleton */
+.tt-home-card--skeleton {
+  align-items: stretch;
+  pointer-events: none;
+}
+
+.tt-home-skeleton {
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.8) 25%,
+    rgba(241, 245, 249, 0.95) 50%,
+    rgba(226, 232, 240, 0.8) 75%
+  );
+  background-size: 200% 100%;
+  animation: tt-home-shimmer 1.2s ease-in-out infinite;
+}
+
+.tt-home-skeleton--icon {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  margin: 0 auto 1rem;
+}
+
+.tt-home-skeleton--title {
+  height: 28px;
+  width: 65%;
+  margin: 0 auto 1rem;
+}
+
+.tt-home-skeleton--line {
+  height: 52px;
+  width: 100%;
+  margin-bottom: 0.5rem;
+}
+
+.tt-home-skeleton--short {
+  width: 80%;
+}
+
+.tt-home-skeleton--btn {
+  height: 58px;
+  width: 100%;
+  margin-top: 0.75rem;
+  border-radius: 16px;
+}
+
+@keyframes tt-home-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (min-width: 769px) {
+  .tt-home {
+    max-width: 420px;
+  }
+
+  .tt-home-card {
+    padding: 2rem 1.75rem 1.75rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .tt-home-card {
+    padding: 1.5rem 1.125rem 1.25rem;
+    border-radius: 20px;
+  }
+
+  .tt-home-btn {
+    min-height: 56px;
+    font-size: 1rem;
+  }
+}
