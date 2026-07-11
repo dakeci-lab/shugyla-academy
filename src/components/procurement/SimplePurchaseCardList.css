@@ -1,0 +1,134 @@
+.simple-purchase-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.simple-purchase-cards__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.simple-purchase-cards__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.simple-purchase-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-white);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+.simple-purchase-card--sync-error {
+  border-color: rgba(220, 38, 38, 0.25);
+  background: #fffafa;
+}
+
+.simple-purchase-card__main {
+  flex: 1;
+  min-width: 0;
+}
+
+.simple-purchase-card__supplier {
+  display: block;
+  width: 100%;
+  margin: 0 0 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.simple-purchase-card__supplier--static {
+  cursor: default;
+}
+
+.simple-purchase-card__supplier:not(:disabled):active {
+  color: var(--color-primary-dark);
+}
+
+.simple-purchase-card__date {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.simple-purchase-card__sync {
+  margin-bottom: 8px;
+}
+
+.simple-purchase-card__sync .purchase-sync-status {
+  font-size: 12px;
+}
+
+.simple-purchase-card__facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+  margin: 0;
+}
+
+.simple-purchase-card__fact {
+  min-width: 0;
+}
+
+.simple-purchase-card__fact dt {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--color-text-muted);
+}
+
+.simple-purchase-card__fact dd {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.3;
+}
+
+.simple-purchase-card__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  padding-top: 2px;
+}
+
+.simple-purchase-card__actions .icon-action-btn {
+  width: 40px;
+  height: 40px;
+}
+
+@media (min-width: 901px) {
+  .simple-purchase-cards {
+    display: none;
+  }
+}

@@ -88,6 +88,14 @@
   font-size: 13px;
 }
 
+.platform-layout__mobile-head--compact {
+  padding-bottom: 10px;
+}
+
+.platform-layout__mobile-head--compact .platform-layout__title {
+  margin-bottom: 0;
+}
+
 @media (max-width: 900px) {
   .platform-layout__overlay {
     display: block;

@@ -80,3 +80,17 @@
   gap: 8px;
   margin-top: 16px;
 }
+
+@media (max-width: 900px) {
+  .purchase-filter-popover {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    top: auto;
+    width: auto;
+    max-height: min(78vh, 520px);
+    overflow-y: auto;
+    z-index: 400;
+  }
+}

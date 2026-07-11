@@ -21,6 +21,10 @@ export default function PlatformLayout() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const section = getPlatformSection(pathname)
+  const compactMobileHead =
+    pathname === '/platform/procurement' ||
+    (pathname.startsWith('/platform/procurement/') &&
+      !pathname.startsWith('/platform/procurement/analytics'))
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
@@ -87,9 +91,15 @@ export default function PlatformLayout() {
             <PlatformUserMenu user={user} onLogout={handleLogout} />
           </header>
 
-          <div className="platform-layout__mobile-head">
+          <div
+            className={`platform-layout__mobile-head${
+              compactMobileHead ? ' platform-layout__mobile-head--compact' : ''
+            }`}
+          >
             <h1 className="platform-layout__title">{section.title}</h1>
-            <p className="platform-layout__desc">{section.description}</p>
+            {!compactMobileHead && (
+              <p className="platform-layout__desc">{section.description}</p>
+            )}
           </div>
 
           <div className="platform-layout__content">

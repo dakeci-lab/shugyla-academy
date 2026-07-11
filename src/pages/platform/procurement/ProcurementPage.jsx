@@ -27,6 +27,7 @@ import {
   hasActivePurchaseFilters,
   paginateItems,
 } from '../../../utils/purchaseFilter'
+import { formatPurchaseFilterSummary } from '../../../utils/purchaseFilterSummary'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../../../components/admin/AdminModal'
 import ConfirmDialog from '../../../components/admin/ConfirmDialog'
@@ -35,9 +36,10 @@ import SimpleCreatePurchaseForm, {
   EMPTY_SIMPLE_PURCHASE_FORM,
 } from '../../../components/procurement/SimpleCreatePurchaseForm'
 import SimplePurchaseTable from '../../../components/procurement/SimplePurchaseTable'
+import SimplePurchaseCardList from '../../../components/procurement/SimplePurchaseCardList'
 import PurchaseFilterPopover from '../../../components/procurement/PurchaseFilterPopover'
 import TablePagination from '../../../components/procurement/TablePagination'
-import { FilterIcon } from '../../../components/icons/PlatformIcons'
+import { FilterIcon, ChevronDownIcon } from '../../../components/icons/PlatformIcons'
 import '../../../components/admin/admin-shared.css'
 import './ProcurementPage.css'
 
@@ -98,6 +100,10 @@ export default function ProcurementPage() {
   }, [version])
 
   const filtersActive = hasActivePurchaseFilters(appliedFilters)
+  const filterSummary = useMemo(
+    () => formatPurchaseFilterSummary(appliedFilters),
+    [appliedFilters]
+  )
 
   if (!canView) {
     return <PlatformAccessDenied title="Нет доступа к разделу «Закуп»" />
@@ -225,29 +231,54 @@ export default function ProcurementPage() {
   }
 
   const modalOpen = showCreate || Boolean(editingOrder)
+  const emptyMessage = getEmptyMessage()
+  const listTotals = filteredOrders.length > 0 ? totals : null
 
   return (
     <div className="procurement-page">
-      <div className="procurement-page__toolbar">
-        <div className="procurement-page__toolbar-actions">
+      <div className="procurement-page__header">
+        <div className="procurement-page__header-main">
           {canCreate && (
-            <button type="button" className="btn btn--primary btn--sm" onClick={openCreate}>
+            <button
+              type="button"
+              className="btn btn--primary btn--sm procurement-page__create-btn"
+              onClick={openCreate}
+            >
               Создать закуп
             </button>
           )}
-          <div className="procurement-page__filter-anchor">
+
+          <div className="procurement-page__filter-wrap">
             <button
               ref={filterButtonRef}
               type="button"
-              className={`btn btn--outline btn--sm procurement-page__filter-btn${
-                filtersActive ? ' procurement-page__filter-btn--active' : ''
+              className={`procurement-page__filter-trigger${
+                filtersActive ? ' procurement-page__filter-trigger--active' : ''
               }`}
               onClick={toggleFilter}
               aria-expanded={filterOpen}
             >
-              <FilterIcon size={16} />
-              Фильтр
-              {filtersActive && <span className="procurement-page__filter-badge" aria-hidden="true" />}
+              <span className="procurement-page__filter-trigger-desktop">
+                <FilterIcon size={16} />
+                Фильтр
+                {filtersActive && <span className="procurement-page__filter-badge" aria-hidden="true" />}
+              </span>
+              <span className="procurement-page__filter-trigger-mobile">
+                <span className="procurement-page__mobile-filter-main">
+                  <FilterIcon size={18} />
+                  <span className="procurement-page__mobile-filter-label">Фильтр</span>
+                  <ChevronDownIcon size={16} />
+                </span>
+                {filterSummary.length > 0 && (
+                  <span className="procurement-page__mobile-filter-chips">
+                    {filterSummary.map((chip) => (
+                      <span key={chip} className="procurement-page__mobile-filter-chip">
+                        {chip}
+                      </span>
+                    ))}
+                  </span>
+                )}
+              </span>
             </button>
             <PurchaseFilterPopover
               open={filterOpen}
@@ -260,13 +291,14 @@ export default function ProcurementPage() {
             />
           </div>
         </div>
-        <span className="admin-toolbar__info">
+
+        <span className="admin-toolbar__info procurement-page__count">
           {filteredOrders.length} из {simpleOrders.length}
         </span>
       </div>
 
       <section className="procurement-page__section">
-        <div className="procurement-list-panel">
+        <div className="procurement-list-panel procurement-list-panel--desktop">
           <SimplePurchaseTable
             orders={pagedOrders}
             documentsByPurchaseId={documentsByPurchaseId}
@@ -276,8 +308,33 @@ export default function ProcurementPage() {
             onDelete={requestDelete}
             onRetry={handleRetry}
             rowIndexOffset={(safePage - 1) * PURCHASE_PAGE_SIZE}
-            totals={filteredOrders.length > 0 ? totals : null}
-            emptyMessage={getEmptyMessage()}
+            totals={listTotals}
+            emptyMessage={emptyMessage}
+          />
+
+          {filteredOrders.length > 0 && (
+            <TablePagination
+              page={safePage}
+              totalPages={totalPages}
+              from={from}
+              to={to}
+              totalCount={filteredOrders.length}
+              onPageChange={setPage}
+            />
+          )}
+        </div>
+
+        <div className="procurement-list-panel procurement-list-panel--mobile">
+          <SimplePurchaseCardList
+            orders={pagedOrders}
+            documentsByPurchaseId={documentsByPurchaseId}
+            showActions={showActions}
+            canEditOrder={(order) => canEditSimplePurchase(user, order)}
+            onOpenEditor={openPurchaseEditor}
+            onDelete={requestDelete}
+            onRetry={handleRetry}
+            totals={listTotals}
+            emptyMessage={emptyMessage}
           />
 
           {filteredOrders.length > 0 && (
@@ -292,6 +349,17 @@ export default function ProcurementPage() {
           )}
         </div>
       </section>
+
+      {canCreate && (
+        <button
+          type="button"
+          className="procurement-page__fab"
+          onClick={openCreate}
+          aria-label="Создать закуп"
+        >
+          +
+        </button>
+      )}
 
       {deleteTargetId && (
         <ConfirmDialog
