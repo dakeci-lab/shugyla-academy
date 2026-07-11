@@ -1,6 +1,10 @@
 import { PURCHASE_STATUS } from './purchaseData'
 import { RECEIVING_STATUS, normalizeReceivingDocument } from './receivingData'
-import { toDateKey } from './shiftData'
+import { toDateKey, buildWeekDates } from './shiftData'
+import {
+  dateToSupplierWeekdayId,
+  SUPPLIER_STATUS,
+} from './supplierData'
 import {
   SYNC_STATUS,
   SYNC_STATUS_LABELS,
@@ -32,6 +36,21 @@ export const SIMPLE_DELIVERY_ICONS = {
   received: '✅',
   overdue: '⚠',
 }
+
+/** Источник записи в чек-листе приёмки */
+export const RECEIVING_ENTRY_SOURCE = {
+  EXPECTED: 'expected',
+  PURCHASE: 'purchase',
+}
+
+/** Статус ожидаемой поставки в приёмке (раздел «Приёмка») */
+export const EXPECTED_DELIVERY_LABEL = 'Ожидается'
+
+/** Заголовок блока плана закупок (раздел «Закуп») */
+export const PROCUREMENT_PLAN_LABEL = 'План закупок'
+
+/** Статус записи в плане закупок (раздел «Закуп») */
+export const PROCUREMENT_PLAN_ITEM_STATUS = 'К заказу'
 
 export function getWorkflowMode(entity) {
   return entity?.workflowMode ?? entity?.workflow_mode ?? PROCUREMENT_WORKFLOW_MODE.ANALYTICS
@@ -106,19 +125,90 @@ export function buildSimpleReceivingEntries(orders, documents) {
 
   return simpleOrders
     .map((order) => ({
+      source: RECEIVING_ENTRY_SOURCE.PURCHASE,
       order,
       document: resolveSimpleReceivingDocument(order, relevantDocuments),
+      supplier: null,
       dateKey: order.expectedDeliveryDate || '',
+      id: order.id,
     }))
     .filter((entry) => entry.document)
     .sort((a, b) => {
       const dateCmp = (a.dateKey || '').localeCompare(b.dateKey || '')
       if (dateCmp !== 0) return dateCmp
-      return (a.order.supplierName || '').localeCompare(b.order.supplierName || '', 'ru')
+      return getReceivingEntrySupplierName(a).localeCompare(getReceivingEntrySupplierName(b), 'ru')
     })
 }
 
+/** Записи плана закупок по расписанию поставщиков (без оформленного закупа) */
+export function buildExpectedDeliveryEntries(suppliers, weekStartKey, orders = []) {
+  if (!weekStartKey) return []
+
+  const activeSuppliers = (suppliers || []).filter(
+    (supplier) =>
+      supplier.status === SUPPLIER_STATUS.ACTIVE &&
+      Array.isArray(supplier.deliveryWeekdays) &&
+      supplier.deliveryWeekdays.length > 0
+  )
+
+  if (!activeSuppliers.length) return []
+
+  const occupied = new Set()
+  for (const order of filterSimplePurchases(orders)) {
+    if (order.supplierId && order.expectedDeliveryDate) {
+      occupied.add(`${order.supplierId}:${order.expectedDeliveryDate}`)
+    }
+  }
+
+  const entries = []
+  for (const date of buildWeekDates(weekStartKey)) {
+    const dateKey = toDateKey(date)
+    const weekdayId = dateToSupplierWeekdayId(date)
+
+    for (const supplier of activeSuppliers) {
+      if (!supplier.deliveryWeekdays.includes(weekdayId)) continue
+      const slotKey = `${supplier.id}:${dateKey}`
+      if (occupied.has(slotKey)) continue
+
+      entries.push({
+        source: RECEIVING_ENTRY_SOURCE.EXPECTED,
+        id: `expected-${supplier.id}-${dateKey}`,
+        supplier,
+        order: null,
+        document: null,
+        dateKey,
+      })
+    }
+  }
+
+  return entries.sort((a, b) => {
+    const dateCmp = (a.dateKey || '').localeCompare(b.dateKey || '')
+    if (dateCmp !== 0) return dateCmp
+    return getReceivingEntrySupplierName(a).localeCompare(getReceivingEntrySupplierName(b), 'ru')
+  })
+}
+
+/** Объединить реальные закупы и записи плана закупок по расписанию */
+export function buildMergedReceivingEntries(orders, documents, suppliers, weekStartKey) {
+  const purchaseEntries = buildSimpleReceivingEntries(orders, documents)
+  const expectedEntries = buildExpectedDeliveryEntries(suppliers, weekStartKey, orders)
+  return [...purchaseEntries, ...expectedEntries]
+}
+
+export function isExpectedReceivingEntry(entry) {
+  return entry?.source === RECEIVING_ENTRY_SOURCE.EXPECTED
+}
+
+export function getReceivingEntrySupplierName(entry) {
+  return entry?.supplier?.name || entry?.order?.supplierName || entry?.document?.supplierName || '—'
+}
+
+export function getReceivingEntryKey(entry) {
+  return entry?.id || entry?.order?.id || `${entry?.supplier?.id}:${entry?.dateKey}`
+}
+
 export function isSimpleReceivingEntryDone(entry) {
+  if (isExpectedReceivingEntry(entry)) return false
   return (
     entry?.document?.status === RECEIVING_STATUS.RECEIVED ||
     entry?.order?.status === PURCHASE_STATUS.RECEIVED
@@ -188,7 +278,12 @@ export function sortReceivingChecklistEntries(entries, checkedOverrides = {}) {
     const aDone = isDone(a)
     const bDone = isDone(b)
     if (aDone !== bDone) return aDone ? 1 : -1
-    return (a.order?.supplierName || '').localeCompare(b.order?.supplierName || '', 'ru')
+
+    const aExpected = isExpectedReceivingEntry(a)
+    const bExpected = isExpectedReceivingEntry(b)
+    if (aExpected !== bExpected) return aExpected ? -1 : 1
+
+    return getReceivingEntrySupplierName(a).localeCompare(getReceivingEntrySupplierName(b), 'ru')
   })
 }
 

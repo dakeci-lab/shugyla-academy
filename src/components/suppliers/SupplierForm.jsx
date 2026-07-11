@@ -7,8 +7,11 @@ import {
   SUPPLIER_STATUS_LABELS,
   categoriesToInputValue,
   inputValueToCategories,
+  parseSupplierWeekdays,
+  serializeSupplierWeekdays,
 } from '../../utils/supplierData'
 import { getActiveEmployees } from '../../utils/employeeData'
+import SupplierWeekdaySelector from './SupplierWeekdaySelector'
 import '../../components/admin/admin-shared.css'
 import './SupplierForm.css'
 
@@ -19,8 +22,8 @@ export const EMPTY_SUPPLIER_FORM = {
   managerName: '',
   managerPhone: '',
   whatsapp: '',
-  orderDays: '',
-  deliveryDays: '',
+  orderWeekdays: [],
+  deliveryWeekdays: [],
   minOrderAmount: '',
   paymentType: PAYMENT_TYPE.CASH,
   deferralDays: '',
@@ -41,8 +44,8 @@ export function supplierToForm(supplier) {
     managerName: supplier.managerName || '',
     managerPhone: supplier.managerPhone || '',
     whatsapp: supplier.whatsapp || '',
-    orderDays: supplier.orderDays || '',
-    deliveryDays: supplier.deliveryDays || '',
+    orderWeekdays: parseSupplierWeekdays(supplier.orderWeekdays ?? supplier.orderDays),
+    deliveryWeekdays: parseSupplierWeekdays(supplier.deliveryWeekdays ?? supplier.deliveryDays),
     minOrderAmount: supplier.minOrderAmount != null ? String(supplier.minOrderAmount) : '',
     paymentType: supplier.paymentType || PAYMENT_TYPE.CASH,
     deferralDays: supplier.deferralDays != null ? String(supplier.deferralDays) : '',
@@ -61,6 +64,8 @@ export function formToSupplierPayload(form) {
   const employeeId = form.responsibleEmployeeId ? Number(form.responsibleEmployeeId) : null
   const employees = getActiveEmployees()
   const employee = employees.find((e) => e.id === employeeId)
+  const orderWeekdays = parseSupplierWeekdays(form.orderWeekdays)
+  const deliveryWeekdays = parseSupplierWeekdays(form.deliveryWeekdays)
 
   return {
     name: form.name.trim(),
@@ -69,8 +74,10 @@ export function formToSupplierPayload(form) {
     managerName: form.managerName.trim(),
     managerPhone: form.managerPhone.trim(),
     whatsapp: form.whatsapp.trim(),
-    orderDays: form.orderDays.trim(),
-    deliveryDays: form.deliveryDays.trim(),
+    orderWeekdays,
+    deliveryWeekdays,
+    orderDays: serializeSupplierWeekdays(orderWeekdays),
+    deliveryDays: serializeSupplierWeekdays(deliveryWeekdays),
     minOrderAmount: form.minOrderAmount !== '' ? Number(form.minOrderAmount) : null,
     paymentType: form.paymentType,
     deferralDays:
@@ -162,25 +169,17 @@ export default function SupplierForm({ form, onChange, error }) {
         />
       </label>
 
-      <div className="admin-form__row">
-        <label className="admin-form__label">
-          Дни приёма заказа
-          <input
-            className="admin-form__input"
-            value={form.orderDays}
-            onChange={(e) => setField('orderDays', e.target.value)}
-            placeholder="Пн, Ср, Пт"
-          />
-        </label>
-        <label className="admin-form__label">
-          Дни доставки
-          <input
-            className="admin-form__input"
-            value={form.deliveryDays}
-            onChange={(e) => setField('deliveryDays', e.target.value)}
-            placeholder="Вт, Чт, Сб"
-          />
-        </label>
+      <div className="supplier-form__schedule">
+        <SupplierWeekdaySelector
+          label="Дни заказа"
+          value={form.orderWeekdays}
+          onChange={(value) => setField('orderWeekdays', value)}
+        />
+        <SupplierWeekdaySelector
+          label="Дни поставки"
+          value={form.deliveryWeekdays}
+          onChange={(value) => setField('deliveryWeekdays', value)}
+        />
       </div>
 
       <div className="admin-form__row">

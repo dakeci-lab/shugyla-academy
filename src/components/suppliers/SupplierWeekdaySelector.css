@@ -1,0 +1,75 @@
+.supplier-weekday-selector {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.supplier-weekday-selector__legend {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text, #111827);
+}
+
+.supplier-weekday-selector__grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.supplier-weekday-selector__day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 6px 4px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  background: var(--color-white, #fff);
+  font-size: 12px;
+  font-weight: 600;
+  color: #374151;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, color 0.15s, box-shadow 0.15s;
+  user-select: none;
+}
+
+.supplier-weekday-selector__day input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.supplier-weekday-selector__day:hover:not(:has(input:disabled)) {
+  border-color: var(--color-primary, #059669);
+}
+
+.supplier-weekday-selector__day--active {
+  border-color: var(--color-primary, #059669);
+  background: var(--color-primary-light, #ecfdf5);
+  color: var(--color-primary-dark, #047857);
+  box-shadow: 0 0 0 1px rgba(5, 150, 105, 0.12);
+}
+
+.supplier-weekday-selector:disabled .supplier-weekday-selector__day {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@media (max-width: 640px) {
+  .supplier-weekday-selector__grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 400px) {
+  .supplier-weekday-selector__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, useEffect } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import {
   canViewPurchases,
@@ -11,24 +12,26 @@ import {
   updatePurchaseOrder,
 } from '../../../services/purchaseDataService'
 import { getReceivingDocumentsSync } from '../../../services/receivingDataService'
+import { getAllSuppliersSync } from '../../../utils/supplierData'
 import {
   createSimplePurchaseOptimistic,
   deleteSimplePurchaseOptimistic,
   retrySimplePurchaseSync,
 } from '../../../services/purchaseOptimisticService'
-import { filterSimplePurchases } from '../../../utils/procurementWorkflow'
+import {
+  buildExpectedDeliveryEntries,
+  filterSimplePurchases,
+} from '../../../utils/procurementWorkflow'
 import { PURCHASE_STATUS } from '../../../utils/purchaseData'
 import {
   createDefaultPurchaseFilters,
-  PURCHASE_PAGE_SIZE,
   calcPurchaseTotals,
   filterPurchaseOrders,
-  getPaginationMeta,
   hasActivePurchaseFilters,
-  paginateItems,
 } from '../../../utils/purchaseFilter'
 import { formatPurchaseFilterSummary } from '../../../utils/purchaseFilterSummary'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
+import { useWeekScheduleState } from '../../../hooks/useWeekScheduleState'
 import AdminModal from '../../../components/admin/AdminModal'
 import ConfirmDialog from '../../../components/admin/ConfirmDialog'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
@@ -38,15 +41,30 @@ import SimpleCreatePurchaseForm, {
 import SimplePurchaseTable from '../../../components/procurement/SimplePurchaseTable'
 import SimplePurchaseCardList from '../../../components/procurement/SimplePurchaseCardList'
 import PurchaseFilterPopover from '../../../components/procurement/PurchaseFilterPopover'
-import TablePagination from '../../../components/procurement/TablePagination'
+import WeekScheduleNav from '../../../components/procurement/WeekScheduleNav'
+import ProcurementPlanDayList from '../../../components/procurement/ProcurementPlanDayList'
 import { FilterIcon, ChevronDownIcon } from '../../../components/icons/PlatformIcons'
 import '../../../components/admin/admin-shared.css'
 import './ProcurementPage.css'
+import '../../../components/procurement/SimpleDeliveryCard.css'
 
 /** Простая закупка — /platform/procurement */
 export default function ProcurementPage() {
   const { user } = useSession()
+  const location = useLocation()
+  const navigate = useNavigate()
   const { version, refresh, notifyChange } = useAdminRefresh()
+  const {
+    weekStartKey,
+    selectedDateKey,
+    setSelectedDateKey,
+    weekDates,
+    weekTitle,
+    todayKey,
+    changeWeek,
+    goToday,
+    selectWeekContaining,
+  } = useWeekScheduleState()
   const filterButtonRef = useRef(null)
   const [showCreate, setShowCreate] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
@@ -57,7 +75,6 @@ export default function ProcurementPage() {
   const [filterOpen, setFilterOpen] = useState(false)
   const [appliedFilters, setAppliedFilters] = useState(createDefaultPurchaseFilters)
   const [draftFilters, setDraftFilters] = useState(createDefaultPurchaseFilters)
-  const [page, setPage] = useState(1)
 
   const canView = canViewPurchases(user)
   const canCreate = canCreatePurchase(user)
@@ -76,20 +93,36 @@ export default function ProcurementPage() {
     [simpleOrders, appliedFilters]
   )
 
-  const totals = useMemo(
-    () => calcPurchaseTotals(filteredOrders),
-    [filteredOrders]
-  )
+  const dayOrders = useMemo(() => {
+    if (!selectedDateKey) return []
+    return filteredOrders
+      .filter((order) => order.expectedDeliveryDate === selectedDateKey)
+      .sort((a, b) => (a.supplierName || '').localeCompare(b.supplierName || '', 'ru'))
+  }, [filteredOrders, selectedDateKey])
 
-  const { totalPages, safePage, from, to } = useMemo(
-    () => getPaginationMeta(filteredOrders.length, page, PURCHASE_PAGE_SIZE),
-    [filteredOrders.length, page]
-  )
+  const expectedEntriesByDate = useMemo(() => {
+    const entries = buildExpectedDeliveryEntries(
+      getAllSuppliersSync(),
+      weekStartKey,
+      getPurchaseOrdersSync()
+    )
+    const counts = {}
+    for (const entry of entries) {
+      counts[entry.dateKey] = (counts[entry.dateKey] || 0) + 1
+    }
+    return counts
+  }, [version, weekStartKey])
 
-  const pagedOrders = useMemo(
-    () => paginateItems(filteredOrders, safePage, PURCHASE_PAGE_SIZE),
-    [filteredOrders, safePage]
-  )
+  const countsByDate = useMemo(() => {
+    const counts = { ...expectedEntriesByDate }
+    for (const order of filteredOrders) {
+      if (!order.expectedDeliveryDate) continue
+      counts[order.expectedDeliveryDate] = (counts[order.expectedDeliveryDate] || 0) + 1
+    }
+    return counts
+  }, [filteredOrders, expectedEntriesByDate])
+
+  const totals = useMemo(() => calcPurchaseTotals(dayOrders), [dayOrders])
 
   const documentsByPurchaseId = useMemo(() => {
     const map = new Map()
@@ -116,12 +149,35 @@ export default function ProcurementPage() {
     setFormError('')
   }
 
-  function openCreate() {
+  function openCreate(prefill = null) {
     setEditingOrder(null)
-    setForm(EMPTY_SIMPLE_PURCHASE_FORM)
+    setForm(
+      prefill
+        ? {
+            ...EMPTY_SIMPLE_PURCHASE_FORM,
+            supplierId: prefill.supplierId || '',
+            supplierName: prefill.supplierName || '',
+            expectedDeliveryDate: prefill.expectedDeliveryDate || selectedDateKey || '',
+          }
+        : {
+            ...EMPTY_SIMPLE_PURCHASE_FORM,
+            expectedDeliveryDate: selectedDateKey || '',
+          }
+    )
     setFormError('')
     setShowCreate(true)
   }
+
+  useEffect(() => {
+    const prefill = location.state?.createPurchase
+    if (!prefill || !canCreate) return
+
+    if (prefill.expectedDeliveryDate) {
+      selectWeekContaining(prefill.expectedDeliveryDate)
+    }
+    openCreate(prefill)
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location.state, canCreate, location.pathname, navigate])
 
   function openPurchaseEditor(orderId) {
     const order = simpleOrders.find((item) => item.id === orderId)
@@ -212,7 +268,6 @@ export default function ProcurementPage() {
 
   function applyFilters() {
     setAppliedFilters({ ...draftFilters })
-    setPage(1)
     setFilterOpen(false)
   }
 
@@ -220,19 +275,21 @@ export default function ProcurementPage() {
     const defaults = createDefaultPurchaseFilters()
     setDraftFilters(defaults)
     setAppliedFilters(defaults)
-    setPage(1)
     setFilterOpen(false)
   }
 
   function getEmptyMessage() {
+    if (!selectedDateKey) return 'Выберите день недели'
     if (simpleOrders.length === 0) return 'Закупы не созданы'
-    if (filtersActive) return 'По выбранному фильтру закупы не найдены'
-    return 'Закупы не созданы'
+    if (filtersActive && filteredOrders.length === 0) {
+      return 'По выбранному фильтру закупы не найдены'
+    }
+    return 'На этот день закупок нет'
   }
 
   const modalOpen = showCreate || Boolean(editingOrder)
   const emptyMessage = getEmptyMessage()
-  const listTotals = filteredOrders.length > 0 ? totals : null
+  const listTotals = dayOrders.length > 0 ? totals : null
 
   return (
     <div className="procurement-page">
@@ -242,7 +299,7 @@ export default function ProcurementPage() {
             <button
               type="button"
               className="btn btn--primary btn--sm procurement-page__create-btn"
-              onClick={openCreate}
+              onClick={() => openCreate()}
             >
               Создать закуп
             </button>
@@ -293,68 +350,73 @@ export default function ProcurementPage() {
         </div>
 
         <span className="admin-toolbar__info procurement-page__count">
-          {filteredOrders.length} из {simpleOrders.length}
+          {dayOrders.length} {selectedDateKey ? 'за день' : ''}
         </span>
       </div>
 
+      <WeekScheduleNav
+        weekTitle={weekTitle}
+        weekDates={weekDates}
+        selectedDateKey={selectedDateKey}
+        todayKey={todayKey}
+        countsByDate={countsByDate}
+        onPrevWeek={() => changeWeek(-1)}
+        onNextWeek={() => changeWeek(1)}
+        onToday={goToday}
+        onSelectDate={setSelectedDateKey}
+      />
+
+      <ProcurementPlanDayList
+        weekStartKey={weekStartKey}
+        selectedDateKey={selectedDateKey}
+        version={version}
+        canCreate={canCreate}
+        onCreatePurchase={openCreate}
+      />
+
       <section className="procurement-page__section">
-        <div className="procurement-list-panel procurement-list-panel--desktop">
-          <SimplePurchaseTable
-            orders={pagedOrders}
-            documentsByPurchaseId={documentsByPurchaseId}
-            showActions={showActions}
-            canEditOrder={(order) => canEditSimplePurchase(user, order)}
-            onOpenEditor={openPurchaseEditor}
-            onDelete={requestDelete}
-            onRetry={handleRetry}
-            rowIndexOffset={(safePage - 1) * PURCHASE_PAGE_SIZE}
-            totals={listTotals}
-            emptyMessage={emptyMessage}
-          />
+        <h2 className="procurement-page__section-title">Закупки</h2>
 
-          {filteredOrders.length > 0 && (
-            <TablePagination
-              page={safePage}
-              totalPages={totalPages}
-              from={from}
-              to={to}
-              totalCount={filteredOrders.length}
-              onPageChange={setPage}
-            />
-          )}
-        </div>
+        {!selectedDateKey ? (
+          <p className="procurement-page__empty">Выберите день недели, чтобы посмотреть закупки.</p>
+        ) : (
+          <>
+            <div className="procurement-list-panel procurement-list-panel--desktop">
+              <SimplePurchaseTable
+                orders={dayOrders}
+                documentsByPurchaseId={documentsByPurchaseId}
+                showActions={showActions}
+                canEditOrder={(order) => canEditSimplePurchase(user, order)}
+                onOpenEditor={openPurchaseEditor}
+                onDelete={requestDelete}
+                onRetry={handleRetry}
+                totals={listTotals}
+                emptyMessage={emptyMessage}
+              />
+            </div>
 
-        <div className="procurement-list-panel procurement-list-panel--mobile">
-          <SimplePurchaseCardList
-            orders={pagedOrders}
-            documentsByPurchaseId={documentsByPurchaseId}
-            showActions={showActions}
-            canEditOrder={(order) => canEditSimplePurchase(user, order)}
-            onOpenEditor={openPurchaseEditor}
-            onDelete={requestDelete}
-            onRetry={handleRetry}
-            totals={listTotals}
-            emptyMessage={emptyMessage}
-          />
-
-          {filteredOrders.length > 0 && (
-            <TablePagination
-              page={safePage}
-              totalPages={totalPages}
-              from={from}
-              to={to}
-              totalCount={filteredOrders.length}
-              onPageChange={setPage}
-            />
-          )}
-        </div>
+            <div className="procurement-list-panel procurement-list-panel--mobile">
+              <SimplePurchaseCardList
+                orders={dayOrders}
+                documentsByPurchaseId={documentsByPurchaseId}
+                showActions={showActions}
+                canEditOrder={(order) => canEditSimplePurchase(user, order)}
+                onOpenEditor={openPurchaseEditor}
+                onDelete={requestDelete}
+                onRetry={handleRetry}
+                totals={listTotals}
+                emptyMessage={emptyMessage}
+              />
+            </div>
+          </>
+        )}
       </section>
 
       {canCreate && (
         <button
           type="button"
           className="procurement-page__fab"
-          onClick={openCreate}
+          onClick={() => openCreate()}
           aria-label="Создать закуп"
         >
           +

@@ -5,6 +5,7 @@ import {
   SUPPLIER_STATUS,
   PAYMENT_TYPE,
   RETURN_POLICY,
+  serializeSupplierWeekdays,
 } from '../utils/supplierData'
 
 async function throwIfError(result, context) {
@@ -45,8 +46,8 @@ function supplierToRow(data) {
     manager_name: data.managerName?.trim() || '',
     manager_phone: data.managerPhone?.trim() || '',
     whatsapp: data.whatsapp?.trim() || null,
-    order_days: data.orderDays?.trim() || '',
-    delivery_days: data.deliveryDays?.trim() || '',
+    order_days: serializeSupplierWeekdays(data.orderWeekdays ?? data.orderDays),
+    delivery_days: serializeSupplierWeekdays(data.deliveryWeekdays ?? data.deliveryDays),
     min_order_amount: data.minOrderAmount ?? null,
     payment_type: data.paymentType || PAYMENT_TYPE.CASH,
     deferral_days: data.deferralDays ?? null,

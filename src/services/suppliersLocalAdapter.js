@@ -1,4 +1,10 @@
-import { normalizeSupplier, SUPPLIER_STATUS, PAYMENT_TYPE, RETURN_POLICY } from '../utils/supplierData'
+import {
+  normalizeSupplier,
+  SUPPLIER_STATUS,
+  PAYMENT_TYPE,
+  RETURN_POLICY,
+  serializeSupplierWeekdays,
+} from '../utils/supplierData'
 import umagSeed from '../data/umagSuppliersSeed.json'
 
 const STORAGE_KEY = 'shugyla_suppliers'
@@ -125,8 +131,8 @@ function rowFromSupplier(supplier) {
     manager_name: supplier.managerName || '',
     manager_phone: supplier.managerPhone || '',
     whatsapp: supplier.whatsapp || null,
-    order_days: supplier.orderDays || '',
-    delivery_days: supplier.deliveryDays || '',
+    order_days: serializeSupplierWeekdays(supplier.orderWeekdays ?? supplier.orderDays),
+    delivery_days: serializeSupplierWeekdays(supplier.deliveryWeekdays ?? supplier.deliveryDays),
     min_order_amount: supplier.minOrderAmount,
     payment_type: supplier.paymentType || PAYMENT_TYPE.CASH,
     deferral_days: supplier.deferralDays,

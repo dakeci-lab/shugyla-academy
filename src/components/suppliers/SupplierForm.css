@@ -1,3 +1,15 @@
 .supplier-form .admin-form__hint {
   margin-top: 4px;
 }
+
+.supplier-form__schedule {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+@media (max-width: 720px) {
+  .supplier-form__schedule {
+    grid-template-columns: 1fr;
+  }
+}

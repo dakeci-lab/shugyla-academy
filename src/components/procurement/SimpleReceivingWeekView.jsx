@@ -4,51 +4,40 @@ import { canAcceptSimpleDelivery } from '../../config/permissions'
 import { isCloudMode } from '../../lib/dataMode'
 import { getReceivingDocumentsSync } from '../../services/receivingDataService'
 import { getPurchaseOrdersSync } from '../../services/purchaseDataService'
+import { getAllSuppliersSync } from '../../utils/supplierData'
 import {
   acceptSimpleDeliveryOptimistic,
   unacceptSimpleDeliveryOptimistic,
 } from '../../services/purchaseOptimisticService'
 import { useAdminRefresh } from '../../hooks/useAdminRefresh'
+import { useWeekScheduleState } from '../../hooks/useWeekScheduleState'
 import {
-  buildSimpleReceivingEntries,
+  buildMergedReceivingEntries,
   getReceivingChecklistToggleState,
+  getReceivingEntryKey,
+  isExpectedReceivingEntry,
   isSimpleReceivingEntryDone,
   sortReceivingChecklistEntries,
 } from '../../utils/procurementWorkflow'
-import {
-  toDateKey,
-  formatWeekRangeLabel,
-  formatWeekDayHeader,
-  getInitialWeekStartKey,
-  addWeeks,
-  buildWeekDates,
-} from '../../utils/shiftData'
-import SchedulePeriodBar from '../admin/SchedulePeriodBar'
+import { toDateKey } from '../../utils/shiftData'
+import WeekScheduleNav from './WeekScheduleNav'
 import SimpleDeliveryCard from './SimpleDeliveryCard'
 import './SimpleDeliveryCard.css'
-import '../admin/EmployeeSchedule.css'
-
-function isTodayInWeek(weekStartKey, todayKey = toDateKey(new Date())) {
-  return buildWeekDates(weekStartKey).some((date) => toDateKey(date) === todayKey)
-}
-
-function getInitialPageSelectedDateKey(weekStartKey) {
-  const todayKey = toDateKey(new Date())
-  return isTodayInWeek(weekStartKey, todayKey) ? todayKey : weekStartKey
-}
-
-function getWeekNavigationSelectedDateKey(weekStartKey) {
-  return weekStartKey
-}
 
 /** Недельная приёмка: выбор дня → компактный чек-лист поставок */
 export default function SimpleReceivingWeekView() {
   const { user } = useSession()
   const { version, notifyChange } = useAdminRefresh()
-  const [weekStartKey, setWeekStartKey] = useState(getInitialWeekStartKey)
-  const [selectedDateKey, setSelectedDateKey] = useState(() =>
-    getInitialPageSelectedDateKey(getInitialWeekStartKey())
-  )
+  const {
+    weekStartKey,
+    selectedDateKey,
+    setSelectedDateKey,
+    weekDates,
+    weekTitle,
+    todayKey,
+    changeWeek,
+    goToday,
+  } = useWeekScheduleState()
   const [checkedOverrides, setCheckedOverrides] = useState({})
   const [togglingId, setTogglingId] = useState(null)
 
@@ -59,16 +48,14 @@ export default function SimpleReceivingWeekView() {
 
   const canAccept = canAcceptSimpleDelivery(user)
 
-  const weekDates = useMemo(() => buildWeekDates(weekStartKey), [weekStartKey])
-  const todayKey = toDateKey(new Date())
-  const isCurrentWeek = weekDates.some((date) => toDateKey(date) === todayKey)
-  const weekTitle = isCurrentWeek
-    ? `Текущая неделя (${formatWeekRangeLabel(weekStartKey)})`
-    : formatWeekRangeLabel(weekStartKey)
-
   const allEntries = useMemo(() => {
-    return buildSimpleReceivingEntries(getPurchaseOrdersSync(), getReceivingDocumentsSync())
-  }, [version])
+    return buildMergedReceivingEntries(
+      getPurchaseOrdersSync(),
+      getReceivingDocumentsSync(),
+      getAllSuppliersSync(),
+      weekStartKey
+    )
+  }, [version, weekStartKey])
 
   const entriesByDate = useMemo(() => {
     const map = new Map()
@@ -83,9 +70,18 @@ export default function SimpleReceivingWeekView() {
     return map
   }, [allEntries, checkedOverrides])
 
+  const countsByDate = useMemo(() => {
+    const counts = {}
+    for (const [dateKey, entries] of entriesByDate) {
+      counts[dateKey] = entries.length
+    }
+    return counts
+  }, [entriesByDate])
+
   const dayEntries = selectedDateKey ? entriesByDate.get(selectedDateKey) || [] : []
 
   function getIsReceived(entry) {
+    if (isExpectedReceivingEntry(entry)) return false
     const docId = entry.document?.id
     if (docId && checkedOverrides[docId] !== undefined) {
       return checkedOverrides[docId]
@@ -103,6 +99,8 @@ export default function SimpleReceivingWeekView() {
   }
 
   async function handleToggleEntry(entry) {
+    if (isExpectedReceivingEntry(entry)) return
+
     const docId = entry.document?.id
     if (!docId || togglingId === docId) return
 
@@ -136,58 +134,21 @@ export default function SimpleReceivingWeekView() {
     }
   }
 
-  function changeWeek(delta) {
-    setWeekStartKey((prev) => {
-      const next = addWeeks(prev, delta)
-      setSelectedDateKey(getWeekNavigationSelectedDateKey(next))
-      return next
-    })
-  }
-
-  function goToday() {
-    setWeekStartKey(getInitialWeekStartKey())
-    setSelectedDateKey(todayKey)
-  }
-
   const isTodaySelected = selectedDateKey === todayKey
 
   return (
     <>
-      <SchedulePeriodBar
-        title={weekTitle}
-        onPrev={() => changeWeek(-1)}
-        onNext={() => changeWeek(1)}
+      <WeekScheduleNav
+        weekTitle={weekTitle}
+        weekDates={weekDates}
+        selectedDateKey={selectedDateKey}
+        todayKey={todayKey}
+        countsByDate={countsByDate}
+        onPrevWeek={() => changeWeek(-1)}
+        onNextWeek={() => changeWeek(1)}
         onToday={goToday}
-        prevLabel="Предыдущая неделя"
-        nextLabel="Следующая неделя"
+        onSelectDate={setSelectedDateKey}
       />
-
-      <div className="simple-receiving-day-bar" role="tablist" aria-label="Дни недели">
-        {weekDates.map((date) => {
-          const dateKey = toDateKey(date)
-          const { weekday, day } = formatWeekDayHeader(date)
-          const isToday = dateKey === todayKey
-          const isSelected = selectedDateKey === dateKey
-          const count = entriesByDate.get(dateKey)?.length || 0
-
-          return (
-            <button
-              key={dateKey}
-              type="button"
-              role="tab"
-              aria-selected={isSelected}
-              className={`simple-receiving-day-bar__day${isSelected ? ' simple-receiving-day-bar__day--active' : ''}${isToday ? ' simple-receiving-day-bar__day--today' : ''}`}
-              onClick={() => setSelectedDateKey(dateKey)}
-            >
-              <span className="simple-receiving-day-bar__weekday">{weekday}</span>
-              <span className="simple-receiving-day-bar__number">{day}</span>
-              {count > 0 && (
-                <span className="simple-receiving-day-bar__count">{count}</span>
-              )}
-            </button>
-          )
-        })}
-      </div>
 
       {!selectedDateKey ? (
         <p className="simple-receiving-week__hint">
@@ -202,22 +163,27 @@ export default function SimpleReceivingWeekView() {
       ) : (
         <div className="simple-receiving-checklist" role="list">
           {dayEntries.map((entry) => {
-            const toggleState = getReceivingChecklistToggleState(
-              entry.order,
-              getReceivingDocumentsSync(),
-              isCloudMode()
-            )
+            const isExpected = isExpectedReceivingEntry(entry)
+            const toggleState = isExpected
+              ? { canToggle: false, statusLabel: null, reason: 'expected' }
+              : getReceivingChecklistToggleState(
+                  entry.order,
+                  getReceivingDocumentsSync(),
+                  isCloudMode()
+                )
 
             return (
               <SimpleDeliveryCard
-                key={entry.order.id}
+                key={getReceivingEntryKey(entry)}
                 order={entry.order}
                 document={entry.document}
+                supplier={entry.supplier}
+                entrySource={entry.source}
                 isReceived={getIsReceived(entry)}
                 canAccept={canAccept && toggleState.canToggle}
                 syncStatusLabel={toggleState.statusLabel}
                 syncPending={toggleState.reason === 'syncing'}
-                toggling={togglingId === entry.document.id}
+                toggling={!isExpected && togglingId === entry.document?.id}
                 onToggle={() => handleToggleEntry(entry)}
               />
             )

@@ -53,6 +53,107 @@ export const SUPPLIER_STATUS_FILTER_OPTIONS = [
   { id: SUPPLIER_STATUS.ARCHIVED, label: SUPPLIER_STATUS_LABELS.archived },
 ]
 
+/** Дни недели для расписания поставщика (ISO: пн → вс) */
+export const SUPPLIER_WEEKDAYS = [
+  { id: 'mon', label: 'Пн' },
+  { id: 'tue', label: 'Вт' },
+  { id: 'wed', label: 'Ср' },
+  { id: 'thu', label: 'Чт' },
+  { id: 'fri', label: 'Пт' },
+  { id: 'sat', label: 'Сб' },
+  { id: 'sun', label: 'Вс' },
+]
+
+const SUPPLIER_WEEKDAY_IDS = new Set(SUPPLIER_WEEKDAYS.map((day) => day.id))
+
+const LEGACY_WEEKDAY_ALIASES = {
+  пн: 'mon',
+  пон: 'mon',
+  mon: 'mon',
+  monday: 'mon',
+  вт: 'tue',
+  tue: 'tue',
+  tuesday: 'tue',
+  ср: 'wed',
+  wed: 'wed',
+  wednesday: 'wed',
+  чт: 'thu',
+  thu: 'thu',
+  thursday: 'thu',
+  пт: 'fri',
+  fri: 'fri',
+  friday: 'fri',
+  сб: 'sat',
+  sat: 'sat',
+  saturday: 'sat',
+  вс: 'sun',
+  sun: 'sun',
+  sunday: 'sun',
+}
+
+function normalizeWeekdayToken(token) {
+  const key = String(token || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\./g, '')
+  if (!key) return null
+  if (SUPPLIER_WEEKDAY_IDS.has(key)) return key
+  return LEGACY_WEEKDAY_ALIASES[key] || null
+}
+
+/** Парсинг дней недели из JSON-массива или legacy-строки «Пн, Чт» */
+export function parseSupplierWeekdays(value) {
+  if (Array.isArray(value)) {
+    const result = []
+    for (const item of value) {
+      const id = normalizeWeekdayToken(item)
+      if (id && !result.includes(id)) result.push(id)
+    }
+    return result
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return []
+
+    if (trimmed.startsWith('[')) {
+      try {
+        return parseSupplierWeekdays(JSON.parse(trimmed))
+      } catch {
+        return []
+      }
+    }
+
+    const result = []
+    for (const part of trimmed.split(/[,;]+/)) {
+      const id = normalizeWeekdayToken(part)
+      if (id && !result.includes(id)) result.push(id)
+    }
+    return result
+  }
+
+  return []
+}
+
+export function serializeSupplierWeekdays(weekdays) {
+  const normalized = parseSupplierWeekdays(weekdays)
+  if (!normalized.length) return ''
+  return JSON.stringify(normalized)
+}
+
+export function formatSupplierWeekdays(weekdays) {
+  const normalized = parseSupplierWeekdays(weekdays)
+  if (!normalized.length) return '—'
+  return normalized
+    .map((id) => SUPPLIER_WEEKDAYS.find((day) => day.id === id)?.label || id)
+    .join(', ')
+}
+
+export function dateToSupplierWeekdayId(date) {
+  const jsDay = date.getDay()
+  return ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][jsDay]
+}
+
 function parseCategories(value) {
   if (Array.isArray(value)) {
     return value.map((v) => String(v).trim()).filter(Boolean)
@@ -70,6 +171,12 @@ export function normalizeSupplier(raw) {
   if (!raw) return null
 
   const categories = parseCategories(raw.productCategories ?? raw.product_categories)
+  const orderWeekdays = parseSupplierWeekdays(
+    raw.orderWeekdays ?? raw.order_weekdays ?? raw.order_days ?? raw.orderDays
+  )
+  const deliveryWeekdays = parseSupplierWeekdays(
+    raw.deliveryWeekdays ?? raw.delivery_weekdays ?? raw.delivery_days ?? raw.deliveryDays
+  )
 
   return {
     id: raw.id,
@@ -79,8 +186,10 @@ export function normalizeSupplier(raw) {
     managerName: raw.managerName ?? raw.manager_name ?? '',
     managerPhone: raw.managerPhone ?? raw.manager_phone ?? '',
     whatsapp: raw.whatsapp ?? '',
-    orderDays: raw.orderDays ?? raw.order_days ?? '',
-    deliveryDays: raw.deliveryDays ?? raw.delivery_days ?? '',
+    orderWeekdays,
+    deliveryWeekdays,
+    orderDays: formatSupplierWeekdays(orderWeekdays),
+    deliveryDays: formatSupplierWeekdays(deliveryWeekdays),
     minOrderAmount:
       raw.minOrderAmount != null
         ? Number(raw.minOrderAmount)

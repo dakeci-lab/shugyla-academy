@@ -75,6 +75,11 @@ export default function SupplierTable({
   onEdit,
   onDeactivate,
 }) {
+  function openEdit(supplier, event) {
+    event?.stopPropagation?.()
+    onEdit?.(supplier)
+  }
+
   return (
     <>
       <div className="supplier-table-desktop">
@@ -96,7 +101,19 @@ export default function SupplierTable({
               {suppliers.map((supplier, index) => (
                 <tr key={supplier.id} className="supplier-table__row">
                   <td className="supplier-table__num">{index + 1}</td>
-                  <td className="supplier-table__name">{supplier.name}</td>
+                  <td className="supplier-table__name">
+                    {canEdit && onEdit ? (
+                      <button
+                        type="button"
+                        className="supplier-name-link"
+                        onClick={(event) => openEdit(supplier, event)}
+                      >
+                        {supplier.name}
+                      </button>
+                    ) : (
+                      supplier.name
+                    )}
+                  </td>
                   <td>{displayValue(supplier.managerName)}</td>
                   <td>{displayValue(supplier.managerPhone)}</td>
                   <td>{displayValue(supplier.orderDays)}</td>
@@ -123,7 +140,17 @@ export default function SupplierTable({
         {suppliers.map((supplier) => (
           <li key={supplier.id} className="supplier-card-item">
             <div className="supplier-card-item__head">
-              <h3 className="supplier-card-item__title">{supplier.name}</h3>
+              {canEdit && onEdit ? (
+                <button
+                  type="button"
+                  className="supplier-name-link supplier-name-link--title"
+                  onClick={(event) => openEdit(supplier, event)}
+                >
+                  {supplier.name}
+                </button>
+              ) : (
+                <h3 className="supplier-card-item__title">{supplier.name}</h3>
+              )}
               <SupplierStatusBadge status={supplier.status} />
             </div>
 

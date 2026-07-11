@@ -1,0 +1,69 @@
+import { useMemo } from 'react'
+import { getAllSuppliersSync } from '../../utils/supplierData'
+import { getPurchaseOrdersSync } from '../../services/purchaseDataService'
+import {
+  buildExpectedDeliveryEntries,
+  getReceivingEntryKey,
+  getReceivingEntrySupplierName,
+  PROCUREMENT_PLAN_ITEM_STATUS,
+  PROCUREMENT_PLAN_LABEL,
+} from '../../utils/procurementWorkflow'
+import './ProcurementPlanSection.css'
+
+/** План закупок выбранного дня (раздел «Закуп») */
+export default function ProcurementPlanDayList({
+  weekStartKey,
+  selectedDateKey,
+  version,
+  canCreate,
+  onCreatePurchase,
+}) {
+  void version
+
+  const dayEntries = useMemo(() => {
+    if (!selectedDateKey) return []
+    return buildExpectedDeliveryEntries(
+      getAllSuppliersSync(),
+      weekStartKey,
+      getPurchaseOrdersSync()
+    ).filter((entry) => entry.dateKey === selectedDateKey)
+  }, [weekStartKey, selectedDateKey, version])
+
+  if (!selectedDateKey || dayEntries.length === 0) {
+    return null
+  }
+
+  return (
+    <section className="procurement-plan procurement-plan--day">
+      <h2 className="procurement-plan__title">{PROCUREMENT_PLAN_LABEL}</h2>
+
+      <ul className="procurement-plan__list">
+        {dayEntries.map((entry) => (
+          <li key={getReceivingEntryKey(entry)} className="procurement-plan__item">
+            <div className="procurement-plan__info">
+              <span className="procurement-plan__supplier">
+                {getReceivingEntrySupplierName(entry)}
+              </span>
+              <span className="procurement-plan__status">{PROCUREMENT_PLAN_ITEM_STATUS}</span>
+            </div>
+            {canCreate && (
+              <button
+                type="button"
+                className="btn btn--primary btn--sm"
+                onClick={() =>
+                  onCreatePurchase({
+                    supplierId: entry.supplier?.id || '',
+                    supplierName: getReceivingEntrySupplierName(entry),
+                    expectedDeliveryDate: entry.dateKey,
+                  })
+                }
+              >
+                Создать заказ
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
