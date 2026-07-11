@@ -10,13 +10,13 @@ export const SUPPLIER_STATUS = {
 
 export const SUPPLIER_STATUS_LABELS = {
   active: 'Активный',
-  inactive: 'Неактивный',
+  inactive: 'Деактивирован',
   archived: 'Архив',
 }
 
 export const SUPPLIER_STATUS_BADGE = {
   active: 'done',
-  inactive: 'warning',
+  inactive: 'idle',
   archived: 'idle',
 }
 
@@ -127,6 +127,18 @@ export function getSupplierByIdSync(id) {
 
 export function getActiveSuppliersCount() {
   return getAllSuppliersSync().filter((s) => s.status === SUPPLIER_STATUS.ACTIVE).length
+}
+
+/** Склонение «N активных поставщиков» */
+export function formatActiveSuppliersCount(count) {
+  const n = Number(count) || 0
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return `${n} активный поставщик`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) {
+    return `${n} активных поставщика`
+  }
+  return `${n} активных поставщиков`
 }
 
 export function formatSupplierCategories(categories) {

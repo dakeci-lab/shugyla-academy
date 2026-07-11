@@ -10,7 +10,8 @@ import {
 } from '../../../services/academyDataService'
 import {
   filterSuppliers,
-  SUPPLIER_STATUS_FILTER_OPTIONS,
+  SUPPLIER_STATUS,
+  formatActiveSuppliersCount,
 } from '../../../utils/supplierData'
 import { useSession } from '../../../context/SessionContext'
 import {
@@ -21,6 +22,7 @@ import {
 } from '../../../config/permissions'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../../../components/admin/AdminModal'
+import ConfirmDialog from '../../../components/admin/ConfirmDialog'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
 import SupplierForm, {
   EMPTY_SUPPLIER_FORM,
@@ -29,6 +31,7 @@ import SupplierForm, {
 } from '../../../components/suppliers/SupplierForm'
 import SupplierTable from '../../../components/suppliers/SupplierTable'
 import SupplierDetails from '../../../components/suppliers/SupplierDetails'
+import { SearchIcon } from '../../../components/icons/PlatformIcons'
 import '../../../components/admin/admin-shared.css'
 import './SuppliersPage.css'
 
@@ -37,13 +40,14 @@ export function SuppliersListPage() {
   const { user } = useSession()
   const { version, refresh } = useAdminRefresh()
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(EMPTY_SUPPLIER_FORM)
   const [formError, setFormError] = useState('')
   const [actionError, setActionError] = useState('')
   const [saving, setSaving] = useState(false)
+  const [deactivateTarget, setDeactivateTarget] = useState(null)
+  const [deactivating, setDeactivating] = useState(false)
 
   const canView = canViewSuppliers(user)
   const canEdit = canEditSuppliers(user)
@@ -51,9 +55,13 @@ export function SuppliersListPage() {
   void version
 
   const suppliers = getSuppliers()
+  const activeSuppliers = useMemo(
+    () => suppliers.filter((supplier) => supplier.status === SUPPLIER_STATUS.ACTIVE),
+    [suppliers, version]
+  )
   const filtered = useMemo(
-    () => filterSuppliers(suppliers, { search, status: statusFilter }),
-    [suppliers, search, statusFilter, version]
+    () => filterSuppliers(activeSuppliers, { search, status: 'all' }),
+    [activeSuppliers, search, version]
   )
 
   if (!canView) {
@@ -104,46 +112,59 @@ export function SuppliersListPage() {
     }
   }
 
+  function requestDeactivate(supplier) {
+    setDeactivateTarget(supplier)
+  }
+
+  async function confirmDeactivate() {
+    if (!deactivateTarget) return
+    setDeactivating(true)
+    setActionError('')
+    try {
+      await updateSupplier(deactivateTarget.id, { status: SUPPLIER_STATUS.INACTIVE })
+      setDeactivateTarget(null)
+      await refresh()
+    } catch (err) {
+      setActionError(err.message || 'Не удалось деактивировать поставщика')
+    } finally {
+      setDeactivating(false)
+    }
+  }
+
   return (
     <div className="suppliers-page">
-      <div className="suppliers-page__toolbar admin-toolbar">
-        <div>
-          <h2 className="suppliers-page__heading">Поставщики</h2>
-          <p className="admin-toolbar__info">{filtered.length} из {suppliers.length}</p>
-        </div>
+      <p className="suppliers-page__count">{formatActiveSuppliersCount(activeSuppliers.length)}</p>
+
+      <div className="suppliers-page__toolbar">
+        <label className="suppliers-page__search-wrap">
+          <span className="suppliers-page__search-icon" aria-hidden="true">
+            <SearchIcon size={18} />
+          </span>
+          <input
+            type="search"
+            className="suppliers-page__search"
+            placeholder="Поиск по названию, менеджеру, телефону…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            aria-label="Поиск поставщиков"
+          />
+        </label>
         {canEdit && (
-          <button type="button" className="btn btn--primary" onClick={openCreate}>
-            Добавить поставщика
+          <button
+            type="button"
+            className="btn btn--primary btn--sm suppliers-page__add-btn"
+            onClick={openCreate}
+          >
+            + Добавить поставщика
           </button>
         )}
-      </div>
-
-      <div className="suppliers-page__filters">
-        <input
-          type="search"
-          className="admin-form__input suppliers-page__search"
-          placeholder="Поиск по названию, менеджеру или телефону…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <select
-          className="admin-form__input suppliers-page__status"
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-        >
-          {SUPPLIER_STATUS_FILTER_OPTIONS.map((opt) => (
-            <option key={opt.id} value={opt.id}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
       </div>
 
       {actionError && <p className="admin-form__error">{actionError}</p>}
 
       {filtered.length === 0 ? (
         <div className="suppliers-page__empty">
-          {suppliers.length === 0
+          {activeSuppliers.length === 0
             ? 'Поставщики ещё не добавлены.'
             : 'По вашему запросу ничего не найдено.'}
         </div>
@@ -152,6 +173,18 @@ export function SuppliersListPage() {
           suppliers={filtered}
           canEdit={canEdit}
           onEdit={openEdit}
+          onDeactivate={canEdit ? requestDeactivate : null}
+        />
+      )}
+
+      {deactivateTarget && (
+        <ConfirmDialog
+          title="Деактивировать поставщика?"
+          message="Поставщик будет скрыт из списка активных. Все старые закупы сохранятся."
+          confirmLabel="Деактивировать"
+          onCancel={() => setDeactivateTarget(null)}
+          onConfirm={confirmDeactivate}
+          loading={deactivating}
         />
       )}
 
