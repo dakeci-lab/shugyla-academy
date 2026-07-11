@@ -1,4 +1,4 @@
-import { normalizeShift, isWorkingShiftStatus, toDateKey } from '../utils/shiftData'
+import { normalizeShift, isWorkingShiftStatus } from '../utils/shiftData'
 import { getEmployeeById } from '../utils/employeeData'
 import {
   normalizeWorkLocation,
@@ -6,7 +6,9 @@ import {
   DEFAULT_ATTENDANCE_SETTINGS,
   isWithinWorkLocation,
   clampRadiusMeters,
+  resolveActiveShiftForToday,
 } from '../utils/attendanceData'
+import { toDateKeyInAppTimezone, addDaysToDateKey } from '../utils/timezone'
 
 const STORAGE_KEYS = {
   LOCATIONS: 'shugyla_work_locations',
@@ -97,11 +99,14 @@ export function saveAttendanceSettings(settings, updatedBy = null) {
 }
 
 function getTodayShift(employeeId) {
-  const today = toDateKey(new Date())
-  const row = readShifts().find(
-    (shift) => shift.employee_id === employeeId && shift.shift_date === today
+  const today = toDateKeyInAppTimezone()
+  const yesterday = addDaysToDateKey(today, -1)
+  const rows = readShifts().filter(
+    (shift) =>
+      shift.employee_id === employeeId &&
+      (shift.shift_date === today || shift.shift_date === yesterday)
   )
-  return row ? normalizeShift(row) : null
+  return resolveActiveShiftForToday(rows)
 }
 
 export async function checkInEmployee(employeeId, coords) {

@@ -73,7 +73,17 @@ declare
 begin
   select * into v_shift
   from academy_employee_shifts
-  where employee_id = p_employee_id and shift_date = v_today
+  where employee_id = p_employee_id
+    and (
+      shift_date = v_today
+      or (
+        shift_date = v_today - 1
+        and actual_start_time is not null
+        and actual_end_time is null
+      )
+    )
+  order by shift_date desc
+  limit 1
   for update;
 
   if v_shift.id is null then

@@ -5,7 +5,9 @@ import {
   normalizeAttendanceSettings,
   DEFAULT_ATTENDANCE_SETTINGS,
   clampRadiusMeters,
+  resolveActiveShiftForToday,
 } from '../utils/attendanceData'
+import { toDateKeyInAppTimezone, addDaysToDateKey } from '../utils/timezone'
 
 async function throwIfError(result, context) {
   if (result.error) {
@@ -119,15 +121,18 @@ export async function checkOutEmployee(employeeId, coords) {
 }
 
 export async function getTodayShiftForEmployee(employeeId) {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = toDateKeyInAppTimezone()
+  const yesterday = addDaysToDateKey(today, -1)
+
   const rows = await throwIfError(
     await supabase
       .from('academy_employee_shifts')
       .select('*')
       .eq('employee_id', employeeId)
-      .eq('shift_date', today)
-      .maybeSingle(),
+      .in('shift_date', [today, yesterday])
+      .order('shift_date', { ascending: false }),
     'Загрузка смены на сегодня'
   )
-  return rows ? rowToShift(rows) : null
+
+  return resolveActiveShiftForToday(rows || [])
 }

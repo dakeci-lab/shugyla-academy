@@ -1,11 +1,24 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getCurrentPosition, extractCoords, validatePositionAccuracy } from '../../../utils/geolocation'
-import { formatTimeRange, SHIFT_STATUS, SHIFT_STATUS_LABELS, isWorkingShiftStatus } from '../../../utils/shiftData'
+import {
+  formatTimeRange,
+  SHIFT_STATUS,
+  SHIFT_STATUS_LABELS,
+  isWorkingShiftStatus,
+  computeShiftStatus,
+} from '../../../utils/shiftData'
 import {
   getTodayShiftState,
   formatTodayLabel,
   formatDurationMinutes,
+  debugLogTimeTracker,
 } from '../../../utils/attendanceData'
+import {
+  resolveCanCheckIn,
+  resolveCanCheckOut,
+  resolveTimeTrackerDisplayStatus,
+  buildTimeTrackerAuditRow,
+} from '../../../utils/timeTrackerAudit'
 import {
   getTodayShiftForEmployee,
   checkInEmployee,
@@ -16,16 +29,6 @@ import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import '../admin-shared.css'
 import '../EmployeeRating.css'
 
-function getDisplayStatus(shift, state) {
-  if (state.code === 'ready_check_in') return 'Смена ещё не начата'
-  if (state.code === 'checked_in') return 'Вы на работе'
-  if (state.code === 'completed') return 'Смена завершена'
-  if (!shift) return state.message
-  if (shift.status === SHIFT_STATUS.DAY_OFF) return 'Сегодня у вас выходной'
-  if (state.code === 'no_schedule') return 'На сегодня график не установлен'
-  if (state.code === 'not_working') return 'Сегодня у вас нет запланированной рабочей смены'
-  return state.message
-}
 
 function TimeTrackerSkeleton() {
   return (
@@ -67,9 +70,19 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
     try {
       const row = await getTodayShiftForEmployee(employeeId)
       setShift(row)
+      debugLogTimeTracker('loadShift', {
+        employeeId,
+        shiftFound: Boolean(row),
+        shiftDate: row?.shiftDate ?? null,
+        planned: row
+          ? formatTimeRange(row.plannedStartTime, row.plannedEndTime)
+          : null,
+        status: row?.status ?? null,
+      })
     } catch {
       setLoadError(true)
       setShift(null)
+      debugLogTimeTracker('loadShiftError', { employeeId })
     } finally {
       setLoading(false)
     }
@@ -81,18 +94,50 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
     loadShift()
   }, [loadShift])
 
+  const computedStatus = useMemo(() => {
+    if (!shift) return null
+    return computeShiftStatus(shift, now)
+  }, [shift, now])
+
   const state = useMemo(() => {
     if (loading) return { code: 'loading', message: '' }
-    return getTodayShiftState(shift)
-  }, [shift, loading])
+    return getTodayShiftState(shift, undefined, now)
+  }, [shift, loading, now])
 
   const displayStatus = useMemo(() => {
     if (loading) return ''
-    if (shift?.computedStatus?.label && isWorkingShiftStatus(shift.status)) {
-      return shift.computedStatus.label
-    }
-    return getDisplayStatus(shift, state)
-  }, [shift, state, loading])
+    return resolveTimeTrackerDisplayStatus(shift, state, computedStatus, now)
+  }, [shift, state, loading, computedStatus, now])
+
+  const checkInResult = useMemo(
+    () => resolveCanCheckIn(shift, state, { loading, loadError, now }),
+    [shift, state, loading, loadError, now]
+  )
+  const checkOutResult = useMemo(
+    () => resolveCanCheckOut(shift, state, { loading, loadError }),
+    [shift, state, loading, loadError]
+  )
+
+  const canCheckIn = checkInResult.value
+  const canCheckOut = checkOutResult.value
+  const disabledReason = acting
+    ? 'acting'
+    : !canCheckIn
+      ? checkInResult.reason
+      : null
+
+  useEffect(() => {
+    if (loading) return
+    const audit = buildTimeTrackerAuditRow({
+      employeeId,
+      role: user?.role ?? null,
+      shift,
+      now,
+      loading,
+      loadError,
+    })
+    debugLogTimeTracker('audit', audit)
+  }, [loading, employeeId, user?.role, shift, state, computedStatus, canCheckIn, canCheckOut, disabledReason, now, loadError])
 
   async function runWithGeolocation(action) {
     setActing(true)
@@ -121,9 +166,6 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
     await runWithGeolocation((coords) => checkOutEmployee(employeeId, coords))
     setSuccess('Уход отмечен')
   }
-
-  const canCheckIn = !loading && !loadError && state.code === 'ready_check_in'
-  const canCheckOut = !loading && !loadError && state.code === 'checked_in'
 
   const welcomeName = user?.name?.split(/\s+/)[0] || user?.name || 'сотрудник'
 
@@ -189,9 +231,10 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
               })}
             </p>
           )}
-          {shift?.workedMinutes > 0 && (
+          {(computedStatus?.workedMinutes ?? shift?.workedMinutes) > 0 && (
             <p>
-              <strong>Отработано:</strong> {formatDurationMinutes(shift.workedMinutes)}
+              <strong>Отработано:</strong>{' '}
+              {formatDurationMinutes(computedStatus?.workedMinutes ?? shift.workedMinutes)}
             </p>
           )}
         </div>

@@ -7,7 +7,18 @@ import {
   SHIFT_STATUS,
   computeLateMinutesFromTimes,
   computeEarlyLeaveMinutesFromTimes,
+  normalizeShift,
 } from './shiftData'
+import {
+  buildPlannedShiftEndDateTime,
+  isFalseMidnightAbsence,
+  isShiftPlannedEndReached,
+} from './shiftMidnightEnd'
+import {
+  toDateKeyInAppTimezone,
+  addDaysToDateKey,
+  APP_TIMEZONE,
+} from './timezone'
 
 /** Событие обновления рейтинга (после сохранения смены / отметки) */
 export const RATING_UPDATED_EVENT = 'shugyla:rating-updated'
@@ -170,7 +181,66 @@ export function clampRadiusMeters(value) {
 export function buildPlannedDateTime(shiftDate, timeValue) {
   const time = formatTimeValue(timeValue)
   if (!shiftDate || !time) return null
-  return new Date(`${shiftDate}T${time}:00`)
+  const [year, month, day] = shiftDate.split('-').map(Number)
+  const [hours, minutes] = time.split(':').map(Number)
+  const localDate = new Date(year, month - 1, day, hours, minutes, 0, 0)
+  if (Number.isNaN(localDate.getTime())) return null
+  return localDate
+}
+
+export function isShiftEnded(shift, now = new Date()) {
+  return isShiftPlannedEndReached(shift, now)
+}
+
+export function isCheckoutWaitExpired(shift, settings, now = new Date()) {
+  const plannedEnd = buildPlannedShiftEndDateTime(shift)
+  if (!plannedEnd) return false
+  const waitMs = (settings.checkoutWaitMinutes || 0) * 60000
+  return now.getTime() >= plannedEnd.getTime() + waitMs
+}
+
+/**
+ * Выбирает актуальную смену: сегодня или вчерашнюю с незакрытым приходом (смена через полночь).
+ */
+export function resolveActiveShiftForToday(shifts, now = new Date()) {
+  const todayKey = toDateKeyInAppTimezone(now)
+  const yesterdayKey = addDaysToDateKey(todayKey, -1)
+  const byDate = new Map()
+
+  for (const row of shifts || []) {
+    const normalized = normalizeShift(row)
+    if (normalized?.shiftDate) {
+      byDate.set(normalized.shiftDate, normalized)
+    }
+  }
+
+  const todayShift = byDate.get(todayKey) || null
+  const yesterdayShift = byDate.get(yesterdayKey) || null
+
+  if (yesterdayShift?.actualStartTime && !yesterdayShift?.actualEndTime) {
+    return yesterdayShift
+  }
+
+  return todayShift
+}
+
+const TIME_TRACKER_DEBUG_KEY = 'shugyla_time_tracker_debug'
+
+export function isTimeTrackerDebugEnabled() {
+  if (typeof localStorage !== 'undefined' && localStorage.getItem(TIME_TRACKER_DEBUG_KEY) === '1') {
+    return true
+  }
+  return import.meta.env?.DEV === true
+}
+
+/** Диагностика тайм-трекера (только dev / явное включение) */
+export function debugLogTimeTracker(label, payload) {
+  if (!isTimeTrackerDebugEnabled()) return
+  console.info(`[TimeTracker] ${label}`, {
+    timezone: APP_TIMEZONE,
+    todayKey: toDateKeyInAppTimezone(),
+    ...payload,
+  })
 }
 
 export function calculateLateMinutes(shift, actualStartIso, graceMinutes = 0) {
@@ -182,7 +252,7 @@ export function calculateLateMinutes(shift, actualStartIso, graceMinutes = 0) {
 }
 
 export function calculateEarlyLeaveMinutes(shift, actualEndIso, graceMinutes = 0) {
-  const plannedEnd = buildPlannedDateTime(shift.shiftDate, shift.plannedEndTime)
+  const plannedEnd = buildPlannedShiftEndDateTime(shift)
   const actualEnd = actualEndIso ? new Date(actualEndIso) : null
   if (!plannedEnd || !actualEnd || Number.isNaN(actualEnd.getTime())) return 0
   const diff = Math.round((plannedEnd.getTime() - actualEnd.getTime()) / 60000)
@@ -194,18 +264,6 @@ export function calculateWorkedMinutes(shift, actualStartIso, actualEndIso) {
   const end = actualEndIso ? new Date(actualEndIso) : null
   if (!start || !end || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 0
   return Math.max(0, Math.round((end.getTime() - start.getTime()) / 60000))
-}
-
-export function isShiftEnded(shift, now = new Date()) {
-  const plannedEnd = buildPlannedDateTime(shift.shiftDate, shift.plannedEndTime)
-  return plannedEnd ? now >= plannedEnd : false
-}
-
-export function isCheckoutWaitExpired(shift, settings, now = new Date()) {
-  const plannedEnd = buildPlannedDateTime(shift.shiftDate, shift.plannedEndTime)
-  if (!plannedEnd) return false
-  const waitMs = (settings.checkoutWaitMinutes || 0) * 60000
-  return now.getTime() >= plannedEnd.getTime() + waitMs
 }
 
 export function getTodayShiftState(shift, settings, now = new Date()) {
@@ -236,7 +294,10 @@ export function buildAutoScoreEvents(shift, settings, now = new Date()) {
 export function calculateShiftRatingEntries(shift, settings, now = new Date()) {
   if (!shift?.id) return []
 
-  if (shift.status === SHIFT_STATUS.ABSENCE) {
+  if (
+    shift.status === SHIFT_STATUS.ABSENCE &&
+    !isFalseMidnightAbsence(shift, SHIFT_STATUS.ABSENCE, now)
+  ) {
     return [
       {
         shiftId: shift.id,
@@ -258,7 +319,10 @@ export function calculateShiftRatingEntries(shift, settings, now = new Date()) {
   const hasCheckIn = hasRecordedCheckIn(shift)
   const hasCheckOut = hasRecordedCheckOut(shift)
 
-  if (result.code === SHIFT_RESULT_CODE.ABSENCE) {
+  if (
+    result.code === SHIFT_RESULT_CODE.ABSENCE &&
+    !isFalseMidnightAbsence(shift, result.code, now)
+  ) {
     events.push({
       shiftId: shift.id,
       eventDate: date,
@@ -504,5 +568,5 @@ export function formatDurationMinutes(minutes) {
 }
 
 export function todayDateKey() {
-  return toDateKey(new Date())
+  return toDateKeyInAppTimezone()
 }
