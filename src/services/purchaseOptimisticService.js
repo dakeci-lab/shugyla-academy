@@ -10,7 +10,7 @@ import {
   getCloudReceivingDocuments,
 } from '../lib/cloudStore'
 import { normalizePurchaseOrder, PURCHASE_STATUS } from '../utils/purchaseData'
-import { RECEIVING_STATUS } from '../utils/receivingData'
+import { normalizeReceivingDocument, RECEIVING_STATUS } from '../utils/receivingData'
 import { SYNC_STATUS } from '../utils/syncStatus'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
 import { toastSuccess, toastError } from './notificationService'
@@ -20,6 +20,7 @@ import * as receivingCloud from './receivingSupabaseAdapter'
 import * as receivingLocal from './receivingLocalAdapter'
 import { getPurchaseOrdersSync } from './purchaseDataService'
 import { getReceivingDocumentsSync } from './receivingDataService'
+import { refreshData } from './academyDataService'
 import { getLocalReceivingBundle } from './receivingLocalAdapter'
 import {
   saveOptimisticPurchase,
@@ -43,6 +44,8 @@ const DELETE_SUCCESS_MESSAGE = 'Закупка успешно удалена'
 const DELETE_ERROR_MESSAGE = 'Не удалось удалить закупку'
 const ACCEPT_SUCCESS_MESSAGE = 'Поставка принята'
 const UNACCEPT_SUCCESS_MESSAGE = 'Отметка снята'
+const ACCEPT_ERROR_MESSAGE = 'Не удалось принять поставку'
+const UNACCEPT_ERROR_MESSAGE = 'Не удалось снять отметку'
 
 /** Заказы из Supabase приходят без syncStatus — их тоже нужно удалять в облаке */
 function shouldDeletePurchaseFromCloud(order) {
@@ -101,7 +104,83 @@ function materializeReceivingDocument(document, order) {
   return receivingLocal.ensureSimpleReceivingDocumentLocal(document, order)
 }
 
-/** Фоновое сохранение отметки чек-листа — только статус, без доп. этапов */
+/** Cloud: optimistic только в in-memory store (не localStorage) */
+function applySimpleDeliveryStateCloud(document, order, { received, user }) {
+  const now = new Date().toISOString()
+
+  const docPatch = received
+    ? {
+        status: RECEIVING_STATUS.RECEIVED,
+        receivedBy: user?.login || user?.id || '',
+        receivedByName: user?.name || '',
+        updatedAt: now,
+      }
+    : {
+        status: RECEIVING_STATUS.AWAITING_RECEIVING,
+        receivedBy: null,
+        receivedByName: null,
+        updatedAt: now,
+      }
+
+  const previousDocument = normalizeReceivingDocument({ ...document })
+  const previousOrder = order ? normalizePurchaseOrder({ ...order }) : null
+
+  upsertCloudReceivingDocument(normalizeReceivingDocument({ ...document, ...docPatch }))
+
+  if (order) {
+    upsertCloudPurchase(
+      normalizePurchaseOrder({
+        ...order,
+        status: received ? PURCHASE_STATUS.RECEIVED : PURCHASE_STATUS.AWAITING_RECEIVING,
+        updatedAt: now,
+      })
+    )
+  }
+
+  return { previousDocument, previousOrder }
+}
+
+function revertSimpleDeliveryStateCloud(snapshot) {
+  if (!snapshot) return
+  if (snapshot.previousDocument) {
+    upsertCloudReceivingDocument(snapshot.previousDocument)
+  }
+  if (snapshot.previousOrder) {
+    upsertCloudPurchase(snapshot.previousOrder)
+  }
+}
+
+async function ensureReceivingDocumentInCloud(document, order) {
+  if (document?.id) {
+    const byId = await receivingCloud.fetchDocumentById(document.id)
+    if (byId) return byId
+  }
+
+  const orderId = order?.id ?? document?.purchaseOrderId
+  if (orderId) {
+    const cloudOrder = await cloud.fetchOrderById(orderId)
+    if (cloudOrder?.receivingDocumentId) {
+      const linked = await receivingCloud.fetchDocumentById(cloudOrder.receivingDocumentId)
+      if (linked) return linked
+    }
+
+    if (cloudOrder && !cloudOrder.receivingDocumentId) {
+      const created = await receivingCloud.createSimpleReceivingFromPurchaseCloud(cloudOrder, null)
+      if (created?.receivingDocumentId) {
+        return receivingCloud.fetchDocumentById(created.receivingDocumentId)
+      }
+    }
+  }
+
+  if (document?.id && order) {
+    await receivingCloud.syncSimpleReceivingDocumentCloud(document, order)
+    return receivingCloud.fetchDocumentById(document.id)
+  }
+
+  return null
+}
+
+/** Фоновое сохранение отметки чек-листа в Supabase */
 async function persistSimpleDeliveryChecklistState({
   documentId,
   document,
@@ -119,44 +198,36 @@ async function persistSimpleDeliveryChecklistState({
     return
   }
 
-  const existing = await receivingCloud.fetchDocumentById(documentId)
-  if (!existing) {
-    if (document && order) {
-      await receivingCloud.syncSimpleReceivingDocumentCloud(document, order)
-    }
+  const ensured = await ensureReceivingDocumentInCloud(document, order)
+  if (!ensured?.id) {
+    throw new Error('Документ приёмки не найден в Supabase')
   }
 
-  const syncedDocument = await receivingCloud.fetchDocumentById(documentId)
-  if (!syncedDocument) {
-    console.warn(
-      '[SimpleDeliveryChecklist] document not in Supabase, status kept in overlay',
-      documentId
-    )
-    return
-  }
+  const resolvedDocumentId = ensured.id
 
   if (received) {
-    await receivingCloud.acceptSimpleDeliveryCloud(documentId, user)
+    await receivingCloud.acceptSimpleDeliveryCloud(resolvedDocumentId, user)
   } else {
-    await receivingCloud.unacceptSimpleDeliveryCloud(documentId)
+    await receivingCloud.unacceptSimpleDeliveryCloud(resolvedDocumentId)
   }
 
-  clearOptimisticReceivingSyncState(documentId, order?.id)
+  clearOptimisticReceivingSyncState(resolvedDocumentId, order?.id ?? ensured.purchaseOrderId)
 
-  const freshDocument = await receivingCloud.fetchDocumentById(documentId)
+  const freshDocument = await receivingCloud.fetchDocumentById(resolvedDocumentId)
   if (freshDocument) {
     upsertCloudReceivingDocument(freshDocument)
   }
 
-  if (order?.id) {
-    const freshOrder = await cloud.fetchOrderById(order.id)
+  const purchaseOrderId = order?.id ?? ensured.purchaseOrderId
+  if (purchaseOrderId) {
+    const freshOrder = await cloud.fetchOrderById(purchaseOrderId)
     if (freshOrder) {
       upsertCloudPurchase(freshOrder)
     }
   }
 }
 
-function applySimpleDeliveryState(document, order, { received, user }) {
+function applySimpleDeliveryStateLocal(document, order, { received, user }) {
   const now = new Date().toISOString()
 
   const docPatch = received
@@ -174,19 +245,19 @@ function applySimpleDeliveryState(document, order, { received, user }) {
       }
 
   const updatedDocument = upsertOptimisticReceivingDocument(document, docPatch)
-  upsertCloudReceivingDocument(updatedDocument)
+  materializeReceivingDocument(updatedDocument, order)
 
   if (order) {
     const orderPatch = {
       status: received ? PURCHASE_STATUS.RECEIVED : PURCHASE_STATUS.AWAITING_RECEIVING,
       updatedAt: now,
     }
-    const updatedOrder = upsertOptimisticPurchase(order, orderPatch)
-    upsertCloudPurchase(updatedOrder)
+    upsertOptimisticPurchase(order, orderPatch)
+    local.updatePurchaseOrderSync(order.id, orderPatch)
   }
 }
 
-/** Чек-лист приёмки: только отметка выполнения (без следующих этапов процесса) */
+/** Чек-лист приёмки: optimistic UI + сохранение в Supabase (cloud) */
 function markSimpleDeliveryChecklist({ documentId, user, notifyChange, context, received }) {
   const document = resolveReceivingDocumentForAction({
     documentId,
@@ -201,9 +272,19 @@ function markSimpleDeliveryChecklist({ documentId, user, notifyChange, context, 
   const order = resolveOrderForReceivingDocument(document, context.order)
   const resolvedDocumentId = document.id
 
-  applySimpleDeliveryState(document, order, { received, user: received ? user : null })
-  toastSuccess(received ? ACCEPT_SUCCESS_MESSAGE : UNACCEPT_SUCCESS_MESSAGE)
+  const cloudSnapshot = isCloudMode()
+    ? applySimpleDeliveryStateCloud(document, order, {
+        received,
+        user: received ? user : null,
+      })
+    : null
+
+  if (!isCloudMode()) {
+    applySimpleDeliveryStateLocal(document, order, { received, user: received ? user : null })
+  }
+
   notifyChange?.()
+  toastSuccess(received ? ACCEPT_SUCCESS_MESSAGE : UNACCEPT_SUCCESS_MESSAGE)
 
   void persistSimpleDeliveryChecklistState({
     documentId: resolvedDocumentId,
@@ -211,9 +292,18 @@ function markSimpleDeliveryChecklist({ documentId, user, notifyChange, context, 
     order,
     received,
     user,
-  }).catch((error) => {
-    console.error('[SimpleDeliveryChecklist] background persist failed', error)
   })
+    .then(() => {
+      notifyChange?.()
+    })
+    .catch((error) => {
+      console.error('[SimpleDeliveryChecklist] persist failed', error)
+      if (isCloudMode()) {
+        revertSimpleDeliveryStateCloud(cloudSnapshot)
+        notifyChange?.()
+        toastError(received ? ACCEPT_ERROR_MESSAGE : UNACCEPT_ERROR_MESSAGE)
+      }
+    })
 
   return true
 }

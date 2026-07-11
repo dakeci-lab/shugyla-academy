@@ -4,7 +4,7 @@ import { refreshData } from './academyDataService'
 import * as local from './receivingLocalAdapter'
 import * as cloud from './receivingSupabaseAdapter'
 import {
-  getOptimisticOverlay,
+  getOptimisticOverlayForMerge,
   getOptimisticDeletedOrderIds,
   mergeReceivingDocuments,
 } from './purchaseOptimisticStore'
@@ -12,7 +12,7 @@ import {
 function getReceivingSource() {
   if (isCloudMode()) {
     const documents = getCloudReceivingDocuments()
-    const overlay = getOptimisticOverlay()
+    const overlay = getOptimisticOverlayForMerge()
     const deletedOrderIds = getOptimisticDeletedOrderIds()
     if (documents || overlay.documents.length || deletedOrderIds.length) {
       return mergeReceivingDocuments(documents || [], overlay.documents, deletedOrderIds)

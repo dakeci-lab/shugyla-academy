@@ -5,7 +5,7 @@ import * as local from './purchaseLocalAdapter'
 import * as cloud from './purchaseSupabaseAdapter'
 import { transferFromPurchase } from './receivingDataService'
 import {
-  getOptimisticOverlay,
+  getOptimisticOverlayForMerge,
   getOptimisticDeletedOrderIds,
   mergePurchaseOrders,
 } from './purchaseOptimisticStore'
@@ -17,7 +17,7 @@ function getAdapter() {
 function getPurchasesSource() {
   if (isCloudMode()) {
     const orders = getCloudPurchases()
-    const overlay = getOptimisticOverlay()
+    const overlay = getOptimisticOverlayForMerge()
     const deletedOrderIds = getOptimisticDeletedOrderIds()
     if (orders || overlay.orders.length || deletedOrderIds.length) {
       return mergePurchaseOrders(orders || [], overlay.orders, deletedOrderIds)

@@ -1,5 +1,6 @@
 import { normalizePurchaseOrder } from '../utils/purchaseData'
 import { normalizeReceivingDocument } from '../utils/receivingData'
+import { SYNC_STATUS } from '../utils/syncStatus'
 
 const OVERLAY_KEY = 'shugyla_purchase_optimistic_overlay'
 
@@ -43,6 +44,28 @@ function writeOverlay(overlay) {
 
 export function getOptimisticOverlay() {
   return readOverlay()
+}
+
+/** Overlay для merge: только pending/error закупки — не локальные отметки чек-листа */
+export function getOptimisticOverlayForMerge() {
+  const overlay = readOverlay()
+
+  const pendingOrErrorOrders = overlay.orders.filter(
+    (order) =>
+      order.syncStatus === SYNC_STATUS.PENDING || order.syncStatus === SYNC_STATUS.ERROR
+  )
+  const pendingOrderIds = new Set(pendingOrErrorOrders.map((order) => order.id))
+
+  const documents = overlay.documents.filter((doc) => {
+    if (!doc.purchaseOrderId) return false
+    return pendingOrderIds.has(doc.purchaseOrderId)
+  })
+
+  return {
+    orders: pendingOrErrorOrders,
+    documents,
+    pendingDeletes: overlay.pendingDeletes,
+  }
 }
 
 export function getOptimisticDeletedOrderIds() {

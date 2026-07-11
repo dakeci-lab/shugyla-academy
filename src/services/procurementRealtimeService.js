@@ -1,13 +1,13 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
 
-const DEBOUNCE_MS = 450
-const POLL_INTERVAL_MS = 45000
+const DEBOUNCE_MS = 350
+const POLL_INTERVAL_MS = 15000
 const CHANNEL_NAME = 'procurement-sync'
 
 /**
  * Подписка на изменения закупов и приёмки через Supabase Realtime.
- * При недоступности Realtime — резервный polling каждые 45 с.
+ * Realtime + резервный polling каждые 15 с (на случай недоступности Realtime).
  */
 export function subscribeProcurementRealtime(onSync) {
   if (!isCloudMode() || !isSupabaseConfigured() || !supabase) {
@@ -41,6 +41,8 @@ export function subscribeProcurementRealtime(onSync) {
     pollTimer = null
   }
 
+  startPolling()
+
   const channel = supabase
     .channel(CHANNEL_NAME)
     .on(
@@ -57,13 +59,11 @@ export function subscribeProcurementRealtime(onSync) {
       if (disposed) return
 
       if (status === 'SUBSCRIBED') {
-        stopPolling()
         return
       }
 
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-        console.warn('[ProcurementRealtime] Realtime unavailable, using polling fallback', err)
-        startPolling()
+        console.warn('[ProcurementRealtime] Realtime unavailable, polling only', err)
       }
     })
 
