@@ -45,7 +45,7 @@ export default function WeekScheduleNav({
             >
               <span className="simple-receiving-day-bar__weekday">{weekday}</span>
               <span className="simple-receiving-day-bar__number">{day}</span>
-              {count > 0 && (
+              {isSelected && count > 0 && (
                 <span className="simple-receiving-day-bar__count">{count}</span>
               )}
             </button>

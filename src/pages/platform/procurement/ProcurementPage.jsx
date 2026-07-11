@@ -43,7 +43,7 @@ import SimplePurchaseCardList from '../../../components/procurement/SimplePurcha
 import PurchaseFilterPopover from '../../../components/procurement/PurchaseFilterPopover'
 import WeekScheduleNav from '../../../components/procurement/WeekScheduleNav'
 import ProcurementPlanDayList from '../../../components/procurement/ProcurementPlanDayList'
-import { FilterIcon, ChevronDownIcon } from '../../../components/icons/PlatformIcons'
+import { FilterIcon, PlusIcon } from '../../../components/icons/PlatformIcons'
 import '../../../components/admin/admin-shared.css'
 import './ProcurementPage.css'
 import '../../../components/procurement/SimpleDeliveryCard.css'
@@ -305,6 +305,17 @@ export default function ProcurementPage() {
             </button>
           )}
 
+          {canCreate && (
+            <button
+              type="button"
+              className="procurement-page__mobile-create"
+              onClick={() => openCreate()}
+              aria-label="Создать закуп вне расписания"
+            >
+              <PlusIcon size={20} />
+            </button>
+          )}
+
           <div className="procurement-page__filter-wrap">
             <button
               ref={filterButtonRef}
@@ -314,6 +325,7 @@ export default function ProcurementPage() {
               }`}
               onClick={toggleFilter}
               aria-expanded={filterOpen}
+              aria-label="Фильтр"
             >
               <span className="procurement-page__filter-trigger-desktop">
                 <FilterIcon size={16} />
@@ -321,20 +333,8 @@ export default function ProcurementPage() {
                 {filtersActive && <span className="procurement-page__filter-badge" aria-hidden="true" />}
               </span>
               <span className="procurement-page__filter-trigger-mobile">
-                <span className="procurement-page__mobile-filter-main">
-                  <FilterIcon size={18} />
-                  <span className="procurement-page__mobile-filter-label">Фильтр</span>
-                  <ChevronDownIcon size={16} />
-                </span>
-                {filterSummary.length > 0 && (
-                  <span className="procurement-page__mobile-filter-chips">
-                    {filterSummary.map((chip) => (
-                      <span key={chip} className="procurement-page__mobile-filter-chip">
-                        {chip}
-                      </span>
-                    ))}
-                  </span>
-                )}
+                <FilterIcon size={20} />
+                {filtersActive && <span className="procurement-page__filter-badge" aria-hidden="true" />}
               </span>
             </button>
             <PurchaseFilterPopover
@@ -348,6 +348,16 @@ export default function ProcurementPage() {
             />
           </div>
         </div>
+
+        {filtersActive && filterSummary.length > 0 && (
+          <div className="procurement-page__mobile-filter-chips">
+            {filterSummary.map((chip) => (
+              <span key={chip} className="procurement-page__mobile-filter-chip">
+                {chip}
+              </span>
+            ))}
+          </div>
+        )}
 
         <span className="admin-toolbar__info procurement-page__count">
           {dayOrders.length} {selectedDateKey ? 'за день' : ''}
@@ -406,22 +416,13 @@ export default function ProcurementPage() {
                 onRetry={handleRetry}
                 totals={listTotals}
                 emptyMessage={emptyMessage}
+                compact
+                hideDate
               />
             </div>
           </>
         )}
       </section>
-
-      {canCreate && (
-        <button
-          type="button"
-          className="procurement-page__fab"
-          onClick={() => openCreate()}
-          aria-label="Создать закуп"
-        >
-          +
-        </button>
-      )}
 
       {deleteTargetId && (
         <ConfirmDialog

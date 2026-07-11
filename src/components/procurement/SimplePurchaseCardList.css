@@ -127,6 +127,64 @@
   height: 40px;
 }
 
+/* Компактный режим для мобильного раздела «Закуп» */
+.simple-purchase-cards--compact {
+  gap: 6px;
+}
+
+.simple-purchase-cards--compact .simple-purchase-cards__summary {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.simple-purchase-cards--compact .simple-purchase-cards__list {
+  gap: 6px;
+}
+
+.simple-purchase-card--compact {
+  gap: 8px;
+  padding: 10px 10px 10px 12px;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+.simple-purchase-card--compact .simple-purchase-card__supplier {
+  font-size: 15px;
+  margin-bottom: 0;
+}
+
+.simple-purchase-card--compact .simple-purchase-card__sync {
+  margin-bottom: 4px;
+}
+
+.simple-purchase-card--compact .simple-purchase-card__facts {
+  gap: 4px 10px;
+}
+
+.simple-purchase-card--compact .simple-purchase-card__fact dt {
+  font-size: 10px;
+}
+
+.simple-purchase-card--compact .simple-purchase-card__fact dd {
+  font-size: 13px;
+}
+
+.simple-purchase-card--compact .simple-purchase-card__actions {
+  gap: 4px;
+  padding-top: 0;
+}
+
+.simple-purchase-card--compact .simple-purchase-card__actions .icon-action-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.simple-purchase-card--compact .simple-purchase-card__actions .btn--sm {
+  padding: 0.2rem 0.45rem;
+  font-size: 0.75rem;
+}
+
 @media (min-width: 901px) {
   .simple-purchase-cards {
     display: none;

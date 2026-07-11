@@ -38,31 +38,34 @@ export default function ProcurementPlanDayList({
       <h2 className="procurement-plan__title">{PROCUREMENT_PLAN_LABEL}</h2>
 
       <ul className="procurement-plan__list">
-        {dayEntries.map((entry) => (
-          <li key={getReceivingEntryKey(entry)} className="procurement-plan__item">
-            <div className="procurement-plan__info">
-              <span className="procurement-plan__supplier">
-                {getReceivingEntrySupplierName(entry)}
-              </span>
-              <span className="procurement-plan__status">{PROCUREMENT_PLAN_ITEM_STATUS}</span>
-            </div>
-            {canCreate && (
-              <button
-                type="button"
-                className="btn btn--primary btn--sm"
-                onClick={() =>
-                  onCreatePurchase({
-                    supplierId: entry.supplier?.id || '',
-                    supplierName: getReceivingEntrySupplierName(entry),
-                    expectedDeliveryDate: entry.dateKey,
-                  })
-                }
-              >
-                Создать заказ
-              </button>
-            )}
-          </li>
-        ))}
+        {dayEntries.map((entry) => {
+          const supplierName = getReceivingEntrySupplierName(entry)
+
+          return (
+            <li key={getReceivingEntryKey(entry)} className="procurement-plan__item">
+              <div className="procurement-plan__info">
+                <span className="procurement-plan__supplier">{supplierName}</span>
+                <span className="procurement-plan__status">{PROCUREMENT_PLAN_ITEM_STATUS}</span>
+              </div>
+              {canCreate && (
+                <button
+                  type="button"
+                  className="procurement-plan__add-btn"
+                  aria-label={`Создать заказ: ${supplierName}`}
+                  onClick={() =>
+                    onCreatePurchase({
+                      supplierId: entry.supplier?.id || '',
+                      supplierName,
+                      expectedDeliveryDate: entry.dateKey,
+                    })
+                  }
+                >
+                  <span aria-hidden="true">+</span>
+                </button>
+              )}
+            </li>
+          )
+        })}
       </ul>
     </section>
   )

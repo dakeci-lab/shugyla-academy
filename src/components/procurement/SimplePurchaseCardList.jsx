@@ -38,6 +38,8 @@ export default function SimplePurchaseCardList({
   onRetry,
   totals,
   emptyMessage = 'Закупы не созданы',
+  compact = false,
+  hideDate = false,
 }) {
   if (!orders.length) {
     return (
@@ -48,7 +50,7 @@ export default function SimplePurchaseCardList({
   }
 
   return (
-    <div className="simple-purchase-cards">
+    <div className={`simple-purchase-cards${compact ? ' simple-purchase-cards--compact' : ''}`}>
       {totals && (
         <div className="simple-purchase-cards__summary">
           <span>{totals.count} закупок</span>
@@ -66,7 +68,7 @@ export default function SimplePurchaseCardList({
           return (
             <li
               key={order.id}
-              className={`simple-purchase-card${syncError ? ' simple-purchase-card--sync-error' : ''}`}
+              className={`simple-purchase-card${syncError ? ' simple-purchase-card--sync-error' : ''}${compact ? ' simple-purchase-card--compact' : ''}`}
             >
               <div className="simple-purchase-card__main">
                 {editable ? (
@@ -84,9 +86,11 @@ export default function SimplePurchaseCardList({
                   </span>
                 )}
 
-                <span className="simple-purchase-card__date">
-                  {formatPurchaseDateLong(order.expectedDeliveryDate)}
-                </span>
+                {!hideDate && (
+                  <span className="simple-purchase-card__date">
+                    {formatPurchaseDateLong(order.expectedDeliveryDate)}
+                  </span>
+                )}
 
                 {(pending || syncError) && (
                   <div className="simple-purchase-card__sync">
