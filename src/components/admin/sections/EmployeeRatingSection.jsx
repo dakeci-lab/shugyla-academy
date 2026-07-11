@@ -129,35 +129,50 @@ export default function EmployeeRatingSection() {
           </div>
 
           <ul className="rating-list__body">
-            {rows.map((row) => (
-              <li key={row.employee.id}>
-                <button
-                  type="button"
-                  className="rating-list__row"
-                  onClick={() => setDetailEmployee(row.employee)}
-                >
-                  <span
-                    className={`rating-list__col rating-list__col--place rating-list__place ${PLACE_CLASS[row.place] || ''}`}
+            {rows.map((row) => {
+              const roleLabel = row.employee.position || getRoleLabel(row.employee.role)
+
+              return (
+                <li key={row.employee.id}>
+                  <button
+                    type="button"
+                    className="rating-list__row"
+                    onClick={() => setDetailEmployee(row.employee)}
                   >
-                    {row.place}
-                  </span>
-                  <span className="rating-list__col rating-list__col--employee">
-                    <EmployeeAvatar
-                      name={row.employee.name}
-                      avatarUrl={row.employee.avatarUrl}
-                      size="sm"
-                    />
-                    <span className="rating-list__name">{row.employee.name}</span>
-                  </span>
-                  <span className="rating-list__col rating-list__col--position">
-                    {row.employee.position || getRoleLabel(row.employee.role)}
-                  </span>
-                  <span className="rating-list__col rating-list__col--score">
-                    <RatingScoreBar score={row.totalPoints} />
-                  </span>
-                </button>
-              </li>
-            ))}
+                    <span
+                      className={`rating-list__col rating-list__col--place rating-list__place ${PLACE_CLASS[row.place] || ''}`}
+                    >
+                      {row.place}
+                    </span>
+
+                    <span className="rating-list__profile">
+                      <EmployeeAvatar
+                        name={row.employee.name}
+                        avatarUrl={row.employee.avatarUrl}
+                        size="sm"
+                        className="rating-list__avatar"
+                      />
+                      <span className="rating-list__info">
+                        <span className="rating-list__name">{row.employee.name}</span>
+                        <span className="rating-list__role">{roleLabel}</span>
+                        <RatingScoreBar
+                          score={row.totalPoints}
+                          compact
+                          className="rating-list__bar--mobile"
+                        />
+                      </span>
+                    </span>
+
+                    <span className="rating-list__col rating-list__col--position rating-list__desktop-only">
+                      {roleLabel}
+                    </span>
+                    <span className="rating-list__col rating-list__col--score rating-list__desktop-only">
+                      <RatingScoreBar score={row.totalPoints} />
+                    </span>
+                  </button>
+                </li>
+              )
+            })}
           </ul>
         </div>
       )}

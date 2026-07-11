@@ -427,6 +427,16 @@ export function getRatingScoreColor(score) {
   return `hsl(${hue}, 68%, 42%)`
 }
 
+/** Градиент полосы рейтинга по диапазонам баллов */
+export function getRatingScoreGradient(score) {
+  const value = clampRatingScore(score)
+  if (value >= 95) return 'linear-gradient(90deg, #15803d, #22c55e)'
+  if (value >= 85) return 'linear-gradient(90deg, #65a30d, #a3e635)'
+  if (value >= 75) return 'linear-gradient(90deg, #ca8a04, #facc15)'
+  if (value >= 60) return 'linear-gradient(90deg, #ea580c, #fb923c)'
+  return 'linear-gradient(90deg, #dc2626, #ef4444)'
+}
+
 export function aggregateEmployeeRating(events, shifts = []) {
   const stats = {
     totalPoints: 0,

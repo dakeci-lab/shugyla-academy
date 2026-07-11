@@ -100,6 +100,19 @@
   flex: 0 0 40px;
 }
 
+@media (max-width: 768px) {
+  .rating-list__avatar.employee-avatar--sm {
+    width: 60px;
+    height: 60px;
+    min-width: 60px;
+    min-height: 60px;
+    max-width: 60px;
+    max-height: 60px;
+    flex: 0 0 60px;
+    font-size: 1rem;
+  }
+}
+
 .admin-table td .employee-avatar,
 .admin-table td .employee-table-cell {
   vertical-align: middle;
