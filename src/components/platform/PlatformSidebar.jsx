@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import DataModeBadge from '../admin/DataModeBadge'
 import { useSession } from '../../context/SessionContext'
@@ -10,37 +10,87 @@ import {
 import { filterPlatformNav } from '../../platform/platformAccess'
 import './PlatformSidebar.css'
 
+const MOBILE_QUERY = '(max-width: 900px)'
+const HOVER_COLLAPSE_DELAY_MS = 220
+
+function useMediaQuery(query) {
+  const [matches, setMatches] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(query).matches
+  )
+
+  useEffect(() => {
+    const media = window.matchMedia(query)
+    const onChange = () => setMatches(media.matches)
+    onChange()
+    media.addEventListener('change', onChange)
+    return () => media.removeEventListener('change', onChange)
+  }, [query])
+
+  return matches
+}
+
 /**
  * Боковое меню Shugyla Platform
- * Desktop: постоянный sidebar слева
- * Mobile: drawer, открывается бургером
+ * Desktop: hover-раскрытие + активный раздел всегда открыт
+ * Mobile: drawer со всеми разделами сразу раскрытыми
  */
 export default function PlatformSidebar({ isOpen = false, onClose, onNavigate }) {
   const { user } = useSession()
   const { pathname } = useLocation()
+  const isMobile = useMediaQuery(MOBILE_QUERY)
   const navItems = useMemo(
     () => filterPlatformNav(PLATFORM_NAV, user),
     [user]
   )
-  const [expandedGroups, setExpandedGroups] = useState(() => new Set())
+
+  const pinnedGroupIds = useMemo(
+    () => new Set(getAutoExpandedGroupIds(pathname, navItems)),
+    [pathname, navItems]
+  )
+
+  const [hoveredGroupId, setHoveredGroupId] = useState(null)
+  const collapseTimerRef = useRef(null)
+
+  useEffect(
+    () => () => {
+      if (collapseTimerRef.current) {
+        window.clearTimeout(collapseTimerRef.current)
+      }
+    },
+    []
+  )
 
   useEffect(() => {
-    const autoIds = getAutoExpandedGroupIds(pathname, navItems)
-    if (autoIds.length === 0) return
-    setExpandedGroups((prev) => {
-      const next = new Set(prev)
-      autoIds.forEach((id) => next.add(id))
-      return next
-    })
-  }, [pathname, navItems])
+    if (isMobile) {
+      setHoveredGroupId(null)
+    }
+  }, [isMobile])
 
-  function toggleGroup(groupId) {
-    setExpandedGroups((prev) => {
-      const next = new Set(prev)
-      if (next.has(groupId)) next.delete(groupId)
-      else next.add(groupId)
-      return next
-    })
+  function isGroupOpen(groupId) {
+    if (isMobile && isOpen) return true
+    if (pinnedGroupIds.has(groupId)) return true
+    if (!isMobile && hoveredGroupId === groupId) return true
+    return false
+  }
+
+  function handleGroupEnter(groupId) {
+    if (isMobile) return
+    if (collapseTimerRef.current) {
+      window.clearTimeout(collapseTimerRef.current)
+      collapseTimerRef.current = null
+    }
+    setHoveredGroupId(groupId)
+  }
+
+  function handleGroupLeave(groupId) {
+    if (isMobile) return
+    if (collapseTimerRef.current) {
+      window.clearTimeout(collapseTimerRef.current)
+    }
+    collapseTimerRef.current = window.setTimeout(() => {
+      setHoveredGroupId((current) => (current === groupId ? null : current))
+      collapseTimerRef.current = null
+    }, HOVER_COLLAPSE_DELAY_MS)
   }
 
   function handleNavClick() {
@@ -70,14 +120,17 @@ export default function PlatformSidebar({ isOpen = false, onClose, onNavigate })
       <nav className="platform-sidebar__nav" aria-label="Разделы платформы">
         {navItems.map((item) =>
           item.children ? (
-            <div key={item.id} className="platform-sidebar__group">
-              <button
-                type="button"
-                className={`platform-sidebar__group-toggle ${
-                  expandedGroups.has(item.id) ? 'platform-sidebar__group-toggle--open' : ''
-                }`}
-                onClick={() => toggleGroup(item.id)}
-                aria-expanded={expandedGroups.has(item.id)}
+            <div
+              key={item.id}
+              className={`platform-sidebar__group${
+                isGroupOpen(item.id) ? ' platform-sidebar__group--open' : ''
+              }${pinnedGroupIds.has(item.id) ? ' platform-sidebar__group--pinned' : ''}`}
+              onMouseEnter={() => handleGroupEnter(item.id)}
+              onMouseLeave={() => handleGroupLeave(item.id)}
+            >
+              <div
+                className="platform-sidebar__group-toggle"
+                aria-expanded={isGroupOpen(item.id)}
               >
                 <span className="platform-sidebar__group-label">
                   {item.icon && (
@@ -88,9 +141,14 @@ export default function PlatformSidebar({ isOpen = false, onClose, onNavigate })
                   <span>{item.label}</span>
                 </span>
                 <span className="platform-sidebar__caret" aria-hidden="true" />
-              </button>
-              {expandedGroups.has(item.id) && (
-                <div className="platform-sidebar__subnav">
+              </div>
+
+              <div
+                className={`platform-sidebar__subnav${
+                  isGroupOpen(item.id) ? ' platform-sidebar__subnav--open' : ''
+                }`}
+              >
+                <div className="platform-sidebar__subnav-inner">
                   {item.children.map((child) => (
                     <NavLink
                       key={child.id}
@@ -113,7 +171,7 @@ export default function PlatformSidebar({ isOpen = false, onClose, onNavigate })
                     </NavLink>
                   ))}
                 </div>
-              )}
+              </div>
             </div>
           ) : (
             <NavLink
