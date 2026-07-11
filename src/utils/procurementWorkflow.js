@@ -155,8 +155,15 @@ export function buildExpectedDeliveryEntries(suppliers, weekStartKey, orders = [
 
   const occupied = new Set()
   for (const order of filterSimplePurchases(orders)) {
-    if (order.supplierId && order.expectedDeliveryDate) {
-      occupied.add(`${order.supplierId}:${order.expectedDeliveryDate}`)
+    if (!order.expectedDeliveryDate) continue
+
+    if (order.supplierId) {
+      occupied.add(`id:${order.supplierId}:${order.expectedDeliveryDate}`)
+    }
+
+    const supplierName = order.supplierName?.trim().toLowerCase()
+    if (supplierName) {
+      occupied.add(`name:${supplierName}:${order.expectedDeliveryDate}`)
     }
   }
 
@@ -167,8 +174,10 @@ export function buildExpectedDeliveryEntries(suppliers, weekStartKey, orders = [
 
     for (const supplier of activeSuppliers) {
       if (!supplier.deliveryWeekdays.includes(weekdayId)) continue
-      const slotKey = `${supplier.id}:${dateKey}`
-      if (occupied.has(slotKey)) continue
+
+      const idKey = `id:${supplier.id}:${dateKey}`
+      const nameKey = `name:${supplier.name.trim().toLowerCase()}:${dateKey}`
+      if (occupied.has(idKey) || occupied.has(nameKey)) continue
 
       entries.push({
         source: RECEIVING_ENTRY_SOURCE.EXPECTED,

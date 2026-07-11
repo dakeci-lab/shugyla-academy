@@ -184,6 +184,8 @@
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.375rem;
   margin-bottom: 0.75rem;
+  width: 100%;
+  min-width: 0;
 }
 
 .simple-receiving-day-bar__day {
@@ -193,14 +195,19 @@
   justify-content: center;
   gap: 0.125rem;
   position: relative;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 56px;
   min-height: 56px;
+  max-height: 56px;
   padding: 0.375rem 0.25rem;
   border: 1px solid var(--color-border, #e5e7eb);
   border-radius: 8px;
   background: var(--color-white, #fff);
   font-family: inherit;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
 }
 
 .simple-receiving-day-bar__day:hover {
@@ -210,12 +217,18 @@
 .simple-receiving-day-bar__day--active {
   border-color: var(--color-primary, #059669);
   background: var(--color-primary-light, #ecfdf5);
-  box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.12);
 }
 
-.simple-receiving-day-bar__day--today .simple-receiving-day-bar__number {
+.simple-receiving-day-bar__day--active .simple-receiving-day-bar__weekday {
   color: var(--color-primary-dark, #047857);
-  font-weight: 700;
+}
+
+.simple-receiving-day-bar__day--active .simple-receiving-day-bar__number {
+  color: var(--color-primary-dark, #047857);
+}
+
+.simple-receiving-day-bar__day--today:not(.simple-receiving-day-bar__day--active) .simple-receiving-day-bar__number {
+  color: var(--color-primary-dark, #047857);
 }
 
 .simple-receiving-day-bar__weekday {
@@ -224,6 +237,11 @@
   text-transform: uppercase;
   letter-spacing: 0.03em;
   color: #6b7280;
+  line-height: 1.1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .simple-receiving-day-bar__number {
@@ -231,6 +249,7 @@
   font-weight: 600;
   color: #111827;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .simple-receiving-day-bar__count {
@@ -247,6 +266,7 @@
   font-weight: 700;
   line-height: 1rem;
   text-align: center;
+  pointer-events: none;
 }
 
 .simple-receiving-checklist {

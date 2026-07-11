@@ -12,7 +12,7 @@ import {
   updatePurchaseOrder,
 } from '../../../services/purchaseDataService'
 import { getReceivingDocumentsSync } from '../../../services/receivingDataService'
-import { getAllSuppliersSync } from '../../../utils/supplierData'
+import { getAllSuppliersSync, getSupplierByIdSync } from '../../../utils/supplierData'
 import {
   createSimplePurchaseOptimistic,
   deleteSimplePurchaseOptimistic,
@@ -26,7 +26,6 @@ import { PURCHASE_STATUS } from '../../../utils/purchaseData'
 import {
   createDefaultPurchaseFilters,
   calcPurchaseTotals,
-  filterPurchaseOrders,
   hasActivePurchaseFilters,
 } from '../../../utils/purchaseFilter'
 import { formatPurchaseFilterSummary } from '../../../utils/purchaseFilterSummary'
@@ -88,17 +87,22 @@ export default function ProcurementPage() {
       .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   }, [version])
 
-  const filteredOrders = useMemo(
-    () => filterPurchaseOrders(simpleOrders, appliedFilters),
-    [simpleOrders, appliedFilters]
-  )
-
+  /** Список закупов выбранного дня — период из фильтра не применяем (дату задаёт навигация по неделе) */
   const dayOrders = useMemo(() => {
     if (!selectedDateKey) return []
-    return filteredOrders
-      .filter((order) => order.expectedDeliveryDate === selectedDateKey)
-      .sort((a, b) => (a.supplierName || '').localeCompare(b.supplierName || '', 'ru'))
-  }, [filteredOrders, selectedDateKey])
+
+    let result = simpleOrders.filter(
+      (order) => order.expectedDeliveryDate === selectedDateKey
+    )
+
+    if (appliedFilters.supplierId) {
+      result = result.filter((order) => order.supplierId === appliedFilters.supplierId)
+    }
+
+    return result.sort((a, b) =>
+      (a.supplierName || '').localeCompare(b.supplierName || '', 'ru')
+    )
+  }, [simpleOrders, selectedDateKey, appliedFilters.supplierId])
 
   const expectedEntriesByDate = useMemo(() => {
     const entries = buildExpectedDeliveryEntries(
@@ -115,12 +119,12 @@ export default function ProcurementPage() {
 
   const countsByDate = useMemo(() => {
     const counts = { ...expectedEntriesByDate }
-    for (const order of filteredOrders) {
+    for (const order of simpleOrders) {
       if (!order.expectedDeliveryDate) continue
       counts[order.expectedDeliveryDate] = (counts[order.expectedDeliveryDate] || 0) + 1
     }
     return counts
-  }, [filteredOrders, expectedEntriesByDate])
+  }, [simpleOrders, expectedEntriesByDate])
 
   const totals = useMemo(() => calcPurchaseTotals(dayOrders), [dayOrders])
 
@@ -151,12 +155,23 @@ export default function ProcurementPage() {
 
   function openCreate(prefill = null) {
     setEditingOrder(null)
+
+    const supplierId = prefill?.supplierId || ''
+    const supplierName = prefill?.supplierName || ''
+    const resolvedSupplier =
+      (supplierId && getSupplierByIdSync(supplierId)) ||
+      getAllSuppliersSync().find(
+        (supplier) =>
+          supplier.name.trim().toLowerCase() === supplierName.trim().toLowerCase()
+      ) ||
+      null
+
     setForm(
       prefill
         ? {
             ...EMPTY_SIMPLE_PURCHASE_FORM,
-            supplierId: prefill.supplierId || '',
-            supplierName: prefill.supplierName || '',
+            supplierId: resolvedSupplier?.id || supplierId || '',
+            supplierName: resolvedSupplier?.name || supplierName,
             expectedDeliveryDate: prefill.expectedDeliveryDate || selectedDateKey || '',
           }
         : {
@@ -212,11 +227,8 @@ export default function ProcurementPage() {
     return true
   }
 
-  function handleSave() {
-    setFormError('')
-    if (!validateForm()) return
-
-    const payload = {
+  function buildCreatePayload() {
+    return {
       supplierId: form.supplierId || null,
       supplierName: form.supplierName,
       expectedDeliveryDate: form.expectedDeliveryDate,
@@ -225,6 +237,13 @@ export default function ProcurementPage() {
       createdBy: user?.login || user?.id || '',
       createdByName: user?.name || '',
     }
+  }
+
+  function handleSave() {
+    setFormError('')
+    if (!validateForm()) return
+
+    const payload = buildCreatePayload()
 
     if (editingOrder) {
       setSaving(true)
@@ -238,8 +257,13 @@ export default function ProcurementPage() {
       return
     }
 
+    const deliveryDate = payload.expectedDeliveryDate
     closeModal()
     createSimplePurchaseOptimistic(payload, user, notifyChange)
+
+    if (deliveryDate && deliveryDate !== selectedDateKey) {
+      selectWeekContaining(deliveryDate)
+    }
   }
 
   function requestDelete(orderId) {
@@ -281,7 +305,7 @@ export default function ProcurementPage() {
   function getEmptyMessage() {
     if (!selectedDateKey) return 'Выберите день недели'
     if (simpleOrders.length === 0) return 'Закупы не созданы'
-    if (filtersActive && filteredOrders.length === 0) {
+    if (appliedFilters.supplierId && dayOrders.length === 0) {
       return 'По выбранному фильтру закупы не найдены'
     }
     return 'На этот день закупок нет'
