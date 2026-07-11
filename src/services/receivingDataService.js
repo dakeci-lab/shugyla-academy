@@ -3,11 +3,20 @@ import { getCloudReceivingDocuments } from '../lib/cloudStore'
 import { refreshData } from './academyDataService'
 import * as local from './receivingLocalAdapter'
 import * as cloud from './receivingSupabaseAdapter'
+import {
+  getOptimisticOverlay,
+  getOptimisticDeletedOrderIds,
+  mergeReceivingDocuments,
+} from './purchaseOptimisticStore'
 
 function getReceivingSource() {
   if (isCloudMode()) {
     const documents = getCloudReceivingDocuments()
-    if (documents) return documents
+    const overlay = getOptimisticOverlay()
+    const deletedOrderIds = getOptimisticDeletedOrderIds()
+    if (documents || overlay.documents.length || deletedOrderIds.length) {
+      return mergeReceivingDocuments(documents || [], overlay.documents, deletedOrderIds)
+    }
     return []
   }
   return local.getLocalReceivingBundle().documents
@@ -54,6 +63,22 @@ export async function completeReceivingDocument(documentId, items, user) {
   const result = isCloudMode()
     ? await cloud.completeReceivingDocumentCloud(documentId, items, user)
     : await local.completeReceivingDocumentLocal(documentId, items, user)
+  await afterReceivingMutation()
+  return result
+}
+
+export async function acceptSimpleDelivery(documentId, user) {
+  const result = isCloudMode()
+    ? await cloud.acceptSimpleDeliveryCloud(documentId, user)
+    : await local.acceptSimpleDeliveryLocal(documentId, user)
+  await afterReceivingMutation()
+  return result
+}
+
+export async function unacceptSimpleDelivery(documentId) {
+  const result = isCloudMode()
+    ? await cloud.unacceptSimpleDeliveryCloud(documentId)
+    : await local.unacceptSimpleDeliveryLocal(documentId)
   await afterReceivingMutation()
   return result
 }

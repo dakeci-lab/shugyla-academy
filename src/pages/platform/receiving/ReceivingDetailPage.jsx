@@ -10,6 +10,7 @@ import {
   saveReceivingDocument,
   completeReceivingDocument,
 } from '../../../services/receivingDataService'
+import { isSimpleWorkflow } from '../../../utils/procurementWorkflow'
 import {
   formatReceivingDate,
   normalizeReceivingItem,
@@ -57,7 +58,20 @@ export default function ReceivingDetailPage() {
       <div className="purchase-detail">
         <p className="purchase-detail__not-found">Документ приёмки не найден.</p>
         <Link to="/platform/receiving" className="btn btn--ghost">
-          ← К списку приёмок
+          ← К приёмке
+        </Link>
+      </div>
+    )
+  }
+
+  if (isSimpleWorkflow(document)) {
+    return (
+      <div className="purchase-detail">
+        <p className="purchase-detail__not-found">
+          Простая приёмка отображается в недельном графике.
+        </p>
+        <Link to="/platform/receiving" className="btn btn--ghost">
+          ← К приёмке
         </Link>
       </div>
     )
@@ -121,7 +135,7 @@ export default function ReceivingDetailPage() {
 
       <div className="purchase-detail__header">
         <div>
-          <h2 className="purchase-detail__number">{document.number}</h2>
+          <h2 className="purchase-detail__title">{document.supplierName || 'Приёмка'}</h2>
           <ReceivingStatusBadge status={document.status} />
         </div>
         {canEdit && !isFinalized && (
@@ -151,23 +165,19 @@ export default function ReceivingDetailPage() {
 
       <dl className="purchase-detail__meta">
         <div>
-          <dt>№ закупа</dt>
+          <dt>Закуп</dt>
           <dd>
             {document.purchaseOrderId ? (
               <Link
                 to={`/platform/procurement/${document.purchaseOrderId}`}
                 className="receiving-detail__purchase-link"
               >
-                {document.purchaseOrderNumber || document.purchaseOrderId}
+                {document.supplierName || 'Открыть закуп'}
               </Link>
             ) : (
               '—'
             )}
           </dd>
-        </div>
-        <div>
-          <dt>Поставщик</dt>
-          <dd>{document.supplierName || '—'}</dd>
         </div>
         <div>
           <dt>Ожидаемая дата доставки</dt>

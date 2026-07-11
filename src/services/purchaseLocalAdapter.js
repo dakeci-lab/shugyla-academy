@@ -3,10 +3,19 @@ import {
   normalizePurchaseItem,
   PURCHASE_STATUS,
   calcOrderTotal,
+  PROCUREMENT_WORKFLOW_MODE,
 } from '../utils/purchaseData'
+import { SYNC_STATUS } from '../utils/syncStatus'
+import { isCloudMode } from '../lib/dataMode'
+import { normalizeReceivingDocument, RECEIVING_STATUS } from '../utils/receivingData'
+import {
+  createSimpleReceivingFromPurchaseLocal,
+  syncSimpleReceivingFromPurchaseLocal,
+  deleteReceivingByPurchaseIdLocal,
+  getLocalReceivingDocumentById,
+} from './receivingLocalAdapter'
 
 const ORDERS_KEY = 'shugyla_purchase_orders'
-const COUNTER_KEY = 'shugyla_purchase_counter'
 
 function readOrders() {
   const data = localStorage.getItem(ORDERS_KEY)
@@ -21,14 +30,8 @@ function genId() {
   return crypto.randomUUID()
 }
 
-function nextNumber() {
-  const year = new Date().getFullYear()
-  const counter = Number(localStorage.getItem(COUNTER_KEY) || '0') + 1
-  localStorage.setItem(COUNTER_KEY, String(counter))
-  return `Z-${year}-${String(counter).padStart(4, '0')}`
-}
-
 function seedIfEmpty() {
+  if (isCloudMode()) return
   if (readOrders().length > 0) return
 
   const now = new Date().toISOString()
@@ -98,7 +101,6 @@ function seedIfEmpty() {
   writeOrders([
     normalizePurchaseOrder({
       id: genId(),
-      number: 'Z-2026-0001',
       date: today,
       supplierId: null,
       supplierName: 'ТОО «МолКом»',
@@ -113,7 +115,6 @@ function seedIfEmpty() {
     }),
     normalizePurchaseOrder({
       id: genId(),
-      number: 'Z-2026-0002',
       date: today,
       supplierId: null,
       supplierName: 'ИП «Bakaleya Plus»',
@@ -128,7 +129,6 @@ function seedIfEmpty() {
     }),
     normalizePurchaseOrder({
       id: genId(),
-      number: 'Z-2026-0003',
       date: '2026-07-05',
       supplierId: null,
       supplierName: 'Прима Nivea',
@@ -142,7 +142,6 @@ function seedIfEmpty() {
       updated_at: now,
     }),
   ])
-  localStorage.setItem(COUNTER_KEY, '3')
 }
 
 export function getLocalPurchasesBundle() {
@@ -160,7 +159,6 @@ export async function createPurchaseOrder(data) {
   const now = new Date().toISOString()
   const order = normalizePurchaseOrder({
     id: genId(),
-    number: nextNumber(),
     date: data.date || now.slice(0, 10),
     supplierId: data.supplierId || null,
     supplierName: data.supplierName?.trim() || '',
@@ -176,6 +174,132 @@ export async function createPurchaseOrder(data) {
   orders.unshift(order)
   writeOrders(orders)
   return order.id
+}
+
+export function buildSimplePurchaseEntities(data, user) {
+  const now = new Date().toISOString()
+  const today = now.slice(0, 10)
+  const totalAmount = Math.max(0, Number(data.totalAmount) || 0)
+  const orderId = genId()
+  const docId = genId()
+
+  const order = normalizePurchaseOrder({
+    id: orderId,
+    date: today,
+    supplierId: data.supplierId || null,
+    supplierName: data.supplierName?.trim() || '',
+    status: PURCHASE_STATUS.AWAITING_RECEIVING,
+    createdBy: data.createdBy || user?.login || user?.id || '',
+    createdByName: data.createdByName || user?.name || '',
+    expectedDeliveryDate: data.expectedDeliveryDate || '',
+    comment: data.comment?.trim() || '',
+    totalAmount,
+    itemsCount: 0,
+    items: [],
+    workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
+    transferredToReceiving: true,
+    receivingDocumentId: docId,
+    syncStatus: data.syncStatus ?? SYNC_STATUS.SYNCED,
+    syncError: data.syncError ?? null,
+    created_at: now,
+    updated_at: now,
+  })
+
+  const document = normalizeReceivingDocument({
+    id: docId,
+    purchaseOrderId: orderId,
+    supplierId: order.supplierId,
+    supplierName: order.supplierName,
+    status: RECEIVING_STATUS.AWAITING_RECEIVING,
+    expectedDeliveryDate: order.expectedDeliveryDate,
+    createdBy: order.createdBy,
+    createdByName: order.createdByName,
+    comment: order.comment,
+    totalAmount: order.totalAmount,
+    workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
+    created_at: now,
+    updated_at: now,
+  })
+
+  return { order, document }
+}
+
+export function createSimplePurchaseSync(data, user) {
+  if (isCloudMode()) {
+    return buildSimplePurchaseEntities(data, user)
+  }
+
+  seedIfEmpty()
+  const orders = readOrders()
+  const now = new Date().toISOString()
+  const today = now.slice(0, 10)
+  const totalAmount = Math.max(0, Number(data.totalAmount) || 0)
+
+  const order = normalizePurchaseOrder({
+    id: genId(),
+    date: today,
+    supplierId: data.supplierId || null,
+    supplierName: data.supplierName?.trim() || '',
+    status: PURCHASE_STATUS.AWAITING_RECEIVING,
+    createdBy: data.createdBy || user?.login || user?.id || '',
+    createdByName: data.createdByName || user?.name || '',
+    expectedDeliveryDate: data.expectedDeliveryDate || '',
+    comment: data.comment?.trim() || '',
+    totalAmount,
+    itemsCount: 0,
+    items: [],
+    workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
+    transferredToReceiving: true,
+    syncStatus: data.syncStatus ?? SYNC_STATUS.SYNCED,
+    syncError: data.syncError ?? null,
+    created_at: now,
+    updated_at: now,
+  })
+
+  orders.unshift(order)
+  writeOrders(orders)
+
+  const { receivingDocumentId } = createSimpleReceivingFromPurchaseLocal(order, user)
+  const savedOrder = normalizePurchaseOrder({
+    ...readOrders().find((item) => item.id === order.id),
+    receivingDocumentId,
+  })
+  const document = getLocalReceivingDocumentById(receivingDocumentId)
+
+  return { order: savedOrder, document }
+}
+
+export async function createSimplePurchase(data, user) {
+  const { order } = createSimplePurchaseSync(data, user)
+  return order.id
+}
+
+export async function deletePurchaseOrder(orderId) {
+  deletePurchaseOrderSync(orderId)
+}
+
+export function deletePurchaseOrderSync(orderId) {
+  const orders = readOrders()
+  const order = orders.find((o) => o.id === orderId)
+  if (!order) throw new Error('Закуп не найден')
+
+  deleteReceivingByPurchaseIdLocal(orderId)
+  writeOrders(orders.filter((o) => o.id !== orderId))
+}
+
+export function updatePurchaseOrderSync(orderId, updates) {
+  const orders = readOrders()
+  const idx = orders.findIndex((item) => item.id === orderId)
+  if (idx < 0) return null
+
+  const merged = normalizePurchaseOrder({
+    ...orders[idx],
+    ...updates,
+    updated_at: new Date().toISOString(),
+  })
+  orders[idx] = merged
+  writeOrders(orders)
+  return merged
 }
 
 export async function updatePurchaseOrder(orderId, updates) {
@@ -196,6 +320,11 @@ export async function updatePurchaseOrder(orderId, updates) {
   }
   orders[idx] = merged
   writeOrders(orders)
+
+  if (merged.workflowMode === PROCUREMENT_WORKFLOW_MODE.SIMPLE) {
+    syncSimpleReceivingFromPurchaseLocal(merged)
+  }
+
   return merged
 }
 

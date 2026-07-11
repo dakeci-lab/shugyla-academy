@@ -38,27 +38,20 @@ const ALL_PLATFORM_ROLES = [
   ROLE_IDS.SELLER,
 ]
 
+const STAFF_EMPLOYEES_ROLES = [
+  ROLE_IDS.FLOOR_ADMIN,
+  ROLE_IDS.CASHIER,
+  ROLE_IDS.SELLER,
+  ROLE_IDS.PURCHASER,
+  ROLE_IDS.RECEIVER,
+]
+
 const ROUTE_ACCESS = {
   [ROUTE_KEYS.HOME]: ALL_PLATFORM_ROLES,
-  [ROUTE_KEYS.EMPLOYEES_GROUP]: [
-    ROLE_IDS.ADMIN,
-    ROLE_IDS.FLOOR_ADMIN,
-    ROLE_IDS.CASHIER,
-    ROLE_IDS.SELLER,
-  ],
+  [ROUTE_KEYS.EMPLOYEES_GROUP]: [ROLE_IDS.ADMIN, ...STAFF_EMPLOYEES_ROLES],
   [ROUTE_KEYS.EMPLOYEES_LIST]: [ROLE_IDS.ADMIN],
-  [ROUTE_KEYS.EMPLOYEES_SCHEDULE]: [
-    ROLE_IDS.ADMIN,
-    ROLE_IDS.FLOOR_ADMIN,
-    ROLE_IDS.CASHIER,
-    ROLE_IDS.SELLER,
-  ],
-  [ROUTE_KEYS.EMPLOYEES_RATING]: [
-    ROLE_IDS.ADMIN,
-    ROLE_IDS.FLOOR_ADMIN,
-    ROLE_IDS.CASHIER,
-    ROLE_IDS.SELLER,
-  ],
+  [ROUTE_KEYS.EMPLOYEES_SCHEDULE]: [ROLE_IDS.ADMIN, ...STAFF_EMPLOYEES_ROLES],
+  [ROUTE_KEYS.EMPLOYEES_RATING]: [ROLE_IDS.ADMIN, ...STAFF_EMPLOYEES_ROLES],
   [ROUTE_KEYS.EMPLOYEES_PAYROLL]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.EMPLOYEES_HIRING]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.PROCUREMENT_GROUP]: [
@@ -132,14 +125,41 @@ export function filterPlatformNav(nav, user) {
   return nav
     .map((item) => {
       if (item.children) {
-        const children = item.children.filter((child) => canViewMenuItem(user, child))
+        const children = item.children
+          .filter((child) => canViewMenuItem(user, child))
+          .map((child) => adaptEmployeesNavItem(child, user, item))
         if (children.length === 0) return null
-        return { ...item, children }
+        const adapted = adaptEmployeesNavItem(item, user, item)
+        return { ...adapted, children }
       }
       if (!canViewMenuItem(user, item)) return null
-      return item
+      return adaptEmployeesNavItem(item, user, item)
     })
     .filter(Boolean)
+}
+
+function adaptEmployeesNavItem(item, user, group) {
+  if (group?.id !== 'employees' || canManageEmployees(user)) return item
+
+  if (item.routeKey === ROUTE_KEYS.EMPLOYEES_SCHEDULE) {
+    return {
+      ...item,
+      label: 'Мой график',
+      title: 'Мой график',
+      description: 'Ваш график работы и фактические отметки.',
+    }
+  }
+
+  if (item.routeKey === ROUTE_KEYS.EMPLOYEES_RATING) {
+    return {
+      ...item,
+      label: 'Рейтинг сотрудников',
+      title: 'Рейтинг сотрудников',
+      description: 'Общий рейтинг компании и ваше место в списке.',
+    }
+  }
+
+  return item
 }
 
 // --- Действия: поставщики ---
@@ -194,6 +214,28 @@ export function canReceiveGoods(user) {
   return isAdmin(role) || role === ROLE_IDS.RECEIVER
 }
 
+export function isSimplePurchaseReceived(order) {
+  return order?.status === 'received'
+}
+
+export function canEditSimplePurchase(user, order) {
+  const role = resolveUserRole(user)
+  if (isAdmin(role)) return true
+  if (isSimplePurchaseReceived(order)) return false
+  if (role !== ROLE_IDS.PURCHASER) return false
+  const author = order?.createdBy ?? order?.created_by ?? ''
+  const userKey = user?.login || String(user?.id || '')
+  return author === userKey
+}
+
+export function canDeleteSimplePurchase(user, order) {
+  return canEditSimplePurchase(user, order)
+}
+
+export function canAcceptSimpleDelivery(user) {
+  return canViewReceivingDocuments(user)
+}
+
 // --- Действия: сотрудники и настройки ---
 
 export function canManageEmployees(user) {
@@ -235,8 +277,15 @@ export function getEmployeeSchedulePath(user, employeeId = null) {
       ? `/platform/employees/${employeeId}/schedule`
       : '/platform/employees/schedule'
   }
-  if (user?.id) return `/platform/employees/${user.id}/schedule`
-  return '/platform/academy/cabinet'
+  return '/platform/employees/schedule'
+}
+
+export function getEmployeesSectionPath(user) {
+  if (canManageEmployees(user)) return '/platform/employees/list'
+  if (canAccessRoute(user, ROUTE_KEYS.EMPLOYEES_SCHEDULE)) {
+    return '/platform/employees/schedule'
+  }
+  return getDefaultPlatformPath(user)
 }
 
 export function canEditEmployeeAvatar(user, employeeId) {

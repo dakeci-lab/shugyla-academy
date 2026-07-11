@@ -3,16 +3,16 @@ import { getSuppliers } from '../../services/academyDataService'
 import SearchableSupplierSelect from '../suppliers/SearchableSupplierSelect'
 import './CreatePurchaseModal.css'
 
-export const EMPTY_PURCHASE_FORM = {
+export const EMPTY_SIMPLE_PURCHASE_FORM = {
   supplierId: '',
   supplierName: '',
-  date: new Date().toISOString().slice(0, 10),
-  expectedDeliveryDate: '',
+  expectedDeliveryDate: new Date().toISOString().slice(0, 10),
+  totalAmount: '',
   comment: '',
 }
 
-/** Форма создания закупа */
-export default function CreatePurchaseForm({ form, onChange, error }) {
+/** Упрощённая форма создания закупа */
+export default function SimpleCreatePurchaseForm({ form, onChange, error }) {
   const suppliers = useMemo(() => getSuppliers(), [])
 
   function handleSupplierChange(supplierId, supplier) {
@@ -33,29 +33,34 @@ export default function CreatePurchaseForm({ form, onChange, error }) {
           suppliers={suppliers}
           value={form.supplierId}
           onChange={handleSupplierChange}
+          required
         />
       </label>
 
-      <div className="admin-form__row">
-        <label className="admin-form__label">
-          Дата закупа
-          <input
-            type="date"
-            className="admin-form__input"
-            value={form.date}
-            onChange={(e) => onChange({ ...form, date: e.target.value })}
-          />
-        </label>
-        <label className="admin-form__label">
-          Ожидаемая дата доставки
-          <input
-            type="date"
-            className="admin-form__input"
-            value={form.expectedDeliveryDate}
-            onChange={(e) => onChange({ ...form, expectedDeliveryDate: e.target.value })}
-          />
-        </label>
-      </div>
+      <label className="admin-form__label">
+        Дата поставки
+        <input
+          type="date"
+          className="admin-form__input"
+          value={form.expectedDeliveryDate}
+          onChange={(e) => onChange({ ...form, expectedDeliveryDate: e.target.value })}
+          required
+        />
+      </label>
+
+      <label className="admin-form__label">
+        Общая сумма закупа (₸)
+        <input
+          type="number"
+          className="admin-form__input"
+          min="0"
+          step="1"
+          value={form.totalAmount}
+          onChange={(e) => onChange({ ...form, totalAmount: e.target.value })}
+          placeholder="250000"
+          required
+        />
+      </label>
 
       <label className="admin-form__label">
         Комментарий
@@ -64,7 +69,7 @@ export default function CreatePurchaseForm({ form, onChange, error }) {
           rows={3}
           value={form.comment}
           onChange={(e) => onChange({ ...form, comment: e.target.value })}
-          placeholder="Примечания к заказу…"
+          placeholder="Необязательно…"
         />
       </label>
     </div>

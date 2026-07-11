@@ -7,12 +7,10 @@ import {
   RECEIVING_STATUS,
   RECEIVING_ITEM_STATUS,
 } from '../utils/receivingData'
-import { PURCHASE_STATUS } from '../utils/purchaseData'
-import { getLocalPurchasesBundle } from './purchaseLocalAdapter'
+import { PURCHASE_STATUS, PROCUREMENT_WORKFLOW_MODE } from '../utils/purchaseData'
 
 const DOCUMENTS_KEY = 'shugyla_receiving_documents'
 const ITEMS_KEY = 'shugyla_receiving_items'
-const COUNTER_KEY = 'shugyla_receiving_counter'
 const ORDERS_KEY = 'shugyla_purchase_orders'
 
 function readDocuments() {
@@ -46,31 +44,9 @@ function genId() {
   return crypto.randomUUID()
 }
 
-function nextReceivingNumber() {
-  const year = new Date().getFullYear()
-  const documents = readDocuments()
-  const prefix = `R-${year}-`
-  let counter = 1
-
-  const latest = documents
-    .map((doc) => doc.number)
-    .filter((num) => num?.startsWith(prefix))
-    .sort()
-    .pop()
-
-  if (latest) {
-    const match = latest.match(/R-\d{4}-(\d+)/)
-    if (match) counter = Number(match[1]) + 1
-  }
-
-  return `${prefix}${String(counter).padStart(4, '0')}`
-}
-
 function bundleDocuments() {
   const documents = readDocuments()
   const items = readItems()
-  const purchases = getLocalPurchasesBundle().orders
-  const purchaseById = new Map(purchases.map((order) => [order.id, order]))
 
   const itemsByDoc = new Map()
   for (const item of items) {
@@ -79,16 +55,9 @@ function bundleDocuments() {
     itemsByDoc.get(docId).push(item)
   }
 
-  return documents.map((doc) => {
-    const purchase = purchaseById.get(doc.purchaseOrderId ?? doc.purchase_order_id)
-    return normalizeReceivingDocument(
-      {
-        ...doc,
-        purchaseOrderNumber: purchase?.number ?? null,
-      },
-      itemsByDoc.get(doc.id) || []
-    )
-  })
+  return documents.map((doc) =>
+    normalizeReceivingDocument(doc, itemsByDoc.get(doc.id) || [])
+  )
 }
 
 export function getLocalReceivingBundle() {
@@ -123,13 +92,10 @@ export async function transferFromPurchaseLocal(orderId, user) {
   const totals = calcReceivingTotals(mappedForTotals)
   const now = new Date().toISOString()
   const docId = genId()
-  const number = nextReceivingNumber()
 
   const document = normalizeReceivingDocument({
     id: docId,
-    number,
     purchaseOrderId: order.id,
-    purchaseOrderNumber: order.number,
     supplierId: order.supplierId ?? order.supplier_id ?? null,
     supplierName: order.supplierName ?? order.supplier_name ?? '',
     status: RECEIVING_STATUS.AWAITING_RECEIVING,
@@ -188,7 +154,230 @@ export async function transferFromPurchaseLocal(orderId, user) {
   }
   writePurchaseOrders(purchases)
 
-  return { receivingDocumentId: docId, number }
+  return { receivingDocumentId: docId }
+}
+
+export function createSimpleReceivingFromPurchaseLocal(order, user) {
+  const purchases = readPurchaseOrders()
+  const existing = purchases.find((o) => o.id === order.id)
+  if (!existing) throw new Error('Закуп не найден')
+
+  if (existing.receivingDocumentId || existing.receiving_document_id) {
+    return {
+      receivingDocumentId: existing.receivingDocumentId ?? existing.receiving_document_id,
+    }
+  }
+
+  const now = new Date().toISOString()
+  const docId = genId()
+  const totalAmount = Number(order.totalAmount ?? order.total_amount ?? 0)
+
+  const document = normalizeReceivingDocument({
+    id: docId,
+    purchaseOrderId: order.id,
+    supplierId: order.supplierId ?? order.supplier_id ?? null,
+    supplierName: order.supplierName ?? order.supplier_name ?? '',
+    status: RECEIVING_STATUS.AWAITING_RECEIVING,
+    expectedDeliveryDate: order.expectedDeliveryDate ?? order.expected_delivery_date ?? '',
+    createdBy: user?.login || user?.id || order.createdBy || '',
+    createdByName: user?.name || order.createdByName || '',
+    receivedBy: null,
+    receivedByName: null,
+    comment: order.comment ?? '',
+    totalAmount,
+    totalOrderedQty: 0,
+    totalReceivedQty: 0,
+    totalDifferenceQty: 0,
+    workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
+    created_at: now,
+    updated_at: now,
+  })
+
+  const documents = readDocuments()
+  documents.unshift({ ...document, items: undefined })
+  writeDocuments(documents)
+
+  const orderIdx = purchases.findIndex((o) => o.id === order.id)
+  if (orderIdx >= 0) {
+    purchases[orderIdx] = {
+      ...purchases[orderIdx],
+      status: PURCHASE_STATUS.AWAITING_RECEIVING,
+      transferredToReceiving: true,
+      transferred_to_receiving: true,
+      receivingDocumentId: docId,
+      receiving_document_id: docId,
+      updated_at: now,
+    }
+    writePurchaseOrders(purchases)
+  }
+
+  return { receivingDocumentId: docId }
+}
+
+export function syncSimpleReceivingFromPurchaseLocal(order) {
+  const documents = readDocuments()
+  const docId = order.receivingDocumentId ?? order.receiving_document_id
+  if (!docId) return
+
+  const docIdx = documents.findIndex((doc) => doc.id === docId)
+  if (docIdx < 0) return
+
+  documents[docIdx] = {
+    ...documents[docIdx],
+    supplierId: order.supplierId ?? null,
+    supplier_id: order.supplierId ?? null,
+    supplierName: order.supplierName ?? '',
+    supplier_name: order.supplierName ?? '',
+    expectedDeliveryDate: order.expectedDeliveryDate ?? '',
+    expected_delivery_date: order.expectedDeliveryDate ?? '',
+    comment: order.comment ?? '',
+    totalAmount: order.totalAmount ?? 0,
+    total_amount: order.totalAmount ?? 0,
+    updated_at: new Date().toISOString(),
+  }
+  writeDocuments(documents)
+}
+
+export function deleteReceivingByPurchaseIdLocal(purchaseOrderId) {
+  const documents = readDocuments()
+  const docIds = documents
+    .filter((doc) => (doc.purchaseOrderId ?? doc.purchase_order_id) === purchaseOrderId)
+    .map((doc) => doc.id)
+
+  if (docIds.length === 0) return
+
+  writeDocuments(documents.filter((doc) => !docIds.includes(doc.id)))
+
+  const allItems = readItems().filter(
+    (item) => !docIds.includes(item.receivingDocumentId ?? item.receiving_document_id)
+  )
+  writeItems(allItems)
+}
+
+/** Гарантирует наличие документа приёмки в localStorage (для чек-листа) */
+export function ensureSimpleReceivingDocumentLocal(document, order) {
+  if (!document?.id) return null
+
+  const documents = readDocuments()
+  const idx = documents.findIndex(
+    (doc) =>
+      doc.id === document.id ||
+      (order?.id && (doc.purchaseOrderId ?? doc.purchase_order_id) === order.id)
+  )
+
+  if (idx >= 0) {
+    return normalizeReceivingDocument(documents[idx])
+  }
+
+  const now = new Date().toISOString()
+  const normalized = normalizeReceivingDocument({
+    ...document,
+    purchaseOrderId: order?.id ?? document.purchaseOrderId,
+    supplierId: document.supplierId ?? order?.supplierId ?? null,
+    supplierName: document.supplierName ?? order?.supplierName ?? '',
+    expectedDeliveryDate: document.expectedDeliveryDate ?? order?.expectedDeliveryDate ?? '',
+    totalAmount: document.totalAmount ?? order?.totalAmount ?? 0,
+    workflowMode: document.workflowMode ?? PROCUREMENT_WORKFLOW_MODE.SIMPLE,
+    created_at: document.createdAt ?? now,
+    updated_at: now,
+  })
+
+  documents.unshift({
+    ...normalized,
+    purchase_order_id: normalized.purchaseOrderId,
+    supplier_id: normalized.supplierId,
+    supplier_name: normalized.supplierName,
+    expected_delivery_date: normalized.expectedDeliveryDate,
+    total_amount: normalized.totalAmount,
+    workflow_mode: normalized.workflowMode,
+  })
+  writeDocuments(documents)
+
+  if (order?.id) {
+    const purchases = readPurchaseOrders()
+    const orderIdx = purchases.findIndex((item) => item.id === order.id)
+    if (orderIdx >= 0) {
+      purchases[orderIdx] = {
+        ...purchases[orderIdx],
+        receivingDocumentId: normalized.id,
+        receiving_document_id: normalized.id,
+        transferredToReceiving: true,
+        transferred_to_receiving: true,
+        updated_at: now,
+      }
+      writePurchaseOrders(purchases)
+    }
+  }
+
+  return normalized
+}
+
+export async function acceptSimpleDeliveryLocal(documentId, user) {
+  const documents = readDocuments()
+  const docIdx = documents.findIndex((doc) => doc.id === documentId)
+  if (docIdx < 0) throw new Error('Документ приёмки не найден')
+
+  const doc = documents[docIdx]
+  const now = new Date().toISOString()
+
+  documents[docIdx] = {
+    ...doc,
+    status: RECEIVING_STATUS.RECEIVED,
+    receivedBy: user?.login || user?.id || doc.receivedBy || null,
+    receivedByName: user?.name || doc.receivedByName || null,
+    updated_at: now,
+  }
+  writeDocuments(documents)
+
+  const purchaseOrderId = doc.purchaseOrderId ?? doc.purchase_order_id
+  if (purchaseOrderId) {
+    const purchases = readPurchaseOrders()
+    const orderIdx = purchases.findIndex((o) => o.id === purchaseOrderId)
+    if (orderIdx >= 0) {
+      purchases[orderIdx] = {
+        ...purchases[orderIdx],
+        status: PURCHASE_STATUS.RECEIVED,
+        updated_at: now,
+      }
+      writePurchaseOrders(purchases)
+    }
+  }
+
+  return getLocalReceivingDocumentById(documentId)
+}
+
+export async function unacceptSimpleDeliveryLocal(documentId) {
+  const documents = readDocuments()
+  const docIdx = documents.findIndex((doc) => doc.id === documentId)
+  if (docIdx < 0) throw new Error('Документ приёмки не найден')
+
+  const doc = documents[docIdx]
+  const now = new Date().toISOString()
+
+  documents[docIdx] = {
+    ...doc,
+    status: RECEIVING_STATUS.AWAITING_RECEIVING,
+    receivedBy: null,
+    receivedByName: null,
+    updated_at: now,
+  }
+  writeDocuments(documents)
+
+  const purchaseOrderId = doc.purchaseOrderId ?? doc.purchase_order_id
+  if (purchaseOrderId) {
+    const purchases = readPurchaseOrders()
+    const orderIdx = purchases.findIndex((o) => o.id === purchaseOrderId)
+    if (orderIdx >= 0) {
+      purchases[orderIdx] = {
+        ...purchases[orderIdx],
+        status: PURCHASE_STATUS.AWAITING_RECEIVING,
+        updated_at: now,
+      }
+      writePurchaseOrders(purchases)
+    }
+  }
+
+  return getLocalReceivingDocumentById(documentId)
 }
 
 export async function saveReceivingDocumentLocal(documentId, items, user) {

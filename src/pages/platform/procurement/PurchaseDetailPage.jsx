@@ -14,6 +14,7 @@ import {
   updatePurchaseOrderItem,
   deletePurchaseOrderItem,
 } from '../../../services/purchaseDataService'
+import { isSimpleWorkflow } from '../../../utils/procurementWorkflow'
 import {
   formatPurchaseDate,
   formatPurchaseAmount,
@@ -67,6 +68,19 @@ export default function PurchaseDetailPage() {
     return (
       <div className="purchase-detail">
         <p className="purchase-detail__not-found">Закуп не найден.</p>
+        <Link to="/platform/procurement" className="btn btn--ghost">
+          ← К списку закупов
+        </Link>
+      </div>
+    )
+  }
+
+  if (isSimpleWorkflow(order)) {
+    return (
+      <div className="purchase-detail">
+        <p className="purchase-detail__not-found">
+          Это простая закупка. Редактирование доступно в списке закупов.
+        </p>
         <Link to="/platform/procurement" className="btn btn--ghost">
           ← К списку закупов
         </Link>
@@ -170,12 +184,12 @@ export default function PurchaseDetailPage() {
 
   async function handleCancel() {
     if (!canEdit) return
-    if (!window.confirm(`Отменить закуп ${order.number}?`)) return
+    if (!window.confirm(`Отменить закуп «${order.supplierName || 'без названия'}»?`)) return
     setError('')
     try {
       await cancelPurchaseOrder(order.id)
       await refresh()
-      navigate('/platform/procurement')
+      navigate('/platform/procurement/analytics')
     } catch (err) {
       setError(err.message || 'Не удалось отменить закуп')
     }
@@ -184,14 +198,14 @@ export default function PurchaseDetailPage() {
   return (
     <div className="purchase-detail">
       <div className="purchase-detail__back">
-        <Link to="/platform/procurement" className="purchase-detail__back-link">
+        <Link to="/platform/procurement/analytics" className="purchase-detail__back-link">
           ← К списку закупов
         </Link>
       </div>
 
       <div className="purchase-detail__header">
         <div>
-          <h2 className="purchase-detail__number">{order.number}</h2>
+          <h2 className="purchase-detail__title">{order.supplierName || 'Закуп'}</h2>
           <PurchaseStatusBadge status={order.status} />
         </div>
         <div className="purchase-detail__actions">

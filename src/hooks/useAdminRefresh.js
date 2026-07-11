@@ -6,7 +6,7 @@ import { useAcademyData } from '../context/AcademyDataContext'
  * Вызывайте refresh() после add/update операций.
  */
 export function useAdminRefresh() {
-  const { version: dataVersion, reload } = useAcademyData()
+  const { version: dataVersion, reload, notifyChange } = useAcademyData()
   const [version, setVersion] = useState(0)
 
   const refresh = useCallback(async () => {
@@ -14,5 +14,10 @@ export function useAdminRefresh() {
     setVersion((v) => v + 1)
   }, [reload])
 
-  return { version: version + dataVersion, refresh }
+  const bump = useCallback(() => {
+    notifyChange()
+    setVersion((v) => v + 1)
+  }, [notifyChange])
+
+  return { version: version + dataVersion, refresh, notifyChange: bump }
 }

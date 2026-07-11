@@ -8,16 +8,16 @@ import {
   RECEIVING_STATUS,
   RECEIVING_ITEM_STATUS,
 } from '../utils/receivingData'
-import { PURCHASE_STATUS } from '../utils/purchaseData'
+import { PURCHASE_STATUS, PROCUREMENT_WORKFLOW_MODE } from '../utils/purchaseData'
+import { throwUserError, toUserErrorMessage } from '../utils/userErrorMessage'
 import { fetchOrderById } from './purchaseSupabaseAdapter'
 
-async function throwIfError(result, context) {
-  if (result.error) throw new Error(`${context}: ${result.error.message}`)
-  return result.data
+function throwIfError(result, context, fallback = 'Не удалось сохранить данные.') {
+  return throwUserError(result, context, fallback)
 }
 
 function ensureClient() {
-  if (!supabase) throw new Error('Supabase не настроен')
+  if (!supabase) throw new Error(toUserErrorMessage('Supabase не настроен', 'Сервер не настроен'))
 }
 
 function rowToItem(row) {
@@ -67,13 +67,11 @@ function itemToRow(item, documentId) {
   return row
 }
 
-function rowToDocument(row, items = [], purchaseOrderNumber = null) {
+function rowToDocument(row, items = []) {
   return normalizeReceivingDocument(
     {
       id: row.id,
-      number: row.number,
       purchase_order_id: row.purchase_order_id,
-      purchase_order_number: purchaseOrderNumber,
       supplier_id: row.supplier_id,
       supplier_name: row.supplier_name,
       status: row.status,
@@ -86,6 +84,8 @@ function rowToDocument(row, items = [], purchaseOrderNumber = null) {
       total_ordered_qty: row.total_ordered_qty,
       total_received_qty: row.total_received_qty,
       total_difference_qty: row.total_difference_qty,
+      total_amount: row.total_amount,
+      workflow_mode: row.workflow_mode,
       created_at: row.created_at,
       updated_at: row.updated_at,
     },
@@ -95,7 +95,6 @@ function rowToDocument(row, items = [], purchaseOrderNumber = null) {
 
 function documentToRow(doc, extras = {}) {
   const row = {
-    number: doc.number,
     purchase_order_id: doc.purchaseOrderId ?? doc.purchase_order_id ?? null,
     supplier_id: doc.supplierId ?? doc.supplier_id ?? null,
     supplier_name: (doc.supplierName ?? doc.supplier_name ?? '').trim(),
@@ -109,6 +108,8 @@ function documentToRow(doc, extras = {}) {
     total_ordered_qty: doc.totalOrderedQty ?? doc.total_ordered_qty ?? 0,
     total_received_qty: doc.totalReceivedQty ?? doc.total_received_qty ?? 0,
     total_difference_qty: doc.totalDifferenceQty ?? doc.total_difference_qty ?? 0,
+    total_amount: doc.totalAmount ?? doc.total_amount ?? 0,
+    workflow_mode: doc.workflowMode ?? PROCUREMENT_WORKFLOW_MODE.ANALYTICS,
   }
 
   if (extras.id) row.id = extras.id
@@ -116,28 +117,6 @@ function documentToRow(doc, extras = {}) {
   if (extras.updated_at) row.updated_at = extras.updated_at
 
   return row
-}
-
-async function nextReceivingNumber() {
-  ensureClient()
-  const year = new Date().getFullYear()
-  const prefix = `R-${year}-`
-
-  const result = await supabase
-    .from('receiving_documents')
-    .select('number')
-    .like('number', `${prefix}%`)
-    .order('number', { ascending: false })
-    .limit(1)
-
-  let counter = 1
-  const latest = result.data?.[0]?.number
-  if (latest) {
-    const match = latest.match(/R-\d{4}-(\d+)/)
-    if (match) counter = Number(match[1]) + 1
-  }
-
-  return `${prefix}${String(counter).padStart(4, '0')}`
 }
 
 async function fetchDocumentById(documentId) {
@@ -160,17 +139,7 @@ async function fetchDocumentById(documentId) {
 
   const items = await throwIfError(itemsResult, 'Загрузка позиций приёмки')
 
-  let purchaseOrderNumber = null
-  if (docRow.purchase_order_id) {
-    const orderResult = await supabase
-      .from('purchase_orders')
-      .select('number')
-      .eq('id', docRow.purchase_order_id)
-      .maybeSingle()
-    purchaseOrderNumber = orderResult.data?.number ?? null
-  }
-
-  return rowToDocument(docRow, items || [], purchaseOrderNumber)
+  return rowToDocument(docRow, items || [])
 }
 
 export async function fetchReceivingDataCloud() {
@@ -195,21 +164,6 @@ export async function fetchReceivingDataCloud() {
 
   const items = await throwIfError(itemsResult, 'Загрузка позиций приёмки')
 
-  const purchaseOrderIds = [
-    ...new Set(documents.map((row) => row.purchase_order_id).filter(Boolean)),
-  ]
-  const purchaseNumbers = new Map()
-  if (purchaseOrderIds.length > 0) {
-    const ordersResult = await supabase
-      .from('purchase_orders')
-      .select('id, number')
-      .in('id', purchaseOrderIds)
-    const orders = await throwIfError(ordersResult, 'Загрузка связанных закупов')
-    for (const order of orders || []) {
-      purchaseNumbers.set(order.id, order.number)
-    }
-  }
-
   const itemsByDoc = new Map()
   for (const row of items || []) {
     if (!itemsByDoc.has(row.receiving_document_id)) {
@@ -220,7 +174,7 @@ export async function fetchReceivingDataCloud() {
 
   return {
     documents: documents.map((row) =>
-      rowToDocument(row, itemsByDoc.get(row.id) || [], purchaseNumbers.get(row.purchase_order_id))
+      rowToDocument(row, itemsByDoc.get(row.id) || [])
     ),
   }
 }
@@ -246,11 +200,9 @@ export async function transferFromPurchaseCloud(orderId, user) {
   )
   const now = new Date().toISOString()
   const docId = crypto.randomUUID()
-  const number = await nextReceivingNumber()
 
   const docRow = documentToRow(
     {
-      number,
       purchaseOrderId: order.id,
       supplierId: order.supplierId,
       supplierName: order.supplierName,
@@ -312,7 +264,7 @@ export async function transferFromPurchaseCloud(orderId, user) {
     'Обновление закупа после передачи в приёмку'
   )
 
-  return { receivingDocumentId: docId, number }
+  return { receivingDocumentId: docId }
 }
 
 async function syncReceivingItems(documentId, items) {
@@ -443,6 +395,237 @@ export async function completeReceivingDocumentCloud(documentId, items, user) {
         .from('purchase_orders')
         .update({
           status: purchaseStatus,
+          updated_at: now,
+        })
+        .eq('id', current.purchaseOrderId),
+      'Обновление связанного закупа'
+    )
+  }
+
+  return fetchDocumentById(documentId)
+}
+
+export async function syncSimpleReceivingDocumentCloud(document, order) {
+  ensureClient()
+  if (!document?.id) return null
+
+  const existingResult = await supabase
+    .from('receiving_documents')
+    .select('id')
+    .eq('id', document.id)
+    .maybeSingle()
+
+  await throwIfError(existingResult, 'Проверка документа приёмки')
+  if (existingResult.data?.id) {
+    return existingResult.data.id
+  }
+
+  const now = new Date().toISOString()
+  const docRow = documentToRow(
+    {
+      purchaseOrderId: order?.id ?? document.purchaseOrderId,
+      supplierId: document.supplierId ?? order?.supplierId,
+      supplierName: document.supplierName ?? order?.supplierName,
+      status: RECEIVING_STATUS.AWAITING_RECEIVING,
+      expectedDeliveryDate: document.expectedDeliveryDate ?? order?.expectedDeliveryDate,
+      createdBy: document.createdBy ?? order?.createdBy ?? '',
+      createdByName: document.createdByName ?? order?.createdByName ?? '',
+      receivedBy: null,
+      receivedByName: null,
+      comment: document.comment ?? order?.comment ?? '',
+      totalAmount: document.totalAmount ?? order?.totalAmount ?? 0,
+      totalOrderedQty: 0,
+      totalReceivedQty: 0,
+      totalDifferenceQty: 0,
+      workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
+    },
+    { id: document.id, created_at: document.createdAt || now, updated_at: now }
+  )
+
+  await throwIfError(
+    await supabase.from('receiving_documents').insert(docRow),
+    'Создание документа приёмки'
+  )
+
+  if (order?.id) {
+    await throwIfError(
+      await supabase
+        .from('purchase_orders')
+        .update({
+          status: PURCHASE_STATUS.AWAITING_RECEIVING,
+          transferred_to_receiving: true,
+          receiving_document_id: document.id,
+          updated_at: now,
+        })
+        .eq('id', order.id),
+      'Привязка документа приёмки'
+    )
+  }
+
+  return document.id
+}
+
+export async function createSimpleReceivingFromPurchaseCloud(order, user) {
+  ensureClient()
+
+  if (order.receivingDocumentId) {
+    return { receivingDocumentId: order.receivingDocumentId }
+  }
+
+  const now = new Date().toISOString()
+  const docId = crypto.randomUUID()
+  const totalAmount = Number(order.totalAmount ?? 0)
+
+  const docRow = documentToRow(
+    {
+      purchaseOrderId: order.id,
+      supplierId: order.supplierId,
+      supplierName: order.supplierName,
+      status: RECEIVING_STATUS.AWAITING_RECEIVING,
+      expectedDeliveryDate: order.expectedDeliveryDate,
+      createdBy: user?.login || user?.id || order.createdBy || '',
+      createdByName: user?.name || order.createdByName || '',
+      receivedBy: null,
+      receivedByName: null,
+      comment: order.comment,
+      totalAmount,
+      totalOrderedQty: 0,
+      totalReceivedQty: 0,
+      totalDifferenceQty: 0,
+      workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
+    },
+    { id: docId, created_at: now, updated_at: now }
+  )
+
+  await throwIfError(
+    await supabase.from('receiving_documents').insert(docRow),
+    'Создание документа приёмки'
+  )
+
+  await throwIfError(
+    await supabase
+      .from('purchase_orders')
+      .update({
+        status: PURCHASE_STATUS.AWAITING_RECEIVING,
+        transferred_to_receiving: true,
+        receiving_document_id: docId,
+        updated_at: now,
+      })
+      .eq('id', order.id),
+    'Обновление закупа после передачи в приёмку'
+  )
+
+  return { receivingDocumentId: docId }
+}
+
+export async function syncSimpleReceivingFromPurchaseCloud(order) {
+  ensureClient()
+  const docId = order.receivingDocumentId
+  if (!docId) return
+
+  await throwIfError(
+    await supabase
+      .from('receiving_documents')
+      .update({
+        supplier_id: order.supplierId ?? null,
+        supplier_name: (order.supplierName ?? '').trim(),
+        expected_delivery_date: order.expectedDeliveryDate || null,
+        comment: (order.comment ?? '').trim(),
+        total_amount: order.totalAmount ?? 0,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', docId),
+    'Синхронизация документа приёмки'
+  )
+}
+
+export async function deleteReceivingByPurchaseIdCloud(purchaseOrderId) {
+  ensureClient()
+
+  const docsResult = await supabase
+    .from('receiving_documents')
+    .select('id')
+    .eq('purchase_order_id', purchaseOrderId)
+
+  const docRows = await throwIfError(docsResult, 'Поиск документов приёмки')
+  const docIds = (docRows || []).map((row) => row.id)
+  if (docIds.length === 0) return
+
+  await throwIfError(
+    await supabase.from('receiving_items').delete().in('receiving_document_id', docIds),
+    'Удаление позиций приёмки'
+  )
+
+  await throwIfError(
+    await supabase.from('receiving_documents').delete().in('id', docIds),
+    'Удаление документов приёмки'
+  )
+}
+
+export async function acceptSimpleDeliveryCloud(documentId, user) {
+  ensureClient()
+
+  const current = await fetchDocumentById(documentId)
+  if (!current) throw new Error('Документ приёмки не найден')
+
+  const now = new Date().toISOString()
+
+  await throwIfError(
+    await supabase
+      .from('receiving_documents')
+      .update({
+        status: RECEIVING_STATUS.RECEIVED,
+        received_by: user?.login || user?.id || current.receivedBy || null,
+        received_by_name: user?.name || current.receivedByName || null,
+        updated_at: now,
+      })
+      .eq('id', documentId),
+    'Принятие поставки'
+  )
+
+  if (current.purchaseOrderId) {
+    await throwIfError(
+      await supabase
+        .from('purchase_orders')
+        .update({
+          status: PURCHASE_STATUS.RECEIVED,
+          updated_at: now,
+        })
+        .eq('id', current.purchaseOrderId),
+      'Обновление связанного закупа'
+    )
+  }
+
+  return fetchDocumentById(documentId)
+}
+
+export async function unacceptSimpleDeliveryCloud(documentId) {
+  ensureClient()
+
+  const current = await fetchDocumentById(documentId)
+  if (!current) throw new Error('Документ приёмки не найден')
+
+  const now = new Date().toISOString()
+
+  await throwIfError(
+    await supabase
+      .from('receiving_documents')
+      .update({
+        status: RECEIVING_STATUS.AWAITING_RECEIVING,
+        received_by: null,
+        received_by_name: null,
+        updated_at: now,
+      })
+      .eq('id', documentId),
+    'Снятие отметки приёмки'
+  )
+
+  if (current.purchaseOrderId) {
+    await throwIfError(
+      await supabase
+        .from('purchase_orders')
+        .update({
+          status: PURCHASE_STATUS.AWAITING_RECEIVING,
           updated_at: now,
         })
         .eq('id', current.purchaseOrderId),

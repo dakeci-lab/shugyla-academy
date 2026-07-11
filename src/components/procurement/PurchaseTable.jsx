@@ -7,7 +7,12 @@ import { PurchaseStatusBadge } from './PurchaseStatsCards'
 import './PurchaseTable.css'
 
 /** Таблица активных закупов */
-export default function PurchaseTable({ orders, canEdit = false, onCancel }) {
+export default function PurchaseTable({
+  orders,
+  canEdit = false,
+  onCancel,
+  detailPathPrefix = '/platform/procurement',
+}) {
   const navigate = useNavigate()
 
   if (!orders.length) {
@@ -23,7 +28,6 @@ export default function PurchaseTable({ orders, canEdit = false, onCancel }) {
       <table className="purchase-table admin-table">
         <thead>
           <tr>
-            <th>№ закупа</th>
             <th>Дата</th>
             <th>Поставщик</th>
             <th>Товаров</th>
@@ -39,9 +43,8 @@ export default function PurchaseTable({ orders, canEdit = false, onCancel }) {
             <tr
               key={order.id}
               className="purchase-table__row"
-              onClick={() => navigate(`/platform/procurement/${order.id}`)}
+              onClick={() => navigate(`${detailPathPrefix}/${order.id}`)}
             >
-              <td className="purchase-table__number">{order.number}</td>
               <td>{formatPurchaseDate(order.date)}</td>
               <td>{order.supplierName || '—'}</td>
               <td>{order.itemsCount ?? order.items?.length ?? 0}</td>
@@ -57,7 +60,7 @@ export default function PurchaseTable({ orders, canEdit = false, onCancel }) {
                   className="btn btn--ghost btn--sm"
                   onClick={(e) => {
                     e.stopPropagation()
-                    navigate(`/platform/procurement/${order.id}`)
+                    navigate(`${detailPathPrefix}/${order.id}`)
                   }}
                 >
                   Открыть

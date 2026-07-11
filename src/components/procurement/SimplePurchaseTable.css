@@ -1,0 +1,56 @@
+.procurement-table-panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-white);
+}
+
+.procurement-table-panel__table {
+  border: none;
+  border-radius: 0;
+}
+
+.purchase-table__index {
+  width: 48px;
+  text-align: center;
+  color: var(--color-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.purchase-table__amount {
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.purchase-table__totals-row td {
+  padding: 12px 14px;
+  background: #f8faf9;
+  border-top: 1px solid var(--color-border);
+}
+
+.purchase-table__totals {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.purchase-table__totals-label {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.purchase-table__totals-item strong {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+@media (max-width: 700px) {
+  .purchase-table__totals {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}

@@ -20,7 +20,6 @@ export default function ReceivingTable({ documents }) {
       <table className="purchase-table admin-table">
         <thead>
           <tr>
-            <th>№ приёмки</th>
             <th>Ожидаемая дата доставки</th>
             <th>Поставщик</th>
             <th>Товаров</th>
@@ -36,7 +35,6 @@ export default function ReceivingTable({ documents }) {
               className="purchase-table__row"
               onClick={() => navigate(`/platform/receiving/${doc.id}`)}
             >
-              <td className="purchase-table__number">{doc.number}</td>
               <td>{formatReceivingDate(doc.expectedDeliveryDate)}</td>
               <td>{doc.supplierName || '—'}</td>
               <td>{doc.itemsCount ?? doc.items?.length ?? 0}</td>

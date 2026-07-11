@@ -8,9 +8,6 @@ import {
   getCandidateQuestions,
   createVacancy,
   updateVacancy,
-  publishVacancy,
-  unpublishVacancy,
-  archiveVacancy,
   deleteVacancy,
   updateCandidateNotes,
   updateCandidateStatus,
@@ -18,8 +15,8 @@ import {
   saveCandidateInterviewInvitation,
   convertCandidateToTrainee,
 } from '../../../services/academyDataService'
+import { toastSuccess } from '../../../services/notificationService'
 import {
-  VACANCY_STATUS,
   VACANCY_STATUS_LABELS,
   VACANCY_ROLES,
   getVacancyRoleLabel,
@@ -41,7 +38,10 @@ import {
 import { EMPLOYEE_FORM_ROLES, ROLES } from '../../../data/roles'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
+import ConfirmDialog from '../ConfirmDialog'
 import StatusBadge from '../StatusBadge'
+import IconActionButton from '../IconActionButton'
+import { PencilIcon, TrashIcon, LinkIcon } from '../../icons/PlatformIcons'
 import VacancyQuestionEditor from '../VacancyQuestionEditor'
 import CandidateAvatar from '../../CandidateAvatar'
 import CandidatePhotoPreviewModal from '../../CandidatePhotoPreviewModal'
@@ -50,6 +50,7 @@ import CandidateInterviewInviteModal, {
 } from '../CandidateInterviewInviteModal'
 import '../../CandidateAvatar.css'
 import '../admin-shared.css'
+import '../IconActionButton.css'
 import '../RecruitmentSection.css'
 import '../../../pages/Apply.css'
 
@@ -98,7 +99,8 @@ export default function RecruitmentSection() {
   const [vacancyForm, setVacancyForm] = useState(EMPTY_VACANCY)
   const [vacancyError, setVacancyError] = useState('')
   const [actionError, setActionError] = useState('')
-  const [copiedSlug, setCopiedSlug] = useState('')
+  const [deleteVacancyTarget, setDeleteVacancyTarget] = useState(null)
+  const [deletingVacancy, setDeletingVacancy] = useState(false)
 
   const [candidateFilters, setCandidateFilters] = useState({
     vacancyId: 'all',
@@ -210,13 +212,31 @@ export default function RecruitmentSection() {
     }
   }
 
-  async function runVacancyAction(action, vacancyId) {
+  function openVacancyEditor(vacancy) {
+    openEditVacancy(vacancy)
+  }
+
+  async function handleCopyApplyLink(slug) {
+    copyApplyLink(slug)
+    toastSuccess('Ссылка скопирована')
+  }
+
+  function requestDeleteVacancy(vacancy) {
+    setDeleteVacancyTarget(vacancy)
+  }
+
+  async function confirmDeleteVacancy() {
+    if (!deleteVacancyTarget) return
+    setDeletingVacancy(true)
     setActionError('')
     try {
-      await action(vacancyId)
+      await deleteVacancy(deleteVacancyTarget.id)
+      setDeleteVacancyTarget(null)
       await refresh()
     } catch (err) {
-      setActionError(err.message || 'Не удалось выполнить действие')
+      setActionError(err.message || 'Не удалось удалить вакансию')
+    } finally {
+      setDeletingVacancy(false)
     }
   }
 
@@ -314,77 +334,66 @@ export default function RecruitmentSection() {
           </div>
 
           <div className="admin-table-wrap">
-            <table className="admin-table">
+            <table className="admin-table recruitment-vacancies-table">
               <thead>
                 <tr>
-                  <th>Название</th>
+                  <th className="recruitment-vacancies-table__index">№</th>
+                  <th>Название вакансии</th>
                   <th>Роль</th>
                   <th>Статус</th>
                   <th>Проходной %</th>
-                  <th>Вопросов</th>
                   <th>Кандидатов</th>
                   <th>Ссылка</th>
-                  <th></th>
+                  <th>Действия</th>
                 </tr>
               </thead>
               <tbody>
                 {vacancies.length === 0 ? (
                   <tr><td colSpan={8} className="admin-empty">Вакансии не созданы</td></tr>
                 ) : (
-                  vacancies.map((v) => (
+                  vacancies.map((v, index) => (
                     <tr key={v.id}>
-                      <td><strong>{v.title}</strong></td>
+                      <td className="recruitment-vacancies-table__index">{index + 1}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="vacancy-row-link"
+                          onClick={() => openVacancyEditor(v)}
+                        >
+                          {v.title}
+                        </button>
+                      </td>
                       <td>{getVacancyRoleLabel(v.employeeRole || v.role)}</td>
                       <td>
                         <StatusBadge label={VACANCY_STATUS_LABELS[v.status]} type={STATUS_BADGE[v.status]} />
                       </td>
                       <td>{v.passingScore}%</td>
-                      <td>{v.questionCount ?? 0}</td>
                       <td>{v.candidateCount ?? 0}</td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn btn--outline btn--sm"
-                          onClick={() => {
-                            copyApplyLink(v.slug)
-                            setCopiedSlug(v.slug)
-                            setTimeout(() => setCopiedSlug(''), 2000)
-                          }}
-                        >
-                          {copiedSlug === v.slug ? 'Скопировано' : 'Скопировать ссылку'}
-                        </button>
-                        <div className="admin-table__hint">/apply/{v.slug}</div>
+                        <code className="admin-code recruitment-vacancies-table__link">/apply/{v.slug}</code>
                       </td>
                       <td>
                         <div className="admin-table__actions">
-                          <button type="button" className="btn btn--outline btn--sm" onClick={() => openEditVacancy(v)}>
-                            Редактировать
-                          </button>
-                          {v.status === VACANCY_STATUS.DRAFT && (
-                            <button type="button" className="btn btn--outline btn--sm" onClick={() => runVacancyAction(publishVacancy, v.id)}>
-                              Опубликовать
-                            </button>
-                          )}
-                          {v.status === VACANCY_STATUS.PUBLISHED && (
-                            <button type="button" className="btn btn--outline btn--sm" onClick={() => runVacancyAction(unpublishVacancy, v.id)}>
-                              Снять с публикации
-                            </button>
-                          )}
-                          {v.status !== VACANCY_STATUS.ARCHIVED && (
-                            <button type="button" className="btn btn--outline btn--sm" onClick={() => runVacancyAction(archiveVacancy, v.id)}>
-                              Архивировать
-                            </button>
-                          )}
-                          <button
-                            type="button"
-                            className="btn btn--outline btn--sm admin-table__danger"
-                            onClick={async () => {
-                              if (!window.confirm(`Удалить вакансию «${v.title}»?`)) return
-                              await runVacancyAction(deleteVacancy, v.id)
-                            }}
+                          <IconActionButton
+                            label="Редактировать вакансию"
+                            variant="primary"
+                            onClick={() => openVacancyEditor(v)}
                           >
-                            Удалить
-                          </button>
+                            <PencilIcon />
+                          </IconActionButton>
+                          <IconActionButton
+                            label="Скопировать ссылку"
+                            onClick={() => handleCopyApplyLink(v.slug)}
+                          >
+                            <LinkIcon />
+                          </IconActionButton>
+                          <IconActionButton
+                            label="Удалить вакансию"
+                            variant="danger"
+                            onClick={() => requestDeleteVacancy(v)}
+                          >
+                            <TrashIcon />
+                          </IconActionButton>
                         </div>
                       </td>
                     </tr>
@@ -393,6 +402,17 @@ export default function RecruitmentSection() {
               </tbody>
             </table>
           </div>
+
+          {deleteVacancyTarget && (
+            <ConfirmDialog
+              title="Удалить вакансию?"
+              message={`Вакансия «${deleteVacancyTarget.title}» будет удалена без возможности восстановления.`}
+              confirmLabel="Удалить"
+              onCancel={() => setDeleteVacancyTarget(null)}
+              onConfirm={confirmDeleteVacancy}
+              loading={deletingVacancy}
+            />
+          )}
         </>
       )}
 
@@ -543,6 +563,9 @@ export default function RecruitmentSection() {
                   <option value="published">Опубликовано</option>
                   <option value="archived">Архив</option>
                 </select>
+                <span className="admin-form__hint">
+                  Публикация, снятие с публикации и архивирование выполняются через статус вакансии.
+                </span>
               </label>
             </div>
             {vacancyError && <p className="admin-form__error">{vacancyError}</p>}

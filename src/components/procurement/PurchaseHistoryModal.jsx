@@ -28,7 +28,6 @@ export default function PurchaseHistoryModal({ orders, onClose }) {
           <table className="purchase-history admin-table">
             <thead>
               <tr>
-                <th>№ закупа</th>
                 <th>Дата</th>
                 <th>Поставщик</th>
                 <th>Сумма</th>
@@ -39,7 +38,6 @@ export default function PurchaseHistoryModal({ orders, onClose }) {
             <tbody>
               {history.map((order) => (
                 <tr key={order.id}>
-                  <td>{order.number}</td>
                   <td>{formatPurchaseDate(order.date)}</td>
                   <td>{order.supplierName || '—'}</td>
                   <td>{formatPurchaseAmount(order.totalAmount)}</td>

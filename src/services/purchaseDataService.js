@@ -4,6 +4,11 @@ import { refreshData } from './academyDataService'
 import * as local from './purchaseLocalAdapter'
 import * as cloud from './purchaseSupabaseAdapter'
 import { transferFromPurchase } from './receivingDataService'
+import {
+  getOptimisticOverlay,
+  getOptimisticDeletedOrderIds,
+  mergePurchaseOrders,
+} from './purchaseOptimisticStore'
 
 function getAdapter() {
   return isCloudMode() ? cloud : local
@@ -12,7 +17,11 @@ function getAdapter() {
 function getPurchasesSource() {
   if (isCloudMode()) {
     const orders = getCloudPurchases()
-    if (orders) return orders
+    const overlay = getOptimisticOverlay()
+    const deletedOrderIds = getOptimisticDeletedOrderIds()
+    if (orders || overlay.orders.length || deletedOrderIds.length) {
+      return mergePurchaseOrders(orders || [], overlay.orders, deletedOrderIds)
+    }
     return []
   }
   return local.getLocalPurchasesBundle().orders
@@ -68,9 +77,17 @@ export async function deletePurchaseOrder(orderId) {
   if (isCloudMode()) {
     await cloud.deletePurchaseOrderCloud(orderId)
   } else {
-    throw new Error('Удаление закупа доступно только в облачном режиме')
+    await local.deletePurchaseOrder(orderId)
   }
   await afterPurchaseMutation()
+}
+
+export async function createSimplePurchase(data, user) {
+  const id = isCloudMode()
+    ? await cloud.createSimplePurchaseCloud(data, user)
+    : await local.createSimplePurchase(data, user)
+  await afterPurchaseMutation()
+  return id
 }
 
 export async function transferPurchaseToReceiving(orderId, user) {

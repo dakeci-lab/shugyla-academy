@@ -8,6 +8,7 @@ const AcademyDataContext = createContext({
   loading: false,
   version: 0,
   reload: async () => {},
+  notifyChange: () => {},
 })
 
 function DataLoadingScreen() {
@@ -32,6 +33,10 @@ export function AcademyDataProvider({ children }) {
     if (isCloudMode()) {
       await initializeData()
     }
+    setVersion((v) => v + 1)
+  }, [])
+
+  const notifyChange = useCallback(() => {
     setVersion((v) => v + 1)
   }, [])
 
@@ -68,7 +73,7 @@ export function AcademyDataProvider({ children }) {
   }
 
   return (
-    <AcademyDataContext.Provider value={{ ready, loading, version, reload }}>
+    <AcademyDataContext.Provider value={{ ready, loading, version, reload, notifyChange }}>
       {children}
     </AcademyDataContext.Provider>
   )

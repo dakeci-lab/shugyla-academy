@@ -1,0 +1,5 @@
+.receiving-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}

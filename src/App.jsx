@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-
 import { LanguageProvider } from './context/LanguageContext'
 import { AcademyDataProvider } from './context/AcademyDataContext'
 import { SessionProvider } from './context/SessionContext'
+import { ToastProvider } from './context/ToastContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import PlatformRoute from './components/platform/PlatformRoute'
 import { ROUTE_KEYS } from './config/permissions'
@@ -19,6 +20,7 @@ import PlatformIndex from './pages/platform/PlatformIndex'
 import PlatformAcademy from './pages/platform/PlatformAcademy'
 import PlatformSettings from './pages/platform/PlatformSettings'
 import PlatformEmployees from './pages/platform/PlatformEmployees'
+import PlatformEmployeesRedirect from './pages/platform/PlatformEmployeesRedirect'
 import PlatformWorkSchedule from './pages/platform/PlatformWorkSchedule'
 import PlatformEmployeeSchedule from './pages/platform/PlatformEmployeeSchedule'
 import PlatformEmployeeRating from './pages/platform/PlatformEmployeeRating'
@@ -27,6 +29,7 @@ import PlatformHiring from './pages/platform/PlatformHiring'
 import PlatformStandardsManage from './pages/platform/PlatformStandardsManage'
 import SuppliersPage, { SupplierDetailPage } from './pages/platform/suppliers/SuppliersPage'
 import ProcurementPage from './pages/platform/procurement/ProcurementPage'
+import AnalyticsProcurementPage from './pages/platform/procurement/AnalyticsProcurementPage'
 import PurchaseDetailPage from './pages/platform/procurement/PurchaseDetailPage'
 import ReceivingPage from './pages/platform/receiving/ReceivingPage'
 import ReceivingDetailPage from './pages/platform/receiving/ReceivingDetailPage'
@@ -60,6 +63,7 @@ export default function App() {
       <AcademyDataProvider>
       <BrowserRouter basename="/shugyla-academy">
       <SessionProvider>
+      <ToastProvider>
       <Routes>
         {/* Публичные маршруты */}
         <Route path="/" element={<Navigate to="/login" replace />} />
@@ -88,7 +92,7 @@ export default function App() {
             }
           />
 
-          <Route path="employees" element={<Navigate to="/platform/employees/list" replace />} />
+          <Route path="employees" element={<PlatformEmployeesRedirect />} />
           <Route
             path="employees/list"
             element={
@@ -154,6 +158,22 @@ export default function App() {
             element={
               <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
                 <ProcurementPage />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="procurement/analytics"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
+                <AnalyticsProcurementPage />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="procurement/analytics/:id"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
+                <PurchaseDetailPage />
               </PlatformRoute>
             }
           />
@@ -310,6 +330,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
+      </ToastProvider>
       </SessionProvider>
       </BrowserRouter>
       </AcademyDataProvider>

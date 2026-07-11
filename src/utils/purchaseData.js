@@ -1,3 +1,7 @@
+import { getWorkflowMode } from './procurementWorkflow'
+
+export { PROCUREMENT_WORKFLOW_MODE, getWorkflowMode, isSimpleWorkflow } from './procurementWorkflow'
+
 /** Статусы закупочного документа (purchase_orders.status) */
 
 export const PURCHASE_STATUS = {
@@ -61,7 +65,6 @@ export function normalizePurchaseOrder(raw) {
   const items = (raw.items || []).map(normalizePurchaseItem)
   return {
     id: raw.id,
-    number: raw.number,
     date: raw.date ?? raw.purchaseDate ?? raw.purchase_date ?? '',
     purchaseDate: raw.purchaseDate ?? raw.purchase_date ?? raw.date ?? '',
     supplierId: raw.supplierId ?? raw.supplier_id ?? null,
@@ -75,6 +78,9 @@ export function normalizePurchaseOrder(raw) {
     comment: raw.comment ?? '',
     transferredToReceiving: raw.transferredToReceiving ?? raw.transferred_to_receiving ?? false,
     receivingDocumentId: raw.receivingDocumentId ?? raw.receiving_document_id ?? null,
+    workflowMode: getWorkflowMode(raw),
+    syncStatus: raw.syncStatus ?? raw.sync_status ?? null,
+    syncError: raw.syncError ?? raw.sync_error ?? null,
     items,
     createdAt: raw.createdAt ?? raw.created_at ?? null,
     updatedAt: raw.updatedAt ?? raw.updated_at ?? null,

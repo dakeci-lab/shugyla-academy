@@ -139,3 +139,53 @@ export function getCloudPurchases() {
 export function getCloudReceivingDocuments() {
   return store.loaded ? store.receivingDocuments : null
 }
+
+export function upsertCloudPurchase(order) {
+  if (!store.loaded || !order) return
+  const list = store.purchases || []
+  const idx = list.findIndex((item) => item.id === order.id)
+  if (idx >= 0) {
+    list[idx] = order
+  } else {
+    list.unshift(order)
+  }
+  store.purchases = list
+}
+
+export function upsertCloudReceivingDocument(document) {
+  if (!store.loaded || !document) return
+  const list = store.receivingDocuments || []
+  const idx = list.findIndex((item) => item.id === document.id)
+  if (idx >= 0) {
+    list[idx] = document
+  } else {
+    list.unshift(document)
+  }
+  store.receivingDocuments = list
+}
+
+export function patchCloudPurchase(orderId, patch) {
+  if (!store.loaded) return
+  store.purchases = (store.purchases || []).map((item) =>
+    item.id === orderId ? { ...item, ...patch } : item
+  )
+}
+
+export function patchCloudReceivingDocument(documentId, patch) {
+  if (!store.loaded) return
+  store.receivingDocuments = (store.receivingDocuments || []).map((item) =>
+    item.id === documentId ? { ...item, ...patch } : item
+  )
+}
+
+export function removeCloudPurchase(orderId) {
+  if (!store.loaded) return
+  store.purchases = (store.purchases || []).filter((item) => item.id !== orderId)
+}
+
+export function removeCloudReceivingByPurchaseId(purchaseOrderId) {
+  if (!store.loaded) return
+  store.receivingDocuments = (store.receivingDocuments || []).filter(
+    (item) => item.purchaseOrderId !== purchaseOrderId
+  )
+}

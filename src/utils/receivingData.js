@@ -1,3 +1,5 @@
+import { getWorkflowMode } from './procurementWorkflow'
+
 /** Статусы документа приёмки (receiving_documents.status) */
 
 export const RECEIVING_STATUS = {
@@ -97,9 +99,7 @@ export function normalizeReceivingDocument(raw, items = []) {
 
   return {
     id: raw.id,
-    number: raw.number,
     purchaseOrderId: raw.purchaseOrderId ?? raw.purchase_order_id ?? null,
-    purchaseOrderNumber: raw.purchaseOrderNumber ?? raw.purchase_order_number ?? null,
     supplierId: raw.supplierId ?? raw.supplier_id ?? null,
     supplierName: raw.supplierName ?? raw.supplier_name ?? '',
     status,
@@ -113,7 +113,9 @@ export function normalizeReceivingDocument(raw, items = []) {
     totalReceivedQty: raw.totalReceivedQty ?? raw.total_received_qty ?? totals.totalReceivedQty,
     totalDifferenceQty:
       raw.totalDifferenceQty ?? raw.total_difference_qty ?? totals.totalDifferenceQty,
+    totalAmount: raw.totalAmount ?? raw.total_amount ?? 0,
     itemsCount: raw.itemsCount ?? raw.items_count ?? normalizedItems.length,
+    workflowMode: getWorkflowMode(raw),
     items: normalizedItems,
     createdAt: raw.createdAt ?? raw.created_at ?? null,
     updatedAt: raw.updatedAt ?? raw.updated_at ?? null,

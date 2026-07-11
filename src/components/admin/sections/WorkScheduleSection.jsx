@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useSession } from '../../../context/SessionContext'
+import { canViewTeamSchedule } from '../../../config/permissions'
 import { getStaffEmployees } from '../../../utils/employeeData'
 import {
   shiftsToMap,
@@ -22,6 +24,9 @@ import '../EmployeeSchedule.css'
 /** Общий график всех сотрудников (недельный вид) */
 export default function WorkScheduleSection() {
   const navigate = useNavigate()
+  const { user } = useSession()
+  const viewTeam = canViewTeamSchedule(user)
+  const selfEmployeeId = user?.id != null ? Number(user.id) : null
   const [weekStartKey, setWeekStartKey] = useState(getInitialWeekStartKey)
   const [shifts, setShifts] = useState([])
   const [loading, setLoading] = useState(true)
@@ -37,12 +42,16 @@ export default function WorkScheduleSection() {
     : formatWeekRangeLabel(weekStartKey)
 
   const employees = useMemo(() => {
+    let list = getStaffEmployees('active')
+    if (!viewTeam && selfEmployeeId) {
+      list = list.filter((emp) => Number(emp.id) === selfEmployeeId)
+    }
     const q = search.trim().toLowerCase()
-    return getStaffEmployees('active').filter((emp) => {
+    return list.filter((emp) => {
       if (!q) return true
       return emp.name.toLowerCase().includes(q)
     })
-  }, [search])
+  }, [search, viewTeam, selfEmployeeId])
 
   const employeeIds = useMemo(() => employees.map((emp) => emp.id), [employees])
   const employeeIdsKey = employeeIds.join(',')
@@ -99,7 +108,9 @@ export default function WorkScheduleSection() {
         nextLabel="Следующая неделя"
       />
 
-      <EmployeeSearchToolbar value={search} onChange={(e) => setSearch(e.target.value)} />
+      {viewTeam && (
+        <EmployeeSearchToolbar value={search} onChange={(e) => setSearch(e.target.value)} />
+      )}
 
       {error && <p className="admin-form__error">{error}</p>}
 
@@ -147,13 +158,17 @@ export default function WorkScheduleSection() {
                   <tr key={emp.id}>
                     <td className="team-schedule-table__index">{index + 1}</td>
                     <td className="team-schedule-table__employee">
-                      <button
-                        type="button"
-                        className="team-schedule-table__employee-btn"
-                        onClick={() => openEmployeeSchedule(emp.id)}
-                      >
-                        {emp.name}
-                      </button>
+                      {viewTeam ? (
+                        <button
+                          type="button"
+                          className="team-schedule-table__employee-btn"
+                          onClick={() => openEmployeeSchedule(emp.id)}
+                        >
+                          {emp.name}
+                        </button>
+                      ) : (
+                        <span>{emp.name}</span>
+                      )}
                     </td>
                     {weekDates.map((date) => {
                       const dateKey = toDateKey(date)

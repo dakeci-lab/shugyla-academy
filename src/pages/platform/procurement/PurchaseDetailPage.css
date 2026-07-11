@@ -21,7 +21,8 @@
   margin-bottom: 20px;
 }
 
-.purchase-detail__number {
+.purchase-detail__number,
+.purchase-detail__title {
   margin: 0 0 8px;
   font-size: 22px;
   font-weight: 700;
