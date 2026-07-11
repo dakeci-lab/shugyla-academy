@@ -11,6 +11,10 @@ import {
 } from '../lib/cloudStore'
 import { normalizePurchaseOrder, PURCHASE_STATUS } from '../utils/purchaseData'
 import { normalizeReceivingDocument, RECEIVING_STATUS } from '../utils/receivingData'
+import {
+  PROCUREMENT_WORKFLOW_MODE,
+  getReceivingChecklistToggleState,
+} from '../utils/procurementWorkflow'
 import { SYNC_STATUS } from '../utils/syncStatus'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
 import { toastSuccess, toastError } from './notificationService'
@@ -150,34 +154,176 @@ function revertSimpleDeliveryStateCloud(snapshot) {
   }
 }
 
-async function ensureReceivingDocumentInCloud(document, order) {
-  if (document?.id) {
-    const byId = await receivingCloud.fetchDocumentById(document.id)
-    if (byId) return byId
-  }
+const ENSURE_CLOUD_RETRY_DELAYS_MS = [0, 250, 500, 1000, 1500, 2000]
 
-  const orderId = order?.id ?? document?.purchaseOrderId
-  if (orderId) {
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function waitForPurchaseOrderInCloud(orderId, { attempts = 20, delayMs = 400 } = {}) {
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
     const cloudOrder = await cloud.fetchOrderById(orderId)
-    if (cloudOrder?.receivingDocumentId) {
-      const linked = await receivingCloud.fetchDocumentById(cloudOrder.receivingDocumentId)
-      if (linked) return linked
+    if (cloudOrder) return cloudOrder
+
+    const localOrder = getPurchaseOrdersSync().find((item) => item.id === orderId)
+    const localDocument = getReceivingDocumentsSync().find(
+      (item) => item.purchaseOrderId === orderId
+    )
+
+    if (localOrder && localOrder.syncStatus !== SYNC_STATUS.ERROR) {
+      try {
+        await cloud.syncSimplePurchaseCloud(localOrder, localDocument)
+        const synced = await cloud.fetchOrderById(orderId)
+        if (synced) return synced
+      } catch (error) {
+        console.warn('[ensurePurchaseAndReceiving] sync retry', error)
+      }
     }
 
-    if (cloudOrder && !cloudOrder.receivingDocumentId) {
-      const created = await receivingCloud.createSimpleReceivingFromPurchaseCloud(cloudOrder, null)
+    if (attempt < attempts - 1) {
+      await delay(delayMs)
+    }
+  }
+
+  return null
+}
+
+function buildReceivingDocumentPayload(document, order, cloudOrder) {
+  const orderId = order?.id ?? document?.purchaseOrderId ?? cloudOrder?.id
+  const docId =
+    document?.id ??
+    cloudOrder?.receivingDocumentId ??
+    order?.receivingDocumentId ??
+    crypto.randomUUID()
+
+  return normalizeReceivingDocument({
+    id: docId,
+    purchaseOrderId: orderId,
+    supplierId: document?.supplierId ?? order?.supplierId ?? cloudOrder?.supplierId ?? null,
+    supplierName: document?.supplierName ?? order?.supplierName ?? cloudOrder?.supplierName ?? '',
+    status: RECEIVING_STATUS.AWAITING_RECEIVING,
+    expectedDeliveryDate:
+      document?.expectedDeliveryDate ??
+      order?.expectedDeliveryDate ??
+      cloudOrder?.expectedDeliveryDate ??
+      '',
+    totalAmount: document?.totalAmount ?? order?.totalAmount ?? cloudOrder?.totalAmount ?? 0,
+    workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
+  })
+}
+
+async function tryEnsurePurchaseAndReceivingInCloud(document, order) {
+  const orderId = order?.id ?? document?.purchaseOrderId
+  if (!orderId) {
+    throw new Error('Закуп не найден')
+  }
+
+  let localOrder = order || getPurchaseOrdersSync().find((item) => item.id === orderId) || null
+  let localDocument =
+    document ||
+    getReceivingDocumentsSync().find((item) => item.purchaseOrderId === orderId) ||
+    null
+
+  if (localOrder?.syncStatus === SYNC_STATUS.PENDING) {
+    await waitForPurchaseOrderInCloud(orderId)
+    localOrder = getPurchaseOrdersSync().find((item) => item.id === orderId) || localOrder
+    localDocument =
+      getReceivingDocumentsSync().find((item) => item.purchaseOrderId === orderId) || localDocument
+  }
+
+  let cloudOrder = await cloud.fetchOrderById(orderId)
+  if (!cloudOrder && localOrder) {
+    await cloud.syncSimplePurchaseCloud(localOrder, localDocument)
+    cloudOrder = await cloud.fetchOrderById(orderId)
+  }
+
+  if (!cloudOrder) {
+    cloudOrder = await waitForPurchaseOrderInCloud(orderId)
+  }
+
+  if (!cloudOrder) {
+    throw new Error('Закуп не синхронизирован с Supabase')
+  }
+
+  const candidateIds = [
+    localDocument?.id,
+    document?.id,
+    cloudOrder.receivingDocumentId,
+    localOrder?.receivingDocumentId,
+  ].filter(Boolean)
+
+  for (const docId of candidateIds) {
+    const existing = await receivingCloud.fetchDocumentById(docId)
+    if (existing) {
+      return { document: existing, order: cloudOrder }
+    }
+  }
+
+  const docPayload = buildReceivingDocumentPayload(localDocument || document, localOrder, cloudOrder)
+
+  await receivingCloud.syncSimpleReceivingDocumentCloud(docPayload, cloudOrder)
+
+  let ensuredDocument = await receivingCloud.fetchDocumentById(docPayload.id)
+  if (!ensuredDocument && cloudOrder.receivingDocumentId) {
+    ensuredDocument = await receivingCloud.fetchDocumentById(cloudOrder.receivingDocumentId)
+  }
+
+  if (!ensuredDocument) {
+    const refreshedOrder = await cloud.fetchOrderById(orderId)
+    if (refreshedOrder?.receivingDocumentId) {
+      ensuredDocument = await receivingCloud.fetchDocumentById(refreshedOrder.receivingDocumentId)
+      if (ensuredDocument) {
+        return { document: ensuredDocument, order: refreshedOrder }
+      }
+    }
+
+    if (!refreshedOrder?.receivingDocumentId) {
+      const created = await receivingCloud.createSimpleReceivingFromPurchaseCloud(
+        refreshedOrder || cloudOrder,
+        null
+      )
       if (created?.receivingDocumentId) {
-        return receivingCloud.fetchDocumentById(created.receivingDocumentId)
+        ensuredDocument = await receivingCloud.fetchDocumentById(created.receivingDocumentId)
+        const finalOrder = await cloud.fetchOrderById(orderId)
+        if (ensuredDocument) {
+          return { document: ensuredDocument, order: finalOrder || cloudOrder }
+        }
       }
     }
   }
 
-  if (document?.id && order) {
-    await receivingCloud.syncSimpleReceivingDocumentCloud(document, order)
-    return receivingCloud.fetchDocumentById(document.id)
+  if (!ensuredDocument?.id) {
+    throw new Error('Документ приёмки не найден в Supabase')
   }
 
-  return null
+  const finalOrder = (await cloud.fetchOrderById(orderId)) || cloudOrder
+  return { document: ensuredDocument, order: finalOrder }
+}
+
+async function ensurePurchaseAndReceivingInCloud(document, order) {
+  let lastError = null
+
+  for (const waitMs of ENSURE_CLOUD_RETRY_DELAYS_MS) {
+    if (waitMs) {
+      await delay(waitMs)
+    }
+
+    try {
+      const ensured = await tryEnsurePurchaseAndReceivingInCloud(document, order)
+      if (ensured?.document?.id) {
+        upsertCloudReceivingDocument(ensured.document)
+        if (ensured.order) {
+          upsertCloudPurchase(ensured.order)
+        }
+        return ensured
+      }
+    } catch (error) {
+      lastError = error
+      console.warn('[ensurePurchaseAndReceivingInCloud] retry', error)
+    }
+  }
+
+  throw lastError || new Error('Документ приёмки не найден в Supabase')
 }
 
 /** Фоновое сохранение отметки чек-листа в Supabase */
@@ -198,12 +344,12 @@ async function persistSimpleDeliveryChecklistState({
     return
   }
 
-  const ensured = await ensureReceivingDocumentInCloud(document, order)
-  if (!ensured?.id) {
+  const ensured = await ensurePurchaseAndReceivingInCloud(document, order)
+  if (!ensured?.document?.id) {
     throw new Error('Документ приёмки не найден в Supabase')
   }
 
-  const resolvedDocumentId = ensured.id
+  const resolvedDocumentId = ensured.document.id
 
   if (received) {
     await receivingCloud.acceptSimpleDeliveryCloud(resolvedDocumentId, user)
@@ -211,14 +357,17 @@ async function persistSimpleDeliveryChecklistState({
     await receivingCloud.unacceptSimpleDeliveryCloud(resolvedDocumentId)
   }
 
-  clearOptimisticReceivingSyncState(resolvedDocumentId, order?.id ?? ensured.purchaseOrderId)
+  clearOptimisticReceivingSyncState(
+    resolvedDocumentId,
+    order?.id ?? ensured.document.purchaseOrderId
+  )
 
   const freshDocument = await receivingCloud.fetchDocumentById(resolvedDocumentId)
   if (freshDocument) {
     upsertCloudReceivingDocument(freshDocument)
   }
 
-  const purchaseOrderId = order?.id ?? ensured.purchaseOrderId
+  const purchaseOrderId = order?.id ?? ensured.document.purchaseOrderId
   if (purchaseOrderId) {
     const freshOrder = await cloud.fetchOrderById(purchaseOrderId)
     if (freshOrder) {
@@ -266,11 +415,26 @@ function markSimpleDeliveryChecklist({ documentId, user, notifyChange, context, 
   })
   if (!document?.id) {
     console.error('[SimpleDeliveryChecklist] document not found', { documentId, context })
-    return false
+    return Promise.resolve(false)
   }
 
   const order = resolveOrderForReceivingDocument(document, context.order)
   const resolvedDocumentId = document.id
+
+  if (isCloudMode()) {
+    const toggleState = getReceivingChecklistToggleState(
+      order,
+      getReceivingDocumentsSync(),
+      true
+    )
+    if (!toggleState.canToggle) {
+      console.warn('[SimpleDeliveryChecklist] toggle blocked until sync', {
+        documentId: resolvedDocumentId,
+        reason: toggleState.reason,
+      })
+      return Promise.resolve(false)
+    }
+  }
 
   const cloudSnapshot = isCloudMode()
     ? applySimpleDeliveryStateCloud(document, order, {
@@ -281,12 +445,14 @@ function markSimpleDeliveryChecklist({ documentId, user, notifyChange, context, 
 
   if (!isCloudMode()) {
     applySimpleDeliveryStateLocal(document, order, { received, user: received ? user : null })
+    notifyChange?.()
+    toastSuccess(received ? ACCEPT_SUCCESS_MESSAGE : UNACCEPT_SUCCESS_MESSAGE)
+    return Promise.resolve(true)
   }
 
   notifyChange?.()
-  toastSuccess(received ? ACCEPT_SUCCESS_MESSAGE : UNACCEPT_SUCCESS_MESSAGE)
 
-  void persistSimpleDeliveryChecklistState({
+  return persistSimpleDeliveryChecklistState({
     documentId: resolvedDocumentId,
     document,
     order,
@@ -295,17 +461,18 @@ function markSimpleDeliveryChecklist({ documentId, user, notifyChange, context, 
   })
     .then(() => {
       notifyChange?.()
+      toastSuccess(received ? ACCEPT_SUCCESS_MESSAGE : UNACCEPT_SUCCESS_MESSAGE)
+      return true
     })
     .catch((error) => {
       console.error('[SimpleDeliveryChecklist] persist failed', error)
-      if (isCloudMode()) {
-        revertSimpleDeliveryStateCloud(cloudSnapshot)
-        notifyChange?.()
-        toastError(received ? ACCEPT_ERROR_MESSAGE : UNACCEPT_ERROR_MESSAGE)
-      }
+      revertSimpleDeliveryStateCloud(cloudSnapshot)
+      notifyChange?.()
+      toastError(
+        toUserErrorMessage(error, received ? ACCEPT_ERROR_MESSAGE : UNACCEPT_ERROR_MESSAGE)
+      )
+      return false
     })
-
-  return true
 }
 
 /** Optimistic Accept — мгновенная отметка приёмки */

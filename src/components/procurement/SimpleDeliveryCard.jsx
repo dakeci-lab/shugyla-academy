@@ -13,12 +13,18 @@ export default function SimpleDeliveryCard({
   canAccept,
   onToggle,
   toggling,
+  syncStatusLabel,
+  syncPending,
 }) {
   const deliveryStatus = isReceived ? 'received' : resolveSimpleDeliveryStatus(document)
   const amount = order?.totalAmount ?? document?.totalAmount ?? 0
   const supplierName = order?.supplierName || document?.supplierName || '—'
-  const statusLabel = isReceived ? 'Поставка принята' : SIMPLE_DELIVERY_LABELS[deliveryStatus]
-  const interactive = canAccept && Boolean(document?.id)
+  const statusLabel = syncStatusLabel
+    ? syncStatusLabel
+    : isReceived
+      ? 'Поставка принята'
+      : SIMPLE_DELIVERY_LABELS[deliveryStatus]
+  const interactive = canAccept && Boolean(document?.id) && !syncStatusLabel
 
   function handleToggle(event) {
     event.preventDefault()
@@ -56,7 +62,18 @@ export default function SimpleDeliveryCard({
         <span className="simple-delivery-row__supplier">{supplierName}</span>
         <span className="simple-delivery-row__meta">
           <span className="simple-delivery-row__amount">{formatPurchaseAmount(amount)}</span>
-          <span className="simple-delivery-row__status">{statusLabel}</span>
+          <span className="simple-delivery-row__status">
+            {syncStatusLabel ? (
+              <span className="purchase-sync-status purchase-sync-status--pending">
+                {syncPending && (
+                  <span className="purchase-sync-status__spinner" aria-hidden="true" />
+                )}
+                {syncStatusLabel}
+              </span>
+            ) : (
+              statusLabel
+            )}
+          </span>
         </span>
       </button>
     </div>

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSession } from '../../context/SessionContext'
 import { canAcceptSimpleDelivery } from '../../config/permissions'
+import { isCloudMode } from '../../lib/dataMode'
 import { getReceivingDocumentsSync } from '../../services/receivingDataService'
 import { getPurchaseOrdersSync } from '../../services/purchaseDataService'
 import {
@@ -10,6 +11,7 @@ import {
 import { useAdminRefresh } from '../../hooks/useAdminRefresh'
 import {
   buildSimpleReceivingEntries,
+  getReceivingChecklistToggleState,
   isSimpleReceivingEntryDone,
   sortReceivingChecklistEntries,
 } from '../../utils/procurementWorkflow'
@@ -100,9 +102,16 @@ export default function SimpleReceivingWeekView() {
     })
   }
 
-  function handleToggleEntry(entry) {
+  async function handleToggleEntry(entry) {
     const docId = entry.document?.id
     if (!docId || togglingId === docId) return
+
+    const toggleState = getReceivingChecklistToggleState(
+      entry.order,
+      getReceivingDocumentsSync(),
+      isCloudMode()
+    )
+    if (!toggleState.canToggle) return
 
     const context = { document: entry.document, order: entry.order, orderId: entry.order?.id }
     const currentlyReceived = getIsReceived(entry)
@@ -111,15 +120,19 @@ export default function SimpleReceivingWeekView() {
     setCheckedOverrides((prev) => ({ ...prev, [docId]: nextReceived }))
     setTogglingId(docId)
 
-    const ok = currentlyReceived
-      ? unacceptSimpleDeliveryOptimistic(docId, notifyChange, context)
-      : acceptSimpleDeliveryOptimistic(docId, user, notifyChange, context)
+    try {
+      const result = currentlyReceived
+        ? unacceptSimpleDeliveryOptimistic(docId, notifyChange, context)
+        : acceptSimpleDeliveryOptimistic(docId, user, notifyChange, context)
 
-    setTogglingId(null)
+      const ok = result && typeof result.then === 'function' ? await result : result
 
-    if (!ok) {
-      clearOverride(docId)
-      console.error('[ReceivingChecklist] toggle failed', { docId, entry })
+      if (!ok) {
+        clearOverride(docId)
+        console.error('[ReceivingChecklist] toggle failed', { docId, entry })
+      }
+    } finally {
+      setTogglingId(null)
     }
   }
 
@@ -188,17 +201,27 @@ export default function SimpleReceivingWeekView() {
         </p>
       ) : (
         <div className="simple-receiving-checklist" role="list">
-          {dayEntries.map((entry) => (
-            <SimpleDeliveryCard
-              key={entry.order.id}
-              order={entry.order}
-              document={entry.document}
-              isReceived={getIsReceived(entry)}
-              canAccept={canAccept}
-              toggling={togglingId === entry.document.id}
-              onToggle={() => handleToggleEntry(entry)}
-            />
-          ))}
+          {dayEntries.map((entry) => {
+            const toggleState = getReceivingChecklistToggleState(
+              entry.order,
+              getReceivingDocumentsSync(),
+              isCloudMode()
+            )
+
+            return (
+              <SimpleDeliveryCard
+                key={entry.order.id}
+                order={entry.order}
+                document={entry.document}
+                isReceived={getIsReceived(entry)}
+                canAccept={canAccept && toggleState.canToggle}
+                syncStatusLabel={toggleState.statusLabel}
+                syncPending={toggleState.reason === 'syncing'}
+                toggling={togglingId === entry.document.id}
+                onToggle={() => handleToggleEntry(entry)}
+              />
+            )
+          })}
         </div>
       )}
     </>

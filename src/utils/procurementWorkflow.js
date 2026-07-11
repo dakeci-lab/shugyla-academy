@@ -1,6 +1,12 @@
 import { PURCHASE_STATUS } from './purchaseData'
 import { RECEIVING_STATUS, normalizeReceivingDocument } from './receivingData'
 import { toDateKey } from './shiftData'
+import {
+  SYNC_STATUS,
+  SYNC_STATUS_LABELS,
+  isSyncPending,
+  isSyncError,
+} from './syncStatus'
 
 /** Режимы модуля закупа */
 export const PROCUREMENT_WORKFLOW_MODE = {
@@ -117,6 +123,55 @@ export function isSimpleReceivingEntryDone(entry) {
     entry?.document?.status === RECEIVING_STATUS.RECEIVED ||
     entry?.order?.status === PURCHASE_STATUS.RECEIVED
   )
+}
+
+/** Документ приёмки есть только как fallback (ещё нет строки в облачном store) */
+export function isVirtualReceivingDocument(order, documents) {
+  if (!order?.receivingDocumentId) return false
+  const list = documents || []
+  return !list.some(
+    (doc) => doc.id === order.receivingDocumentId || doc.purchaseOrderId === order.id
+  )
+}
+
+/**
+ * Можно ли переключать чек-лист приёмки.
+ * Пока закуп не синхронизирован с Supabase — галочка недоступна.
+ */
+export function getReceivingChecklistToggleState(order, documents, cloudMode = false) {
+  if (!order?.id || !order.receivingDocumentId) {
+    return { canToggle: false, reason: 'missing', statusLabel: null }
+  }
+
+  if (!cloudMode) {
+    return { canToggle: true, reason: 'ready', statusLabel: null }
+  }
+
+  if (isSyncPending(order.syncStatus)) {
+    return {
+      canToggle: false,
+      reason: 'syncing',
+      statusLabel: SYNC_STATUS_LABELS[SYNC_STATUS.PENDING],
+    }
+  }
+
+  if (isSyncError(order.syncStatus)) {
+    return {
+      canToggle: false,
+      reason: 'error',
+      statusLabel: SYNC_STATUS_LABELS[SYNC_STATUS.ERROR],
+    }
+  }
+
+  if (isVirtualReceivingDocument(order, documents)) {
+    return {
+      canToggle: true,
+      reason: 'virtual',
+      statusLabel: null,
+    }
+  }
+
+  return { canToggle: true, reason: 'ready', statusLabel: null }
 }
 
 /** Чек-лист: необработанные сверху, обработанные снизу */

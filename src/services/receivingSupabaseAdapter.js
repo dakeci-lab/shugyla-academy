@@ -33,7 +33,6 @@ function rowToItem(row) {
     purchase_price: row.purchase_price,
     status: row.status,
     comment: row.comment,
-    sort_order: row.sort_order,
     created_at: row.created_at,
     updated_at: row.updated_at,
   })
@@ -56,7 +55,6 @@ function itemToRow(item, documentId) {
     purchase_price: item.purchasePrice ?? item.purchase_price ?? 0,
     status: item.status ?? RECEIVING_ITEM_STATUS.PENDING,
     comment: item.comment ?? '',
-    sort_order: item.sortOrder ?? item.sort_order ?? 0,
     updated_at: now,
   }
 
@@ -135,7 +133,7 @@ async function fetchDocumentById(documentId) {
     .from('receiving_items')
     .select('*')
     .eq('receiving_document_id', documentId)
-    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
 
   const items = await throwIfError(itemsResult, 'Загрузка позиций приёмки')
 
@@ -160,7 +158,7 @@ export async function fetchReceivingDataCloud() {
     .from('receiving_items')
     .select('*')
     .in('receiving_document_id', docIds)
-    .order('sort_order', { ascending: true })
+    .order('created_at', { ascending: true })
 
   const items = await throwIfError(itemsResult, 'Загрузка позиций приёмки')
 
@@ -238,7 +236,6 @@ export async function transferFromPurchaseCloud(orderId, user) {
           purchasePrice: item.purchasePrice,
           status: RECEIVING_ITEM_STATUS.PENDING,
           comment: item.comment,
-          sortOrder: index,
           created_at: now,
         }),
         docId
@@ -291,9 +288,7 @@ async function syncReceivingItems(documentId, items) {
   }
 
   if (normalized.length > 0) {
-    const rows = normalized.map((item, index) =>
-      itemToRow({ ...item, sortOrder: index }, documentId)
-    )
+    const rows = normalized.map((item) => itemToRow(item, documentId))
     await throwIfError(
       await supabase.from('receiving_items').upsert(rows),
       'Сохранение позиций приёмки'
@@ -469,7 +464,10 @@ export async function createSimpleReceivingFromPurchaseCloud(order, user) {
   ensureClient()
 
   if (order.receivingDocumentId) {
-    return { receivingDocumentId: order.receivingDocumentId }
+    const existing = await fetchDocumentById(order.receivingDocumentId)
+    if (existing) {
+      return { receivingDocumentId: order.receivingDocumentId }
+    }
   }
 
   const now = new Date().toISOString()
