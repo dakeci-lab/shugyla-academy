@@ -1,39 +1,40 @@
 .photo-preview-overlay {
   position: fixed;
   inset: 0;
-  z-index: 300;
+  z-index: 2000;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
-  background: rgba(0, 0, 0, 0.72);
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  background: rgba(0, 0, 0, 0.82);
 }
 
 .photo-preview-modal {
   position: relative;
+  z-index: 2010;
   display: flex;
   align-items: center;
   justify-content: center;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
 }
 
 .photo-preview-close {
-  position: absolute;
-  top: -0.25rem;
-  right: -0.25rem;
-  z-index: 1;
+  position: fixed;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
+  z-index: 2020;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2.5rem;
-  height: 2.5rem;
+  width: 44px;
+  height: 44px;
   border: none;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.95);
   color: #111827;
-  font-size: 1.5rem;
-  line-height: 1;
   cursor: pointer;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.25);
   transition: background 0.15s, transform 0.15s;
@@ -44,14 +45,71 @@
   transform: scale(1.05);
 }
 
+.photo-preview-close:focus-visible {
+  outline: 2px solid var(--color-primary, #059669);
+  outline-offset: 2px;
+}
+
 .candidate-photo-preview {
   display: block;
-  max-width: 90vw;
-  max-height: 85vh;
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
   object-fit: contain;
   border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
   cursor: default;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.candidate-photo-preview--visible {
+  opacity: 1;
+}
+
+.photo-preview-loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.photo-preview-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255, 255, 255, 0.25);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: photo-preview-spin 0.7s linear infinite;
+}
+
+@keyframes photo-preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.photo-preview-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  text-align: center;
+  color: #fff;
+}
+
+.photo-preview-error__icon {
+  opacity: 0.85;
+}
+
+.photo-preview-error__text {
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.photo-preview-error__btn {
+  margin-top: 4px;
 }
 
 .candidate-detail-photo-btn {
@@ -61,36 +119,22 @@
   border: none;
   background: none;
   cursor: pointer;
-  border-radius: 50%;
+  border-radius: 16px;
 }
 
 .candidate-detail-photo-btn::after {
-  content: '⤢';
+  content: '';
   position: absolute;
-  right: 0.35rem;
-  bottom: 0.35rem;
-  width: 1.75rem;
-  height: 1.75rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 0.9rem;
-  opacity: 0;
-  transition: opacity 0.15s;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(0, 0, 0, 0);
+  transition: background 0.15s;
   pointer-events: none;
 }
 
 .candidate-detail-photo-btn:hover::after,
 .candidate-detail-photo-btn:focus-visible::after {
-  opacity: 1;
-}
-
-.candidate-detail-photo-btn:hover .candidate-avatar,
-.candidate-detail-photo-btn:focus-visible .candidate-avatar {
-  filter: brightness(0.92);
+  background: rgba(0, 0, 0, 0.18);
 }
 
 .candidate-detail-photo-btn:focus-visible {
@@ -98,10 +142,32 @@
   outline-offset: 3px;
 }
 
-@media (max-width: 600px) {
-  .photo-preview-close {
-    top: 0.5rem;
-    right: 0.5rem;
-    position: fixed;
-  }
+.candidate-detail-photo-btn__zoom {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.15s;
+  pointer-events: none;
+}
+
+.candidate-detail-photo-btn:hover .candidate-detail-photo-btn__zoom,
+.candidate-detail-photo-btn:focus-visible .candidate-detail-photo-btn__zoom {
+  opacity: 1;
+}
+
+.candidate-detail-photo-btn--static {
+  cursor: default;
+}
+
+.candidate-detail-photo-btn--static::after {
+  display: none;
 }

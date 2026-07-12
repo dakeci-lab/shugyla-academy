@@ -4,12 +4,23 @@ import {
   normalizeCandidateQuestion,
   normalizeCandidate,
   generateUniqueVacancySlug,
-  calculateApplicationScore,
+  evaluateCandidateScreening,
   getAllVacanciesSync,
   getAllCandidatesSync,
+  getVacancyByIdSync,
+  isVacancyQuestionsLocked,
+  isVacancyPassingScoreLocked,
+  VACANCY_QUESTIONS_LOCKED_MESSAGE,
   VACANCY_STATUS,
   CANDIDATE_STATUS,
 } from '../utils/recruitmentData'
+
+async function assertVacancyQuestionsEditable(vacancyId) {
+  const vacancy = getVacancyByIdSync(vacancyId)
+  if (isVacancyQuestionsLocked(vacancy)) {
+    throw new Error(VACANCY_QUESTIONS_LOCKED_MESSAGE)
+  }
+}
 
 async function throwIfError(result, context) {
   if (result.error) throw new Error(`${context}: ${result.error.message}`)
@@ -127,6 +138,15 @@ export async function createVacancy(data) {
 }
 
 export async function updateVacancy(vacancyId, updates) {
+  const current = getVacancyByIdSync(vacancyId)
+  if (!current) throw new Error('Вакансия не найдена')
+
+  if (updates.passingScore != null && isVacancyPassingScoreLocked(current)) {
+    throw new Error(
+      'Проходной процент зафиксирован: по этой вакансии уже есть кандидаты. Создайте новую вакансию для другого порога.'
+    )
+  }
+
   const patch = {}
   if (updates.title != null) patch.title = updates.title
   if (updates.slug != null) patch.slug = updates.slug
@@ -165,7 +185,54 @@ export async function archiveVacancy(vacancyId) {
   await updateVacancy(vacancyId, { status: VACANCY_STATUS.ARCHIVED })
 }
 
+export async function duplicateVacancy(sourceVacancyId) {
+  const source = getVacancyByIdSync(sourceVacancyId)
+  if (!source) throw new Error('Вакансия не найдена')
+
+  const title = `${source.title} (копия)`
+  const slug = generateUniqueVacancySlug(title, getAllVacanciesSync())
+  const newId = crypto.randomUUID()
+
+  await createVacancy({
+    id: newId,
+    title,
+    description: source.description,
+    role: source.role,
+    employeeRole: source.employeeRole,
+    passingScore: source.passingScore,
+    status: VACANCY_STATUS.DRAFT,
+    slug,
+  })
+
+  const questionsRes = await supabase
+    .from('academy_candidate_questions')
+    .select('*')
+    .eq('vacancy_id', sourceVacancyId)
+    .order('sort_order')
+  const sourceQuestions = (await throwIfError(questionsRes, 'Загрузка вопросов')).map(rowToQuestion)
+
+  if (sourceQuestions.length) {
+    const rows = sourceQuestions.map((q, index) => ({
+      id: crypto.randomUUID(),
+      vacancy_id: newId,
+      question_text: q.questionText,
+      question_type: q.questionType || 'single_choice',
+      options: q.options,
+      scores: q.scores,
+      required: q.required !== false,
+      sort_order: index,
+    }))
+    await throwIfError(
+      await supabase.from('academy_candidate_questions').insert(rows),
+      'Копирование вопросов'
+    )
+  }
+
+  return newId
+}
+
 export async function createCandidateQuestion(vacancyId, data) {
+  await assertVacancyQuestionsEditable(vacancyId)
   const countRes = await supabase
     .from('academy_candidate_questions')
     .select('sort_order')
@@ -190,6 +257,14 @@ export async function createCandidateQuestion(vacancyId, data) {
 }
 
 export async function updateCandidateQuestion(questionId, updates) {
+  const qRes = await supabase
+    .from('academy_candidate_questions')
+    .select('vacancy_id')
+    .eq('id', questionId)
+    .maybeSingle()
+  const qRow = await throwIfError(qRes, 'Загрузка вопроса')
+  if (qRow?.vacancy_id) await assertVacancyQuestionsEditable(qRow.vacancy_id)
+
   const patch = {}
   if (updates.questionText != null) patch.question_text = updates.questionText
   if (updates.options != null) patch.options = updates.options
@@ -205,6 +280,14 @@ export async function updateCandidateQuestion(questionId, updates) {
 }
 
 export async function deleteCandidateQuestion(questionId) {
+  const qRes = await supabase
+    .from('academy_candidate_questions')
+    .select('vacancy_id')
+    .eq('id', questionId)
+    .maybeSingle()
+  const qRow = await throwIfError(qRes, 'Загрузка вопроса')
+  if (qRow?.vacancy_id) await assertVacancyQuestionsEditable(qRow.vacancy_id)
+
   await throwIfError(
     await supabase.from('academy_candidate_questions').delete().eq('id', questionId),
     'Удаление вопроса'
@@ -212,6 +295,7 @@ export async function deleteCandidateQuestion(questionId) {
 }
 
 export async function reorderCandidateQuestions(vacancyId, orderedQuestionIds) {
+  await assertVacancyQuestionsEditable(vacancyId)
   await Promise.all(
     orderedQuestionIds.map((id, index) =>
       supabase
@@ -242,7 +326,7 @@ export async function submitCandidateApplication(applicationData) {
     .order('sort_order')
   const questions = (await throwIfError(questionsRes, 'Загрузка вопросов')).map(rowToQuestion)
 
-  const { totalScore, maxScore, scorePercent, status } = calculateApplicationScore(
+  const screening = evaluateCandidateScreening(
     questions,
     applicationData.answers || {},
     vacancyRow.passing_score
@@ -267,10 +351,10 @@ export async function submitCandidateApplication(applicationData) {
     answers: applicationData.answers || {},
     photo_url: applicationData.photoUrl || null,
     photo_path: applicationData.photoPath || null,
-    score_percent: scorePercent,
-    total_score: totalScore,
-    max_score: maxScore,
-    status,
+    score_percent: screening.scorePercent,
+    total_score: screening.totalScore,
+    max_score: screening.maxScore,
+    status: screening.status,
   }
 
   const inserted = await throwIfError(
@@ -314,6 +398,10 @@ export async function updateCandidateNotes(candidateId, notes) {
 
 export async function rejectCandidate(candidateId) {
   await updateCandidateStatus(candidateId, CANDIDATE_STATUS.REJECTED)
+}
+
+export async function restoreCandidateToNew(candidateId) {
+  await updateCandidateStatus(candidateId, CANDIDATE_STATUS.NEW)
 }
 
 export async function inviteCandidate(candidateId) {

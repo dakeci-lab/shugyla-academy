@@ -25,7 +25,9 @@ import PlatformWorkSchedule from './pages/platform/PlatformWorkSchedule'
 import PlatformEmployeeSchedule from './pages/platform/PlatformEmployeeSchedule'
 import PlatformEmployeeRating from './pages/platform/PlatformEmployeeRating'
 import PlatformTimeTracker from './pages/platform/PlatformTimeTracker'
-import PlatformHiring from './pages/platform/PlatformHiring'
+import PlatformHrVacancies from './pages/platform/PlatformHrVacancies'
+import PlatformHrCandidates from './pages/platform/PlatformHrCandidates'
+import HrPlatformRoute from './components/platform/HrPlatformRoute'
 import PlatformStandardsManage from './pages/platform/PlatformStandardsManage'
 import SuppliersPage, { SupplierDetailPage } from './pages/platform/suppliers/SuppliersPage'
 import ProcurementPage from './pages/platform/procurement/ProcurementPage'
@@ -146,10 +148,28 @@ export default function App() {
           />
           <Route
             path="employees/hiring"
+            element={<Navigate to="/platform/hr/vacancies" replace />}
+          />
+          <Route
+            path="employees/recruitment"
+            element={<Navigate to="/platform/hr/vacancies" replace />}
+          />
+
+          <Route path="hr" element={<Navigate to="/platform/hr/vacancies" replace />} />
+          <Route
+            path="hr/vacancies"
             element={
-              <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_HIRING}>
-                <PlatformHiring />
-              </PlatformRoute>
+              <HrPlatformRoute routeKey={ROUTE_KEYS.HR_VACANCIES}>
+                <PlatformHrVacancies />
+              </HrPlatformRoute>
+            }
+          />
+          <Route
+            path="hr/candidates"
+            element={
+              <HrPlatformRoute routeKey={ROUTE_KEYS.HR_CANDIDATES}>
+                <PlatformHrCandidates />
+              </HrPlatformRoute>
             }
           />
 
@@ -292,7 +312,7 @@ export default function App() {
               }
             >
               <Route index element={<PlatformAcademyManageHub />} />
-              <Route path="hiring" element={<Navigate to="/platform/employees/hiring" replace />} />
+              <Route path="hiring" element={<Navigate to="/platform/hr/vacancies" replace />} />
               <Route path="standards" element={<Navigate to="/platform/standards/manage" replace />} />
               <Route path=":section" element={<PlatformAcademyManageSection />} />
             </Route>
@@ -320,7 +340,11 @@ export default function App() {
         <Route path="/admin/courses" element={<Navigate to="/platform/academy/manage/courses" replace />} />
         <Route path="/admin/routes" element={<Navigate to="/platform/academy/manage/courses" replace />} />
         <Route path="/admin/standards" element={<Navigate to="/platform/standards/manage" replace />} />
-        <Route path="/admin/hiring" element={<Navigate to="/platform/employees/hiring" replace />} />
+        <Route path="/admin/hiring" element={<Navigate to="/platform/hr/vacancies" replace />} />
+        <Route path="/hiring" element={<Navigate to="/platform/hr/vacancies" replace />} />
+        <Route path="/recruitment" element={<Navigate to="/platform/hr/vacancies" replace />} />
+        <Route path="/employees/hiring" element={<Navigate to="/platform/hr/vacancies" replace />} />
+        <Route path="/employees/recruitment" element={<Navigate to="/platform/hr/vacancies" replace />} />
         <Route path="/admin/tests" element={<Navigate to="/platform/academy/manage/tests" replace />} />
         <Route path="/admin/attestation" element={<Navigate to="/platform/academy/manage/courses" replace />} />
         <Route path="/admin/progress" element={<Navigate to="/platform/academy/manage/progress" replace />} />

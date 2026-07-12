@@ -3,10 +3,21 @@ import {
   normalizeCandidateQuestion,
   normalizeCandidate,
   generateUniqueVacancySlug,
-  calculateApplicationScore,
+  evaluateCandidateScreening,
+  getVacancyByIdSync,
+  isVacancyQuestionsLocked,
+  isVacancyPassingScoreLocked,
+  VACANCY_QUESTIONS_LOCKED_MESSAGE,
   VACANCY_STATUS,
   CANDIDATE_STATUS,
 } from '../utils/recruitmentData'
+
+function assertVacancyQuestionsEditable(vacancyId) {
+  const vacancy = getVacancyByIdSync(vacancyId)
+  if (isVacancyQuestionsLocked(vacancy)) {
+    throw new Error(VACANCY_QUESTIONS_LOCKED_MESSAGE)
+  }
+}
 
 const STORAGE_KEYS = {
   VACANCIES: 'shugyla_vacancies',
@@ -202,6 +213,18 @@ export async function updateVacancy(vacancyId, updates) {
   const idx = bundle.vacancies.findIndex((v) => v.id === vacancyId)
   if (idx < 0) throw new Error('Вакансия не найдена')
   const current = bundle.vacancies[idx]
+  const vacancyWithCounts = normalizeVacancy({
+    ...current,
+    candidateCount: bundle.candidates.filter((c) => c.vacancyId === vacancyId).length,
+    questionCount: bundle.questions.filter((q) => q.vacancyId === vacancyId).length,
+  })
+
+  if (updates.passingScore != null && isVacancyPassingScoreLocked(vacancyWithCounts)) {
+    throw new Error(
+      'Проходной процент зафиксирован: по этой вакансии уже есть кандидаты. Создайте новую вакансию для другого порога.'
+    )
+  }
+
   const next = { ...current, ...updates }
   if (updates.title && !updates.slug) {
     next.slug = generateUniqueVacancySlug(updates.title, bundle.vacancies, vacancyId)
@@ -228,7 +251,54 @@ export async function archiveVacancy(vacancyId) {
   await updateVacancy(vacancyId, { status: VACANCY_STATUS.ARCHIVED })
 }
 
+export async function duplicateVacancy(sourceVacancyId) {
+  const bundle = getLocalRecruitmentBundle()
+  const source = bundle.vacancies.find((v) => v.id === sourceVacancyId)
+  if (!source) throw new Error('Вакансия не найдена')
+
+  const title = `${source.title} (копия)`
+  const slug = generateUniqueVacancySlug(title, bundle.vacancies)
+  const newId = genId()
+
+  const vacancy = normalizeVacancy({
+    id: newId,
+    title,
+    description: source.description,
+    role: source.role,
+    employeeRole: source.employeeRole,
+    passingScore: source.passingScore,
+    status: VACANCY_STATUS.DRAFT,
+    slug,
+  })
+
+  bundle.vacancies.push(vacancy)
+
+  const sourceQuestions = bundle.questions
+    .filter((q) => q.vacancyId === sourceVacancyId)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+
+  sourceQuestions.forEach((q, index) => {
+    bundle.questions.push(
+      normalizeCandidateQuestion({
+        id: genId(),
+        vacancyId: newId,
+        questionText: q.questionText,
+        questionType: q.questionType,
+        options: [...q.options],
+        scores: [...q.scores],
+        required: q.required,
+        sortOrder: index,
+      })
+    )
+  })
+
+  saveVacancies(bundle.vacancies)
+  saveQuestions(bundle.questions)
+  return newId
+}
+
 export async function createCandidateQuestion(vacancyId, data) {
+  assertVacancyQuestionsEditable(vacancyId)
   const bundle = getLocalRecruitmentBundle()
   const existing = bundle.questions.filter((q) => q.vacancyId === vacancyId)
   const question = normalizeCandidateQuestion({
@@ -246,16 +316,20 @@ export async function updateCandidateQuestion(questionId, updates) {
   const bundle = getLocalRecruitmentBundle()
   const idx = bundle.questions.findIndex((q) => q.id === questionId)
   if (idx < 0) throw new Error('Вопрос не найден')
+  assertVacancyQuestionsEditable(bundle.questions[idx].vacancyId)
   bundle.questions[idx] = normalizeCandidateQuestion({ ...bundle.questions[idx], ...updates })
   saveQuestions(bundle.questions)
 }
 
 export async function deleteCandidateQuestion(questionId) {
   const bundle = getLocalRecruitmentBundle()
+  const question = bundle.questions.find((q) => q.id === questionId)
+  if (question) assertVacancyQuestionsEditable(question.vacancyId)
   saveQuestions(bundle.questions.filter((q) => q.id !== questionId))
 }
 
 export async function reorderCandidateQuestions(vacancyId, orderedQuestionIds) {
+  assertVacancyQuestionsEditable(vacancyId)
   const bundle = getLocalRecruitmentBundle()
   orderedQuestionIds.forEach((id, index) => {
     const q = bundle.questions.find((item) => item.id === id && item.vacancyId === vacancyId)
@@ -276,7 +350,7 @@ export async function submitCandidateApplication(applicationData) {
     .filter((q) => q.vacancyId === vacancy.id)
     .sort((a, b) => a.sortOrder - b.sortOrder)
 
-  const { totalScore, maxScore, scorePercent, status } = calculateApplicationScore(
+  const screening = evaluateCandidateScreening(
     questions,
     applicationData.answers || {},
     vacancy.passingScore
@@ -301,10 +375,10 @@ export async function submitCandidateApplication(applicationData) {
     answers: applicationData.answers || {},
     photoUrl: applicationData.photoUrl || null,
     photoPath: applicationData.photoPath || null,
-    totalScore,
-    maxScore,
-    scorePercent,
-    status,
+    totalScore: screening.totalScore,
+    maxScore: screening.maxScore,
+    scorePercent: screening.scorePercent,
+    status: screening.status,
     submittedAt: new Date().toISOString(),
   })
 
@@ -336,6 +410,10 @@ export async function updateCandidateNotes(candidateId, notes) {
 
 export async function rejectCandidate(candidateId) {
   await updateCandidateStatus(candidateId, CANDIDATE_STATUS.REJECTED)
+}
+
+export async function restoreCandidateToNew(candidateId) {
+  await updateCandidateStatus(candidateId, CANDIDATE_STATUS.NEW)
 }
 
 export async function inviteCandidate(candidateId) {

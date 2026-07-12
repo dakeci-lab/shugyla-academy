@@ -10,6 +10,8 @@ import {
   validateQuestionForm,
   questionFormToPayload,
   questionToForm,
+  isVacancyQuestionsLocked,
+  VACANCY_QUESTIONS_LOCKED_MESSAGE,
 } from '../../utils/recruitmentData'
 import { useAdminRefresh } from '../../hooks/useAdminRefresh'
 import AdminModal from './AdminModal'
@@ -27,7 +29,7 @@ const EMPTY_FORM = {
 }
 
 /** Редактор фильтр-вопросов вакансии */
-export default function VacancyQuestionEditor({ vacancyId }) {
+export default function VacancyQuestionEditor({ vacancyId, vacancy }) {
   const { version, refresh } = useAdminRefresh()
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
@@ -37,8 +39,10 @@ export default function VacancyQuestionEditor({ vacancyId }) {
   void version
 
   const questions = getCandidateQuestions(vacancyId)
+  const questionsLocked = isVacancyQuestionsLocked(vacancy)
 
   function openCreate() {
+    if (questionsLocked) return
     setEditId(null)
     setForm(EMPTY_FORM)
     setError('')
@@ -46,6 +50,7 @@ export default function VacancyQuestionEditor({ vacancyId }) {
   }
 
   function openEdit(question) {
+    if (questionsLocked) return
     setEditId(question.id)
     setForm(questionToForm(question))
     setError('')
@@ -75,6 +80,7 @@ export default function VacancyQuestionEditor({ vacancyId }) {
   }
 
   async function handleDelete(questionId) {
+    if (questionsLocked) return
     if (!window.confirm('Удалить вопрос?')) return
     try {
       await deleteCandidateQuestion(questionId)
@@ -85,6 +91,7 @@ export default function VacancyQuestionEditor({ vacancyId }) {
   }
 
   async function moveQuestion(questionId, direction) {
+    if (questionsLocked) return
     const ids = questions.map((q) => q.id)
     const index = ids.indexOf(questionId)
     const target = index + direction
@@ -106,16 +113,29 @@ export default function VacancyQuestionEditor({ vacancyId }) {
   }
 
   return (
-    <div className="learning-path-courses">
+    <div className="learning-path-courses vacancy-questions-editor">
       <div className="admin-toolbar">
         <h3 className="admin-detail-heading">Фильтр-вопросы для кандидата</h3>
-        <button type="button" className="btn btn--primary btn--sm" onClick={openCreate}>
-          + Добавить вопрос
-        </button>
+        {!questionsLocked && (
+          <button type="button" className="btn btn--primary btn--sm" onClick={openCreate}>
+            + Добавить вопрос
+          </button>
+        )}
       </div>
 
+      {questionsLocked && (
+        <div className="vacancy-questions-locked-notice" role="status">
+          <p className="vacancy-questions-locked-notice__title">Вопросы этой вакансии зафиксированы</p>
+          <p className="vacancy-questions-locked-notice__text">{VACANCY_QUESTIONS_LOCKED_MESSAGE}</p>
+        </div>
+      )}
+
       {questions.length === 0 ? (
-        <p className="admin-form__hint">Вопросы не добавлены. Добавьте первый фильтр-вопрос.</p>
+        <p className="admin-form__hint">
+          {questionsLocked
+            ? 'Для этой вакансии вопросы не были настроены. Создайте новую вакансию, если нужен другой набор вопросов.'
+            : 'Вопросы не добавлены. Добавьте первый фильтр-вопрос.'}
+        </p>
       ) : (
         <div className="admin-table-wrap">
           <table className="admin-table admin-table--compact">
@@ -124,7 +144,7 @@ export default function VacancyQuestionEditor({ vacancyId }) {
                 <th>#</th>
                 <th>Вопрос</th>
                 <th>Обязательный</th>
-                <th></th>
+                {!questionsLocked && <th></th>}
               </tr>
             </thead>
             <tbody>
@@ -133,36 +153,38 @@ export default function VacancyQuestionEditor({ vacancyId }) {
                   <td>{index + 1}</td>
                   <td>{q.questionText}</td>
                   <td>{q.required ? 'Да' : 'Нет'}</td>
-                  <td>
-                    <div className="admin-table__actions">
-                      <button type="button" className="btn btn--outline btn--sm" onClick={() => openEdit(q)}>
-                        Редактировать
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--outline btn--sm"
-                        disabled={index === 0}
-                        onClick={() => moveQuestion(q.id, -1)}
-                      >
-                        ↑
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--outline btn--sm"
-                        disabled={index === questions.length - 1}
-                        onClick={() => moveQuestion(q.id, 1)}
-                      >
-                        ↓
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn--outline btn--sm admin-table__danger"
-                        onClick={() => handleDelete(q.id)}
-                      >
-                        Удалить
-                      </button>
-                    </div>
-                  </td>
+                  {!questionsLocked && (
+                    <td>
+                      <div className="admin-table__actions">
+                        <button type="button" className="btn btn--outline btn--sm" onClick={() => openEdit(q)}>
+                          Редактировать
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--outline btn--sm"
+                          disabled={index === 0}
+                          onClick={() => moveQuestion(q.id, -1)}
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--outline btn--sm"
+                          disabled={index === questions.length - 1}
+                          onClick={() => moveQuestion(q.id, 1)}
+                        >
+                          ↓
+                        </button>
+                        <button
+                          type="button"
+                          className="btn btn--outline btn--sm admin-table__danger"
+                          onClick={() => handleDelete(q.id)}
+                        >
+                          Удалить
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -172,7 +194,7 @@ export default function VacancyQuestionEditor({ vacancyId }) {
 
       {error && !showForm && <p className="admin-form__error">{error}</p>}
 
-      {showForm && (
+      {showForm && !questionsLocked && (
         <AdminModal
           title={editId ? 'Редактировать вопрос' : 'Добавить вопрос'}
           onClose={() => setShowForm(false)}

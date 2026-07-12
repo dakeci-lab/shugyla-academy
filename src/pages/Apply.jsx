@@ -4,6 +4,7 @@ import {
   getPublishedVacancyBySlug,
   getCandidateQuestions,
   submitCandidateApplication,
+  refreshData,
 } from '../services/academyDataService'
 import { getVacancyRoleLabel } from '../utils/recruitmentData'
 import { isCloudMode } from '../lib/dataMode'
@@ -31,7 +32,39 @@ const EMPTY_FORM = {
 /** Публичная анкета кандидата — /apply/:slug */
 export default function ApplyPage() {
   const { slug } = useParams()
-  const vacancy = slug ? getPublishedVacancyBySlug(slug) : null
+  const [loadState, setLoadState] = useState(isCloudMode() ? 'loading' : 'loaded')
+  const [loadVersion, setLoadVersion] = useState(0)
+
+  useEffect(() => {
+    if (!slug) return undefined
+    if (!isCloudMode()) {
+      setLoadState('loaded')
+      return undefined
+    }
+
+    let cancelled = false
+    setLoadState('loading')
+
+    refreshData()
+      .then(() => {
+        if (!cancelled) {
+          setLoadState('loaded')
+          setLoadVersion((v) => v + 1)
+        }
+      })
+      .catch((err) => {
+        console.error('[Apply] Не удалось загрузить данные вакансии', err)
+        if (!cancelled) setLoadState('error')
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [slug])
+
+  void loadVersion
+
+  const vacancy = slug && loadState === 'loaded' ? getPublishedVacancyBySlug(slug) : null
   const questions = vacancy ? getCandidateQuestions(vacancy.id) : []
 
   const [form, setForm] = useState(EMPTY_FORM)
@@ -51,6 +84,30 @@ export default function ApplyPage() {
       }
     }
   }, [photoPreview])
+
+  if (loadState === 'loading') {
+    return (
+      <div className="apply-page">
+        <div className="apply-page__card apply-page__closed">
+          <h1>Загрузка анкеты…</h1>
+        </div>
+      </div>
+    )
+  }
+
+  if (loadState === 'error') {
+    return (
+      <div className="apply-page">
+        <div className="apply-page__card apply-page__closed">
+          <h1>Не удалось загрузить анкету</h1>
+          <p>Попробуйте обновить страницу или вернитесь позже.</p>
+          <p>
+            <Link to="/vacancies">← К вакансиям</Link>
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   if (!slug || !vacancy) {
     return (
@@ -114,6 +171,7 @@ export default function ApplyPage() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (submitting) return
     setError('')
 
     if (!form.firstName.trim()) {

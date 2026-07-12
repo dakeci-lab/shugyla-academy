@@ -817,6 +817,12 @@ export async function deleteVacancy(vacancyId) {
   if (isCloudMode()) await refreshData()
 }
 
+export async function duplicateVacancy(vacancyId) {
+  const id = await getRecruitmentAdapter().duplicateVacancy(vacancyId)
+  if (isCloudMode()) await refreshData()
+  return id
+}
+
 export async function createCandidateQuestion(vacancyId, questionData) {
   if (!questionData.questionText?.trim()) throw new Error('Укажите текст вопроса')
   if (!questionData.options?.length || questionData.options.length < 2) {
@@ -889,6 +895,11 @@ export async function updateCandidateNotes(candidateId, notes) {
 
 export async function rejectCandidate(candidateId) {
   await getRecruitmentAdapter().rejectCandidate(candidateId)
+  if (isCloudMode()) await refreshData()
+}
+
+export async function restoreCandidateToNew(candidateId) {
+  await getRecruitmentAdapter().restoreCandidateToNew(candidateId)
   if (isCloudMode()) await refreshData()
 }
 

@@ -1,10 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useBodyScrollLock } from '../../hooks/useBodyScrollLock'
+import { DEFAULT_INTERVIEW_ADDRESS } from '../../utils/recruitmentConstants'
+import { getTodayLocalDateString } from '../../utils/candidateDisplayUtils'
 import {
   INTERVIEW_SALUTATION_OPTIONS,
   buildInterviewInvitationText,
   validateInterviewInviteForm,
 } from '../../utils/recruitmentData'
+import { toastSuccess } from '../../services/notificationService'
+import { CloseIcon } from '../icons/PlatformIcons'
 import './CandidateInterviewInviteModal.css'
 import './admin-shared.css'
 
@@ -27,14 +32,24 @@ async function copyTextToClipboard(text) {
 }
 
 function buildInitialForm(candidate) {
+  const savedAddress = candidate?.interviewAddress?.trim()
   return {
     salutation: candidate?.interviewSalutation || 'neutral',
     candidateName: candidate?.firstName || candidate?.fullName || '',
     date: candidate?.interviewDate || '',
     time: candidate?.interviewTime || '',
-    address: candidate?.interviewAddress || '',
+    address: savedAddress || DEFAULT_INTERVIEW_ADDRESS,
     comment: candidate?.interviewComment || '',
   }
+}
+
+function validateFormWithDate(form) {
+  const errors = validateInterviewInviteForm(form)
+  const today = getTodayLocalDateString()
+  if (form.date?.trim() && form.date < today) {
+    errors.date = 'Нельзя выбрать прошедшую дату'
+  }
+  return errors
 }
 
 /** Модальное окно приглашения кандидата на собеседование */
@@ -47,6 +62,9 @@ export default function CandidateInterviewInviteModal({
   const [form, setForm] = useState(() => buildInitialForm(candidate))
   const [errors, setErrors] = useState({})
   const [submitError, setSubmitError] = useState('')
+  const [copying, setCopying] = useState(false)
+
+  useBodyScrollLock(Boolean(candidate))
 
   useEffect(() => {
     setForm(buildInitialForm(candidate))
@@ -55,18 +73,11 @@ export default function CandidateInterviewInviteModal({
   }, [candidate])
 
   useEffect(() => {
-    const previousOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-
     function handleKeyDown(event) {
       if (event.key === 'Escape') onClose()
     }
-
     window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', handleKeyDown)
-    }
+    return () => window.removeEventListener('keydown', handleKeyDown)
   }, [onClose])
 
   const previewText = useMemo(
@@ -82,8 +93,22 @@ export default function CandidateInterviewInviteModal({
     [form]
   )
 
-  async function handleSubmit() {
-    const validationErrors = validateInterviewInviteForm(form)
+  async function handleCopyOnly() {
+    setCopying(true)
+    setSubmitError('')
+    try {
+      const copied = await copyTextToClipboard(previewText)
+      if (!copied) throw new Error('Не удалось скопировать текст в буфер обмена')
+      toastSuccess('Приглашение скопировано')
+    } catch (err) {
+      setSubmitError(err.message || 'Не удалось скопировать текст')
+    } finally {
+      setCopying(false)
+    }
+  }
+
+  async function handleInvite() {
+    const validationErrors = validateFormWithDate(form)
     setErrors(validationErrors)
     if (Object.keys(validationErrors).length > 0) return
 
@@ -107,6 +132,9 @@ export default function CandidateInterviewInviteModal({
 
   if (!candidate) return null
 
+  const todayMin = getTodayLocalDateString()
+  const busy = submitting || copying
+
   return createPortal(
     <div className="interview-invite-overlay" onClick={onClose} role="presentation">
       <div
@@ -126,7 +154,7 @@ export default function CandidateInterviewInviteModal({
             onClick={onClose}
             aria-label="Закрыть"
           >
-            ×
+            <CloseIcon size={20} />
           </button>
         </div>
 
@@ -148,11 +176,7 @@ export default function CandidateInterviewInviteModal({
 
           <label className="admin-form__label">
             Имя кандидата
-            <input
-              className="admin-form__input"
-              value={form.candidateName}
-              readOnly
-            />
+            <input className="admin-form__input" value={form.candidateName} readOnly />
           </label>
 
           <div className="admin-form__row">
@@ -162,6 +186,7 @@ export default function CandidateInterviewInviteModal({
                 type="date"
                 className="admin-form__input"
                 value={form.date}
+                min={todayMin}
                 onChange={(e) => setForm({ ...form, date: e.target.value })}
                 required
               />
@@ -182,8 +207,9 @@ export default function CandidateInterviewInviteModal({
 
           <label className="admin-form__label">
             Адрес *
-            <input
-              className="admin-form__input"
+            <textarea
+              className="admin-form__input interview-invite-modal__address"
+              rows={2}
               value={form.address}
               onChange={(e) => setForm({ ...form, address: e.target.value })}
               placeholder="Адрес магазина или места встречи"
@@ -203,27 +229,33 @@ export default function CandidateInterviewInviteModal({
             />
           </label>
 
-          <div>
-            <p className="admin-form__hint" style={{ marginBottom: '0.5rem' }}>
-              Текст сообщения для WhatsApp
-            </p>
-            <pre className="interview-invite-preview">{previewText}</pre>
+          <div className="interview-invite-preview-card">
+            <p className="interview-invite-preview-card__label">Предпросмотр текста приглашения</p>
+            <div className="interview-invite-preview">{previewText}</div>
           </div>
 
           {submitError && <p className="admin-form__error">{submitError}</p>}
         </div>
 
         <div className="interview-invite-modal__footer">
-          <button type="button" className="btn btn--outline" onClick={onClose} disabled={submitting}>
+          <button type="button" className="btn btn--outline" onClick={onClose} disabled={busy}>
             Отмена
           </button>
           <button
             type="button"
-            className="btn btn--primary"
-            onClick={handleSubmit}
-            disabled={submitting}
+            className="btn btn--outline"
+            onClick={handleCopyOnly}
+            disabled={busy}
           >
-            {submitting ? 'Сохранение…' : 'Скопировать и отметить приглашённым'}
+            {copying ? 'Копирование…' : 'Скопировать приглашение'}
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={handleInvite}
+            disabled={busy}
+          >
+            {submitting ? 'Сохранение…' : 'Пригласить'}
           </button>
         </div>
       </div>

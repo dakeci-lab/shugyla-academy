@@ -117,6 +117,28 @@
   border-top: 1px solid var(--color-border, #e5e7eb);
 }
 
+.vacancy-questions-locked-notice {
+  margin: 0 0 1rem;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+.vacancy-questions-locked-notice__title {
+  margin: 0 0 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.vacancy-questions-locked-notice__text {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: #78350f;
+}
+
 .employee-form-candidate-meta {
   display: flex;
   gap: 1rem;
