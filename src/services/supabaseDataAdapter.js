@@ -2,6 +2,16 @@ import { supabase } from '../lib/supabaseClient'
 import { normalizeEmployee, canEmployeeLogin } from '../utils/employeeData'
 import { normalizeLesson } from '../utils/lessonData'
 import { fetchTestsData } from './testSupabaseAdapter'
+import { normalizeRoleId } from '../data/roles'
+import { resolveRoleIdByCode } from './rbacService'
+
+async function resolveRoleIdForSlug(roleSlug) {
+  try {
+    return await resolveRoleIdByCode(normalizeRoleId(roleSlug))
+  } catch {
+    return null
+  }
+}
 
 function parseDurationHours(durationLabel) {
   if (!durationLabel) return null
@@ -165,6 +175,7 @@ export async function fetchAllData() {
       login: row.login,
       password: row.password,
       role: row.role,
+      roleId: row.role_id,
       position: row.position,
       employmentStatus: row.status,
       assignedCourseIds: assignmentMap.get(row.id) || [],
@@ -273,10 +284,15 @@ async function createUser(data) {
     login: employee.login,
     password: employee.password || '',
     role: employee.role,
+    role_id: employee.roleId || null,
     position: employee.position || '',
     status: employee.employmentStatus,
     avatar_url: employee.avatarUrl || null,
     work_location_id: employee.workLocationId || null,
+  }
+
+  if (!row.role_id && employee.role) {
+    row.role_id = await resolveRoleIdForSlug(employee.role)
   }
 
   await throwIfError(
@@ -308,7 +324,11 @@ async function updateUser(id, updates) {
   if (updates.name != null) patch.full_name = updates.name
   if (updates.login != null) patch.login = updates.login
   if (updates.password != null && updates.password !== '') patch.password = updates.password
-  if (updates.role != null) patch.role = updates.role
+  if (updates.role != null) {
+    patch.role = updates.role
+    patch.role_id = await resolveRoleIdForSlug(updates.role)
+  }
+  if (updates.roleId != null) patch.role_id = updates.roleId
   if (updates.position != null) patch.position = updates.position
   if (updates.employmentStatus != null) patch.status = updates.employmentStatus
   if (updates.status != null) patch.status = updates.status
@@ -596,6 +616,7 @@ export async function authenticateUser(loginValue, password) {
       login: row.login,
       password: row.password,
       role: row.role,
+      roleId: row.role_id,
       position: row.position,
       employmentStatus: row.status,
       assignedCourseIds: assignments.map((a) => a.course_id),

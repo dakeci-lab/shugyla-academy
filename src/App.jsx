@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-
 import { LanguageProvider } from './context/LanguageContext'
 import { AcademyDataProvider } from './context/AcademyDataContext'
 import { SessionProvider } from './context/SessionContext'
+import { PermissionProvider } from './context/PermissionContext'
 import { ToastProvider } from './context/ToastContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import PlatformRoute from './components/platform/PlatformRoute'
@@ -65,6 +66,7 @@ export default function App() {
       <AcademyDataProvider>
       <BrowserRouter basename="/shugyla-academy">
       <SessionProvider>
+      <PermissionProvider>
       <ToastProvider>
       <Routes>
         {/* Публичные маршруты */}
@@ -355,6 +357,7 @@ export default function App() {
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
       </ToastProvider>
+      </PermissionProvider>
       </SessionProvider>
       </BrowserRouter>
       </AcademyDataProvider>

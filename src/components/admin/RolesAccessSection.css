@@ -1,0 +1,213 @@
+.roles-access__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.roles-access__table-wrap {
+  overflow-x: auto;
+}
+
+.roles-access__table code {
+  font-size: 12px;
+}
+
+.roles-access__role-name {
+  font-weight: 600;
+}
+
+.roles-access__role-desc {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.roles-access__badge {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #047857;
+}
+
+.roles-access__status {
+  font-size: 12px;
+  color: #b45309;
+}
+
+.roles-access__status--active {
+  color: #047857;
+}
+
+.roles-access__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.roles-access__hint {
+  color: var(--color-text-muted, #6b7280);
+}
+
+.roles-access__form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.roles-access__checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.roles-access__permissions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 360px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.roles-access__permissions-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.roles-access__module {
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 10px;
+  background: #fafafa;
+}
+
+.roles-access__module-summary {
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.roles-access__module-summary::-webkit-details-marker {
+  display: none;
+}
+
+.roles-access__module-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.roles-access__module-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.roles-access__permission {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 2px 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid var(--color-border, #e5e7eb);
+  cursor: pointer;
+}
+
+.roles-access__permission-name {
+  font-size: 13px;
+}
+
+.roles-access__permission-code {
+  grid-column: 2;
+  font-size: 11px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.roles-access__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+}
+
+.roles-access__permissions-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.roles-access__permissions-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.roles-access__module-count {
+  margin-left: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.roles-access__permission-desc {
+  grid-column: 2;
+  font-size: 11px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.admin-modal--xwide {
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.admin-modal--xwide .admin-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-modal--xwide .roles-access__form {
+  flex: 1;
+  min-height: 0;
+}
+
+.admin-modal--xwide .roles-access__permissions {
+  flex: 1;
+  min-height: 120px;
+  max-height: min(52vh, 480px);
+  overflow-y: auto;
+}
+
+@media (max-width: 768px) {
+  .roles-access__head {
+    flex-direction: column;
+  }
+
+  .roles-access__actions {
+    justify-content: flex-start;
+  }
+
+  .admin-modal--xwide .roles-access__permissions {
+    max-height: min(45vh, 360px);
+  }
+
+  .roles-access__permissions-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

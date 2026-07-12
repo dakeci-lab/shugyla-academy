@@ -144,6 +144,7 @@ export function normalizeEmployee(raw) {
     lastName,
     name,
     position: raw.position || role?.label || roleId,
+    roleId: raw.roleId ?? raw.role_id ?? null,
     employmentStatus: normalizeEmploymentStatus(
       raw.employmentStatus || raw.status
     ),
@@ -338,6 +339,7 @@ export const EMPTY_EMPLOYEE_FORM = {
   firstName: '',
   lastName: '',
   role: ROLE_IDS.CASHIER,
+  roleId: '',
   login: '',
   password: '',
   avatarUrl: '',
@@ -350,6 +352,7 @@ export function employeeToForm(employee) {
     firstName: employee.firstName || '',
     lastName: employee.lastName || '',
     role: employee.role || ROLE_IDS.CASHIER,
+    roleId: employee.roleId || '',
     login: employee.login || '',
     password: '',
     avatarUrl: employee.avatarUrl || '',

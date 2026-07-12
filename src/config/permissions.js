@@ -3,8 +3,15 @@
  */
 
 import { ROLE_IDS, isAdmin, normalizeRoleId, getRole } from '../data/roles'
+import {
+  PERMISSION_CODES,
+  PERMISSION_KEYS,
+  RBAC_DEFAULT_ROLE_PERMISSIONS,
+  resolvePermissionCode,
+} from './permissionCatalog'
+import { getPermissionCodesForUserRole, getRbacCache } from '../services/rbacService'
 
-export { ROLE_IDS }
+export { ROLE_IDS, PERMISSION_CODES, PERMISSION_KEYS }
 
 /** Ключи маршрутов / пунктов меню */
 export const ROUTE_KEYS = {
@@ -93,6 +100,58 @@ export function resolveUserRole(user) {
   return null
 }
 
+/** Набор code-прав пользователя (RBAC-кэш или legacy seed) */
+export function getUserPermissionCodes(user) {
+  if (!user) return new Set()
+
+  const fromCache = getPermissionCodesForUserRole(user)
+  if (fromCache.length > 0) {
+    return new Set(fromCache.map(resolvePermissionCode))
+  }
+
+  const stored = user.permissionCodes || user.permissionSlugs
+  if (Array.isArray(stored) && stored.length > 0) {
+    return new Set(stored.map(resolvePermissionCode))
+  }
+
+  const role = resolveUserRole(user)
+  if (!role) return new Set()
+  if (isAdmin(role)) {
+    const adminPerms = getRbacCache()?.permissions?.map((p) => p.code || p.slug)
+    if (adminPerms?.length) return new Set(adminPerms.map(resolvePermissionCode))
+    return new Set((RBAC_DEFAULT_ROLE_PERMISSIONS.admin || []).map(resolvePermissionCode))
+  }
+
+  return new Set((RBAC_DEFAULT_ROLE_PERMISSIONS[role] || []).map(resolvePermissionCode))
+}
+
+/** @deprecated */
+export function getUserPermissionSlugs(user) {
+  return getUserPermissionCodes(user)
+}
+
+/**
+ * Универсальная проверка права доступа.
+ * Admin всегда имеет доступ. При отсутствии RBAC-кэша — fallback на legacy seed.
+ */
+export function can(user, permission) {
+  if (!user || !permission) return false
+  const role = resolveUserRole(user)
+  if (isAdmin(role)) return true
+  const code = resolvePermissionCode(permission)
+  const permissions = getUserPermissionCodes(user)
+  if (permissions.has(code)) return true
+  return permissions.has(permission)
+}
+
+export function canAny(user, permissions) {
+  return permissions.some((permission) => can(user, permission))
+}
+
+export function canAll(user, permissions) {
+  return permissions.every((permission) => can(user, permission))
+}
+
 export function hasRole(user, roles) {
   const role = resolveUserRole(user)
   if (!role) return false
@@ -104,6 +163,31 @@ export function canAccessRoute(user, routeKey) {
   const role = resolveUserRole(user)
   if (!role) return false
   if (isAdmin(role)) return true
+
+  const P = PERMISSION_CODES
+
+  const routePermissionMap = {
+    [ROUTE_KEYS.HOME]: [P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW],
+    [ROUTE_KEYS.EMPLOYEES_LIST]: [P.EMPLOYEES_VIEW],
+    [ROUTE_KEYS.EMPLOYEES_SCHEDULE]: [P.SCHEDULE_VIEW_TEAM, P.SCHEDULE_VIEW_OWN],
+    [ROUTE_KEYS.EMPLOYEES_RATING]: [P.RATING_VIEW],
+    [ROUTE_KEYS.EMPLOYEES_PAYROLL]: [P.PAYROLL_VIEW, P.FINANCE_VIEW],
+    [ROUTE_KEYS.HR_VACANCIES]: [P.RECRUITMENT_VIEW, P.RECRUITMENT_MANAGE_VACANCIES],
+    [ROUTE_KEYS.HR_CANDIDATES]: [P.RECRUITMENT_VIEW, P.RECRUITMENT_MANAGE_CANDIDATES],
+    [ROUTE_KEYS.PROCUREMENT]: [P.PROCUREMENT_VIEW],
+    [ROUTE_KEYS.RECEIVING]: [P.RECEIVING_VIEW],
+    [ROUTE_KEYS.SUPPLIERS]: [P.SUPPLIERS_VIEW],
+    [ROUTE_KEYS.PRICE_TAGS]: [P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE],
+    [ROUTE_KEYS.ACADEMY]: [P.ACADEMY_VIEW],
+    [ROUTE_KEYS.ACADEMY_MANAGE]: [P.ACADEMY_MANAGE_COURSES, P.ACADEMY_ASSIGN_COURSES],
+    [ROUTE_KEYS.STANDARDS]: [P.STANDARDS_VIEW],
+    [ROUTE_KEYS.STANDARDS_MANAGE]: [P.STANDARDS_MANAGE],
+    [ROUTE_KEYS.SETTINGS]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],
+  }
+
+  const permissions = routePermissionMap[routeKey]
+  if (permissions?.some((perm) => can(user, perm))) return true
+
   const allowed = ROUTE_ACCESS[routeKey]
   return Boolean(allowed?.includes(role))
 }
@@ -173,8 +257,7 @@ export function canViewSuppliers(user) {
 }
 
 export function canEditSuppliers(user) {
-  const role = resolveUserRole(user)
-  return isAdmin(role) || role === ROLE_IDS.PURCHASER
+  return canAny(user, [PERMISSION_CODES.SUPPLIERS_EDIT, PERMISSION_CODES.SUPPLIERS_CREATE])
 }
 
 export function canArchiveSuppliers(user) {
@@ -192,8 +275,7 @@ export function canViewPurchases(user) {
 }
 
 export function canCreatePurchase(user) {
-  const role = resolveUserRole(user)
-  return isAdmin(role) || role === ROLE_IDS.PURCHASER
+  return can(user, PERMISSION_CODES.PROCUREMENT_CREATE)
 }
 
 export function canEditPurchase(user) {
@@ -214,8 +296,7 @@ export function canViewReceivingDocuments(user) {
 }
 
 export function canReceiveGoods(user) {
-  const role = resolveUserRole(user)
-  return isAdmin(role) || role === ROLE_IDS.RECEIVER
+  return can(user, PERMISSION_CODES.RECEIVING_MANAGE)
 }
 
 export function isSimplePurchaseReceived(order) {
@@ -243,36 +324,57 @@ export function canAcceptSimpleDelivery(user) {
 // --- Действия: сотрудники и настройки ---
 
 export function canManageEmployees(user) {
-  return canAccessRoute(user, ROUTE_KEYS.EMPLOYEES_LIST)
+  return canAny(user, [
+    PERMISSION_CODES.EMPLOYEES_EDIT,
+    PERMISSION_CODES.EMPLOYEES_CREATE,
+    PERMISSION_CODES.EMPLOYEES_VIEW,
+  ])
+}
+
+export function canCreateEmployees(user) {
+  return can(user, PERMISSION_CODES.EMPLOYEES_CREATE)
 }
 
 export function canManageSettings(user) {
-  return canAccessRoute(user, ROUTE_KEYS.SETTINGS)
+  return can(user, PERMISSION_CODES.SETTINGS_MANAGE)
 }
 
 export function canManageAcademy(user) {
-  return canAccessRoute(user, ROUTE_KEYS.ACADEMY_MANAGE)
+  return canAny(user, [PERMISSION_CODES.ACADEMY_MANAGE_COURSES, PERMISSION_CODES.ACADEMY_ASSIGN_COURSES])
 }
 
 export function canManageStandards(user) {
-  return canAccessRoute(user, ROUTE_KEYS.STANDARDS_MANAGE)
+  return can(user, PERMISSION_CODES.STANDARDS_MANAGE)
+}
+
+export function canManageRoles(user) {
+  return canAny(user, [PERMISSION_CODES.ROLES_ASSIGN_PERMISSIONS, PERMISSION_CODES.ROLES_EDIT])
+}
+
+export function canViewRoles(user) {
+  return can(user, PERMISSION_CODES.ROLES_VIEW) || canManageRoles(user)
 }
 
 export function canChangeEmployeeRoles(user) {
-  return canManageEmployees(user)
+  return can(user, PERMISSION_CODES.EMPLOYEES_MANAGE_ROLES) || canManageEmployees(user)
 }
 
 export function canViewTeamSchedule(user) {
-  return canManageEmployees(user)
+  return can(user, PERMISSION_CODES.SCHEDULE_VIEW_TEAM)
+}
+
+export function canViewOwnSchedule(user) {
+  return can(user, PERMISSION_CODES.SCHEDULE_VIEW_OWN)
 }
 
 export function canViewEmployeeSchedule(user, employeeId) {
-  if (canManageEmployees(user)) return true
+  if (canViewTeamSchedule(user)) return true
+  if (canViewOwnSchedule(user) && Number(user?.id) === Number(employeeId)) return true
   return Number(user?.id) === Number(employeeId)
 }
 
 export function canEditEmployeeSchedule(user) {
-  return canManageEmployees(user)
+  return canAny(user, [PERMISSION_CODES.SCHEDULE_EDIT, PERMISSION_CODES.SCHEDULE_BULK_EDIT])
 }
 
 export function getEmployeeSchedulePath(user, employeeId = null) {

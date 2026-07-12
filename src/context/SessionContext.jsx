@@ -1,24 +1,47 @@
-import { createContext, useCallback, useContext, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { getUser, saveUser, clearUser } from '../utils/storage'
-import { resolveUserRole } from '../config/permissions'
+import { getUserPermissionCodes, resolveUserRole } from '../config/permissions'
 import { getRole } from '../data/roles'
+import { ensureRbacLoaded } from '../services/rbacService'
 
 const SessionContext = createContext(null)
 
 function normalizeSessionUser(raw) {
   if (!raw) return null
-  const roleId = resolveUserRole(raw)
-  const role = getRole(roleId)
-  return {
+  const roleSlug = resolveUserRole(raw)
+  const role = getRole(roleSlug)
+  const enriched = {
     ...raw,
-    role: roleId,
-    roleName: role?.label || roleId,
+    role: roleSlug,
+    roleId: raw.roleId ?? raw.role_id ?? null,
+    roleName: role?.label || roleSlug,
     permissions: role?.permissions || raw.permissions || [],
+  }
+  const permissionSlugs = [...getUserPermissionCodes(enriched)]
+  return {
+    ...enriched,
+    permissionSlugs,
+    permissionCodes: permissionSlugs,
   }
 }
 
 export function SessionProvider({ children }) {
   const [user, setUser] = useState(() => normalizeSessionUser(getUser()))
+  const [rbacReady, setRbacReady] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    ensureRbacLoaded()
+      .catch(() => null)
+      .finally(() => {
+        if (cancelled) return
+        setRbacReady(true)
+        setUser(normalizeSessionUser(getUser()))
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const refreshSession = useCallback(() => {
     setUser(normalizeSessionUser(getUser()))
@@ -46,7 +69,7 @@ export function SessionProvider({ children }) {
 
   return (
     <SessionContext.Provider
-      value={{ user, setSessionUser, updateSessionUser, refreshSession, logout }}
+      value={{ user, rbacReady, setSessionUser, updateSessionUser, refreshSession, logout }}
     >
       {children}
     </SessionContext.Provider>

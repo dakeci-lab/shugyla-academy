@@ -27,7 +27,8 @@ import {
   canCreateEmployeeForCandidate,
   isCandidateEmployeeCreated,
 } from '../../../utils/recruitmentData'
-import { ROLES, EMPLOYEE_FORM_ROLES, getRoleLabel } from '../../../data/roles'
+import { getRoleLabel } from '../../../data/roles'
+import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
 import StatusBadge from '../StatusBadge'
@@ -64,8 +65,15 @@ export default function EmployeesSection() {
   const [deactivateTarget, setDeactivateTarget] = useState(null)
   const [deactivating, setDeactivating] = useState(false)
   const [workLocations, setWorkLocations] = useState([])
+  const [assignableRoles, setAssignableRoles] = useState([])
 
   void version
+
+  useEffect(() => {
+    getRolesForEmployeeForm(form.role, form.roleId)
+      .then(setAssignableRoles)
+      .catch(() => setAssignableRoles([]))
+  }, [version, form.role, form.roleId])
 
   useEffect(() => {
     getWorkLocations()
@@ -159,12 +167,19 @@ export default function EmployeesSection() {
       return
     }
 
+    const selectedRole =
+      assignableRoles.find((role) => role.id === form.roleId) ||
+      getRoleByCode(form.role) ||
+      assignableRoles.find((role) => role.code === form.role)
+    const roleCode = selectedRole?.code || form.role
+
     const payload = {
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
-      role: form.role,
+      role: roleCode,
+      roleId: selectedRole?.id || form.roleId || null,
       login: form.login.trim(),
-      position: getRoleLabel(form.role),
+      position: selectedRole?.name || getRoleLabel(roleCode),
       employmentStatus: form.employmentStatus,
       workLocationId: form.workLocationId || null,
       ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
@@ -467,17 +482,46 @@ export default function EmployeesSection() {
               Роль в системе *
               <select
                 className="admin-form__select"
-                value={form.role}
-                onChange={(e) => setForm({ ...form, role: e.target.value })}
+                value={form.roleId || form.role}
+                onChange={(e) => {
+                  const value = e.target.value
+                  const role = assignableRoles.find((item) => item.id === value)
+                  setForm({
+                    ...form,
+                    roleId: role?.id || '',
+                    role: role?.code || value,
+                  })
+                }}
               >
-                {EMPLOYEE_FORM_ROLES.map((roleId) => (
-                  <option key={roleId} value={roleId}>
-                    {ROLES[roleId]?.label || roleId}
+                {!form.roleId &&
+                  form.role &&
+                  !assignableRoles.some((role) => role.code === form.role) && (
+                    <option value={form.role}>
+                      {getRoleLabel(form.role)} (legacy)
+                    </option>
+                  )}
+                {editId &&
+                  form.roleId &&
+                  !assignableRoles.some((role) => role.id === form.roleId) && (
+                    <option value={form.roleId}>
+                      {(getRoleByCode(form.role)?.name || getRoleLabel(form.role))} (неактивна)
+                    </option>
+                  )}
+                {assignableRoles.length === 0 &&
+                  [form.role].filter(Boolean).map((roleCode) => (
+                    <option key={roleCode} value={roleCode}>
+                      {getRoleLabel(roleCode)}
+                    </option>
+                  ))}
+                {assignableRoles.map((role) => (
+                  <option key={role.id} value={role.id}>
+                    {role.name}
+                    {!role.isActive ? ' (неактивна)' : ''}
                   </option>
                 ))}
               </select>
               <span className="admin-form__hint">
-                Роль определяет доступ к разделам платформы.
+                Роль определяет доступ к разделам платформы через RBAC.
               </span>
             </label>
 

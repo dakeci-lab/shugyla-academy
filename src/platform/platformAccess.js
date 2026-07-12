@@ -8,6 +8,15 @@ import {
   canViewMenuItem,
   filterPlatformNav as filterNav,
   getDefaultPlatformPath,
+  canManageRoles,
+  canManageSettings,
+  can,
+  canAny,
+  canAll,
+  getUserPermissionSlugs,
+  getUserPermissionCodes,
+  PERMISSION_CODES,
+  PERMISSION_KEYS,
   resolveUserRole,
 } from '../config/permissions'
 
@@ -26,7 +35,20 @@ export const ACCESS = {
   EMPLOYEES_RATING: ROUTE_KEYS.EMPLOYEES_RATING,
 }
 
-export { ROUTE_KEYS, getDefaultPlatformPath, resolveUserRole }
+export {
+  ROUTE_KEYS,
+  getDefaultPlatformPath,
+  resolveUserRole,
+  canManageRoles,
+  canManageSettings,
+  can,
+  canAny,
+  canAll,
+  getUserPermissionSlugs,
+  getUserPermissionCodes,
+  PERMISSION_CODES,
+  PERMISSION_KEYS,
+}
 
 export function canAccessNavItem(userOrRole, routeKey = ROUTE_KEYS.ACADEMY) {
   const user =
