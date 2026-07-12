@@ -17,10 +17,16 @@ import { getTeamShiftsForMonth } from '../../../services/academyDataService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import AdminModal from '../AdminModal'
 import TeamScheduleCell from '../TeamScheduleCell'
+import TeamScheduleMobileCard from '../TeamScheduleMobileCard'
+import TeamScheduleDaySheet from '../TeamScheduleDaySheet'
+import TeamScheduleMobileLegend from '../TeamScheduleMobileLegend'
 import SchedulePeriodBar from '../SchedulePeriodBar'
 import EmployeeSearchToolbar from '../EmployeeSearchToolbar'
+import useMediaQuery, { MOBILE_SCHEDULE_QUERY } from '../../../hooks/useMediaQuery'
+import { buildTeamScheduleDaySheetModel } from '../../../utils/teamScheduleMobileUtils'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
+import '../TeamScheduleMobile.css'
 
 /** Общий график всех сотрудников (недельный вид) */
 export default function WorkScheduleSection() {
@@ -34,6 +40,8 @@ export default function WorkScheduleSection() {
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [commentPreview, setCommentPreview] = useState(null)
+  const [daySheet, setDaySheet] = useState(null)
+  const isMobileSchedule = useMediaQuery(MOBILE_SCHEDULE_QUERY)
 
   const weekDates = useMemo(() => buildWeekDates(weekStartKey), [weekStartKey])
   const todayKey = toDateKey(new Date())
@@ -100,6 +108,112 @@ export default function WorkScheduleSection() {
     navigate(`/platform/employees/${employeeId}/schedule`)
   }
 
+  function openDaySheet(employee, date, shift) {
+    setDaySheet({
+      detail: buildTeamScheduleDaySheetModel(employee, shift, date),
+    })
+  }
+
+  function closeDaySheet() {
+    setDaySheet(null)
+  }
+
+  const scheduleTable = (
+    <div className="team-schedule-wrap team-schedule-wrap--desktop">
+      <table className="team-schedule-table team-schedule-table--week">
+        <thead>
+          <tr>
+            <th className="team-schedule-table__index" scope="col">
+              №
+            </th>
+            <th className="team-schedule-table__employee" scope="col">
+              Сотрудник
+            </th>
+            {weekDates.map((date) => {
+              const dateKey = toDateKey(date)
+              const { weekday, day } = formatWeekDayHeader(date)
+              const isToday = dateKey === todayKey
+              return (
+                <th key={dateKey} scope="col" className="team-schedule-table__day">
+                  {isToday ? (
+                    <span className="team-schedule-table__today-badge">
+                      <span className="team-schedule-table__day-weekday">{weekday}</span>
+                      <span className="team-schedule-table__day-number">{day}</span>
+                    </span>
+                  ) : (
+                    <>
+                      <span className="team-schedule-table__day-weekday">{weekday}</span>
+                      <span className="team-schedule-table__day-number">{day}</span>
+                    </>
+                  )}
+                </th>
+              )
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {employees.map((emp, index) => {
+            const empShifts = shiftsByEmployee.get(emp.id) || new Map()
+            return (
+              <tr key={emp.id}>
+                <td className="team-schedule-table__index">{index + 1}</td>
+                <td className="team-schedule-table__employee">
+                  {viewTeam ? (
+                    <button
+                      type="button"
+                      className="team-schedule-table__employee-btn"
+                      onClick={() => openEmployeeSchedule(emp.id)}
+                    >
+                      {emp.name}
+                    </button>
+                  ) : (
+                    <span>{emp.name}</span>
+                  )}
+                </td>
+                {weekDates.map((date) => {
+                  const dateKey = toDateKey(date)
+                  const shift = empShifts.get(dateKey)
+
+                  return (
+                    <td key={dateKey} className="team-schedule-table__day team-schedule-cell">
+                      <TeamScheduleCell
+                        shift={shift}
+                        onCommentClick={(text) =>
+                          setCommentPreview({ text, employeeName: emp.name, dateKey })
+                        }
+                      />
+                    </td>
+                  )
+                })}
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+
+  const scheduleMobile = (
+    <div className="team-schedule-mobile">
+      <div className="team-schedule-mobile__list">
+        {employees.map((emp, index) => (
+          <TeamScheduleMobileCard
+            key={emp.id}
+            index={index}
+            employee={emp}
+            weekDates={weekDates}
+            shiftsMap={shiftsByEmployee.get(emp.id) || new Map()}
+            todayKey={todayKey}
+            onDayOpen={openDaySheet}
+            onEmployeeOpen={openEmployeeSchedule}
+            canOpenEmployee={viewTeam}
+          />
+        ))}
+      </div>
+      <TeamScheduleMobileLegend />
+    </div>
+  )
+
   return (
     <>
       <SchedulePeriodBar
@@ -122,79 +236,17 @@ export default function WorkScheduleSection() {
       ) : employees.length === 0 ? (
         <p className="schedule-empty">Сотрудники не найдены</p>
       ) : (
-        <div className="team-schedule-wrap">
-          <table className="team-schedule-table team-schedule-table--week">
-            <thead>
-              <tr>
-                <th className="team-schedule-table__index" scope="col">
-                  №
-                </th>
-                <th className="team-schedule-table__employee" scope="col">
-                  Сотрудник
-                </th>
-                {weekDates.map((date) => {
-                  const dateKey = toDateKey(date)
-                  const { weekday, day } = formatWeekDayHeader(date)
-                  const isToday = dateKey === todayKey
-                  return (
-                    <th key={dateKey} scope="col" className="team-schedule-table__day">
-                      {isToday ? (
-                        <span className="team-schedule-table__today-badge">
-                          <span className="team-schedule-table__day-weekday">{weekday}</span>
-                          <span className="team-schedule-table__day-number">{day}</span>
-                        </span>
-                      ) : (
-                        <>
-                          <span className="team-schedule-table__day-weekday">{weekday}</span>
-                          <span className="team-schedule-table__day-number">{day}</span>
-                        </>
-                      )}
-                    </th>
-                  )
-                })}
-              </tr>
-            </thead>
-            <tbody>
-              {employees.map((emp, index) => {
-                const empShifts = shiftsByEmployee.get(emp.id) || new Map()
-                return (
-                  <tr key={emp.id}>
-                    <td className="team-schedule-table__index">{index + 1}</td>
-                    <td className="team-schedule-table__employee">
-                      {viewTeam ? (
-                        <button
-                          type="button"
-                          className="team-schedule-table__employee-btn"
-                          onClick={() => openEmployeeSchedule(emp.id)}
-                        >
-                          {emp.name}
-                        </button>
-                      ) : (
-                        <span>{emp.name}</span>
-                      )}
-                    </td>
-                    {weekDates.map((date) => {
-                      const dateKey = toDateKey(date)
-                      const shift = empShifts.get(dateKey)
-
-                      return (
-                        <td key={dateKey} className="team-schedule-table__day team-schedule-cell">
-                          <TeamScheduleCell
-                            shift={shift}
-                            onCommentClick={(text) =>
-                              setCommentPreview({ text, employeeName: emp.name, dateKey })
-                            }
-                          />
-                        </td>
-                      )
-                    })}
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {!isMobileSchedule && scheduleTable}
+          {isMobileSchedule && scheduleMobile}
+        </>
       )}
+
+      <TeamScheduleDaySheet
+        open={Boolean(daySheet)}
+        detail={daySheet?.detail}
+        onClose={closeDaySheet}
+      />
 
       {commentPreview && (
         <AdminModal
