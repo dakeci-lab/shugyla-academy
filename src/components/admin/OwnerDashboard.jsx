@@ -1,97 +1,353 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getStaffEmployees } from '../../utils/employeeData'
+import { haversineDistanceMeters, RATING_UPDATED_EVENT } from '../../utils/attendanceData'
+import { APP_TIMEZONE, addDaysToDateKey, toDateKeyInAppTimezone } from '../../utils/timezone'
 import {
-  computeCompanyHealthMetrics,
-  filterShiftsByDate,
-  filterShiftsByDateRange,
-  filterShiftsByMonth,
-  getWeekDateKeys,
-} from '../../utils/companyHealth'
-import {
-  getCurrentMonthState,
-  RATING_UPDATED_EVENT,
-} from '../../utils/attendanceData'
-import {
-  addWeeks,
-  formatMonthYearLabel,
-  formatWeekRangeLabel,
-  getInitialWeekStartKey,
-  toDateKey,
+  formatTimeRange,
+  isWorkingShiftStatus,
+  timeToMinutes,
 } from '../../utils/shiftData'
-import { getAttendanceSettings, getTeamShiftsForMonth } from '../../services/academyDataService'
+import {
+  getAttendanceSettings,
+  getTeamShiftsForMonth,
+  getWorkLocations,
+} from '../../services/academyDataService'
 import { usePlatformPageRefresh } from '../../context/PullToRefreshContext'
+import { ChevronLeftIcon, ChevronRightIcon } from '../icons/PlatformIcons'
+import AdminModal from './AdminModal'
 import CompanyHealthGauge from './CompanyHealthGauge'
 import './admin-shared.css'
 import './OwnerDashboard.css'
 
-const PERIOD = {
-  TODAY: 'today',
-  WEEK: 'week',
-  MONTH: 'month',
-}
-
 const REFRESH_MS = 60_000
 
-function StatItem({ label, value }) {
+const METRIC_KEYS = {
+  SCHEDULED: 'scheduled',
+  ON_TIME: 'onTime',
+  LATE: 'late',
+  ABSENT: 'absent',
+  OUT_OF_ZONE: 'outOfZone',
+}
+
+const METRIC_CONFIG = {
+  [METRIC_KEYS.SCHEDULED]: {
+    label: 'По графику',
+    tone: 'neutral',
+    empty: 'На выбранный день рабочих смен нет.',
+  },
+  [METRIC_KEYS.ON_TIME]: {
+    label: 'Пришли вовремя',
+    tone: 'success',
+    empty: 'За выбранный день своевременных приходов нет.',
+  },
+  [METRIC_KEYS.LATE]: {
+    label: 'Опоздали',
+    tone: 'warning',
+    empty: 'За выбранный день опозданий нет.',
+  },
+  [METRIC_KEYS.ABSENT]: {
+    label: 'Отсутствуют',
+    tone: 'danger',
+    empty: 'За выбранный день отсутствующих нет.',
+  },
+  [METRIC_KEYS.OUT_OF_ZONE]: {
+    label: 'Вне геозоны',
+    tone: 'warning',
+    empty: 'За выбранный день отметок вне разрешённой геозоны нет.',
+  },
+}
+
+function parseDateKey(dateKey) {
+  const [year, month, day] = dateKey.split('-').map(Number)
+  return { year, month, day }
+}
+
+function getMonthStateFromDateKey(dateKey) {
+  const { year, month } = parseDateKey(dateKey)
+  return { year, month }
+}
+
+function formatSelectedDate(dateKey) {
+  const { year, month, day } = parseDateKey(dateKey)
+  const date = new Date(year, month - 1, day)
+  const formatted = date.toLocaleDateString('ru-RU', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  })
+  return formatted.charAt(0).toUpperCase() + formatted.slice(1)
+}
+
+function getTimeLabelInAppTimezone(value) {
+  if (!value) return ''
+  if (typeof value === 'string' && value.includes('T')) {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    return new Intl.DateTimeFormat('ru-RU', {
+      timeZone: APP_TIMEZONE,
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).format(date)
+  }
+  return String(value).slice(0, 5)
+}
+
+function getMinutesInAppTimezone(date) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: APP_TIMEZONE,
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const hours = Number(parts.find((part) => part.type === 'hour')?.value ?? 0)
+  const minutes = Number(parts.find((part) => part.type === 'minute')?.value ?? 0)
+  return hours * 60 + minutes
+}
+
+function getActualStartMinutes(shift) {
+  return timeToMinutes(getTimeLabelInAppTimezone(shift.actualStartTime))
+}
+
+function getPlannedStartMinutes(shift) {
+  return timeToMinutes(shift.plannedStartTime)
+}
+
+function getLateMinutes(shift) {
+  const plannedStart = getPlannedStartMinutes(shift)
+  const actualStart = getActualStartMinutes(shift)
+  if (plannedStart == null || actualStart == null) return 0
+  return Math.max(0, actualStart - plannedStart)
+}
+
+function hasCheckIn(shift) {
+  return Boolean(getTimeLabelInAppTimezone(shift.actualStartTime))
+}
+
+function isAbsenceDue(shift, selectedDateKey, todayKey, settings, now) {
+  if (hasCheckIn(shift)) return false
+  if (selectedDateKey < todayKey) return true
+  if (selectedDateKey > todayKey) return false
+
+  const plannedStart = getPlannedStartMinutes(shift)
+  if (plannedStart == null) return false
+
+  const grace = Number(settings?.lateGraceMinutes) || 0
+  return getMinutesInAppTimezone(now) > plannedStart + grace
+}
+
+function getShiftLocation(shift, employee, locations) {
+  if (!locations.length) return null
+  if (shift.workLocationId) {
+    const byShift = locations.find((location) => location.id === shift.workLocationId)
+    if (byShift) return byShift
+  }
+  if (employee?.workLocationId) {
+    const byEmployee = locations.find((location) => location.id === employee.workLocationId)
+    if (byEmployee) return byEmployee
+  }
+  return locations.find((location) => location.isActive) || null
+}
+
+function getZoneDistance(shift, employee, locations) {
+  if (shift.checkInLatitude == null || shift.checkInLongitude == null) return null
+  const location = getShiftLocation(shift, employee, locations)
+  if (!location) return null
+
+  const distance = haversineDistanceMeters(
+    Number(location.latitude),
+    Number(location.longitude),
+    Number(shift.checkInLatitude),
+    Number(shift.checkInLongitude)
+  )
+
+  return {
+    distance,
+    radius: Number(location.radiusMeters) || 0,
+    locationName: location.name || 'Рабочая точка',
+  }
+}
+
+function createDetail(employee, shift, extra = '') {
+  const planned = formatTimeRange(shift.plannedStartTime, shift.plannedEndTime) || '—'
+  const actualIn = getTimeLabelInAppTimezone(shift.actualStartTime) || '—'
+  return {
+    id: employee.id,
+    name: employee.name || `Сотрудник #${employee.id}`,
+    position: employee.position || employee.roleName || employee.role || '',
+    planned,
+    actualIn,
+    extra,
+  }
+}
+
+function addUnique(target, employee, shift, extra = '') {
+  if (!target.has(employee.id)) {
+    target.set(employee.id, createDetail(employee, shift, extra))
+  }
+}
+
+function emptyMetricMaps() {
+  return {
+    [METRIC_KEYS.SCHEDULED]: new Map(),
+    [METRIC_KEYS.ON_TIME]: new Map(),
+    [METRIC_KEYS.LATE]: new Map(),
+    [METRIC_KEYS.ABSENT]: new Map(),
+    [METRIC_KEYS.OUT_OF_ZONE]: new Map(),
+  }
+}
+
+function chooseEmployeeShift(shifts) {
   return (
-    <div className="owner-dashboard__stat">
-      <span className="owner-dashboard__stat-label">{label}</span>
-      <span className="owner-dashboard__stat-value">{value}</span>
-    </div>
+    shifts.find((shift) => hasCheckIn(shift)) ||
+    shifts.find((shift) => isWorkingShiftStatus(shift.status)) ||
+    shifts[0]
+  )
+}
+
+function buildDailyMetrics({
+  employees,
+  shifts,
+  locations,
+  settings,
+  selectedDateKey,
+  todayKey,
+  now,
+}) {
+  const employeesById = new Map(employees.map((employee) => [Number(employee.id), employee]))
+  const groupedShifts = new Map()
+
+  shifts
+    .filter((shift) => shift.shiftDate === selectedDateKey && isWorkingShiftStatus(shift.status))
+    .forEach((shift) => {
+      const employeeId = Number(shift.employeeId)
+      if (!employeesById.has(employeeId)) return
+      if (!groupedShifts.has(employeeId)) groupedShifts.set(employeeId, [])
+      groupedShifts.get(employeeId).push(shift)
+    })
+
+  const metrics = emptyMetricMaps()
+  let checkInCount = 0
+
+  groupedShifts.forEach((employeeShifts, employeeId) => {
+    const employee = employeesById.get(employeeId)
+    const shift = chooseEmployeeShift(employeeShifts)
+    if (!employee || !shift) return
+
+    addUnique(metrics[METRIC_KEYS.SCHEDULED], employee, shift)
+
+    const checkedIn = hasCheckIn(shift)
+    const lateMinutes = getLateMinutes(shift)
+    const grace = Number(settings?.lateGraceMinutes) || 0
+
+    if (checkedIn) {
+      checkInCount += 1
+      if (lateMinutes > grace) {
+        addUnique(metrics[METRIC_KEYS.LATE], employee, shift, `${lateMinutes} мин`)
+      } else {
+        addUnique(metrics[METRIC_KEYS.ON_TIME], employee, shift)
+      }
+    } else if (isAbsenceDue(shift, selectedDateKey, todayKey, settings, now)) {
+      addUnique(metrics[METRIC_KEYS.ABSENT], employee, shift)
+    }
+
+    const zone = getZoneDistance(shift, employee, locations)
+    if (zone && zone.distance > zone.radius) {
+      addUnique(
+        metrics[METRIC_KEYS.OUT_OF_ZONE],
+        employee,
+        shift,
+        `${Math.round(zone.distance)} м от ${zone.locationName}`
+      )
+    }
+  })
+
+  const problemEmployeeIds = new Set([
+    ...metrics[METRIC_KEYS.LATE].keys(),
+    ...metrics[METRIC_KEYS.ABSENT].keys(),
+    ...metrics[METRIC_KEYS.OUT_OF_ZONE].keys(),
+  ])
+  const scheduled = metrics[METRIC_KEYS.SCHEDULED].size
+  const health = scheduled
+    ? Math.max(0, Math.round(((scheduled - problemEmployeeIds.size) / scheduled) * 100))
+    : 100
+
+  return {
+    health,
+    hasCheckIns: checkInCount > 0,
+    stats: {
+      scheduled,
+      onTime: metrics[METRIC_KEYS.ON_TIME].size,
+      late: metrics[METRIC_KEYS.LATE].size,
+      absent: metrics[METRIC_KEYS.ABSENT].size,
+      outOfZone: metrics[METRIC_KEYS.OUT_OF_ZONE].size,
+    },
+    details: Object.fromEntries(
+      Object.entries(metrics).map(([key, value]) => [key, [...value.values()]])
+    ),
+  }
+}
+
+function MetricCard({ metricKey, value, onOpen }) {
+  const config = METRIC_CONFIG[metricKey]
+  return (
+    <button
+      type="button"
+      className={`owner-dashboard__metric owner-dashboard__metric--${config.tone}`}
+      onClick={onOpen}
+    >
+      <span className="owner-dashboard__metric-label">{config.label}</span>
+      <span className="owner-dashboard__metric-value">{value}</span>
+    </button>
   )
 }
 
 /** Главный дашборд владельца (только Администратор) */
 export default function OwnerDashboard() {
-  const [period, setPeriod] = useState(PERIOD.TODAY)
-  const [weekStartKey, setWeekStartKey] = useState(getInitialWeekStartKey)
-  const [{ year, month }, setMonthState] = useState(getCurrentMonthState)
+  const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKeyInAppTimezone())
   const [settings, setSettings] = useState(null)
-  const [allShifts, setAllShifts] = useState([])
+  const [dayShifts, setDayShifts] = useState([])
+  const [workLocations, setWorkLocations] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [now, setNow] = useState(() => new Date())
+  const [activeMetric, setActiveMetric] = useState(null)
 
-  const todayKey = toDateKey(now)
-  const employeeIds = useMemo(
-    () => getStaffEmployees('active').map((emp) => emp.id),
-    []
-  )
+  const todayKey = toDateKeyInAppTimezone(now)
+  const employees = useMemo(() => getStaffEmployees('active'), [])
+  const employeeIds = useMemo(() => employees.map((emp) => emp.id), [employees])
   const employeeIdsKey = employeeIds.join(',')
-
-  const weekDateKeys = useMemo(() => getWeekDateKeys(weekStartKey), [weekStartKey])
-  const weekStart = weekDateKeys[0]
-  const weekEnd = weekDateKeys[weekDateKeys.length - 1]
+  const selectedMonthState = useMemo(
+    () => getMonthStateFromDateKey(selectedDateKey),
+    [selectedDateKey]
+  )
+  const selectedDateLabel = formatSelectedDate(selectedDateKey)
+  const isTodaySelected = selectedDateKey === todayKey
+  const isFutureSelected = selectedDateKey > todayKey
 
   const loadData = useCallback(async () => {
     setError('')
     try {
-      const attendanceSettings = await getAttendanceSettings()
+      const [attendanceSettings, shifts, locations] = await Promise.all([
+        getAttendanceSettings(),
+        getTeamShiftsForMonth(
+          selectedMonthState.year,
+          selectedMonthState.month,
+          employeeIds.length ? employeeIds : null
+        ),
+        getWorkLocations(),
+      ])
+
       setSettings(attendanceSettings)
-
-      const current = getCurrentMonthState()
-      const monthsToLoad = new Map()
-      monthsToLoad.set(`${current.year}-${current.month}`, current)
-      monthsToLoad.set(`${year}-${month}`, { year, month })
-
-      getWeekDateKeys(weekStartKey).forEach((dateKey) => {
-        const [y, m] = dateKey.split('-').map(Number)
-        monthsToLoad.set(`${y}-${m}`, { year: y, month: m })
-      })
-
-      const monthResults = await Promise.all(
-        [...monthsToLoad.values()].map(({ year: y, month: m }) =>
-          getTeamShiftsForMonth(y, m, employeeIds.length ? employeeIds : null)
-        )
-      )
-
-      setAllShifts(monthResults.flat())
+      setWorkLocations(locations || [])
+      setDayShifts((shifts || []).filter((shift) => shift.shiftDate === selectedDateKey))
     } catch (err) {
       setError(err.message || 'Не удалось загрузить данные дашборда')
     } finally {
       setLoading(false)
     }
-  }, [weekStartKey, year, month, employeeIdsKey])
+  }, [selectedDateKey, selectedMonthState.year, selectedMonthState.month, employeeIdsKey])
 
   usePlatformPageRefresh(loadData)
 
@@ -105,6 +361,12 @@ export default function OwnerDashboard() {
   }, [])
 
   useEffect(() => {
+    if (selectedDateKey > todayKey) {
+      setSelectedDateKey(todayKey)
+    }
+  }, [selectedDateKey, todayKey])
+
+  useEffect(() => {
     function handleRatingUpdated() {
       loadData()
     }
@@ -112,164 +374,78 @@ export default function OwnerDashboard() {
     return () => window.removeEventListener(RATING_UPDATED_EVENT, handleRatingUpdated)
   }, [loadData])
 
-  const todayShifts = useMemo(
-    () => filterShiftsByDate(allShifts, todayKey),
-    [allShifts, todayKey]
+  const dailyMetrics = useMemo(
+    () =>
+      settings
+        ? buildDailyMetrics({
+            employees,
+            shifts: dayShifts,
+            locations: workLocations,
+            settings,
+            selectedDateKey,
+            todayKey,
+            now,
+          })
+        : null,
+    [employees, dayShifts, workLocations, settings, selectedDateKey, todayKey, now]
   )
 
-  const weekShifts = useMemo(
-    () => filterShiftsByDateRange(allShifts, weekStart, weekEnd),
-    [allShifts, weekStart, weekEnd]
-  )
+  const stats = dailyMetrics?.stats || {
+    scheduled: 0,
+    onTime: 0,
+    late: 0,
+    absent: 0,
+    outOfZone: 0,
+  }
+  const hasNoMarks = !loading && !error && dailyMetrics && !dailyMetrics.hasCheckIns
+  const activeMetricConfig = activeMetric ? METRIC_CONFIG[activeMetric] : null
+  const activeMetricRows = activeMetric ? dailyMetrics?.details?.[activeMetric] || [] : []
 
-  const selectedMonthShifts = useMemo(
-    () => filterShiftsByMonth(allShifts, year, month),
-    [allShifts, year, month]
-  )
+  function shiftDay(delta) {
+    setSelectedDateKey((prev) => {
+      const next = addDaysToDateKey(prev, delta)
+      return next > todayKey ? todayKey : next
+    })
+  }
 
-  const todayMetrics = useMemo(
-    () => (settings ? computeCompanyHealthMetrics(todayShifts, settings, now) : null),
-    [todayShifts, settings, now]
-  )
-
-  const weekMetrics = useMemo(
-    () => (settings ? computeCompanyHealthMetrics(weekShifts, settings, now) : null),
-    [weekShifts, settings, now]
-  )
-
-  const monthMetrics = useMemo(
-    () => (settings ? computeCompanyHealthMetrics(selectedMonthShifts, settings, now) : null),
-    [selectedMonthShifts, settings, now]
-  )
-
-  const activeMetrics =
-    period === PERIOD.TODAY
-      ? todayMetrics
-      : period === PERIOD.WEEK
-        ? weekMetrics
-        : monthMetrics
-
-  const currentMonth = getCurrentMonthState()
-  const isCurrentMonthSelected =
-    year === currentMonth.year && month === currentMonth.month
-  const monthLabel = formatMonthYearLabel(year, month)
-  const weekLabel = formatWeekRangeLabel(weekStartKey)
-
-  function goTodayPeriod() {
-    setPeriod(PERIOD.TODAY)
-    setWeekStartKey(getInitialWeekStartKey())
-    setMonthState(getCurrentMonthState())
+  function goToday() {
+    setSelectedDateKey(toDateKeyInAppTimezone())
     setNow(new Date())
   }
 
-  const summaryStats = activeMetrics?.stats || {
-    scheduled: 0,
-    workingNow: 0,
-    late: 0,
-    absent: 0,
-    earlyLeave: 0,
-    missingCheckIn: 0,
-    missingCheckOut: 0,
-  }
-
-  const workingNowLabel =
-    period === PERIOD.TODAY
-      ? `${summaryStats.workingNow} / ${summaryStats.scheduled}`
-      : '—'
-
   return (
     <div className="owner-dashboard">
-      <div className="owner-dashboard__periods">
+      <section className="owner-dashboard__day-panel" aria-label="Выбор дня">
         <button
           type="button"
-          className={`owner-dashboard__period-card ${period === PERIOD.TODAY ? 'owner-dashboard__period-card--active' : ''}`}
-          onClick={() => setPeriod(PERIOD.TODAY)}
+          className="owner-dashboard__day-arrow"
+          onClick={() => shiftDay(-1)}
+          aria-label="Предыдущий день"
         >
-          <span className="owner-dashboard__period-card-label">Сегодня</span>
-          <span className="owner-dashboard__period-card-value">
-            {todayMetrics ? `${todayMetrics.health}%` : '—'}
-          </span>
+          <ChevronLeftIcon size={18} />
         </button>
 
-        <button
-          type="button"
-          className={`owner-dashboard__period-card ${period === PERIOD.WEEK ? 'owner-dashboard__period-card--active' : ''}`}
-          onClick={() => setPeriod(PERIOD.WEEK)}
-        >
-          <span className="owner-dashboard__period-card-label">Выбранный период</span>
-          <span className="owner-dashboard__period-card-hint">{weekLabel}</span>
-          <span className="owner-dashboard__period-card-value">
-            {weekMetrics ? `${weekMetrics.health}%` : '—'}
-          </span>
-        </button>
+        <div className="owner-dashboard__day-current">
+          <span className="owner-dashboard__day-label">{selectedDateLabel}</span>
+          <span className="owner-dashboard__day-hint">Статистика за один календарный день</span>
+        </div>
 
-        <button
-          type="button"
-          className={`owner-dashboard__period-card ${period === PERIOD.MONTH ? 'owner-dashboard__period-card--active' : ''}`}
-          onClick={() => setPeriod(PERIOD.MONTH)}
-        >
-          <span className="owner-dashboard__period-card-label">
-            {isCurrentMonthSelected ? `Текущий месяц (${monthLabel})` : monthLabel}
-          </span>
-          <span className="owner-dashboard__period-card-value">
-            {monthMetrics ? `${monthMetrics.health}%` : '—'}
-          </span>
-        </button>
-      </div>
-
-      {period === PERIOD.WEEK && (
-        <div className="owner-dashboard__week-nav">
-          <button
-            type="button"
-            className="btn btn--outline btn--sm"
-            onClick={() => setWeekStartKey((prev) => addWeeks(prev, -1))}
-          >
-            ← Неделя
-          </button>
-          <button type="button" className="btn btn--outline btn--sm" onClick={goTodayPeriod}>
+        {!isTodaySelected && (
+          <button type="button" className="owner-dashboard__today-btn" onClick={goToday}>
             Сегодня
           </button>
-          <button
-            type="button"
-            className="btn btn--outline btn--sm"
-            onClick={() => setWeekStartKey((prev) => addWeeks(prev, 1))}
-          >
-            Неделя →
-          </button>
-        </div>
-      )}
+        )}
 
-      {period === PERIOD.MONTH && !isCurrentMonthSelected && (
-        <div className="owner-dashboard__week-nav">
-          <button
-            type="button"
-            className="btn btn--outline btn--sm"
-            onClick={() =>
-              setMonthState((prev) => {
-                const date = new Date(prev.year, prev.month - 2, 1)
-                return { year: date.getFullYear(), month: date.getMonth() + 1 }
-              })
-            }
-          >
-            ← Месяц
-          </button>
-          <button type="button" className="btn btn--outline btn--sm" onClick={goTodayPeriod}>
-            Сегодня
-          </button>
-          <button
-            type="button"
-            className="btn btn--outline btn--sm"
-            onClick={() =>
-              setMonthState((prev) => {
-                const date = new Date(prev.year, prev.month, 1)
-                return { year: date.getFullYear(), month: date.getMonth() + 1 }
-              })
-            }
-          >
-            Месяц →
-          </button>
-        </div>
-      )}
+        <button
+          type="button"
+          className="owner-dashboard__day-arrow"
+          onClick={() => shiftDay(1)}
+          disabled={isTodaySelected || isFutureSelected}
+          aria-label="Следующий день"
+        >
+          <ChevronRightIcon size={18} />
+        </button>
+      </section>
 
       {error && <p className="admin-form__error">{error}</p>}
 
@@ -277,24 +453,75 @@ export default function OwnerDashboard() {
         <p className="schedule-loading">Загрузка дашборда…</p>
       ) : (
         <section className="owner-dashboard__hero">
-          <CompanyHealthGauge score={activeMetrics?.health ?? 100} />
+          <CompanyHealthGauge score={dailyMetrics?.health ?? 100} size={188} />
 
           <div className="owner-dashboard__summary">
-            <h3 className="owner-dashboard__summary-title">Дисциплина сотрудников</h3>
-            <div className="owner-dashboard__stats">
-              <StatItem label="Работают сейчас" value={workingNowLabel} />
-              <StatItem label="Опоздали" value={summaryStats.late} />
-              <StatItem label="Отсутствуют" value={summaryStats.absent} />
-              <StatItem label="Ранний уход" value={summaryStats.earlyLeave} />
-              <StatItem label="Без отметки прихода" value={summaryStats.missingCheckIn} />
-              <StatItem label="Без отметки ухода" value={summaryStats.missingCheckOut} />
+            <div className="owner-dashboard__summary-head">
+              <h3 className="owner-dashboard__summary-title">Статус команды</h3>
+              <p className="owner-dashboard__summary-subtitle">
+                Уникальные сотрудники по графику и фактическим отметкам прихода.
+              </p>
             </div>
-            <p className="owner-dashboard__summary-hint">
-              Показатель рассчитывается по правилам тайм-трекера. Выходные и нерабочие дни не
-              учитываются.
-            </p>
+
+            <div className="owner-dashboard__metrics">
+              <MetricCard
+                metricKey={METRIC_KEYS.SCHEDULED}
+                value={stats.scheduled}
+                onOpen={() => setActiveMetric(METRIC_KEYS.SCHEDULED)}
+              />
+              <MetricCard
+                metricKey={METRIC_KEYS.ON_TIME}
+                value={stats.onTime}
+                onOpen={() => setActiveMetric(METRIC_KEYS.ON_TIME)}
+              />
+              <MetricCard
+                metricKey={METRIC_KEYS.LATE}
+                value={stats.late}
+                onOpen={() => setActiveMetric(METRIC_KEYS.LATE)}
+              />
+              <MetricCard
+                metricKey={METRIC_KEYS.ABSENT}
+                value={stats.absent}
+                onOpen={() => setActiveMetric(METRIC_KEYS.ABSENT)}
+              />
+              <MetricCard
+                metricKey={METRIC_KEYS.OUT_OF_ZONE}
+                value={stats.outOfZone}
+                onOpen={() => setActiveMetric(METRIC_KEYS.OUT_OF_ZONE)}
+              />
+            </div>
+
+            {hasNoMarks && (
+              <p className="owner-dashboard__empty-note">За этот день отметок пока нет.</p>
+            )}
           </div>
         </section>
+      )}
+
+      {activeMetric && activeMetricConfig && (
+        <AdminModal title={activeMetricConfig.label} onClose={() => setActiveMetric(null)}>
+          {activeMetricRows.length > 0 ? (
+            <div className="owner-dashboard__people-list">
+              {activeMetricRows.map((row) => (
+                <div key={row.id} className="owner-dashboard__person">
+                  <div className="owner-dashboard__person-main">
+                    <span className="owner-dashboard__person-name">{row.name}</span>
+                    {row.position && (
+                      <span className="owner-dashboard__person-position">{row.position}</span>
+                    )}
+                  </div>
+                  <div className="owner-dashboard__person-meta">
+                    <span>План: {row.planned}</span>
+                    <span>Приход: {row.actualIn}</span>
+                    {row.extra && <span>{row.extra}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="owner-dashboard__modal-empty">{activeMetricConfig.empty}</p>
+          )}
+        </AdminModal>
       )}
     </div>
   )
