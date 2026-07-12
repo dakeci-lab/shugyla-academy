@@ -45,11 +45,18 @@ export default function CandidatesToolbar({
   onRemoveChip,
   vacancies,
   resultCount,
+  draftResultCount,
   totalCount,
 }) {
   const filterButtonRef = useRef(null)
   const [filterOpen, setFilterOpen] = useState(false)
   const isMobile = useIsMobileViewport()
+
+  useEffect(() => {
+    if (!isMobile && filterOpen) {
+      setFilterOpen(false)
+    }
+  }, [isMobile, filterOpen])
 
   const activeFilterCount = countActiveCandidateFilters(appliedFilters)
   const filtersActive = hasActiveCandidateFilters(appliedFilters)
@@ -99,6 +106,7 @@ export default function CandidatesToolbar({
             }`}
             onClick={toggleFilters}
             aria-expanded={filterOpen}
+            aria-controls={isMobile ? 'candidate-filters-sheet' : undefined}
             aria-label={
               activeFilterCount > 0 ? `Фильтры, активно ${activeFilterCount}` : 'Фильтры'
             }
@@ -145,10 +153,12 @@ export default function CandidatesToolbar({
           open={filterOpen}
           draft={draftFilters}
           vacancies={vacancies}
+          resultCount={draftResultCount ?? resultCount}
           onChange={onDraftChange}
           onApply={applyFilters}
           onReset={onResetFilters}
           onClose={() => setFilterOpen(false)}
+          returnFocusRef={filterButtonRef}
         />
       )}
     </div>

@@ -57,6 +57,11 @@ export default function CandidatesSection() {
     return sortCandidates(filtered, appliedFilters.ageSort)
   }, [candidates, appliedFilters, debouncedSearch])
 
+  const draftResultCount = useMemo(() => {
+    const filtered = filterCandidates(candidates, draftFilters, debouncedSearch)
+    return filtered.length
+  }, [candidates, draftFilters, debouncedSearch])
+
   const detailCandidate = detailCandidateId ? getCandidateById(detailCandidateId) : null
   const detailVacancy = detailCandidate?.vacancyId
     ? getVacancyById(detailCandidate.vacancyId)
@@ -144,6 +149,7 @@ export default function CandidatesSection() {
         onRemoveChip={setAppliedFilters}
         vacancies={vacancies}
         resultCount={displayedCandidates.length}
+        draftResultCount={draftResultCount}
         totalCount={candidates.length}
       />
 
