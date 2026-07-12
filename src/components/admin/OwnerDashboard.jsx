@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { getStaffEmployees } from '../../utils/employeeData'
-import { haversineDistanceMeters, RATING_UPDATED_EVENT } from '../../utils/attendanceData'
+import { RATING_UPDATED_EVENT } from '../../utils/attendanceData'
 import { APP_TIMEZONE, addDaysToDateKey, toDateKeyInAppTimezone } from '../../utils/timezone'
 import {
   formatTimeRange,
@@ -10,7 +10,6 @@ import {
 import {
   getAttendanceSettings,
   getTeamShiftsForMonth,
-  getWorkLocations,
 } from '../../services/academyDataService'
 import { usePlatformPageRefresh } from '../../context/PullToRefreshContext'
 import { ChevronLeftIcon, ChevronRightIcon } from '../icons/PlatformIcons'
@@ -26,7 +25,6 @@ const METRIC_KEYS = {
   ON_TIME: 'onTime',
   LATE: 'late',
   ABSENT: 'absent',
-  OUT_OF_ZONE: 'outOfZone',
 }
 
 const METRIC_CONFIG = {
@@ -49,11 +47,6 @@ const METRIC_CONFIG = {
     label: 'Отсутствуют',
     tone: 'danger',
     empty: 'За выбранный день отсутствующих нет.',
-  },
-  [METRIC_KEYS.OUT_OF_ZONE]: {
-    label: 'Вне геозоны',
-    tone: 'warning',
-    empty: 'За выбранный день отметок вне разрешённой геозоны нет.',
   },
 }
 
@@ -137,38 +130,6 @@ function isAbsenceDue(shift, selectedDateKey, todayKey, settings, now) {
   return getMinutesInAppTimezone(now) > plannedStart + grace
 }
 
-function getShiftLocation(shift, employee, locations) {
-  if (!locations.length) return null
-  if (shift.workLocationId) {
-    const byShift = locations.find((location) => location.id === shift.workLocationId)
-    if (byShift) return byShift
-  }
-  if (employee?.workLocationId) {
-    const byEmployee = locations.find((location) => location.id === employee.workLocationId)
-    if (byEmployee) return byEmployee
-  }
-  return locations.find((location) => location.isActive) || null
-}
-
-function getZoneDistance(shift, employee, locations) {
-  if (shift.checkInLatitude == null || shift.checkInLongitude == null) return null
-  const location = getShiftLocation(shift, employee, locations)
-  if (!location) return null
-
-  const distance = haversineDistanceMeters(
-    Number(location.latitude),
-    Number(location.longitude),
-    Number(shift.checkInLatitude),
-    Number(shift.checkInLongitude)
-  )
-
-  return {
-    distance,
-    radius: Number(location.radiusMeters) || 0,
-    locationName: location.name || 'Рабочая точка',
-  }
-}
-
 function createDetail(employee, shift, extra = '') {
   const planned = formatTimeRange(shift.plannedStartTime, shift.plannedEndTime) || '—'
   const actualIn = getTimeLabelInAppTimezone(shift.actualStartTime) || '—'
@@ -194,7 +155,6 @@ function emptyMetricMaps() {
     [METRIC_KEYS.ON_TIME]: new Map(),
     [METRIC_KEYS.LATE]: new Map(),
     [METRIC_KEYS.ABSENT]: new Map(),
-    [METRIC_KEYS.OUT_OF_ZONE]: new Map(),
   }
 }
 
@@ -209,7 +169,6 @@ function chooseEmployeeShift(shifts) {
 function buildDailyMetrics({
   employees,
   shifts,
-  locations,
   settings,
   selectedDateKey,
   todayKey,
@@ -251,22 +210,11 @@ function buildDailyMetrics({
     } else if (isAbsenceDue(shift, selectedDateKey, todayKey, settings, now)) {
       addUnique(metrics[METRIC_KEYS.ABSENT], employee, shift)
     }
-
-    const zone = getZoneDistance(shift, employee, locations)
-    if (zone && zone.distance > zone.radius) {
-      addUnique(
-        metrics[METRIC_KEYS.OUT_OF_ZONE],
-        employee,
-        shift,
-        `${Math.round(zone.distance)} м от ${zone.locationName}`
-      )
-    }
   })
 
   const problemEmployeeIds = new Set([
     ...metrics[METRIC_KEYS.LATE].keys(),
     ...metrics[METRIC_KEYS.ABSENT].keys(),
-    ...metrics[METRIC_KEYS.OUT_OF_ZONE].keys(),
   ])
   const scheduled = metrics[METRIC_KEYS.SCHEDULED].size
   const health = scheduled
@@ -281,7 +229,6 @@ function buildDailyMetrics({
       onTime: metrics[METRIC_KEYS.ON_TIME].size,
       late: metrics[METRIC_KEYS.LATE].size,
       absent: metrics[METRIC_KEYS.ABSENT].size,
-      outOfZone: metrics[METRIC_KEYS.OUT_OF_ZONE].size,
     },
     details: Object.fromEntries(
       Object.entries(metrics).map(([key, value]) => [key, [...value.values()]])
@@ -308,7 +255,6 @@ export default function OwnerDashboard() {
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKeyInAppTimezone())
   const [settings, setSettings] = useState(null)
   const [dayShifts, setDayShifts] = useState([])
-  const [workLocations, setWorkLocations] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [now, setNow] = useState(() => new Date())
@@ -329,18 +275,16 @@ export default function OwnerDashboard() {
   const loadData = useCallback(async () => {
     setError('')
     try {
-      const [attendanceSettings, shifts, locations] = await Promise.all([
+      const [attendanceSettings, shifts] = await Promise.all([
         getAttendanceSettings(),
         getTeamShiftsForMonth(
           selectedMonthState.year,
           selectedMonthState.month,
           employeeIds.length ? employeeIds : null
         ),
-        getWorkLocations(),
       ])
 
       setSettings(attendanceSettings)
-      setWorkLocations(locations || [])
       setDayShifts((shifts || []).filter((shift) => shift.shiftDate === selectedDateKey))
     } catch (err) {
       setError(err.message || 'Не удалось загрузить данные дашборда')
@@ -380,14 +324,13 @@ export default function OwnerDashboard() {
         ? buildDailyMetrics({
             employees,
             shifts: dayShifts,
-            locations: workLocations,
             settings,
             selectedDateKey,
             todayKey,
             now,
           })
         : null,
-    [employees, dayShifts, workLocations, settings, selectedDateKey, todayKey, now]
+    [employees, dayShifts, settings, selectedDateKey, todayKey, now]
   )
 
   const stats = dailyMetrics?.stats || {
@@ -395,7 +338,6 @@ export default function OwnerDashboard() {
     onTime: 0,
     late: 0,
     absent: 0,
-    outOfZone: 0,
   }
   const hasNoMarks = !loading && !error && dailyMetrics && !dailyMetrics.hasCheckIns
   const activeMetricConfig = activeMetric ? METRIC_CONFIG[activeMetric] : null
@@ -430,12 +372,6 @@ export default function OwnerDashboard() {
           <span className="owner-dashboard__day-hint">Статистика за один календарный день</span>
         </div>
 
-        {!isTodaySelected && (
-          <button type="button" className="owner-dashboard__today-btn" onClick={goToday}>
-            Сегодня
-          </button>
-        )}
-
         <button
           type="button"
           className="owner-dashboard__day-arrow"
@@ -444,6 +380,19 @@ export default function OwnerDashboard() {
           aria-label="Следующий день"
         >
           <ChevronRightIcon size={18} />
+        </button>
+
+        <button
+          type="button"
+          className={`owner-dashboard__today-btn${
+            isTodaySelected ? ' owner-dashboard__today-btn--hidden' : ''
+          }`}
+          onClick={goToday}
+          disabled={isTodaySelected}
+          aria-hidden={isTodaySelected}
+          tabIndex={isTodaySelected ? -1 : 0}
+        >
+          Сегодня
         </button>
       </section>
 
@@ -483,11 +432,6 @@ export default function OwnerDashboard() {
                 metricKey={METRIC_KEYS.ABSENT}
                 value={stats.absent}
                 onOpen={() => setActiveMetric(METRIC_KEYS.ABSENT)}
-              />
-              <MetricCard
-                metricKey={METRIC_KEYS.OUT_OF_ZONE}
-                value={stats.outOfZone}
-                onOpen={() => setActiveMetric(METRIC_KEYS.OUT_OF_ZONE)}
               />
             </div>
 

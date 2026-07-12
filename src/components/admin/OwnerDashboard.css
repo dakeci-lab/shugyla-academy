@@ -7,7 +7,7 @@
 
 .owner-dashboard__day-panel {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto 40px;
+  grid-template-columns: 40px minmax(0, 1fr) 40px 84px;
   align-items: center;
   gap: 0.625rem;
   padding: 0.75rem;
@@ -42,6 +42,11 @@
   color: var(--color-primary-dark, #047857);
 }
 
+.owner-dashboard__today-btn--hidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .owner-dashboard__day-arrow:hover:not(:disabled),
 .owner-dashboard__today-btn:hover {
   border-color: rgba(42, 157, 92, 0.35);
@@ -59,6 +64,8 @@
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
+  align-items: center;
+  text-align: center;
 }
 
 .owner-dashboard__day-label {
@@ -114,7 +121,7 @@
 
 .owner-dashboard__metrics {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.625rem;
 }
 
@@ -303,20 +310,33 @@
 
 @media (max-width: 560px) {
   .owner-dashboard__day-panel {
-    grid-template-columns: 40px minmax(0, 1fr) 40px;
+    grid-template-columns: 36px minmax(0, 1fr) 36px 64px;
+    gap: 0.375rem;
+    padding: 0.625rem;
+  }
+
+  .owner-dashboard__day-arrow,
+  .owner-dashboard__today-btn {
+    height: 36px;
+    border-radius: 9px;
+  }
+
+  .owner-dashboard__day-arrow {
+    width: 36px;
   }
 
   .owner-dashboard__today-btn {
-    grid-column: 1 / -1;
-    width: 100%;
+    width: 64px;
+    padding: 0;
+    font-size: 0.75rem;
   }
 
   .owner-dashboard__day-label {
-    font-size: 0.95rem;
+    font-size: 0.86rem;
   }
 
   .owner-dashboard__day-hint {
-    white-space: normal;
+    display: none;
   }
 
   .owner-dashboard__hero {
