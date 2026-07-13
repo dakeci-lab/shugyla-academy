@@ -8,6 +8,7 @@ import {
   ROLE_IDS,
 } from '../data/roles'
 import { resolveUserRole, getDefaultPlatformPath } from '../config/permissions'
+import { LOGIN_PATH } from '../router/authRoutes'
 import { getAllCourses } from './adminData'
 import { saveUser } from './storage'
 import {
@@ -15,6 +16,11 @@ import {
   getEmployeeById,
 } from './employeeData'
 import { authenticateUser } from '../services/academyDataService'
+import {
+  requiresMandatorySupabaseAuth,
+  signInSupabaseAuthAfterAcademyLogin,
+  SESSION_TYPE,
+} from '../services/authService'
 import { isCloudMode } from '../lib/dataMode'
 import {
   getCoursesForEmployee,
@@ -36,7 +42,7 @@ export function getSafeRedirectPath(redirectPath) {
     redirectPath &&
     redirectPath.startsWith('/') &&
     !redirectPath.startsWith('//') &&
-    !redirectPath.startsWith('/login') &&
+    !redirectPath.startsWith(LOGIN_PATH) &&
     !redirectPath.startsWith('/forgot-password') &&
     !redirectPath.startsWith('/reset-password')
   ) {
@@ -56,7 +62,7 @@ export function getPostLoginPath(user, redirectPath) {
 const DEACTIVATED_MESSAGE = 'Аккаунт деактивирован. Обратитесь к администратору.'
 
 /**
- * Вход по логину и паролю (academy_users / localStorage)
+ * Вход по логину и паролю (academy_users / localStorage; cloud + Supabase Auth для admin)
  */
 export async function login(loginValue, password) {
   const result = isCloudMode()
@@ -73,18 +79,38 @@ export async function login(loginValue, password) {
   const user = result.user
   const roleId = resolveUserRole(user) || normalizeRoleId(user.role) || ROLE_IDS.CASHIER
   const role = getRole(roleId)
+  const mandatoryAuth = isCloudMode() && requiresMandatorySupabaseAuth(user.role || roleId)
+
+  let sessionType = SESSION_TYPE.LEGACY
+  let supabaseAuthenticated = false
+
+  if (isCloudMode()) {
+    const authBridge = await signInSupabaseAuthAfterAcademyLogin(user.login, password, {
+      required: mandatoryAuth,
+    })
+    if (!authBridge.ok) {
+      return { success: false, error: authBridge.error }
+    }
+    if (authBridge.session?.access_token) {
+      sessionType = SESSION_TYPE.SUPABASE
+      supabaseAuthenticated = true
+    }
+  }
 
   const sessionUser = {
     id: user.id,
     login: user.login,
     name: user.name,
     role: roleId,
+    roleId: user.roleId ?? user.role_id ?? null,
     roleName: role?.label || roleId,
     permissions: role?.permissions || [],
     assignedCourseIds: user.assignedCourseIds || [],
+    sessionType,
+    supabaseAuthenticated,
   }
   saveUser(sessionUser)
-  return { success: true, user: sessionUser }
+  return { success: true, user: sessionUser, sessionType, supabaseAuthenticated }
 }
 
 /** Курсы по роли (legacy — для admin stats fallback) */

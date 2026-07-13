@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { getRouterBasename } from './router/basename'
 import { LanguageProvider } from './context/LanguageContext'
 import { AcademyDataProvider } from './context/AcademyDataContext'
 import { SessionProvider } from './context/SessionContext'
@@ -6,6 +7,8 @@ import { PermissionProvider } from './context/PermissionContext'
 import { ToastProvider } from './context/ToastContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import PlatformRoute from './components/platform/PlatformRoute'
+import PlatformNotFound from './components/platform/PlatformNotFound'
+import { LOGIN_PATH } from './router/authRoutes'
 import { ROUTE_KEYS } from './config/permissions'
 import PlatformLayout from './layouts/PlatformLayout'
 import Login from './pages/Login'
@@ -20,6 +23,8 @@ import StandardsPage from './pages/Standards'
 import PlatformIndex from './pages/platform/PlatformIndex'
 import PlatformAcademy from './pages/platform/PlatformAcademy'
 import PlatformSettings from './pages/platform/PlatformSettings'
+import PlatformSettingsGeneral from './pages/platform/PlatformSettingsGeneral'
+import PlatformSettingsRoles from './pages/platform/PlatformSettingsRoles'
 import PlatformEmployees from './pages/platform/PlatformEmployees'
 import PlatformEmployeesRedirect from './pages/platform/PlatformEmployeesRedirect'
 import PlatformWorkSchedule from './pages/platform/PlatformWorkSchedule'
@@ -63,14 +68,14 @@ function LegacyStandardRedirect() {
 export default function App() {
   return (
     <LanguageProvider>
-      <AcademyDataProvider>
-      <BrowserRouter basename="/shugyla-academy">
       <SessionProvider>
+      <BrowserRouter basename={getRouterBasename()}>
+      <AcademyDataProvider>
       <PermissionProvider>
       <ToastProvider>
       <Routes>
         {/* Публичные маршруты */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Navigate to={LOGIN_PATH} replace />} />
         <Route path="/vacancies" element={<VacanciesPage />} />
         <Route path="/vacancies/:slug" element={<VacancyDetailPage />} />
         <Route path="/apply/:slug" element={<ApplyPage />} />
@@ -322,15 +327,25 @@ export default function App() {
 
           <Route path="courses/:id" element={<CoursePage embedded />} />
 
+          <Route path="settings" element={<PlatformSettings />} />
           <Route
-            path="settings"
+            path="settings/general"
             element={
-              <PlatformRoute routeKey={ROUTE_KEYS.SETTINGS}>
-                <PlatformSettings />
+              <PlatformRoute routeKey={ROUTE_KEYS.SETTINGS_GENERAL}>
+                <PlatformSettingsGeneral />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="settings/roles"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.SETTINGS_ROLES}>
+                <PlatformSettingsRoles />
               </PlatformRoute>
             }
           />
           <Route path="profile" element={<Profile />} />
+          <Route path="*" element={<PlatformNotFound />} />
         </Route>
 
         {/* Редиректы со старых маршрутов */}
@@ -354,13 +369,13 @@ export default function App() {
         <Route path="/standards" element={<Navigate to="/platform/standards" replace />} />
         <Route path="/standards/:slug" element={<LegacyStandardRedirect />} />
 
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to={LOGIN_PATH} replace />} />
       </Routes>
       </ToastProvider>
       </PermissionProvider>
-      </SessionProvider>
-      </BrowserRouter>
       </AcademyDataProvider>
+      </BrowserRouter>
+      </SessionProvider>
     </LanguageProvider>
   )
 }

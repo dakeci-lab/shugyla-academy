@@ -9,7 +9,12 @@ import {
   RBAC_DEFAULT_ROLE_PERMISSIONS,
   resolvePermissionCode,
 } from './permissionCatalog'
-import { getPermissionCodesForUserRole, getRbacCache } from '../services/rbacService'
+import {
+  getPermissionCodesForUserRole,
+  getRbacCache,
+  getRbacLoadState,
+  RBAC_LOAD_STATE,
+} from '../services/rbacService'
 
 export { ROLE_IDS, PERMISSION_CODES, PERMISSION_KEYS }
 
@@ -36,6 +41,8 @@ export const ROUTE_KEYS = {
   STANDARDS: 'standards',
   STANDARDS_MANAGE: 'standards_manage',
   SETTINGS: 'settings',
+  SETTINGS_GENERAL: 'settings_general',
+  SETTINGS_ROLES: 'settings_roles',
 }
 
 const ALL_PLATFORM_ROLES = [
@@ -90,30 +97,29 @@ const ROUTE_ACCESS = {
   [ROUTE_KEYS.STANDARDS]: ALL_PLATFORM_ROLES,
   [ROUTE_KEYS.STANDARDS_MANAGE]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SETTINGS]: [ROLE_IDS.ADMIN],
+  [ROUTE_KEYS.SETTINGS_GENERAL]: [ROLE_IDS.ADMIN],
+  [ROUTE_KEYS.SETTINGS_ROLES]: [ROLE_IDS.ADMIN],
 }
 
-/** Определение роли пользователя с учётом legacy и admin по умолчанию */
+/** Определение роли пользователя с учётом legacy, RBAC role_id и admin по умолчанию */
 export function resolveUserRole(user) {
   if (!user) return null
   if (user.role) return normalizeRoleId(user.role)
+  const roleId = user.roleId ?? user.role_id
+  if (roleId) {
+    const rbacRole = getRbacCache()?.roles?.find((item) => item.id === roleId)
+    if (rbacRole?.code) return normalizeRoleId(rbacRole.code)
+  }
   if (user.login === 'admin') return ROLE_IDS.ADMIN
   return null
 }
 
-/** Набор code-прав пользователя (RBAC-кэш или legacy seed) */
-export function getUserPermissionCodes(user) {
-  if (!user) return new Set()
+const MINIMAL_SAFE_PERMISSIONS = [
+  PERMISSION_CODES.DASHBOARD_VIEW,
+  PERMISSION_CODES.ACADEMY_VIEW,
+]
 
-  const fromCache = getPermissionCodesForUserRole(user)
-  if (fromCache.length > 0) {
-    return new Set(fromCache.map(resolvePermissionCode))
-  }
-
-  const stored = user.permissionCodes || user.permissionSlugs
-  if (Array.isArray(stored) && stored.length > 0) {
-    return new Set(stored.map(resolvePermissionCode))
-  }
-
+function getLegacyPermissionCodes(user) {
   const role = resolveUserRole(user)
   if (!role) return new Set()
   if (isAdmin(role)) {
@@ -121,8 +127,41 @@ export function getUserPermissionCodes(user) {
     if (adminPerms?.length) return new Set(adminPerms.map(resolvePermissionCode))
     return new Set((RBAC_DEFAULT_ROLE_PERMISSIONS.admin || []).map(resolvePermissionCode))
   }
-
   return new Set((RBAC_DEFAULT_ROLE_PERMISSIONS[role] || []).map(resolvePermissionCode))
+}
+
+/** Набор code-прав пользователя (RBAC-кэш или legacy seed) */
+export function getUserPermissionCodes(user) {
+  if (!user) return new Set()
+
+  const rbacState = getRbacLoadState()
+  const fromCache = getPermissionCodesForUserRole(user)
+
+  if (rbacState === RBAC_LOAD_STATE.LOADED) {
+    if (fromCache.length > 0) {
+      return new Set(fromCache.map(resolvePermissionCode))
+    }
+    if (isAdmin(resolveUserRole(user))) {
+      return getLegacyPermissionCodes(user)
+    }
+    return new Set()
+  }
+
+  if (rbacState === RBAC_LOAD_STATE.ERROR) {
+    if (fromCache.length > 0) {
+      return new Set(fromCache.map(resolvePermissionCode))
+    }
+    if (isAdmin(resolveUserRole(user))) {
+      return getLegacyPermissionCodes(user)
+    }
+    return new Set(MINIMAL_SAFE_PERMISSIONS.map(resolvePermissionCode))
+  }
+
+  if (fromCache.length > 0) {
+    return new Set(fromCache.map(resolvePermissionCode))
+  }
+
+  return getLegacyPermissionCodes(user)
 }
 
 /** @deprecated */
@@ -160,9 +199,9 @@ export function hasRole(user, roles) {
 }
 
 export function canAccessRoute(user, routeKey) {
+  if (!user) return false
   const role = resolveUserRole(user)
-  if (!role) return false
-  if (isAdmin(role)) return true
+  if (role && isAdmin(role)) return true
 
   const P = PERMISSION_CODES
 
@@ -183,10 +222,14 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.STANDARDS]: [P.STANDARDS_VIEW],
     [ROUTE_KEYS.STANDARDS_MANAGE]: [P.STANDARDS_MANAGE],
     [ROUTE_KEYS.SETTINGS]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],
+    [ROUTE_KEYS.SETTINGS_GENERAL]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],
+    [ROUTE_KEYS.SETTINGS_ROLES]: [P.ROLES_VIEW, P.ROLES_EDIT, P.ROLES_ASSIGN_PERMISSIONS],
   }
 
   const permissions = routePermissionMap[routeKey]
   if (permissions?.some((perm) => can(user, perm))) return true
+
+  if (!role) return false
 
   const allowed = ROUTE_ACCESS[routeKey]
   return Boolean(allowed?.includes(role))

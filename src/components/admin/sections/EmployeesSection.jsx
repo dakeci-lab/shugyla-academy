@@ -29,7 +29,10 @@ import {
 } from '../../../utils/recruitmentData'
 import { getRoleLabel } from '../../../data/roles'
 import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
+import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
+import Can from '../../auth/Can'
+import { PERMISSION_CODES } from '../../../config/permissions'
 import AdminModal from '../AdminModal'
 import StatusBadge from '../StatusBadge'
 import EmployeeAvatar from '../../EmployeeAvatar'
@@ -242,26 +245,30 @@ export default function EmployeesSection() {
     if (isActiveStaffEmployee(emp)) {
       return (
         <>
-          <IconActionButton
-            label="Редактировать сотрудника"
-            variant="primary"
-            onClick={(event) => {
-              event.stopPropagation()
-              openEdit(emp)
-            }}
-          >
-            <PencilIcon />
-          </IconActionButton>
-          <IconActionButton
-            label="Деактивировать сотрудника"
-            variant="danger"
-            onClick={(event) => {
-              event.stopPropagation()
-              handleDeactivate(emp)
-            }}
-          >
-            <TrashIcon />
-          </IconActionButton>
+          <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
+            <IconActionButton
+              label="Редактировать сотрудника"
+              variant="primary"
+              onClick={(event) => {
+                event.stopPropagation()
+                openEdit(emp)
+              }}
+            >
+              <PencilIcon />
+            </IconActionButton>
+          </Can>
+          <Can permission={PERMISSION_CODES.EMPLOYEES_DEACTIVATE}>
+            <IconActionButton
+              label="Деактивировать сотрудника"
+              variant="danger"
+              onClick={(event) => {
+                event.stopPropagation()
+                handleDeactivate(emp)
+              }}
+            >
+              <TrashIcon />
+            </IconActionButton>
+          </Can>
         </>
       )
     }
@@ -269,41 +276,47 @@ export default function EmployeesSection() {
     if (isDeactivatedStaffEmployee(emp)) {
       return (
         <>
-          <IconActionButton
-            label="Редактировать сотрудника"
-            variant="primary"
-            onClick={(event) => {
-              event.stopPropagation()
-              openEdit(emp)
-            }}
-          >
-            <PencilIcon />
-          </IconActionButton>
-          <button
-            type="button"
-            className="btn btn--outline btn--sm"
-            onClick={(event) => {
-              event.stopPropagation()
-              handleActivate(emp)
-            }}
-          >
-            Активировать
-          </button>
+          <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
+            <IconActionButton
+              label="Редактировать сотрудника"
+              variant="primary"
+              onClick={(event) => {
+                event.stopPropagation()
+                openEdit(emp)
+              }}
+            >
+              <PencilIcon />
+            </IconActionButton>
+          </Can>
+          <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
+            <button
+              type="button"
+              className="btn btn--outline btn--sm"
+              onClick={(event) => {
+                event.stopPropagation()
+                handleActivate(emp)
+              }}
+            >
+              Активировать
+            </button>
+          </Can>
         </>
       )
     }
 
     return (
-      <IconActionButton
-        label="Редактировать сотрудника"
-        variant="primary"
-        onClick={(event) => {
-          event.stopPropagation()
-          openEdit(emp)
-        }}
-      >
-        <PencilIcon />
-      </IconActionButton>
+      <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
+        <IconActionButton
+          label="Редактировать сотрудника"
+          variant="primary"
+          onClick={(event) => {
+            event.stopPropagation()
+            openEdit(emp)
+          }}
+        >
+          <PencilIcon />
+        </IconActionButton>
+      </Can>
     )
   }
 
@@ -326,9 +339,11 @@ export default function EmployeesSection() {
             </button>
           ))}
         </div>
-        <button type="button" className="btn btn--primary btn--sm" onClick={openAdd}>
-          + Добавить сотрудника
-        </button>
+        <Can permission={PERMISSION_CODES.EMPLOYEES_CREATE}>
+          <button type="button" className="btn btn--primary btn--sm" onClick={openAdd}>
+            + Добавить сотрудника
+          </button>
+        </Can>
       </div>
 
       {successMessage && (
@@ -504,18 +519,33 @@ export default function EmployeesSection() {
                   form.roleId &&
                   !assignableRoles.some((role) => role.id === form.roleId) && (
                     <option value={form.roleId}>
-                      {(getRoleByCode(form.role)?.name || getRoleLabel(form.role))} (неактивна)
+                      {formatRoleDisplayLabel(
+                        getRoleByCode(form.role) || {
+                          code: form.role,
+                          name: getRoleLabel(form.role),
+                          employeeCount: 0,
+                        },
+                        assignableRoles
+                      )}{' '}
+                      (неактивна)
                     </option>
                   )}
                 {assignableRoles.length === 0 &&
                   [form.role].filter(Boolean).map((roleCode) => (
                     <option key={roleCode} value={roleCode}>
-                      {getRoleLabel(roleCode)}
+                      {formatRoleDisplayLabel(
+                        getRoleByCode(roleCode) || {
+                          code: roleCode,
+                          name: getRoleLabel(roleCode),
+                          employeeCount: 0,
+                        },
+                        assignableRoles
+                      )}
                     </option>
                   ))}
                 {assignableRoles.map((role) => (
                   <option key={role.id} value={role.id}>
-                    {role.name}
+                    {formatRoleDisplayLabel(role, assignableRoles)}
                     {!role.isActive ? ' (неактивна)' : ''}
                   </option>
                 ))}

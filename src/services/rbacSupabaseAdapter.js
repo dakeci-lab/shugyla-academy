@@ -7,7 +7,7 @@ const PERMISSION_TABLE = 'permissions'
 const ROLE_PERMISSION_TABLE = 'role_permissions'
 
 export const RBAC_MIGRATION_MESSAGE =
-  'Таблицы системы ролей ещё не созданы в Supabase. Необходимо применить миграцию RBAC.'
+  'Система ролей ещё не подключена к базе данных. Необходимо применить миграцию RBAC.'
 
 function isMissingRbacTableError(error) {
   if (!error) return false

@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { sendPasswordResetEmail, usesSupabaseAuth } from '../services/authService'
+import { LOGIN_PATH } from '../router/authRoutes'
 import './Login.css'
 
-/** Восстановление пароля — /forgot-password */
+/** Восстановление пароля — /forgot-password (card-layout, не форма входа) */
 export default function ForgotPassword() {
   const [email, setEmail] = useState('')
   const [error, setError] = useState('')
@@ -74,7 +75,7 @@ export default function ForgotPassword() {
           </form>
         )}
 
-        <Link to="/login" className="login-page__back">
+        <Link to={LOGIN_PATH} className="login-page__back">
           ← Вернуться ко входу
         </Link>
       </div>

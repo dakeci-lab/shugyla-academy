@@ -4,6 +4,7 @@ import { getUser, getCourseProgress } from '../utils/storage'
 import { markLessonComplete } from '../services/academyDataService'
 import { useAcademyData } from '../context/AcademyDataContext'
 import { resolveCourseAccess, ACCESS_REASON } from '../utils/auth'
+import { getLoginUrl } from '../router/authRoutes'
 import {
   areAllMandatoryLessonsComplete,
   calcLessonProgress,
@@ -58,8 +59,7 @@ export default function CoursePage({ embedded = false }) {
   }
 
   if (access.reason === ACCESS_REASON.UNAUTHENTICATED) {
-    const redirect = encodeURIComponent(location.pathname)
-    return <Navigate to={`/login?redirect=${redirect}`} replace />
+    return <Navigate to={getLoginUrl(location.pathname)} replace />
   }
 
   if (access.reason === ACCESS_REASON.FORBIDDEN) {

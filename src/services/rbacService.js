@@ -13,8 +13,21 @@ function getAdapter() {
   return isCloudMode() ? supabaseAdapter : localAdapter
 }
 
+export const RBAC_LOAD_STATE = {
+  IDLE: 'idle',
+  LOADED: 'loaded',
+  MISSING: 'missing',
+  ERROR: 'error',
+}
+
+let loadState = RBAC_LOAD_STATE.IDLE
+
 let cache = null
 let loadPromise = null
+
+export function getRbacLoadState() {
+  return loadState
+}
 
 export function getRbacCache() {
   return cache
@@ -39,11 +52,19 @@ export async function ensureRbacLoaded(force = false) {
     .loadRbacSnapshot()
     .then((snapshot) => {
       cache = snapshot
+      loadState = RBAC_LOAD_STATE.LOADED
       loadPromise = null
       return snapshot
     })
     .catch((err) => {
       loadPromise = null
+      if (err.message === RBAC_MIGRATION_MESSAGE) {
+        loadState = RBAC_LOAD_STATE.MISSING
+      } else if (loadState === RBAC_LOAD_STATE.LOADED) {
+        loadState = RBAC_LOAD_STATE.ERROR
+      } else {
+        loadState = RBAC_LOAD_STATE.MISSING
+      }
       throw err
     })
 
@@ -172,6 +193,7 @@ export async function resolveRoleIdBySlug(roleSlug) {
 export function invalidateRbacCache() {
   cache = null
   loadPromise = null
+  loadState = RBAC_LOAD_STATE.IDLE
 }
 
 export function getRoleById(roleId) {
@@ -183,4 +205,4 @@ export function getRoleByCode(code) {
 }
 
 export const RBAC_MIGRATION_MESSAGE =
-  'Таблицы системы ролей ещё не созданы в Supabase. Необходимо применить миграцию RBAC.'
+  'Система ролей ещё не подключена к базе данных. Необходимо применить миграцию RBAC.'

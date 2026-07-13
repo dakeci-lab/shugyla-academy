@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { signOut } from '../services/authService'
 import PlatformUserMenu from '../components/platform/PlatformUserMenu'
 import PlatformMobileHeader from '../components/platform/PlatformMobileHeader'
 import AppInstallBanner from '../components/platform/AppInstallBanner'
@@ -11,6 +10,7 @@ import { useAcademyData } from '../context/AcademyDataContext'
 import { useProcurementRealtime } from '../hooks/useProcurementRealtime'
 import { getPlatformSection } from '../platform/platformNav'
 import { useSession } from '../context/SessionContext'
+import { LOGIN_PATH } from '../router/authRoutes'
 import './PlatformLayout.css'
 
 /** Оболочка Shugyla Platform — sidebar + контент */
@@ -43,13 +43,8 @@ export default function PlatformLayout() {
   }, [drawerOpen])
 
   async function handleLogout() {
-    try {
-      await signOut()
-    } catch (err) {
-      console.warn('Supabase signOut failed:', err)
-    }
-    logout()
-    navigate('/login')
+    await logout()
+    navigate(LOGIN_PATH)
   }
 
   function closeDrawer() {

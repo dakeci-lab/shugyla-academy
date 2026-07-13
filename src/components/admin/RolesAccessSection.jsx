@@ -27,7 +27,11 @@ const EMPTY_FORM = {
   isActive: true,
 }
 
-/** Настройки → Роли и доступы */
+/**
+ * LEGACY: заменён на src/components/admin/roles/RolesAccessPage.jsx
+ * Оставлен для справки; не подключайте в новых страницах.
+ */
+/** Настройки → Роли и доступы (устаревший встроенный блок) */
 export default function RolesAccessSection() {
   const { user, refreshSession } = useSession()
   const allowed = canManageRoles(user)

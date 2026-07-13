@@ -12,7 +12,10 @@ import {
 import './RolesManagementPanel.css'
 import './admin-shared.css'
 
-/** Управление ролями и правами доступа */
+/**
+ * LEGACY: не используется в приложении.
+ * Актуальный UI — src/components/admin/roles/RolesAccessPage.jsx
+ */
 export default function RolesManagementPanel() {
   const { user } = useSession()
   const allowed = canManageRoles(user)

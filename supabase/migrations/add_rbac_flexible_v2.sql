@@ -1,3 +1,4 @@
+-- DEPRECATED: do not execute. Use 20260712163000_complete_flexible_rbac.sql
 -- RBAC v2: гибкие roles / permissions / role_permissions
 -- Не изменяет старые миграции. Мигрирует данные из platform_* если они уже существуют.
 -- academy_users.role (text) сохраняется для обратной совместимости.

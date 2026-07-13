@@ -101,16 +101,59 @@ export const PERMISSION_MODULES = {
   schedule: 'График работы',
   attendance: 'Тайм-трекер',
   rating: 'Рейтинг',
-  recruitment: 'HR / Найм',
-  academy: 'Academy',
-  standards: 'Стандарты',
-  procurement: 'Закуп',
+  recruitment: 'HR',
+  academy: 'Академия',
+  standards: 'База стандартов',
+  procurement: 'Закупки',
   receiving: 'Приёмка',
   suppliers: 'Поставщики',
   price_tags: 'Ценники',
   payroll: 'Зарплата',
   finance: 'Финансы',
   settings: 'Настройки',
+}
+
+/** Модули для вкладок матрицы доступа (только реальные разделы платформы) */
+export const RBAC_MATRIX_MODULES = [
+  'dashboard',
+  'employees',
+  'schedule',
+  'attendance',
+  'rating',
+  'recruitment',
+  'procurement',
+  'receiving',
+  'suppliers',
+  'price_tags',
+  'standards',
+  'academy',
+  'settings',
+  'roles',
+]
+
+export const PERMISSION_ACTION_LABELS = {
+  view: 'Смотреть',
+  create: 'Создавать',
+  edit: 'Редактировать',
+  delete: 'Удалять',
+  manage: 'Управлять',
+  view_team: 'График команды',
+  view_own: 'Свой график',
+  bulk_edit: 'Массовое изменение',
+  check_in: 'Отметка прихода',
+  check_out: 'Отметка ухода',
+  manage_roles: 'Назначение ролей',
+  deactivate: 'Деактивировать',
+  assign_permissions: 'Назначение разрешений',
+  manage_vacancies: 'Управление вакансиями',
+  manage_candidates: 'Управление кандидатами',
+  invite_candidate: 'Приглашение кандидата',
+  hire_candidate: 'Приём кандидата',
+  manage_courses: 'Управление курсами',
+  assign_courses: 'Назначение обучения',
+  transfer: 'Передача в приёмку',
+  calculate: 'Расчёт',
+  manage_settings: 'Настройки модуля',
 }
 
 /** @deprecated */
@@ -233,6 +276,27 @@ export function getPermissionLabel(code) {
 
 export function getPermissionModuleLabel(module) {
   return PERMISSION_MODULES[module] || module
+}
+
+export function getPermissionActionLabel(action) {
+  if (!action) return 'Доступ'
+  return PERMISSION_ACTION_LABELS[action] || action.replace(/_/g, ' ')
+}
+
+export function parsePermissionAction(code) {
+  if (!code) return 'access'
+  const parts = String(code).split('.')
+  return parts[parts.length - 1] || 'access'
+}
+
+export function groupPermissionsForMatrix(permissions, moduleFilter = null) {
+  const modules = moduleFilter ? [moduleFilter] : RBAC_MATRIX_MODULES
+  const byModule = groupPermissionsByModule(permissions)
+  const map = new Map(byModule.map((g) => [g.module, g]))
+
+  return modules
+    .map((module) => map.get(module))
+    .filter(Boolean)
 }
 
 export function groupPermissionsByModule(permissions) {

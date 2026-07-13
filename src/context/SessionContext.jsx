@@ -1,23 +1,53 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { getUser, saveUser, clearUser } from '../utils/storage'
 import { getUserPermissionCodes, resolveUserRole } from '../config/permissions'
-import { getRole } from '../data/roles'
-import { ensureRbacLoaded } from '../services/rbacService'
+import { getRole, normalizeRoleId } from '../data/roles'
+import { ensureRbacLoaded, getRoleById, getRoleByCode } from '../services/rbacService'
+import {
+  restorePlatformSession,
+  signOut,
+  usesSupabaseAuth,
+  subscribeToAuthChanges,
+  resolveSessionUser,
+  SESSION_TYPE,
+} from '../services/authService'
+import { isCloudMode } from '../lib/dataMode'
 
 const SessionContext = createContext(null)
 
-function normalizeSessionUser(raw) {
+export const AUTH_STATUS = {
+  LOADING: 'loading',
+  AUTHENTICATED: 'authenticated',
+  UNAUTHENTICATED: 'unauthenticated',
+}
+
+export { SESSION_TYPE }
+
+function normalizeSessionUser(raw, options = {}) {
   if (!raw) return null
-  const roleSlug = resolveUserRole(raw)
-  const role = getRole(roleSlug)
+  const { trustPermissionCodes = false } = options
+
+  const rbacRole =
+    (raw.roleId && getRoleById(raw.roleId)) ||
+    (raw.role && getRoleByCode(normalizeRoleId(raw.role))) ||
+    null
+
+  const roleSlug = rbacRole?.code || resolveUserRole(raw) || raw.role || null
+  const staticRole = roleSlug ? getRole(roleSlug) : null
+
   const enriched = {
     ...raw,
     role: roleSlug,
-    roleId: raw.roleId ?? raw.role_id ?? null,
-    roleName: role?.label || roleSlug,
-    permissions: role?.permissions || raw.permissions || [],
+    roleId: raw.roleId ?? rbacRole?.id ?? null,
+    roleName: rbacRole?.name || staticRole?.label || raw.roleName || roleSlug,
+    permissions: [],
   }
-  const permissionSlugs = [...getUserPermissionCodes(enriched)]
+
+  const permissionSlugs =
+    trustPermissionCodes && Array.isArray(raw.permissionCodes) && raw.permissionCodes.length > 0
+      ? [...raw.permissionCodes]
+      : [...getUserPermissionCodes(enriched)]
+
   return {
     ...enriched,
     permissionSlugs,
@@ -26,50 +56,207 @@ function normalizeSessionUser(raw) {
 }
 
 export function SessionProvider({ children }) {
-  const [user, setUser] = useState(() => normalizeSessionUser(getUser()))
+  const [user, setUser] = useState(null)
+  const [authStatus, setAuthStatus] = useState(AUTH_STATUS.LOADING)
+  const [sessionType, setSessionType] = useState(null)
+  const [supabaseAuthenticated, setSupabaseAuthenticated] = useState(false)
   const [rbacReady, setRbacReady] = useState(false)
+  const sessionEstablishedRef = useRef(false)
+  const initGenerationRef = useRef(0)
 
   useEffect(() => {
+    const initId = ++initGenerationRef.current
     let cancelled = false
-    ensureRbacLoaded()
-      .catch(() => null)
-      .finally(() => {
-        if (cancelled) return
-        setRbacReady(true)
-        setUser(normalizeSessionUser(getUser()))
+    let unsubscribeAuth = () => {}
+
+    async function applyRestoredSession(restored) {
+      if (cancelled || initId !== initGenerationRef.current || sessionEstablishedRef.current) {
+        return
+      }
+
+      const trustPermissions = restored.sessionType === SESSION_TYPE.LEGACY
+      const normalized = restored.user
+        ? normalizeSessionUser(
+            {
+              ...restored.user,
+              sessionType: restored.sessionType,
+            },
+            { trustPermissionCodes: trustPermissions }
+          )
+        : null
+
+      if (normalized) {
+        saveUser(normalized)
+      }
+
+      if (cancelled || initId !== initGenerationRef.current || sessionEstablishedRef.current) {
+        return
+      }
+
+      setUser(normalized)
+      setSessionType(restored.sessionType)
+      setSupabaseAuthenticated(restored.supabaseAuthenticated)
+      setAuthStatus(
+        normalized ? AUTH_STATUS.AUTHENTICATED : AUTH_STATUS.UNAUTHENTICATED
+      )
+      setRbacReady(true)
+    }
+
+    async function initSession() {
+      let restored = {
+        user: null,
+        sessionType: null,
+        supabaseAuthenticated: false,
+      }
+
+      try {
+        restored = await restorePlatformSession()
+      } catch {
+        if (!sessionEstablishedRef.current) {
+          clearUser()
+        }
+      }
+
+      try {
+        await ensureRbacLoaded()
+      } catch {
+        // RBAC fallback обрабатывается в permissions.js
+      }
+
+      await applyRestoredSession(restored)
+    }
+
+    if (isCloudMode() && usesSupabaseAuth()) {
+      unsubscribeAuth = subscribeToAuthChanges(async (session, event) => {
+        if (cancelled || initId !== initGenerationRef.current) return
+
+        if (event === 'TOKEN_REFRESHED' && session?.access_token) {
+          setSupabaseAuthenticated(true)
+          return
+        }
+
+        if (event !== 'SIGNED_IN' || !session?.access_token) return
+        if (sessionEstablishedRef.current) return
+
+        try {
+          await ensureRbacLoaded()
+          const profile = await resolveSessionUser(session)
+          if (!profile || cancelled || initId !== initGenerationRef.current) return
+
+          await applyRestoredSession({
+            user: {
+              ...profile,
+              sessionType: SESSION_TYPE.SUPABASE,
+              supabaseAuthenticated: true,
+            },
+            sessionType: SESSION_TYPE.SUPABASE,
+            supabaseAuthenticated: true,
+          })
+        } catch {
+          // initSession или следующее auth-событие завершит восстановление
+        }
       })
+    }
+
+    initSession()
+
     return () => {
       cancelled = true
+      unsubscribeAuth()
     }
   }, [])
 
   const refreshSession = useCallback(() => {
-    setUser(normalizeSessionUser(getUser()))
+    const stored = getUser()
+    const normalized = stored
+      ? normalizeSessionUser(stored, {
+          trustPermissionCodes: stored.sessionType === SESSION_TYPE.LEGACY,
+        })
+      : null
+    setUser(normalized)
+    setSessionType(stored?.sessionType ?? null)
+    setSupabaseAuthenticated(
+      stored?.sessionType === SESSION_TYPE.SUPABASE ||
+        Boolean(stored?.supabaseAuthenticated)
+    )
+    setAuthStatus(
+      normalized ? AUTH_STATUS.AUTHENTICATED : AUTH_STATUS.UNAUTHENTICATED
+    )
   }, [])
 
-  const setSessionUser = useCallback((sessionUser) => {
-    const normalized = normalizeSessionUser(sessionUser)
+  const setSessionUser = useCallback((sessionUser, options = {}) => {
+    sessionEstablishedRef.current = true
+    const nextSessionType =
+      options.sessionType ?? sessionUser?.sessionType ?? SESSION_TYPE.LEGACY
+    const nextSupabaseAuthenticated =
+      options.supabaseAuthenticated ??
+      sessionUser?.supabaseAuthenticated ??
+      nextSessionType === SESSION_TYPE.SUPABASE
+    const normalized = normalizeSessionUser(
+      {
+        ...sessionUser,
+        sessionType: nextSessionType,
+        supabaseAuthenticated: nextSupabaseAuthenticated,
+      },
+      { trustPermissionCodes: nextSessionType === SESSION_TYPE.LEGACY }
+    )
     saveUser(normalized)
     setUser(normalized)
+    setSessionType(nextSessionType)
+    setSupabaseAuthenticated(nextSupabaseAuthenticated)
+    setAuthStatus(AUTH_STATUS.AUTHENTICATED)
   }, [])
 
   const updateSessionUser = useCallback((patch) => {
     const current = getUser()
     if (!current) return null
-    const next = normalizeSessionUser({ ...current, ...patch })
+    const next = normalizeSessionUser(
+      { ...current, ...patch },
+      { trustPermissionCodes: current.sessionType === SESSION_TYPE.LEGACY }
+    )
     saveUser(next)
     setUser(next)
+    setSessionType(next.sessionType ?? sessionType)
+    setSupabaseAuthenticated(
+      next.sessionType === SESSION_TYPE.SUPABASE ||
+        Boolean(next.supabaseAuthenticated)
+    )
+    setAuthStatus(AUTH_STATUS.AUTHENTICATED)
     return next
+  }, [sessionType])
+
+  const logout = useCallback(async () => {
+    if (isCloudMode() && usesSupabaseAuth()) {
+      try {
+        await signOut()
+      } catch (err) {
+        console.warn('Supabase signOut failed:', err)
+      }
+    }
+    clearUser()
+    sessionEstablishedRef.current = false
+    setUser(null)
+    setSessionType(null)
+    setSupabaseAuthenticated(false)
+    setAuthStatus(AUTH_STATUS.UNAUTHENTICATED)
   }, [])
 
-  const logout = useCallback(() => {
-    clearUser()
-    setUser(null)
-  }, [])
+  const sessionReady = authStatus !== AUTH_STATUS.LOADING
 
   return (
     <SessionContext.Provider
-      value={{ user, rbacReady, setSessionUser, updateSessionUser, refreshSession, logout }}
+      value={{
+        user,
+        authStatus,
+        sessionReady,
+        sessionType,
+        supabaseAuthenticated,
+        rbacReady,
+        setSessionUser,
+        updateSessionUser,
+        refreshSession,
+        logout,
+      }}
     >
       {children}
     </SessionContext.Provider>

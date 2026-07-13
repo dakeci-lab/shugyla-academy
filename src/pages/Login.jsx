@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { login, getPostLoginPath } from '../utils/auth'
-import { useSession } from '../context/SessionContext'
+import { useSession, AUTH_STATUS, SESSION_TYPE } from '../context/SessionContext'
+import { requiresMandatorySupabaseAuth } from '../services/authService'
+import AuthLoadingScreen from '../components/AuthLoadingScreen'
 import './Login.css'
 
 const DEACTIVATED_MESSAGE = 'Аккаунт деактивирован. Обратитесь к администратору.'
@@ -43,19 +45,45 @@ export default function Login() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const redirect = searchParams.get('redirect')
-  const { setSessionUser, user } = useSession()
+  const {
+    setSessionUser,
+    user,
+    authStatus,
+    supabaseAuthenticated,
+    rbacReady,
+  } = useSession()
 
   const [loginValue, setLoginValue] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [completingLogin, setCompletingLogin] = useState(false)
 
   useEffect(() => {
-    if (user) {
-      navigate(getPostLoginPath(user, redirect), { replace: true })
-    }
-  }, [user, navigate, redirect])
+    if (authStatus === AUTH_STATUS.LOADING) return
+    if (!user || authStatus !== AUTH_STATUS.AUTHENTICATED) return
+    if (!rbacReady) return
+
+    const needsSupabaseJwt =
+      requiresMandatorySupabaseAuth(user.role) ||
+      user.sessionType === SESSION_TYPE.SUPABASE
+    if (needsSupabaseJwt && !supabaseAuthenticated) return
+
+    navigate(getPostLoginPath(user, redirect), { replace: true })
+    setCompletingLogin(false)
+  }, [
+    user,
+    authStatus,
+    supabaseAuthenticated,
+    rbacReady,
+    navigate,
+    redirect,
+  ])
+
+  if (authStatus === AUTH_STATUS.LOADING || completingLogin) {
+    return <AuthLoadingScreen />
+  }
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -65,18 +93,23 @@ export default function Login() {
     try {
       const result = await login(loginValue, password)
       if (!result.success) {
-        setError(
-          result.error === 'invalid' || result.error === DEACTIVATED_MESSAGE
-            ? result.error === DEACTIVATED_MESSAGE
-              ? DEACTIVATED_MESSAGE
-              : 'Неверный логин или пароль'
-            : 'Не удалось войти. Попробуйте позже.'
-        )
+        if (result.error === 'invalid') {
+          setError('Неверный логин или пароль')
+        } else if (result.error === DEACTIVATED_MESSAGE) {
+          setError(DEACTIVATED_MESSAGE)
+        } else if (typeof result.error === 'string' && result.error) {
+          setError(result.error)
+        } else {
+          setError('Не удалось войти. Попробуйте позже.')
+        }
         return
       }
 
-      setSessionUser(result.user)
-      navigate(getPostLoginPath(result.user, redirect), { replace: true })
+      setSessionUser(result.user, {
+        sessionType: result.sessionType,
+        supabaseAuthenticated: result.supabaseAuthenticated,
+      })
+      setCompletingLogin(true)
     } catch {
       setError('Не удалось войти. Попробуйте позже.')
     } finally {
@@ -117,13 +150,13 @@ export default function Login() {
 
           <form className="login-page__form" onSubmit={handleSubmit}>
             <label className="login-page__label">
-              Логин
+              Логин или телефон
               <input
                 type="text"
                 className="login-page__input"
                 value={loginValue}
                 onChange={(e) => setLoginValue(e.target.value)}
-                placeholder="Введите логин"
+                placeholder="Введите логин или телефон"
                 required
                 autoComplete="username"
               />

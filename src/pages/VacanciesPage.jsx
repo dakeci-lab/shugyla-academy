@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { getPublishedVacancies } from '../services/academyDataService'
 import { getVacancyRoleLabel } from '../utils/recruitmentData'
+import { LOGIN_PATH } from '../router/authRoutes'
 import Header from '../components/Header'
 import './Vacancies.css'
 import './Apply.css'
@@ -42,7 +43,7 @@ export default function VacanciesPage() {
 
         <p className="vacancies-page__login-hint">
           Сотрудникам:{' '}
-          <Link to="/login" className="vacancies-page__login-link">
+          <Link to={LOGIN_PATH} className="vacancies-page__login-link">
             войти в Shugyla Platform
           </Link>
         </p>

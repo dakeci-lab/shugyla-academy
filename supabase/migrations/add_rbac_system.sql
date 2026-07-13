@@ -1,3 +1,4 @@
+-- DEPRECATED: do not execute. Use 20260712163000_complete_flexible_rbac.sql
 -- RBAC: роли, права и связи role_permissions
 -- Сохраняем academy_users.role (text) для обратной совместимости
 

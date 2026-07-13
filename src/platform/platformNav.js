@@ -212,11 +212,31 @@ export const PLATFORM_NAV = [
   },
   {
     id: 'settings',
-    path: '/platform/settings',
     label: 'Настройки',
     routeKey: ROUTE_KEYS.SETTINGS,
     title: 'Настройки',
-    description: 'Параметры платформы и режим работы.',
+    description: 'Параметры платформы, геозона и роли доступа.',
+    pathPrefixes: ['/platform/settings'],
+    children: [
+      {
+        id: 'settings-general',
+        path: '/platform/settings/general',
+        label: 'Общие настройки',
+        end: true,
+        routeKey: ROUTE_KEYS.SETTINGS_GENERAL,
+        title: 'Общие настройки',
+        description: 'Рабочая точка, геозона и режим работы платформы.',
+      },
+      {
+        id: 'settings-roles',
+        path: '/platform/settings/roles',
+        label: 'Роли и доступы',
+        end: true,
+        routeKey: ROUTE_KEYS.SETTINGS_ROLES,
+        title: 'Роли и доступы',
+        description: 'Роли сотрудников и матрица разрешений.',
+      },
+    ],
   },
 ]
 

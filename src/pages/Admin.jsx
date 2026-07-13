@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../context/SessionContext'
+import { LOGIN_PATH } from '../router/authRoutes'
 import AdminLayout from '../layouts/AdminLayout'
 import OverviewSection from '../components/admin/sections/OverviewSection'
 import EmployeesSection from '../components/admin/sections/EmployeesSection'
@@ -49,7 +50,7 @@ export default function Admin() {
 
   function handleLogout() {
     logout()
-    navigate('/login')
+    navigate(LOGIN_PATH)
   }
 
   return (

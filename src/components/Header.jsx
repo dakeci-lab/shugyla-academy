@@ -2,6 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { canManageAdmin } from '../utils/auth'
 import { useSession } from '../context/SessionContext'
 import { useLanguage } from '../context/LanguageContext'
+import { LOGIN_PATH } from '../router/authRoutes'
 import LangSwitch from './LangSwitch'
 import './Header.css'
 
@@ -16,7 +17,7 @@ export default function Header({ variant = 'default' }) {
 
   function handleLogout() {
     logout()
-    navigate('/login')
+    navigate(LOGIN_PATH)
   }
 
   const logoTo = user ? '/platform' : variant === 'landing' ? '/vacancies' : '/platform'
@@ -72,7 +73,7 @@ export default function Header({ variant = 'default' }) {
               </button>
             </>
           ) : (
-            <Link to="/login" className="btn btn--primary btn--sm">
+            <Link to={LOGIN_PATH} className="btn btn--primary btn--sm">
               {t.login}
             </Link>
           )}

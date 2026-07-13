@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { updatePassword, mapAuthError, usesSupabaseAuth } from '../services/authService'
+import { LOGIN_PATH } from '../router/authRoutes'
 import './Login.css'
 
-/** Сброс пароля — /reset-password */
+/** Сброс пароля — /reset-password (card-layout, не форма входа) */
 export default function ResetPassword() {
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
@@ -77,7 +78,7 @@ export default function ResetPassword() {
     setLoading(true)
     try {
       await updatePassword(password)
-      navigate('/login', {
+      navigate(LOGIN_PATH, {
         replace: true,
         state: { passwordUpdated: true },
       })
@@ -150,7 +151,7 @@ export default function ResetPassword() {
           </form>
         )}
 
-        <Link to="/login" className="login-page__back">
+        <Link to={LOGIN_PATH} className="login-page__back">
           ← Вернуться ко входу
         </Link>
       </div>

@@ -1,0 +1,252 @@
+.roles-page {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.roles-page__tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  padding-bottom: 4px;
+}
+
+.roles-page__tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 10px 14px;
+  border-radius: 10px 10px 0 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted, #6b7280);
+  cursor: pointer;
+}
+
+.roles-page__tab--active {
+  color: #047857;
+  background: #ecfdf5;
+  box-shadow: inset 0 -2px 0 #047857;
+}
+
+.roles-page__content {
+  min-height: 0;
+}
+
+.roles-page__panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.roles-page__matrix {
+  min-height: 400px;
+}
+
+.roles-matrix__toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.roles-matrix__role-select {
+  flex: 1;
+  min-width: 220px;
+  max-width: 420px;
+}
+
+.roles-matrix__role-meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 12px;
+  background: #fafafa;
+}
+
+.roles-matrix__role-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.roles-matrix__role-desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.roles-matrix__unsaved-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  font-size: 13px;
+}
+
+.roles-matrix__unsaved-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.roles-matrix__module-tabs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.roles-matrix__module-tab {
+  flex: 0 0 auto;
+  appearance: none;
+  border: 1px solid var(--color-border, #e5e7eb);
+  background: #fff;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted, #6b7280);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.roles-matrix__module-tab--active {
+  color: #047857;
+  border-color: #6ee7b7;
+  background: #ecfdf5;
+}
+
+.roles-matrix__actions-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.roles-matrix__bulk-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.roles-matrix__content {
+  flex: 1;
+  min-height: 200px;
+  overflow: auto;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.roles-matrix__table-wrap {
+  overflow-x: auto;
+}
+
+.roles-matrix__table {
+  width: 100%;
+  min-width: 480px;
+}
+
+.roles-matrix__perm-name {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.roles-matrix__perm-action {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.roles-matrix__check-cell {
+  width: 72px;
+  text-align: center;
+}
+
+.roles-matrix__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 12px 0 4px;
+  background: linear-gradient(to top, #fff 80%, rgba(255, 255, 255, 0));
+}
+
+.roles-matrix__footer-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.roles-matrix__dirty-hint {
+  font-size: 12px;
+  color: #b45309;
+}
+
+@media (max-width: 768px) {
+  .roles-matrix__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .roles-matrix__role-select {
+    max-width: none;
+  }
+
+  .roles-matrix__table {
+    min-width: 0;
+  }
+
+  .roles-matrix__table thead {
+    display: none;
+  }
+
+  .roles-matrix__table tbody tr {
+    display: block;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-border, #e5e7eb);
+  }
+
+  .roles-matrix__table tbody td {
+    display: block;
+    width: 100%;
+    padding: 0;
+    border: none;
+  }
+
+  .roles-matrix__check-cell {
+    width: auto;
+    text-align: left;
+    margin-top: 8px;
+  }
+
+  .roles-matrix__check-cell input {
+    width: 18px;
+    height: 18px;
+  }
+
+  .roles-matrix__footer {
+    position: sticky;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+    padding-top: 10px;
+  }
+}

@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { isCloudMode } from '../lib/dataMode'
 import { initializeData, refreshProcurementData } from '../services/academyDataService'
+import { isPublicAppPath } from '../router/authRoutes'
 import './AcademyDataContext.css'
 
 const AcademyDataContext = createContext({
@@ -26,6 +28,8 @@ function DataLoadingScreen() {
 }
 
 export function AcademyDataProvider({ children }) {
+  const { pathname } = useLocation()
+  const isPublicRoute = isPublicAppPath(pathname)
   const [ready, setReady] = useState(!isCloudMode())
   const [loading, setLoading] = useState(isCloudMode())
   const [version, setVersion] = useState(0)
@@ -76,7 +80,7 @@ export function AcademyDataProvider({ children }) {
     load()
   }, [])
 
-  if (loading || !ready) {
+  if ((loading || !ready) && !isPublicRoute) {
     return <DataLoadingScreen />
   }
 

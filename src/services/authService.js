@@ -1,5 +1,12 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { getRole } from '../data/roles'
+import { getUser, clearUser } from '../utils/storage'
+import {
+  ensureRbacLoaded,
+  getRoleById,
+  getRoleByCode,
+  getPermissionCodesForUserRole,
+} from './rbacService'
 import {
   authenticateEmployee,
   canEmployeeLogin,
@@ -11,9 +18,13 @@ import {
   normalizePhone,
   phoneToTechnicalEmail,
   technicalEmailToPhone,
+  loginToTechnicalEmail,
+  technicalEmailToLogin,
 } from '../utils/phoneUtils'
 
-const APP_BASE = '/shugyla-academy'
+import { getAppBasePath } from '../router/basename'
+
+const APP_BASE = getAppBasePath()
 
 export function usesSupabaseAuth() {
   return isSupabaseConfigured()
@@ -105,10 +116,69 @@ export async function loadAcademyProfileByLogin(loginValue) {
   return buildSessionUser(employee, technicalEmailToPhone(employee.login) || employee.login)
 }
 
+export async function loadAcademyProfileById(userId) {
+  if (userId === undefined || userId === null || userId === '') return null
+
+  if (isCloudMode() && supabase) {
+    const result = await supabase
+      .from('academy_users')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle()
+
+    if (result.error) {
+      throw new Error('Не удалось загрузить профиль сотрудника')
+    }
+
+    if (!result.data) return null
+
+    const row = result.data
+    if (!canEmployeeLogin(row.status)) {
+      return { deactivated: true }
+    }
+
+    const assignmentsRes = await supabase
+      .from('academy_course_assignments')
+      .select('course_id')
+      .eq('user_id', row.id)
+
+    if (assignmentsRes.error) {
+      throw new Error('Не удалось загрузить назначения курсов')
+    }
+
+    return buildSessionUser(
+      normalizeEmployee({
+        id: row.id,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        name: row.full_name,
+        login: row.login,
+        password: row.password,
+        role: row.role,
+        roleId: row.role_id,
+        position: row.position,
+        employmentStatus: row.status,
+        assignedCourseIds: (assignmentsRes.data || []).map((a) => a.course_id),
+        avatarUrl: row.avatar_url,
+      }),
+      technicalEmailToPhone(row.login) || row.login
+    )
+  }
+
+  const employee = getAllEmployees().find((e) => String(e.id) === String(userId))
+  if (!employee) return null
+  if (!canEmployeeLogin(employee.employmentStatus)) {
+    return { deactivated: true }
+  }
+  return buildSessionUser(employee, technicalEmailToPhone(employee.login) || employee.login)
+}
+
 export async function loadAcademyProfileByEmail(email) {
   const phone = technicalEmailToPhone(email)
   if (phone) return loadAcademyProfileByLogin(phone)
-  return loadAcademyProfileByLogin(email)
+  const login = technicalEmailToLogin(email)
+  if (login) return loadAcademyProfileByLogin(login)
+  return null
 }
 
 export function mapAuthError(error) {
@@ -194,16 +264,311 @@ export function mapPasswordChangeError(error) {
 
 function resolveAuthEmail(session, fallbackLogin) {
   if (session?.user?.email) return session.user.email
+  return loginToTechnicalEmail(fallbackLogin)
+}
 
-  const login = fallbackLogin?.trim()
-  if (!login) return null
+export const SESSION_TYPE = {
+  SUPABASE: 'supabase',
+  LEGACY: 'legacy',
+}
 
-  if (login.includes('@')) return login
+/** Роли, для которых Supabase Auth-сессия обязательна (RBAC RPC) */
+export function requiresMandatorySupabaseAuth(role) {
+  if (!role) return false
+  const code = String(role).toLowerCase()
+  return code === 'admin' || code === 'administrator'
+}
 
-  const phone = normalizePhone(login)
-  if (phone) return phoneToTechnicalEmail(phone)
+/** Минимальная проверка сохранённого профиля shugyla_user */
+export function isValidStoredPlatformUser(raw) {
+  if (!raw || typeof raw !== 'object') return false
+  const id = raw.id
+  if (id === undefined || id === null || id === '') return false
+  return Boolean(String(raw.login || '').trim())
+}
 
-  return login
+function emptyRestoredSession() {
+  return {
+    user: null,
+    sessionType: null,
+    supabaseAuthenticated: false,
+  }
+}
+
+/**
+ * Legacy-восстановление: shugyla_user → academy_users → roles → role_permissions.
+ * Не доверяет permissions из localStorage; динамические роли не требуют статического каталога.
+ */
+async function restoreLegacyPlatformSession(storedSnapshot) {
+  if (!isValidStoredPlatformUser(storedSnapshot)) {
+    clearUser()
+    return emptyRestoredSession()
+  }
+
+  try {
+    await ensureRbacLoaded()
+  } catch {
+    clearUser()
+    return emptyRestoredSession()
+  }
+
+  let profile = null
+  try {
+    if (storedSnapshot.id !== undefined && storedSnapshot.id !== null && storedSnapshot.id !== '') {
+      profile = await loadAcademyProfileById(storedSnapshot.id)
+    }
+    if (!profile && storedSnapshot.login) {
+      profile = await loadAcademyProfileByLogin(storedSnapshot.login)
+    }
+  } catch {
+    clearUser()
+    return emptyRestoredSession()
+  }
+
+  if (!profile || profile.deactivated) {
+    clearUser()
+    return emptyRestoredSession()
+  }
+
+  const roleId = profile.roleId ?? profile.role_id ?? null
+  const roleCodeFromProfile = profile.role ? String(profile.role).trim() : ''
+
+  if (!roleId && !roleCodeFromProfile) {
+    clearUser()
+    return emptyRestoredSession()
+  }
+
+  const rbacRole =
+    (roleId && getRoleById(roleId)) ||
+    (roleCodeFromProfile && getRoleByCode(roleCodeFromProfile)) ||
+    null
+
+  if (!rbacRole || rbacRole.isActive === false) {
+    clearUser()
+    return emptyRestoredSession()
+  }
+
+  if (
+    requiresMandatorySupabaseAuth(rbacRole.code) ||
+    requiresMandatorySupabaseAuth(roleCodeFromProfile)
+  ) {
+    // Admin требует Supabase JWT — не удаляем shugyla_user, пока Auth ещё может восстановиться
+    return emptyRestoredSession()
+  }
+
+  const permissionCodes = getPermissionCodesForUserRole({
+    role: rbacRole.code,
+    roleId: rbacRole.id,
+  })
+
+  return {
+    user: {
+      id: profile.id,
+      login: profile.login,
+      name: profile.name,
+      role: rbacRole.code,
+      roleId: rbacRole.id,
+      roleName: rbacRole.name,
+      permissions: [],
+      permissionCodes,
+      permissionSlugs: permissionCodes,
+      assignedCourseIds: profile.assignedCourseIds || [],
+      sessionType: SESSION_TYPE.LEGACY,
+    },
+    sessionType: SESSION_TYPE.LEGACY,
+    supabaseAuthenticated: false,
+  }
+}
+
+/** Дождаться INITIAL_SESSION от Supabase SDK (загрузка session из storage) */
+function waitForSupabaseInitialAuthEvent() {
+  if (!supabase) return Promise.resolve()
+
+  return new Promise((resolve) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'INITIAL_SESSION') {
+        subscription.unsubscribe()
+        resolve()
+      }
+    })
+  })
+}
+
+/** Дождаться обновления access token (refresh) без setTimeout */
+function waitForSupabaseTokenRefresh() {
+  if (!supabase) return Promise.resolve(null)
+
+  return new Promise((resolve) => {
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'TOKEN_REFRESHED' && session?.access_token) {
+        subscription.unsubscribe()
+        resolve(session)
+      } else if (event === 'SIGNED_OUT') {
+        subscription.unsubscribe()
+        resolve(null)
+      }
+    })
+  })
+}
+
+/**
+ * Supabase Auth session после холодного старта: INITIAL_SESSION → getSession (refresh) → TOKEN_REFRESHED.
+ */
+export async function resolveSupabaseAuthSession() {
+  if (!usesSupabaseAuth() || !supabase) return null
+
+  await waitForSupabaseInitialAuthEvent()
+
+  const { data, error } = await supabase.auth.getSession()
+  if (!error && data?.session?.access_token) {
+    return data.session
+  }
+
+  if (data?.session?.refresh_token && !data?.session?.access_token) {
+    const refreshed = await waitForSupabaseTokenRefresh()
+    if (refreshed?.access_token) return refreshed
+  }
+
+  return null
+}
+
+/**
+ * Восстановление сессии при старте: Supabase JWT → профиль, иначе shugyla_user (legacy).
+ * При наличии JWT не переходит в legacy и не очищает shugyla_user.
+ */
+export async function restorePlatformSession() {
+  const storedUser = getUser()
+
+  let supabaseSession = null
+  if (usesSupabaseAuth() && supabase) {
+    try {
+      supabaseSession = await resolveSupabaseAuthSession()
+    } catch {
+      // Ошибка SDK — сохраняем возможность legacy-восстановления
+    }
+  }
+
+  if (supabaseSession?.access_token) {
+    try {
+      await ensureRbacLoaded()
+    } catch {
+      // RBAC нужен для normalize; без legacy-fallback при активном JWT
+    }
+
+    try {
+      const profile = await resolveSessionUser(supabaseSession)
+      if (profile) {
+        return {
+          user: {
+            ...profile,
+            sessionType: SESSION_TYPE.SUPABASE,
+            supabaseAuthenticated: true,
+          },
+          sessionType: SESSION_TYPE.SUPABASE,
+          supabaseAuthenticated: true,
+        }
+      }
+    } catch {
+      // JWT валиден, профиль временно недоступен — не legacy, не clearUser
+    }
+
+    return emptyRestoredSession()
+  }
+
+  if (isValidStoredPlatformUser(storedUser)) {
+    return restoreLegacyPlatformSession(storedUser)
+  }
+
+  return emptyRestoredSession()
+}
+
+function mapMandatorySupabaseAuthError(error) {
+  if (!error) return 'Не удалось создать защищённую сессию администратора'
+
+  const message = error.message || ''
+  const code = error.code || error.status || ''
+
+  if (message.includes('Failed to fetch') || message.includes('NetworkError')) {
+    return 'Supabase Auth недоступен. Проверьте подключение и попробуйте позже.'
+  }
+
+  if (
+    code === 'invalid_credentials' ||
+    message.includes('Invalid login credentials') ||
+    message.includes('Invalid email or password')
+  ) {
+    return 'Учётная запись администратора не настроена в Supabase Auth. Обратитесь к техническому администратору.'
+  }
+
+  return 'Не удалось создать защищённую сессию администратора'
+}
+
+/**
+ * После успешной проверки academy_users — создать Supabase Auth-сессию (JWT для RPC).
+ * required=true для admin/administrator: без JWT вход не считается успешным.
+ */
+export async function signInSupabaseAuthAfterAcademyLogin(login, password, { required = false } = {}) {
+  if (!usesSupabaseAuth() || !supabase) {
+    if (required) {
+      return {
+        ok: false,
+        error: 'Supabase Auth недоступен. Проверьте подключение и попробуйте позже.',
+      }
+    }
+    return { ok: true, skipped: true }
+  }
+
+  const email = loginToTechnicalEmail(login)
+  if (!email) {
+    if (required) {
+      return { ok: false, error: 'Не удалось создать защищённую сессию администратора' }
+    }
+    return { ok: true, skipped: true }
+  }
+
+  try {
+    const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
+
+    if (signInError) {
+      if (required) {
+        await supabase.auth.signOut().catch(() => {})
+        return { ok: false, error: mapMandatorySupabaseAuthError(signInError) }
+      }
+      return { ok: true, optionalFailed: true }
+    }
+
+    const session = data?.session ?? null
+
+    if (required) {
+      if (!session?.access_token) {
+        await supabase.auth.signOut().catch(() => {})
+        return { ok: false, error: 'Не удалось создать защищённую сессию администратора' }
+      }
+
+      const sessionEmail = session.user?.email?.toLowerCase()
+      if (sessionEmail !== email.toLowerCase()) {
+        await supabase.auth.signOut().catch(() => {})
+        return { ok: false, error: 'Не удалось создать защищённую сессию администратора' }
+      }
+    }
+
+    return { ok: true, session }
+  } catch {
+    if (required) {
+      return {
+        ok: false,
+        error: 'Supabase Auth недоступен. Проверьте подключение и попробуйте позже.',
+      }
+    }
+    return { ok: true, optionalFailed: true }
+  }
 }
 
 /**
@@ -333,11 +698,9 @@ export async function getCurrentAuthSession() {
 
 export async function resolveSessionUser(session) {
   if (!session?.user?.email) return null
-  const phone = technicalEmailToPhone(session.user.email)
-  const profile = phone
-    ? await loadAcademyProfileByLogin(phone)
-    : await loadAcademyProfileByEmail(session.user.email)
+  const profile = await loadAcademyProfileByEmail(session.user.email)
   if (!profile || profile.deactivated) return null
+  const phone = technicalEmailToPhone(session.user.email)
   return phone ? { ...profile, phone } : profile
 }
 
@@ -369,8 +732,8 @@ export async function updatePassword(newPassword) {
 export function subscribeToAuthChanges(callback) {
   if (!usesSupabaseAuth() || !supabase) return () => {}
 
-  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
-    callback(session)
+  const { data } = supabase.auth.onAuthStateChange((event, session) => {
+    callback(session, event)
   })
 
   return () => {
