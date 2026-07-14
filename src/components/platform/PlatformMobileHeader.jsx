@@ -1,4 +1,4 @@
-import PlatformUserMenu from './PlatformUserMenu'
+import PlatformHeaderActions from './PlatformHeaderActions'
 import './PlatformMobileHeader.css'
 
 /** Компактный header для mobile/PWA */
@@ -21,7 +21,7 @@ export default function PlatformMobileHeader({ user, onMenuOpen, onLogout }) {
         <span className="platform-mobile-header__name">Shugyla Platform</span>
       </div>
 
-      <PlatformUserMenu user={user} onLogout={onLogout} compact />
+      <PlatformHeaderActions user={user} onLogout={onLogout} compact bellVariant="mobile" />
     </header>
   )
 }

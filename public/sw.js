@@ -77,3 +77,111 @@ self.addEventListener('fetch', (event) => {
       .catch(() => caches.match(request))
   )
 })
+
+function resolveSafeNotificationUrl(rawUrl) {
+  const origin = self.location.origin
+  const fallback = `${origin}${BASE}`
+  if (!rawUrl || typeof rawUrl !== 'string') return fallback
+
+  const trimmed = rawUrl.trim()
+  if (/^(javascript|data):/i.test(trimmed)) return fallback
+
+  try {
+    const url = new URL(trimmed, origin)
+    if (url.origin !== origin) return fallback
+    const basePath = BASE.replace(/\/$/, '')
+    if (!url.pathname.startsWith(basePath)) return fallback
+    return url.href
+  } catch {
+    return fallback
+  }
+}
+
+function parsePushPayload(event) {
+  const fallback = {
+    title: 'Shugyla Platform',
+    body: 'У вас новое уведомление',
+    icon: `${BASE}icons/icon-192.png`,
+    badge: `${BASE}icons/icon-192.png`,
+    tag: 'shugyla-notification',
+    data: { url: `${BASE}platform/profile` },
+    actions: [],
+    requireInteraction: false,
+  }
+
+  if (!event.data) return fallback
+
+  try {
+    const payload = event.data.json()
+    const data = payload?.data && typeof payload.data === 'object' ? payload.data : {}
+    return {
+      title: typeof payload.title === 'string' && payload.title.trim() ? payload.title.trim() : fallback.title,
+      body: typeof payload.body === 'string' && payload.body.trim() ? payload.body.trim() : fallback.body,
+      icon: typeof payload.icon === 'string' ? payload.icon : fallback.icon,
+      badge: typeof payload.badge === 'string' ? payload.badge : fallback.badge,
+      tag: typeof payload.tag === 'string' && payload.tag.trim() ? payload.tag.trim() : fallback.tag,
+      data: {
+        url: resolveSafeNotificationUrl(data.url || payload.url),
+        notification_id: data.notification_id ?? null,
+        type: data.type ?? null,
+      },
+      actions: Array.isArray(payload.actions) ? payload.actions.slice(0, 2) : [],
+      requireInteraction: payload.requireInteraction === true,
+    }
+  } catch {
+    return fallback
+  }
+}
+
+self.addEventListener('push', (event) => {
+  event.waitUntil(
+    (async () => {
+      const payload = parsePushPayload(event)
+      await self.registration.showNotification(payload.title, {
+        body: payload.body,
+        icon: payload.icon,
+        badge: payload.badge,
+        tag: payload.tag,
+        data: payload.data,
+        actions: payload.actions,
+        renotify: Boolean(payload.tag),
+        requireInteraction: payload.requireInteraction,
+      })
+    })()
+  )
+})
+
+async function focusOrOpenClient(targetUrl) {
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  for (const client of clients) {
+    if (!client.url.includes(BASE.replace(/\/$/, ''))) continue
+    await client.focus()
+    if ('navigate' in client) {
+      try {
+        await client.navigate(targetUrl)
+        return
+      } catch {
+        return
+      }
+    }
+    return
+  }
+  await self.clients.openWindow(targetUrl)
+}
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close()
+
+  const data = event.notification.data || {}
+  let targetUrl = resolveSafeNotificationUrl(data.url)
+
+  if (event.action && typeof event.action === 'string') {
+    targetUrl = resolveSafeNotificationUrl(event.action)
+  }
+
+  event.waitUntil(focusOrOpenClient(targetUrl))
+})
+
+self.addEventListener('notificationclose', () => {
+  // Intentionally no-op on this step
+})

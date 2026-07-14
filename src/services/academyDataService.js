@@ -1,5 +1,8 @@
 import { isCloudMode, getDataModeLabel, getDataModeVariant } from '../lib/dataMode'
-import { setCloudStore, clearCloudStore, patchCloudStore } from '../lib/cloudStore'
+import { setCloudStore, clearCloudStore, patchCloudStore, getCloudStore } from '../lib/cloudStore'
+import { normalizeEmployee } from '../utils/employeeData'
+import { createEmployeeWithAuth } from './employeeProvisioningService'
+import { updateEmployeeAsAdmin } from './employeeAdminService'
 import * as supabaseAdapter from './supabaseDataAdapter'
 import * as testSupabaseAdapter from './testSupabaseAdapter'
 import * as testLocalAdapter from './testLocalAdapter'
@@ -178,32 +181,68 @@ export async function getEmployees() {
 
 export async function createEmployee(data) {
   if (isCloudMode()) {
-    const all = await supabaseAdapter.fetchAllData()
-    const newId =
-      data.id ?? (all.employees.length
-        ? Math.max(...all.employees.map((e) => e.id)) + 1
-        : 1)
-    const id = await supabaseAdapter.createEmployee({ ...data, id: newId })
-    await refreshData()
-    return id
+    const fullName =
+      data.name?.trim() ||
+      `${data.firstName || ''} ${data.lastName || ''}`.trim()
+
+    const row = await createEmployeeWithAuth({
+      login: data.login,
+      temporaryPassword: data.password,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      fullName,
+      roleId: data.roleId,
+      position: data.position,
+      avatarUrl: data.avatarUrl,
+    })
+
+    const store = getCloudStore()
+    if (store.loaded) {
+      const employee = normalizeEmployee({
+        id: row.id,
+        firstName: row.first_name,
+        lastName: row.last_name,
+        name: row.full_name,
+        login: row.login,
+        role: row.role,
+        roleId: row.role_id,
+        position: row.position,
+        employmentStatus: row.status,
+        avatarUrl: row.avatar_url,
+        assignedCourseIds: data.assignedCourseIds || [],
+        workLocationId: data.workLocationId || null,
+      })
+      store.employees = [...store.employees, employee]
+    }
+
+    return row.id
   }
   const id = await localAdapter.createEmployee(data)
   return id
 }
 
 export async function updateEmployee(id, updates) {
+  if (isCloudMode()) {
+    await updateEmployeeAsAdmin(id, updates)
+    return
+  }
   await getAdapter().updateEmployee(id, updates)
-  if (isCloudMode()) await refreshData()
 }
 
 export async function deactivateEmployee(id) {
+  if (isCloudMode()) {
+    await updateEmployeeAsAdmin(id, { employmentStatus: 'inactive' })
+    return
+  }
   await getAdapter().deactivateEmployee(id)
-  if (isCloudMode()) await refreshData()
 }
 
 export async function restoreEmployee(id) {
+  if (isCloudMode()) {
+    await updateEmployeeAsAdmin(id, { employmentStatus: 'active' })
+    return
+  }
   await getAdapter().restoreEmployee(id)
-  if (isCloudMode()) await refreshData()
 }
 
 export async function permanentlyDeleteEmployee(id) {

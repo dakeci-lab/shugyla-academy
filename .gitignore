@@ -20,3 +20,6 @@ dist-ssr
 .env
 .env.local
 .env.local.save
+.local-secrets/
+supabase/functions/.env
+supabase/.env.local

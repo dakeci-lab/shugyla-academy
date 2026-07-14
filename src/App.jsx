@@ -5,6 +5,7 @@ import { AcademyDataProvider } from './context/AcademyDataContext'
 import { SessionProvider } from './context/SessionContext'
 import { PermissionProvider } from './context/PermissionContext'
 import { ToastProvider } from './context/ToastContext'
+import { NotificationInboxProvider } from './context/NotificationInboxContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import PlatformRoute from './components/platform/PlatformRoute'
 import PlatformNotFound from './components/platform/PlatformNotFound'
@@ -73,6 +74,7 @@ export default function App() {
       <AcademyDataProvider>
       <PermissionProvider>
       <ToastProvider>
+      <NotificationInboxProvider>
       <Routes>
         {/* Публичные маршруты */}
         <Route path="/" element={<Navigate to={LOGIN_PATH} replace />} />
@@ -371,6 +373,7 @@ export default function App() {
 
         <Route path="*" element={<Navigate to={LOGIN_PATH} replace />} />
       </Routes>
+      </NotificationInboxProvider>
       </ToastProvider>
       </PermissionProvider>
       </AcademyDataProvider>

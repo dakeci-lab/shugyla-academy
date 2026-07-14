@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
+import { ACADEMY_PROFILE_SAFE_FIELDS } from './authService'
 import { normalizeEmployee, canEmployeeLogin } from '../utils/employeeData'
 import { normalizeLesson } from '../utils/lessonData'
 import { fetchTestsData } from './testSupabaseAdapter'
@@ -150,14 +151,15 @@ async function throwIfError(result, context) {
 export async function fetchAllData() {
   const [usersRes, coursesRes, lessonsRes, assignmentsRes, progressRes] =
     await Promise.all([
-      supabase.from('academy_users').select('*').order('id'),
+      supabase.from('academy_users').select(ACADEMY_PROFILE_SAFE_FIELDS).order('id'),
       supabase.from('academy_courses').select('*').order('id'),
       supabase.from('academy_lessons').select('*').eq('is_deleted', false).order('sort_order'),
       supabase.from('academy_course_assignments').select('*'),
       supabase.from('academy_progress').select('*'),
     ])
 
-  const users = await throwIfError(usersRes, 'Загрузка сотрудников')
+  // Auth-first RLS: authenticated users cannot list all employees yet (admin policy pending).
+  const users = usersRes.error ? [] : await throwIfError(usersRes, 'Загрузка сотрудников')
   const courses = await throwIfError(coursesRes, 'Загрузка курсов')
   const lessons = await throwIfError(lessonsRes, 'Загрузка уроков')
   const assignments = await throwIfError(assignmentsRes, 'Загрузка назначений')
@@ -173,7 +175,6 @@ export async function fetchAllData() {
       lastName: row.last_name,
       name: row.full_name,
       login: row.login,
-      password: row.password,
       role: row.role,
       roleId: row.role_id,
       position: row.position,
@@ -582,6 +583,7 @@ export async function saveTestResult(userId, courseId, score, passed) {
   )
 }
 
+/** @deprecated Pre-Auth password compare — not used in Auth-first cloud login. */
 export async function authenticateUser(loginValue, password) {
   if (!loginValue?.trim()) return { ok: false, reason: 'invalid' }
 

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
-import PlatformUserMenu from '../components/platform/PlatformUserMenu'
+import PlatformHeaderActions from '../components/platform/PlatformHeaderActions'
 import PlatformMobileHeader from '../components/platform/PlatformMobileHeader'
 import AppInstallBanner from '../components/platform/AppInstallBanner'
 import PlatformSidebar from '../components/platform/PlatformSidebar'
@@ -83,7 +83,7 @@ export default function PlatformLayout() {
               <h1 className="platform-layout__title">{section.title}</h1>
               <p className="platform-layout__desc">{section.description}</p>
             </div>
-            <PlatformUserMenu user={user} onLogout={handleLogout} />
+            <PlatformHeaderActions user={user} onLogout={handleLogout} bellVariant="desktop" />
           </header>
 
           <div

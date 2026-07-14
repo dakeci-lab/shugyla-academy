@@ -5,6 +5,7 @@ import { useSession } from '../context/SessionContext'
 import { getEmployeeById } from '../utils/employeeData'
 import ProfileAvatarEditor from '../components/ProfileAvatarEditor'
 import ProfileChangePasswordForm from '../components/ProfileChangePasswordForm'
+import PushNotificationSettings from '../components/platform/notifications/PushNotificationSettings'
 import './Profile.css'
 
 /** Страница профиля — внутри PlatformLayout */
@@ -108,6 +109,8 @@ export default function Profile() {
       <section className="profile-page__card">
         <ProfileChangePasswordForm userLogin={user.login} />
       </section>
+
+      <PushNotificationSettings />
     </div>
   )
 }

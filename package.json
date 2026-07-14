@@ -7,7 +7,17 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "import:suppliers": "node scripts/import-suppliers-from-umag.mjs"
+    "import:suppliers": "node scripts/import-suppliers-from-umag.mjs",
+    "supabase:local:bootstrap": "node scripts/supabase-local-bootstrap.mjs",
+    "supabase:local:verify-notifications": "node scripts/verify-notification-foundation.mjs",
+    "supabase:local:verify-auth-first": "node scripts/verify-auth-first-login.mjs",
+    "supabase:local:verify-employee-provisioning": "node scripts/verify-employee-provisioning.mjs",
+    "supabase:local:verify-employee-admin-access": "node scripts/verify-employee-admin-access.mjs",
+    "webpush:local:generate-vapid": "node scripts/generate-local-vapid-keys.mjs",
+    "webpush:local:prepare-edge-env": "node scripts/prepare-local-web-push-edge-env.mjs",
+    "webpush:local:restart-supabase": "node scripts/restart-local-supabase-with-webpush-env.mjs",
+    "supabase:local:verify-web-push-foundation": "node scripts/verify-web-push-foundation.mjs",
+    "supabase:local:verify-web-push-sender": "node scripts/verify-web-push-sender.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",

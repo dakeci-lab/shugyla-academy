@@ -130,30 +130,52 @@ export function SessionProvider({ children }) {
       unsubscribeAuth = subscribeToAuthChanges(async (session, event) => {
         if (cancelled || initId !== initGenerationRef.current) return
 
+        if (event === 'SIGNED_OUT') {
+          clearUser()
+          sessionEstablishedRef.current = false
+          setUser(null)
+          setSessionType(null)
+          setSupabaseAuthenticated(false)
+          setAuthStatus(AUTH_STATUS.UNAUTHENTICATED)
+          return
+        }
+
         if (event === 'TOKEN_REFRESHED' && session?.access_token) {
           setSupabaseAuthenticated(true)
           return
         }
 
-        if (event !== 'SIGNED_IN' || !session?.access_token) return
+        if (event !== 'SIGNED_IN' || !session?.access_token || !session.user?.id) return
         if (sessionEstablishedRef.current) return
 
         try {
-          await ensureRbacLoaded()
           const profile = await resolveSessionUser(session)
-          if (!profile || cancelled || initId !== initGenerationRef.current) return
+          if (!profile || cancelled || initId !== initGenerationRef.current) {
+            if (!cancelled) {
+              await signOut().catch(() => {})
+              clearUser()
+              setUser(null)
+              setSessionType(null)
+              setSupabaseAuthenticated(false)
+              setAuthStatus(AUTH_STATUS.UNAUTHENTICATED)
+            }
+            return
+          }
 
           await applyRestoredSession({
-            user: {
-              ...profile,
-              sessionType: SESSION_TYPE.SUPABASE,
-              supabaseAuthenticated: true,
-            },
+            user: profile,
             sessionType: SESSION_TYPE.SUPABASE,
             supabaseAuthenticated: true,
           })
         } catch {
-          // initSession или следующее auth-событие завершит восстановление
+          if (!cancelled) {
+            await signOut().catch(() => {})
+            clearUser()
+            setUser(null)
+            setSessionType(null)
+            setSupabaseAuthenticated(false)
+            setAuthStatus(AUTH_STATUS.UNAUTHENTICATED)
+          }
         }
       })
     }
@@ -225,8 +247,22 @@ export function SessionProvider({ children }) {
     return next
   }, [sessionType])
 
+  useEffect(() => {
+    if (!isCloudMode() || !supabaseAuthenticated) return
+
+    import('../services/webPushSubscriptionService')
+      .then(({ syncExistingPushSubscription }) => syncExistingPushSubscription())
+      .catch(() => {})
+  }, [supabaseAuthenticated, user?.id])
+
   const logout = useCallback(async () => {
     if (isCloudMode() && usesSupabaseAuth()) {
+      try {
+        const { removePushSubscriptionForLogout } = await import('../services/webPushSubscriptionService')
+        await removePushSubscriptionForLogout()
+      } catch (err) {
+        console.warn('Push subscription cleanup failed during logout')
+      }
       try {
         await signOut()
       } catch (err) {

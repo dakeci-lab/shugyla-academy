@@ -32,7 +32,7 @@ export function loginToTechnicalEmail(loginValue) {
   if (login.includes('@')) return login.toLowerCase()
   const phone = normalizePhone(login)
   if (phone) return phoneToTechnicalEmail(phone)
-  return `${login}${TECH_EMAIL_DOMAIN}`
+  return `${login.toLowerCase()}${TECH_EMAIL_DOMAIN}`
 }
 
 export function technicalEmailToPhone(email) {

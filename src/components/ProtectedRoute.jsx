@@ -3,24 +3,31 @@ import { useSession, AUTH_STATUS } from '../context/SessionContext'
 import { canManageAdmin, roleHasPermission } from '../utils/auth'
 import { getDefaultPlatformPath } from '../platform/platformAccess'
 import { getLoginUrl } from '../router/authRoutes'
+import { isCloudMode } from '../lib/dataMode'
+import { usesSupabaseAuth } from '../services/authService'
 import AuthLoadingScreen from './AuthLoadingScreen'
 
 /**
- * Защищённый маршрут — проверяет внутреннюю сессию пользователя
+ * Защищённый маршрут — cloud mode требует Supabase Auth + platform session.
  */
 export default function ProtectedRoute({
   children,
   requireAdmin = false,
   requiredPermission = null,
 }) {
-  const { user, authStatus } = useSession()
+  const { user, authStatus, supabaseAuthenticated } = useSession()
   const location = useLocation()
+  const cloudAuthRequired = isCloudMode() && usesSupabaseAuth()
 
   if (authStatus === AUTH_STATUS.LOADING) {
     return <AuthLoadingScreen />
   }
 
-  if (!user) {
+  const sessionValid =
+    user &&
+    (!cloudAuthRequired || supabaseAuthenticated)
+
+  if (!sessionValid) {
     const redirectPath = `${location.pathname}${location.search}`
     return <Navigate to={getLoginUrl(redirectPath)} replace />
   }

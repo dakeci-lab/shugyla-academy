@@ -10,18 +10,21 @@ import {
 import { resolveUserRole, getDefaultPlatformPath } from '../config/permissions'
 import { LOGIN_PATH } from '../router/authRoutes'
 import { getAllCourses } from './adminData'
-import { saveUser } from './storage'
+import { saveUser, clearUser } from './storage'
 import {
   authenticateEmployee,
   getEmployeeById,
 } from './employeeData'
-import { authenticateUser } from '../services/academyDataService'
 import {
-  requiresMandatorySupabaseAuth,
-  signInSupabaseAuthAfterAcademyLogin,
+  DEACTIVATED_ACCOUNT_MESSAGE,
+  buildCloudPlatformSessionUser,
+  loadAcademyProfileByAuthUserId,
+  signOut,
   SESSION_TYPE,
 } from '../services/authService'
 import { isCloudMode } from '../lib/dataMode'
+import { supabase } from '../lib/supabaseClient'
+import { loginToTechnicalEmail } from './phoneUtils'
 import {
   getCoursesForEmployee,
   canEmployeeAccessCourse,
@@ -59,43 +62,24 @@ export function getPostLoginPath(user, redirectPath) {
   return safe
 }
 
-const DEACTIVATED_MESSAGE = 'Аккаунт деактивирован. Обратитесь к администратору.'
+const INVALID_CREDENTIALS_MESSAGE = 'invalid'
 
 /**
- * Вход по логину и паролю (academy_users / localStorage; cloud + Supabase Auth для admin)
+ * Offline/local login — mock employees in localStorage (no Supabase).
  */
-export async function login(loginValue, password) {
-  const result = isCloudMode()
-    ? await authenticateUser(loginValue, password)
-    : authenticateEmployee(loginValue, password)
+function loginOffline(loginValue, password) {
+  const result = authenticateEmployee(loginValue, password)
 
   if (!result.ok) {
     return {
       success: false,
-      error: result.reason === 'deactivated' ? DEACTIVATED_MESSAGE : 'invalid',
+      error: result.reason === 'deactivated' ? DEACTIVATED_ACCOUNT_MESSAGE : INVALID_CREDENTIALS_MESSAGE,
     }
   }
 
   const user = result.user
   const roleId = resolveUserRole(user) || normalizeRoleId(user.role) || ROLE_IDS.CASHIER
   const role = getRole(roleId)
-  const mandatoryAuth = isCloudMode() && requiresMandatorySupabaseAuth(user.role || roleId)
-
-  let sessionType = SESSION_TYPE.LEGACY
-  let supabaseAuthenticated = false
-
-  if (isCloudMode()) {
-    const authBridge = await signInSupabaseAuthAfterAcademyLogin(user.login, password, {
-      required: mandatoryAuth,
-    })
-    if (!authBridge.ok) {
-      return { success: false, error: authBridge.error }
-    }
-    if (authBridge.session?.access_token) {
-      sessionType = SESSION_TYPE.SUPABASE
-      supabaseAuthenticated = true
-    }
-  }
 
   const sessionUser = {
     id: user.id,
@@ -106,11 +90,104 @@ export async function login(loginValue, password) {
     roleName: role?.label || roleId,
     permissions: role?.permissions || [],
     assignedCourseIds: user.assignedCourseIds || [],
-    sessionType,
-    supabaseAuthenticated,
+    sessionType: SESSION_TYPE.LEGACY,
+    supabaseAuthenticated: false,
   }
   saveUser(sessionUser)
-  return { success: true, user: sessionUser, sessionType, supabaseAuthenticated }
+  return {
+    success: true,
+    user: sessionUser,
+    sessionType: SESSION_TYPE.LEGACY,
+    supabaseAuthenticated: false,
+  }
+}
+
+/**
+ * Cloud Auth-first login: Supabase Auth validates password, then own profile by auth_user_id.
+ */
+async function loginCloud(loginValue, password) {
+  const loginInput = loginValue?.trim()
+  if (!loginInput || !password) {
+    return { success: false, error: INVALID_CREDENTIALS_MESSAGE }
+  }
+
+  const technicalEmail = loginToTechnicalEmail(loginInput)
+  if (!technicalEmail) {
+    return { success: false, error: INVALID_CREDENTIALS_MESSAGE }
+  }
+
+  clearUser()
+  try {
+    await signOut()
+  } catch {
+    // Previous session may be absent
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email: technicalEmail,
+    password,
+  })
+
+  if (error || !data.session?.access_token || !data.user?.id) {
+    await supabase.auth.signOut().catch(() => {})
+    clearUser()
+    return { success: false, error: INVALID_CREDENTIALS_MESSAGE }
+  }
+
+  let profileRow
+  try {
+    profileRow = await loadAcademyProfileByAuthUserId(data.user.id)
+  } catch {
+    await supabase.auth.signOut().catch(() => {})
+    clearUser()
+    return { success: false, error: INVALID_CREDENTIALS_MESSAGE }
+  }
+
+  if (profileRow?.deactivated) {
+    await supabase.auth.signOut().catch(() => {})
+    clearUser()
+    return { success: false, error: DEACTIVATED_ACCOUNT_MESSAGE }
+  }
+
+  if (!profileRow) {
+    await supabase.auth.signOut().catch(() => {})
+    clearUser()
+    return { success: false, error: INVALID_CREDENTIALS_MESSAGE }
+  }
+
+  let sessionUser
+  try {
+    sessionUser = await buildCloudPlatformSessionUser(profileRow)
+  } catch {
+    await supabase.auth.signOut().catch(() => {})
+    clearUser()
+    return { success: false, error: INVALID_CREDENTIALS_MESSAGE }
+  }
+
+  if (!sessionUser) {
+    await supabase.auth.signOut().catch(() => {})
+    clearUser()
+    return { success: false, error: INVALID_CREDENTIALS_MESSAGE }
+  }
+
+  saveUser(sessionUser)
+  return {
+    success: true,
+    user: sessionUser,
+    sessionType: SESSION_TYPE.SUPABASE,
+    supabaseAuthenticated: true,
+  }
+}
+
+/**
+ * Вход по логину и паролю.
+ * Cloud: Auth-first (Supabase only). Offline: local mock employees.
+ */
+export async function login(loginValue, password) {
+  if (isCloudMode()) {
+    return loginCloud(loginValue, password)
+  }
+  return loginOffline(loginValue, password)
 }
 
 /** Курсы по роли (legacy — для admin stats fallback) */

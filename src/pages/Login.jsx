@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { login, getPostLoginPath } from '../utils/auth'
 import { useSession, AUTH_STATUS, SESSION_TYPE } from '../context/SessionContext'
-import { requiresMandatorySupabaseAuth } from '../services/authService'
+import { isCloudMode } from '../lib/dataMode'
 import AuthLoadingScreen from '../components/AuthLoadingScreen'
 import './Login.css'
 
@@ -65,9 +65,7 @@ export default function Login() {
     if (!user || authStatus !== AUTH_STATUS.AUTHENTICATED) return
     if (!rbacReady) return
 
-    const needsSupabaseJwt =
-      requiresMandatorySupabaseAuth(user.role) ||
-      user.sessionType === SESSION_TYPE.SUPABASE
+    const needsSupabaseJwt = isCloudMode()
     if (needsSupabaseJwt && !supabaseAuthenticated) return
 
     navigate(getPostLoginPath(user, redirect), { replace: true })

@@ -26,6 +26,13 @@ import { getAppBasePath } from '../router/basename'
 
 const APP_BASE = getAppBasePath()
 
+/** Safe academy_users columns for Auth-first cloud queries (never includes password). */
+export const ACADEMY_PROFILE_SAFE_FIELDS =
+  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, auth_user_id'
+
+const DEACTIVATED_ACCOUNT_MESSAGE =
+  'Аккаунт деактивирован. Обратитесь к администратору.'
+
 export function usesSupabaseAuth() {
   return isSupabaseConfigured()
 }
@@ -56,6 +63,118 @@ function buildSessionUser(employee, phone = null) {
   }
 }
 
+function profileRowToEmployee(row, assignedCourseIds = []) {
+  return normalizeEmployee({
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    name: row.full_name,
+    login: row.login,
+    role: row.role,
+    roleId: row.role_id,
+    position: row.position,
+    employmentStatus: row.status,
+    assignedCourseIds,
+    avatarUrl: row.avatar_url,
+  })
+}
+
+/**
+ * Load course assignments for the authenticated employee (after Auth session exists).
+ */
+export async function loadAcademyAssignmentsForEmployee(employeeId) {
+  if (employeeId === undefined || employeeId === null || employeeId === '' || !supabase) {
+    return []
+  }
+
+  const assignmentsRes = await supabase
+    .from('academy_course_assignments')
+    .select('course_id')
+    .eq('user_id', employeeId)
+
+  if (assignmentsRes.error) {
+    throw new Error('Не удалось загрузить назначения курсов')
+  }
+
+  return (assignmentsRes.data || []).map((a) => a.course_id)
+}
+
+/**
+ * Auth-first profile lookup: academy_users.auth_user_id = Supabase Auth user id.
+ * Must only be called after a valid Auth session exists.
+ */
+export async function loadAcademyProfileByAuthUserId(authUserId) {
+  if (!authUserId || !supabase) return null
+
+  const result = await supabase
+    .from('academy_users')
+    .select(ACADEMY_PROFILE_SAFE_FIELDS)
+    .eq('auth_user_id', authUserId)
+    .maybeSingle()
+
+  if (result.error) {
+    throw new Error('Не удалось загрузить профиль сотрудника')
+  }
+
+  if (!result.data) return null
+
+  const row = result.data
+  if (!canEmployeeLogin(row.status)) {
+    return { deactivated: true }
+  }
+
+  return row
+}
+
+/** Build platform session user from an academy_users row (no password). */
+export async function buildCloudPlatformSessionUser(profileRow, options = {}) {
+  const { skipAssignments = false } = options
+  const assignedCourseIds = skipAssignments
+    ? []
+    : await loadAcademyAssignmentsForEmployee(profileRow.id)
+
+  await ensureRbacLoaded()
+
+  const employee = profileRowToEmployee(profileRow, assignedCourseIds)
+  const sessionProfile = buildSessionUser(
+    employee,
+    technicalEmailToPhone(profileRow.login) || profileRow.login
+  )
+
+  const roleId = sessionProfile.roleId ?? profileRow.role_id ?? null
+  const roleCodeFromProfile = sessionProfile.role ? String(sessionProfile.role).trim() : ''
+
+  const rbacRole =
+    (roleId && getRoleById(roleId)) ||
+    (roleCodeFromProfile && getRoleByCode(roleCodeFromProfile)) ||
+    null
+
+  if (!rbacRole || rbacRole.isActive === false) {
+    return null
+  }
+
+  const permissionCodes = getPermissionCodesForUserRole({
+    role: rbacRole.code,
+    roleId: rbacRole.id,
+  })
+
+  return {
+    ...sessionProfile,
+    role: rbacRole.code,
+    roleId: rbacRole.id,
+    roleName: rbacRole.name,
+    permissions: [],
+    permissionCodes,
+    permissionSlugs: permissionCodes,
+    assignedCourseIds,
+    sessionType: SESSION_TYPE.SUPABASE,
+    supabaseAuthenticated: true,
+  }
+}
+
+/**
+ * @deprecated Pre-Auth lookup by login. Do not use in Auth-first cloud login/restore paths.
+ */
 export async function loadAcademyProfileByLogin(loginValue) {
   const login = loginValue?.trim()
   if (!login) return null
@@ -63,7 +182,7 @@ export async function loadAcademyProfileByLogin(loginValue) {
   if (isCloudMode() && supabase) {
     const result = await supabase
       .from('academy_users')
-      .select('*')
+      .select(ACADEMY_PROFILE_SAFE_FIELDS)
       .eq('login', login)
       .maybeSingle()
 
@@ -88,20 +207,7 @@ export async function loadAcademyProfileByLogin(loginValue) {
     }
 
     return buildSessionUser(
-      normalizeEmployee({
-        id: row.id,
-        firstName: row.first_name,
-        lastName: row.last_name,
-        name: row.full_name,
-        login: row.login,
-        password: row.password,
-        role: row.role,
-        roleId: row.role_id,
-        position: row.position,
-        employmentStatus: row.status,
-        assignedCourseIds: (assignmentsRes.data || []).map((a) => a.course_id),
-        avatarUrl: row.avatar_url,
-      }),
+      profileRowToEmployee(row, (assignmentsRes.data || []).map((a) => a.course_id)),
       technicalEmailToPhone(row.login) || row.login
     )
   }
@@ -116,13 +222,16 @@ export async function loadAcademyProfileByLogin(loginValue) {
   return buildSessionUser(employee, technicalEmailToPhone(employee.login) || employee.login)
 }
 
+/**
+ * @deprecated Pre-Auth lookup by id. Do not use in Auth-first cloud login/restore paths.
+ */
 export async function loadAcademyProfileById(userId) {
   if (userId === undefined || userId === null || userId === '') return null
 
   if (isCloudMode() && supabase) {
     const result = await supabase
       .from('academy_users')
-      .select('*')
+      .select(ACADEMY_PROFILE_SAFE_FIELDS)
       .eq('id', userId)
       .maybeSingle()
 
@@ -147,20 +256,7 @@ export async function loadAcademyProfileById(userId) {
     }
 
     return buildSessionUser(
-      normalizeEmployee({
-        id: row.id,
-        firstName: row.first_name,
-        lastName: row.last_name,
-        name: row.full_name,
-        login: row.login,
-        password: row.password,
-        role: row.role,
-        roleId: row.role_id,
-        position: row.position,
-        employmentStatus: row.status,
-        assignedCourseIds: (assignmentsRes.data || []).map((a) => a.course_id),
-        avatarUrl: row.avatar_url,
-      }),
+      profileRowToEmployee(row, (assignmentsRes.data || []).map((a) => a.course_id)),
       technicalEmailToPhone(row.login) || row.login
     )
   }
@@ -174,12 +270,15 @@ export async function loadAcademyProfileById(userId) {
 }
 
 export async function loadAcademyProfileByEmail(email) {
+  /** @deprecated Auth-first cloud paths must use loadAcademyProfileByAuthUserId. */
   const phone = technicalEmailToPhone(email)
   if (phone) return loadAcademyProfileByLogin(phone)
   const login = technicalEmailToLogin(email)
   if (login) return loadAcademyProfileByLogin(login)
   return null
 }
+
+export { DEACTIVATED_ACCOUNT_MESSAGE }
 
 export function mapAuthError(error) {
   if (!error) return 'Произошла ошибка. Попробуйте позже.'
@@ -437,48 +536,56 @@ export async function resolveSupabaseAuthSession() {
 }
 
 /**
- * Восстановление сессии при старте: Supabase JWT → профиль, иначе shugyla_user (legacy).
- * При наличии JWT не переходит в legacy и не очищает shugyla_user.
+ * Cloud restore/login: build session from Supabase Auth user id (auth_user_id lookup).
+ */
+async function resolveCloudSessionFromAuthUserId(authUserId) {
+  if (!authUserId) return null
+
+  const profileRow = await loadAcademyProfileByAuthUserId(authUserId)
+  if (!profileRow || profileRow.deactivated) return null
+
+  return buildCloudPlatformSessionUser(profileRow)
+}
+
+/**
+ * Восстановление сессии при старте.
+ * Cloud: только Supabase JWT + auth_user_id (без legacy fallback).
+ * Offline: legacy localStorage snapshot.
  */
 export async function restorePlatformSession() {
-  const storedUser = getUser()
-
-  let supabaseSession = null
   if (usesSupabaseAuth() && supabase) {
+    let supabaseSession = null
     try {
       supabaseSession = await resolveSupabaseAuthSession()
     } catch {
-      // Ошибка SDK — сохраняем возможность legacy-восстановления
+      clearUser()
+      return emptyRestoredSession()
     }
-  }
 
-  if (supabaseSession?.access_token) {
-    try {
-      await ensureRbacLoaded()
-    } catch {
-      // RBAC нужен для normalize; без legacy-fallback при активном JWT
+    if (!supabaseSession?.access_token || !supabaseSession.user?.id) {
+      clearUser()
+      return emptyRestoredSession()
     }
 
     try {
-      const profile = await resolveSessionUser(supabaseSession)
-      if (profile) {
+      const sessionUser = await resolveCloudSessionFromAuthUserId(supabaseSession.user.id)
+      if (sessionUser) {
         return {
-          user: {
-            ...profile,
-            sessionType: SESSION_TYPE.SUPABASE,
-            supabaseAuthenticated: true,
-          },
+          user: sessionUser,
           sessionType: SESSION_TYPE.SUPABASE,
           supabaseAuthenticated: true,
         }
       }
     } catch {
-      // JWT валиден, профиль временно недоступен — не legacy, не clearUser
+      // fall through to signOut
     }
 
+    await signOut().catch(() => {})
+    clearUser()
     return emptyRestoredSession()
   }
 
+  const storedUser = getUser()
   if (isValidStoredPlatformUser(storedUser)) {
     return restoreLegacyPlatformSession(storedUser)
   }
@@ -508,8 +615,7 @@ function mapMandatorySupabaseAuthError(error) {
 }
 
 /**
- * После успешной проверки academy_users — создать Supabase Auth-сессию (JWT для RPC).
- * required=true для admin/administrator: без JWT вход не считается успешным.
+ * @deprecated Pre-Auth bridge after academy_users password compare. Auth-first login uses signInWithPassword directly.
  */
 export async function signInSupabaseAuthAfterAcademyLogin(login, password, { required = false } = {}) {
   if (!usesSupabaseAuth() || !supabase) {
@@ -635,22 +741,31 @@ export async function signInWithEmail(email, password) {
         return { ok: false, error: mapAuthError(error) }
       }
 
-      const profile = await loadAcademyProfileByEmail(normalizedLogin)
-      if (profile?.deactivated) {
-        await supabase.auth.signOut()
-        return { ok: false, error: 'Аккаунт деактивирован. Обратитесь к администратору.' }
-      }
-      if (!profile) {
-        await supabase.auth.signOut()
-        return {
-          ok: false,
-          error:
-            'Профиль сотрудника не найден. Убедитесь, что логин совпадает с учётной записью в системе.',
-        }
+      const authUserId = data.session?.user?.id
+      if (!authUserId) {
+        await supabase.auth.signOut().catch(() => {})
+        return { ok: false, error: 'Неверный логин или пароль' }
       }
 
-      return { ok: true, user: profile, session: data.session }
+      const profileRow = await loadAcademyProfileByAuthUserId(authUserId)
+      if (profileRow?.deactivated) {
+        await supabase.auth.signOut()
+        return { ok: false, error: DEACTIVATED_ACCOUNT_MESSAGE }
+      }
+      if (!profileRow) {
+        await supabase.auth.signOut()
+        return { ok: false, error: 'Неверный логин или пароль' }
+      }
+
+      const user = await buildCloudPlatformSessionUser(profileRow)
+      if (!user) {
+        await supabase.auth.signOut()
+        return { ok: false, error: 'Неверный логин или пароль' }
+      }
+
+      return { ok: true, user, session: data.session }
     } catch (err) {
+      await supabase.auth.signOut().catch(() => {})
       return { ok: false, error: mapAuthError(err) }
     }
   }
@@ -697,11 +812,8 @@ export async function getCurrentAuthSession() {
 }
 
 export async function resolveSessionUser(session) {
-  if (!session?.user?.email) return null
-  const profile = await loadAcademyProfileByEmail(session.user.email)
-  if (!profile || profile.deactivated) return null
-  const phone = technicalEmailToPhone(session.user.email)
-  return phone ? { ...profile, phone } : profile
+  if (!session?.user?.id) return null
+  return resolveCloudSessionFromAuthUserId(session.user.id)
 }
 
 export async function sendPasswordResetEmail(email) {
