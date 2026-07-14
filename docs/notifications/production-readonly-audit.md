@@ -1,6 +1,6 @@
 # Production Read-Only Audit — Step 22A
 
-**Date:** 2026-07-14  
+**Date:** 2026-07-14
 **Local checkpoint:** `6648b3d` — `feat: complete local notification system and production preflight`  
 **Branch:** `main`  
 **Owner approval:** read-only production check only; no writes performed.
@@ -411,7 +411,7 @@ Apply only `20260714200000_production_auth_bridge_phase1.sql` as first productio
 
 ## 22. Authenticated CLI audit — Step 22B
 
-**Date:** 2026-07-14  
+**Date:** 2026-07-14
 **CLI version:** `2.109.1`  
 **Owner action:** `npm exec --yes supabase@2.109.1 login` — success  
 **Constraints honored:** no `supabase link`, no production writes, no secret values printed.
@@ -558,7 +558,7 @@ Apply only `20260714200000_production_auth_bridge_phase1.sql` as first productio
 
 > **Superseded:** Phase 1 applied in production as `20260714172032`. Next write: provisioning `--dry-run` only.
 
-**Date:** 2026-07-14  
+**Date:** 2026-07-14
 **Status:** local preparation only. **No production changes.**
 
 ### 23.1 Production Auth exposure (at Step 22C planning)
@@ -591,7 +591,7 @@ Apply only `20260714200000_production_auth_bridge_phase1.sql` as first productio
 
 ## 24. Phase 1 production apply — Step 22E sync
 
-**Date:** 2026-07-14  
+**Date:** 2026-07-14
 **Status:** Phase 1 applied in production. Local migration file synced to production apply order.
 
 ### 24.1 Production migration
@@ -628,3 +628,61 @@ Reordered local SQL: `employee_owned_by_current_auth()` now created **after** `a
 > **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
 
 Auth provisioning `--dry-run` only — no user create/change until owner reviews aggregate report.
+
+---
+
+## 25. Phase B production Auth provisioning — Step 22F
+
+**Date:** 2026-07-14
+**Status:** Production Auth provisioning **completed**. Phase 2, deploy, notifications, and Cron **not** performed.
+
+### 25.1 Owner approval
+
+Owner explicitly confirmed: link 1 existing Auth user, create 16 Auth users, fill `auth_user_id`. No grant revoke, deploy, Phase 2, notification migrations, or Cron.
+
+### 25.2 Pre-apply verification
+
+| Check | Value |
+|-------|-------|
+| `academy_users` total | 17 |
+| Linked `auth_user_id` | 0 |
+| `auth.users` total | 1 |
+| Legacy passwords nonempty | 17 |
+| Dry-run `existingAuthMatches` | 1 |
+| Dry-run `wouldCreateAuthUsers` | 16 |
+| Dry-run `conflicts` | 0 |
+| Active / inactive | 9 / 8 |
+| Phase 1 objects | present (from Step 22E) |
+| Legacy policies / anon grants | preserved |
+| Notification tables | absent |
+| Edge Functions / secrets / Cron | none |
+
+### 25.3 Post-apply production state
+
+| Check | Value |
+|-------|-------|
+| Production provisioning | **completed** |
+| Existing Auth user linked | **1** |
+| New Auth users created | **16** |
+| Academy users linked | **17 / 17** |
+| Active linked | **9 / 9** |
+| Inactive linked | **8 / 8** |
+| Conflicts / duplicate emails | **0** |
+| `auth.users` total | **17** (was 1) |
+| Distinct `auth_user_id` | **17** |
+| Legacy passwords nonempty | **17** |
+| Employee status counts | active **9**, inactive/other **8** (unchanged) |
+| Legacy policies / anon grants | **preserved** |
+| Auth health | 17 email identities; 17 confirmed; 0 deleted; 0 anonymous; 0 orphan links |
+| Phase 2 | **not applied** |
+| Notification tables | **still absent** |
+| Edge Functions | **0** |
+| Secrets | **0** |
+| Cron | **not configured** |
+| Deploy | **not performed** |
+
+### 25.4 Next production write
+
+> **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
+
+Deploy Auth-first **admin Edge Functions only** (`admin-create-employee`, `admin-list-employees`, `admin-update-employee`). No frontend deploy, no Phase 2, no notification migrations.

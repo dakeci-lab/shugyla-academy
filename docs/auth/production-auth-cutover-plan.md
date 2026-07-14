@@ -1,6 +1,6 @@
 # Production Auth Cutover Plan
 
-**Status:** Phase 1 **applied in production** (2026-07-14). Provisioning and later phases pending owner approval.
+**Status:** Phase 1 and **Phase B provisioning applied in production** (2026-07-14). Phase 2+ pending owner approval.
 
 Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md), [../notifications/production-readonly-audit.md](../notifications/production-readonly-audit.md)
 
@@ -31,7 +31,37 @@ Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checkl
 3. Create `employee_owned_by_current_auth()` (requires column)
 4. `notify pgrst, 'reload schema'`
 
-**Next production write:** Auth provisioning `--dry-run` only — separate owner approval. No user create/change without explicit approval.
+**Next production write:** Deploy Auth-first admin Edge Functions only — separate owner approval. No Phase 2, frontend deploy, or notification rollout without explicit approval.
+
+---
+
+## Phase B production provisioning (completed — Step 22F)
+
+**Date:** 2026-07-14
+**Tool:** `scripts/production-auth-users-migration.mjs` (`--apply` with owner confirmation)
+
+| Metric | Value |
+|--------|-------|
+| Production provisioning | **completed** |
+| Existing Auth user linked | **1** |
+| New Auth users created | **16** |
+| Academy users linked | **17 / 17** |
+| Active linked | **9 / 9** |
+| Inactive linked | **8 / 8** |
+| Conflicts / duplicates | **0** |
+| Legacy passwords | **preserved** (17 nonempty) |
+| Legacy policies / anon grants | **preserved** |
+| Phase 2 | **not applied** |
+| Deploy (frontend / Edge Functions) | **not performed** |
+| Notification rollout | **not performed** |
+
+**Pre-apply dry-run (verified):** `academyUsers=17`, `alreadyLinked=0`, `existingAuthMatches=1`, `wouldCreateAuthUsers=16`, `conflicts=0`, `activeUsers=9`, `inactiveUsers=8`, `ready=true`.
+
+**Post-apply dry-run (verified):** `academyUsers=17`, `alreadyLinked=17`, `wouldCreateAuthUsers=0`, `conflicts=0`, `activeUsers=9`, `inactiveUsers=8`, `ready=true`. (`existingAuthMatches` counts only unlinked rows with an Auth match — **0** after full link.)
+
+**Auth health (aggregate):** 17 Auth users; 17 email identities; 17 confirmed; 0 deleted; 0 anonymous; 0 orphan links; 17 distinct `auth_user_id` values.
+
+> Phase B production apply **completed**. Do not re-run `--apply` without analysis.
 
 ---
 

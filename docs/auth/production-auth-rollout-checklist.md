@@ -1,6 +1,6 @@
 # Production Auth Rollout Checklist
 
-**Status:** Phase 1 applied in production. Approvals 2–6 pending.
+**Status:** Phase 1 and Approval 2 (provisioning) completed in production. Approvals 3–6 pending.
 
 Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md)
 
@@ -32,18 +32,21 @@ Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md)
 
 ---
 
-## Approval 2 — Auth user provisioning
+## Approval 2 — Auth user provisioning ✓ COMPLETED
 
-**Owner approval required. Next production write: `--dry-run` first.**
+**Step 22F — owner-approved production provisioning (2026-07-14)**
 
 Run `scripts/production-auth-users-migration.mjs`.
 
-- [ ] `--dry-run` aggregate report reviewed (`ready: true`, `conflicts: 0`)
-- [ ] `--apply` executed with production `service_role` (env only, never Git)
-- [ ] `--status` confirms all active users linked
-- [ ] No passwords/emails/UUIDs in logs
-- [ ] Inactive users linked but login still blocked by frontend
-- [ ] **Do not** run Phase 2 until counts verified
+- [x] `--dry-run` aggregate report reviewed (`ready: true`, `conflicts: 0`)
+- [x] `--apply` executed with production `service_role` (env only, never Git)
+- [x] `--status` confirms all active users linked (17/17)
+- [x] No passwords/emails/UUIDs in logs
+- [x] Inactive users linked but login still blocked by frontend (8/8 linked)
+- [x] Existing Auth user linked: **1**; new Auth users created: **16**
+- [x] Legacy passwords preserved; legacy policies/grants preserved
+- [x] Phase 2 **not** applied on this step
+- [x] **Do not** run Phase 2 until Approval 3 smoke passes
 
 ---
 
