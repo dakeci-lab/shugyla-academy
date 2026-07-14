@@ -686,3 +686,47 @@ Owner explicitly confirmed: link 1 existing Auth user, create 16 Auth users, fil
 > **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
 
 Deploy Auth-first **admin Edge Functions only** (`admin-create-employee`, `admin-list-employees`, `admin-update-employee`). No frontend deploy, no Phase 2, no notification migrations.
+
+---
+
+## 26. Employee admin Edge Functions deploy — Step 22H
+
+**Date:** 2026-07-14
+**Status:** Three employee administration Edge Functions **deployed**. Frontend, Phase 2, notifications, and Cron **not** performed.
+
+### 26.1 Owner approval
+
+Owner confirmed deploy of `admin-create-employee`, `admin-list-employees`, `admin-update-employee` only. No frontend, Phase 2, notification migrations, secrets, or Cron.
+
+### 26.2 Pre-deploy state
+
+| Check | Value |
+|-------|-------|
+| Edge Functions | **0** |
+| Prior failed deploy attempts | no functions created (missing source) |
+
+### 26.3 Post-deploy state
+
+| Check | Value |
+|-------|-------|
+| Edge Functions deployed | **3** |
+| Functions | `admin-create-employee`, `admin-list-employees`, `admin-update-employee` |
+| Status | all **ACTIVE** |
+| `verify_jwt` | **true** on all three |
+| Unauthorized smoke (no JWT) | **401** on all three |
+| `academy_users` total / linked | **17 / 17** |
+| `auth.users` total | **17** |
+| Legacy passwords | **17** nonempty |
+| Legacy policies / anon grants | **preserved** |
+| Phase 2 | **not applied** |
+| Notification tables | **absent** |
+| Manual secrets set/unset | **none** |
+| Cron | **not configured** |
+| Frontend deploy | **not performed** |
+| Authenticated smoke | **not performed** |
+
+### 26.4 Next production write
+
+> **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
+
+Authenticated smoke test of three deployed admin Edge Functions from an active administrator JWT. No frontend deploy, no Phase 2.

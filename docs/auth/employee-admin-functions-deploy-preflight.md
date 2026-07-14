@@ -2,9 +2,11 @@
 
 **Date:** 2026-07-14  
 **Step:** 22G  
-**Status:** Preflight complete. **No production deploy performed.**
+**Status:** Preflight complete (22G). **Production deploy completed (22H).**
 
 Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md), [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md)
+
+**Deploy timestamp:** 2026-07-14
 
 ---
 
@@ -201,4 +203,20 @@ Static scan: `service_role` absent in `src/`; no `select('*')` in the three func
 
 ## 12. Production mutation status
 
-**None** on Step 22G. Production Auth provisioning (Step 22F) unchanged. Edge Functions count remains **0** until explicit deploy approval.
+**Step 22G:** None. Edge Functions count **0**.
+
+**Step 22H (2026-07-14):** Three employee admin functions deployed.
+
+| Check | Value |
+|-------|-------|
+| Production function count | **3** |
+| Functions | `admin-create-employee`, `admin-list-employees`, `admin-update-employee` |
+| All ACTIVE | yes |
+| `verify_jwt` | **true** on all three |
+| Unauthorized smoke | **401** on all three |
+| Frontend | **legacy** (not deployed) |
+| Phase 2 | **not applied** |
+| Notification tables | **absent** |
+| Manual secrets set/unset | **none** |
+| Cron | **not configured** |
+| `academy_users` linked | **17/17** (unchanged) |

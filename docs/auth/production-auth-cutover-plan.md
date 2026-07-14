@@ -1,6 +1,6 @@
 # Production Auth Cutover Plan
 
-**Status:** Phase 1 and **Phase B provisioning applied in production** (2026-07-14). Phase 2+ pending owner approval.
+**Status:** Phase 1, Phase B provisioning, and **employee admin Edge Functions deploy** completed in production (2026-07-14). Phase 2 and frontend deploy pending owner approval.
 
 Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md), [../notifications/production-readonly-audit.md](../notifications/production-readonly-audit.md)
 
@@ -31,7 +31,30 @@ Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checkl
 3. Create `employee_owned_by_current_auth()` (requires column)
 4. `notify pgrst, 'reload schema'`
 
-**Next production write:** Deploy Auth-first admin Edge Functions only — separate owner approval. No Phase 2, frontend deploy, or notification rollout without explicit approval.
+**Next production write:** Authenticated smoke test of deployed admin Edge Functions — separate owner approval. No frontend deploy or Phase 2 without explicit approval.
+
+---
+
+## Phase C — Employee admin Edge Functions deploy (completed — Step 22H)
+
+**Date:** 2026-07-14
+**Owner approval:** deploy only `admin-create-employee`, `admin-list-employees`, `admin-update-employee`.
+
+| Metric | Value |
+|--------|-------|
+| Functions deployed | **3** |
+| `verify_jwt` | **enabled** on all three |
+| Unauthorized smoke (no JWT) | **401** on all three |
+| Frontend deploy | **not performed** (legacy) |
+| Phase 2 | **not applied** |
+| Notification migrations | **not applied** |
+| Manual secrets set/unset | **none** |
+| Cron | **not configured** |
+| `academy_users` / Auth users | **unchanged** (17/17 linked) |
+
+Deploy order: `admin-create-employee` → `admin-list-employees` → `admin-update-employee`. All **ACTIVE**.
+
+> Authenticated functional smoke test **not** performed on Step 22H. Frontend remains on legacy anon path.
 
 ---
 

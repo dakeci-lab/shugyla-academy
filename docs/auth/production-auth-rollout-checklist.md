@@ -1,6 +1,6 @@
 # Production Auth Rollout Checklist
 
-**Status:** Phase 1 and Approval 2 (provisioning) completed in production. Approvals 3–6 pending.
+**Status:** Phase 1, Approval 2 (provisioning), and **admin Edge Functions deploy** (Step 22H) completed. Frontend deploy and Approvals 4–6 pending.
 
 Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md)
 
@@ -50,20 +50,21 @@ Run `scripts/production-auth-users-migration.mjs`.
 
 ---
 
-## Approval 3 — Auth-first frontend + admin Edge Functions
+## Approval 3 — Auth-first frontend + admin Edge Functions (partial — Step 22H)
 
-**Owner approval required.**
+**Edge Functions deploy completed (2026-07-14). Frontend deploy pending.**
 
-- [ ] Deploy `admin-create-employee`
-- [ ] Deploy `admin-list-employees`
-- [ ] Deploy `admin-update-employee`
-- [ ] Deploy Auth-first frontend (GitHub Pages)
-- [ ] Smoke: admin login
+- [x] Deploy `admin-create-employee` — ACTIVE, `verify_jwt=true`
+- [x] Deploy `admin-list-employees` — ACTIVE, `verify_jwt=true`
+- [x] Deploy `admin-update-employee` — ACTIVE, `verify_jwt=true`
+- [x] Unauthorized smoke: all three return **401** without JWT
+- [ ] Deploy Auth-first frontend (GitHub Pages) — **not on Step 22H**
+- [ ] Authenticated smoke: admin login — **pending separate approval**
 - [ ] Smoke: cashier login
 - [ ] Smoke: procurement/receiver login
 - [ ] Smoke: inactive employee blocked
 - [ ] Session restore + logout verified
-- [ ] **Do not** run Phase 2 until smoke passes
+- [ ] **Do not** run Phase 2 until authenticated smoke passes
 
 ---
 
