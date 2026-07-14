@@ -13,6 +13,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { createClient } from '@supabase/supabase-js'
 import { loginToTechnicalEmail } from '../src/utils/phoneUtils.js'
+import { getLocalSupabaseStatus } from './lib/localSupabaseCli.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -338,10 +339,7 @@ async function stageSafety() {
 
   run('docker', ['info'], { capture: true })
 
-  const statusResult = run('npx', ['supabase', 'status', '-o', 'json'], { capture: true })
-  const jsonMatch = statusResult.stdout.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) fail('Could not parse supabase status JSON')
-  state.status = JSON.parse(jsonMatch[0])
+  state.status = getLocalSupabaseStatus()
 
   state.apiUrl = state.status.API_URL
   state.anonKey = state.status.ANON_KEY

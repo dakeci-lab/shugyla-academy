@@ -7,10 +7,11 @@
  *   npm run webpush:local:generate-vapid -- --force
  */
 
-import { createHash, createECDH } from 'crypto'
+import { createECDH } from 'crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import { canonicalVapidFingerprint } from './lib/vapid-fingerprint.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -46,8 +47,8 @@ function base64url(buffer) {
   return Buffer.from(buffer).toString('base64url')
 }
 
-function fingerprint(publicKey) {
-  return createHash('sha256').update(publicKey).digest('hex').slice(0, 16)
+function fingerprint(publicKeyBuffer) {
+  return canonicalVapidFingerprint(Buffer.from(publicKeyBuffer).toString('base64url'))
 }
 
 function parseEnvFile(content) {

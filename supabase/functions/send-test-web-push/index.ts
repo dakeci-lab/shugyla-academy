@@ -5,7 +5,8 @@ import {
 } from '../_shared/employeeAuthorization.ts'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { isWebPushConfigured, sendWebPush } from '../_shared/webPushSender.ts'
+import { deliverNotificationToSubscription } from '../_shared/notificationDelivery.ts'
+import { isWebPushConfigured } from '../_shared/webPushSender.ts'
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -279,67 +280,27 @@ Deno.serve(async (req) => {
     return adminErrorResponse('internal_error', 500)
   }
 
-  const { data: delivery, error: deliveryError } = await serviceClient
-    .from('notification_deliveries')
-    .insert({
-      notification_id: notification.id,
-      subscription_id: subscription.id,
-      channel: 'web_push',
-      provider: 'web_push',
-      status: 'pending',
-      attempt_number: 1,
-      request_id: requestId,
-      queued_at: new Date().toISOString(),
+  let deliveryOutcome
+  try {
+    deliveryOutcome = await deliverNotificationToSubscription({
+      serviceClient,
+      notification: {
+        id: notification.id,
+        title: 'Shugyla Platform',
+        body: 'Тестовое push-уведомление отправлено сервером',
+        action_url: '/shugyla-academy/platform/profile',
+      },
+      subscription,
+      requestId,
+      attemptNumber: 1,
+      buildPayload,
+      pushOptions: { ttl: 180, urgency: 'normal' },
     })
-    .select('id')
-    .single()
-
-  if (deliveryError || !delivery?.id) {
+  } catch {
     return jsonResponse({ ok: false, code: 'delivery_tracking_error' }, 500)
   }
 
-  const pushPayload = buildPayload(notification.id, requestId)
-  const pushResult = await sendWebPush({
-    endpoint: subscription.endpoint,
-    p256dh: subscription.p256dh_key,
-    auth: subscription.auth_key,
-    payload: pushPayload,
-    ttl: 180,
-    urgency: 'normal',
-    topic: pushPayload.tag,
-  })
-
-  const now = new Date().toISOString()
-
-  if (pushResult.classification === 'accepted') {
-    await serviceClient
-      .from('notification_deliveries')
-      .update({
-        status: 'accepted',
-        provider_status_code: pushResult.statusCode,
-        sent_at: now,
-        error_code: null,
-        error_message: null,
-        failed_at: null,
-      })
-      .eq('id', delivery.id)
-
-    await serviceClient
-      .from('notifications')
-      .update({ status: 'dispatched' })
-      .eq('id', notification.id)
-
-    await serviceClient
-      .from('notification_push_subscriptions')
-      .update({
-        last_used_at: now,
-        last_success_at: now,
-        failure_count: 0,
-        is_active: true,
-        revoked_at: null,
-      })
-      .eq('id', subscription.id)
-
+  if (deliveryOutcome.status === 'accepted') {
     return jsonResponse({
       ok: true,
       notification_id: notification.id,
@@ -347,31 +308,7 @@ Deno.serve(async (req) => {
     })
   }
 
-  if (pushResult.classification === 'subscription_expired') {
-    await serviceClient
-      .from('notification_deliveries')
-      .update({
-        status: 'permanently_failed',
-        provider_status_code: pushResult.statusCode,
-        error_code: 'subscription_expired',
-        error_message: 'Push subscription expired',
-        failed_at: now,
-      })
-      .eq('id', delivery.id)
-
-    await serviceClient
-      .from('notification_push_subscriptions')
-      .update({
-        is_active: false,
-        permission_status: 'revoked',
-        revoked_at: now,
-        failure_count: (subscription.failure_count ?? 0) + 1,
-        last_failure_at: now,
-      })
-      .eq('id', subscription.id)
-
-    await serviceClient.from('notifications').update({ status: 'failed' }).eq('id', notification.id)
-
+  if (deliveryOutcome.classification === 'subscription_expired') {
     return jsonResponse(
       {
         ok: false,
@@ -383,20 +320,7 @@ Deno.serve(async (req) => {
     )
   }
 
-  if (pushResult.classification === 'configuration_error') {
-    await serviceClient
-      .from('notification_deliveries')
-      .update({
-        status: 'failed',
-        provider_status_code: pushResult.statusCode,
-        error_code: 'web_push_not_configured',
-        error_message: 'Web push configuration error',
-        failed_at: now,
-      })
-      .eq('id', delivery.id)
-
-    await serviceClient.from('notifications').update({ status: 'failed' }).eq('id', notification.id)
-
+  if (deliveryOutcome.classification === 'configuration_error') {
     return jsonResponse(
       {
         ok: false,
@@ -408,28 +332,7 @@ Deno.serve(async (req) => {
     )
   }
 
-  if (pushResult.classification === 'retryable_failure') {
-    await serviceClient
-      .from('notification_deliveries')
-      .update({
-        status: 'retryable',
-        provider_status_code: pushResult.statusCode,
-        error_code: 'provider_unavailable',
-        error_message: 'Push provider temporarily unavailable',
-        failed_at: now,
-      })
-      .eq('id', delivery.id)
-
-    await serviceClient
-      .from('notification_push_subscriptions')
-      .update({
-        failure_count: (subscription.failure_count ?? 0) + 1,
-        last_failure_at: now,
-      })
-      .eq('id', subscription.id)
-
-    await serviceClient.from('notifications').update({ status: 'failed' }).eq('id', notification.id)
-
+  if (deliveryOutcome.classification === 'retryable_failure') {
     return jsonResponse(
       {
         ok: false,
@@ -440,27 +343,6 @@ Deno.serve(async (req) => {
       503
     )
   }
-
-  await serviceClient
-    .from('notification_deliveries')
-    .update({
-      status: 'failed',
-      provider_status_code: pushResult.statusCode,
-      error_code: pushResult.classification,
-      error_message: 'Push delivery failed',
-      failed_at: now,
-    })
-    .eq('id', delivery.id)
-
-  await serviceClient
-    .from('notification_push_subscriptions')
-    .update({
-      failure_count: (subscription.failure_count ?? 0) + 1,
-      last_failure_at: now,
-    })
-    .eq('id', subscription.id)
-
-  await serviceClient.from('notifications').update({ status: 'failed' }).eq('id', notification.id)
 
   return jsonResponse(
     {

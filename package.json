@@ -14,10 +14,16 @@
     "supabase:local:verify-employee-provisioning": "node scripts/verify-employee-provisioning.mjs",
     "supabase:local:verify-employee-admin-access": "node scripts/verify-employee-admin-access.mjs",
     "webpush:local:generate-vapid": "node scripts/generate-local-vapid-keys.mjs",
+    "webpush:local:verify-vapid-integrity": "node scripts/verify-vapid-key-integrity.mjs",
     "webpush:local:prepare-edge-env": "node scripts/prepare-local-web-push-edge-env.mjs",
     "webpush:local:restart-supabase": "node scripts/restart-local-supabase-with-webpush-env.mjs",
     "supabase:local:verify-web-push-foundation": "node scripts/verify-web-push-foundation.mjs",
-    "supabase:local:verify-web-push-sender": "node scripts/verify-web-push-sender.mjs"
+    "supabase:local:verify-web-push-sender": "node scripts/verify-web-push-sender.mjs",
+    "supabase:local:verify-time-tracker-dispatch-core": "node scripts/verify-time-tracker-dispatch-core.mjs",
+    "supabase:local:verify-time-tracker-dispatch-edge": "node scripts/verify-time-tracker-dispatch-edge.mjs",
+    "supabase:local:verify-time-tracker-manual-dispatch": "node scripts/verify-time-tracker-manual-dispatch.mjs",
+    "supabase:local:verify-time-tracker-scheduler": "node scripts/verify-time-tracker-scheduler.mjs",
+    "supabase:local:verify-time-tracker-scheduler-auth": "node scripts/verify-time-tracker-scheduler-auth.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",

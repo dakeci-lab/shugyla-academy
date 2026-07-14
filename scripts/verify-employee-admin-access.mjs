@@ -13,6 +13,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { createClient } from '@supabase/supabase-js'
 import { loginToTechnicalEmail } from '../src/utils/phoneUtils.js'
+import { getLocalSupabaseStatus } from './lib/localSupabaseCli.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -185,10 +186,7 @@ async function stageEnvironment() {
   console.log('Stage 1: Environment')
   run('docker', ['info'], { capture: true })
 
-  const statusResult = run('npx', ['supabase', 'status', '-o', 'json'], { capture: true })
-  const jsonMatch = statusResult.stdout.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) fail('Could not parse supabase status JSON')
-  const status = JSON.parse(jsonMatch[0])
+  const status = getLocalSupabaseStatus()
 
   state.apiUrl = status.API_URL
   state.anonKey = status.ANON_KEY

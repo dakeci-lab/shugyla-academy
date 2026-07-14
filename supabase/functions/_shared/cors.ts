@@ -1,6 +1,7 @@
 export const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-shugyla-scheduler-timestamp, x-shugyla-scheduler-signature, x-shugyla-scheduler-test-run-at',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 

@@ -454,3 +454,15 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/send-test-web-push/deno.json"
 entrypoint = "./functions/send-test-web-push/index.ts"
+
+[functions.dispatch-time-tracker-notifications]
+enabled = true
+verify_jwt = true
+import_map = "./functions/dispatch-time-tracker-notifications/deno.json"
+entrypoint = "./functions/dispatch-time-tracker-notifications/index.ts"
+
+[functions.run-time-tracker-notification-scheduler]
+enabled = true
+verify_jwt = false
+import_map = "./functions/run-time-tracker-notification-scheduler/deno.json"
+entrypoint = "./functions/run-time-tracker-notification-scheduler/index.ts"

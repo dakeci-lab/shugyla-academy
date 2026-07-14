@@ -13,6 +13,7 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import { createClient } from '@supabase/supabase-js'
 import { loginToTechnicalEmail } from '../src/utils/phoneUtils.js'
+import { getLocalSupabaseStatus } from './lib/localSupabaseCli.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -166,10 +167,7 @@ function stageEnvironment() {
   console.log('Stage 1: Environment')
   run('docker', ['info'], { capture: true })
 
-  const statusResult = run('npx', ['supabase', 'status', '-o', 'json'], { capture: true })
-  const jsonMatch = statusResult.stdout.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) fail('Could not parse supabase status JSON')
-  const status = JSON.parse(jsonMatch[0])
+  const status = getLocalSupabaseStatus()
 
   state.apiUrl = status.API_URL
   state.anonKey = status.ANON_KEY
@@ -212,7 +210,28 @@ function stageSecrets() {
   assert('VITE env has no private key', !envContent.includes('VAPID_PRIVATE_KEY'))
 
   const gitCheck = run('git', ['grep', '-n', 'VAPID_PRIVATE_KEY'], { capture: true, allowFailure: true })
-  assert('private key not tracked by git', gitCheck.status !== 0)
+  const privateKeyValue = secrets.match(/^VAPID_PRIVATE_KEY=(.+)$/m)?.[1]?.trim()
+  if (privateKeyValue) {
+    const gitValueCheck = run('git', ['grep', '-F', privateKeyValue], { capture: true, allowFailure: true })
+    assert('private key value not tracked by git', gitValueCheck.status !== 0)
+  }
+  assert(
+    'private key env file not tracked',
+    !run('git', ['ls-files', '.local-secrets/web-push.env'], { capture: true, allowFailure: true }).stdout.trim()
+  )
+  assert(
+    'edge env not tracked',
+    !run('git', ['ls-files', 'supabase/functions/.env'], { capture: true, allowFailure: true }).stdout.trim()
+  )
+  assert(
+    'VAPID_PRIVATE_KEY references only in allowed tracked files',
+    !gitCheck.stdout.split('\n').some((line) => {
+      if (!line.trim()) return false
+      return !/^(docs\/notifications\/[^:]+|scripts\/(generate-local-vapid-keys[^:]*|prepare-local-web-push-edge-env[^:]*|verify-web-push[^:]+)|supabase\/(config\.toml|functions\/_shared\/webPushSender\.ts)):/.test(
+        line
+      )
+    })
+  )
 
   console.log('')
 }

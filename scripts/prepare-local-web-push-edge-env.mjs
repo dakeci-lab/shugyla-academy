@@ -6,10 +6,15 @@
  *   npm run webpush:local:prepare-edge-env
  */
 
-import { createHash } from 'crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
+import {
+  decodeSchedulerSecret,
+  fingerprintSecret,
+  generateSchedulerSecret,
+} from './lib/scheduler-request-signing.mjs'
+import { canonicalVapidFingerprint } from './lib/vapid-fingerprint.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -85,10 +90,6 @@ function validateSubject(subject) {
   }
 }
 
-function fingerprint(publicKey) {
-  return createHash('sha256').update(publicKey).digest('hex').slice(0, 16)
-}
-
 function main() {
   assertLocalEnvironment()
 
@@ -124,6 +125,20 @@ function main() {
   edgeEnv = upsertLine(edgeEnv, 'VAPID_PRIVATE_KEY', privateKey)
   edgeEnv = upsertLine(edgeEnv, 'VAPID_SUBJECT', subject)
   edgeEnv = upsertLine(edgeEnv, 'WEB_PUSH_TEST_ENABLED', 'true')
+  edgeEnv = upsertLine(edgeEnv, 'TIME_TRACKER_DISPATCH_TEST_ENABLED', 'true')
+  edgeEnv = upsertLine(edgeEnv, 'TIME_TRACKER_DISPATCH_REAL_TEST_ENABLED', 'true')
+
+  const existingSchedulerSecret = parseEnv(edgeEnv)['TIME_TRACKER_SCHEDULER_SECRET_CURRENT']
+    ?? (existsSync(EDGE_ENV) ? parseEnv(readFileSync(EDGE_ENV, 'utf8'))['TIME_TRACKER_SCHEDULER_SECRET_CURRENT'] : undefined)
+
+  let schedulerSecret = existingSchedulerSecret
+  if (!schedulerSecret || decodeSchedulerSecret(schedulerSecret) === null) {
+    schedulerSecret = generateSchedulerSecret()
+  }
+
+  edgeEnv = upsertLine(edgeEnv, 'TIME_TRACKER_SCHEDULER_ENABLED', 'true')
+  edgeEnv = upsertLine(edgeEnv, 'TIME_TRACKER_SCHEDULER_TEST_MODE', 'true')
+  edgeEnv = upsertLine(edgeEnv, 'TIME_TRACKER_SCHEDULER_SECRET_CURRENT', schedulerSecret)
 
   if (!edgeEnv.includes('# Local Web Push Edge env')) {
     edgeEnv = `# Local Web Push Edge env — never commit\n${edgeEnv}`
@@ -137,8 +152,10 @@ function main() {
   console.log('Local Web Push Edge env prepared successfully')
   console.log(`Destination: ${EDGE_ENV}`)
   console.log(`Supabase local env: ${SUPABASE_ENV_LOCAL}`)
-  console.log(`Public key fingerprint: ${fingerprint(publicKey)}`)
+  console.log(`Public key fingerprint: ${canonicalVapidFingerprint(publicKey)}`)
   console.log('Private key present: true')
+  console.log('Scheduler secret configured: true')
+  console.log(`Scheduler secret fingerprint: ${fingerprintSecret(schedulerSecret)}`)
 }
 
 main()

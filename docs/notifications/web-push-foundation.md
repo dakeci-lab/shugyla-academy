@@ -28,6 +28,24 @@ npm run webpush:local:generate-vapid
 
 Private key must never appear in `src/`, `public/`, service worker, docs, or frontend bundle.
 
+### Public key fingerprint (canonical)
+
+Used for audit logs only — never log the full public key.
+
+```
+fingerprint = SHA256(base64url_decode(VAPID_PUBLIC_KEY)).hex().slice(0, 16)
+```
+
+Implementation: `scripts/lib/vapid-fingerprint.mjs` → `canonicalVapidFingerprint()`.
+
+Verify integrity:
+
+```bash
+npm run webpush:local:verify-vapid-integrity
+```
+
+**Legacy note:** Step 18 reported fingerprint from SHA-256 of raw EC point bytes at generation time (equivalent to canonical). Step 21B `prepare-edge-env` briefly used SHA-256 of the base64url **string** — different hash, same key pair.
+
 ## Permission UX
 
 - No automatic permission prompt on app load.
