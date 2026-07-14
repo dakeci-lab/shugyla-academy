@@ -5,7 +5,8 @@
  * Usage:
  *   node scripts/production-auth-users-migration.mjs --dry-run
  *   node scripts/production-auth-users-migration.mjs --status
- *   node scripts/production-auth-users-migration.mjs --apply   # local fixtures only on this step
+ *   node scripts/production-auth-users-migration.mjs --apply
+ *     Production requires AUTH_CUTOVER_OWNER_APPROVED=1 in environment.
  *
  * Requires env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
  * Never commit service role key. Never log passwords, full emails, or auth UUIDs.
@@ -67,7 +68,12 @@ function loadConfig() {
   }
 
   if (modeApply && isProductionUrl(url)) {
-    fail('Production --apply blocked on this preparation step. Use --dry-run or --status only.')
+    if (process.env.AUTH_CUTOVER_OWNER_APPROVED !== '1') {
+      fail('Production --apply requires AUTH_CUTOVER_OWNER_APPROVED=1 owner confirmation.')
+    }
+    if (!url.includes(PRODUCTION_REF)) {
+      fail(`Production --apply blocked: URL must target project ref ${PRODUCTION_REF}.`)
+    }
   }
 
   return { url, serviceRoleKey }
@@ -107,6 +113,7 @@ function buildPlan(academyUsers, authByEmail) {
     existingAuthMatches: 0,
     wouldCreateAuthUsers: 0,
     conflicts: 0,
+    activeUsers: 0,
     inactiveUsers: 0,
     ready: true,
   }
@@ -114,6 +121,9 @@ function buildPlan(academyUsers, authByEmail) {
   const actions = []
 
   for (const row of academyUsers) {
+    if (row.status === 'active') {
+      stats.activeUsers += 1
+    }
     if (row.status === 'inactive' || row.status === 'terminated') {
       stats.inactiveUsers += 1
     }
@@ -245,9 +255,10 @@ async function main() {
   }
 
   if (modeApply) {
-    if (!isLocalUrl(url)) fail('Local --apply only on this preparation step.')
     const withPassword = await fetchAcademyUsers(admin, true)
-    const plan = buildPlan(withPassword, authByEmail)
+    const authByEmailFresh = await listAllAuthUsers(admin)
+    const plan = buildPlan(withPassword, authByEmailFresh)
+    if (!plan.stats.ready) fail('Apply blocked: plan has conflicts.')
     await applyActions(admin, withPassword, plan.actions)
     const after = await fetchAcademyUsers(admin)
     const linked = after.filter((r) => r.auth_user_id).length
