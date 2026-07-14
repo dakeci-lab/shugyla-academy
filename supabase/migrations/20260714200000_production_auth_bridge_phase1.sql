@@ -10,6 +10,11 @@
 -- Does NOT:
 --   drop legacy policies, revoke anon grants, backfill auth_user_id,
 --   create Auth users, clear passwords, or touch notification tables.
+--
+-- Apply order (production-verified):
+--   1. schema + login_to_technical_email helper
+--   2. auth_user_id column + FK + partial UNIQUE index
+--   3. employee_owned_by_current_auth helper (requires auth_user_id column)
 
 select pg_advisory_xact_lock(202607142000);
 
@@ -63,7 +68,32 @@ revoke all on function auth_private.login_to_technical_email(text) from anon;
 grant execute on function auth_private.login_to_technical_email(text) to service_role;
 
 -- ---------------------------------------------------------------------------
--- 2. Ownership helper for later RLS (Phase 2)
+-- 2. auth_user_id column + constraints (additive)
+-- ---------------------------------------------------------------------------
+
+alter table public.academy_users
+  add column if not exists auth_user_id uuid;
+
+alter table public.academy_users
+  drop constraint if exists academy_users_auth_user_id_fkey;
+
+alter table public.academy_users
+  add constraint academy_users_auth_user_id_fkey
+  foreign key (auth_user_id)
+  references auth.users (id)
+  on delete set null;
+
+alter table public.academy_users
+  drop constraint if exists academy_users_auth_user_id_unique;
+
+drop index if exists idx_academy_users_auth_user_id_unique;
+
+create unique index if not exists idx_academy_users_auth_user_id_unique
+  on public.academy_users (auth_user_id)
+  where auth_user_id is not null;
+
+-- ---------------------------------------------------------------------------
+-- 3. Ownership helper for later RLS (Phase 2) — after auth_user_id exists
 -- ---------------------------------------------------------------------------
 
 create or replace function auth_private.employee_owned_by_current_auth(p_employee_id bigint)
@@ -89,30 +119,5 @@ comment on function auth_private.employee_owned_by_current_auth(bigint) is
 
 revoke all on function auth_private.employee_owned_by_current_auth(bigint) from public;
 revoke all on function auth_private.employee_owned_by_current_auth(bigint) from anon;
-
--- ---------------------------------------------------------------------------
--- 3. auth_user_id column + constraints (additive)
--- ---------------------------------------------------------------------------
-
-alter table public.academy_users
-  add column if not exists auth_user_id uuid;
-
-alter table public.academy_users
-  drop constraint if exists academy_users_auth_user_id_fkey;
-
-alter table public.academy_users
-  add constraint academy_users_auth_user_id_fkey
-  foreign key (auth_user_id)
-  references auth.users (id)
-  on delete set null;
-
-alter table public.academy_users
-  drop constraint if exists academy_users_auth_user_id_unique;
-
-drop index if exists idx_academy_users_auth_user_id_unique;
-
-create unique index if not exists idx_academy_users_auth_user_id_unique
-  on public.academy_users (auth_user_id)
-  where auth_user_id is not null;
 
 notify pgrst, 'reload schema';

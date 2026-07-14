@@ -1,6 +1,6 @@
 # Production Auth Rollout Checklist
 
-**Status:** planning only. Each phase requires **separate explicit owner approval**.
+**Status:** Phase 1 applied in production. Approvals 2–6 pending.
 
 Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md)
 
@@ -10,29 +10,33 @@ Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md)
 
 - [x] Project ref confirmed: `cxadzerxndlscwvdaymk`
 - [x] Anon exposure confirmed on `academy_users`, `academy_employee_shifts`
-- [x] 17 academy users; 9 active; 17 legacy passwords
-- [x] 1 Auth user; `auth_user_id` column absent
-- [x] No Edge Functions; no secrets; no pg_cron
 - [x] Direct Auth-first deploy marked unsafe
 
 ---
 
-## Approval 1 — Phase 1 additive migration
+## Approval 1 — Phase 1 additive migration ✓ COMPLETED
 
-**Owner approval required before any production write.**
+**Production migration:** `20260714172032_production_auth_bridge_phase1`
 
-- [ ] Production backup confirmed
-- [ ] Apply only `20260714200000_production_auth_bridge_phase1.sql`
-- [ ] Verify column `auth_user_id` exists (nullable)
-- [ ] Verify legacy anon policy **still present**
-- [ ] Verify legacy `password` values unchanged
-- [ ] **Do not** run provisioning, deploy, or Phase 2
+- [x] Production backup confirmed
+- [x] Phase 1 applied (second attempt after full rollback of failed first attempt)
+- [x] `auth_user_id` column exists (nullable)
+- [x] FK + partial UNIQUE index verified
+- [x] Both helper functions exist
+- [x] Legacy anon policy **still present**
+- [x] Legacy `password` values unchanged (17 nonempty)
+- [x] Linked `auth_user_id` = 0 (provisioning not started)
+- [x] No provisioning, deploy, or Phase 2 on this step
+
+**First-attempt failure (resolved):** `employee_owned_by_current_auth()` was created before `auth_user_id` column. Local file reordered to match successful production apply.
 
 ---
 
 ## Approval 2 — Auth user provisioning
 
-**Owner approval required. Run `scripts/production-auth-users-migration.mjs`.**
+**Owner approval required. Next production write: `--dry-run` first.**
+
+Run `scripts/production-auth-users-migration.mjs`.
 
 - [ ] `--dry-run` aggregate report reviewed (`ready: true`, `conflicts: 0`)
 - [ ] `--apply` executed with production `service_role` (env only, never Git)

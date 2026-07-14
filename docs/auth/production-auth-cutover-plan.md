@@ -1,10 +1,39 @@
 # Production Auth Cutover Plan
 
-**Status:** local preparation only. **No production actions on this document.**
+**Status:** Phase 1 **applied in production** (2026-07-14). Provisioning and later phases pending owner approval.
 
 Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md), [../notifications/production-readonly-audit.md](../notifications/production-readonly-audit.md)
 
-## Production risk summary
+## Phase 1 production apply (completed)
+
+| Item | Value |
+|------|-------|
+| Production migration version | `20260714172032` (`production_auth_bridge_phase1`) |
+| Local canonical file | `20260714200000_production_auth_bridge_phase1.sql` (same SQL, reordered) |
+| First attempt | **Failed** — `employee_owned_by_current_auth()` created before `auth_user_id` column |
+| Rollback | **Complete** — no partial state retained |
+| Second attempt | **Success** — corrected apply order (see below) |
+
+**Verified in production after apply:**
+
+- `auth_user_id` exists, nullable
+- FK `ON DELETE SET NULL`
+- Partial UNIQUE index `idx_academy_users_auth_user_id_unique`
+- Both helpers: `login_to_technical_email`, `employee_owned_by_current_auth`
+- `academy_users` total = 17; linked = 0; legacy passwords nonempty = 17
+- Legacy policies and anon grants **preserved**
+- No Auth users created; notifications/functions/secrets/Cron untouched
+
+**Production-verified apply order:**
+
+1. Create `auth_private` schema + `login_to_technical_email()`
+2. Add `auth_user_id` column + FK + partial UNIQUE index
+3. Create `employee_owned_by_current_auth()` (requires column)
+4. `notify pgrst, 'reload schema'`
+
+**Next production write:** Auth provisioning `--dry-run` only — separate owner approval. No user create/change without explicit approval.
+
+---
 
 | Finding | Impact |
 |---------|--------|
@@ -43,17 +72,19 @@ Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checkl
 
 ## Phase A — Additive bridge (SQL)
 
-**File:** `supabase/migrations/20260714200000_production_auth_bridge_phase1.sql`
+**Local file:** `supabase/migrations/20260714200000_production_auth_bridge_phase1.sql`
+**Production applied as:** `20260714172032_production_auth_bridge_phase1` ✓
 
-1. Production backup (owner).
-2. Add nullable `academy_users.auth_user_id`.
-3. FK → `auth.users(id) ON DELETE SET NULL`.
-4. Partial UNIQUE index on non-null `auth_user_id`.
-5. `auth_private.login_to_technical_email()` + `employee_owned_by_current_auth()` helpers.
-6. **Keep** legacy login working (no policy/grant changes).
-7. **Do not** clear `password`.
+Apply order (production-verified):
 
-> **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
+1. `auth_private` schema + `login_to_technical_email()`
+2. Nullable `academy_users.auth_user_id` + FK + partial UNIQUE index
+3. `employee_owned_by_current_auth()` — **after** column exists
+4. `notify pgrst, 'reload schema'`
+
+Legacy login remains working (no policy/grant changes, no password clear).
+
+> Phase 1 production apply **completed**. Do not re-apply.
 
 ---
 

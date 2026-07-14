@@ -556,26 +556,20 @@ Apply only `20260713194500_notification_system_foundation.sql` as first write �
 
 Apply only `20260714200000_production_auth_bridge_phase1.sql` as first production write — after owner approval. No Auth user creation, no grant revoke, no frontend/functions deploy, no notification migrations.
 
----
-
-## 23. Auth cutover preparation — Step 22C
+> **Superseded:** Phase 1 applied in production as `20260714172032`. Next write: provisioning `--dry-run` only.
 
 **Date:** 2026-07-14  
 **Status:** local preparation only. **No production changes.**
 
-### 23.1 Production Auth exposure (confirmed)
+### 23.1 Production Auth exposure (at Step 22C planning)
 
-| Finding | Value |
-|---------|-------|
-| `academy_users` rows | 17 |
-| Active users | 9 |
-| Legacy non-empty `password` | 17 |
-| `auth.users` rows | 1 |
-| `auth_user_id` column | **absent** |
-| Permissive anon on `academy_users` | `FOR ALL USING(true)` |
-| Permissive anon on `academy_employee_shifts` | `FOR ALL USING(true)` |
-| Anon privileges | SELECT, INSERT, UPDATE, DELETE, TRUNCATE |
-| Direct Auth-first deploy | **unsafe** |
+| Finding | Value (pre–Phase 1) | After Phase 1 apply |
+|---------|---------------------|---------------------|
+| `academy_users` rows | 17 | 17 |
+| `auth_user_id` column | absent | **present**, nullable |
+| Linked `auth_user_id` | n/a | **0** |
+| Legacy non-empty `password` | 17 | 17 |
+| Permissive anon policies | present | **preserved** |
 
 ### 23.2 Local artifacts prepared
 
@@ -595,37 +589,42 @@ Apply only `20260714200000_production_auth_bridge_phase1.sql` as first productio
 
 ---
 
-## 23. Auth cutover preparation — Step 22C
+## 24. Phase 1 production apply — Step 22E sync
 
 **Date:** 2026-07-14  
-**Status:** local preparation only. **No production changes.**
+**Status:** Phase 1 applied in production. Local migration file synced to production apply order.
 
-### 23.1 Production Auth exposure (confirmed)
+### 24.1 Production migration
 
-| Finding | Value |
-|---------|-------|
-| `academy_users` rows | 17 |
-| Active users | 9 |
-| Legacy non-empty `password` | 17 |
-| `auth.users` rows | 1 |
-| `auth_user_id` column | **absent** |
-| Permissive anon on `academy_users` | `FOR ALL USING(true)` |
-| Permissive anon on `academy_employee_shifts` | `FOR ALL USING(true)` |
-| Anon privileges | SELECT, INSERT, UPDATE, DELETE, TRUNCATE |
-| Direct Auth-first deploy | **unsafe** |
+| Field | Value |
+|-------|-------|
+| Applied version | `20260714172032` (`production_auth_bridge_phase1`) |
+| Local canonical file | `20260714200000_production_auth_bridge_phase1.sql` |
+| First attempt | Failed — function before column |
+| Rollback | Complete |
+| Second attempt | Success |
 
-### 23.2 Local artifacts prepared
+### 24.2 Post-apply production state
 
-| Artifact | Purpose |
-|----------|---------|
-| `20260714200000_production_auth_bridge_phase1.sql` | Additive bridge only |
-| `20260714210000_production_auth_security_cutover_phase2.sql` | Security cutover with preconditions |
-| `20260714220000_production_legacy_password_cleanup_phase3.sql` | Password clear (HIGH RISK) |
-| `scripts/production-auth-users-migration.mjs` | Provisioning tool |
-| `scripts/verify-production-auth-cutover.mjs` | Local verification |
-| `docs/auth/production-auth-cutover-plan.md` | Phased plan |
-| `docs/auth/production-auth-rollout-checklist.md` | Owner approval gates |
+| Check | Value |
+|-------|-------|
+| `auth_user_id` | exists, nullable |
+| FK | `ON DELETE SET NULL` |
+| Partial UNIQUE index | present |
+| Helper functions | both present |
+| `academy_users` total | 17 |
+| Linked `auth_user_id` | **0** |
+| Legacy passwords nonempty | 17 |
+| Legacy policies / anon grants | preserved |
+| Auth users created | none |
+| Notifications / functions / secrets / Cron | untouched |
 
-### 23.3 Readiness
+### 24.3 Local fix (Step 22E)
 
-**NOT_READY_FOR_DIRECT_NOTIFICATION_DEPLOY** — Auth cutover must precede notification rollout.
+Reordered local SQL: `employee_owned_by_current_auth()` now created **after** `auth_user_id` + FK + index. No semantic changes.
+
+### 24.4 Next production write
+
+> **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
+
+Auth provisioning `--dry-run` only — no user create/change until owner reviews aggregate report.
