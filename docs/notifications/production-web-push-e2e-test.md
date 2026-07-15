@@ -111,13 +111,76 @@ After disable → enable on the same device, the browser created a **new push en
 
 ---
 
+## Step 22U — Controlled production test send attempt (partial)
+
+**Date:** 2026-07-15
+**Status:** frontend + `send-test-web-push` gate deployed; **no successful delivery**; **no DB records**.
+
+| Item | Result |
+|------|--------|
+| Frontend commit | **`b05373e`** (bundle `assets/index-Dtk_bUds.js`) |
+| Edge Function | `send-test-web-push` with `WEB_PUSH_PRODUCTION_TEST_ENABLED` gate |
+| Backend test gates | temporarily enabled, then **disabled** (both secrets digest = `false`) |
+| Frontend E2E flag | `config/production-web-push-e2e-test.flag` = **`enabled`** |
+| Owner action | one accidental click before gated step; read-only audit showed **no** `notifications` / `deliveries` rows |
+| Notifications / deliveries / sent | **0** / **0** / **0** |
+| Rules enabled / Cron | **0** / **0** |
+
+---
+
+## Step 22V — Test-send diagnostics fix (local)
+
+**Date:** 2026-07-15
+**Status:** safe frontend diagnostics committed locally; **not deployed** until Step 22W.
+
+| Item | Result |
+|------|--------|
+| Commit | **`745a178`** |
+| Scope | `webPushSubscriptionService.js`, `PushNotificationSettings.jsx`, diagnostics verifier only |
+| Edge Functions | **unchanged** |
+| Test gates | **not enabled** |
+| Test send | **not performed** |
+
+Root cause addressed: `functions.invoke` error `context` is a `Response`; mis-parsed JSON produced generic UI errors; refresh cleared state.
+
+---
+
+## Step 22W — Diagnostics production deploy (completed)
+
+**Date:** 2026-07-15
+**Owner confirmation:** deploy **`745a178`** without retest push; rules **disabled**; Cron **off**.
+
+| Item | Result |
+|------|--------|
+| Deployed commit | **`745a178`** |
+| GitHub Pages workflow | **Deploy Shugyla Academy to GitHub Pages** run **29422446136** — **success** |
+| Secondary workflow | **Deploy to GitHub Pages** run **29422445238** — **success** |
+| Production bundle | `assets/index-CfthA7r8.js`, `assets/index-y715ftA8.css` |
+| Production URL | `https://dakeci-lab.github.io/shugyla-academy/` |
+| Diagnostics verifier | **23/23** |
+| Subscription reconcile | **30/30** |
+| Test send performed | **no** (button not clicked; `send-test-web-push` not invoked) |
+| Notifications / deliveries / sent | **0** / **0** / **0** |
+| Subscriptions total / active | **3** / **3** |
+| Duplicate endpoints | **0** |
+| Backend test gates | `WEB_PUSH_TEST_ENABLED` / `WEB_PUSH_PRODUCTION_TEST_ENABLED` — **disabled** (digest = `false`) |
+| Rules enabled / Cron | **0** / **0** |
+| Business baseline | **18/18** unchanged |
+| Edge Functions redeployed | **no** |
+| VAPID secrets rotated | **no** |
+
+Diagnostics in production bundle: `session_expired`, `browser_subscription_missing`, `active_subscription_not_found`, `test_sender_disabled`, invoke/network classification; `sessionStorage` persistence key `shugyla.web_push.last_test_send_diagnostic`; `role="alert"`; no raw Edge Function JSON to user; no automatic retry on test-send.
+
+---
+
 ## Next gated step — single test send
 
-After Step 22T owner confirmation (**re-enable successful**):
+After Step 22W diagnostics deploy and **separate owner confirmation**:
 
-1. Send **exactly one** test push via `send-test-web-push` to the **owner admin device** active subscription (not secondary admin devices or other roles).
-2. Verify browser delivery and `notification_deliveries` tracking.
-3. Do **not** resend; do **not** enable rules or Cron.
+1. Synchronize browser subscription on the owner admin device; confirm exactly **one** matching active subscription.
+2. Send **exactly one** test push via manual button press only (no automatic retry).
+3. Verify browser delivery and `notification_deliveries` tracking.
+4. Do **not** resend; do **not** enable rules or Cron.
 
 ---
 

@@ -238,6 +238,51 @@ See [production-web-push-e2e-test.md](./production-web-push-e2e-test.md).
 
 ---
 
+## Step 22U — Controlled production test send attempt
+
+**Date:** 2026-07-15
+**Status:** gated frontend + Edge Function path deployed; **no delivery**; backend gates later **disabled**.
+
+| Item | Result |
+|------|--------|
+| Frontend commit | **`b05373e`** |
+| `send-test-web-push` | deployed with production test gate |
+| Notifications / deliveries / sent | **0** / **0** / **0** |
+| Rules enabled / Cron | **0** / **0** |
+| Business baseline | **18/18** unchanged |
+
+---
+
+## Step 22V — Web Push test-send diagnostics (local fix)
+
+**Date:** 2026-07-15
+**Commit:** **`745a178`** — frontend diagnostics + verifier only; **no** Edge Function / migration / gate changes.
+
+---
+
+## Step 22W — Web Push diagnostics production deploy
+
+**Date:** 2026-07-15
+**Owner confirmation:** deploy diagnostics **`745a178`**; **no** retest push; rules **disabled**; Cron **off**.
+
+| Item | Result |
+|------|--------|
+| Deployed commit | **`745a178`** |
+| GitHub Pages | run **29422446136** — **success** |
+| Production bundle | `assets/index-CfthA7r8.js` |
+| Test send | **not performed** |
+| Notifications / deliveries / sent | **0** / **0** / **0** |
+| Subscriptions total / active | **3** / **3** |
+| Backend test gates | **disabled** (`WEB_PUSH_TEST_ENABLED`, `WEB_PUSH_PRODUCTION_TEST_ENABLED` digest = `false`) |
+| Rules enabled / Cron | **0** / **0** |
+| Edge Functions redeployed | **no** |
+| VAPID secrets | **unchanged** |
+| Business baseline | **18/18** unchanged |
+
+Local docs commit: `docs: record web push diagnostics production deploy` (not pushed).
+
+---
+
 ## Next step (gated)
 
-Send **exactly one** production test Web Push to the **active** administrator subscription; verify browser delivery and delivery tracking. Rules **disabled**, Cron **off**.
+After **separate owner confirmation**: synchronize browser subscription on owner admin device, confirm one matching active subscription, then allow **one** manual test-send button press (no automatic retry). Rules **disabled**, Cron **off**.
