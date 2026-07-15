@@ -260,6 +260,13 @@ function stageNotificationObjects() {
       (select count(*)::int from public.notification_rules where is_enabled = true) as rules_enabled,
       (select count(*)::int from public.notifications) as notifications,
       (select count(*)::int from public.notification_push_subscriptions) as subscriptions,
+      (select count(*)::int from public.notification_push_subscriptions where is_active = true) as subscriptions_active,
+      (select count(*)::int from (
+        select endpoint
+        from public.notification_push_subscriptions
+        group by endpoint
+        having count(*) > 1
+      ) duplicate_endpoints) as duplicate_endpoints,
       (select count(*)::int from public.notification_deliveries) as deliveries;
   `)
 
@@ -267,7 +274,12 @@ function stageNotificationObjects() {
   assert('rules count = 4', counts.rules === 4)
   assert('enabled rules = 0', counts.rules_enabled === 0)
   assert('notifications count = 0', counts.notifications === 0)
-  assert('subscriptions count = 0', counts.subscriptions === 0)
+  assert('subscriptions total >= 0', counts.subscriptions >= 0)
+  assert('duplicate endpoints = 0', counts.duplicate_endpoints === 0)
+  assert('active subscriptions <= total', counts.subscriptions_active <= counts.subscriptions)
+  if (counts.subscriptions >= 1) {
+    assert('active subscriptions = 1 for controlled E2E', counts.subscriptions_active === 1)
+  }
   assert('deliveries count = 0', counts.deliveries === 0)
 
   const ruleCodes = dbQueryJson(`

@@ -213,13 +213,77 @@ Deno.serve(async (req) => {
       last_used_at: now,
     }
 
-    const { error: upsertError } = await serviceClient
+    const { data: deviceRow, error: deviceLookupError } = await serviceClient
       .from('notification_push_subscriptions')
-      .upsert(row, { onConflict: 'endpoint' })
+      .select('id')
+      .eq('employee_id', employeeId)
+      .eq('device_id', deviceId)
+      .maybeSingle()
 
-    if (upsertError) {
-      console.error('push_register_failed', { category: upsertError.message })
+    if (deviceLookupError) {
+      console.error('push_register_device_lookup_failed', { category: deviceLookupError.message })
       return adminErrorResponse('internal_error', 500)
+    }
+
+    if (deviceRow) {
+      const { data: endpointRow, error: endpointLookupError } = await serviceClient
+        .from('notification_push_subscriptions')
+        .select('id, employee_id')
+        .eq('endpoint', endpoint)
+        .maybeSingle()
+
+      if (endpointLookupError) {
+        console.error('push_register_endpoint_lookup_failed', { category: endpointLookupError.message })
+        return adminErrorResponse('internal_error', 500)
+      }
+
+      if (endpointRow && endpointRow.id !== deviceRow.id) {
+        if (endpointRow.employee_id !== employeeId) {
+          return adminErrorResponse('forbidden', 403)
+        }
+
+        const { error: deleteStaleError } = await serviceClient
+          .from('notification_push_subscriptions')
+          .delete()
+          .eq('id', endpointRow.id)
+          .eq('employee_id', employeeId)
+
+        if (deleteStaleError) {
+          console.error('push_register_stale_delete_failed', { category: deleteStaleError.message })
+          return adminErrorResponse('internal_error', 500)
+        }
+      }
+
+      const { error: updateError } = await serviceClient
+        .from('notification_push_subscriptions')
+        .update({
+          auth_user_id: authUserId,
+          endpoint,
+          p256dh_key: p256dh,
+          auth_key: authKey,
+          expiration_time: expirationTime,
+          user_agent: userAgent,
+          permission_status: 'granted',
+          is_active: true,
+          revoked_at: null,
+          last_used_at: now,
+        })
+        .eq('id', deviceRow.id)
+        .eq('employee_id', employeeId)
+
+      if (updateError) {
+        console.error('push_register_update_failed', { category: updateError.message })
+        return adminErrorResponse('internal_error', 500)
+      }
+    } else {
+      const { error: upsertError } = await serviceClient
+        .from('notification_push_subscriptions')
+        .upsert(row, { onConflict: 'endpoint' })
+
+      if (upsertError) {
+        console.error('push_register_failed', { category: upsertError.message })
+        return adminErrorResponse('internal_error', 500)
+      }
     }
 
     return subscriptionResponse(true, true, 'granted')

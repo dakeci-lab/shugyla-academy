@@ -18,6 +18,7 @@
     "webpush:local:prepare-edge-env": "node scripts/prepare-local-web-push-edge-env.mjs",
     "webpush:local:restart-supabase": "node scripts/restart-local-supabase-with-webpush-env.mjs",
     "supabase:local:verify-web-push-foundation": "node scripts/verify-web-push-foundation.mjs",
+    "supabase:local:verify-web-push-subscription-reconcile": "node scripts/verify-web-push-subscription-reconcile.mjs",
     "supabase:local:verify-web-push-sender": "node scripts/verify-web-push-sender.mjs",
     "supabase:local:verify-time-tracker-dispatch-core": "node scripts/verify-time-tracker-dispatch-core.mjs",
     "supabase:local:verify-time-tracker-dispatch-edge": "node scripts/verify-time-tracker-dispatch-edge.mjs",

@@ -4,6 +4,23 @@ import { isCloudMode } from '../lib/dataMode'
 const DEVICE_ID_STORAGE_KEY = 'shugyla.web_push.device_id'
 const LOGOUT_CLEANUP_MS = 3000
 
+export const WEB_PUSH_ERROR_MESSAGES = {
+  permission_denied: 'Уведомления запрещены в настройках браузера',
+  service_worker_unavailable: 'Не удалось подготовить уведомления на этом устройстве',
+  browser_subscribe_failed: 'Браузер не смог создать подписку на уведомления',
+  backend_registration_failed: 'Не удалось сохранить регистрацию устройства',
+  session_expired: 'Сессия истекла. Войдите снова',
+  network: 'Нет соединения. Повторите попытку',
+}
+
+export class WebPushError extends Error {
+  constructor(code, message) {
+    super(message)
+    this.name = 'WebPushError'
+    this.code = code
+  }
+}
+
 function hasWindow() {
   return typeof window !== 'undefined'
 }
@@ -47,19 +64,43 @@ export function urlBase64ToUint8Array(base64String) {
   return outputArray
 }
 
+function subscriptionApplicationServerKey(subscription) {
+  const key = subscription.options?.applicationServerKey
+  if (!key) return null
+  if (key instanceof ArrayBuffer) return new Uint8Array(key)
+  if (ArrayBuffer.isView(key)) return new Uint8Array(key.buffer, key.byteOffset, key.byteLength)
+  return null
+}
+
+function subscriptionMatchesVapid(subscription, vapidPublicKey) {
+  const subKey = subscriptionApplicationServerKey(subscription)
+  if (!subKey) return true
+  const expected = urlBase64ToUint8Array(vapidPublicKey)
+  if (subKey.length !== expected.length) return false
+  return subKey.every((byte, index) => byte === expected[index])
+}
+
+function isNetworkError(error) {
+  const message = error?.message ?? ''
+  return /failed to fetch|networkerror|load failed|network request failed/i.test(message)
+}
+
 async function ensureAuthSession() {
   if (!isCloudMode() || !supabase) {
-    throw new Error('Web Push доступен только в облачном режиме')
+    throw new WebPushError(
+      'service_worker_unavailable',
+      'Web Push доступен только в облачном режиме'
+    )
   }
   const { data, error } = await supabase.auth.getSession()
   if (error || !data?.session?.access_token) {
-    throw new Error('Сессия истекла. Войдите в аккаунт заново.')
+    throw new WebPushError('session_expired', WEB_PUSH_ERROR_MESSAGES.session_expired)
   }
 }
 
 function mapFunctionError(data, fallback) {
   const code = data?.code
-  if (code === 'unauthorized') return 'Сессия истекла. Войдите в аккаунт заново.'
+  if (code === 'unauthorized') return WEB_PUSH_ERROR_MESSAGES.session_expired
   if (code === 'inactive_caller' || code === 'forbidden') {
     return 'Нет доступа для управления уведомлениями на этом устройстве.'
   }
@@ -69,18 +110,41 @@ function mapFunctionError(data, fallback) {
   return fallback
 }
 
+function classifyInvokeFailure(error, data) {
+  const status = error?.context?.status
+  if (status === 401) {
+    return new WebPushError('session_expired', WEB_PUSH_ERROR_MESSAGES.session_expired)
+  }
+  if (isNetworkError(error)) {
+    return new WebPushError('network', WEB_PUSH_ERROR_MESSAGES.network)
+  }
+  const contextBody = error?.context?.json ?? error?.context?.body
+  if (contextBody && typeof contextBody === 'object') {
+    return new WebPushError(
+      'backend_registration_failed',
+      mapFunctionError(contextBody, WEB_PUSH_ERROR_MESSAGES.backend_registration_failed)
+    )
+  }
+  if (data && !data.ok) {
+    return new WebPushError(
+      'backend_registration_failed',
+      mapFunctionError(data, WEB_PUSH_ERROR_MESSAGES.backend_registration_failed)
+    )
+  }
+  return new WebPushError(
+    'backend_registration_failed',
+    WEB_PUSH_ERROR_MESSAGES.backend_registration_failed
+  )
+}
+
 async function invokeManageSubscription(body) {
   await ensureAuthSession()
   const { data, error } = await supabase.functions.invoke('manage-push-subscription', { body })
   if (error) {
-    const contextBody = error.context?.json ?? error.context?.body
-    if (contextBody && typeof contextBody === 'object') {
-      throw new Error(mapFunctionError(contextBody, 'Не удалось обновить регистрацию уведомлений'))
-    }
-    throw new Error('Не удалось обновить регистрацию уведомлений')
+    throw classifyInvokeFailure(error, data)
   }
   if (!data?.ok) {
-    throw new Error(mapFunctionError(data, 'Не удалось обновить регистрацию уведомлений'))
+    throw classifyInvokeFailure(null, data)
   }
   return data
 }
@@ -95,6 +159,40 @@ function serializeSubscription(subscription) {
       auth: json.keys?.auth,
     },
   }
+}
+
+async function createBrowserSubscription(registration, vapidPublicKey) {
+  try {
+    return await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+    })
+  } catch {
+    throw new WebPushError('browser_subscribe_failed', WEB_PUSH_ERROR_MESSAGES.browser_subscribe_failed)
+  }
+}
+
+async function registerBrowserSubscriptionWithBackend(deviceId, subscription) {
+  await invokeManageSubscription({
+    action: 'register',
+    device_id: deviceId,
+    subscription: serializeSubscription(subscription),
+  })
+}
+
+async function resolveBrowserSubscription(registration, vapidPublicKey) {
+  let subscription = await registration.pushManager.getSubscription()
+
+  if (subscription && !subscriptionMatchesVapid(subscription, vapidPublicKey)) {
+    await subscription.unsubscribe().catch(() => {})
+    subscription = null
+  }
+
+  if (!subscription) {
+    subscription = await createBrowserSubscription(registration, vapidPublicKey)
+  }
+
+  return subscription
 }
 
 export async function getServiceWorkerRegistration() {
@@ -167,57 +265,105 @@ export async function syncExistingPushSubscription() {
   return data.subscription
 }
 
-export async function requestAndRegisterPushSubscription() {
+export async function enablePushNotifications() {
   if (!isWebPushSupported()) {
-    throw new Error('Этот браузер не поддерживает системные уведомления')
+    throw new WebPushError(
+      'service_worker_unavailable',
+      WEB_PUSH_ERROR_MESSAGES.service_worker_unavailable
+    )
   }
 
   const vapidPublicKey = getVapidPublicKey()
   if (!vapidPublicKey) {
-    throw new Error('Локальный VAPID public key не настроен')
+    throw new WebPushError(
+      'backend_registration_failed',
+      WEB_PUSH_ERROR_MESSAGES.backend_registration_failed
+    )
   }
 
-  const permission = await Notification.requestPermission()
+  let permission = getNotificationPermission()
+  if (permission === 'denied') {
+    throw new WebPushError('permission_denied', WEB_PUSH_ERROR_MESSAGES.permission_denied)
+  }
+  if (permission === 'default') {
+    permission = await Notification.requestPermission()
+  }
   if (permission !== 'granted') {
-    throw new Error('Разрешение на уведомления не получено')
+    throw new WebPushError('permission_denied', WEB_PUSH_ERROR_MESSAGES.permission_denied)
   }
 
   const registration = await getServiceWorkerRegistration()
   if (!registration) {
-    throw new Error('Service worker недоступен')
-  }
-
-  let subscription = await registration.pushManager.getSubscription()
-  if (!subscription) {
-    subscription = await registration.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-    })
+    throw new WebPushError(
+      'service_worker_unavailable',
+      WEB_PUSH_ERROR_MESSAGES.service_worker_unavailable
+    )
   }
 
   const deviceId = getOrCreateDeviceId()
   if (!deviceId) {
-    throw new Error('Не удалось определить устройство')
+    throw new WebPushError(
+      'backend_registration_failed',
+      WEB_PUSH_ERROR_MESSAGES.backend_registration_failed
+    )
   }
 
-  const data = await invokeManageSubscription({
-    action: 'register',
-    device_id: deviceId,
-    subscription: serializeSubscription(subscription),
-  })
+  let subscription = await resolveBrowserSubscription(registration, vapidPublicKey)
 
-  return data.subscription
+  try {
+    await registerBrowserSubscriptionWithBackend(deviceId, subscription)
+  } catch (err) {
+    if (!(err instanceof WebPushError) || err.code !== 'backend_registration_failed') {
+      throw err
+    }
+
+    await subscription.unsubscribe().catch(() => {})
+    subscription = await createBrowserSubscription(registration, vapidPublicKey)
+    await registerBrowserSubscriptionWithBackend(deviceId, subscription)
+  }
+
+  const verified = await registration.pushManager.getSubscription()
+  if (!verified) {
+    throw new WebPushError(
+      'browser_subscribe_failed',
+      WEB_PUSH_ERROR_MESSAGES.browser_subscribe_failed
+    )
+  }
+
+  return verified
+}
+
+export async function requestAndRegisterPushSubscription() {
+  const subscription = await enablePushNotifications()
+  return { registered: true, active: true, permission: 'granted', subscription }
 }
 
 export async function disablePushNotifications() {
   const deviceId = getOrCreateDeviceId()
   if (!deviceId) return null
 
-  await invokeManageSubscription({ action: 'disable', device_id: deviceId })
+  try {
+    await invokeManageSubscription({ action: 'disable', device_id: deviceId })
+  } catch (err) {
+    if (err instanceof WebPushError && err.code === 'network') {
+      throw err
+    }
+    if (err instanceof WebPushError && err.code === 'session_expired') {
+      throw err
+    }
+    throw new WebPushError(
+      'backend_registration_failed',
+      WEB_PUSH_ERROR_MESSAGES.backend_registration_failed
+    )
+  }
 
   const browserSub = await getExistingBrowserSubscription()
   if (browserSub) {
-    await browserSub.unsubscribe()
+    try {
+      await browserSub.unsubscribe()
+    } catch {
+      // Browser unsubscribe is best-effort after backend deactivation.
+    }
   }
 
   return { disabled: true }
@@ -234,7 +380,7 @@ export async function removePushSubscriptionForLogout() {
       invokeManageSubscription({ action: 'remove', device_id: deviceId }),
       new Promise((resolve) => window.setTimeout(resolve, LOGOUT_CLEANUP_MS)),
     ])
-  } catch (err) {
+  } catch {
     console.warn('Push subscription cleanup failed during logout')
     return null
   }
@@ -283,7 +429,7 @@ function mapSendTestError(data, fallback) {
     return 'Серверная отправка уведомлений не настроена.'
   }
   if (code === 'unauthorized') {
-    return 'Сессия истекла. Войдите в аккаунт заново.'
+    return WEB_PUSH_ERROR_MESSAGES.session_expired
   }
   return fallback
 }

@@ -23,6 +23,7 @@ const FIXTURE_TAG = 'web-push-verify'
 const USER_A_PASSWORD = 'WebPushUserA123!'
 const USER_B_PASSWORD = 'WebPushUserB123!'
 const ENDPOINT = `https://127.0.0.1:54321/local-push/${FIXTURE_TAG}`
+const ENDPOINT_ROTATED = `https://127.0.0.1:54321/local-push/${FIXTURE_TAG}-rotated`
 const P256DH = 'BEl62iUYgUihxQfF9Kj3QfF9Kj3QfF9Kj3QfF9Kj3QfF9Kj3QfF9Kj3QfF'
 const AUTH_KEY = 'tBHItJI5svbpez7KI4CCXg'
 
@@ -55,6 +56,7 @@ async function main() {
     await stageSetupFixture()
     await stageFunctionAuth()
     await stageRegister()
+    await stageReEnableAfterDisable()
     await stageSharedDevice()
     await stageDisableRemove()
     await stageSecurityResponse()
@@ -151,12 +153,12 @@ async function invoke({ token, body, method = 'POST' } = {}) {
   return { status: response.status, json }
 }
 
-function validRegisterBody(deviceId) {
+function validRegisterBody(deviceId, endpoint = ENDPOINT) {
   return {
     action: 'register',
     device_id: deviceId,
     subscription: {
-      endpoint: ENDPOINT,
+      endpoint,
       expiration_time: null,
       keys: { p256dh: P256DH, auth: AUTH_KEY },
     },
@@ -227,7 +229,7 @@ function stageSecrets() {
     'VAPID_PRIVATE_KEY references only in allowed tracked files',
     !gitCheck.stdout.split('\n').some((line) => {
       if (!line.trim()) return false
-      return !/^(docs\/notifications\/[^:]+|scripts\/(generate-local-vapid-keys[^:]*|prepare-local-web-push-edge-env[^:]*|verify-web-push[^:]+|verify-vapid-key-integrity[^:]*|verify-time-tracker-dispatch-edge[^:]*|verify-production-notification-foundation-readiness[^:]*|verify-production-auth-cutover[^:]*)):|supabase\/(config\.toml|functions\/_shared\/webPushSender\.ts):/.test(
+      return !/^(docs\/notifications\/[^:]+|scripts\/(generate-local-vapid-keys[^:]*|prepare-local-web-push-edge-env[^:]*|setup-production-vapid-public-key[^:]*|verify-web-push[^:]+|verify-vapid-key-integrity[^:]*|verify-time-tracker-dispatch-edge[^:]*|verify-production-notification-foundation-readiness[^:]*|verify-production-auth-cutover[^:]*)):|supabase\/(config\.toml|functions\/_shared\/webPushSender\.ts):/.test(
         line
       )
     })
@@ -310,11 +312,14 @@ function stageStaticFrontend() {
   assert('uses VITE public key', service.includes('VITE_WEB_PUSH_VAPID_PUBLIC_KEY'))
   assert('no private key in service', !service.includes('VAPID_PRIVATE_KEY'))
   assert('invoke manage-push-subscription', service.includes("supabase.functions.invoke('manage-push-subscription'"))
+  assert('enable reconcile helper', service.includes('enablePushNotifications'))
+  assert('getSubscription reconcile path', service.includes('getSubscription()'))
   assert('device id storage key', service.includes('shugyla.web_push.device_id'))
   assert('no endpoint logging', !service.includes('console.log') || !/endpoint/.test(service))
   assert('logout cleanup helper', service.includes('removePushSubscriptionForLogout'))
   assert('requestPermission only in enable flow', !ui.includes('useEffect') || !ui.includes('requestPermission'))
   assert('enable button click handler', ui.includes('onClick={handleEnable}'))
+  assert('double-click guard', ui.includes('disabled={busy}'))
   assert('dev test guarded', ui.includes('import.meta.env.DEV'))
   assert('no secrets in UI', !ui.includes('endpoint') && !ui.includes('p256dh'))
 
@@ -526,6 +531,67 @@ async function stageRegister() {
   console.log('')
 }
 
+async function stageReEnableAfterDisable() {
+  console.log('Stage 9b: Re-enable after disable (device endpoint rotation)')
+
+  const disable = await invoke({
+    token: state.tokens.a,
+    body: { action: 'disable', device_id: state.deviceA },
+  })
+  assert('disable before re-enable → 200', disable.status === 200)
+
+  const activeAfterDisable = psqlScalar(`
+    SELECT COUNT(*) FROM public.notification_push_subscriptions
+    WHERE employee_id = ${state.users.a.employeeId}
+      AND device_id = '${state.deviceA}'::uuid
+      AND is_active = true;
+  `)
+  assert('device active = 0 after disable', activeAfterDisable === '0')
+
+  const disableAgain = await invoke({
+    token: state.tokens.a,
+    body: { action: 'disable', device_id: state.deviceA },
+  })
+  assert('repeat disable idempotent → 200', disableAgain.status === 200)
+
+  const reRegister = await invoke({
+    token: state.tokens.a,
+    body: validRegisterBody(state.deviceA, ENDPOINT_ROTATED),
+  })
+  assert('re-register after disable with new endpoint → 200', reRegister.status === 200 && reRegister.json?.ok)
+
+  const deviceRows = psqlScalar(`
+    SELECT COUNT(*) FROM public.notification_push_subscriptions
+    WHERE employee_id = ${state.users.a.employeeId}
+      AND device_id = '${state.deviceA}'::uuid;
+  `)
+  assert('single row per employee+device', deviceRows === '1')
+
+  const deviceActive = psqlScalar(`
+    SELECT COUNT(*) FROM public.notification_push_subscriptions
+    WHERE employee_id = ${state.users.a.employeeId}
+      AND device_id = '${state.deviceA}'::uuid
+      AND is_active = true;
+  `)
+  assert('device active = 1 after re-enable', deviceActive === '1')
+
+  const repeatEnable = await invoke({
+    token: state.tokens.a,
+    body: validRegisterBody(state.deviceA, ENDPOINT_ROTATED),
+  })
+  assert('repeat register idempotent → 200', repeatEnable.status === 200)
+
+  const stillActive = psqlScalar(`
+    SELECT COUNT(*) FROM public.notification_push_subscriptions
+    WHERE employee_id = ${state.users.a.employeeId}
+      AND device_id = '${state.deviceA}'::uuid
+      AND is_active = true;
+  `)
+  assert('repeat register keeps single active row', stillActive === '1')
+
+  console.log('')
+}
+
 async function stageSharedDevice() {
   console.log('Stage 10: Shared device ownership')
 
@@ -629,7 +695,7 @@ async function stageCleanup() {
     }
   }
 
-  psqlExec(`DELETE FROM public.notification_push_subscriptions WHERE endpoint = '${ENDPOINT}';`)
+  psqlExec(`DELETE FROM public.notification_push_subscriptions WHERE endpoint IN ('${ENDPOINT}', '${ENDPOINT_ROTATED}');`)
   psqlExec(`DELETE FROM public.academy_users WHERE login LIKE '${FIXTURE_TAG}-%';`)
   psqlExec(`DELETE FROM public.academy_users WHERE full_name LIKE '%[${FIXTURE_TAG}]%';`)
 

@@ -364,7 +364,7 @@ function stageSecrets() {
     'VAPID_PRIVATE_KEY references only in allowed tracked files',
     !gitCheck.stdout.split('\n').some((line) => {
       if (!line.trim()) return false
-      return !/^(docs\/notifications\/[^:]+|scripts\/(generate-local-vapid-keys[^:]*|prepare-local-web-push-edge-env[^:]*|verify-web-push[^:]+|verify-vapid-key-integrity[^:]*|verify-time-tracker-dispatch-edge[^:]*|verify-production-notification-foundation-readiness[^:]*|verify-production-auth-cutover[^:]*)):|supabase\/(config\.toml|functions\/_shared\/webPushSender\.ts):/.test(
+      return !/^(docs\/notifications\/[^:]+|scripts\/(generate-local-vapid-keys[^:]*|prepare-local-web-push-edge-env[^:]*|setup-production-vapid-public-key[^:]*|verify-web-push[^:]+|verify-vapid-key-integrity[^:]*|verify-time-tracker-dispatch-edge[^:]*|verify-production-notification-foundation-readiness[^:]*|verify-production-auth-cutover[^:]*)):|supabase\/(config\.toml|functions\/_shared\/webPushSender\.ts):/.test(
         line
       )
     })

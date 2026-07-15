@@ -4,12 +4,14 @@ import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
 import {
   disablePushNotifications,
+  enablePushNotifications,
   getNotificationPermission,
   getPushRegistrationStatus,
   isWebPushSupported,
-  requestAndRegisterPushSubscription,
   sendServerTestWebPush,
   showDevelopmentTestNotification,
+  WebPushError,
+  WEB_PUSH_ERROR_MESSAGES,
 } from '../../../services/webPushSubscriptionService'
 import './PushNotificationSettings.css'
 
@@ -40,6 +42,7 @@ export default function PushNotificationSettings() {
   const [errorMessage, setErrorMessage] = useState('')
   const [serverSendState, setServerSendState] = useState(SERVER_SEND_STATE.IDLE)
   const [serverSendMessage, setServerSendMessage] = useState('')
+  const [busy, setBusy] = useState(false)
 
   const refreshStatus = useCallback(async () => {
     if (!isCloudMode()) {
@@ -89,25 +92,46 @@ export default function PushNotificationSettings() {
     void refreshStatus()
   }, [refreshStatus])
 
+  function resolveEnableErrorMessage(err) {
+    if (err instanceof WebPushError && err.code && WEB_PUSH_ERROR_MESSAGES[err.code]) {
+      return WEB_PUSH_ERROR_MESSAGES[err.code]
+    }
+    return err?.message || WEB_PUSH_ERROR_MESSAGES.backend_registration_failed
+  }
+
   async function handleEnable() {
+    if (busy) return
+    setBusy(true)
     setErrorMessage('')
     setUiState(UI_STATE.ENABLING)
     try {
-      await requestAndRegisterPushSubscription()
+      await enablePushNotifications()
       setUiState(UI_STATE.ENABLED)
       showSuccess('Уведомления на этом устройстве включены')
     } catch (err) {
-      if (getNotificationPermission() === 'denied') {
+      if (
+        err instanceof WebPushError &&
+        err.code === 'permission_denied'
+      ) {
         setUiState(UI_STATE.DENIED)
-        showWarning('Уведомления заблокированы в настройках браузера')
+        showWarning(WEB_PUSH_ERROR_MESSAGES.permission_denied)
         return
       }
-      setErrorMessage(err.message || 'Не удалось подключить уведомления')
+      if (getNotificationPermission() === 'denied') {
+        setUiState(UI_STATE.DENIED)
+        showWarning(WEB_PUSH_ERROR_MESSAGES.permission_denied)
+        return
+      }
+      setErrorMessage(resolveEnableErrorMessage(err))
       setUiState(UI_STATE.ERROR)
+    } finally {
+      setBusy(false)
     }
   }
 
   async function handleDisable() {
+    if (busy) return
+    setBusy(true)
     setErrorMessage('')
     setUiState(UI_STATE.DISABLING)
     try {
@@ -115,8 +139,10 @@ export default function PushNotificationSettings() {
       setUiState(UI_STATE.DISABLED)
       showSuccess('Уведомления отключены')
     } catch (err) {
-      setErrorMessage(err.message || 'Не удалось отключить уведомления')
+      setErrorMessage(resolveEnableErrorMessage(err))
       setUiState(UI_STATE.ERROR)
+    } finally {
+      setBusy(false)
     }
   }
 
@@ -180,7 +206,7 @@ export default function PushNotificationSettings() {
 
       {uiState === UI_STATE.DENIED && (
         <p className="push-settings__status push-settings__status--warning">
-          Уведомления заблокированы в настройках браузера.
+          {WEB_PUSH_ERROR_MESSAGES.permission_denied}
         </p>
       )}
 
@@ -193,6 +219,7 @@ export default function PushNotificationSettings() {
             type="button"
             className="btn btn--primary btn--sm"
             onClick={handleEnable}
+            disabled={busy}
           >
             {uiState === UI_STATE.DISABLED ? 'Включить снова' : 'Включить уведомления'}
           </button>
@@ -214,6 +241,7 @@ export default function PushNotificationSettings() {
             type="button"
             className="btn btn--outline btn--sm"
             onClick={handleDisable}
+            disabled={busy}
           >
             Отключить
           </button>
@@ -267,7 +295,12 @@ export default function PushNotificationSettings() {
           <p className="push-settings__status push-settings__status--warning">
             {errorMessage || 'Не удалось подключить уведомления'}
           </p>
-          <button type="button" className="btn btn--primary btn--sm" onClick={handleEnable}>
+          <button
+            type="button"
+            className="btn btn--primary btn--sm"
+            onClick={handleEnable}
+            disabled={busy}
+          >
             Повторить
           </button>
         </div>
