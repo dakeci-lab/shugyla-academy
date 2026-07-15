@@ -234,6 +234,26 @@ Run `scripts/production-auth-users-migration.mjs`.
 
 ---
 
+## Approval 11 — Production VAPID rotation ✓ COMPLETED (Step 22AG)
+
+**Date:** 2026-07-15  
+**Owner confirmation:** full VAPID rotation; secure private backup; update VAPID secrets + frontend; redeploy sender functions; **no push**; **no permit**; preserve subscription rows.
+
+- [x] Old fingerprint **`3766a407dc40a509`** — matching private key **lost** (Step 22S script wrote private key only to deleted temp file)
+- [x] New fingerprint **`a2027241e05d32fd`** — cryptographically verified (65/32 bytes, pair match, WebCrypto import OK)
+- [x] Permanent private backup saved **outside git** (not documented by path)
+- [x] Private key **absent** from repository / bundle
+- [x] Supabase secrets updated: **`VAPID_PUBLIC_KEY`**, **`VAPID_PRIVATE_KEY`**, **`VAPID_SUBJECT`** only
+- [x] Frontend `config/production-vapid-public.key` updated; commit **`b985c82`** pushed
+- [x] GitHub Pages run **29436298941** success; bundle `index-C92ZZT5z.js`
+- [x] `send-test-web-push` **v14** + `dispatch-time-tracker-notifications` **v11** redeployed (sender module cache reset)
+- [x] Subscription rows **3** preserved; **0** deleted; **3** devices await manual reconciliation
+- [x] Permits **1/1/0**; failed notification/delivery **1/1** — **unchanged**
+- [x] Legacy gates **OFF**; rules **0**; Cron **0**; baseline **18/18**
+- [x] Push **not sent**; permit **not issued** on this step
+
+---
+
 ## Explicit prohibitions (all phases)
 
 - No `supabase link` unless separately approved for migration history audit

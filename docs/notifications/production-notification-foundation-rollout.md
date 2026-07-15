@@ -384,6 +384,23 @@ Context: Steps 22X/22Z rejected sends with 0 records while env gates appeared ON
 
 ---
 
+## Step 22AG — Production VAPID rotation (completed)
+
+**Date:** 2026-07-15  
+**Status:** new P-256 pair generated once; permanent private backup outside git; Supabase VAPID trio updated; frontend public key + sender Edge Functions redeployed; subscription rows **preserved**.
+
+| Item | Result |
+|------|--------|
+| Old fingerprint | **`3766a407dc40a509`** (matching private **lost** — Step 22S temp-file-only write) |
+| New fingerprint | **`a2027241e05d32fd`** |
+| Secrets changed | VAPID trio only |
+| Subscriptions deleted | **0** |
+| Push / permit | **none** |
+| Legacy gates / rules / Cron | **OFF / 0 / 0** |
+| Business baseline | **18/18** unchanged |
+
+---
+
 ## Next step (gated)
 
-Permit-based controlled test-send only after **separate owner confirmation**: prepare device → preflight → issue one-time permit → one manual send click. Legacy gates **OFF**; rules **disabled**; Cron **off**.
+Controlled device reconciliation with new VAPID public key — **separate owner confirmation**. Then permit-based controlled test-send when ready. Legacy gates **OFF**; rules **disabled**; Cron **off**.

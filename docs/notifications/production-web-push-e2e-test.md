@@ -347,6 +347,49 @@ Step 22AB blocked because `schedule.edit` is legitimately shared with «Адми
 
 ---
 
+## Step 22AG — Production VAPID rotation (completed)
+
+**Date:** 2026-07-15  
+**Owner confirmation:** full VAPID rotation; secure private backup outside git; update Supabase VAPID secrets + frontend public key; redeploy sender functions; **no push**; **no permit**; **do not delete** existing subscription rows.
+
+| Item | Result |
+|------|--------|
+| Root cause (22AF) | Step 22S script saved only public key to git; private key lived in temp env-file deleted after `supabase secrets set` — **matching private key lost** |
+| Old public fingerprint | **`3766a407dc40a509`** |
+| New public fingerprint | **`a2027241e05d32fd`** |
+| Key-pair validation | public **65** bytes (`0x04` prefix); private **32** bytes; derived public byte-equal ✅ |
+| Permanent private backup | **yes** — outside repository, mode **600**, directory **700** (path not recorded in docs) |
+| Private key in git | **no** |
+| Supabase secrets updated | **`VAPID_PUBLIC_KEY`**, **`VAPID_PRIVATE_KEY`**, **`VAPID_SUBJECT`** only |
+| Frontend public key | `config/production-vapid-public.key` updated |
+| Commit | **`b985c82`** — `feat: rotate production VAPID key pair` |
+| GitHub Pages | workflow **Deploy to GitHub Pages** run **29436298941** — **success** @ **`b985c82`** |
+| Bundle | `assets/index-C92ZZT5z.js` — new public fingerprint embedded ✅ |
+| Edge Functions redeployed (sender cache reset) | **`send-test-web-push`** **v14**; **`dispatch-time-tracker-notifications`** **v11** |
+| Scheduler redeployed | **no** (`run-time-tracker-notification-scheduler` does not bundle sender directly) |
+| `verify_jwt` | `send-test-web-push` **true**; dispatcher **true** (unchanged) |
+| Backend subscription rows | **3 preserved**; **0 deleted**; **0 reconciled** to new VAPID yet |
+| Devices awaiting manual reconciliation | **3** |
+| Permits / notifications / deliveries | **1 / 1 / 0** active permits; **1 / 1** failed notification/delivery (**unchanged**) |
+| Push sent on this step | **no** |
+| Permit issued on this step | **no** |
+| Legacy gates | **OFF / OFF** |
+| Rules / Cron | **0** / **0** |
+| Business baseline | **18/18**; shifts **190**; roles **9**; role_permissions **137** |
+
+### Rotation-script safety (22AG)
+
+- `--rotate` / `--install-secrets` are **separate invocations**; `--overwrite` required to replace existing backup
+- Permanent secure env backup **outside repository**; temp CLI env-file **deleted** after secrets install
+- Private key **never printed**; verifier **`npm run verify:production-vapid-rotation`**
+- Frontend: missing `applicationServerKey` treated as mismatch; registered VAPID fingerprint in localStorage after successful backend register; controlled resubscribe only inside manual prepare — **no background auto-retry**
+
+### Next gated step
+
+Controlled reconciliation of **current iPhone** with new VAPID public key — **separate owner confirmation** required. Push **not** sent; permit **not** issued; other two devices **unchanged**.
+
+---
+
 ## Next gated step — permit-based controlled test-send (separate owner confirmation)
 
 After Step 22AA deploy:
