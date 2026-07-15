@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
+import { isCloudMode } from '../../../lib/dataMode'
 import { canViewTeamSchedule } from '../../../config/permissions'
 import { getStaffEmployees } from '../../../utils/employeeData'
 import {
@@ -14,6 +15,7 @@ import {
   getMonthsForWeek,
 } from '../../../utils/shiftData'
 import { getTeamShiftsForMonth } from '../../../services/academyDataService'
+import { fetchTeamWorkforceData } from '../../../services/workforceAdminService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import AdminModal from '../AdminModal'
 import TeamScheduleCell from '../TeamScheduleCell'
@@ -36,6 +38,7 @@ export default function WorkScheduleSection() {
   const selfEmployeeId = user?.id != null ? Number(user.id) : null
   const [weekStartKey, setWeekStartKey] = useState(getInitialWeekStartKey)
   const [shifts, setShifts] = useState([])
+  const [loadedEmployees, setLoadedEmployees] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
@@ -51,7 +54,11 @@ export default function WorkScheduleSection() {
     : formatWeekRangeLabel(weekStartKey)
 
   const employees = useMemo(() => {
-    let list = getStaffEmployees('active')
+    const base =
+      isCloudMode() && viewTeam && loadedEmployees != null
+        ? loadedEmployees
+        : getStaffEmployees('active')
+    let list = base
     if (!viewTeam && selfEmployeeId) {
       list = list.filter((emp) => Number(emp.id) === selfEmployeeId)
     }
@@ -60,7 +67,7 @@ export default function WorkScheduleSection() {
       if (!q) return true
       return emp.name.toLowerCase().includes(q)
     })
-  }, [search, viewTeam, selfEmployeeId])
+  }, [search, viewTeam, selfEmployeeId, loadedEmployees])
 
   const employeeIds = useMemo(() => employees.map((emp) => emp.id), [employees])
   const employeeIdsKey = employeeIds.join(',')
@@ -69,18 +76,30 @@ export default function WorkScheduleSection() {
     setLoading(true)
     setError('')
     try {
-      const months = getMonthsForWeek(weekStartKey)
-      const ids = employeeIds.length ? employeeIds : null
-      const monthResults = await Promise.all(
-        months.map(({ year, month }) => getTeamShiftsForMonth(year, month, ids))
-      )
-      setShifts(monthResults.flat())
+      if (isCloudMode() && viewTeam) {
+        const dateFrom = toDateKey(weekDates[0])
+        const dateTo = toDateKey(weekDates[weekDates.length - 1])
+        const bundle = await fetchTeamWorkforceData({
+          dateFrom,
+          dateTo,
+          view: 'schedule',
+        })
+        setLoadedEmployees(bundle.employees)
+        setShifts(bundle.shifts)
+      } else {
+        const months = getMonthsForWeek(weekStartKey)
+        const ids = employeeIds.length ? employeeIds : null
+        const monthResults = await Promise.all(
+          months.map(({ year, month }) => getTeamShiftsForMonth(year, month, ids))
+        )
+        setShifts(monthResults.flat())
+      }
     } catch (err) {
       setError(err.message || 'Не удалось загрузить график')
     } finally {
       setLoading(false)
     }
-  }, [weekStartKey, employeeIdsKey])
+  }, [weekStartKey, viewTeam, weekDates])
 
   usePlatformPageRefresh(loadShifts)
 
@@ -229,18 +248,25 @@ export default function WorkScheduleSection() {
         <EmployeeSearchToolbar value={search} onChange={(e) => setSearch(e.target.value)} />
       )}
 
-      {error && <p className="admin-form__error">{error}</p>}
+      {error && (
+        <div className="schedule-error">
+          <p className="admin-form__error">{error}</p>
+          <button type="button" className="btn btn--secondary btn--sm" onClick={loadShifts}>
+            Повторить
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <div className="schedule-loading">Загрузка графика…</div>
-      ) : employees.length === 0 ? (
+      ) : !error && employees.length === 0 ? (
         <p className="schedule-empty">Сотрудники не найдены</p>
-      ) : (
+      ) : !error ? (
         <>
           {!isMobileSchedule && scheduleTable}
           {isMobileSchedule && scheduleMobile}
         </>
-      )}
+      ) : null}
 
       <TeamScheduleDaySheet
         open={Boolean(daySheet)}

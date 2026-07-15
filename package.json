@@ -26,7 +26,8 @@
     "supabase:local:verify-time-tracker-scheduler-auth": "node scripts/verify-time-tracker-scheduler-auth.mjs",
     "supabase:local:verify-production-auth-cutover": "node scripts/verify-production-auth-cutover.mjs",
     "verify:auth-first-frontend-production-readiness": "node scripts/verify-auth-first-frontend-production-readiness.mjs",
-    "verify:production-notification-foundation-readiness": "node scripts/verify-production-notification-foundation-readiness.mjs"
+    "verify:production-notification-foundation-readiness": "node scripts/verify-production-notification-foundation-readiness.mjs",
+    "supabase:local:verify-team-workforce-admin-access": "node scripts/verify-team-workforce-admin-access.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",

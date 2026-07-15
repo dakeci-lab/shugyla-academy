@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { isCloudMode } from '../../lib/dataMode'
 import { getStaffEmployees } from '../../utils/employeeData'
 import { RATING_UPDATED_EVENT } from '../../utils/attendanceData'
 import { APP_TIMEZONE, addDaysToDateKey, toDateKeyInAppTimezone } from '../../utils/timezone'
@@ -11,6 +12,10 @@ import {
   getAttendanceSettings,
   getTeamShiftsForMonth,
 } from '../../services/academyDataService'
+import {
+  fetchTeamWorkforceData,
+  monthToDateRange,
+} from '../../services/workforceAdminService'
 import { usePlatformPageRefresh } from '../../context/PullToRefreshContext'
 import { ChevronLeftIcon, ChevronRightIcon } from '../icons/PlatformIcons'
 import AdminModal from './AdminModal'
@@ -255,13 +260,17 @@ export default function OwnerDashboard() {
   const [selectedDateKey, setSelectedDateKey] = useState(() => toDateKeyInAppTimezone())
   const [settings, setSettings] = useState(null)
   const [dayShifts, setDayShifts] = useState([])
+  const [teamEmployees, setTeamEmployees] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [now, setNow] = useState(() => new Date())
   const [activeMetric, setActiveMetric] = useState(null)
 
   const todayKey = toDateKeyInAppTimezone(now)
-  const employees = useMemo(() => getStaffEmployees('active'), [])
+  const employees = useMemo(
+    () => (isCloudMode() ? teamEmployees : getStaffEmployees('active')),
+    [teamEmployees]
+  )
   const employeeIds = useMemo(() => employees.map((emp) => emp.id), [employees])
   const employeeIdsKey = employeeIds.join(',')
   const selectedMonthState = useMemo(
@@ -274,18 +283,34 @@ export default function OwnerDashboard() {
 
   const loadData = useCallback(async () => {
     setError('')
+    setLoading(true)
     try {
-      const [attendanceSettings, shifts] = await Promise.all([
-        getAttendanceSettings(),
-        getTeamShiftsForMonth(
+      if (isCloudMode()) {
+        const { dateFrom, dateTo } = monthToDateRange(
           selectedMonthState.year,
-          selectedMonthState.month,
-          employeeIds.length ? employeeIds : null
-        ),
-      ])
-
-      setSettings(attendanceSettings)
-      setDayShifts((shifts || []).filter((shift) => shift.shiftDate === selectedDateKey))
+          selectedMonthState.month
+        )
+        const [attendanceSettings, bundle] = await Promise.all([
+          getAttendanceSettings(),
+          fetchTeamWorkforceData({ dateFrom, dateTo, view: 'dashboard' }),
+        ])
+        setSettings(attendanceSettings)
+        setTeamEmployees(bundle.employees)
+        setDayShifts(
+          (bundle.shifts || []).filter((shift) => shift.shiftDate === selectedDateKey)
+        )
+      } else {
+        const [attendanceSettings, shifts] = await Promise.all([
+          getAttendanceSettings(),
+          getTeamShiftsForMonth(
+            selectedMonthState.year,
+            selectedMonthState.month,
+            employeeIds.length ? employeeIds : null
+          ),
+        ])
+        setSettings(attendanceSettings)
+        setDayShifts((shifts || []).filter((shift) => shift.shiftDate === selectedDateKey))
+      }
     } catch (err) {
       setError(err.message || 'Не удалось загрузить данные дашборда')
     } finally {
@@ -340,6 +365,7 @@ export default function OwnerDashboard() {
     absent: 0,
   }
   const hasNoMarks = !loading && !error && dailyMetrics && !dailyMetrics.hasCheckIns
+  const showMetrics = !loading && !error && dailyMetrics
   const activeMetricConfig = activeMetric ? METRIC_CONFIG[activeMetric] : null
   const activeMetricRows = activeMetric ? dailyMetrics?.details?.[activeMetric] || [] : []
 
@@ -396,11 +422,18 @@ export default function OwnerDashboard() {
         </button>
       </section>
 
-      {error && <p className="admin-form__error">{error}</p>}
+      {error && (
+        <div className="owner-dashboard__error">
+          <p className="admin-form__error">{error}</p>
+          <button type="button" className="btn btn--secondary btn--sm" onClick={loadData}>
+            Повторить
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <p className="schedule-loading">Загрузка дашборда…</p>
-      ) : (
+      ) : showMetrics ? (
         <section className="owner-dashboard__hero">
           <CompanyHealthGauge score={dailyMetrics?.health ?? 100} size={188} />
 
@@ -440,7 +473,7 @@ export default function OwnerDashboard() {
             )}
           </div>
         </section>
-      )}
+      ) : null}
 
       {activeMetric && activeMetricConfig && (
         <AdminModal title={activeMetricConfig.label} onClose={() => setActiveMetric(null)}>

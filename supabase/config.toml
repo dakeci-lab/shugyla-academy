@@ -437,6 +437,12 @@ verify_jwt = true
 import_map = "./functions/admin-list-employees/deno.json"
 entrypoint = "./functions/admin-list-employees/index.ts"
 
+[functions.admin-team-workforce-data]
+enabled = true
+verify_jwt = true
+import_map = "./functions/admin-team-workforce-data/deno.json"
+entrypoint = "./functions/admin-team-workforce-data/index.ts"
+
 [functions.admin-update-employee]
 enabled = true
 verify_jwt = true

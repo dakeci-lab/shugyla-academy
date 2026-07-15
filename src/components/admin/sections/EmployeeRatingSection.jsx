@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { isCloudMode } from '../../../lib/dataMode'
 import { getStaffEmployees } from '../../../utils/employeeData'
 import { getRoleLabel } from '../../../data/roles'
 import {
   compareRatingRows,
   getCurrentMonthState,
   RATING_UPDATED_EVENT,
+  calculateRatingsByEmployee,
 } from '../../../utils/attendanceData'
 import { formatMonthYearLabel } from '../../../utils/shiftData'
-import { computeEmployeeRatingsForMonth } from '../../../services/academyDataService'
+import { fetchTeamWorkforceForMonth } from '../../../services/workforceAdminService'
+import { getAttendanceSettings, computeEmployeeRatingsForMonth } from '../../../services/academyDataService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeRatingDetailModal from '../EmployeeRatingDetailModal'
@@ -31,31 +34,47 @@ export default function EmployeeRatingSection() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [ratingsByEmployee, setRatingsByEmployee] = useState(new Map())
+  const [loadedEmployees, setLoadedEmployees] = useState(null)
   const [detailEmployee, setDetailEmployee] = useState(null)
 
   const employees = useMemo(() => {
+    const base = isCloudMode() && loadedEmployees != null ? loadedEmployees : getStaffEmployees('active')
     const q = search.trim().toLowerCase()
-    return getStaffEmployees('active').filter((emp) => {
+    return base.filter((emp) => {
       if (!q) return true
       return emp.name.toLowerCase().includes(q)
     })
-  }, [search])
-
-  const employeeIdsKey = employees.map((e) => e.id).join(',')
+  }, [search, loadedEmployees])
 
   const loadRating = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      const employeeIds = employees.map((emp) => emp.id)
-      const ratings = await computeEmployeeRatingsForMonth(year, month, employeeIds)
-      setRatingsByEmployee(ratings)
+      if (isCloudMode()) {
+        const [settings, bundle] = await Promise.all([
+          getAttendanceSettings(),
+          fetchTeamWorkforceForMonth(year, month, 'rating'),
+        ])
+        setLoadedEmployees(bundle.employees)
+        const employeeIds = bundle.employees.map((emp) => emp.id)
+        const ratings = calculateRatingsByEmployee(
+          bundle.shifts,
+          employeeIds,
+          settings,
+          new Date()
+        )
+        setRatingsByEmployee(ratings)
+      } else {
+        const employeeIds = employees.map((emp) => emp.id)
+        const ratings = await computeEmployeeRatingsForMonth(year, month, employeeIds)
+        setRatingsByEmployee(ratings)
+      }
     } catch (err) {
       setError(err.message || 'Не удалось загрузить рейтинг')
     } finally {
       setLoading(false)
     }
-  }, [year, month, employeeIdsKey])
+  }, [year, month])
 
   usePlatformPageRefresh(loadRating)
 
@@ -113,13 +132,20 @@ export default function EmployeeRatingSection() {
 
       <EmployeeSearchToolbar value={search} onChange={(e) => setSearch(e.target.value)} />
 
-      {error && <p className="admin-form__error">{error}</p>}
+      {error && (
+        <div className="schedule-error">
+          <p className="admin-form__error">{error}</p>
+          <button type="button" className="btn btn--secondary btn--sm" onClick={loadRating}>
+            Повторить
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <p className="schedule-loading">Загрузка рейтинга…</p>
-      ) : rows.length === 0 ? (
+      ) : !error && rows.length === 0 ? (
         <p className="schedule-empty">Сотрудники не найдены</p>
-      ) : (
+      ) : !error ? (
         <div className="rating-list">
           <div className="rating-list__head" aria-hidden="true">
             <span className="rating-list__col rating-list__col--place">№</span>
@@ -175,7 +201,7 @@ export default function EmployeeRatingSection() {
             })}
           </ul>
         </div>
-      )}
+      ) : null}
 
       {detailEmployee && (
         <EmployeeRatingDetailModal
