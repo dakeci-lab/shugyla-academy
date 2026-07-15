@@ -1,6 +1,6 @@
 # Production Auth Rollout Checklist
 
-**Status:** Drift detected (Step 22J). **Auth-first frontend blocked.** Provisioning gap: 1 unlinked active employee. Authenticated smoke test (22I) pending drift fix.
+**Status:** Reconciled baseline **18/18 linked** (Step 22K). Authenticated smoke test (22I retry) pending. **Auth-first frontend blocked** until smoke passes.
 
 Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md)
 
@@ -58,10 +58,10 @@ Run `scripts/production-auth-users-migration.mjs`.
 - [x] Deploy `admin-list-employees` — ACTIVE, `verify_jwt=true`
 - [x] Deploy `admin-update-employee` — ACTIVE, `verify_jwt=true`
 - [x] Unauthorized smoke: all three return **401** without JWT
-- [ ] **BLOCKED:** Authenticated smoke test (Step 22I) — stopped at baseline drift (17 expected vs 18 actual)
-- [ ] **BLOCKED:** Deploy Auth-first frontend — requires 18/18 linked + smoke pass
-- [ ] Authenticated smoke: admin login — pending drift fix + owner approval
-- [ ] Smoke: cashier login — **blocked until drift fixed**
+- [ ] **BLOCKED:** Authenticated smoke test (Step 22I retry) — pending owner approval (baseline now 18/18)
+- [ ] **BLOCKED:** Deploy Auth-first frontend — requires smoke pass
+- [ ] Authenticated smoke: admin login — pending owner approval
+- [ ] Smoke: cashier login — **blocked until smoke pass**
 - [ ] Smoke: procurement/receiver login
 - [ ] Smoke: inactive employee blocked
 - [ ] Session restore + logout verified
@@ -69,19 +69,23 @@ Run `scripts/production-auth-users-migration.mjs`.
 
 ---
 
-## Approval 2b — Drift remediation (pending owner approval)
+## Approval 2b — Drift remediation ✓ COMPLETED (Step 22K)
 
-**Step 22J audit (2026-07-15) — read-only, no mutations**
+**Step 22J audit + Step 22K reconciliation (2026-07-15)**
 
 - [x] External drift detected: `academy_users` 17 → **18**; unlinked **1** (active)
-- [x] Step 22I smoke test correctly stopped before sign-in
-- [x] Dry-run: `wouldCreateAuthUsers=1`, `existingAuthMatches=0`, `conflicts=0`, `ready=true`
-- [x] Source: **likely_created_via_legacy_frontend**
-- [ ] Targeted provisioning `--apply` for **1** unlinked employee only — **pending owner approval**
-- [ ] Re-run Step 22I authenticated smoke test after 18/18 linked
-- [ ] **Do not** deploy Auth-first frontend until above complete
+- [x] Owner confirmed: legacy frontend manual add; record retained
+- [x] Step 22I smoke test correctly stopped before sign-in (pre-reconciliation)
+- [x] Dry-run before 22K: `wouldCreateAuthUsers=1`, `conflicts=0`, `ready=true`
+- [x] Targeted provisioning `--apply`: **1** Auth user created, **1** row linked
+- [x] Reconciled baseline: **18/18** linked; active **10/10**; `auth.users=18`
+- [x] Legacy passwords/policies/grants preserved
+- [ ] Re-run Step 22I authenticated smoke test — **pending owner approval**
+- [ ] **Do not** deploy Auth-first frontend until smoke passes
 
 ---
+
+## Approval 4 — Security cutover / anon revoke
 
 **Owner approval required.**
 

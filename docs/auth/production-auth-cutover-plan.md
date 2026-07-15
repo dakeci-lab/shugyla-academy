@@ -1,6 +1,6 @@
 # Production Auth Cutover Plan
 
-**Status:** Phase 1, Phase B provisioning (17 users), Edge Functions deploy, and **production drift audit** (Step 22J) completed. **Auth-first frontend blocked** until 18/18 linked + authenticated smoke test. Phase 2 pending.
+**Status:** Reconciled baseline **18/18 linked** (Step 22K). Authenticated smoke test (22I retry) pending owner approval. **Auth-first frontend still blocked** until smoke passes. Phase 2 pending.
 
 Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md), [../notifications/production-readonly-audit.md](../notifications/production-readonly-audit.md)
 
@@ -31,7 +31,31 @@ Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checkl
 3. Create `employee_owned_by_current_auth()` (requires column)
 4. `notify pgrst, 'reload schema'`
 
-**Next production write:** Link single unlinked employee via targeted provisioning `--apply` (1 Auth user create) — separate owner approval. **Do not** deploy Auth-first frontend until 18/18 linked and Step 22I smoke test passes.
+**Next production write:** Repeat Step 22I authenticated smoke test — separate owner approval. **Do not** deploy Auth-first frontend or Phase 2 until smoke passes.
+
+---
+
+## Single-user auth reconciliation (Step 22K — completed)
+
+**Date:** 2026-07-15
+**Owner confirmation:** drift cause accepted — new employee added via legacy frontend; record must be retained.
+
+| Metric | Before 22K | After 22K |
+|--------|------------|-----------|
+| `academy_users` | 18 | **18** |
+| linked | 17 | **18** |
+| unlinked | 1 | **0** |
+| active linked | 9 | **10/10** |
+| inactive linked | 8 | **8/8** |
+| `auth.users` | 17 | **18** |
+| new Auth users created | — | **1** |
+| conflicts | 0 | **0** |
+
+**Actions:** one `auth.admin.createUser()` + `auth_user_id` link on sole unlinked row only (`.is('auth_user_id', null)`). Prior 17 links unchanged by script design.
+
+**Preserved:** legacy passwords (18 nonempty); legacy policies/grants; employee status/role/shifts; frontend legacy; Phase 2 not applied.
+
+> Reconciled baseline achieved. Authenticated smoke test **not** run on Step 22K.
 
 ---
 
@@ -63,7 +87,7 @@ Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checkl
 - `auth.users` = **18**
 - conflicts = **0**
 
-> **Auth-first frontend remains blocked** until drift resolved and authenticated smoke test succeeds.
+> **Auth-first frontend remains blocked** until authenticated smoke test (22I retry) succeeds.
 
 ---
 

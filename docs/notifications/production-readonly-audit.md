@@ -802,3 +802,49 @@ Evidence: missing `auth_user_id` (Edge create would populate); legacy anon acces
 > **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
 
 Create **1** missing Auth user and link the single unlinked `academy_user` via targeted provisioning `--apply`. No frontend, Phase 2, grants, or notification changes.
+
+---
+
+## 28. Single-user auth reconciliation — Step 22K
+
+**Date:** 2026-07-15
+**Status:** One-user provisioning **completed**. Reconciled baseline **18/18** achieved.
+
+### 28.1 Owner confirmation
+
+Drift cause accepted: new employee manually added via legacy frontend after Step 22F. Business record retained — not deleted.
+
+### 28.2 Pre-apply state
+
+| Metric | Value |
+|--------|-------|
+| `academy_users` | 18 |
+| linked | 17 |
+| unlinked | 1 (active, role `seller`) |
+| `auth.users` | 17 |
+| dry-run | `wouldCreateAuthUsers=1`, `conflicts=0`, `ready=true` |
+
+### 28.3 Post-apply state
+
+| Metric | Value |
+|--------|-------|
+| New Auth users created | **1** |
+| Academy users linked | **18 / 18** |
+| Active linked | **10 / 10** |
+| Inactive linked | **8 / 8** |
+| Unlinked | **0** |
+| `auth.users` | **18** |
+| Conflicts / orphans / duplicates | **0** |
+| Email identities / confirmed | **18 / 18** |
+| Legacy passwords nonempty | **18** |
+| Legacy policies / anon grants | **preserved** |
+| Edge Functions | **3** ACTIVE |
+| Frontend | **legacy** |
+| Phase 2 | **not applied** |
+| Notifications / Cron | **untouched** |
+
+### 28.4 Next production write
+
+> **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
+
+Repeat Step 22I authenticated non-mutating smoke test against reconciled baseline 18/18. No frontend deploy, no Phase 2.
