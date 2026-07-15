@@ -21,6 +21,9 @@ const PROJECT_ID = 'shugyla-academy'
 const FIXTURE_TAG = 'web-push-permit-verify'
 const USER_A_PASSWORD = 'WebPushPermitA123!'
 const USER_B_PASSWORD = 'WebPushPermitB123!'
+const USER_FA_PASSWORD = 'WebPushPermitFA123!'
+const USER_P_PASSWORD = 'WebPushPermitP123!'
+const USER_R_PASSWORD = 'WebPushPermitR123!'
 const ENDPOINT = `https://127.0.0.1:54321/local-push/${FIXTURE_TAG}`
 const P256DH = 'BEl62iUYgUihxQfF9Kj3QfF9Kj3QfF9Kj3QfF9Kj3QfF9Kj3QfF9Kj3QfF9Kj3QfF'
 const AUTH_KEY = 'tBHItJI5svbpez7KI4CCXg'
@@ -38,6 +41,9 @@ const state = {
   deviceA: crypto.randomUUID(),
   deviceB: crypto.randomUUID(),
   deviceC: crypto.randomUUID(),
+  deviceD: crypto.randomUUID(),
+  deviceE: crypto.randomUUID(),
+  deviceF: crypto.randomUUID(),
   p256dh: null,
   authKey: null,
   createdAuthUserIds: [],
@@ -209,7 +215,8 @@ function stageStatic() {
   assert('legacy returns permit_required', senderFn.includes("'permit_required'"))
   assert('send requires permit_id', senderFn.includes('permit_id'))
   assert('consume before notification insert', senderFn.indexOf('consumeTestSendPermit') < senderFn.indexOf(".from('notifications')"))
-  assert('schedule.edit permission for issue', senderFn.includes("'schedule.edit'") || senderFn.includes('TEST_SEND_PERMIT_ISSUE_PERMISSION'))
+  assert('roles.assign_permissions for issue', shared.includes("'roles.assign_permissions'") || shared.includes('TEST_SEND_PERMIT_ISSUE_PERMISSION'))
+  assert('shared does not gate issue on schedule.edit', !shared.includes("'schedule.edit'"))
   assert('preflight permit_required field', senderFn.includes('permit_required'))
   assert('preflight ready_to_send false', senderFn.includes('ready_to_send: false'))
   assert('shared permit helpers', shared.includes('issueTestSendPermit'))
@@ -322,10 +329,18 @@ async function stageSetup() {
 
   state.roleIds.cashier = psqlScalar(`SELECT id::text FROM public.roles WHERE code = 'cashier' LIMIT 1;`)
   state.roleIds.admin = psqlScalar(`SELECT id::text FROM public.roles WHERE code = 'admin' LIMIT 1;`)
-  if (!state.roleIds.cashier || !state.roleIds.admin) fail('Missing roles')
+  state.roleIds.floorAdmin = psqlScalar(`SELECT id::text FROM public.roles WHERE code = 'floor_admin' LIMIT 1;`)
+  state.roleIds.purchaser = psqlScalar(`SELECT id::text FROM public.roles WHERE code = 'purchaser' LIMIT 1;`)
+  state.roleIds.receiver = psqlScalar(`SELECT id::text FROM public.roles WHERE code = 'receiver' LIMIT 1;`)
+  if (!state.roleIds.cashier || !state.roleIds.admin || !state.roleIds.floorAdmin || !state.roleIds.purchaser || !state.roleIds.receiver) {
+    fail('Missing roles')
+  }
 
   await createUser('a', `${FIXTURE_TAG}-user-a`, USER_A_PASSWORD, 'cashier', state.roleIds.cashier)
   await createUser('b', `${FIXTURE_TAG}-user-b`, USER_B_PASSWORD, 'admin', state.roleIds.admin)
+  await createUser('fa', `${FIXTURE_TAG}-user-fa`, USER_FA_PASSWORD, 'floor_admin', state.roleIds.floorAdmin)
+  await createUser('p', `${FIXTURE_TAG}-user-p`, USER_P_PASSWORD, 'purchaser', state.roleIds.purchaser)
+  await createUser('r', `${FIXTURE_TAG}-user-r`, USER_R_PASSWORD, 'receiver', state.roleIds.receiver)
 
   const regA = await invokeRegister({ token: state.tokens.a, body: validRegisterBody(state.deviceA) })
   assert('user A register → 200', regA.status === 200 && regA.json?.ok)
@@ -341,6 +356,24 @@ async function stageSetup() {
     body: validRegisterBody(state.deviceC, `${ENDPOINT}-admin-c`),
   })
   assert('admin second device register → 200', regC.status === 200 && regC.json?.ok)
+
+  const regFa = await invokeRegister({
+    token: state.tokens.fa,
+    body: validRegisterBody(state.deviceD, `${ENDPOINT}-floor-admin`),
+  })
+  assert('floor admin register → 200', regFa.status === 200 && regFa.json?.ok)
+
+  const regP = await invokeRegister({
+    token: state.tokens.p,
+    body: validRegisterBody(state.deviceE, `${ENDPOINT}-purchaser`),
+  })
+  assert('purchaser register → 200', regP.status === 200 && regP.json?.ok)
+
+  const regR = await invokeRegister({
+    token: state.tokens.r,
+    body: validRegisterBody(state.deviceF, `${ENDPOINT}-receiver`),
+  })
+  assert('receiver register → 200', regR.status === 200 && regR.json?.ok)
 
   console.log('')
 }
@@ -484,11 +517,59 @@ async function stageEdgeIntegration() {
   const beforePermits = Number(psqlScalar('SELECT COUNT(*) FROM public.notification_test_send_permits;'))
   assert('preflight does not create permit', beforePermits >= 0)
 
-  const issueForbidden = await invokeSender({
-    token: state.tokens.a,
-    body: { action: 'issue_permit', device_id: state.deviceA },
-  })
-  assert('non-admin issue → 403', issueForbidden.status === 403 && issueForbidden.json?.code === 'permit_issue_forbidden')
+  async function assertIssueForbidden(label, token, deviceId) {
+    const before = Number(psqlScalar('SELECT COUNT(*) FROM public.notification_test_send_permits;'))
+    const beforeNotifications = Number(psqlScalar('SELECT COUNT(*) FROM public.notifications;'))
+    const beforeDeliveries = Number(psqlScalar('SELECT COUNT(*) FROM public.notification_deliveries;'))
+    const res = await invokeSender({
+      token,
+      body: { action: 'issue_permit', device_id: deviceId },
+    })
+    assert(`${label} issue → 403`, res.status === 403 && res.json?.code === 'permit_issue_forbidden')
+    const after = Number(psqlScalar('SELECT COUNT(*) FROM public.notification_test_send_permits;'))
+    assert(`${label} issue does not create permit`, after === before)
+    const afterNotifications = Number(psqlScalar('SELECT COUNT(*) FROM public.notifications;'))
+    const afterDeliveries = Number(psqlScalar('SELECT COUNT(*) FROM public.notification_deliveries;'))
+    assert(`${label} issue does not create notification`, afterNotifications === beforeNotifications)
+    assert(`${label} issue does not create delivery`, afterDeliveries === beforeDeliveries)
+  }
+
+  await assertIssueForbidden('cashier', state.tokens.a, state.deviceA)
+  await assertIssueForbidden('floor admin (schedule.edit only)', state.tokens.fa, state.deviceD)
+  await assertIssueForbidden('purchaser', state.tokens.p, state.deviceE)
+  await assertIssueForbidden('receiver', state.tokens.r, state.deviceF)
+
+  const floorAdminHasScheduleEdit = psqlScalar(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM public.role_permissions rp
+      JOIN public.permissions p ON p.id = rp.permission_id
+      WHERE rp.role_id = '${state.roleIds.floorAdmin}'::uuid
+        AND p.code = 'schedule.edit'
+    );
+  `)
+  assert('floor admin has schedule.edit locally', floorAdminHasScheduleEdit === 't')
+  const floorAdminHasAssign = psqlScalar(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM public.role_permissions rp
+      JOIN public.permissions p ON p.id = rp.permission_id
+      WHERE rp.role_id = '${state.roleIds.floorAdmin}'::uuid
+        AND p.code = 'roles.assign_permissions'
+    );
+  `)
+  assert('floor admin lacks roles.assign_permissions locally', floorAdminHasAssign === 'f')
+
+  const adminHasAssign = psqlScalar(`
+    SELECT EXISTS (
+      SELECT 1
+      FROM public.role_permissions rp
+      JOIN public.permissions p ON p.id = rp.permission_id
+      WHERE rp.role_id = '${state.roleIds.admin}'::uuid
+        AND p.code = 'roles.assign_permissions'
+    );
+  `)
+  assert('admin has roles.assign_permissions locally', adminHasAssign === 't')
 
   const issueAdmin = await invokeSender({
     token: state.tokens.b,

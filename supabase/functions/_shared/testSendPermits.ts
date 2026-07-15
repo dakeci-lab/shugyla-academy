@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export const TEST_SEND_PERMIT_ISSUE_PERMISSION = 'schedule.edit'
+export const TEST_SEND_PERMIT_ISSUE_PERMISSION = 'roles.assign_permissions'
 export const TEST_SEND_PERMIT_TTL_SECONDS = 300
 
 export type PermitConsumeStatus =
