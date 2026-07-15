@@ -1,5 +1,12 @@
 import { supabase } from '../lib/supabaseClient'
 import { normalizeShift } from '../utils/shiftData'
+import {
+  normalizeWorkLocation,
+  normalizeAttendanceSettings,
+  DEFAULT_ATTENDANCE_SETTINGS,
+  clampRadiusMeters,
+} from '../utils/attendanceData'
+import { toDateKeyInAppTimezone, addDaysToDateKey } from '../utils/timezone'
 
 const CHECK_IN_ERROR = 'Не удалось отметить приход. Проверьте интернет и повторите попытку.'
 const CHECK_OUT_ERROR = 'Не удалось отметить уход. Проверьте интернет и повторите попытку.'
@@ -21,6 +28,7 @@ function sanitizeAttendanceError(message, context) {
 
 function mapTimeTrackerActionError(errorBody, context) {
   const code = errorBody?.code ?? errorBody?.error?.code
+  if (code === 'clock_in_required') return 'Сначала отметьте приход'
   if (code === 'unauthorized') return 'Сессия истекла. Войдите в аккаунт заново'
   if (code === 'forbidden' || code === 'inactive_caller' || code === 'forbidden_field') {
     return context === 'checkout' ? CHECK_OUT_ERROR : CHECK_IN_ERROR
@@ -44,14 +52,6 @@ async function invokeTimeTrackerAction(body, context) {
 
   return data
 }
-import {
-  normalizeWorkLocation,
-  normalizeAttendanceSettings,
-  DEFAULT_ATTENDANCE_SETTINGS,
-  clampRadiusMeters,
-  resolveActiveShiftForToday,
-} from '../utils/attendanceData'
-import { toDateKeyInAppTimezone, addDaysToDateKey } from '../utils/timezone'
 
 async function throwIfError(result, context) {
   if (result.error) {
@@ -76,8 +76,16 @@ function rowToLocation(row) {
   })
 }
 
-function rowToShift(row) {
-  return normalizeShift(row)
+function rowToShift(row, meta = {}) {
+  const shift = normalizeShift(row)
+  if (!shift) return null
+  if (meta.previousShiftMissedClockOut) {
+    shift.previousShiftMissedClockOut = true
+  }
+  if (meta.trackerStatus) {
+    shift.trackerStatus = meta.trackerStatus
+  }
+  return shift
 }
 
 export async function getWorkLocations() {
@@ -168,10 +176,18 @@ export async function checkOutEmployee(_employeeId, coords) {
   return rowToShift(result.shift)
 }
 
-export async function getTodayShiftForEmployee(employeeId) {
+export async function getTodayShiftForEmployee(_employeeId) {
+  const result = await invokeTimeTrackerAction({ action: 'get_today_status' }, 'checkin')
+  return rowToShift(result.shift, {
+    previousShiftMissedClockOut: Boolean(result.previousShiftMissedClockOut),
+    trackerStatus: result.status ?? null,
+  })
+}
+
+/** Fallback read path for admin views — cloud tracker UI uses get_today_status Edge Function. */
+export async function getRecentShiftsForEmployee(employeeId) {
   const today = toDateKeyInAppTimezone()
   const yesterday = addDaysToDateKey(today, -1)
-
   const rows = await throwIfError(
     await supabase
       .from('academy_employee_shifts')
@@ -181,6 +197,5 @@ export async function getTodayShiftForEmployee(employeeId) {
       .order('shift_date', { ascending: false }),
     'Загрузка смены на сегодня'
   )
-
-  return resolveActiveShiftForToday(rows || [])
+  return rows || []
 }

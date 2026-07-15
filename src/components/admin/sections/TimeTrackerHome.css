@@ -26,6 +26,17 @@
   color: var(--color-text);
 }
 
+.tt-home-missed-checkout-hint {
+  margin: 0 0 0.75rem;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--color-text-muted, #6b7280);
+  background: rgba(234, 179, 8, 0.08);
+  border-radius: 10px;
+  border: 1px solid rgba(234, 179, 8, 0.2);
+}
+
 .tt-home-header__date {
   margin: 0;
   font-size: 0.9375rem;

@@ -130,6 +130,7 @@ export default function TimeTrackerHomeCard({
   isWorkingShift,
   actionError,
   success,
+  previousShiftMissedClockOut = false,
 }) {
   const variant = useMemo(
     () =>
@@ -194,6 +195,12 @@ export default function TimeTrackerHomeCard({
           <p className="tt-home-header__section">{sectionTitle}</p>
           <p className="tt-home-header__date">{formatHomeDateLabel()}</p>
         </header>
+      )}
+
+      {previousShiftMissedClockOut && !loading && !loadError && (
+        <p className="tt-home-missed-checkout-hint" role="status">
+          Во время прошлой смены уход не был отмечен
+        </p>
       )}
 
       {loading ? (

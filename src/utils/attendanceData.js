@@ -15,6 +15,10 @@ import {
   isShiftPlannedEndReached,
 } from './shiftMidnightEnd'
 import {
+  resolveWorkWindowShift,
+  isOpenShiftWorkWindowActive,
+} from './shiftWorkWindow'
+import {
   toDateKeyInAppTimezone,
   addDaysToDateKey,
   APP_TIMEZONE,
@@ -200,29 +204,18 @@ export function isCheckoutWaitExpired(shift, settings, now = new Date()) {
 }
 
 /**
- * Выбирает актуальную смену: сегодня или вчерашнюю с незакрытым приходом (смена через полночь).
+ * Выбирает актуальную смену для текущего рабочего окна.
+ * Вчерашняя открытая смена учитывается только до effectivePlannedEndAt (ночные смены).
  */
 export function resolveActiveShiftForToday(shifts, now = new Date()) {
-  const todayKey = toDateKeyInAppTimezone(now)
-  const yesterdayKey = addDaysToDateKey(todayKey, -1)
-  const byDate = new Map()
-
-  for (const row of shifts || []) {
-    const normalized = normalizeShift(row)
-    if (normalized?.shiftDate) {
-      byDate.set(normalized.shiftDate, normalized)
-    }
-  }
-
-  const todayShift = byDate.get(todayKey) || null
-  const yesterdayShift = byDate.get(yesterdayKey) || null
-
-  if (yesterdayShift?.actualStartTime && !yesterdayShift?.actualEndTime) {
-    return yesterdayShift
-  }
-
-  return todayShift
+  return resolveWorkWindowShift(shifts, now).activeShift
 }
+
+export function detectPreviousShiftMissedClockOut(shifts, now = new Date()) {
+  return resolveWorkWindowShift(shifts, now).previousShiftMissedClockOut
+}
+
+export { resolveWorkWindowShift, isOpenShiftWorkWindowActive, isMissedClockOutShift } from './shiftWorkWindow'
 
 const TIME_TRACKER_DEBUG_KEY = 'shugyla_time_tracker_debug'
 

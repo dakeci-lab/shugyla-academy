@@ -155,14 +155,8 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
   const [acting, setActing] = useState(false)
   const [actionError, setActionError] = useState('')
   const [success, setSuccess] = useState('')
+  const [previousShiftMissedClockOut, setPreviousShiftMissedClockOut] = useState(false)
   const [now, setNow] = useState(new Date())
-
-  useEffect(() => {
-    const intervalMs =
-      shift?.actualStartTime && !shift?.actualEndTime ? 30000 : 60000
-    const timer = setInterval(() => setNow(new Date()), intervalMs)
-    return () => clearInterval(timer)
-  }, [shift?.actualStartTime, shift?.actualEndTime])
 
   const loadShift = useCallback(async () => {
     if (!employeeId) return
@@ -172,6 +166,7 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
     try {
       const row = await getTodayShiftForEmployee(employeeId)
       setShift(row)
+      setPreviousShiftMissedClockOut(Boolean(row?.previousShiftMissedClockOut))
       debugLogTimeTracker('loadShift', {
         employeeId,
         shiftFound: Boolean(row),
@@ -216,12 +211,20 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
     [shift, state, loading, loadError, now]
   )
   const checkOutResult = useMemo(
-    () => resolveCanCheckOut(shift, state, { loading, loadError }),
-    [shift, state, loading, loadError]
+    () => resolveCanCheckOut(shift, state, { loading, loadError, now }),
+    [shift, state, loading, loadError, now]
   )
 
   const canCheckIn = checkInResult.value
   const canCheckOut = checkOutResult.value
+
+  useEffect(() => {
+    const intervalMs =
+      shift?.actualStartTime && !shift?.actualEndTime && canCheckOut ? 30000 : 60000
+    const timer = setInterval(() => setNow(new Date()), intervalMs)
+    return () => clearInterval(timer)
+  }, [shift?.actualStartTime, shift?.actualEndTime, canCheckOut])
+
   const disabledReason = acting
     ? 'acting'
     : !canCheckIn
@@ -309,7 +312,8 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
         now={now}
         isWorkingShift={Boolean(shift && isWorkingShiftStatus(shift.status))}
         actionError={actionError}
-        success={success}
+        success={success && !actionError ? success : ''}
+        previousShiftMissedClockOut={previousShiftMissedClockOut}
       />
     )
   }

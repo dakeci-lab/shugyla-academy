@@ -5,6 +5,13 @@ import {
   authorizeAuthenticatedEmployee,
 } from '../_shared/employeeAuthorization.ts'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
+import {
+  addDaysToDateKey,
+  deriveTrackerStatus,
+  getDateKeyInTimezone,
+  isOpenShiftWorkWindowActive,
+  resolveWorkWindowShift,
+} from '../_shared/shiftWorkWindow.ts'
 
 const APP_TIMEZONE = 'Asia/Almaty'
 
@@ -30,25 +37,6 @@ type Coords = {
   latitude: number
   longitude: number
   accuracy?: number | null
-}
-
-function getDateKeyInTimezone(date: Date, timeZone = APP_TIMEZONE): string {
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date)
-  const year = parts.find((p) => p.type === 'year')?.value ?? '0000'
-  const month = parts.find((p) => p.type === 'month')?.value ?? '01'
-  const day = parts.find((p) => p.type === 'day')?.value ?? '01'
-  return `${year}-${month}-${day}`
-}
-
-function addDaysToDateKey(dateKey: string, delta: number): string {
-  const [year, month, day] = dateKey.split('-').map(Number)
-  const date = new Date(Date.UTC(year, month - 1, day + delta))
-  return date.toISOString().slice(0, 10)
 }
 
 function extractRpcMessage(error: { message?: string; details?: string } | null): string {
@@ -104,11 +92,12 @@ function parseCoords(value: unknown): Coords | null {
   return { latitude, longitude, accuracy }
 }
 
-async function loadActiveShiftRows(
+async function loadRecentShiftRows(
   serviceClient: SupabaseClient,
-  employeeId: number
-): Promise<Record<string, unknown> | null> {
-  const todayKey = getDateKeyInTimezone(new Date())
+  employeeId: number,
+  now = new Date()
+): Promise<ShiftLike[]> {
+  const todayKey = getDateKeyInTimezone(now, APP_TIMEZONE)
   const yesterdayKey = addDaysToDateKey(todayKey, -1)
 
   const { data, error } = await serviceClient
@@ -118,31 +107,93 @@ async function loadActiveShiftRows(
     .in('shift_date', [todayKey, yesterdayKey])
     .order('shift_date', { ascending: false })
 
-  if (error) return null
-
-  const rows = data ?? []
-  const byDate = new Map<string, Record<string, unknown>>()
-  for (const row of rows) {
-    if (row.shift_date) byDate.set(String(row.shift_date), row)
-  }
-
-  const yesterdayShift = byDate.get(yesterdayKey) ?? null
-  if (yesterdayShift?.actual_start_time && !yesterdayShift?.actual_end_time) {
-    return yesterdayShift
-  }
-
-  return byDate.get(todayKey) ?? null
+  if (error) return []
+  return (data ?? []) as ShiftLike[]
 }
 
-async function handleGetTodayStatus(serviceClient: SupabaseClient, employeeId: number) {
-  const shift = await loadActiveShiftRows(serviceClient, employeeId)
-  return jsonResponse({ ok: true, shift: shift ?? null })
+async function resolveShiftContext(
+  serviceClient: SupabaseClient,
+  employeeId: number,
+  now = new Date()
+) {
+  const rows = await loadRecentShiftRows(serviceClient, employeeId, now)
+  return resolveWorkWindowShift(rows, now)
+}
+
+async function validateGeolocation(
+  serviceClient: SupabaseClient,
+  employeeId: number,
+  coords: Coords
+): Promise<Response | null> {
+  const { data: location, error: locError } = await serviceClient.rpc(
+    'platform_get_employee_work_location',
+    { p_employee_id: employeeId }
+  )
+
+  if (locError || !location?.id) {
+    return jsonResponse(
+      {
+        ok: false,
+        code: 'attendance_error',
+        message: 'Рабочая территория ещё не настроена. Обратитесь к администратору',
+      },
+      422
+    )
+  }
+
+  const { data: distance, error: distanceError } = await serviceClient.rpc(
+    'platform_haversine_meters',
+    {
+      lat1: location.latitude,
+      lon1: location.longitude,
+      lat2: coords.latitude,
+      lon2: coords.longitude,
+    }
+  )
+
+  if (distanceError) {
+    return jsonResponse(
+      { ok: false, code: 'attendance_error', message: mapAttendanceError(distanceError.message ?? '', 'clock_in') },
+      422
+    )
+  }
+
+  if (Number(distance) > Number(location.radius_meters)) {
+    return jsonResponse(
+      {
+        ok: false,
+        code: 'attendance_error',
+        message: `Вы находитесь вне рабочей территории (~${Math.round(Number(distance))} м)`,
+      },
+      422
+    )
+  }
+
+  return null
+}
+
+async function handleGetTodayStatus(
+  serviceClient: SupabaseClient,
+  employeeId: number,
+  now = new Date()
+) {
+  const context = await resolveShiftContext(serviceClient, employeeId, now)
+  const activeShift = context.activeShift
+  const status = deriveTrackerStatus(activeShift, now)
+
+  return jsonResponse({
+    ok: true,
+    shift: activeShift ?? null,
+    status,
+    previousShiftMissedClockOut: context.previousShiftMissedClockOut,
+  })
 }
 
 async function handleClockIn(
   serviceClient: SupabaseClient,
   employeeId: number,
-  coords: Coords
+  coords: Coords,
+  now = new Date()
 ) {
   const { data, error } = await serviceClient.rpc('attendance_check_in', {
     p_employee_id: employeeId,
@@ -157,9 +208,10 @@ async function handleClockIn(
 
   const message = extractRpcMessage(error)
   if (isAlreadyCheckedInMessage(message)) {
-    const shift = await loadActiveShiftRows(serviceClient, employeeId)
-    if (shift?.actual_start_time) {
-      return jsonResponse({ ok: true, shift, idempotent: true })
+    const context = await resolveShiftContext(serviceClient, employeeId, now)
+    const todayShift = context.todayShift
+    if (todayShift?.actual_start_time && isOpenShiftWorkWindowActive(todayShift, now)) {
+      return jsonResponse({ ok: true, shift: todayShift, idempotent: true })
     }
   }
 
@@ -169,34 +221,96 @@ async function handleClockIn(
   )
 }
 
-async function handleClockOut(
+async function performClockOutOnShift(
   serviceClient: SupabaseClient,
   employeeId: number,
+  shift: ShiftLike,
   coords: Coords
 ) {
-  const { data, error } = await serviceClient.rpc('attendance_check_out', {
-    p_employee_id: employeeId,
-    p_latitude: coords.latitude,
-    p_longitude: coords.longitude,
-    p_accuracy: coords.accuracy,
-  })
+  const geoError = await validateGeolocation(serviceClient, employeeId, coords)
+  if (geoError) return geoError
 
-  if (!error) {
+  const shiftId = (shift as Record<string, unknown>).id
+  if (!shiftId) {
+    return jsonResponse(
+      { ok: false, code: 'attendance_error', message: 'Не удалось отметить уход. Проверьте интернет и повторите попытку.' },
+      422
+    )
+  }
+
+  const nowIso = new Date().toISOString()
+  const { data, error } = await serviceClient
+    .from('academy_employee_shifts')
+    .update({
+      actual_end_time: nowIso,
+      check_out_latitude: coords.latitude,
+      check_out_longitude: coords.longitude,
+      check_out_accuracy: coords.accuracy,
+      updated_at: nowIso,
+    })
+    .eq('id', shiftId)
+    .eq('employee_id', employeeId)
+    .is('actual_end_time', null)
+    .not('actual_start_time', 'is', null)
+    .select('*')
+    .maybeSingle()
+
+  if (error) {
+    return jsonResponse(
+      { ok: false, code: 'attendance_error', message: mapAttendanceError(error.message ?? '', 'clock_out') },
+      422
+    )
+  }
+
+  if (data) {
     return jsonResponse({ ok: true, shift: data, idempotent: false })
   }
 
-  const message = extractRpcMessage(error)
-  if (isAlreadyCheckedOutMessage(message)) {
-    const shift = await loadActiveShiftRows(serviceClient, employeeId)
-    if (shift?.actual_end_time) {
-      return jsonResponse({ ok: true, shift, idempotent: true })
-    }
+  const { data: existing } = await serviceClient
+    .from('academy_employee_shifts')
+    .select('*')
+    .eq('id', shiftId)
+    .eq('employee_id', employeeId)
+    .maybeSingle()
+
+  if (existing?.actual_end_time) {
+    return jsonResponse({ ok: true, shift: existing, idempotent: true })
   }
 
   return jsonResponse(
-    { ok: false, code: 'attendance_error', message: mapAttendanceError(message, 'clock_out') },
+    { ok: false, code: 'clock_in_required', message: 'Сначала отметьте приход' },
     422
   )
+}
+
+async function handleClockOut(
+  serviceClient: SupabaseClient,
+  employeeId: number,
+  coords: Coords,
+  now = new Date()
+) {
+  const context = await resolveShiftContext(serviceClient, employeeId, now)
+  const activeShift = context.activeShift
+
+  if (!activeShift?.actual_start_time) {
+    return jsonResponse(
+      { ok: false, code: 'clock_in_required', message: 'Сначала отметьте приход' },
+      422
+    )
+  }
+
+  if (!isOpenShiftWorkWindowActive(activeShift, now)) {
+    return jsonResponse(
+      { ok: false, code: 'clock_in_required', message: 'Сначала отметьте приход' },
+      422
+    )
+  }
+
+  if (activeShift.actual_end_time) {
+    return jsonResponse({ ok: true, shift: activeShift, idempotent: true })
+  }
+
+  return performClockOutOnShift(serviceClient, employeeId, activeShift, coords)
 }
 
 function rejectForbiddenFields(body: Record<string, unknown>): Response | null {
@@ -231,9 +345,10 @@ Deno.serve(async (req) => {
   }
 
   const { serviceClient, caller } = auth
+  const now = new Date()
 
   if (action === 'get_today_status') {
-    return handleGetTodayStatus(serviceClient, caller.id)
+    return handleGetTodayStatus(serviceClient, caller.id, now)
   }
 
   const coords = parseCoords(body.coords)
@@ -242,8 +357,8 @@ Deno.serve(async (req) => {
   }
 
   if (action === 'clock_in') {
-    return handleClockIn(serviceClient, caller.id, coords)
+    return handleClockIn(serviceClient, caller.id, coords, now)
   }
 
-  return handleClockOut(serviceClient, caller.id, coords)
+  return handleClockOut(serviceClient, caller.id, coords, now)
 })

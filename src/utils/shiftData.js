@@ -1,5 +1,7 @@
 /** Модель смен и графика сотрудников */
 
+import { isEffectivePlannedEndReached } from './shiftWorkWindow'
+
 export const SHIFT_STATUS = {
   WORKING: 'working',
   DAY_OFF: 'day_off',
@@ -167,8 +169,7 @@ function buildShiftPlannedDateTime(shiftDate, timeValue) {
 }
 
 function isShiftPlannedEndPassed(shift, now = new Date()) {
-  const plannedEnd = buildShiftPlannedDateTime(shift.shiftDate, shift.plannedEndTime)
-  return plannedEnd ? now >= plannedEnd : false
+  return isEffectivePlannedEndReached(shift, now)
 }
 
 function isPastShiftDay(shift, now = new Date()) {

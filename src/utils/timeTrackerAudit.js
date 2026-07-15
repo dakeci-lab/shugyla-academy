@@ -40,10 +40,13 @@ export function resolveCanCheckIn(shift, state, { loading, loadError, now = new 
 }
 
 /** Можно ли отметить уход — только для UI тайм-трекера */
-export function resolveCanCheckOut(shift, state, { loading, loadError }) {
+export function resolveCanCheckOut(shift, state, { loading, loadError, now = new Date() }) {
   if (loading) return { value: false, reason: 'loading' }
   if (loadError) return { value: false, reason: 'load_error' }
   if (!shift) return { value: false, reason: 'shift_not_loaded' }
+  if (!isOpenShiftWorkWindowActive(shift, now)) {
+    return { value: false, reason: 'shift_not_active' }
+  }
   if (shift.actualStartTime && !shift.actualEndTime) {
     return { value: true, reason: null }
   }
@@ -103,7 +106,7 @@ export function buildTimeTrackerAuditRow({
   const state = loading ? { code: 'loading' } : getTodayShiftState(shift, undefined, now)
   const computedStatus = shift ? computeShiftStatus(shift, now) : null
   const checkIn = resolveCanCheckIn(shift, state, { loading, loadError, now })
-  const checkOut = resolveCanCheckOut(shift, state, { loading, loadError })
+  const checkOut = resolveCanCheckOut(shift, state, { loading, loadError, now })
 
   let disabledReason = null
   if (!checkIn.value) disabledReason = checkIn.reason
