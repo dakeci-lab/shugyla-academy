@@ -215,11 +215,24 @@ Run `scripts/production-auth-users-migration.mjs`.
 - [x] Phase 2 **not rolled back**; Phase 3 **not applied**
 - [x] Notification rules enabled **0**; subscriptions **0**; pushes **0**; Cron **0**
 - [x] Web Push E2E **not run** (by design)
-- [x] Docs: [team-workforce-phase2-frontend-fix.md](./team-workforce-phase2-frontend-fix.md)
 
 ---
 
-## Approval 7 — Team workforce production fix ✓ COMPLETED (Step 22R)
+## Approval 10 — DB-backed Web Push test permits ✓ COMPLETED (Step 22AA)
+
+**Date:** 2026-07-15  
+**Owner confirmation:** deploy permit infrastructure; **no** production permit issued; **no** push sent.
+
+- [x] Migration `20260715183000_notification_test_send_permits` applied (point SQL + repair)
+- [x] `send-test-web-push` deployed **v11**, `verify_jwt=true`
+- [x] Commit **`c957f36`** pushed; GitHub Pages bundle `index-CuZe510x.js`
+- [x] Permit UI present; permit UUID **not** shown to user
+- [x] Legacy gates **OFF**; rules **0**; Cron **0**
+- [x] Permits total **0**; notifications/deliveries **0**
+- [x] Business baseline **18/18** unchanged
+- [x] Phase 3 **not applied**
+
+---
 
 ## Explicit prohibitions (all phases)
 

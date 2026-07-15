@@ -316,6 +316,26 @@ Local docs commit: `docs: record web push diagnostics production deploy` (not pu
 
 ---
 
+## Step 22AA — DB-backed one-time test-send permits
+
+**Date:** 2026-07-15  
+**Status:** migration + `send-test-web-push` **v11** deployed; production permit **not issued**; push **not sent**.
+
+| Item | Result |
+|------|--------|
+| Migration | `20260715183000_notification_test_send_permits` |
+| Authorization | DB permit (TTL **5 min**, atomic consume) replaces env-gate send authorization |
+| Admin permission | `schedule.edit` (existing) |
+| Legacy test gates | **OFF** (diagnostic only) |
+| Permits total / active | **0** / **0** |
+| Notifications / deliveries | **0** / **0** |
+| Rules / Cron | **0** / **0** |
+| Commit | **`c957f36`** |
+
+Context: Steps 22X/22Z rejected sends with 0 records while env gates appeared ON in preflight — isolate env staleness. Permits eliminate operational dependence on Edge secret propagation for send authorization.
+
+---
+
 ## Next step (gated)
 
-Controlled test-send only after **separate owner confirmation**; preflight confirmed `ready_except_gates=true`, `ready_to_send=false`. Rules **disabled**, Cron **off**.
+Permit-based controlled test-send only after **separate owner confirmation**: prepare device → preflight → issue one-time permit → one manual send click. Legacy gates **OFF**; rules **disabled**; Cron **off**.

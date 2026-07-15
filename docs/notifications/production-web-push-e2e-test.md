@@ -231,14 +231,63 @@ Diagnostics in production bundle: `session_expired`, `browser_subscription_missi
 
 ---
 
-## Next gated step — controlled test-send (separate owner confirmation)
+## Step 22Z — Controlled test-send attempt #2 (rejected, env-gate isolate mismatch)
 
-After Step 22Y preflight success:
+**Date:** 2026-07-15  
+**Status:** one manual click after sender preflight with gates ON; **no** notification/delivery records; gates locked down.
+
+| Item | Result |
+|------|--------|
+| Preflight (gates ON) | `ready_to_send=true`, matching active subscription **1** |
+| Manual click | **1**; UI: «Сервер отклонил запрос» |
+| Notifications / deliveries / sent | **0** / **0** / **0** |
+| Probable cause | Edge isolate env staleness: preflight isolate saw gates ON, send isolate saw gates OFF → early `test_sender_disabled` (403) before INSERT |
+| Legacy gates after attempt | **OFF** |
+
+---
+
+## Step 22AA — DB-backed one-time test-send permits (deployed)
+
+**Date:** 2026-07-15  
+**Owner confirmation:** develop + deploy permit infrastructure; **no** permit issued in production; **no** push sent.
+
+| Item | Result |
+|------|--------|
+| Commit | **`c957f36`** |
+| Migration | **`20260715183000_notification_test_send_permits`** — applied + repaired on production |
+| Table | `notification_test_send_permits` — RLS enabled; anon/authenticated direct access denied; service_role only |
+| Issue RPC | `issue_notification_test_send_permit` — TTL **5 minutes** (server-fixed); revokes prior unused permits for employee/device |
+| Consume RPC | `consume_notification_test_send_permit` — atomic `FOR UPDATE`; exactly-once before notification INSERT |
+| Admin permission | **`schedule.edit`** (existing; no role_permissions changes) |
+| Edge Function | `send-test-web-push` **v11**, `verify_jwt=true` — actions: `preflight`, `issue_permit`, `permit_status`, `send` |
+| Legacy env gates | **OFF** (diagnostic only in preflight as `legacy_test_gates_enabled`; send authorized by permit only) |
+| Frontend bundle | `assets/index-CuZe510x.js` |
+| Production permits | **0** total / **0** active |
+| Notifications / deliveries / sent | **0** / **0** / **0** |
+| Verifier | `verify:web-push-test-permits` **76/76** |
+| Business baseline | **18/18** unchanged |
+
+### Permit flow (production UI)
+
+1. «Подготовить устройство к тесту»
+2. «Проверить готовность сервера» (`permit_required=true`, `ready_to_send=false`)
+3. «Создать одноразовое разрешение» (admin + `schedule.edit`; stores permit in sessionStorage only; **no UUID shown**)
+4. «Отправить тестовое уведомление» (requires valid permit; one click; no auto-retry)
+
+### Why env gates were replaced
+
+Steps 22X/22Z showed env-gate toggles are unreliable for controlled production send (isolate env staleness). Permits provide durable, auditable, exactly-once authorization bound to authenticated employee + device.
+
+---
+
+## Next gated step — permit-based controlled test-send (separate owner confirmation)
+
+After Step 22AA deploy:
 
 1. Owner must give **separate explicit confirmation** before any test-send.
-2. Temporarily enable test gates only after confirmation.
-3. Allow **one** manual «Отправить тестовое уведомление» press (no retry).
-4. Rules **disabled**, Cron **off**.
+2. Prepare current device → sender preflight → issue one-time permit (5 min TTL).
+3. Confirm valid permit → allow **one** manual «Отправить тестовое уведомление» press.
+4. **No** auto-retry; legacy gates **OFF**; rules **disabled**; Cron **off**.
 
 ---
 
