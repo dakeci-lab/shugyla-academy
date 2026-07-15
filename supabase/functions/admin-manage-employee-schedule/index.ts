@@ -8,6 +8,7 @@ import {
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
 import {
   MAX_BULK_SHIFTS,
+  assertScheduleChangeAllowed,
   buildShiftRow,
   fetchExistingShiftsByDates,
   normalizeEmployeeId,
@@ -131,6 +132,9 @@ Deno.serve(async (req) => {
       parsed.shift_date,
     ])
     const existing = existingMap.get(parsed.shift_date) ?? null
+    const blockReason = assertScheduleChangeAllowed(existing, parsed)
+    if (blockReason) return adminErrorResponse(blockReason, 409)
+
     const row = buildShiftRow(employeeId, parsed, existing, caller.id)
 
     const { data, error } = await serviceClient
@@ -167,9 +171,13 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: true, action, applied: 0 })
   }
 
-  const rows = entries.map((shift) =>
-    buildShiftRow(employeeId, shift, existingMap.get(shift.shift_date) ?? null, caller.id)
-  )
+  const rows = []
+  for (const shift of entries) {
+    const existing = existingMap.get(shift.shift_date) ?? null
+    const blockReason = assertScheduleChangeAllowed(existing, shift)
+    if (blockReason) return adminErrorResponse(blockReason, 409)
+    rows.push(buildShiftRow(employeeId, shift, existing, caller.id))
+  }
 
   const { error } = await serviceClient
     .from('academy_employee_shifts')

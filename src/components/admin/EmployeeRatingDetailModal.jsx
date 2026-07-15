@@ -14,7 +14,8 @@ import './admin-shared.css'
 /** Детализация рейтинга сотрудника (расчёт на лету) */
 export default function EmployeeRatingDetailModal({ employee, year, month, onClose }) {
   const [entries, setEntries] = useState([])
-  const [totalScore, setTotalScore] = useState(100)
+  const [totalScore, setTotalScore] = useState(null)
+  const [ratingStatus, setRatingStatus] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -26,12 +27,13 @@ export default function EmployeeRatingDetailModal({ employee, year, month, onClo
         getAttendanceSettings(),
         getEmployeeShiftsForMonth(employee.id, year, month),
       ])
-      const { entries: computedEntries, stats } = calculateEmployeeRatingFromShifts(
+      const { entries: computedEntries, stats, ratingStatus: status } = calculateEmployeeRatingFromShifts(
         shifts,
         settings
       )
       setEntries(computedEntries)
       setTotalScore(stats.totalPoints)
+      setRatingStatus(status)
     } catch (err) {
       setError(err.message || 'Не удалось загрузить историю')
     } finally {
@@ -78,7 +80,15 @@ export default function EmployeeRatingDetailModal({ employee, year, month, onClo
         <p className="admin-form__hint">Загрузка…</p>
       ) : (
         <>
-          <p className="admin-form__hint">Итог за период: {totalScore} баллов</p>
+          <p className="admin-form__hint">
+            {totalScore == null
+              ? ratingStatus === 'no_schedule'
+                ? 'За выбранный период график не установлен'
+                : ratingStatus === 'insufficient_data'
+                  ? 'Недостаточно завершённых смен для полноценного рейтинга'
+                  : 'За выбранный период нет завершённых смен'
+              : `Итог за период: ${totalScore} баллов`}
+          </p>
           {groupedByDate.length === 0 ? (
             <p className="admin-form__hint">За выбранный период нет начислений или штрафов</p>
           ) : (

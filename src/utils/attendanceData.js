@@ -17,12 +17,130 @@ import {
 import {
   resolveWorkWindowShift,
   isOpenShiftWorkWindowActive,
+  isEffectivePlannedEndReached,
 } from './shiftWorkWindow'
 import {
   toDateKeyInAppTimezone,
   addDaysToDateKey,
   APP_TIMEZONE,
 } from './timezone'
+
+/** Участие сотрудника в рейтинге за выбранный месяц */
+export const RATING_STATUS = {
+  ELIGIBLE: 'eligible',
+  INSUFFICIENT_DATA: 'insufficient_data',
+  NO_SCHEDULE: 'no_schedule',
+  NO_COMPLETED: 'no_completed',
+}
+
+const MIN_ELIGIBLE_COMPLETED_SHIFTS = 3
+
+function isScorableShiftStatus(status) {
+  return isWorkingShiftStatus(status) || status === SHIFT_STATUS.ABSENCE
+}
+
+export function isShiftCompletedForRating(shift, now = new Date()) {
+  if (!shift?.shiftDate || !isScorableShiftStatus(shift.status)) return false
+
+  const todayKey = toDateKeyInAppTimezone(now)
+  if (shift.shiftDate > todayKey) return false
+  if (shift.shiftDate < todayKey) return true
+
+  if (shift.status === SHIFT_STATUS.ABSENCE) return false
+
+  if (isWorkingShiftStatus(shift.status)) {
+    return isEffectivePlannedEndReached(shift, now)
+  }
+
+  return false
+}
+
+export function buildEmployeeRatingResult(shifts, settings, now = new Date()) {
+  const monthShifts = shifts || []
+  const scheduledShiftCount = monthShifts.length
+
+  if (scheduledShiftCount === 0) {
+    return {
+      entries: [],
+      ratingStatus: RATING_STATUS.NO_SCHEDULE,
+      score: null,
+      completedShiftCount: 0,
+      scheduledShiftCount: 0,
+      stats: {
+        ratingStatus: RATING_STATUS.NO_SCHEDULE,
+        score: null,
+        totalPoints: null,
+        completedShiftCount: 0,
+        scheduledShiftCount: 0,
+        onTimeCount: 0,
+        lateCount: 0,
+        earlyLeaveCount: 0,
+        absenceCount: 0,
+        missingCheckInCount: 0,
+        missingCheckOutCount: 0,
+        completedShifts: 0,
+      },
+    }
+  }
+
+  const completedShifts = monthShifts.filter((shift) => isShiftCompletedForRating(shift, now))
+  const completedShiftCount = completedShifts.length
+
+  if (completedShiftCount === 0) {
+    return {
+      entries: [],
+      ratingStatus: RATING_STATUS.NO_COMPLETED,
+      score: null,
+      completedShiftCount: 0,
+      scheduledShiftCount,
+      stats: {
+        ratingStatus: RATING_STATUS.NO_COMPLETED,
+        score: null,
+        totalPoints: null,
+        completedShiftCount: 0,
+        scheduledShiftCount,
+        onTimeCount: 0,
+        lateCount: 0,
+        earlyLeaveCount: 0,
+        absenceCount: 0,
+        missingCheckInCount: 0,
+        missingCheckOutCount: 0,
+        completedShifts: 0,
+      },
+    }
+  }
+
+  const entries = []
+  completedShifts.forEach((shift) => {
+    calculateShiftRatingEntries(shift, settings, now).forEach((entry) => {
+      entries.push({
+        ...entry,
+        employeeId: shift.employeeId,
+      })
+    })
+  })
+
+  const stats = aggregateEmployeeRating(entries, completedShifts)
+  const ratingStatus =
+    completedShiftCount >= MIN_ELIGIBLE_COMPLETED_SHIFTS
+      ? RATING_STATUS.ELIGIBLE
+      : RATING_STATUS.INSUFFICIENT_DATA
+
+  return {
+    entries,
+    ratingStatus,
+    score: stats.totalPoints,
+    completedShiftCount,
+    scheduledShiftCount,
+    stats: {
+      ...stats,
+      ratingStatus,
+      score: stats.totalPoints,
+      completedShiftCount,
+      scheduledShiftCount,
+    },
+  }
+}
 
 /** Событие обновления рейтинга (после сохранения смены / отметки) */
 export const RATING_UPDATED_EVENT = 'shugyla:rating-updated'
@@ -394,22 +512,7 @@ export function calculateShiftRatingEntries(shift, settings, now = new Date()) {
 
 /** Рейтинг сотрудника за период по его сменам */
 export function calculateEmployeeRatingFromShifts(shifts, settings, now = new Date()) {
-  const scorableShifts = (shifts || []).filter(
-    (shift) => shift.status === SHIFT_STATUS.ABSENCE || isWorkingShiftStatus(shift.status)
-  )
-  const entries = []
-
-  scorableShifts.forEach((shift) => {
-    calculateShiftRatingEntries(shift, settings, now).forEach((entry) => {
-      entries.push({
-        ...entry,
-        employeeId: shift.employeeId,
-      })
-    })
-  })
-
-  const stats = aggregateEmployeeRating(entries, scorableShifts)
-  return { entries, stats }
+  return buildEmployeeRatingResult(shifts, settings, now)
 }
 
 /** Рейтинги нескольких сотрудников за месяц */
@@ -526,7 +629,12 @@ export function aggregateEmployeeRating(events, shifts = []) {
 }
 
 export function compareRatingRows(a, b) {
-  return b.totalPoints - a.totalPoints
+  const scoreA = Number(a.totalPoints)
+  const scoreB = Number(b.totalPoints)
+  if (!Number.isFinite(scoreA) && !Number.isFinite(scoreB)) return 0
+  if (!Number.isFinite(scoreA)) return 1
+  if (!Number.isFinite(scoreB)) return -1
+  return scoreB - scoreA
 }
 
 export function getMonthRange(year, month) {

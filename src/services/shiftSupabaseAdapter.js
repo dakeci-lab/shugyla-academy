@@ -31,6 +31,9 @@ function mapScheduleWriteError(errorBody, fallbackMessage = ERROR_MESSAGES.defau
   ) {
     return ERROR_MESSAGES.validation
   }
+  if (code === 'shift_has_attendance_history') {
+    return 'По этой смене уже есть фактические данные. Удаление или замена на выходной запрещены без подтверждения.'
+  }
   return fallbackMessage
 }
 

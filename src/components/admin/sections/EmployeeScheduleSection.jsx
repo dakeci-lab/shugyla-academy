@@ -8,16 +8,12 @@ import {
   parseDateKey,
   isDateKey,
 } from '../../../utils/shiftData'
-import {
-  getEmployeeShiftsForMonth,
-  saveEmployeeShift,
-  applyBulkEmployeeShifts,
-} from '../../../services/academyDataService'
 import { fetchEmployeeWorkforceBundle } from '../../../services/workforceAdminService'
 import { isCloudMode } from '../../../lib/dataMode'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { canEditEmployeeSchedule } from '../../../config/permissions'
 import { useSession } from '../../../context/SessionContext'
+import { useScheduleBackgroundSync } from '../../../hooks/useScheduleBackgroundSync'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeScheduleCalendar from '../EmployeeScheduleCalendar'
 import ShiftDayEditModal from '../ShiftDayEditModal'
@@ -56,11 +52,13 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
   const [loading, setLoading] = useState(true)
   const [employeeMissing, setEmployeeMissing] = useState(false)
   const [error, setError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
   const [editDateKey, setEditDateKey] = useState(null)
   const [showBulkModal, setShowBulkModal] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [bulkApplying, setBulkApplying] = useState(false)
+
+  const { syncMetaByDate, enqueueSave, enqueueBulkSave, retrySave } = useScheduleBackgroundSync({
+    employeeId,
+    userId: user?.id || null,
+  })
 
   const shiftMap = useMemo(() => shiftsToMap(shifts), [shifts])
 
@@ -80,6 +78,7 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
         setEmployee(localEmployee)
         setEmployeeMissing(!localEmployee)
         if (localEmployee) {
+          const { getEmployeeShiftsForMonth } = await import('../../../services/academyDataService')
           const rows = await getEmployeeShiftsForMonth(employeeId, year, month)
           setShifts(rows)
         } else {
@@ -118,38 +117,18 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
     navigate(-1)
   }
 
-  async function handleSaveShift(payload) {
-    setSaving(true)
-    setError('')
-    try {
-      await saveEmployeeShift(employeeId, payload, user?.id || null)
-      await loadScheduleData()
-      setEditDateKey(null)
-      setSuccessMessage('График сотрудника сохранён')
-    } catch (err) {
-      setError(err.message || 'Не удалось сохранить смену')
-      throw err
-    } finally {
-      setSaving(false)
-    }
+  function handleSaveShift(payload) {
+    const existingShift = shiftMap.get(payload.shiftDate) || null
+    setEditDateKey(null)
+    enqueueSave(payload, existingShift, setShifts)
   }
 
-  async function handleBulkApply(entries, options) {
-    setBulkApplying(true)
-    setError('')
-    try {
-      await applyBulkEmployeeShifts(employeeId, entries, {
-        ...options,
-        createdBy: user?.id || null,
-      })
-      await loadScheduleData()
-      setShowBulkModal(false)
-      setSuccessMessage('График сотрудника сохранён')
-    } catch (err) {
-      setError(err.message || 'Не удалось применить график')
-    } finally {
-      setBulkApplying(false)
-    }
+  function handleBulkApply(entries, options) {
+    enqueueBulkSave(entries, options, setShifts, () => setShowBulkModal(false))
+  }
+
+  function handleRetrySync(dateKey) {
+    retrySave(dateKey, setShifts)
   }
 
   if (loading && !employee) {
@@ -198,11 +177,6 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
         </div>
       </div>
 
-      {successMessage && (
-        <p className="admin-success-banner" role="status">
-          {successMessage}
-        </p>
-      )}
       {error && <p className="admin-form__error">{error}</p>}
 
       {loading ? (
@@ -216,8 +190,10 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
             year={year}
             month={month}
             shiftMap={shiftMap}
+            syncMetaByDate={syncMetaByDate}
             editable={canEdit}
             onEditDay={setEditDateKey}
+            onRetrySync={handleRetrySync}
           />
         </>
       )}
@@ -231,7 +207,6 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
           canEditActual={canEdit}
           onClose={() => setEditDateKey(null)}
           onSave={handleSaveShift}
-          saving={saving}
         />
       )}
 
@@ -239,7 +214,7 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
         <BulkScheduleModal
           onClose={() => setShowBulkModal(false)}
           onApply={handleBulkApply}
-          applying={bulkApplying}
+          applying={false}
         />
       )}
     </>

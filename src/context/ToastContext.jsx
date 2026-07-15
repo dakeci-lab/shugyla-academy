@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import {
   setToastListener,
   clearToastListener,
@@ -38,15 +38,18 @@ export function ToastProvider({ children }) {
     [addToast]
   )
 
-  const value = {
-    showToast,
-    success: (message, duration) =>
-      showToast({ type: TOAST_TYPES.SUCCESS, message, duration }),
-    warning: (message, duration) =>
-      showToast({ type: TOAST_TYPES.WARNING, message, duration }),
-    error: (message, duration) =>
-      showToast({ type: TOAST_TYPES.ERROR, message, duration }),
-  }
+  const value = useMemo(
+    () => ({
+      showToast,
+      success: (message, duration) =>
+        showToast({ type: TOAST_TYPES.SUCCESS, message, duration }),
+      warning: (message, duration) =>
+        showToast({ type: TOAST_TYPES.WARNING, message, duration }),
+      error: (message, duration) =>
+        showToast({ type: TOAST_TYPES.ERROR, message, duration }),
+    }),
+    [showToast]
+  )
 
   return (
     <ToastContext.Provider value={value}>

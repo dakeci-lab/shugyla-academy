@@ -6,6 +6,17 @@ import './EmployeeRating.css'
 
 /** Горизонтальная шкала рейтинга 0–100 */
 export default function RatingScoreBar({ score, compact = false, className = '' }) {
+  if (score == null || !Number.isFinite(Number(score))) {
+    return (
+      <div
+        className={`rating-score-bar rating-score-bar--empty-state${compact ? ' rating-score-bar--compact' : ''}${className ? ` ${className}` : ''}`}
+        aria-label="Рейтинг не рассчитан"
+      >
+        <span className="rating-score-bar__placeholder">—</span>
+      </div>
+    )
+  }
+
   const value = clampRatingScore(score)
   const gradient = getRatingScoreGradient(value)
   const fillWidth = value === 0 ? '0%' : compact ? `max(22px, ${value}%)` : `${value}%`

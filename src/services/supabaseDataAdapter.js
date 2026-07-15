@@ -190,60 +190,54 @@ export async function fetchAllData() {
     normalizedLessons
   )
 
-  let testsData = { tests: [], questions: [], attempts: [] }
-  try {
-    testsData = await fetchTestsData()
-  } catch {
-    testsData = { tests: [], questions: [], attempts: [] }
-  }
+  const [
+    testsResult,
+    pathsResult,
+    standardsResult,
+    recruitmentResult,
+    suppliersResult,
+    purchasesResult,
+    receivingResult,
+  ] = await Promise.allSettled([
+    fetchTestsData(),
+    import('./learningPathSupabaseAdapter').then(({ fetchLearningPathsData }) =>
+      fetchLearningPathsData()
+    ),
+    import('./standardsSupabaseAdapter').then(({ fetchStandardsData }) => fetchStandardsData()),
+    import('./recruitmentSupabaseAdapter').then(({ fetchRecruitmentData }) =>
+      fetchRecruitmentData()
+    ),
+    import('./suppliersSupabaseAdapter').then(({ fetchSuppliersData }) => fetchSuppliersData()),
+    import('./purchaseSupabaseAdapter').then(({ fetchPurchasesDataCloud }) =>
+      fetchPurchasesDataCloud()
+    ),
+    import('./receivingSupabaseAdapter').then(({ fetchReceivingDataCloud }) =>
+      fetchReceivingDataCloud()
+    ),
+  ])
 
-  let pathsData = { paths: [], pathCourses: [], userPaths: [] }
-  try {
-    const { fetchLearningPathsData } = await import('./learningPathSupabaseAdapter')
-    pathsData = await fetchLearningPathsData()
-  } catch {
-    pathsData = { paths: [], pathCourses: [], userPaths: [] }
-  }
-
-  let standardsData = { categories: [], articles: [], reads: [] }
-  try {
-    const { fetchStandardsData } = await import('./standardsSupabaseAdapter')
-    standardsData = await fetchStandardsData()
-  } catch {
-    standardsData = { categories: [], articles: [], reads: [] }
-  }
-
-  let recruitmentData = { vacancies: [], questions: [], candidates: [] }
-  try {
-    const { fetchRecruitmentData } = await import('./recruitmentSupabaseAdapter')
-    recruitmentData = await fetchRecruitmentData()
-  } catch {
-    recruitmentData = { vacancies: [], questions: [], candidates: [] }
-  }
-
-  let suppliersData = { suppliers: [] }
-  try {
-    const { fetchSuppliersData } = await import('./suppliersSupabaseAdapter')
-    suppliersData = await fetchSuppliersData()
-  } catch {
-    suppliersData = { suppliers: [] }
-  }
-
-  let purchasesData = { orders: [] }
-  try {
-    const { fetchPurchasesDataCloud } = await import('./purchaseSupabaseAdapter')
-    purchasesData = await fetchPurchasesDataCloud()
-  } catch {
-    purchasesData = { orders: [] }
-  }
-
-  let receivingData = { documents: [] }
-  try {
-    const { fetchReceivingDataCloud } = await import('./receivingSupabaseAdapter')
-    receivingData = await fetchReceivingDataCloud()
-  } catch {
-    receivingData = { documents: [] }
-  }
+  const testsData =
+    testsResult.status === 'fulfilled'
+      ? testsResult.value
+      : { tests: [], questions: [], attempts: [] }
+  const pathsData =
+    pathsResult.status === 'fulfilled'
+      ? pathsResult.value
+      : { paths: [], pathCourses: [], userPaths: [] }
+  const standardsData =
+    standardsResult.status === 'fulfilled'
+      ? standardsResult.value
+      : { categories: [], articles: [], reads: [] }
+  const recruitmentData =
+    recruitmentResult.status === 'fulfilled'
+      ? recruitmentResult.value
+      : { vacancies: [], questions: [], candidates: [] }
+  const suppliersData =
+    suppliersResult.status === 'fulfilled' ? suppliersResult.value : { suppliers: [] }
+  const purchasesData =
+    purchasesResult.status === 'fulfilled' ? purchasesResult.value : { orders: [] }
+  const receivingData =
+    receivingResult.status === 'fulfilled' ? receivingResult.value : { documents: [] }
 
   return {
     employees,

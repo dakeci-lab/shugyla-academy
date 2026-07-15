@@ -23,6 +23,7 @@ import * as learningPathLocalAdapter from './learningPathLocalAdapter'
 import * as learningPathSupabaseAdapter from './learningPathSupabaseAdapter'
 import * as standardsLocalAdapter from './standardsLocalAdapter'
 import * as standardsSupabaseAdapter from './standardsSupabaseAdapter'
+import { markDevPerf, logDevPerf } from '../utils/devPerf'
 import * as recruitmentLocalAdapter from './recruitmentLocalAdapter'
 import * as recruitmentSupabaseAdapter from './recruitmentSupabaseAdapter'
 import * as suppliersLocalAdapter from './suppliersLocalAdapter'
@@ -128,7 +129,9 @@ export async function initializeData() {
 
   pendingInitialize = (async () => {
     try {
+      markDevPerf('academy-data-load')
       const data = await supabaseAdapter.fetchAllData()
+      logDevPerf('academy-data-load')
       setCloudStore(data)
       return data
     } finally {

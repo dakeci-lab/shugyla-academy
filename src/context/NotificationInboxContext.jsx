@@ -18,6 +18,7 @@ import {
   validateNotificationActionUrl,
   isNotificationUnread,
 } from '../services/inAppNotificationService'
+import { markDevPerf, logDevPerf } from '../utils/devPerf'
 
 const STALE_MS = 60_000
 
@@ -67,7 +68,7 @@ export function NotificationInboxProvider({ children }) {
     if (!canUseInbox) return
 
     const requestId = ++countRequestRef.current
-    const count = await loadUnreadNotificationCount()
+    const count = await loadUnreadNotificationCount({ trustSession: true })
 
     if (!mountedRef.current || requestId !== countRequestRef.current) return
 
@@ -224,7 +225,30 @@ export function NotificationInboxProvider({ children }) {
       return
     }
 
-    void refreshUnreadCount()
+    let cancelled = false
+
+    function runDeferredInit() {
+      if (!cancelled) {
+        markDevPerf('notifications-unread-count')
+        void refreshUnreadCount().finally(() => {
+          logDevPerf('notifications-unread-count')
+        })
+      }
+    }
+
+    if (typeof requestIdleCallback === 'function') {
+      const idleId = requestIdleCallback(runDeferredInit, { timeout: 2500 })
+      return () => {
+        cancelled = true
+        cancelIdleCallback(idleId)
+      }
+    }
+
+    const timerId = setTimeout(runDeferredInit, 0)
+    return () => {
+      cancelled = true
+      clearTimeout(timerId)
+    }
   }, [authStatus, canUseInbox, refreshUnreadCount, resetNotificationState])
 
   useEffect(() => {

@@ -41,15 +41,17 @@ function isNetworkError(error) {
   )
 }
 
-async function getAuthenticatedClient() {
+async function getAuthenticatedClient(options = {}) {
   if (!supabase) {
     return { client: null, error: new Error('Supabase not configured') }
   }
 
-  const { data, error } = await supabase.auth.getSession()
-  if (error) return { client: null, error }
-  if (!data?.session?.access_token) {
-    return { client: null, error: new Error('No auth session') }
+  if (!options.trustSession) {
+    const { data, error } = await supabase.auth.getSession()
+    if (error) return { client: null, error }
+    if (!data?.session?.access_token) {
+      return { client: null, error: new Error('No auth session') }
+    }
   }
 
   return { client: supabase, error: null }
@@ -96,15 +98,17 @@ export async function loadNotifications(options = {}) {
   }
 }
 
-export async function loadUnreadNotificationCount() {
+export async function loadUnreadNotificationCount(options = {}) {
   const now = currentIsoTimestamp()
-  const { client, error: authError } = await getAuthenticatedClient()
+  const { client, error: authError } = await getAuthenticatedClient({
+    trustSession: options.trustSession === true,
+  })
   if (authError || !client) return 0
 
   try {
     const { count, error } = await client
       .from('notifications')
-      .select('*', { count: 'exact', head: true })
+      .select('id', { count: 'exact', head: true })
       .is('read_at', null)
       .or(`expires_at.is.null,expires_at.gt.${now}`)
 

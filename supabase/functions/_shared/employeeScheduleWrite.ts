@@ -57,6 +57,27 @@ export function isWorkingStatus(status: string): boolean {
   return status === 'working'
 }
 
+export function hasShiftAttendanceHistory(
+  existing: Record<string, unknown> | null
+): boolean {
+  if (!existing) return false
+  if (existing.actual_start_time || existing.actual_end_time) return true
+  if (existing.check_in_latitude != null || existing.check_out_latitude != null) return true
+  return false
+}
+
+export function assertScheduleChangeAllowed(
+  existing: Record<string, unknown> | null,
+  shift: ShiftInput
+): string | null {
+  if (!existing || !hasShiftAttendanceHistory(existing)) return null
+  const previousStatus = String(existing.status || '')
+  if (isWorkingStatus(previousStatus) && !isWorkingStatus(shift.status)) {
+    return 'shift_has_attendance_history'
+  }
+  return null
+}
+
 export function assertNoForbiddenShiftKeys(shift: Record<string, unknown>): string | null {
   for (const key of Object.keys(shift)) {
     if (FORBIDDEN_SHIFT_KEYS.has(key)) return 'forbidden_field'

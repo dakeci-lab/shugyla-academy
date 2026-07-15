@@ -7,6 +7,10 @@ import {
   validateShiftForm,
   formToShiftPayload,
 } from '../../utils/shiftData'
+import {
+  isDestructiveScheduleChange,
+  getDestructiveScheduleChangeMessage,
+} from '../../utils/shiftAttendanceGuard'
 import './admin-shared.css'
 
 /** Модальное окно редактирования одной смены */
@@ -18,24 +22,76 @@ export default function ShiftDayEditModal({
   canEditActual = true,
   onClose,
   onSave,
-  saving = false,
 }) {
   const [form, setForm] = useState(() => shiftToForm(shift, dateKey))
   const [errors, setErrors] = useState({})
+  const [destructiveConfirm, setDestructiveConfirm] = useState(false)
+  const [pendingPayload, setPendingPayload] = useState(null)
 
   useEffect(() => {
     setForm(shiftToForm(shift, dateKey))
     setErrors({})
+    setDestructiveConfirm(false)
+    setPendingPayload(null)
   }, [shift, dateKey])
 
   const showShiftTimes = isWorkingShiftStatus(form.status)
 
-  async function handleSubmit(event) {
+  function submitPayload(payload) {
+    onSave(payload)
+  }
+
+  function handleSubmit(event) {
     event.preventDefault()
     const validationErrors = validateShiftForm(form)
     setErrors(validationErrors)
     if (Object.keys(validationErrors).length > 0) return
-    await onSave(formToShiftPayload(form))
+
+    const payload = formToShiftPayload(form)
+    if (isDestructiveScheduleChange(shift, payload)) {
+      setPendingPayload(payload)
+      setDestructiveConfirm(true)
+      return
+    }
+
+    submitPayload(payload)
+  }
+
+  function confirmDestructiveSave() {
+    if (pendingPayload) submitPayload(pendingPayload)
+    setDestructiveConfirm(false)
+    setPendingPayload(null)
+  }
+
+  if (destructiveConfirm) {
+    return (
+      <AdminModal
+        title="Подтверждение изменения"
+        onClose={() => {
+          setDestructiveConfirm(false)
+          setPendingPayload(null)
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className="btn btn--outline"
+              onClick={() => {
+                setDestructiveConfirm(false)
+                setPendingPayload(null)
+              }}
+            >
+              Отмена
+            </button>
+            <button type="button" className="btn btn--primary" onClick={confirmDestructiveSave}>
+              Продолжить
+            </button>
+          </>
+        }
+      >
+        <p className="admin-form__hint">{getDestructiveScheduleChangeMessage()}</p>
+      </AdminModal>
+    )
   }
 
   return (
@@ -45,11 +101,11 @@ export default function ShiftDayEditModal({
       wide
       footer={
         <>
-          <button type="button" className="btn btn--outline" onClick={onClose} disabled={saving}>
+          <button type="button" className="btn btn--outline" onClick={onClose}>
             Отмена
           </button>
-          <button type="submit" className="btn btn--primary" form="shift-day-form" disabled={saving}>
-            {saving ? 'Сохранение…' : 'Сохранить'}
+          <button type="submit" className="btn btn--primary" form="shift-day-form">
+            Сохранить
           </button>
         </>
       }

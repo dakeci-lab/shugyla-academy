@@ -8,10 +8,11 @@ import {
   SHIFT_STATUS_CSS,
   isWorkingShiftStatus,
 } from '../../utils/shiftData'
+import { SYNC_STATUS } from '../../hooks/useScheduleBackgroundSync'
 import { PencilIcon } from '../icons/PlatformIcons'
 import './EmployeeSchedule.css'
 
-function ShiftDayCell({ date, shift, editable, onEdit }) {
+function ShiftDayCell({ date, shift, syncMeta, editable, onEdit, onRetrySync }) {
   if (!date) {
     return <div className="schedule-calendar__cell schedule-calendar__cell--empty" />
   }
@@ -20,6 +21,7 @@ function ShiftDayCell({ date, shift, editable, onEdit }) {
   const status = shift?.status
   const statusClass = status ? SHIFT_STATUS_CSS[status] : 'shift-day--empty'
   const isToday = toDateKey(new Date()) === dateKey
+  const syncFailed = syncMeta?.syncStatus === SYNC_STATUS.ERROR || syncMeta?.syncStatus === SYNC_STATUS.UNSYNCED
 
   function handleClick() {
     if (editable) onEdit(dateKey)
@@ -33,7 +35,7 @@ function ShiftDayCell({ date, shift, editable, onEdit }) {
   return (
     <div className="schedule-calendar__cell">
       <div
-        className={`shift-day ${statusClass}`}
+        className={`shift-day ${statusClass}${syncFailed ? ' shift-day--sync-error' : ''}`}
         onClick={handleClick}
         role={editable ? 'button' : undefined}
         tabIndex={editable ? 0 : undefined}
@@ -64,6 +66,21 @@ function ShiftDayCell({ date, shift, editable, onEdit }) {
             {shift.earlyLeaveMinutes > 0 && (
               <span className="shift-day__actual">Ранний уход: {shift.earlyLeaveMinutes} мин</span>
             )}
+            {syncFailed && (
+              <>
+                <span className="shift-day__sync-status">Не синхронизировано</span>
+                <button
+                  type="button"
+                  className="shift-day__retry"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onRetrySync?.(dateKey)
+                  }}
+                >
+                  Повторить
+                </button>
+              </>
+            )}
           </>
         ) : (
           <span className="shift-day__status">—</span>
@@ -83,8 +100,10 @@ export default function EmployeeScheduleCalendar({
   year,
   month,
   shiftMap,
+  syncMetaByDate = {},
   editable = false,
   onEditDay,
+  onRetrySync,
 }) {
   const cells = buildMonthCalendar(year, month)
 
@@ -100,8 +119,10 @@ export default function EmployeeScheduleCalendar({
           key={date ? toDateKey(date) : `empty-${index}`}
           date={date}
           shift={date ? shiftMap.get(toDateKey(date)) : null}
+          syncMeta={date ? syncMetaByDate[toDateKey(date)] : null}
           editable={editable}
           onEdit={onEditDay}
+          onRetrySync={onRetrySync}
         />
       ))}
     </div>

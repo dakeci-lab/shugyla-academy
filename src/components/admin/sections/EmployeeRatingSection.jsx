@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { isCloudMode } from '../../../lib/dataMode'
 import { getStaffEmployees } from '../../../utils/employeeData'
 import { getRoleLabel } from '../../../data/roles'
 import {
-  compareRatingRows,
   getCurrentMonthState,
   RATING_UPDATED_EVENT,
   calculateRatingsByEmployee,
 } from '../../../utils/attendanceData'
-import { formatMonthYearLabel } from '../../../utils/shiftData'
+import { buildRatingDisplayRows, RATING_STATUS } from '../../../utils/ratingEligibility'
+import { formatMonthYearLabel, getMondayOfWeek, toDateKey, parseDateKey } from '../../../utils/shiftData'
 import { fetchTeamWorkforceForMonth } from '../../../services/workforceAdminService'
 import { getAttendanceSettings, computeEmployeeRatingsForMonth } from '../../../services/academyDataService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
@@ -27,8 +28,63 @@ const PLACE_CLASS = {
   3: 'rating-list__place--bronze',
 }
 
+function RatingRow({ row, onSelect }) {
+  const roleLabel = row.employee.position || getRoleLabel(row.employee.role)
+  const isInsufficient = row.ratingStatus === RATING_STATUS.INSUFFICIENT_DATA
+  const placeLabel = row.place ?? '—'
+
+  return (
+    <li>
+      <button
+        type="button"
+        className={`rating-list__row${isInsufficient ? ' rating-list__row--insufficient' : ''}`}
+        onClick={() => onSelect(row.employee)}
+      >
+        <span
+          className={`rating-list__col rating-list__col--place rating-list__place ${
+            row.showTopPlace ? PLACE_CLASS[row.place] || '' : ''
+          }`}
+        >
+          {placeLabel}
+        </span>
+
+        <span className="rating-list__profile">
+          <EmployeeAvatar
+            name={row.employee.name}
+            avatarUrl={row.employee.avatarUrl}
+            size="sm"
+            className="rating-list__avatar"
+          />
+          <span className="rating-list__info">
+            <span className="rating-list__name">{row.employee.name}</span>
+            <span className="rating-list__role">{roleLabel}</span>
+            {isInsufficient && (
+              <span className="rating-list__badge rating-list__badge--insufficient">
+                Недостаточно данных
+              </span>
+            )}
+            <RatingScoreBar
+              score={row.totalPoints}
+              compact
+              className="rating-list__bar--mobile"
+            />
+          </span>
+        </span>
+
+        <span className="rating-list__col rating-list__col--position rating-list__desktop-only">
+          {roleLabel}
+        </span>
+        <span className="rating-list__col rating-list__col--score rating-list__desktop-only">
+          <RatingScoreBar score={row.totalPoints} />
+        </span>
+      </button>
+    </li>
+  )
+}
+
 /** Страница рейтинга сотрудников (расчёт на лету по сменам) */
 export default function EmployeeRatingSection() {
+  const navigate = useNavigate()
   const [{ year, month }, setMonthState] = useState(getCurrentMonthState)
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -65,7 +121,7 @@ export default function EmployeeRatingSection() {
         )
         setRatingsByEmployee(ratings)
       } else {
-        const employeeIds = employees.map((emp) => emp.id)
+        const employeeIds = getStaffEmployees('active').map((emp) => emp.id)
         const ratings = await computeEmployeeRatingsForMonth(year, month, employeeIds)
         setRatingsByEmployee(ratings)
       }
@@ -93,16 +149,12 @@ export default function EmployeeRatingSection() {
     return () => window.removeEventListener(RATING_UPDATED_EVENT, handleRatingUpdated)
   }, [year, month, loadRating])
 
-  const rows = useMemo(() => {
-    return employees
-      .map((employee) => {
-        const rating = ratingsByEmployee.get(Number(employee.id))
-        return { employee, ...(rating?.stats || { totalPoints: 100 }) }
-      })
-      .sort(compareRatingRows)
-      .map((row, index) => ({ ...row, place: index + 1 }))
-  }, [employees, ratingsByEmployee])
+  const { eligibleRows, insufficientRows, excludedNoScheduleCount } = useMemo(
+    () => buildRatingDisplayRows(employees, ratingsByEmployee),
+    [employees, ratingsByEmployee]
+  )
 
+  const hasVisibleRows = eligibleRows.length > 0 || insufficientRows.length > 0
   const currentMonth = getCurrentMonthState()
   const isCurrentMonth = year === currentMonth.year && month === currentMonth.month
   const monthLabel = formatMonthYearLabel(year, month)
@@ -119,6 +171,12 @@ export default function EmployeeRatingSection() {
     setMonthState(getCurrentMonthState())
   }
 
+  function openScheduleForPeriod() {
+    const firstDay = parseDateKey(`${year}-${String(month).padStart(2, '0')}-01`)
+    const weekStart = toDateKey(getMondayOfWeek(firstDay))
+    navigate(`/platform/employees/schedule?week=${encodeURIComponent(weekStart)}`)
+  }
+
   return (
     <>
       <SchedulePeriodBar
@@ -129,6 +187,23 @@ export default function EmployeeRatingSection() {
         prevLabel="Предыдущий месяц"
         nextLabel="Следующий месяц"
       />
+
+      {excludedNoScheduleCount > 0 && (
+        <div className="rating-excluded-banner" role="status">
+          <span>
+            Не участвуют в рейтинге: {excludedNoScheduleCount}{' '}
+            {excludedNoScheduleCount === 1 ? 'сотрудник' : 'сотрудников'} — не установлен график за
+            выбранный период
+          </span>
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={openScheduleForPeriod}
+          >
+            Посмотреть
+          </button>
+        </div>
+      )}
 
       <EmployeeSearchToolbar value={search} onChange={(e) => setSearch(e.target.value)} />
 
@@ -143,8 +218,8 @@ export default function EmployeeRatingSection() {
 
       {loading ? (
         <p className="schedule-loading">Загрузка рейтинга…</p>
-      ) : !error && rows.length === 0 ? (
-        <p className="schedule-empty">Сотрудники не найдены</p>
+      ) : !error && !hasVisibleRows ? (
+        <p className="schedule-empty">Нет сотрудников с достаточными данными за этот период</p>
       ) : !error ? (
         <div className="rating-list">
           <div className="rating-list__head" aria-hidden="true">
@@ -155,51 +230,21 @@ export default function EmployeeRatingSection() {
           </div>
 
           <ul className="rating-list__body">
-            {rows.map((row) => {
-              const roleLabel = row.employee.position || getRoleLabel(row.employee.role)
-
-              return (
-                <li key={row.employee.id}>
-                  <button
-                    type="button"
-                    className="rating-list__row"
-                    onClick={() => setDetailEmployee(row.employee)}
-                  >
-                    <span
-                      className={`rating-list__col rating-list__col--place rating-list__place ${PLACE_CLASS[row.place] || ''}`}
-                    >
-                      {row.place}
-                    </span>
-
-                    <span className="rating-list__profile">
-                      <EmployeeAvatar
-                        name={row.employee.name}
-                        avatarUrl={row.employee.avatarUrl}
-                        size="sm"
-                        className="rating-list__avatar"
-                      />
-                      <span className="rating-list__info">
-                        <span className="rating-list__name">{row.employee.name}</span>
-                        <span className="rating-list__role">{roleLabel}</span>
-                        <RatingScoreBar
-                          score={row.totalPoints}
-                          compact
-                          className="rating-list__bar--mobile"
-                        />
-                      </span>
-                    </span>
-
-                    <span className="rating-list__col rating-list__col--position rating-list__desktop-only">
-                      {roleLabel}
-                    </span>
-                    <span className="rating-list__col rating-list__col--score rating-list__desktop-only">
-                      <RatingScoreBar score={row.totalPoints} />
-                    </span>
-                  </button>
-                </li>
-              )
-            })}
+            {eligibleRows.map((row) => (
+              <RatingRow key={row.employee.id} row={row} onSelect={setDetailEmployee} />
+            ))}
           </ul>
+
+          {insufficientRows.length > 0 && (
+            <>
+              <div className="rating-list__section-label">Недостаточно данных</div>
+              <ul className="rating-list__body rating-list__body--insufficient">
+                {insufficientRows.map((row) => (
+                  <RatingRow key={row.employee.id} row={row} onSelect={setDetailEmployee} />
+                ))}
+              </ul>
+            </>
+          )}
         </div>
       ) : null}
 
