@@ -35,6 +35,7 @@ function stageStatic() {
   console.log('Stage 1: Prepare flow wiring')
   const service = read('src/services/webPushSubscriptionService.js')
   const ui = read('src/components/platform/notifications/PushNotificationSettings.jsx')
+  const diagnostics = read('src/components/platform/notifications/PushNotificationDiagnostics.jsx')
   const edge = read('supabase/functions/manage-push-subscription/index.ts')
 
   assert('prepareDeviceForTestSend exported', service.includes('export async function prepareDeviceForTestSend'))
@@ -49,11 +50,13 @@ function stageStatic() {
   assert('send checks permit before invoke', service.includes('readPersistedTestSendPermit'))
   assert('send includes permit_id in invoke', service.includes('permit_id: persistedPermit.permitId'))
   assert('status returns matching_subscriptions', edge.includes('matching_subscriptions'))
-  assert('prepare button in UI', ui.includes('Подготовить устройство к тесту'))
-  assert('send disabled until testReady', ui.includes('!testReady'))
-  assert('send disabled until permit valid', ui.includes('!permitValid'))
-  assert('permit issue button present', ui.includes('Создать одноразовое разрешение'))
-  assert('preflight button present', ui.includes('Проверить готовность сервера'))
+  assert('prepare button in diagnostics UI', diagnostics.includes('Подготовить устройство к тесту'))
+  assert('main UI uses connect label', ui.includes('Подключить уведомления'))
+  assert('diagnostics gated by env flag', ui.includes('isWebPushDiagnosticsEnabled'))
+  assert('send disabled until testReady', diagnostics.includes('!testReady'))
+  assert('send disabled until permit valid', diagnostics.includes('!permitValid'))
+  assert('permit issue button in diagnostics', diagnostics.includes('Создать одноразовое разрешение'))
+  assert('preflight button in diagnostics', diagnostics.includes('Проверить готовность сервера'))
   console.log('')
 }
 
@@ -63,7 +66,7 @@ function stageUnit() {
   const evaluateSource = service
     .slice(
       service.indexOf('export function evaluateTestSendReadiness'),
-      service.indexOf('export async function fingerprintDeviceId')
+      service.indexOf('export const DEVICE_CONNECTION_STATUS')
     )
     .replace('export function evaluateTestSendReadiness', 'function evaluateTestSendReadiness')
 
@@ -128,8 +131,8 @@ function stageUnit() {
 }
 
 function uiIncludesBlockedState() {
-  const ui = read('src/components/platform/notifications/PushNotificationSettings.jsx')
-  return ui.includes('SERVER_SEND_STATE.BLOCKED') && ui.includes('hasAttemptedSendTestRequest()')
+  const diagnostics = read('src/components/platform/notifications/PushNotificationDiagnostics.jsx')
+  return diagnostics.includes('SERVER_SEND_STATE.BLOCKED') && diagnostics.includes('hasAttemptedSendTestRequest()')
 }
 
 const PREPARE_TEST_SUCCESS_MESSAGE = 'Устройство готово к тестовому уведомлению'

@@ -34,7 +34,7 @@ function read(rel) {
 function stageStatic() {
   console.log('Stage 1: Static diagnostics wiring')
   const service = read('src/services/webPushSubscriptionService.js')
-  const ui = read('src/components/platform/notifications/PushNotificationSettings.jsx')
+  const diagnostics = read('src/components/platform/notifications/PushNotificationDiagnostics.jsx')
 
   assert('parseFunctionInvokeContext exported', service.includes('export async function parseFunctionInvokeContext'))
   assert('classifySendTestFailure exported', service.includes('export function classifySendTestFailure'))
@@ -43,9 +43,9 @@ function stageStatic() {
   assert('safe user messages present', service.includes('Тестовая отправка временно отключена'))
   assert('diagnostic console logging', service.includes('web_push_test_send_diagnostic'))
   assert('no endpoint logging in diagnostics', !/console\.(log|info).*endpoint/i.test(service))
-  assert('UI reads persisted diagnostic', ui.includes('readPersistedSendTestDiagnostic'))
-  assert('UI alert role for test message', ui.includes('role="alert"'))
-  assert('production button blocks after success', ui.includes('SERVER_SEND_STATE.SUCCESS'))
+  assert('UI reads persisted diagnostic', diagnostics.includes('readPersistedSendTestDiagnostic'))
+  assert('UI alert role for test message', diagnostics.includes('role="alert"'))
+  assert('production button blocks after success', diagnostics.includes('SERVER_SEND_STATE.SUCCESS'))
   assert('prepare flow exported', service.includes('export async function prepareDeviceForTestSend'))
   assert('preflight flow exported', service.includes('export async function preflightServerTestWebPush'))
   assert('request id persistence', service.includes('shugyla.web_push.test_send_request_id'))

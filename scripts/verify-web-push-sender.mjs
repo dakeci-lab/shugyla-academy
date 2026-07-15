@@ -524,6 +524,10 @@ function stageStaticChecks() {
     path.join(ROOT, 'src/components/platform/notifications/PushNotificationSettings.jsx'),
     'utf8'
   )
+  const diagnostics = fs.readFileSync(
+    path.join(ROOT, 'src/components/platform/notifications/PushNotificationDiagnostics.jsx'),
+    'utf8'
+  )
 
   assert('sender uses authorizeAuthenticatedEmployee', senderFn.includes('authorizeAuthenticatedEmployee'))
   assert(
@@ -558,11 +562,12 @@ function stageStaticChecks() {
   assert('service parses invoke context', service.includes('parseFunctionInvokeContext'))
   assert('service sends permit_id', service.includes('permit_id: persistedPermit.permitId'))
 
-  assert('UI imports sendServerTestWebPush', ui.includes('sendServerTestWebPush'))
-  assert('UI handleServerTest handler', ui.includes('handleServerTest'))
-  assert('UI server push button', ui.includes('Отправить серверное push'))
-  assert('UI production E2E button', ui.includes('Отправить тестовое уведомление'))
-  assert('UI server test DEV guarded', ui.includes('import.meta.env.DEV'))
+  assert('UI imports sendServerTestWebPush', diagnostics.includes('sendServerTestWebPush'))
+  assert('UI handleServerTest handler', diagnostics.includes('handleServerTest'))
+  assert('UI server push button', diagnostics.includes('Отправить серверное push'))
+  assert('UI production E2E button', diagnostics.includes('Отправить тестовое уведомление'))
+  assert('UI server test DEV guarded', diagnostics.includes('import.meta.env.DEV'))
+  assert('main UI simplified connect button', ui.includes('Подключить уведомления'))
 
   console.log('')
 }

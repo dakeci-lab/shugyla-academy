@@ -1021,6 +1021,151 @@ export function evaluateTestSendReadiness({
   }
 }
 
+export const DEVICE_CONNECTION_STATUS = {
+  LOADING: 'loading',
+  UNSUPPORTED: 'unsupported',
+  OFFLINE_MODE: 'offline_mode',
+  DENIED: 'denied',
+  CONNECTED: 'connected',
+  RECONNECTION_REQUIRED: 'reconnection_required',
+  NOT_CONNECTED: 'not_connected',
+  CONNECTING: 'connecting',
+  DISCONNECTING: 'disconnecting',
+  ERROR: 'error',
+}
+
+export const CONNECT_SUCCESS_MESSAGE = 'Уведомления успешно подключены'
+export const CONNECT_SUCCESS_HINT =
+  'Теперь напоминания о смене будут приходить автоматически'
+export const CONNECTION_ERROR_MESSAGE = 'Не удалось подключить уведомления'
+export const CONNECTION_ERROR_HINT = 'Проверьте интернет-соединение и повторите попытку'
+
+export function isWebPushDiagnosticsEnabled() {
+  return import.meta.env.VITE_ENABLE_WEB_PUSH_DIAGNOSTICS === 'true'
+}
+
+export function clearTestUiSessionState() {
+  clearPersistedSendTestDiagnostic()
+  if (!hasWindow()) return
+  try {
+    window.sessionStorage.removeItem(SEND_TEST_REQUEST_STORAGE_KEY)
+    window.sessionStorage.removeItem(PREFLIGHT_DIAGNOSTIC_STORAGE_KEY)
+    clearPersistedTestSendPermit()
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+export function evaluateDeviceConnectionStatus({
+  permission,
+  browserSubscriptionPresent,
+  browserVapidMatches,
+  storedVapidFingerprintPresent,
+  storedVapidFingerprintMatches,
+  backendRegistered,
+  backendActive,
+}) {
+  if (permission === 'denied') {
+    return DEVICE_CONNECTION_STATUS.DENIED
+  }
+
+  const isConnected =
+    permission === 'granted' &&
+    browserSubscriptionPresent &&
+    browserVapidMatches &&
+    storedVapidFingerprintPresent &&
+    storedVapidFingerprintMatches &&
+    backendRegistered &&
+    backendActive
+
+  if (isConnected) {
+    return DEVICE_CONNECTION_STATUS.CONNECTED
+  }
+
+  if (permission === 'granted') {
+    const staleBrowserSubscription =
+      browserSubscriptionPresent &&
+      (!browserVapidMatches ||
+        !storedVapidFingerprintPresent ||
+        !storedVapidFingerprintMatches)
+    const inactiveBackendRegistration =
+      browserSubscriptionPresent && backendRegistered && !backendActive
+
+    if (staleBrowserSubscription || inactiveBackendRegistration) {
+      return DEVICE_CONNECTION_STATUS.RECONNECTION_REQUIRED
+    }
+  }
+
+  return DEVICE_CONNECTION_STATUS.NOT_CONNECTED
+}
+
+export async function getDeviceConnectionStatus() {
+  if (!isWebPushSupported()) {
+    return { status: DEVICE_CONNECTION_STATUS.UNSUPPORTED }
+  }
+
+  const permission = getNotificationPermission()
+  if (permission === 'denied') {
+    return { status: DEVICE_CONNECTION_STATUS.DENIED, permission }
+  }
+
+  const vapidPublicKey = getVapidPublicKey()
+  const browserSub =
+    permission === 'granted' ? await getExistingBrowserSubscription() : null
+  const browserSubscriptionPresent = Boolean(browserSub)
+  const browserVapidMatches =
+    browserSubscriptionPresent && vapidPublicKey
+      ? subscriptionMatchesVapid(browserSub, vapidPublicKey)
+      : false
+  const storedVapidFingerprintPresent = Boolean(readRegisteredVapidFingerprint())
+  const storedVapidFingerprintMatches =
+    storedVapidFingerprintPresent && vapidPublicKey
+      ? !(await registeredVapidFingerprintMismatch(vapidPublicKey))
+      : false
+
+  let backendRegistered = false
+  let backendActive = false
+  if (permission === 'granted') {
+    const registration = await getPushRegistrationStatus()
+    backendRegistered = Boolean(registration.registered)
+    backendActive = Boolean(registration.active)
+  }
+
+  return {
+    status: evaluateDeviceConnectionStatus({
+      permission,
+      browserSubscriptionPresent,
+      browserVapidMatches,
+      storedVapidFingerprintPresent,
+      storedVapidFingerprintMatches,
+      backendRegistered,
+      backendActive,
+    }),
+    permission,
+    backendRegistered,
+    backendActive,
+  }
+}
+
+export function resolveConnectionErrorMessage(err) {
+  if (err instanceof WebPushError && err.code === 'network') {
+    return CONNECTION_ERROR_HINT
+  }
+  if (err instanceof WebPushError && err.code && WEB_PUSH_ERROR_MESSAGES[err.code]) {
+    return WEB_PUSH_ERROR_MESSAGES[err.code]
+  }
+  return CONNECTION_ERROR_HINT
+}
+
+export async function connectDeviceNotifications({ reconnect = false } = {}) {
+  if (reconnect) {
+    await prepareDeviceForTestSend()
+    return { connected: true }
+  }
+  await enablePushNotifications()
+  return { connected: true }
+}
+
 export async function fingerprintDeviceId(deviceId) {
   if (!deviceId || !hasWindow() || !window.crypto?.subtle) return null
   const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(deviceId))

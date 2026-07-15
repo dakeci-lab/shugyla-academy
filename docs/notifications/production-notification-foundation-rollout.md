@@ -401,6 +401,46 @@ Context: Steps 22X/22Z rejected sends with 0 records while env gates appeared ON
 
 ---
 
+## Step 22AN — Production automatic notifications **LIVE**
+
+**Date:** 2026-07-15  
+**Status:** **SYSTEM NOTIFICATIONS LIVE** — rules enabled, scheduler HMAC active, Cron every minute, no permit/test push.
+
+| Item | Result |
+|------|--------|
+| Web Push on reconciled iPhone | **delivered** (Step 22AM) |
+| Notification rules enabled | **4 / 4** |
+| Scheduler `TIME_TRACKER_SCHEDULER_ENABLED` | **true** |
+| Scheduler HMAC secret | **installed** (fingerprint only in ops logs) |
+| Cron job | **`time-tracker-notification-scheduler-every-minute`** — `* * * * *`, **active** |
+| Historical backfill | **none** (Asia/Almaty today ±1 day window only) |
+| Permit / test push on this step | **none** |
+| Original subscription trio | **1 active** (reconciled iPhone) / **2 inactive** (legacy VAPID, rows preserved) |
+| Additional subscriptions during launch | **+3** employees self-registered (nasiba, mahabbat, qasiet) |
+| Duplicate endpoints / notifications / deliveries | **0** |
+| Unauthorized scheduler (no HMAC) | **401** |
+| Cron cycles after launch | **7+ succeeded** |
+| Business baseline | **18/18**, shifts **190**, roles **9**, role_permissions **137** |
+
+### Rules (all enabled)
+
+| Code | Offset | Repeat | Max |
+|------|--------|--------|-----|
+| `time_tracker.rule.shift_start_soon` | −10 min | — | 1 |
+| `time_tracker.rule.clock_in_missing` | +5 min | 10 min | 2 |
+| `time_tracker.rule.shift_end_reached` | 0 min | — | 1 |
+| `time_tracker.rule.clock_out_missing` | +10 min | 10 min | 2 |
+
+### Launch notes
+
+- Production flow: `run-time-tracker-notification-scheduler` (HMAC) → `dispatch-time-tracker-notifications` → delivery → `webPushSender`.
+- Cron uses `pg_cron` + `pg_net` + Vault-stored HMAC secret; calls scheduler only (not dispatcher directly).
+- Legacy VAPID subscriptions deactivated with `is_active=false` only; `permission_status` unchanged; rows not deleted.
+- Automatic deliveries to newly registered (non-reconciled) devices may fail with `web_push_not_configured` (403) until devices complete VAPID reconciliation — expected.
+- Permit no longer used for production automation.
+
+---
+
 ## Next step (gated)
 
-Controlled device reconciliation with new VAPID public key — **separate owner confirmation**. Then permit-based controlled test-send when ready. Legacy gates **OFF**; rules **disabled**; Cron **off**.
+Monitor shift-window notifications for reconciled devices; optional employee device reconciliation rollout for additional staff.

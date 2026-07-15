@@ -199,7 +199,7 @@ function stageStatic() {
   const senderFn = read('supabase/functions/send-test-web-push/index.ts')
   const shared = read('supabase/functions/_shared/testSendPermits.ts')
   const service = read('src/services/webPushSubscriptionService.js')
-  const ui = read('src/components/platform/notifications/PushNotificationSettings.jsx')
+  const diagnostics = read('src/components/platform/notifications/PushNotificationDiagnostics.jsx')
 
   assert('migration creates permit table', migration.includes('notification_test_send_permits'))
   assert('migration enables RLS', migration.includes('enable row level security'))
@@ -224,9 +224,9 @@ function stageStatic() {
   assert('service issueServerTestSendPermit exported', service.includes('export async function issueServerTestSendPermit'))
   assert('permit sessionStorage key', service.includes('shugyla.web_push.test_send_permit'))
   assert('send includes permit_id', service.includes('permit_id: persistedPermit.permitId'))
-  assert('permit issue UI button', ui.includes('Создать одноразовое разрешение'))
-  assert('UI does not render permit UUID', !ui.includes('permitId') || ui.includes('permitId: data.permit.token'))
-  assert('send gated by permitValid', ui.includes('!permitValid'))
+  assert('permit issue UI button', diagnostics.includes('Создать одноразовое разрешение'))
+  assert('UI does not render permit UUID', !diagnostics.includes('permitId') || diagnostics.includes('permitId: data.permit.token'))
+  assert('send gated by permitValid', diagnostics.includes('!permitValid'))
   assert('no auto send after issue', !service.includes('issueServerTestSendPermit') || !service.match(/issueServerTestSendPermit[\s\S]{0,200}sendServerTestWebPush/))
   console.log('')
 }
@@ -705,15 +705,15 @@ async function stageConcurrency() {
 function stageFrontendStatic() {
   console.log('Stage 7: Frontend static checks')
   const service = read('src/services/webPushSubscriptionService.js')
-  const ui = read('src/components/platform/notifications/PushNotificationSettings.jsx')
+  const diagnostics = read('src/components/platform/notifications/PushNotificationDiagnostics.jsx')
 
   assert('issueServerTestSendPermit uses issue_permit action', service.includes("action: 'issue_permit'"))
   assert('permit stored in sessionStorage only', service.includes('sessionStorage.setItem(\n      PERMIT_STORAGE_KEY'))
   assert('permit messages defined', service.includes('PERMIT_ERROR_MESSAGES'))
   assert('countdown helper exported', service.includes('export function getTestSendPermitCountdownSeconds'))
   assert('attempt marker before invoke', service.indexOf('persistSendTestRequest') < service.indexOf("action: 'send'"))
-  assert('UI countdown display', ui.includes('permitCountdownSeconds'))
-  assert('UI expiry label without UUID', ui.includes('Разрешение активно до'))
+  assert('UI countdown display', diagnostics.includes('permitCountdownSeconds'))
+  assert('UI expiry label without UUID', diagnostics.includes('Разрешение активно до'))
   console.log('')
 }
 

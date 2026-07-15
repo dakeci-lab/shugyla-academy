@@ -308,7 +308,7 @@ Deno.serve(async (req) => {
   if (action === 'disable') {
     const { data, error } = await serviceClient
       .from('notification_push_subscriptions')
-      .select('id')
+      .select('id, permission_status')
       .eq('employee_id', employeeId)
       .eq('device_id', deviceId)
       .maybeSingle()
@@ -319,7 +319,7 @@ Deno.serve(async (req) => {
     }
 
     if (!data) {
-      return subscriptionResponse(false, false, 'revoked')
+      return subscriptionResponse(false, false, 'default')
     }
 
     const now = new Date().toISOString()
@@ -327,8 +327,6 @@ Deno.serve(async (req) => {
       .from('notification_push_subscriptions')
       .update({
         is_active: false,
-        permission_status: 'revoked',
-        revoked_at: now,
         last_used_at: now,
       })
       .eq('id', data.id)
@@ -339,7 +337,7 @@ Deno.serve(async (req) => {
       return adminErrorResponse('internal_error', 500)
     }
 
-    return subscriptionResponse(true, false, 'revoked')
+    return subscriptionResponse(true, false, data.permission_status ?? 'granted')
   }
 
   // remove
