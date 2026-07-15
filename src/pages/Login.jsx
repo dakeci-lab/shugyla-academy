@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { login, getPostLoginPath } from '../utils/auth'
+import { login, getPostLoginPath, LOGIN_ERROR } from '../utils/auth'
 import { useSession, AUTH_STATUS, SESSION_TYPE } from '../context/SessionContext'
 import { isCloudMode } from '../lib/dataMode'
 import AuthLoadingScreen from '../components/AuthLoadingScreen'
 import './Login.css'
 
 const DEACTIVATED_MESSAGE = 'Аккаунт деактивирован. Обратитесь к администратору.'
+const PROFILE_NOT_CONFIGURED_MESSAGE =
+  'Учётная запись не настроена. Обратитесь к администратору.'
+const NETWORK_ERROR_MESSAGE = 'Нет соединения. Повторите попытку.'
 
 function EyeIcon() {
   return (
@@ -91,10 +94,17 @@ export default function Login() {
     try {
       const result = await login(loginValue, password)
       if (!result.success) {
-        if (result.error === 'invalid') {
+        if (result.error === LOGIN_ERROR.INVALID || result.error === 'invalid') {
           setError('Неверный логин или пароль')
-        } else if (result.error === DEACTIVATED_MESSAGE) {
+        } else if (
+          result.error === LOGIN_ERROR.DEACTIVATED ||
+          result.error === DEACTIVATED_MESSAGE
+        ) {
           setError(DEACTIVATED_MESSAGE)
+        } else if (result.error === LOGIN_ERROR.PROFILE_NOT_CONFIGURED) {
+          setError(PROFILE_NOT_CONFIGURED_MESSAGE)
+        } else if (result.error === LOGIN_ERROR.NETWORK) {
+          setError(NETWORK_ERROR_MESSAGE)
         } else if (typeof result.error === 'string' && result.error) {
           setError(result.error)
         } else {
@@ -109,7 +119,7 @@ export default function Login() {
       })
       setCompletingLogin(true)
     } catch {
-      setError('Не удалось войти. Попробуйте позже.')
+      setError(NETWORK_ERROR_MESSAGE)
     } finally {
       setLoading(false)
     }

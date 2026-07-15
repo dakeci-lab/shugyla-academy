@@ -64,6 +64,25 @@ export function getPostLoginPath(user, redirectPath) {
 
 const INVALID_CREDENTIALS_MESSAGE = 'invalid'
 
+/** Machine-readable login failure codes for Login page (no PII). */
+export const LOGIN_ERROR = {
+  INVALID: 'invalid',
+  DEACTIVATED: 'deactivated',
+  PROFILE_NOT_CONFIGURED: 'profile_not_configured',
+  NETWORK: 'network',
+}
+
+function isAuthNetworkError(err) {
+  if (!err) return false
+  const message = String(err.message || err)
+  return (
+    message.includes('Failed to fetch') ||
+    message.includes('NetworkError') ||
+    message.includes('fetch failed') ||
+    message.includes('Network request failed')
+  )
+}
+
 /**
  * Offline/local login — mock employees in localStorage (no Supabase).
  */
@@ -123,51 +142,71 @@ async function loginCloud(loginValue, password) {
     // Previous session may be absent
   }
 
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: technicalEmail,
-    password,
-  })
+  let data
+  let error
+  try {
+    ;({ data, error } = await supabase.auth.signInWithPassword({
+      email: technicalEmail,
+      password,
+    }))
+  } catch (err) {
+    await supabase.auth.signOut().catch(() => {})
+    clearUser()
+    return {
+      success: false,
+      error: isAuthNetworkError(err) ? LOGIN_ERROR.NETWORK : LOGIN_ERROR.INVALID,
+    }
+  }
 
   if (error || !data.session?.access_token || !data.user?.id) {
     await supabase.auth.signOut().catch(() => {})
     clearUser()
-    return { success: false, error: INVALID_CREDENTIALS_MESSAGE }
+    return {
+      success: false,
+      error: isAuthNetworkError(error) ? LOGIN_ERROR.NETWORK : LOGIN_ERROR.INVALID,
+    }
   }
 
   let profileRow
   try {
     profileRow = await loadAcademyProfileByAuthUserId(data.user.id)
-  } catch {
+  } catch (err) {
     await supabase.auth.signOut().catch(() => {})
     clearUser()
-    return { success: false, error: INVALID_CREDENTIALS_MESSAGE }
+    return {
+      success: false,
+      error: isAuthNetworkError(err) ? LOGIN_ERROR.NETWORK : LOGIN_ERROR.INVALID,
+    }
   }
 
   if (profileRow?.deactivated) {
     await supabase.auth.signOut().catch(() => {})
     clearUser()
-    return { success: false, error: DEACTIVATED_ACCOUNT_MESSAGE }
+    return { success: false, error: LOGIN_ERROR.DEACTIVATED }
   }
 
   if (!profileRow) {
     await supabase.auth.signOut().catch(() => {})
     clearUser()
-    return { success: false, error: INVALID_CREDENTIALS_MESSAGE }
+    return { success: false, error: LOGIN_ERROR.PROFILE_NOT_CONFIGURED }
   }
 
   let sessionUser
   try {
     sessionUser = await buildCloudPlatformSessionUser(profileRow)
-  } catch {
+  } catch (err) {
     await supabase.auth.signOut().catch(() => {})
     clearUser()
-    return { success: false, error: INVALID_CREDENTIALS_MESSAGE }
+    return {
+      success: false,
+      error: isAuthNetworkError(err) ? LOGIN_ERROR.NETWORK : LOGIN_ERROR.INVALID,
+    }
   }
 
   if (!sessionUser) {
     await supabase.auth.signOut().catch(() => {})
     clearUser()
-    return { success: false, error: INVALID_CREDENTIALS_MESSAGE }
+    return { success: false, error: LOGIN_ERROR.PROFILE_NOT_CONFIGURED }
   }
 
   saveUser(sessionUser)

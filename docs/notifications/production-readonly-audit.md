@@ -901,3 +901,34 @@ Repeat Step 22I authenticated non-mutating smoke test against reconciled baselin
 > **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
 
 Prepare Auth-first frontend production deploy. No Phase 2, no notification rollout, no secrets changes.
+
+---
+
+## 30. Auth-first frontend preparation — Step 22M
+
+**Date:** 2026-07-15
+**Status:** Local preparation **completed**. **0** production mutations. **No deploy.**
+
+### 30.1 Scope
+
+- Auth-first login, session restore, logout verified locally
+- Employee admin cloud paths use three Edge Functions
+- Legacy password login fallback **absent** from cloud path
+- Readiness script + deploy plan documented
+- Phase 2, grants, policies, notifications, Cron **untouched**
+
+### 30.2 Production state (unchanged)
+
+| Metric | Value |
+|--------|-------|
+| `academy_users` / linked | **18/18** |
+| `auth.users` | **18** |
+| Edge Functions | **3** ACTIVE |
+| Frontend (production) | **legacy** (not redeployed) |
+| Phase 2 | **not applied** |
+
+### 30.3 Next production write
+
+> **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
+
+Deploy Auth-first frontend static build to GitHub Pages. No SQL, no Phase 2, no grants/policies changes.

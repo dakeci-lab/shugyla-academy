@@ -1,6 +1,6 @@
 # Production Auth Cutover Plan
 
-**Status:** Reconciled baseline **18/18 linked** (Step 22K). Authenticated smoke test **passed** (Step 22L). **Auth-first frontend deploy** pending separate owner approval. Phase 2 pending.
+**Status:** Reconciled baseline **18/18 linked** (Step 22K). Authenticated smoke test **passed** (Step 22L). Auth-first frontend **prepared** (Step 22M). **Production deploy** pending separate owner approval. Phase 2 pending.
 
 Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md), [../notifications/production-readonly-audit.md](../notifications/production-readonly-audit.md)
 
@@ -31,7 +31,29 @@ Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checkl
 3. Create `employee_owned_by_current_auth()` (requires column)
 4. `notify pgrst, 'reload schema'`
 
-**Next production write:** Prepare Auth-first frontend deploy — separate owner approval. **Do not** apply Phase 2 until frontend smoke passes.
+**Next production write:** Deploy Auth-first frontend to GitHub Pages — separate owner approval. **Do not** apply Phase 2 on frontend deploy step.
+
+---
+
+## Auth-first frontend preparation (Step 22M — completed)
+
+**Date:** 2026-07-15
+**Owner confirmation:** prepare Auth-first frontend deploy without Phase 2, grants, policies, notifications, or Cron changes.
+
+| Check | Result |
+|-------|--------|
+| Auth-first login flow | `signInWithPassword` + `auth_user_id` profile lookup; **no** legacy password compare |
+| Session restore / logout | Supabase `getSession` + profile revalidation; `signOut` clears state |
+| Inactive blocking | signOut + safe message after profile status check |
+| Employee admin (cloud) | `admin-list/create/update` Edge Functions integrated |
+| Legacy fallback | **absent** in cloud login path |
+| Readiness script | `verify:auth-first-frontend-production-readiness` |
+| Deploy plan | [auth-first-frontend-production-deploy-plan.md](./auth-first-frontend-production-deploy-plan.md) |
+| Production deploy | **not performed** |
+| Phase 2 | **not applied** |
+| Grants / policies | **unchanged** |
+
+> Frontend production deploy requires separate owner approval (Gate A in deploy plan).
 
 ---
 

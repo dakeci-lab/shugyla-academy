@@ -1,6 +1,6 @@
 # Production Auth Rollout Checklist
 
-**Status:** Reconciled baseline **18/18 linked** (Step 22K). Authenticated smoke test **passed** (Step 22L). **Auth-first frontend deploy** pending separate owner approval.
+**Status:** Reconciled baseline **18/18 linked** (Step 22K). Smoke test **passed** (Step 22L). Auth-first frontend **prepared** (Step 22M). **Production deploy** pending separate owner approval.
 
 Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md)
 
@@ -63,12 +63,12 @@ Run `scripts/production-auth-users-migration.mjs`.
 - [x] `admin-list-employees` HTTP **200**; **17** items; no password/raw auth fields
 - [x] `admin-create-employee` negative: HTTP **422**; **0** mutations
 - [x] `admin-update-employee` negative: HTTP **422**; **0** mutations
-- [ ] **BLOCKED:** Deploy Auth-first frontend — pending separate owner approval
-- [ ] Smoke: cashier login — after frontend deploy
-- [ ] Smoke: procurement/receiver login
-- [ ] Smoke: inactive employee blocked
-- [ ] Session restore + logout verified
-- [ ] **Do not** run Phase 2 until Auth-first frontend smoke passes
+- [x] Auth-first frontend prepared locally (Step 22M)
+- [x] Readiness script: `npm run verify:auth-first-frontend-production-readiness`
+- [x] Deploy plan: [auth-first-frontend-production-deploy-plan.md](./auth-first-frontend-production-deploy-plan.md)
+- [ ] **BLOCKED:** Deploy Auth-first frontend to production — pending separate owner approval
+- [ ] Post-deploy production smoke (admin + staff login, inactive blocked, session restore, logout, admin list)
+- [ ] **Do not** run Phase 2 until post-deploy smoke stable
 
 ---
 
