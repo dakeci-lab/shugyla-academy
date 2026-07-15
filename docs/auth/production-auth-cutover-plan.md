@@ -445,3 +445,26 @@ Preconditions: Phase D stable; owner explicit approval.
 **NOT_READY_FOR_DIRECT_NOTIFICATION_DEPLOY**
 
 Required coordinated Auth cutover before notification migrations or Auth-first frontend alone.
+
+---
+
+## Team workforce production fix — Step 22R (completed)
+
+**Date:** 2026-07-15
+
+After Phase 2, team dashboard / schedule / rating were empty because browser RLS limited direct `academy_users` / `academy_employee_shifts` reads to self-only. Fix: new Edge Function `admin-team-workforce-data` + frontend adapter (`c6e80c1`).
+
+| Item | Status |
+|------|--------|
+| Phase 2 | **preserved** — policies not changed |
+| Phase 3 | **not applied** |
+| Edge Function deployed | `admin-team-workforce-data` **ACTIVE**, `verify_jwt=true` |
+| Frontend deployed | **`c6e80c1`** via GitHub Pages workflow **29412374732** |
+| Главная / График / Рейтинг smoke | **passed** (API parity + bundle checks) |
+| Employee list (`admin-list-employees`) | **passed** |
+| Business baseline | **18/18** unchanged; fingerprints unchanged |
+| Business mutations | **0** |
+| Notification rules enabled | **0**; Cron **0**; pushes **0** |
+| Rollback required | **no** |
+
+See [team-workforce-phase2-frontend-fix.md](./team-workforce-phase2-frontend-fix.md).

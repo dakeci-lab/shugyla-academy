@@ -43,6 +43,7 @@ const EMPLOYEE_FUNCTIONS = [
   'admin-create-employee',
   'admin-list-employees',
   'admin-update-employee',
+  'admin-team-workforce-data',
 ]
 
 const RECONCILIATION_MIGRATIONS = [
@@ -420,7 +421,7 @@ function stageEdgeFunctions() {
     )
   }
 
-  assert('total Edge Functions = 7', functions.length === 7)
+  assert('total Edge Functions = 8', functions.length === 8)
 
   console.log('')
 }

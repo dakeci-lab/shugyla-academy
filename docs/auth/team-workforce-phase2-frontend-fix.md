@@ -1,8 +1,45 @@
 # Team Workforce Phase 2 Frontend Fix
 
-**Status:** Local fix prepared (Step 22Q). **Production not deployed.**
+**Status:** **Production deployed (Step 22R).** Phase 2 preserved.
 
 Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md), [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md)
+
+---
+
+## Production deploy record (Step 22R)
+
+**Date:** 2026-07-15
+**Owner confirmation:** deploy `admin-team-workforce-data` + frontend; Phase 2 not rolled back; notification rules disabled; Cron off.
+
+| Item | Value |
+|------|-------|
+| Edge Function | `admin-team-workforce-data` **ACTIVE**, `verify_jwt=true`, version **1** |
+| Total Edge Functions | **8** (7 prior unchanged versions) |
+| Frontend commit | **`c6e80c1`** |
+| GitHub Actions | **Deploy to GitHub Pages** run **29412374732** — **success** |
+| Production URL | https://dakeci-lab.github.io/shugyla-academy/ |
+
+### Smoke results (non-mutating)
+
+| Check | Result |
+|-------|--------|
+| No JWT → 401 | **passed** |
+| Invalid payload → 422 | **passed** |
+| Admin schedule (team) → 200 | **passed** (employees **9**, shifts **50**) |
+| Admin dashboard view → 200 | **passed** |
+| Admin rating view → 200 | **passed** |
+| `admin-list-employees` → 200 | **passed** (count **17**) |
+| Staff own schedule → 200 self scope | **passed** |
+| Staff dashboard team → 403 | **passed** |
+| DTO excludes password/login/auth fields | **passed** |
+| Главная / График / Рейтинг (API parity) | **passed** |
+| Employee list | **passed** |
+| Business baseline 18/18 | **unchanged** |
+| Fingerprints | **unchanged** |
+| Notification rules enabled | **0** |
+| Cron jobs | **0** |
+| Pushes sent | **0** |
+| Rollback required | **no** |
 
 ---
 
@@ -126,10 +163,12 @@ Loading / error / retry / empty states: errors no longer render as “0 сотр
 
 ## Production deploy scope (next gated step)
 
-1. Deploy **only** `admin-team-workforce-data` Edge Function.
-2. Push frontend commit + GitHub Pages deploy.
-3. Smoke test: Главная, График, Рейтинг (admin session).
-4. **Do not:** change DB policies, enable notification rules, create Cron, deploy other functions.
+**Completed in Step 22R.** See [Production deploy record](#production-deploy-record-step-22r) above.
+
+1. Deploy **only** `admin-team-workforce-data` Edge Function. ✓
+2. Push frontend commit + GitHub Pages deploy. ✓
+3. Smoke test: Главная, График, Рейтинг (admin session). ✓
+4. **Do not:** change DB policies, enable notification rules, create Cron, deploy other functions. ✓
 
 ### Smoke plan
 

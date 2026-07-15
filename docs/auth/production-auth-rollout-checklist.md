@@ -164,6 +164,28 @@ Run `scripts/production-auth-users-migration.mjs`.
 
 ---
 
+## Approval 7 — Team workforce production fix ✓ COMPLETED (Step 22R)
+
+**Date:** 2026-07-15
+**Owner confirmation:** deploy `admin-team-workforce-data` + frontend **`c6e80c1`**; Phase 2 preserved; rules disabled; Cron off.
+
+- [x] Edge Function `admin-team-workforce-data` deployed (**ACTIVE**, `verify_jwt=true`, version **1**)
+- [x] Prior **7** Edge Functions not redeployed (versions unchanged)
+- [x] `git push origin main` fast-forward to **`c6e80c1`**
+- [x] GitHub Pages workflow **29412374732** — **success**
+- [x] Production smoke: workforce API **401/422/200/403** matrix **passed**
+- [x] Главная / График / Рейтинг data paths **passed** (employees **9**, shifts **50** in current week)
+- [x] Employee list **passed** (count **17**)
+- [x] Business baseline **18/18**; fingerprints **unchanged**
+- [x] Business mutations **0**
+- [x] Phase 2 **not rolled back**; Phase 3 **not applied**
+- [x] Notification rules enabled **0**; subscriptions **0**; pushes **0**; Cron **0**
+- [x] Web Push E2E **not run** (by design)
+- [x] Docs: [team-workforce-phase2-frontend-fix.md](./team-workforce-phase2-frontend-fix.md)
+- [ ] **BLOCKED:** controlled Web Push E2E — separate owner approval
+
+---
+
 ## Explicit prohibitions (all phases)
 
 - No `supabase link` unless separately approved for migration history audit

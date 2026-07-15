@@ -1,6 +1,6 @@
 # Production Notification Foundation Rollout — Step 22P
 
-**Date:** 2026-07-15  
+**Date:** 2026-07-15
 **Status:** **completed**  
 **Owner confirmation:** reconcile migrations, create notification tables, deploy notification Edge Functions, install VAPID secrets; rules **disabled**, Cron **off**, no real pushes.
 
@@ -172,3 +172,23 @@ npm run verify:production-notification-foundation-readiness
 ## Next step (gated)
 
 After separate explicit owner confirmation: controlled production Web Push E2E test on one administrator and one device — prepare frontend public VAPID key, deploy frontend, create one subscription, send exactly one test notification. Keep all automatic rules **disabled** and Cron **off**.
+
+---
+
+## Team workforce Edge Function inventory update — Step 22R
+
+**Date:** 2026-07-15
+**Scope:** deploy **only** `admin-team-workforce-data`; **no** notification function redeploy; **no** DB migration.
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Total Edge Functions | **7** | **8** |
+| Employee/admin functions | 3 | **4** (+ `admin-team-workforce-data`) |
+| Notification functions | 4 | **4** (unchanged) |
+| Notification rules enabled | **0** | **0** |
+| Cron jobs | **0** | **0** |
+| Frontend commit (unrelated fix) | `8d0cece` | **`c6e80c1`** |
+| Business baseline | 18/18 | **18/18** unchanged |
+| VAPID secrets | unchanged | **unchanged** |
+
+Readiness verifier updated: `npm run verify:production-notification-foundation-readiness` expects **8** total functions including `admin-team-workforce-data`.
