@@ -1,9 +1,7 @@
-import { useNavigate } from 'react-router-dom'
 import StatusBadge from '../admin/StatusBadge'
 import IconActionButton from '../admin/IconActionButton'
-import { EyeIcon, PencilIcon, TrashIcon } from '../icons/PlatformIcons'
+import { PencilIcon } from '../icons/PlatformIcons'
 import {
-  SUPPLIER_STATUS,
   SUPPLIER_STATUS_LABELS,
   SUPPLIER_STATUS_BADGE,
 } from '../../utils/supplierData'
@@ -15,46 +13,18 @@ function displayValue(value) {
   return value
 }
 
-function SupplierActions({ supplier, canEdit, onEdit, onDeactivate, stopPropagation = false }) {
-  const navigate = useNavigate()
-
-  function wrap(handler) {
-    return (event) => {
-      if (stopPropagation) event.stopPropagation()
-      handler(event)
-    }
-  }
-
-  function openDetails(event) {
-    if (stopPropagation) event.stopPropagation()
-    navigate(`/platform/suppliers/${supplier.id}`)
-  }
+function SupplierActions({ supplier, canEdit, onEdit }) {
+  if (!canEdit || !onEdit) return null
 
   return (
     <div className="supplier-table__actions">
-      <IconActionButton label="Просмотр" onClick={openDetails}>
-        <EyeIcon />
+      <IconActionButton
+        label="Редактировать"
+        variant="primary"
+        onClick={() => onEdit(supplier)}
+      >
+        <PencilIcon />
       </IconActionButton>
-      {canEdit && (
-        <>
-          <IconActionButton
-            label="Редактировать"
-            variant="primary"
-            onClick={wrap(() => onEdit(supplier))}
-          >
-            <PencilIcon />
-          </IconActionButton>
-          {supplier.status === SUPPLIER_STATUS.ACTIVE && onDeactivate && (
-            <IconActionButton
-              label="Деактивировать"
-              variant="danger"
-              onClick={wrap(() => onDeactivate(supplier))}
-            >
-              <TrashIcon />
-            </IconActionButton>
-          )}
-        </>
-      )}
     </div>
   )
 }
@@ -68,12 +38,18 @@ function SupplierStatusBadge({ status }) {
   )
 }
 
+function handleCardKeyDown(event, onEdit, supplier) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    onEdit(supplier)
+  }
+}
+
 /** Таблица (desktop) и карточки (mobile) поставщиков */
 export default function SupplierTable({
   suppliers,
   canEdit = false,
   onEdit,
-  onDeactivate,
 }) {
   function openEdit(supplier, event) {
     event?.stopPropagation?.()
@@ -126,7 +102,6 @@ export default function SupplierTable({
                       supplier={supplier}
                       canEdit={canEdit}
                       onEdit={onEdit}
-                      onDeactivate={onDeactivate}
                     />
                   </td>
                 </tr>
@@ -137,53 +112,45 @@ export default function SupplierTable({
       </div>
 
       <ul className="supplier-cards">
-        {suppliers.map((supplier) => (
-          <li key={supplier.id} className="supplier-card-item">
-            <div className="supplier-card-item__head">
-              {canEdit && onEdit ? (
-                <button
-                  type="button"
-                  className="supplier-name-link supplier-name-link--title"
-                  onClick={(event) => openEdit(supplier, event)}
-                >
-                  {supplier.name}
-                </button>
-              ) : (
+        {suppliers.map((supplier) => {
+          const isInteractive = canEdit && onEdit
+
+          return (
+            <li
+              key={supplier.id}
+              className={`supplier-card-item${isInteractive ? ' supplier-card-item--clickable' : ''}`}
+              {...(isInteractive
+                ? {
+                    role: 'button',
+                    tabIndex: 0,
+                    'aria-label': `Редактировать поставщика ${supplier.name}`,
+                    onClick: () => onEdit(supplier),
+                    onKeyDown: (event) => handleCardKeyDown(event, onEdit, supplier),
+                  }
+                : {})}
+            >
+              <div className="supplier-card-item__head">
                 <h3 className="supplier-card-item__title">{supplier.name}</h3>
-              )}
-              <SupplierStatusBadge status={supplier.status} />
-            </div>
+                <SupplierStatusBadge status={supplier.status} />
+              </div>
 
-            <dl className="supplier-card-item__facts">
-              <div className="supplier-card-item__fact">
-                <dt>Менеджер</dt>
-                <dd>{displayValue(supplier.managerName)}</dd>
+              <div className="supplier-card-item__meta">
+                <p className="supplier-card-item__meta-line">
+                  <span className="supplier-card-item__meta-label">Менеджер:</span>{' '}
+                  <span className="supplier-card-item__meta-value">
+                    {displayValue(supplier.managerName)}
+                  </span>
+                </p>
+                <p className="supplier-card-item__meta-line supplier-card-item__meta-line--phone">
+                  <span className="supplier-card-item__meta-label">Телефон:</span>{' '}
+                  <span className="supplier-card-item__meta-value">
+                    {displayValue(supplier.managerPhone)}
+                  </span>
+                </p>
               </div>
-              <div className="supplier-card-item__fact">
-                <dt>Телефон</dt>
-                <dd>{displayValue(supplier.managerPhone)}</dd>
-              </div>
-              <div className="supplier-card-item__fact">
-                <dt>Дни заказа</dt>
-                <dd>{displayValue(supplier.orderDays)}</dd>
-              </div>
-              <div className="supplier-card-item__fact">
-                <dt>Дни доставки</dt>
-                <dd>{displayValue(supplier.deliveryDays)}</dd>
-              </div>
-            </dl>
-
-            <div className="supplier-card-item__actions">
-              <SupplierActions
-                supplier={supplier}
-                canEdit={canEdit}
-                onEdit={onEdit}
-                onDeactivate={onDeactivate}
-                stopPropagation
-              />
-            </div>
-          </li>
-        ))}
+            </li>
+          )
+        })}
       </ul>
     </>
   )

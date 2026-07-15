@@ -154,15 +154,23 @@ export function dateToSupplierWeekdayId(date) {
   return ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][jsDay]
 }
 
+function isGarbageCategory(value) {
+  const text = String(value || '').trim()
+  if (!text) return true
+  if (text === '{}' || text === '{"{}"}' || text === '{""}') return true
+  if (/^\{[\s\S]*\}$/.test(text) || /^\[[\s\S]*\]$/.test(text)) return true
+  return false
+}
+
 function parseCategories(value) {
   if (Array.isArray(value)) {
-    return value.map((v) => String(v).trim()).filter(Boolean)
+    return value.map((v) => String(v).trim()).filter((v) => v && !isGarbageCategory(v))
   }
   if (typeof value === 'string') {
     return value
       .split(',')
       .map((v) => v.trim())
-      .filter(Boolean)
+      .filter((v) => v && !isGarbageCategory(v))
   }
   return []
 }

@@ -1,16 +1,11 @@
 import {
   PAYMENT_TYPE,
   PAYMENT_TYPE_LABELS,
-  RETURN_POLICY,
-  RETURN_POLICY_LABELS,
   SUPPLIER_STATUS,
   SUPPLIER_STATUS_LABELS,
-  categoriesToInputValue,
-  inputValueToCategories,
   parseSupplierWeekdays,
   serializeSupplierWeekdays,
 } from '../../utils/supplierData'
-import { getActiveEmployees } from '../../utils/employeeData'
 import SupplierWeekdaySelector from './SupplierWeekdaySelector'
 import '../../components/admin/admin-shared.css'
 import './SupplierForm.css'
@@ -18,21 +13,13 @@ import './SupplierForm.css'
 export const EMPTY_SUPPLIER_FORM = {
   name: '',
   legalName: '',
-  productCategoriesInput: '',
   managerName: '',
   managerPhone: '',
-  whatsapp: '',
   orderWeekdays: [],
   deliveryWeekdays: [],
-  minOrderAmount: '',
   paymentType: PAYMENT_TYPE.CASH,
   deferralDays: '',
-  returnPolicy: RETURN_POLICY.NO,
-  returnComment: '',
-  responsibleEmployeeId: '',
-  responsibleEmployeeName: '',
   status: SUPPLIER_STATUS.ACTIVE,
-  comment: '',
 }
 
 export function supplierToForm(supplier) {
@@ -40,45 +27,29 @@ export function supplierToForm(supplier) {
   return {
     name: supplier.name || '',
     legalName: supplier.legalName || '',
-    productCategoriesInput: categoriesToInputValue(supplier.productCategories),
     managerName: supplier.managerName || '',
     managerPhone: supplier.managerPhone || '',
-    whatsapp: supplier.whatsapp || '',
     orderWeekdays: parseSupplierWeekdays(supplier.orderWeekdays ?? supplier.orderDays),
     deliveryWeekdays: parseSupplierWeekdays(supplier.deliveryWeekdays ?? supplier.deliveryDays),
-    minOrderAmount: supplier.minOrderAmount != null ? String(supplier.minOrderAmount) : '',
     paymentType: supplier.paymentType || PAYMENT_TYPE.CASH,
     deferralDays: supplier.deferralDays != null ? String(supplier.deferralDays) : '',
-    returnPolicy: supplier.returnPolicy || RETURN_POLICY.NO,
-    returnComment: supplier.returnComment || '',
-    responsibleEmployeeId: supplier.responsibleEmployeeId
-      ? String(supplier.responsibleEmployeeId)
-      : '',
-    responsibleEmployeeName: supplier.responsibleEmployeeName || '',
     status: supplier.status || SUPPLIER_STATUS.ACTIVE,
-    comment: supplier.comment || '',
   }
 }
 
-export function formToSupplierPayload(form) {
-  const employeeId = form.responsibleEmployeeId ? Number(form.responsibleEmployeeId) : null
-  const employees = getActiveEmployees()
-  const employee = employees.find((e) => e.id === employeeId)
+function buildVisibleSupplierPayload(form) {
   const orderWeekdays = parseSupplierWeekdays(form.orderWeekdays)
   const deliveryWeekdays = parseSupplierWeekdays(form.deliveryWeekdays)
 
   return {
     name: form.name.trim(),
     legalName: form.legalName.trim(),
-    productCategories: inputValueToCategories(form.productCategoriesInput),
     managerName: form.managerName.trim(),
     managerPhone: form.managerPhone.trim(),
-    whatsapp: form.whatsapp.trim(),
     orderWeekdays,
     deliveryWeekdays,
     orderDays: serializeSupplierWeekdays(orderWeekdays),
     deliveryDays: serializeSupplierWeekdays(deliveryWeekdays),
-    minOrderAmount: form.minOrderAmount !== '' ? Number(form.minOrderAmount) : null,
     paymentType: form.paymentType,
     deferralDays:
       form.paymentType === PAYMENT_TYPE.DEFERRAL || form.paymentType === PAYMENT_TYPE.MIXED
@@ -86,18 +57,27 @@ export function formToSupplierPayload(form) {
           ? Number(form.deferralDays)
           : null
         : null,
-    returnPolicy: form.returnPolicy,
-    returnComment: form.returnComment.trim(),
-    responsibleEmployeeId: employeeId,
-    responsibleEmployeeName: employee?.name || form.responsibleEmployeeName.trim(),
     status: form.status,
-    comment: form.comment.trim(),
   }
+}
+
+/** Payload для создания — только поля, видимые в форме */
+export function formToSupplierCreatePayload(form) {
+  return buildVisibleSupplierPayload(form)
+}
+
+/** Patch для обновления — не затрагивает скрытые поля (категории, WhatsApp и т.д.) */
+export function formToSupplierUpdatePayload(form) {
+  return buildVisibleSupplierPayload(form)
+}
+
+/** @deprecated используйте formToSupplierCreatePayload / formToSupplierUpdatePayload */
+export function formToSupplierPayload(form) {
+  return buildVisibleSupplierPayload(form)
 }
 
 /** Форма добавления / редактирования поставщика */
 export default function SupplierForm({ form, onChange, error }) {
-  const employees = getActiveEmployees()
   const showDeferral =
     form.paymentType === PAYMENT_TYPE.DEFERRAL || form.paymentType === PAYMENT_TYPE.MIXED
 
@@ -127,17 +107,6 @@ export default function SupplierForm({ form, onChange, error }) {
         </label>
       </div>
 
-      <label className="admin-form__label">
-        Категории товаров
-        <input
-          className="admin-form__input"
-          value={form.productCategoriesInput}
-          onChange={(e) => setField('productCategoriesInput', e.target.value)}
-          placeholder="Молочная продукция, Бакалея, Овощи"
-        />
-        <span className="admin-form__hint">Через запятую</span>
-      </label>
-
       <div className="admin-form__row">
         <label className="admin-form__label">
           Имя менеджера
@@ -158,17 +127,6 @@ export default function SupplierForm({ form, onChange, error }) {
         </label>
       </div>
 
-      <label className="admin-form__label">
-        WhatsApp
-        <input
-          className="admin-form__input"
-          type="tel"
-          value={form.whatsapp}
-          onChange={(e) => setField('whatsapp', e.target.value)}
-          placeholder="Если отличается от телефона"
-        />
-      </label>
-
       <div className="supplier-form__schedule">
         <SupplierWeekdaySelector
           label="Дни заказа"
@@ -184,16 +142,6 @@ export default function SupplierForm({ form, onChange, error }) {
 
       <div className="admin-form__row">
         <label className="admin-form__label">
-          Минимальная сумма заказа (₸)
-          <input
-            className="admin-form__input"
-            type="number"
-            min="0"
-            value={form.minOrderAmount}
-            onChange={(e) => setField('minOrderAmount', e.target.value)}
-          />
-        </label>
-        <label className="admin-form__label">
           Условия оплаты
           <select
             className="admin-form__input"
@@ -201,36 +149,6 @@ export default function SupplierForm({ form, onChange, error }) {
             onChange={(e) => setField('paymentType', e.target.value)}
           >
             {Object.entries(PAYMENT_TYPE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
-
-      {showDeferral && (
-        <label className="admin-form__label">
-          Срок отсрочки (дней)
-          <input
-            className="admin-form__input"
-            type="number"
-            min="0"
-            value={form.deferralDays}
-            onChange={(e) => setField('deferralDays', e.target.value)}
-          />
-        </label>
-      )}
-
-      <div className="admin-form__row">
-        <label className="admin-form__label">
-          Возврат / обмен товара
-          <select
-            className="admin-form__input"
-            value={form.returnPolicy}
-            onChange={(e) => setField('returnPolicy', e.target.value)}
-          >
-            {Object.entries(RETURN_POLICY_LABELS).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
@@ -253,52 +171,18 @@ export default function SupplierForm({ form, onChange, error }) {
         </label>
       </div>
 
-      <label className="admin-form__label">
-        Комментарий по возврату / обмену
-        <textarea
-          className="admin-form__input"
-          rows={2}
-          value={form.returnComment}
-          onChange={(e) => setField('returnComment', e.target.value)}
-        />
-      </label>
-
-      <div className="admin-form__row">
+      {showDeferral && (
         <label className="admin-form__label">
-          Ответственный сотрудник
-          <select
-            className="admin-form__input"
-            value={form.responsibleEmployeeId}
-            onChange={(e) => setField('responsibleEmployeeId', e.target.value)}
-          >
-            <option value="">— Не выбран —</option>
-            {employees.map((emp) => (
-              <option key={emp.id} value={emp.id}>
-                {emp.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="admin-form__label">
-          Или укажите вручную
+          Срок отсрочки (дней)
           <input
             className="admin-form__input"
-            value={form.responsibleEmployeeName}
-            onChange={(e) => setField('responsibleEmployeeName', e.target.value)}
-            placeholder="ФИО ответственного"
+            type="number"
+            min="0"
+            value={form.deferralDays}
+            onChange={(e) => setField('deferralDays', e.target.value)}
           />
         </label>
-      </div>
-
-      <label className="admin-form__label">
-        Общий комментарий
-        <textarea
-          className="admin-form__input"
-          rows={3}
-          value={form.comment}
-          onChange={(e) => setField('comment', e.target.value)}
-        />
-      </label>
+      )}
 
       {error && <p className="admin-form__error">{error}</p>}
     </div>

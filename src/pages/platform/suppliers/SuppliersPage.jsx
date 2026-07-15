@@ -1,12 +1,11 @@
-import { useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   getSuppliers,
   getSupplierById,
   createSupplier,
   updateSupplier,
   deleteSupplier,
-  archiveSupplier,
 } from '../../../services/academyDataService'
 import {
   filterSuppliers,
@@ -14,10 +13,10 @@ import {
   formatActiveSuppliersCount,
 } from '../../../utils/supplierData'
 import { useSession } from '../../../context/SessionContext'
+import { useToast } from '../../../context/ToastContext'
 import {
   canViewSuppliers,
   canEditSuppliers,
-  canArchiveSuppliers,
   canDeleteSuppliers,
 } from '../../../config/permissions'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
@@ -27,10 +26,10 @@ import PlatformAccessDenied from '../../../components/platform/PlatformAccessDen
 import SupplierForm, {
   EMPTY_SUPPLIER_FORM,
   supplierToForm,
-  formToSupplierPayload,
+  formToSupplierCreatePayload,
+  formToSupplierUpdatePayload,
 } from '../../../components/suppliers/SupplierForm'
 import SupplierTable from '../../../components/suppliers/SupplierTable'
-import SupplierDetails from '../../../components/suppliers/SupplierDetails'
 import { SearchIcon } from '../../../components/icons/PlatformIcons'
 import '../../../components/admin/admin-shared.css'
 import './SuppliersPage.css'
@@ -38,19 +37,22 @@ import './SuppliersPage.css'
 /** Страница списка поставщиков — /platform/suppliers */
 export function SuppliersListPage() {
   const { user } = useSession()
+  const { success: showSuccess, error: showError } = useToast()
   const { version, refresh } = useAdminRefresh()
+  const location = useLocation()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(EMPTY_SUPPLIER_FORM)
   const [formError, setFormError] = useState('')
-  const [actionError, setActionError] = useState('')
   const [saving, setSaving] = useState(false)
-  const [deactivateTarget, setDeactivateTarget] = useState(null)
-  const [deactivating, setDeactivating] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const canView = canViewSuppliers(user)
   const canEdit = canEditSuppliers(user)
+  const canDelete = canDeleteSuppliers(user)
 
   void version
 
@@ -63,6 +65,21 @@ export function SuppliersListPage() {
     () => filterSuppliers(activeSuppliers, { search, status: 'all' }),
     [activeSuppliers, search, version]
   )
+
+  useEffect(() => {
+    const openEditId = location.state?.openEditId
+    if (!openEditId || !canEdit) return
+
+    const supplier = getSupplierById(openEditId)
+    if (supplier) {
+      setEditId(supplier.id)
+      setForm(supplierToForm(supplier))
+      setFormError('')
+      setShowForm(true)
+    }
+
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location.state?.openEditId, canEdit, location.pathname, navigate])
 
   if (!canView) {
     return <PlatformAccessDenied title="Нет доступа к поставщикам" />
@@ -97,11 +114,10 @@ export function SuppliersListPage() {
 
     setSaving(true)
     try {
-      const payload = formToSupplierPayload(form)
       if (editId) {
-        await updateSupplier(editId, payload)
+        await updateSupplier(editId, formToSupplierUpdatePayload(form))
       } else {
-        await createSupplier(payload)
+        await createSupplier(formToSupplierCreatePayload(form))
       }
       await refresh()
       closeForm()
@@ -112,22 +128,25 @@ export function SuppliersListPage() {
     }
   }
 
-  function requestDeactivate(supplier) {
-    setDeactivateTarget(supplier)
+  function requestDelete() {
+    if (!editId) return
+    const supplier = getSupplierById(editId)
+    if (supplier) setDeleteTarget(supplier)
   }
 
-  async function confirmDeactivate() {
-    if (!deactivateTarget) return
-    setDeactivating(true)
-    setActionError('')
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
     try {
-      await updateSupplier(deactivateTarget.id, { status: SUPPLIER_STATUS.INACTIVE })
-      setDeactivateTarget(null)
+      await deleteSupplier(deleteTarget.id)
       await refresh()
+      showSuccess('Поставщик удалён')
+      setDeleteTarget(null)
+      closeForm()
     } catch (err) {
-      setActionError(err.message || 'Не удалось деактивировать поставщика')
+      showError(err.message || 'Не удалось удалить поставщика')
     } finally {
-      setDeactivating(false)
+      setDeleting(false)
     }
   }
 
@@ -160,8 +179,6 @@ export function SuppliersListPage() {
         )}
       </div>
 
-      {actionError && <p className="admin-form__error">{actionError}</p>}
-
       {filtered.length === 0 ? (
         <div className="suppliers-page__empty">
           {activeSuppliers.length === 0
@@ -169,22 +186,17 @@ export function SuppliersListPage() {
             : 'По вашему запросу ничего не найдено.'}
         </div>
       ) : (
-        <SupplierTable
-          suppliers={filtered}
-          canEdit={canEdit}
-          onEdit={openEdit}
-          onDeactivate={canEdit ? requestDeactivate : null}
-        />
+        <SupplierTable suppliers={filtered} canEdit={canEdit} onEdit={openEdit} />
       )}
 
-      {deactivateTarget && (
+      {deleteTarget && (
         <ConfirmDialog
-          title="Деактивировать поставщика?"
-          message="Поставщик будет скрыт из списка активных. Все старые закупы сохранятся."
-          confirmLabel="Деактивировать"
-          onCancel={() => setDeactivateTarget(null)}
-          onConfirm={confirmDeactivate}
-          loading={deactivating}
+          title="Удалить поставщика?"
+          message={`Поставщик «${deleteTarget.name}» будет удалён без возможности восстановления. Это действие нельзя отменить.`}
+          confirmLabel="Удалить"
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={confirmDelete}
+          loading={deleting}
         />
       )}
 
@@ -194,14 +206,31 @@ export function SuppliersListPage() {
           onClose={closeForm}
           wide
           footer={
-            <>
-              <button type="button" className="btn btn--ghost" onClick={closeForm}>
-                Отмена
-              </button>
-              <button type="button" className="btn btn--primary" disabled={saving} onClick={handleSave}>
-                {saving ? 'Сохранение…' : 'Сохранить'}
-              </button>
-            </>
+            <div className="suppliers-modal-footer">
+              {editId && canDelete && (
+                <button
+                  type="button"
+                  className="btn suppliers-modal-footer__delete"
+                  disabled={saving || deleting}
+                  onClick={requestDelete}
+                >
+                  Удалить поставщика
+                </button>
+              )}
+              <div className="suppliers-modal-footer__actions">
+                <button type="button" className="btn btn--ghost" onClick={closeForm}>
+                  Отмена
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  disabled={saving || deleting}
+                  onClick={handleSave}
+                >
+                  {saving ? 'Сохранение…' : 'Сохранить'}
+                </button>
+              </div>
+            </div>
           }
         >
           <SupplierForm form={form} onChange={setForm} error={formError} />
@@ -211,102 +240,16 @@ export function SuppliersListPage() {
   )
 }
 
-/** Детальная страница — /platform/suppliers/:id */
+/** Редirect legacy detail URL → список с открытием редактирования */
 export function SupplierDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { user } = useSession()
-  const { version, refresh } = useAdminRefresh()
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState(EMPTY_SUPPLIER_FORM)
-  const [formError, setFormError] = useState('')
-  const [saving, setSaving] = useState(false)
 
-  const canView = canViewSuppliers(user)
-  const canEdit = canEditSuppliers(user)
-  const canArchive = canArchiveSuppliers(user)
-  const canDelete = canDeleteSuppliers(user)
+  useEffect(() => {
+    navigate('/platform/suppliers', { replace: true, state: { openEditId: id } })
+  }, [id, navigate])
 
-  void version
-
-  const supplier = id ? getSupplierById(id) : null
-
-  if (!canView) {
-    return <PlatformAccessDenied title="Нет доступа к поставщикам" />
-  }
-
-  function openEdit(item) {
-    setForm(supplierToForm(item))
-    setFormError('')
-    setShowForm(true)
-  }
-
-  async function handleSave() {
-    if (!supplier) return
-    setFormError('')
-    if (!form.name.trim()) {
-      setFormError('Укажите название поставщика')
-      return
-    }
-    setSaving(true)
-    try {
-      await updateSupplier(supplier.id, formToSupplierPayload(form))
-      await refresh()
-      setShowForm(false)
-    } catch (err) {
-      setFormError(err.message || 'Не удалось сохранить')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleArchive(item) {
-    if (!window.confirm(`Архивировать поставщика «${item.name}»?`)) return
-    await archiveSupplier(item.id)
-    await refresh()
-    navigate('/platform/suppliers')
-  }
-
-  async function handleDelete(item) {
-    if (!window.confirm(`Удалить поставщика «${item.name}» без возможности восстановления?`)) return
-    await deleteSupplier(item.id)
-    await refresh()
-    navigate('/platform/suppliers')
-  }
-
-  return (
-    <>
-      <SupplierDetails
-        supplier={supplier}
-        canEdit={canEdit}
-        canArchive={canArchive}
-        canDelete={canDelete}
-        onEdit={openEdit}
-        onArchive={handleArchive}
-        onDelete={handleDelete}
-      />
-
-      {showForm && canEdit && (
-        <AdminModal
-          title="Редактировать поставщика"
-          onClose={() => setShowForm(false)}
-          wide
-          footer={
-            <>
-              <button type="button" className="btn btn--ghost" onClick={() => setShowForm(false)}>
-                Отмена
-              </button>
-              <button type="button" className="btn btn--primary" disabled={saving} onClick={handleSave}>
-                {saving ? 'Сохранение…' : 'Сохранить'}
-              </button>
-            </>
-          }
-        >
-          <SupplierForm form={form} onChange={setForm} error={formError} />
-        </AdminModal>
-      )}
-    </>
-  )
+  return null
 }
 
 export default function SuppliersPage() {
