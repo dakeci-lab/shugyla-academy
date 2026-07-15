@@ -19,6 +19,7 @@
   --radius-md: 14px;
   --radius-lg: 20px;
   --header-height: 68px;
+  --platform-modal-backdrop: rgba(0, 0, 0, 0.4);
 }
 
 /* ===== Сброс и базовые стили ===== */

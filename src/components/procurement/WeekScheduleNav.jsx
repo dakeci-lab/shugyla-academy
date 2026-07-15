@@ -16,7 +16,7 @@ export default function WeekScheduleNav({
   onSelectDate,
 }) {
   return (
-    <>
+    <div className="week-schedule-nav">
       <SchedulePeriodBar
         title={weekTitle}
         onPrev={onPrevWeek}
@@ -26,7 +26,8 @@ export default function WeekScheduleNav({
         nextLabel="Следующая неделя"
       />
 
-      <div className="simple-receiving-day-bar" role="tablist" aria-label="Дни недели">
+      <div className="week-schedule-nav__days">
+        <div className="simple-receiving-day-bar" role="tablist" aria-label="Дни недели">
         {weekDates.map((date) => {
           const dateKey = toDateKey(date)
           const { weekday, day } = formatWeekDayHeader(date)
@@ -51,7 +52,8 @@ export default function WeekScheduleNav({
             </button>
           )
         })}
+        </div>
       </div>
-    </>
+    </div>
   )
 }

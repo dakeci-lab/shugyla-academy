@@ -322,9 +322,22 @@ export default function ProcurementPage() {
           {canCreate && (
             <button
               type="button"
+              className="procurement-page__desktop-create"
+              onClick={() => openCreate()}
+              aria-label="Создать закуп"
+              title="Создать закуп"
+            >
+              <PlusIcon size={18} />
+            </button>
+          )}
+
+          {canCreate && (
+            <button
+              type="button"
               className="procurement-page__mobile-create"
               onClick={() => openCreate()}
-              aria-label="Создать закуп вне расписания"
+              aria-label="Создать закуп"
+              title="Создать закуп"
             >
               <PlusIcon size={20} />
             </button>

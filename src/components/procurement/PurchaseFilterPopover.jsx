@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
+import AdminModal from '../admin/AdminModal'
 import SearchableSupplierSelect from '../suppliers/SearchableSupplierSelect'
+import useMediaQuery from '../../hooks/useMediaQuery'
 import {
   createDefaultPurchaseFilters,
   getPurchasePeriodDraftDates,
@@ -7,49 +9,15 @@ import {
 } from '../../utils/purchaseFilter'
 import './PurchaseFilterPopover.css'
 
+const MOBILE_QUERY = '(max-width: 900px)'
+
 const PERIOD_PRESETS = [
   { id: PURCHASE_PERIOD_PRESET.TODAY, label: 'Сегодня' },
   { id: PURCHASE_PERIOD_PRESET.WEEK, label: 'Неделя' },
   { id: PURCHASE_PERIOD_PRESET.MONTH, label: 'Месяц' },
 ]
 
-export default function PurchaseFilterPopover({
-  open,
-  draft,
-  onChange,
-  onApply,
-  onReset,
-  onClose,
-  anchorRef,
-}) {
-  const popoverRef = useRef(null)
-
-  useEffect(() => {
-    if (!open) return undefined
-
-    function handlePointerDown(event) {
-      const anchor = anchorRef?.current
-      const popover = popoverRef.current
-      if (!popover) return
-      if (popover.contains(event.target)) return
-      if (anchor?.contains(event.target)) return
-      onClose?.()
-    }
-
-    function handleEscape(event) {
-      if (event.key === 'Escape') onClose?.()
-    }
-
-    document.addEventListener('mousedown', handlePointerDown)
-    document.addEventListener('keydown', handleEscape)
-    return () => {
-      document.removeEventListener('mousedown', handlePointerDown)
-      document.removeEventListener('keydown', handleEscape)
-    }
-  }, [open, onClose, anchorRef])
-
-  if (!open) return null
-
+function PurchaseFilterFields({ draft, onChange }) {
   function setDraft(next) {
     onChange?.(next)
   }
@@ -80,18 +48,8 @@ export default function PurchaseFilterPopover({
     })
   }
 
-  function handleReset() {
-    onChange?.(createDefaultPurchaseFilters())
-    onReset?.()
-  }
-
   return (
-    <div
-      ref={popoverRef}
-      className="purchase-filter-popover"
-      role="dialog"
-      aria-label="Фильтр закупов"
-    >
+    <>
       <div className="purchase-filter-popover__section">
         <span className="purchase-filter-popover__label">Период</span>
         <div className="purchase-filter-popover__presets">
@@ -138,15 +96,93 @@ export default function PurchaseFilterPopover({
           searchPlaceholder="Поиск поставщика..."
         />
       </div>
+    </>
+  )
+}
 
-      <div className="purchase-filter-popover__actions">
-        <button type="button" className="btn btn--ghost btn--sm" onClick={handleReset}>
-          Сбросить
-        </button>
-        <button type="button" className="btn btn--primary btn--sm" onClick={onApply}>
-          Применить
-        </button>
-      </div>
+export default function PurchaseFilterPopover({
+  open,
+  draft,
+  onChange,
+  onApply,
+  onReset,
+  onClose,
+  anchorRef,
+}) {
+  const popoverRef = useRef(null)
+  const isMobile = useMediaQuery(MOBILE_QUERY)
+
+  useEffect(() => {
+    if (!open) return undefined
+
+    function handleEscape(event) {
+      if (event.key === 'Escape') onClose?.()
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [open, onClose])
+
+  useEffect(() => {
+    if (!open || isMobile) return undefined
+
+    function handlePointerDown(event) {
+      const anchor = anchorRef?.current
+      const popover = popoverRef.current
+      if (!popover) return
+      if (popover.contains(event.target)) return
+      if (anchor?.contains(event.target)) return
+      onClose?.()
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [open, isMobile, onClose, anchorRef])
+
+  useEffect(() => {
+    if (open || !isMobile) return undefined
+    anchorRef?.current?.focus()
+  }, [open, isMobile, anchorRef])
+
+  if (!open) return null
+
+  function handleReset() {
+    onChange?.(createDefaultPurchaseFilters())
+    onReset?.()
+  }
+
+  const actions = (
+    <>
+      <button type="button" className="btn btn--ghost btn--sm" onClick={handleReset}>
+        Сбросить
+      </button>
+      <button type="button" className="btn btn--primary btn--sm" onClick={onApply}>
+        Применить
+      </button>
+    </>
+  )
+
+  if (isMobile) {
+    return (
+      <AdminModal title="Фильтр" onClose={onClose} footer={actions}>
+        <PurchaseFilterFields draft={draft} onChange={onChange} />
+      </AdminModal>
+    )
+  }
+
+  return (
+    <div
+      ref={popoverRef}
+      className="purchase-filter-popover"
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="purchase-filter-popover-title"
+    >
+      <h2 id="purchase-filter-popover-title" className="purchase-filter-popover__sr-title">
+        Фильтр
+      </h2>
+      <PurchaseFilterFields draft={draft} onChange={onChange} />
+      <div className="purchase-filter-popover__actions">{actions}</div>
     </div>
   )
 }
