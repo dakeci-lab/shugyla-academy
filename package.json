@@ -34,6 +34,7 @@
     "verify:web-push-test-permits": "node scripts/verify-web-push-test-permits.mjs",
     "verify:production-vapid-rotation": "node scripts/verify-production-vapid-rotation.mjs",
     "verify:employee-schedule-weekly-open": "node scripts/verify-employee-schedule-weekly-open.mjs",
+    "supabase:local:verify-employee-schedule-write": "node scripts/verify-employee-schedule-write.mjs",
     "supabase:local:verify-team-workforce-admin-access": "node scripts/verify-team-workforce-admin-access.mjs"
   },
   "dependencies": {

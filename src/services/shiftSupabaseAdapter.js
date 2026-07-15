@@ -1,18 +1,69 @@
 import { supabase } from '../lib/supabaseClient'
 import { normalizeShift } from '../utils/shiftData'
 
-async function throwIfError(result, context) {
-  if (result.error) {
-    throw new Error(`${context}: ${result.error.message}`)
-  }
-  return result.data
+const ERROR_MESSAGES = {
+  forbidden: 'Нет доступа',
+  inactiveCaller: 'У вас нет прав для выполнения этого действия',
+  unauthorized: 'Сессия истекла. Войдите в аккаунт заново',
+  validation: 'Проверьте параметры графика',
+  default: 'Не удалось сохранить график',
 }
 
-function getMonthRange(year, month) {
-  const lastDay = new Date(year, month, 0).getDate()
+function extractFunctionError(error) {
+  const contextBody = error?.context?.json ?? error?.context?.body
+  if (contextBody && typeof contextBody === 'object') return contextBody
+  return null
+}
+
+function mapScheduleWriteError(errorBody, fallbackMessage = ERROR_MESSAGES.default) {
+  const code = errorBody?.code ?? errorBody?.error?.code
+
+  if (code === 'forbidden' || code === 'inactive_caller') {
+    return ERROR_MESSAGES.forbidden
+  }
+  if (code === 'unauthorized') {
+    return ERROR_MESSAGES.unauthorized
+  }
+  if (
+    code === 'validation_error' ||
+    code === 'malformed_json' ||
+    code === 'forbidden_field'
+  ) {
+    return ERROR_MESSAGES.validation
+  }
+  return fallbackMessage
+}
+
+async function invokeScheduleWrite(body) {
+  const { data, error } = await supabase.functions.invoke('admin-manage-employee-schedule', {
+    body,
+  })
+
+  if (error) {
+    const mapped = mapScheduleWriteError(extractFunctionError(error))
+    throw new Error(mapped)
+  }
+
+  if (!data?.ok) {
+    throw new Error(mapScheduleWriteError(data))
+  }
+
+  return data
+}
+
+function payloadToApiShift(payload) {
   return {
-    start: `${year}-${String(month).padStart(2, '0')}-01`,
-    end: `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+    shift_date: payload.shiftDate,
+    status: payload.status,
+    planned_start_time: payload.plannedStartTime ?? null,
+    planned_end_time: payload.plannedEndTime ?? null,
+    planned_break_start: payload.plannedBreakStart ?? null,
+    planned_break_end: payload.plannedBreakEnd ?? null,
+    actual_start_time: payload.actualStartTime ?? null,
+    actual_end_time: payload.actualEndTime ?? null,
+    actual_break_start: payload.actualBreakStart ?? null,
+    actual_break_end: payload.actualBreakEnd ?? null,
+    comment: payload.comment ?? '',
   }
 }
 
@@ -44,80 +95,19 @@ function rowToShift(row) {
   })
 }
 
-function pickExistingValue(payloadValue, existingValue, defaultValue) {
-  if (payloadValue !== undefined) return payloadValue
-  if (existingValue !== undefined && existingValue !== null) return existingValue
-  return defaultValue
-}
-
-function payloadToRow(employeeId, payload, createdBy = null, existing = null) {
-  return {
-    employee_id: employeeId,
-    shift_date: payload.shiftDate,
-    status: payload.status,
-    planned_start_time: payload.plannedStartTime,
-    planned_end_time: payload.plannedEndTime,
-    planned_break_start: pickExistingValue(
-      payload.plannedBreakStart,
-      existing?.planned_break_start,
-      null
-    ),
-    planned_break_end: pickExistingValue(payload.plannedBreakEnd, existing?.planned_break_end, null),
-    actual_start_time: pickExistingValue(
-      payload.actualStartTime,
-      existing?.actual_start_time,
-      null
-    ),
-    actual_end_time: pickExistingValue(payload.actualEndTime, existing?.actual_end_time, null),
-    actual_break_start: pickExistingValue(
-      payload.actualBreakStart,
-      existing?.actual_break_start,
-      null
-    ),
-    actual_break_end: pickExistingValue(payload.actualBreakEnd, existing?.actual_break_end, null),
-    comment: payload.comment ?? existing?.comment ?? '',
-    created_by: existing?.created_by ?? createdBy,
-    check_in_latitude: pickExistingValue(
-      payload.checkInLatitude,
-      existing?.check_in_latitude,
-      null
-    ),
-    check_in_longitude: pickExistingValue(
-      payload.checkInLongitude,
-      existing?.check_in_longitude,
-      null
-    ),
-    check_in_accuracy: pickExistingValue(payload.checkInAccuracy, existing?.check_in_accuracy, null),
-    check_out_latitude: pickExistingValue(
-      payload.checkOutLatitude,
-      existing?.check_out_latitude,
-      null
-    ),
-    check_out_longitude: pickExistingValue(
-      payload.checkOutLongitude,
-      existing?.check_out_longitude,
-      null
-    ),
-    check_out_accuracy: pickExistingValue(
-      payload.checkOutAccuracy,
-      existing?.check_out_accuracy,
-      null
-    ),
-    work_location_id: pickExistingValue(payload.workLocationId, existing?.work_location_id, null),
+async function throwIfError(result, context) {
+  if (result.error) {
+    throw new Error(`${context}: ${result.error.message}`)
   }
+  return result.data
 }
 
-async function fetchExistingShiftsByDates(employeeId, dates) {
-  if (!dates.length) return new Map()
-  const rows = await throwIfError(
-    await supabase
-      .from('academy_employee_shifts')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .in('shift_date', dates),
-    'Загрузка существующих смен'
-  )
-  return new Map(rows.map((row) => [row.shift_date, row]))
+function getMonthRange(year, month) {
+  const lastDay = new Date(year, month, 0).getDate()
+  return {
+    start: `${year}-${String(month).padStart(2, '0')}-01`,
+    end: `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
+  }
 }
 
 export async function getShiftsForEmployeeMonth(employeeId, year, month) {
@@ -153,18 +143,13 @@ export async function getShiftsForMonth(year, month, employeeIds = null) {
 }
 
 export async function upsertEmployeeShift(employeeId, payload, createdBy = null) {
-  const existingMap = await fetchExistingShiftsByDates(employeeId, [payload.shiftDate])
-  const existing = existingMap.get(payload.shiftDate) || null
-  const row = payloadToRow(employeeId, payload, createdBy, existing)
-  const inserted = await throwIfError(
-    await supabase
-      .from('academy_employee_shifts')
-      .upsert(row, { onConflict: 'employee_id,shift_date' })
-      .select()
-      .single(),
-    'Сохранение смены'
-  )
-  return rowToShift(inserted)
+  void createdBy
+  const data = await invokeScheduleWrite({
+    action: 'upsert_shift',
+    employee_id: Number(employeeId),
+    shift: payloadToApiShift(payload),
+  })
+  return rowToShift(data.shift)
 }
 
 export async function bulkApplyEmployeeShifts(
@@ -172,27 +157,15 @@ export async function bulkApplyEmployeeShifts(
   entries,
   { overwrite = false, createdBy = null } = {}
 ) {
+  void createdBy
   if (!entries.length) return 0
 
-  const dates = entries.map((entry) => entry.shiftDate)
-  const existingMap = await fetchExistingShiftsByDates(employeeId, dates)
+  const data = await invokeScheduleWrite({
+    action: 'bulk_upsert_shifts',
+    employee_id: Number(employeeId),
+    overwrite,
+    shifts: entries.map(payloadToApiShift),
+  })
 
-  if (!overwrite) {
-    entries = entries.filter((entry) => !existingMap.has(entry.shiftDate))
-  }
-
-  if (!entries.length) return 0
-
-  const rows = entries.map((entry) =>
-    payloadToRow(employeeId, entry, createdBy, existingMap.get(entry.shiftDate) || null)
-  )
-
-  await throwIfError(
-    await supabase
-      .from('academy_employee_shifts')
-      .upsert(rows, { onConflict: 'employee_id,shift_date' }),
-    'Массовое сохранение графика'
-  )
-
-  return rows.length
+  return data.applied ?? 0
 }

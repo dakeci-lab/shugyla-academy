@@ -443,6 +443,12 @@ verify_jwt = true
 import_map = "./functions/admin-team-workforce-data/deno.json"
 entrypoint = "./functions/admin-team-workforce-data/index.ts"
 
+[functions.admin-manage-employee-schedule]
+enabled = true
+verify_jwt = true
+import_map = "./functions/admin-manage-employee-schedule/deno.json"
+entrypoint = "./functions/admin-manage-employee-schedule/index.ts"
+
 [functions.admin-update-employee]
 enabled = true
 verify_jwt = true

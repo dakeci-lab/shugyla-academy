@@ -81,7 +81,13 @@ function main() {
   assert('route passes weekStartKey prop', page.includes('weekStartKey={weekStartKey}'))
   console.log('')
 
-  console.log('Stage 5: Scope guard')
+  console.log('Stage 6: Cloud write path')
+  const adapter = read('src/services/shiftSupabaseAdapter.js')
+  assert('cloud writes use schedule edge function', adapter.includes('admin-manage-employee-schedule'))
+  assert('adapter no direct upsert to shifts table', !adapter.includes(".from('academy_employee_shifts').upsert"))
+  console.log('')
+
+  console.log('Stage 7: Scope guard')
   assert('verifier script registered', read('package.json').includes('verify:employee-schedule-weekly-open'))
   const diff = spawnSync('git', ['diff', '--name-only', 'HEAD'], {
     cwd: ROOT,
