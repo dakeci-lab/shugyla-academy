@@ -354,6 +354,36 @@ Context: Steps 22X/22Z rejected sends with 0 records while env gates appeared ON
 
 ---
 
+## Step 22AE — Permit-based controlled test (failed at VAPID)
+
+**Date:** 2026-07-15  
+**Status:** permit consumed; notification/delivery recorded as **failed**; push **not delivered**.
+
+| Item | Result |
+|------|--------|
+| Permit consumed | **1** |
+| Notification / delivery | **1 / 1** failed |
+| error_code | `web_push_not_configured` |
+| provider_status_code | **403** |
+| Canonical public fingerprint | **`3766a407dc40a509`** unchanged |
+| Business baseline | **18/18** unchanged |
+
+---
+
+## Step 22AF — VAPID secret reconciliation (**BLOCKED**)
+
+**Date:** 2026-07-15  
+**Status:** matching private key for canonical public fingerprint **not found locally**; production secrets **not updated**.
+
+| Item | Result |
+|------|--------|
+| Canonical public fingerprint | **`3766a407dc40a509`** |
+| Private key cryptographically matched | **no** (source missing) |
+| Secrets mutated | **none** |
+| Push / permit on this step | **none** |
+
+---
+
 ## Next step (gated)
 
 Permit-based controlled test-send only after **separate owner confirmation**: prepare device → preflight → issue one-time permit → one manual send click. Legacy gates **OFF**; rules **disabled**; Cron **off**.

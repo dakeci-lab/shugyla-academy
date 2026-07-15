@@ -307,6 +307,46 @@ Step 22AB blocked because `schedule.edit` is legitimately shared with «Адми
 
 ---
 
+## Step 22AE — Permit-based controlled test (single attempt, delivery failed)
+
+**Date:** 2026-07-15  
+**Owner confirmation:** one permit + one manual send click; no retry.
+
+| Item | Result |
+|------|--------|
+| Permit issued / consumed | **1 / 1** |
+| Active permits after send | **0** |
+| Notifications / deliveries | **1 / 1** (both **failed**) |
+| Safe errorCode | **`web_push_not_configured`** |
+| Provider status | **403** |
+| UI message | «Серверная отправка уведомлений не настроена.» + «Одноразовое разрешение уже использовано» |
+| Other devices | **not affected** |
+| Legacy gates | **OFF / OFF** |
+
+**Root cause (proven):** production Supabase `VAPID_*` secrets do not match canonical frontend public key fingerprint **`3766a407dc40a509`**. Permit/RBAC flow worked; failure at provider/VAPID signing.
+
+---
+
+## Step 22AF — VAPID secret reconciliation (**BLOCKED**)
+
+**Date:** 2026-07-15  
+**Owner confirmation:** reconcile secrets to canonical pair; no new pair; no push; no permit.
+
+| Item | Result |
+|------|--------|
+| Canonical public source | `config/production-vapid-public.key` — fingerprint **`3766a407dc40a509`** ✅ |
+| Matching private source | **not found** in allowed local sources ❌ |
+| Local dev pair fingerprint | **`71653018b9bcdd1b`** (does not match canonical) |
+| Production secrets updated | **no** (blocked) |
+| New pair generated | **no** |
+| iPhone resubscribe required | **no** (once matching private is restored) |
+
+**Blocker:** `canonical_private_key_not_found`. Step 22S setup script persisted only the public key to git; private key was written to a deleted temp env-file and is not present in `.local-secrets/web-push.env` (local dev pair) or other gitignored env files.
+
+**Required owner decision:** provide secure backup of matching private key for fingerprint `3766a407dc40a509`, **or** approve separate full VAPID rotation step (subscriptions would require re-registration).
+
+---
+
 ## Next gated step — permit-based controlled test-send (separate owner confirmation)
 
 After Step 22AA deploy:
