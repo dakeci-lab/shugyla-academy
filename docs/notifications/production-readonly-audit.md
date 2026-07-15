@@ -730,3 +730,75 @@ Owner confirmed deploy of `admin-create-employee`, `admin-list-employees`, `admi
 > **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
 
 Authenticated smoke test of three deployed admin Edge Functions from an active administrator JWT. No frontend deploy, no Phase 2.
+
+---
+
+## 27. Production auth drift audit — Step 22J
+
+**Date:** 2026-07-15
+**Status:** Read-only audit completed. **No production mutations.**
+
+### 27.1 Drift summary
+
+| Metric | Expected (post-22F) | Actual |
+|--------|---------------------|--------|
+| `academy_users` | 17 | **18** |
+| linked | 17 | 17 |
+| unlinked | 0 | **1** |
+| active | 9 | **10** |
+| inactive/terminated | 8 | 8 |
+| `auth.users` | 17 | 17 |
+| legacy passwords nonempty | 17 | **18** |
+
+### 27.2 Step 22I outcome
+
+Authenticated smoke test **correctly blocked** at baseline verification (`academyUsers` 18 vs expected 17). No Auth sign-in, no Edge Function calls.
+
+### 27.3 Unlinked employee (safe characteristics only)
+
+- status: **active**
+- role code: **seller**
+- `created_at` / `updated_at`: present (date **2026-07-14**)
+- login / password / `role_id`: all filled
+- Auth technical-email match: **0**
+- duplicate technical email: **false**
+- related records: **1** shift; **0** course assignments; **0** attendance
+
+### 27.4 Source classification
+
+**likely_created_via_legacy_frontend**
+
+Evidence: missing `auth_user_id` (Edge create would populate); legacy anon access preserved; no auto-insert trigger on `academy_users`; Edge function logs not available via CLI for invocation count.
+
+### 27.5 Provisioning dry-run (read-only)
+
+```json
+{
+  "academyUsers": 18,
+  "alreadyLinked": 17,
+  "existingAuthMatches": 0,
+  "wouldCreateAuthUsers": 1,
+  "conflicts": 0,
+  "activeUsers": 10,
+  "inactiveUsers": 8,
+  "ready": true
+}
+```
+
+### 27.6 System status (unchanged)
+
+- Edge Functions: **3** ACTIVE, `verify_jwt=true`
+- Frontend: **legacy**
+- Phase 2: **not applied**
+- Notification tables: **absent**
+- Cron: **not configured**
+
+### 27.7 Target baseline (before frontend / 22I retry)
+
+`academy_users=18`, linked=**18**, unlinked=**0**, active linked=**10/10**, `auth.users=18`, conflicts=**0**.
+
+### 27.8 Next production write
+
+> **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
+
+Create **1** missing Auth user and link the single unlinked `academy_user` via targeted provisioning `--apply`. No frontend, Phase 2, grants, or notification changes.

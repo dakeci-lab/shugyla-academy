@@ -1,6 +1,6 @@
 # Production Auth Rollout Checklist
 
-**Status:** Phase 1, Approval 2 (provisioning), and **admin Edge Functions deploy** (Step 22H) completed. Frontend deploy and Approvals 4–6 pending.
+**Status:** Drift detected (Step 22J). **Auth-first frontend blocked.** Provisioning gap: 1 unlinked active employee. Authenticated smoke test (22I) pending drift fix.
 
 Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md)
 
@@ -58,9 +58,10 @@ Run `scripts/production-auth-users-migration.mjs`.
 - [x] Deploy `admin-list-employees` — ACTIVE, `verify_jwt=true`
 - [x] Deploy `admin-update-employee` — ACTIVE, `verify_jwt=true`
 - [x] Unauthorized smoke: all three return **401** without JWT
-- [ ] Deploy Auth-first frontend (GitHub Pages) — **not on Step 22H**
-- [ ] Authenticated smoke: admin login — **pending separate approval**
-- [ ] Smoke: cashier login
+- [ ] **BLOCKED:** Authenticated smoke test (Step 22I) — stopped at baseline drift (17 expected vs 18 actual)
+- [ ] **BLOCKED:** Deploy Auth-first frontend — requires 18/18 linked + smoke pass
+- [ ] Authenticated smoke: admin login — pending drift fix + owner approval
+- [ ] Smoke: cashier login — **blocked until drift fixed**
 - [ ] Smoke: procurement/receiver login
 - [ ] Smoke: inactive employee blocked
 - [ ] Session restore + logout verified
@@ -68,7 +69,19 @@ Run `scripts/production-auth-users-migration.mjs`.
 
 ---
 
-## Approval 4 — Security cutover / anon revoke
+## Approval 2b — Drift remediation (pending owner approval)
+
+**Step 22J audit (2026-07-15) — read-only, no mutations**
+
+- [x] External drift detected: `academy_users` 17 → **18**; unlinked **1** (active)
+- [x] Step 22I smoke test correctly stopped before sign-in
+- [x] Dry-run: `wouldCreateAuthUsers=1`, `existingAuthMatches=0`, `conflicts=0`, `ready=true`
+- [x] Source: **likely_created_via_legacy_frontend**
+- [ ] Targeted provisioning `--apply` for **1** unlinked employee only — **pending owner approval**
+- [ ] Re-run Step 22I authenticated smoke test after 18/18 linked
+- [ ] **Do not** deploy Auth-first frontend until above complete
+
+---
 
 **Owner approval required.**
 

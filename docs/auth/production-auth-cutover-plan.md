@@ -1,6 +1,6 @@
 # Production Auth Cutover Plan
 
-**Status:** Phase 1, Phase B provisioning, and **employee admin Edge Functions deploy** completed in production (2026-07-14). Phase 2 and frontend deploy pending owner approval.
+**Status:** Phase 1, Phase B provisioning (17 users), Edge Functions deploy, and **production drift audit** (Step 22J) completed. **Auth-first frontend blocked** until 18/18 linked + authenticated smoke test. Phase 2 pending.
 
 Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md), [../notifications/production-readonly-audit.md](../notifications/production-readonly-audit.md)
 
@@ -31,7 +31,39 @@ Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checkl
 3. Create `employee_owned_by_current_auth()` (requires column)
 4. `notify pgrst, 'reload schema'`
 
-**Next production write:** Authenticated smoke test of deployed admin Edge Functions — separate owner approval. No frontend deploy or Phase 2 without explicit approval.
+**Next production write:** Link single unlinked employee via targeted provisioning `--apply` (1 Auth user create) — separate owner approval. **Do not** deploy Auth-first frontend until 18/18 linked and Step 22I smoke test passes.
+
+---
+
+## Production drift audit (Step 22J — read-only)
+
+**Date:** 2026-07-15
+
+| Metric | After 22F/22H | Current (22J) |
+|--------|---------------|---------------|
+| `academy_users` | 17 | **18** |
+| linked | 17 | **17** |
+| unlinked | 0 | **1** (active) |
+| active | 9 | **10** |
+| `auth.users` | 17 | **17** |
+| legacy passwords nonempty | 17 | **18** |
+
+**Step 22I:** Authenticated smoke test **correctly stopped** before sign-in (baseline mismatch 17 vs 18).
+
+**Unlinked row (safe characteristics):** status `active`; role code `seller`; `created_at`/`updated_at` present (date 2026-07-14); login/password/role_id filled; **no** Auth technical-email match; **no** duplicate technical email; **1** shift record; **0** course assignments.
+
+**Source classification:** **likely_created_via_legacy_frontend** (evidence: `auth_user_id` null — Edge `admin-create-employee` would set it; anon SELECT on `academy_users` still allowed; permissive legacy policy preserved; no DB auto-create trigger on `academy_users`; function invocation logs unavailable via CLI).
+
+**Provisioning dry-run (22J):** `academyUsers=18`, `alreadyLinked=17`, `existingAuthMatches=0`, `wouldCreateAuthUsers=1`, `conflicts=0`, `activeUsers=10`, `inactiveUsers=8`, `ready=true`.
+
+**Target baseline before frontend deploy / 22I retry:**
+
+- `academy_users` = 18, linked = **18**, unlinked = **0**
+- active linked = **10/10**
+- `auth.users` = **18**
+- conflicts = **0**
+
+> **Auth-first frontend remains blocked** until drift resolved and authenticated smoke test succeeds.
 
 ---
 
