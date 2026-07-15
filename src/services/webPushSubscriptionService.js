@@ -414,7 +414,7 @@ export async function showDevelopmentTestNotification() {
 function mapSendTestError(data, fallback) {
   const code = data?.code
   if (code === 'active_subscription_not_found') {
-    return 'Устройство не зарегистрировано. Включите уведомления снова.'
+    return SEND_TEST_ERROR_MESSAGES.device_not_registered
   }
   if (code === 'subscription_expired') {
     return 'Подписка устарела. Включите уведомления снова.'
@@ -428,10 +428,147 @@ function mapSendTestError(data, fallback) {
   if (code === 'web_push_not_configured') {
     return 'Серверная отправка уведомлений не настроена.'
   }
+  if (code === 'test_sender_disabled') {
+    return SEND_TEST_ERROR_MESSAGES.test_disabled
+  }
   if (code === 'unauthorized') {
-    return WEB_PUSH_ERROR_MESSAGES.session_expired
+    return SEND_TEST_ERROR_MESSAGES.session_expired
+  }
+  if (code === 'inactive_caller' || code === 'forbidden') {
+    return SEND_TEST_ERROR_MESSAGES.server_rejected
+  }
+  if (code === 'validation_error' || code === 'forbidden_field' || code === 'malformed_json') {
+    return SEND_TEST_ERROR_MESSAGES.validation
   }
   return fallback
+}
+
+export const SEND_TEST_ERROR_MESSAGES = {
+  session_expired: 'Сессия истекла',
+  device_not_registered: 'Устройство не зарегистрировано',
+  test_disabled: 'Тестовая отправка временно отключена',
+  network: 'Не удалось связаться с сервером',
+  server_rejected: 'Сервер отклонил запрос',
+  validation: 'Сервер отклонил запрос',
+  generic: 'Не удалось отправить push-уведомление',
+}
+
+const SEND_TEST_DIAGNOSTIC_STORAGE_KEY = 'shugyla.web_push.last_test_send_diagnostic'
+
+export async function parseFunctionInvokeContext(error) {
+  if (!error?.context) return null
+  const context = error.context
+  if (context && typeof context === 'object' && typeof context.json !== 'function') {
+    if (context.json && typeof context.json === 'object') return context.json
+    if (context.body && typeof context.body === 'object') return context.body
+  }
+  if (context && typeof context.json === 'function') {
+    try {
+      const response = typeof context.clone === 'function' ? context.clone() : context
+      return await response.json()
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+export function classifySendTestFailure({
+  stage,
+  httpStatus = 0,
+  errorCode = '',
+  attempted = false,
+}) {
+  return {
+    stage,
+    httpStatus,
+    errorCode: errorCode || 'unknown',
+    attempted,
+    message: resolveSendTestMessage(stage, httpStatus, errorCode),
+  }
+}
+
+function resolveSendTestMessage(stage, httpStatus, errorCode) {
+  if (stage === 'session') return SEND_TEST_ERROR_MESSAGES.session_expired
+  if (stage === 'device') return SEND_TEST_ERROR_MESSAGES.device_not_registered
+  if (stage === 'subscription') return SEND_TEST_ERROR_MESSAGES.device_not_registered
+  if (stage === 'flag') return SEND_TEST_ERROR_MESSAGES.test_disabled
+  if (stage === 'network') return SEND_TEST_ERROR_MESSAGES.network
+  if (errorCode === 'test_sender_disabled') return SEND_TEST_ERROR_MESSAGES.test_disabled
+  if (errorCode === 'active_subscription_not_found' || errorCode === 'subscription_expired') {
+    return SEND_TEST_ERROR_MESSAGES.device_not_registered
+  }
+  if (errorCode === 'unauthorized') return SEND_TEST_ERROR_MESSAGES.session_expired
+  if (httpStatus === 401) return SEND_TEST_ERROR_MESSAGES.session_expired
+  if (httpStatus === 403) return SEND_TEST_ERROR_MESSAGES.server_rejected
+  if (httpStatus === 409) return SEND_TEST_ERROR_MESSAGES.device_not_registered
+  if (httpStatus === 422) return SEND_TEST_ERROR_MESSAGES.validation
+  if (httpStatus >= 500) return SEND_TEST_ERROR_MESSAGES.server_rejected
+  if (stage === 'invoke') return SEND_TEST_ERROR_MESSAGES.server_rejected
+  return SEND_TEST_ERROR_MESSAGES.generic
+}
+
+export function logSendTestDiagnostic(diagnostic) {
+  if (!import.meta.env.DEV && !isProductionE2eTestSendEnabled()) return
+  console.info('web_push_test_send_diagnostic', {
+    stage: diagnostic.stage,
+    httpStatus: diagnostic.httpStatus ?? 0,
+    errorCode: diagnostic.errorCode ?? 'unknown',
+    attempted: Boolean(diagnostic.attempted),
+    at: diagnostic.at ?? new Date().toISOString(),
+  })
+}
+
+export function persistSendTestDiagnostic(diagnostic) {
+  if (!hasWindow()) return
+  try {
+    window.sessionStorage.setItem(
+      SEND_TEST_DIAGNOSTIC_STORAGE_KEY,
+      JSON.stringify({
+        stage: diagnostic.stage,
+        httpStatus: diagnostic.httpStatus ?? 0,
+        errorCode: diagnostic.errorCode ?? 'unknown',
+        message: diagnostic.message,
+        at: diagnostic.at ?? new Date().toISOString(),
+      })
+    )
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+export function readPersistedSendTestDiagnostic() {
+  if (!hasWindow()) return null
+  try {
+    const raw = window.sessionStorage.getItem(SEND_TEST_DIAGNOSTIC_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function clearPersistedSendTestDiagnostic() {
+  if (!hasWindow()) return
+  try {
+    window.sessionStorage.removeItem(SEND_TEST_DIAGNOSTIC_STORAGE_KEY)
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+function throwSendTestFailure(diagnostic) {
+  const payload = {
+    ...diagnostic,
+    at: diagnostic.at ?? new Date().toISOString(),
+  }
+  logSendTestDiagnostic(payload)
+  persistSendTestDiagnostic(payload)
+  const err = new Error(payload.message)
+  err.sendTestDiagnostic = payload
+  throw err
 }
 
 export function isProductionE2eTestSendEnabled() {
@@ -440,30 +577,55 @@ export function isProductionE2eTestSendEnabled() {
 
 export async function sendServerTestWebPush() {
   if (!import.meta.env.DEV && !isProductionE2eTestSendEnabled()) {
-    throw new Error('Server test push is only available in development mode')
+    throwSendTestFailure(
+      classifySendTestFailure({ stage: 'flag', errorCode: 'production_test_disabled', attempted: false })
+    )
   }
 
   if (!isWebPushSupported()) {
-    throw new Error('Этот браузер не поддерживает системные уведомления')
+    throwSendTestFailure(
+      classifySendTestFailure({ stage: 'subscription', errorCode: 'unsupported', attempted: false })
+    )
   }
 
   if (getNotificationPermission() !== 'granted') {
-    throw new Error('Разрешение на уведомления не получено')
+    throwSendTestFailure(
+      classifySendTestFailure({ stage: 'subscription', errorCode: 'permission_denied', attempted: false })
+    )
   }
 
   const browserSub = await getExistingBrowserSubscription()
   if (!browserSub) {
-    throw new Error('Устройство не зарегистрировано. Включите уведомления снова.')
+    throwSendTestFailure(
+      classifySendTestFailure({
+        stage: 'subscription',
+        errorCode: 'browser_subscription_missing',
+        attempted: false,
+      })
+    )
   }
 
   const deviceId = getOrCreateDeviceId()
   if (!deviceId) {
-    throw new Error('Не удалось определить устройство')
+    throwSendTestFailure(
+      classifySendTestFailure({ stage: 'device', errorCode: 'missing_device_id', attempted: false })
+    )
   }
 
-  await ensureAuthSession()
+  try {
+    await ensureAuthSession()
+  } catch (err) {
+    if (err instanceof WebPushError && err.code === 'session_expired') {
+      throwSendTestFailure(classifySendTestFailure({ stage: 'session', errorCode: 'session_expired', attempted: false }))
+    }
+    throw err
+  }
 
   const requestId = crypto.randomUUID()
+  logSendTestDiagnostic(
+    classifySendTestFailure({ stage: 'invoke', errorCode: 'invoke_started', attempted: true })
+  )
+
   const { data, error } = await supabase.functions.invoke('send-test-web-push', {
     body: {
       device_id: deviceId,
@@ -472,16 +634,36 @@ export async function sendServerTestWebPush() {
   })
 
   if (error) {
-    const contextBody = error.context?.json ?? error.context?.body
-    if (contextBody && typeof contextBody === 'object') {
-      throw new Error(mapSendTestError(contextBody, 'Не удалось отправить push-уведомление'))
-    }
-    throw new Error('Не удалось отправить push-уведомление')
+    const contextBody = await parseFunctionInvokeContext(error)
+    const httpStatus = typeof error.context?.status === 'number' ? error.context.status : 0
+    const errorCode = contextBody?.code ?? error.name ?? 'invoke_error'
+    const message = contextBody
+      ? mapSendTestError(contextBody, resolveSendTestMessage('invoke', httpStatus, errorCode))
+      : isNetworkError(error)
+        ? SEND_TEST_ERROR_MESSAGES.network
+        : resolveSendTestMessage('network', httpStatus, errorCode)
+
+    throwSendTestFailure({
+      stage: isNetworkError(error) ? 'network' : 'invoke',
+      httpStatus,
+      errorCode,
+      attempted: true,
+      message,
+    })
   }
 
   if (!data?.ok) {
-    throw new Error(mapSendTestError(data, 'Не удалось отправить push-уведомление'))
+    const errorCode = data?.code ?? 'delivery_failed'
+    throwSendTestFailure({
+      stage: 'invoke',
+      httpStatus: 0,
+      errorCode,
+      attempted: true,
+      message: mapSendTestError(data, SEND_TEST_ERROR_MESSAGES.generic),
+    })
   }
+
+  clearPersistedSendTestDiagnostic()
 
   return {
     notificationId: data.notification_id,

@@ -28,6 +28,7 @@
     "supabase:local:verify-production-auth-cutover": "node scripts/verify-production-auth-cutover.mjs",
     "verify:auth-first-frontend-production-readiness": "node scripts/verify-auth-first-frontend-production-readiness.mjs",
     "verify:production-notification-foundation-readiness": "node scripts/verify-production-notification-foundation-readiness.mjs",
+    "verify:web-push-test-send-diagnostics": "node scripts/verify-web-push-test-send-diagnostics.mjs",
     "supabase:local:verify-team-workforce-admin-access": "node scripts/verify-team-workforce-admin-access.mjs"
   },
   "dependencies": {

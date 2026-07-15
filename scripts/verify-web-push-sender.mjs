@@ -530,6 +530,8 @@ function stageStaticChecks() {
   assert('service mapSendTestError subscription_expired', service.includes("'subscription_expired'"))
   assert('service DEV guard for server send', service.includes('import.meta.env.DEV'))
   assert('service production E2E gate', service.includes('isProductionE2eTestSendEnabled'))
+  assert('service parses invoke context', service.includes('parseFunctionInvokeContext'))
+  assert('service test_sender_disabled mapping', service.includes("'test_sender_disabled'"))
 
   assert('UI imports sendServerTestWebPush', ui.includes('sendServerTestWebPush'))
   assert('UI handleServerTest handler', ui.includes('handleServerTest'))

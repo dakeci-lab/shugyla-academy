@@ -9,6 +9,7 @@ import {
   getPushRegistrationStatus,
   isWebPushSupported,
   isProductionE2eTestSendEnabled,
+  readPersistedSendTestDiagnostic,
   sendServerTestWebPush,
   showDevelopmentTestNotification,
   WebPushError,
@@ -92,6 +93,13 @@ export default function PushNotificationSettings() {
   useEffect(() => {
     void refreshStatus()
   }, [refreshStatus])
+
+  useEffect(() => {
+    const persisted = readPersistedSendTestDiagnostic()
+    if (!persisted?.message) return
+    setServerSendState(SERVER_SEND_STATE.ERROR)
+    setServerSendMessage(persisted.message)
+  }, [])
 
   function resolveEnableErrorMessage(err) {
     if (err instanceof WebPushError && err.code && WEB_PUSH_ERROR_MESSAGES[err.code]) {
@@ -275,7 +283,8 @@ export default function PushNotificationSettings() {
                       ? 'push-settings__status--success'
                       : 'push-settings__status--warning'
                   }`}
-                  role="status"
+                  role="alert"
+                  aria-live="assertive"
                 >
                   {serverSendMessage}
                 </p>
@@ -308,7 +317,8 @@ export default function PushNotificationSettings() {
                       ? 'push-settings__status--success'
                       : 'push-settings__status--warning'
                   }`}
-                  role="status"
+                  role="alert"
+                  aria-live="assertive"
                 >
                   {serverSendMessage}
                 </p>
