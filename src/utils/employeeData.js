@@ -112,6 +112,66 @@ export function getStaffEmployees(filter = 'active') {
   return staff
 }
 
+/** Значение фильтра списка сотрудников по умолчанию */
+export const EMPLOYEE_LIST_DEFAULT_STATUS = 'active'
+
+/** Варианты фильтра статуса на странице списка сотрудников */
+export const EMPLOYEE_LIST_STATUS_FILTER_OPTIONS = [
+  { id: 'active', label: 'Активные' },
+  { id: 'deactivated', label: 'Деактивированные' },
+  { id: 'all', label: 'Все' },
+]
+
+/** Компактная подпись количества в фильтре сотрудников */
+export function formatEmployeeFilterCount(status, count) {
+  const total = Number(count) || 0
+  if (status === 'all') return `Найдено: ${total}`
+  if (status === 'active') return `Активных сотрудников: ${total}`
+  if (status === 'deactivated') return `Деактивированных сотрудников: ${total}`
+  return `Найдено: ${total}`
+}
+
+/** Клиентская фильтрация списка сотрудников по статусу, роли и поиску */
+export function filterEmployees(
+  employees,
+  { search = '', status = EMPLOYEE_LIST_DEFAULT_STATUS, roleId = '' } = {}
+) {
+  let list = Array.isArray(employees) ? employees : []
+
+  if (status === 'active') {
+    list = list.filter(isActiveStaffEmployee)
+  } else if (status === 'deactivated') {
+    list = list.filter(isDeactivatedStaffEmployee)
+  }
+
+  if (roleId) {
+    list = list.filter(
+      (employee) =>
+        String(employee.roleId || '') === String(roleId) ||
+        String(employee.role || '') === String(roleId)
+    )
+  }
+
+  const query = search.trim().toLowerCase()
+  if (!query) return list
+
+  return list.filter((employee) => {
+    const haystack = [
+      employee.name,
+      employee.firstName,
+      employee.lastName,
+      employee.login,
+      employee.position,
+      employee.role,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase()
+
+    return haystack.includes(query)
+  })
+}
+
 function readJson(key, fallback) {
   const data = localStorage.getItem(key)
   return data ? JSON.parse(data) : fallback

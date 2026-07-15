@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   getStaffEmployees,
@@ -7,8 +7,8 @@ import {
   validateEmployeeForm,
   EMPLOYMENT_STATUS,
   EMPLOYEE_STATUS_OPTIONS,
-  getEmploymentStatusLabel,
-  getEmploymentStatusBadgeType,
+  EMPLOYEE_LIST_DEFAULT_STATUS,
+  filterEmployees,
   isDeactivatedStaffEmployee,
   isActiveStaffEmployee,
 } from '../../../utils/employeeData'
@@ -34,28 +34,25 @@ import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
 import { isCloudMode } from '../../../lib/dataMode'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue'
+import useMediaQuery from '../../../hooks/useMediaQuery'
 import { useSession } from '../../../context/SessionContext'
+import { useToast } from '../../../context/ToastContext'
 import Can from '../../auth/Can'
-import { PERMISSION_CODES } from '../../../config/permissions'
+import { PERMISSION_CODES, canManageEmployees } from '../../../config/permissions'
 import AdminModal from '../AdminModal'
-import StatusBadge from '../StatusBadge'
-import EmployeeAvatar from '../../EmployeeAvatar'
-import IconActionButton from '../IconActionButton'
 import ConfirmDialog from '../ConfirmDialog'
-import { PencilIcon, TrashIcon } from '../../icons/PlatformIcons'
+import EmployeeFilterPopover from '../employees/EmployeeFilterPopover'
+import EmployeeListTable from '../employees/EmployeeListTable'
+import EmployeeAvatar from '../../EmployeeAvatar'
 import ProfileAvatarEditor from '../../ProfileAvatarEditor'
+import { FilterIcon, PlusIcon, SearchIcon } from '../../icons/PlatformIcons'
 import '../../EmployeeAvatar.css'
 import '../admin-shared.css'
 import '../RecruitmentSection.css'
-import '../IconActionButton.css'
-
-const FILTER_TABS = [
-  { id: 'active', label: 'Активные' },
-  { id: 'deactivated', label: 'Деактивированные' },
-  { id: 'all', label: 'Все' },
-]
+import './EmployeesSection.css'
 
 const CLOUD_PAGE_SIZE = 50
+const NARROW_SEARCH_QUERY = '(max-width: 480px)'
 
 function mapFilterToListStatus(filter) {
   if (filter === 'all') return 'all'
@@ -67,20 +64,32 @@ function mapFilterToListStatus(filter) {
 export default function EmployeesSection() {
   const cloudMode = isCloudMode()
   const { user: sessionUser } = useSession()
+  const { success: showSuccess, error: showError } = useToast()
   const { version, refresh } = useAdminRefresh()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [filter, setFilter] = useState('active')
+  const filterButtonRef = useRef(null)
+  const hasLoadedOnceRef = useRef(false)
+  const isNarrowSearch = useMediaQuery(NARROW_SEARCH_QUERY)
+
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
-  const [roleFilterId, setRoleFilterId] = useState('')
+  const [appliedStatus, setAppliedStatus] = useState(EMPLOYEE_LIST_DEFAULT_STATUS)
+  const [appliedRoleId, setAppliedRoleId] = useState('')
+  const [draftStatus, setDraftStatus] = useState(EMPLOYEE_LIST_DEFAULT_STATUS)
+  const [draftRoleId, setDraftRoleId] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [filterPreviewTotal, setFilterPreviewTotal] = useState(0)
+
   const [page, setPage] = useState(1)
   const [cloudEmployees, setCloudEmployees] = useState([])
   const [cloudPagination, setCloudPagination] = useState(null)
   const [listLoading, setListLoading] = useState(false)
   const [listError, setListError] = useState('')
+
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
+  const [editingEmployee, setEditingEmployee] = useState(null)
   const [form, setForm] = useState(EMPTY_EMPLOYEE_FORM)
   const [formError, setFormError] = useState('')
   const [actionError, setActionError] = useState('')
@@ -88,12 +97,20 @@ export default function EmployeesSection() {
   const [sourceCandidateId, setSourceCandidateId] = useState(null)
   const [candidatePhone, setCandidatePhone] = useState('')
   const [deactivateTarget, setDeactivateTarget] = useState(null)
+  const [activateTarget, setActivateTarget] = useState(null)
   const [deactivating, setDeactivating] = useState(false)
+  const [activating, setActivating] = useState(false)
   const [workLocations, setWorkLocations] = useState([])
   const [assignableRoles, setAssignableRoles] = useState([])
+  const [filterRoles, setFilterRoles] = useState([])
   const [submitting, setSubmitting] = useState(false)
 
   void version
+
+  const canEdit = canManageEmployees(sessionUser)
+
+  const filtersActive =
+    appliedStatus !== EMPLOYEE_LIST_DEFAULT_STATUS || Boolean(appliedRoleId)
 
   const loadCloudEmployees = useCallback(async () => {
     if (!cloudMode) return
@@ -104,13 +121,14 @@ export default function EmployeesSection() {
         page,
         pageSize: CLOUD_PAGE_SIZE,
         search: debouncedSearch,
-        status: mapFilterToListStatus(filter),
-        roleId: roleFilterId || undefined,
+        status: mapFilterToListStatus(appliedStatus),
+        roleId: appliedRoleId || undefined,
         sortBy: 'full_name',
         sortDirection: 'asc',
       })
       setCloudEmployees(result.employees)
       setCloudPagination(result.pagination)
+      hasLoadedOnceRef.current = true
     } catch (err) {
       setCloudEmployees([])
       setCloudPagination(null)
@@ -118,7 +136,7 @@ export default function EmployeesSection() {
     } finally {
       setListLoading(false)
     }
-  }, [cloudMode, page, debouncedSearch, filter, roleFilterId])
+  }, [cloudMode, page, debouncedSearch, appliedStatus, appliedRoleId])
 
   useEffect(() => {
     if (cloudMode) {
@@ -128,7 +146,7 @@ export default function EmployeesSection() {
 
   useEffect(() => {
     setPage(1)
-  }, [filter, debouncedSearch, roleFilterId])
+  }, [appliedStatus, debouncedSearch, appliedRoleId])
 
   useEffect(() => {
     getRolesForEmployeeForm(form.role, form.roleId)
@@ -137,26 +155,95 @@ export default function EmployeesSection() {
   }, [version, form.role, form.roleId])
 
   useEffect(() => {
+    getRolesForEmployeeForm('', '')
+      .then(setFilterRoles)
+      .catch(() => setFilterRoles([]))
+  }, [version])
+
+  useEffect(() => {
     getWorkLocations()
       .then(setWorkLocations)
       .catch(() => setWorkLocations([]))
   }, [version])
 
-  const offlineEmployees = getStaffEmployees(filter)
-  const employees = cloudMode ? cloudEmployees : offlineEmployees
+  useEffect(() => {
+    if (!cloudMode || !filterOpen) return undefined
 
-  const activeCount = cloudMode
-    ? filter === 'active'
-      ? cloudPagination?.total ?? 0
-      : null
-    : getStaffEmployees('active').length
-  const deactivatedCount = cloudMode
-    ? filter === 'deactivated'
-      ? cloudPagination?.total ?? 0
-      : null
-    : getStaffEmployees('deactivated').length
+    let cancelled = false
+    listEmployeesForAdmin({
+      page: 1,
+      pageSize: 1,
+      search: debouncedSearch,
+      status: mapFilterToListStatus(draftStatus),
+      roleId: draftRoleId || undefined,
+      sortBy: 'full_name',
+      sortDirection: 'asc',
+    })
+      .then((result) => {
+        if (!cancelled) setFilterPreviewTotal(result.pagination?.total ?? 0)
+      })
+      .catch(() => {
+        if (!cancelled) setFilterPreviewTotal(0)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [cloudMode, filterOpen, debouncedSearch, draftStatus, draftRoleId])
+
+  const filteredEmployees = useMemo(() => {
+    if (cloudMode) return cloudEmployees
+    return filterEmployees(getStaffEmployees('all'), {
+      search: debouncedSearch,
+      status: appliedStatus,
+      roleId: appliedRoleId,
+    })
+  }, [cloudMode, cloudEmployees, debouncedSearch, appliedStatus, appliedRoleId, version])
+
+  const filterPreviewCount = useMemo(() => {
+    if (cloudMode) return filterPreviewTotal
+    return filterEmployees(getStaffEmployees('all'), {
+      search: debouncedSearch,
+      status: draftStatus,
+      roleId: draftRoleId,
+    }).length
+  }, [
+    cloudMode,
+    filterPreviewTotal,
+    debouncedSearch,
+    draftStatus,
+    draftRoleId,
+    version,
+  ])
 
   const editingSelf = Boolean(editId && sessionUser?.id === editId)
+  const rowOffset = cloudMode ? (page - 1) * CLOUD_PAGE_SIZE : 0
+  const totalPages = cloudPagination?.total_pages ?? 1
+  const showInitialLoading =
+    cloudMode && listLoading && !hasLoadedOnceRef.current && filteredEmployees.length === 0
+
+  const searchPlaceholder = isNarrowSearch
+    ? 'Поиск сотрудника…'
+    : 'Имя, логин, должность…'
+
+  function getRoleLabelForEmployee(employee) {
+    const role =
+      filterRoles.find((item) => item.id === employee.roleId) ||
+      assignableRoles.find((item) => item.id === employee.roleId) ||
+      getRoleByCode(employee.role)
+    if (role) return formatRoleDisplayLabel(role, filterRoles.length ? filterRoles : assignableRoles)
+    return getRoleLabel(employee.role)
+  }
+
+  function getEmptyMessage() {
+    if (listError) return 'Не удалось загрузить список сотрудников.'
+    if (filtersActive || debouncedSearch.trim()) {
+      return 'По выбранным фильтрам сотрудники не найдены.'
+    }
+    if (appliedStatus === 'active') return 'Активные сотрудники не найдены.'
+    if (appliedStatus === 'deactivated') return 'Деактивированные сотрудники не найдены.'
+    return 'Сотрудники не найдены.'
+  }
 
   useEffect(() => {
     const candidateId = searchParams.get('createFromCandidate')
@@ -184,6 +271,7 @@ export default function EmployeesSection() {
     setSourceCandidateId(candidateId)
     setCandidatePhone(candidate.phone || '')
     setEditId(null)
+    setEditingEmployee(null)
     setForm({
       ...EMPTY_EMPLOYEE_FORM,
       firstName: candidate.firstName || '',
@@ -207,6 +295,7 @@ export default function EmployeesSection() {
     setSourceCandidateId(null)
     setCandidatePhone('')
     setEditId(null)
+    setEditingEmployee(null)
     setForm(EMPTY_EMPLOYEE_FORM)
     setFormError('')
     clearCandidateQuery()
@@ -217,6 +306,7 @@ export default function EmployeesSection() {
     setSourceCandidateId(null)
     setCandidatePhone('')
     setEditId(emp.id)
+    setEditingEmployee(emp)
     setForm(employeeToForm(emp))
     setFormError('')
     clearCandidateQuery()
@@ -226,11 +316,40 @@ export default function EmployeesSection() {
   function closeForm() {
     setShowForm(false)
     setEditId(null)
+    setEditingEmployee(null)
     setFormError('')
     setSourceCandidateId(null)
     setCandidatePhone('')
     setForm((current) => ({ ...current, password: '' }))
     clearCandidateQuery()
+  }
+
+  function toggleFilter() {
+    if (filterOpen) {
+      setFilterOpen(false)
+      return
+    }
+    setDraftStatus(appliedStatus)
+    setDraftRoleId(appliedRoleId)
+    setFilterOpen(true)
+  }
+
+  function closeFilter() {
+    setFilterOpen(false)
+  }
+
+  function applyFilter() {
+    setAppliedStatus(draftStatus)
+    setAppliedRoleId(draftRoleId)
+    setFilterOpen(false)
+  }
+
+  function resetFilter() {
+    setDraftStatus(EMPLOYEE_LIST_DEFAULT_STATUS)
+    setDraftRoleId('')
+    setAppliedStatus(EMPLOYEE_LIST_DEFAULT_STATUS)
+    setAppliedRoleId('')
+    setFilterOpen(false)
   }
 
   async function afterCloudMutation() {
@@ -318,8 +437,14 @@ export default function EmployeesSection() {
     }
   }
 
-  async function handleDeactivate(emp) {
-    setDeactivateTarget(emp)
+  function requestDeactivateFromModal() {
+    if (!editingEmployee) return
+    setDeactivateTarget(editingEmployee)
+  }
+
+  function requestActivateFromModal() {
+    if (!editingEmployee) return
+    setActivateTarget(editingEmployee)
   }
 
   async function confirmDeactivate() {
@@ -329,166 +454,106 @@ export default function EmployeesSection() {
     try {
       await deactivateEmployee(deactivateTarget.id)
       setDeactivateTarget(null)
+      closeForm()
+      showSuccess('Сотрудник деактивирован')
       await afterCloudMutation()
     } catch (err) {
-      setActionError(err.message || 'Не удалось деактивировать сотрудника')
+      showError(err.message || 'Не удалось деактивировать сотрудника')
     } finally {
       setDeactivating(false)
     }
   }
 
-  async function handleActivate(emp) {
+  async function confirmActivate() {
+    if (!activateTarget) return
+    setActivating(true)
     setActionError('')
     try {
-      await restoreEmployee(emp.id)
-      setFilter('active')
+      await restoreEmployee(activateTarget.id)
+      setActivateTarget(null)
+      closeForm()
+      setAppliedStatus(EMPLOYEE_LIST_DEFAULT_STATUS)
+      showSuccess('Сотрудник активирован')
       await afterCloudMutation()
     } catch (err) {
-      setActionError(err.message || 'Не удалось активировать сотрудника')
+      showError(err.message || 'Не удалось активировать сотрудника')
+    } finally {
+      setActivating(false)
     }
   }
 
-  function openSchedule(emp) {
-    navigate(`/platform/employees/${emp.id}/schedule`)
-  }
-
-  function renderActions(emp) {
-    if (isActiveStaffEmployee(emp)) {
-      return (
-        <>
-          <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
-            <IconActionButton
-              label="Редактировать сотрудника"
-              variant="primary"
-              onClick={(event) => {
-                event.stopPropagation()
-                openEdit(emp)
-              }}
-            >
-              <PencilIcon />
-            </IconActionButton>
-          </Can>
-          <Can permission={PERMISSION_CODES.EMPLOYEES_DEACTIVATE}>
-            <IconActionButton
-              label="Деактивировать сотрудника"
-              variant="danger"
-              onClick={(event) => {
-                event.stopPropagation()
-                handleDeactivate(emp)
-              }}
-            >
-              <TrashIcon />
-            </IconActionButton>
-          </Can>
-        </>
-      )
-    }
-
-    if (isDeactivatedStaffEmployee(emp)) {
-      return (
-        <>
-          <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
-            <IconActionButton
-              label="Редактировать сотрудника"
-              variant="primary"
-              onClick={(event) => {
-                event.stopPropagation()
-                openEdit(emp)
-              }}
-            >
-              <PencilIcon />
-            </IconActionButton>
-          </Can>
-          <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
-            <button
-              type="button"
-              className="btn btn--outline btn--sm"
-              onClick={(event) => {
-                event.stopPropagation()
-                handleActivate(emp)
-              }}
-            >
-              Активировать
-            </button>
-          </Can>
-        </>
-      )
-    }
-
-    return (
-      <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
-        <IconActionButton
-          label="Редактировать сотрудника"
-          variant="primary"
-          onClick={(event) => {
-            event.stopPropagation()
-            openEdit(emp)
-          }}
-        >
-          <PencilIcon />
-        </IconActionButton>
-      </Can>
-    )
-  }
-
-  const totalPages = cloudPagination?.total_pages ?? 1
-  const totalFound = cloudPagination?.total ?? employees.length
+  const showDeactivateAction =
+    editId &&
+    editingEmployee &&
+    isActiveStaffEmployee(editingEmployee) &&
+    !editingSelf
+  const showActivateAction =
+    editId &&
+    editingEmployee &&
+    isDeactivatedStaffEmployee(editingEmployee) &&
+    !editingSelf
 
   return (
     <>
-      <div className="admin-toolbar admin-toolbar--stack">
-        <div className="admin-filter-tabs">
-          {FILTER_TABS.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className={`admin-filter-tab ${
-                filter === tab.id ? 'admin-filter-tab--active' : ''
-              }`}
-              onClick={() => setFilter(tab.id)}
-            >
-              {tab.label}
-              {tab.id === 'active' && activeCount != null && ` (${activeCount})`}
-              {tab.id === 'deactivated' && deactivatedCount != null && ` (${deactivatedCount})`}
-            </button>
-          ))}
+      <div className="employees-section__toolbar">
+        <label className="employees-section__search-wrap">
+          <span className="employees-section__search-icon" aria-hidden="true">
+            <SearchIcon size={18} />
+          </span>
+          <input
+            type="search"
+            className="employees-section__search"
+            placeholder={searchPlaceholder}
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            aria-label="Поиск сотрудников"
+          />
+        </label>
+
+        <div className="employees-section__filter-wrap">
+          <button
+            ref={filterButtonRef}
+            type="button"
+            className={`employees-section__icon-btn${
+              filtersActive ? ' employees-section__icon-btn--active' : ''
+            }`}
+            onClick={toggleFilter}
+            aria-expanded={filterOpen}
+            aria-label="Фильтр сотрудников"
+            title="Фильтр сотрудников"
+          >
+            <FilterIcon size={20} />
+            {filtersActive && (
+              <span className="employees-section__filter-indicator" aria-hidden="true" />
+            )}
+          </button>
+          <EmployeeFilterPopover
+            open={filterOpen}
+            draftStatus={draftStatus}
+            draftRoleId={draftRoleId}
+            roles={filterRoles}
+            onStatusChange={setDraftStatus}
+            onRoleChange={setDraftRoleId}
+            resultCount={filterPreviewCount}
+            onApply={applyFilter}
+            onReset={resetFilter}
+            onClose={closeFilter}
+            anchorRef={filterButtonRef}
+          />
         </div>
+
         <Can permission={PERMISSION_CODES.EMPLOYEES_CREATE}>
-          <button type="button" className="btn btn--primary btn--sm" onClick={openAdd}>
-            + Добавить сотрудника
+          <button
+            type="button"
+            className="employees-section__icon-btn employees-section__create-btn"
+            onClick={openAdd}
+            aria-label="Добавить сотрудника"
+            title="Добавить сотрудника"
+          >
+            <PlusIcon size={20} />
           </button>
         </Can>
       </div>
-
-      {cloudMode && (
-        <div className="admin-toolbar admin-toolbar--stack">
-          <label className="admin-form__label admin-form__label--inline">
-            Поиск
-            <input
-              className="admin-form__input"
-              type="search"
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Имя, логин, должность"
-            />
-          </label>
-          <label className="admin-form__label admin-form__label--inline">
-            Роль
-            <select
-              className="admin-form__select"
-              value={roleFilterId}
-              onChange={(e) => setRoleFilterId(e.target.value)}
-            >
-              <option value="">Все роли</option>
-              {assignableRoles.map((role) => (
-                <option key={role.id} value={role.id}>
-                  {formatRoleDisplayLabel(role, assignableRoles)}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-      )}
 
       {successMessage && (
         <p className="admin-success-banner" role="status">
@@ -499,72 +564,20 @@ export default function EmployeesSection() {
       {listError && <p className="admin-form__error">{listError}</p>}
       {actionError && <p className="admin-form__error">{actionError}</p>}
 
-      {cloudMode && listLoading && (
+      {showInitialLoading ? (
         <p className="admin-form__hint" role="status">
           Загрузка сотрудников…
         </p>
+      ) : (
+        <EmployeeListTable
+          employees={filteredEmployees}
+          rowOffset={rowOffset}
+          getRoleLabelForEmployee={getRoleLabelForEmployee}
+          canEdit={canEdit}
+          onEdit={canEdit ? openEdit : null}
+          emptyMessage={getEmptyMessage()}
+        />
       )}
-
-      <div className="admin-table-wrap">
-        <table className="admin-table">
-          <thead>
-            <tr>
-              <th>Сотрудник</th>
-              <th>Логин</th>
-              <th>Роль</th>
-              <th>Статус</th>
-              <th>Действия</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!listLoading && employees.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="admin-empty">
-                  {listError
-                    ? 'Не удалось загрузить список сотрудников.'
-                    : filter === 'active'
-                      ? 'Активные сотрудники не найдены.'
-                      : filter === 'deactivated'
-                        ? 'Деактивированные сотрудники не найдены.'
-                        : 'Сотрудники не найдены.'}
-                </td>
-              </tr>
-            ) : (
-              employees.map((emp) => (
-                <tr
-                  key={emp.id}
-                  className="employee-row-link"
-                  onClick={() => openSchedule(emp)}
-                >
-                  <td>
-                    <span className="employee-table-cell">
-                      <EmployeeAvatar
-                        name={emp.name}
-                        avatarUrl={emp.avatarUrl}
-                        size="sm"
-                      />
-                      <strong>{emp.name}</strong>
-                    </span>
-                  </td>
-                  <td><code className="admin-code">{emp.login}</code></td>
-                  <td>{getRoleLabel(emp.role)}</td>
-                  <td>
-                    <StatusBadge
-                      label={getEmploymentStatusLabel(emp.employmentStatus)}
-                      type={getEmploymentStatusBadgeType(emp.employmentStatus)}
-                    />
-                  </td>
-                  <td onClick={(event) => event.stopPropagation()}>
-                    <div className="admin-table__actions">
-                      {renderActions(emp)}
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
 
       {cloudMode && totalPages > 1 && (
         <div className="admin-toolbar">
@@ -577,7 +590,7 @@ export default function EmployeesSection() {
             Предыдущая
           </button>
           <span className="admin-form__hint">
-            Страница {page} из {totalPages} · найдено {totalFound}
+            Страница {page} из {totalPages} · найдено {cloudPagination?.total ?? filteredEmployees.length}
           </span>
           <button
             type="button"
@@ -593,11 +606,23 @@ export default function EmployeesSection() {
       {deactivateTarget && (
         <ConfirmDialog
           title="Деактивировать сотрудника?"
-          message="Сотрудник больше не будет отображаться среди активных сотрудников, но его данные, история смен и результаты обучения сохранятся."
+          message={`Сотрудник «${deactivateTarget.name}» потеряет доступ к работе в платформе согласно текущей логике. Исторические данные, график, рейтинг, посещаемость и обучение сохранятся.`}
           confirmLabel="Деактивировать"
           onCancel={() => setDeactivateTarget(null)}
           onConfirm={confirmDeactivate}
           loading={deactivating}
+        />
+      )}
+
+      {activateTarget && (
+        <ConfirmDialog
+          title="Активировать сотрудника?"
+          message={`Вернуть сотрудника «${activateTarget.name}» в активный статус? Прежние данные сохранятся.`}
+          confirmLabel="Активировать"
+          confirmVariant="primary"
+          onCancel={() => setActivateTarget(null)}
+          onConfirm={confirmActivate}
+          loading={activating}
         />
       )}
 
@@ -607,19 +632,45 @@ export default function EmployeesSection() {
           onClose={closeForm}
           wide
           footer={
-            <>
-              <button type="button" className="btn btn--outline" onClick={closeForm}>
-                Отмена
-              </button>
-              <button
-                type="submit"
-                className="btn btn--primary"
-                form="employee-form"
-                disabled={submitting}
-              >
-                {sourceCandidateId ? 'Создать сотрудника' : 'Сохранить'}
-              </button>
-            </>
+            <div className="employees-modal-footer">
+              {showDeactivateAction && (
+                <Can permission={PERMISSION_CODES.EMPLOYEES_DEACTIVATE}>
+                  <button
+                    type="button"
+                    className="btn employees-modal-footer__status-action employees-modal-footer__status-action--danger"
+                    disabled={submitting || deactivating || activating}
+                    onClick={requestDeactivateFromModal}
+                  >
+                    Деактивировать сотрудника
+                  </button>
+                </Can>
+              )}
+              {showActivateAction && (
+                <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
+                  <button
+                    type="button"
+                    className="btn employees-modal-footer__status-action employees-modal-footer__status-action--success"
+                    disabled={submitting || deactivating || activating}
+                    onClick={requestActivateFromModal}
+                  >
+                    Активировать сотрудника
+                  </button>
+                </Can>
+              )}
+              <div className="employees-modal-footer__actions">
+                <button type="button" className="btn btn--outline" onClick={closeForm}>
+                  Отмена
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn--primary"
+                  form="employee-form"
+                  disabled={submitting || deactivating || activating}
+                >
+                  {sourceCandidateId ? 'Создать сотрудника' : 'Сохранить'}
+                </button>
+              </div>
+            </div>
           }
         >
           <form id="employee-form" className="admin-form" onSubmit={handleSave}>
@@ -649,7 +700,9 @@ export default function EmployeesSection() {
                 employee={{
                   ...form,
                   name: `${form.firstName} ${form.lastName}`.trim(),
-                  avatarUrl: getStaffEmployees('all').find((item) => item.id === editId)?.avatarUrl || form.avatarUrl,
+                  avatarUrl:
+                    getStaffEmployees('all').find((item) => item.id === editId)?.avatarUrl ||
+                    form.avatarUrl,
                 }}
                 onAvatarChange={async () => {
                   await refresh()
