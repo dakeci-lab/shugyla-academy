@@ -181,6 +181,25 @@ Run `scripts/production-auth-users-migration.mjs`.
 
 ---
 
+## Approval 9 — Web Push subscription reconciliation ✓ COMPLETED (Step 22T)
+
+**Date:** 2026-07-15
+**Owner confirmation:** disable → re-enable on production PWA **successful**; **no test push**.
+
+- [x] Root cause: backend `register` conflict on `(employee_id, device_id)` after endpoint rotation
+- [x] Fix commit **`453b22d`** — frontend reconcile + Edge Function device-scoped UPDATE
+- [x] `manage-push-subscription` deployed (production)
+- [x] Frontend GitHub Pages bundle **`index-CggSmCBd.js`**
+- [x] Owner manual: «Повторное включение прошло успешно»
+- [x] Subscriptions: total **3**, active **3**, duplicate endpoints **0**
+- [x] Notifications / deliveries sent **0**; rules enabled **0**; Cron **0**
+- [x] Business baseline **18/18** unchanged
+- [x] Test push **not sent** (by design)
+- [x] Docs: [production-web-push-e2e-test.md](../notifications/production-web-push-e2e-test.md)
+- [ ] **BLOCKED:** single controlled test send to owner admin device — next gated step
+
+---
+
 **Date:** 2026-07-15
 **Owner confirmation:** deploy `admin-team-workforce-data` + frontend **`c6e80c1`**; Phase 2 preserved; rules disabled; Cron off.
 

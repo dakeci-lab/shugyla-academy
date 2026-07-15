@@ -219,6 +219,25 @@ See [production-web-push-e2e-test.md](./production-web-push-e2e-test.md).
 
 ---
 
+## Step 22T — Web Push subscription reconciliation
+
+**Date:** 2026-07-15
+**Status:** disable → re-enable flow fixed; owner manual test **passed**; **no test push sent**.
+
+| Item | Result |
+|------|--------|
+| Root cause | `upsert(onConflict: endpoint)` + inactive row on same `(employee_id, device_id)` → unique violation on re-register |
+| Backend fix | device-scoped UPDATE before endpoint upsert (`manage-push-subscription`) |
+| Frontend fix | reconcile flow + UX error categories (`453b22d`) |
+| Owner manual re-enable | **success** |
+| Subscriptions total / active | **3** / **3** |
+| Duplicate endpoints | **0** |
+| Notifications / deliveries sent | **0** |
+| Rules enabled / Cron | **0** / **0** |
+| Business baseline | **18/18** unchanged |
+
+---
+
 ## Next step (gated)
 
 Send **exactly one** production test Web Push to the **active** administrator subscription; verify browser delivery and delivery tracking. Rules **disabled**, Cron **off**.

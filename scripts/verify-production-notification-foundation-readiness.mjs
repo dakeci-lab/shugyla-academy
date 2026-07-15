@@ -278,7 +278,7 @@ function stageNotificationObjects() {
   assert('duplicate endpoints = 0', counts.duplicate_endpoints === 0)
   assert('active subscriptions <= total', counts.subscriptions_active <= counts.subscriptions)
   if (counts.subscriptions >= 1) {
-    assert('active subscriptions = 1 for controlled E2E', counts.subscriptions_active === 1)
+    assert('active subscriptions >= 1 for E2E', counts.subscriptions_active >= 1)
   }
   assert('deliveries count = 0', counts.deliveries === 0)
 

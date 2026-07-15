@@ -53,7 +53,7 @@ Owner confirmed: **permission granted, subscription created**.
 | Endpoint / p256dh / auth values | populated (not logged) |
 | `created_at` | present |
 
-**Note:** Two rows exist for one admin (two device IDs); only **one** is `is_active = true`. Idempotent upsert on `endpoint` prevents duplicate endpoints. For the single test send, target the **active** subscription only.
+**Note:** Two rows existed for one admin (two device IDs); only **one** was `is_active = true`. Idempotent upsert on `endpoint` prevents duplicate endpoints. For the single test send, target the **active** subscription only.
 
 ### Safety (unchanged)
 
@@ -71,11 +71,51 @@ Owner confirmed: **permission granted, subscription created**.
 
 ---
 
+## Step 22T — Subscription reconciliation fix (completed)
+
+**Date:** 2026-07-15
+
+### Root cause
+
+After disable → enable on the same device, the browser created a **new push endpoint** while the backend row for `(employee_id, device_id)` still existed (inactive). `manage-push-subscription` used `upsert` only on `endpoint`, causing a unique-index conflict on `(employee_id, device_id)` → HTTP **500** and UI error «Не удалось обновить регистрацию уведомлений».
+
+### Fix
+
+| Layer | Change |
+|-------|--------|
+| Backend | `register` looks up by `(employee_id, device_id)` first; **UPDATE** existing row (new endpoint/keys, `is_active=true`); upsert by `endpoint` only for first registration on device |
+| Frontend | `enablePushNotifications()` reconcile: SW ready → `getSubscription()` → reuse or subscribe → idempotent backend register; stale VAPID retry; categorized UX errors; double-click guard |
+| Tests | `verify-web-push-subscription-reconcile.mjs`; re-enable stage in `verify-web-push-foundation.mjs` |
+| Deploy | `manage-push-subscription` Edge Function + frontend commit **`453b22d`** (bundle `index-CggSmCBd.js`) |
+
+### Owner manual disable → re-enable
+
+**Owner confirmation:** «Повторное включение прошло успешно».
+
+| Metric | Value (post-22T) |
+|--------|------------------|
+| Subscriptions total | **3** |
+| Active subscriptions | **3** |
+| Inactive (historical) | **0** |
+| Distinct devices | **3** |
+| Duplicate endpoints | **0** |
+| Admin (`role=admin`) | **2** rows, **2** active (multi-device) |
+| Other roles | **1** buyer row, **1** active (separate employee/device; not part of gated test send) |
+| Notifications / deliveries / sent | **0** |
+| Rules enabled | **0** |
+| Cron | **0** |
+| Business baseline | **18/18** unchanged |
+| Test push sent | **no** |
+
+**Gated test send:** target the **owner admin device** active subscription only (not buyer or secondary admin devices).
+
+---
+
 ## Next gated step — single test send
 
-After owner confirmation (already granted for overall E2E scope):
+After Step 22T owner confirmation (**re-enable successful**):
 
-1. Send **exactly one** test push via `send-test-web-push` to the **active** admin subscription.
+1. Send **exactly one** test push via `send-test-web-push` to the **owner admin device** active subscription (not secondary admin devices or other roles).
 2. Verify browser delivery and `notification_deliveries` tracking.
 3. Do **not** resend; do **not** enable rules or Cron.
 
