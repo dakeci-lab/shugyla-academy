@@ -2,6 +2,7 @@ import { supabase } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
 
 const DEVICE_ID_STORAGE_KEY = 'shugyla.web_push.device_id'
+const REGISTERED_VAPID_FINGERPRINT_KEY = 'shugyla.web_push.registered_vapid_fingerprint'
 const LOGOUT_CLEANUP_MS = 3000
 
 export const WEB_PUSH_ERROR_MESSAGES = {
@@ -74,10 +75,47 @@ function subscriptionApplicationServerKey(subscription) {
 
 function subscriptionMatchesVapid(subscription, vapidPublicKey) {
   const subKey = subscriptionApplicationServerKey(subscription)
-  if (!subKey) return true
+  if (!subKey) return false
   const expected = urlBase64ToUint8Array(vapidPublicKey)
   if (subKey.length !== expected.length) return false
   return subKey.every((byte, index) => byte === expected[index])
+}
+
+async function computeVapidPublicFingerprint(vapidPublicKey) {
+  if (!vapidPublicKey || !hasWindow() || !window.crypto?.subtle) return null
+  const raw = urlBase64ToUint8Array(vapidPublicKey)
+  const digest = await window.crypto.subtle.digest('SHA-256', raw)
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 16)
+}
+
+function readRegisteredVapidFingerprint() {
+  if (!hasWindow()) return null
+  return window.localStorage.getItem(REGISTERED_VAPID_FINGERPRINT_KEY)
+}
+
+async function persistRegisteredVapidFingerprint(vapidPublicKey) {
+  if (!hasWindow()) return
+  const fingerprint = await computeVapidPublicFingerprint(vapidPublicKey)
+  if (fingerprint) {
+    window.localStorage.setItem(REGISTERED_VAPID_FINGERPRINT_KEY, fingerprint)
+  }
+}
+
+async function registeredVapidFingerprintMismatch(vapidPublicKey) {
+  const stored = readRegisteredVapidFingerprint()
+  if (!stored) return false
+  const current = await computeVapidPublicFingerprint(vapidPublicKey)
+  return Boolean(current && stored !== current)
+}
+
+async function clearStaleBrowserSubscriptionForVapidRotation(registration) {
+  const existing = await registration.pushManager.getSubscription()
+  if (existing) {
+    await existing.unsubscribe().catch(() => {})
+  }
 }
 
 function isNetworkError(error) {
@@ -172,12 +210,15 @@ async function createBrowserSubscription(registration, vapidPublicKey) {
   }
 }
 
-async function registerBrowserSubscriptionWithBackend(deviceId, subscription) {
+async function registerBrowserSubscriptionWithBackend(deviceId, subscription, vapidPublicKey) {
   await invokeManageSubscription({
     action: 'register',
     device_id: deviceId,
     subscription: serializeSubscription(subscription),
   })
+  if (vapidPublicKey) {
+    await persistRegisteredVapidFingerprint(vapidPublicKey)
+  }
 }
 
 async function resolveBrowserSubscription(registration, vapidPublicKey) {
@@ -308,10 +349,14 @@ export async function enablePushNotifications() {
     )
   }
 
+  if (await registeredVapidFingerprintMismatch(vapidPublicKey)) {
+    await clearStaleBrowserSubscriptionForVapidRotation(registration)
+  }
+
   let subscription = await resolveBrowserSubscription(registration, vapidPublicKey)
 
   try {
-    await registerBrowserSubscriptionWithBackend(deviceId, subscription)
+    await registerBrowserSubscriptionWithBackend(deviceId, subscription, vapidPublicKey)
   } catch (err) {
     if (!(err instanceof WebPushError) || err.code !== 'backend_registration_failed') {
       throw err
@@ -319,7 +364,7 @@ export async function enablePushNotifications() {
 
     await subscription.unsubscribe().catch(() => {})
     subscription = await createBrowserSubscription(registration, vapidPublicKey)
-    await registerBrowserSubscriptionWithBackend(deviceId, subscription)
+    await registerBrowserSubscriptionWithBackend(deviceId, subscription, vapidPublicKey)
   }
 
   const verified = await registration.pushManager.getSubscription()
@@ -1053,6 +1098,10 @@ export async function prepareDeviceForTestSend() {
     )
   }
 
+  if (await registeredVapidFingerprintMismatch(vapidPublicKey)) {
+    await clearStaleBrowserSubscriptionForVapidRotation(registration)
+  }
+
   let subscription = await resolveBrowserSubscription(registration, vapidPublicKey)
   if (!subscription) {
     throw new WebPushError('browser_subscribe_failed', PREPARE_TEST_ERROR_MESSAGES.no_browser_subscription)
@@ -1063,7 +1112,7 @@ export async function prepareDeviceForTestSend() {
   }
 
   try {
-    await registerBrowserSubscriptionWithBackend(deviceId, subscription)
+    await registerBrowserSubscriptionWithBackend(deviceId, subscription, vapidPublicKey)
   } catch (err) {
     if (!(err instanceof WebPushError) || err.code !== 'backend_registration_failed') {
       throw err
@@ -1071,7 +1120,7 @@ export async function prepareDeviceForTestSend() {
 
     await subscription.unsubscribe().catch(() => {})
     subscription = await createBrowserSubscription(registration, vapidPublicKey)
-    await registerBrowserSubscriptionWithBackend(deviceId, subscription)
+    await registerBrowserSubscriptionWithBackend(deviceId, subscription, vapidPublicKey)
   }
 
   const status = await getDeviceTestSendStatus()

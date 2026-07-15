@@ -120,6 +120,9 @@ function stageUnit() {
   )
   assert('prepare does not invoke send-test-web-push', !prepareSource.includes("invoke('send-test-web-push'"))
   assert('prepare reuses resolveBrowserSubscription', prepareSource.includes('resolveBrowserSubscription(registration, vapidPublicKey)'))
+  assert('vapid fingerprint mismatch detection', service.includes('registeredVapidFingerprintMismatch'))
+  assert('persist registered vapid fingerprint', service.includes('persistRegisteredVapidFingerprint'))
+  assert('missing applicationServerKey is mismatch', service.includes('if (!subKey) return false'))
   assert('UI blocks after persisted request', uiIncludesBlockedState())
   console.log('')
 }
