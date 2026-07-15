@@ -138,13 +138,29 @@ Run `scripts/production-auth-users-migration.mjs`.
 
 ---
 
-## Approval 6 — Notification migration rollout
+## Approval 6 — Notification foundation rollout ✓ COMPLETED (Step 22P)
 
-**Only after Auth cutover stable. See notification preflight docs.**
+**Date:** 2026-07-15
+**Owner confirmation:** reconcile migrations, create notification tables, deploy notification Edge Functions, install VAPID secrets; rules **disabled**, Cron **off**.
 
-- [ ] `20260713194500_notification_system_foundation.sql` (skip if tables already exist from earlier partial apply)
-- [ ] Remaining notification migrations in order
-- [ ] Edge Functions, secrets, rules, Cron — separate approvals each
+- [x] Overlapping local migrations audited; empty stub `20260714062253` **deleted**
+- [x] Reconciliation migrations applied: `20260714230000`, `20260714231000`, `20260714232000`
+- [x] Legacy versions repaired without SQL re-run: `20260713194500`–`20260714160000`
+- [x] **Not used:** general `supabase db push`
+- [x] Notification tables: **6**; templates **4**; rules **4**; enabled **0**
+- [x] Notifications / subscriptions / deliveries: **0**
+- [x] Cron jobs: **0**
+- [x] VAPID secrets installed (names only in docs)
+- [x] Notification Edge Functions deployed (**4**); employee functions **not** redeployed
+- [x] Negative smoke: JWT functions **401** without token; scheduler **503** without secret
+- [x] Business baseline **18/18**; fingerprints **unchanged**
+- [x] Phase 3 **not applied**
+- [x] Frontend commit **`8d0cece`** unchanged
+- [x] Real Web Push sent: **0**
+- [x] Readiness script: `npm run verify:production-notification-foundation-readiness`
+- [x] Docs: [production-notification-foundation-rollout.md](../notifications/production-notification-foundation-rollout.md)
+- [ ] **BLOCKED:** frontend `VITE_WEB_PUSH_VAPID_PUBLIC_KEY` for browser E2E — separate step
+- [ ] **BLOCKED:** enable rules / Cron / scheduler HMAC — separate approvals
 
 ---
 

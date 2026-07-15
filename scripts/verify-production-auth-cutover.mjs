@@ -206,13 +206,12 @@ function stageStaticMigrationAnalysis() {
 function stageDuplicateDeliveryAnalysis() {
   console.log('Stage 3: Duplicate delivery migration analysis')
 
-  const dup = fs.readFileSync(path.join(ROOT, DUPLICATE_DELIVERY), 'utf8').trim()
-  const canonical = fs.readFileSync(path.join(ROOT, CANONICAL_DELIVERY), 'utf8').trim()
-
-  if (dup.length > 0) {
-    fail('Duplicate delivery file should be empty stub for skip')
+  if (fs.existsSync(path.join(ROOT, DUPLICATE_DELIVERY))) {
+    fail('Empty stub 20260714062253 must be removed from repo')
   }
-  pass('20260714062253 is empty stub — exclude from apply order')
+  pass('20260714062253 empty stub absent from repo')
+
+  const canonical = fs.readFileSync(path.join(ROOT, CANONICAL_DELIVERY), 'utf8').trim()
 
   if (!canonical.includes('notification_deliveries')) {
     fail('Canonical delivery migration must alter notification_deliveries')

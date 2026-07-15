@@ -1040,3 +1040,59 @@ Deploy Auth-first frontend static build to GitHub Pages. No SQL, no Phase 2, no 
 > **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
 
 Prepare production notification foundation rollout: reconcile overlapping migrations, create notification tables, deploy notification Edge Functions, set VAPID secrets — rules **disabled**, Cron **off**.
+
+---
+
+## 33. Notification foundation rollout — Step 22P
+
+**Date:** 2026-07-15
+**Status:** Foundation deployed. Rules **disabled**. Cron **off**. Pushes sent **0**.
+
+### 33.1 Migrations
+
+| Version | Applied SQL | Method |
+|---------|-------------|--------|
+| `20260714230000` | **yes** | `db query --linked -f` + repair |
+| `20260714231000` | **yes** | same |
+| `20260714232000` | **yes** | same |
+| `20260713194500`–`20260714160000` | **no** (repaired) | object equivalence |
+| `20260714062253` | **never** | stub deleted locally |
+
+### 33.2 Objects
+
+| Object | Count |
+|--------|-------|
+| `notification_*` tables | **6** |
+| templates | **4** |
+| rules | **4** |
+| rules enabled | **0** |
+| notifications / subscriptions / deliveries | **0** |
+| Cron jobs | **0** |
+
+### 33.3 Edge Functions
+
+| Function | ACTIVE | `verify_jwt` |
+|----------|--------|--------------|
+| `manage-push-subscription` | yes | `true` |
+| `send-test-web-push` | yes | `true` |
+| `dispatch-time-tracker-notifications` | yes | `true` |
+| `run-time-tracker-notification-scheduler` | yes | `false` |
+| Employee admin (×3) | yes | `true` |
+
+### 33.4 VAPID
+
+| Secret | Present |
+|--------|---------|
+| `VAPID_PUBLIC_KEY` | yes |
+| `VAPID_PRIVATE_KEY` | yes |
+| `VAPID_SUBJECT` | yes |
+
+Fingerprint (canonical, first 16 hex): `3f0f8656d45ac0b1`
+
+### 33.5 Baseline preserved
+
+**18/18** linked; fingerprints unchanged; Phase 3 not applied; frontend **`8d0cece`**.
+
+### 33.6 Next production write
+
+Controlled Web Push E2E — one admin, one device, one test push. Rules and Cron remain **off**.

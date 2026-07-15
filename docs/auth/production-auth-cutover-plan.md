@@ -68,6 +68,31 @@ Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checkl
 
 ---
 
+## Notification foundation rollout (Step 22P — completed)
+
+**Date:** 2026-07-15
+**Status:** Notification tables, Edge Functions, and VAPID secrets deployed. Rules **disabled**, Cron **off**, pushes sent **0**.
+
+| Item | Value |
+|------|-------|
+| Reconciliation migrations | `20260714230000`, `20260714231000`, `20260714232000` (SQL applied) |
+| Legacy migrations repaired | `20260713194500`–`20260714160000` (equivalence verified) |
+| Empty stub `20260714062253` | deleted locally; never in remote history |
+| Notification tables | **6** |
+| Rules enabled | **0** |
+| Edge Functions total | **7** (4 notification + 3 employee) |
+| VAPID secrets | installed — see [production-notification-foundation-rollout.md](../notifications/production-notification-foundation-rollout.md) |
+| VAPID fingerprint (first 16 hex) | `3f0f8656d45ac0b1` |
+| Business baseline | **18/18** unchanged |
+| Phase 3 | **not applied** |
+| Frontend | commit **`8d0cece`** unchanged |
+
+Details: [../notifications/production-notification-foundation-rollout.md](../notifications/production-notification-foundation-rollout.md)
+
+> **Next gated step:** controlled Web Push E2E on one admin + one device (frontend VAPID deploy required).
+
+---
+
 ## Phase 1 production apply (completed)
 
 | Item | Value |
