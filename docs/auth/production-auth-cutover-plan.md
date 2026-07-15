@@ -1,6 +1,6 @@
 # Production Auth Cutover Plan
 
-**Status:** Reconciled baseline **18/18 linked** (Step 22K). Authenticated smoke test **passed** (Step 22L). Auth-first frontend **prepared** (Step 22M). **Production deploy** pending separate owner approval. Phase 2 pending.
+**Status:** Auth-first frontend **deployed** (Step 22N). Baseline **18/18** preserved. Phase 2 **pending** separate owner approval.
 
 Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md), [../notifications/production-readonly-audit.md](../notifications/production-readonly-audit.md)
 
@@ -31,7 +31,31 @@ Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checkl
 3. Create `employee_owned_by_current_auth()` (requires column)
 4. `notify pgrst, 'reload schema'`
 
-**Next production write:** Deploy Auth-first frontend to GitHub Pages — separate owner approval. **Do not** apply Phase 2 on frontend deploy step.
+**Next production write:** Phase 2 security cutover — separate owner approval. **Do not** apply without explicit confirmation.
+
+---
+
+## Auth-first frontend production deploy (Step 22N — completed)
+
+**Date:** 2026-07-15
+**Owner confirmation:** deploy Auth-first frontend without Phase 2, grants/policies, or notification rollout.
+
+| Check | Result |
+|-------|--------|
+| Deployed commit | `8d0cece` (pushed to `origin/main`) |
+| Rollback point (prior frontend) | `b72fca8` |
+| GitHub Actions workflow | **Deploy to GitHub Pages** run **#60** — **success** |
+| Production URL | `https://dakeci-lab.github.io/shugyla-academy/` |
+| Auth-first login (production) | admin + staff **passed**; inactive **blocked** |
+| Session restore / logout | **passed** (programmatic smoke) |
+| Admin employee list | HTTP **200** via `admin-list-employees`; **10** items (page size); no forbidden fields |
+| Production baseline | **18/18** unchanged; fingerprint **unchanged** |
+| Business mutations | **0** |
+| Phase 2 | **not applied** |
+| Legacy grants/policies | **preserved** |
+| Notifications / Cron | **untouched** |
+
+> Phase 2 security cutover is the next gated step — requires separate owner approval.
 
 ---
 

@@ -1,6 +1,6 @@
 # Production Auth Rollout Checklist
 
-**Status:** Reconciled baseline **18/18 linked** (Step 22K). Smoke test **passed** (Step 22L). Auth-first frontend **prepared** (Step 22M). **Production deploy** pending separate owner approval.
+**Status:** Auth-first frontend **deployed** (Step 22N). Baseline **18/18** preserved. Phase 2 **pending** separate owner approval.
 
 Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md)
 
@@ -66,9 +66,16 @@ Run `scripts/production-auth-users-migration.mjs`.
 - [x] Auth-first frontend prepared locally (Step 22M)
 - [x] Readiness script: `npm run verify:auth-first-frontend-production-readiness`
 - [x] Deploy plan: [auth-first-frontend-production-deploy-plan.md](./auth-first-frontend-production-deploy-plan.md)
-- [ ] **BLOCKED:** Deploy Auth-first frontend to production — pending separate owner approval
-- [ ] Post-deploy production smoke (admin + staff login, inactive blocked, session restore, logout, admin list)
-- [ ] **Do not** run Phase 2 until post-deploy smoke stable
+- [x] Auth-first frontend deployed to GitHub Pages (Step 22N) — commit `8d0cece`
+- [x] Workflow **Deploy to GitHub Pages** run **#60** — **success**
+- [x] Post-deploy smoke: admin login **passed**
+- [x] Post-deploy smoke: active staff login **passed**
+- [x] Post-deploy smoke: inactive user **blocked**
+- [x] Session restore + logout **passed**
+- [x] Admin employee list **passed** (Edge Function HTTP **200**)
+- [x] Production baseline **18/18** unchanged after deploy
+- [ ] **BLOCKED:** Phase 2 security cutover — pending separate owner approval
+- [ ] **Do not** run Phase 2 until owner explicitly approves
 
 ---
 

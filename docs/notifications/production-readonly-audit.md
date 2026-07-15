@@ -932,3 +932,49 @@ Prepare Auth-first frontend production deploy. No Phase 2, no notification rollo
 > **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
 
 Deploy Auth-first frontend static build to GitHub Pages. No SQL, no Phase 2, no grants/policies changes.
+
+---
+
+## 31. Auth-first frontend production deploy — Step 22N
+
+**Date:** 2026-07-15
+**Status:** GitHub Pages deploy **completed**. **0** Supabase/database mutations.
+
+### 31.1 Deploy summary
+
+| Item | Value |
+|------|-------|
+| Commit pushed | `8d0cece` |
+| Prior frontend commit (rollback) | `b72fca8` |
+| Workflow | Deploy to GitHub Pages — run **#60** — **success** |
+| URL | `https://dakeci-lab.github.io/shugyla-academy/` |
+| Bundle checks | production Supabase host in JS; no localhost; no `service_role` |
+
+### 31.2 Post-deploy smoke (non-mutating)
+
+| Test | Result |
+|------|--------|
+| Admin Auth-first login | **passed** |
+| Active staff login | **passed** |
+| Inactive user block | **passed** |
+| Session token restore | **passed** |
+| Logout clears session | **passed** |
+| `admin-list-employees` | HTTP **200**; forbidden fields **absent** |
+
+### 31.3 Production state (unchanged)
+
+| Metric | Value |
+|--------|-------|
+| `academy_users` / linked | **18/18** |
+| `auth.users` | **18** |
+| Edge Functions | **3** ACTIVE |
+| Phase 2 | **not applied** |
+| Legacy grants/policies | **preserved** |
+| Notifications / Cron | **untouched** |
+| Business mutations | **0** |
+
+### 31.4 Next production write
+
+> **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
+
+Apply Phase 2 security cutover SQL. No notification rollout on same step.

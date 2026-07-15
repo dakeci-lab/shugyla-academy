@@ -1,6 +1,6 @@
 # Auth-first Frontend Production Deploy Plan
 
-**Status:** Prepared locally (Step 22M). **Not deployed.** Phase 2 **not applied**.
+**Status:** **Deployed** (Step 22N). Phase 2 **not applied**.
 
 Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md), [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md)
 
@@ -177,3 +177,28 @@ All must exit **0** before owner approves deploy.
 ## 12. Production mutation status
 
 **Step 22M:** **0** production mutations. No deploy performed.
+
+---
+
+## 13. Production deploy record (Step 22N — completed)
+
+**Date:** 2026-07-15
+
+| Item | Value |
+|------|-------|
+| Deploy commit | `8d0cece` |
+| Prior rollback commit | `b72fca8` |
+| Trigger | push to `main` |
+| Workflow | `.github/workflows/deploy.yml` — run **#60** — **success** |
+| Build env | `secrets.VITE_SUPABASE_URL` + `secrets.VITE_SUPABASE_ANON_KEY` |
+| Production URL | `https://dakeci-lab.github.io/shugyla-academy/` |
+| Admin login smoke | **passed** |
+| Staff login smoke | **passed** |
+| Inactive block smoke | **passed** |
+| Session restore / logout | **passed** |
+| Admin list (Edge Function) | HTTP **200** |
+| Baseline | **18/18**; fingerprint **unchanged** |
+| Business mutations | **0** |
+| Phase 2 | **not applied** |
+
+**Next gated step:** Phase 2 security cutover — separate owner approval.
