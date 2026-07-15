@@ -13,6 +13,7 @@ import {
   isProductionE2eTestSendEnabled,
   prepareDeviceForTestSend,
   PREPARE_TEST_SUCCESS_MESSAGE,
+  preflightServerTestWebPush,
   readPersistedSendTestDiagnostic,
   readPersistedSendTestRequest,
   sendServerTestWebPush,
@@ -50,6 +51,13 @@ const PREPARE_STATE = {
   ERROR: 'error',
 }
 
+const PREFLIGHT_STATE = {
+  IDLE: 'idle',
+  CHECKING: 'checking',
+  SUCCESS: 'success',
+  ERROR: 'error',
+}
+
 export default function PushNotificationSettings() {
   const { supabaseAuthenticated } = useSession()
   const { success: showSuccess, warning: showWarning } = useToast()
@@ -62,6 +70,9 @@ export default function PushNotificationSettings() {
   const [prepareMessage, setPrepareMessage] = useState('')
   const [testReady, setTestReady] = useState(false)
   const [testSenderEnabled, setTestSenderEnabled] = useState(false)
+  const [preflightState, setPreflightState] = useState(PREFLIGHT_STATE.IDLE)
+  const [preflightMessage, setPreflightMessage] = useState('')
+  const [preflightSummary, setPreflightSummary] = useState('')
 
   const refreshStatus = useCallback(async () => {
     if (!isCloudMode()) {
@@ -231,6 +242,24 @@ export default function PushNotificationSettings() {
     }
   }
 
+  async function handlePreflightServer() {
+    if (preflightState === PREFLIGHT_STATE.CHECKING || busy || !testReady) return
+    setPreflightState(PREFLIGHT_STATE.CHECKING)
+    setPreflightMessage('')
+    setPreflightSummary('')
+    try {
+      const result = await preflightServerTestWebPush()
+      setPreflightState(PREFLIGHT_STATE.SUCCESS)
+      setPreflightMessage(result.message)
+      setPreflightSummary(result.summary)
+      showSuccess(result.message)
+    } catch (err) {
+      setPreflightState(PREFLIGHT_STATE.ERROR)
+      setPreflightMessage(err.message || 'Не удалось проверить готовность сервера')
+      showWarning(err.message || 'Не удалось проверить готовность сервера')
+    }
+  }
+
   async function handleServerTest() {
     if (
       serverSendState === SERVER_SEND_STATE.SENDING ||
@@ -397,6 +426,35 @@ export default function PushNotificationSettings() {
                 >
                   {prepareMessage}
                 </p>
+              )}
+              <button
+                type="button"
+                className="btn btn--outline btn--sm"
+                onClick={handlePreflightServer}
+                disabled={
+                  !testReady ||
+                  preflightState === PREFLIGHT_STATE.CHECKING ||
+                  busy
+                }
+              >
+                {preflightState === PREFLIGHT_STATE.CHECKING
+                  ? 'Проверяем…'
+                  : 'Проверить готовность сервера'}
+              </button>
+              {preflightMessage && (
+                <p
+                  className={`push-settings__status ${
+                    preflightState === PREFLIGHT_STATE.SUCCESS
+                      ? 'push-settings__status--success'
+                      : 'push-settings__status--warning'
+                  }`}
+                  role="status"
+                >
+                  {preflightMessage}
+                </p>
+              )}
+              {preflightSummary && (
+                <pre className="push-settings__hint push-settings__preflight-summary">{preflightSummary}</pre>
               )}
               <button
                 type="button"

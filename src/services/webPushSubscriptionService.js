@@ -455,9 +455,23 @@ export const SEND_TEST_ERROR_MESSAGES = {
 
 const SEND_TEST_DIAGNOSTIC_STORAGE_KEY = 'shugyla.web_push.last_test_send_diagnostic'
 const SEND_TEST_REQUEST_STORAGE_KEY = 'shugyla.web_push.test_send_request_id'
+const PREFLIGHT_DIAGNOSTIC_STORAGE_KEY = 'shugyla.web_push.last_preflight_diagnostic'
 const DEVICE_ID_UUID_RE = /^[0-9a-f-]{36}$/i
 
 export const PREPARE_TEST_SUCCESS_MESSAGE = 'Устройство готово к тестовому уведомлению'
+export const PREFLIGHT_SUCCESS_MESSAGE = 'Сервер и устройство готовы. Тестовая отправка выключена'
+
+export const PREFLIGHT_ERROR_MESSAGES = {
+  session_expired: 'Сессия истекла',
+  inactive_caller: 'Сотрудник неактивен',
+  forbidden: 'Нет доступа',
+  active_subscription_not_found: 'Активная подписка устройства не найдена',
+  matching_subscription_conflict: 'Найден конфликт подписок',
+  web_push_not_configured: 'Web Push не настроен на сервере',
+  internal_error: 'Ошибка сервера',
+  network: 'Не удалось связаться с сервером',
+  generic: 'Не удалось проверить готовность сервера',
+}
 
 export const PREPARE_TEST_ERROR_MESSAGES = {
   permission_denied: 'Уведомления не разрешены в настройках браузера',
@@ -592,6 +606,149 @@ export function persistSendTestRequest(requestId) {
 
 export function hasAttemptedSendTestRequest() {
   return Boolean(readPersistedSendTestRequest())
+}
+
+function mapPreflightError(data, fallback) {
+  const code = data?.code
+  if (code === 'unauthorized') return PREFLIGHT_ERROR_MESSAGES.session_expired
+  if (code === 'inactive_caller') return PREFLIGHT_ERROR_MESSAGES.inactive_caller
+  if (code === 'forbidden' || code === 'forbidden_field') return PREFLIGHT_ERROR_MESSAGES.forbidden
+  if (code === 'active_subscription_not_found') return PREFLIGHT_ERROR_MESSAGES.active_subscription_not_found
+  if (code === 'matching_subscription_conflict') return PREFLIGHT_ERROR_MESSAGES.matching_subscription_conflict
+  if (code === 'web_push_not_configured') return PREFLIGHT_ERROR_MESSAGES.web_push_not_configured
+  if (code === 'validation_error' || code === 'malformed_json') return PREFLIGHT_ERROR_MESSAGES.forbidden
+  return fallback
+}
+
+export function persistPreflightDiagnostic(diagnostic) {
+  if (!hasWindow()) return
+  try {
+    window.sessionStorage.setItem(PREFLIGHT_DIAGNOSTIC_STORAGE_KEY, JSON.stringify(diagnostic))
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+export function readPersistedPreflightDiagnostic() {
+  if (!hasWindow()) return null
+  try {
+    const raw = window.sessionStorage.getItem(PREFLIGHT_DIAGNOSTIC_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+export function formatPreflightSuccessSummary(checks) {
+  const lines = [
+    'авторизация: готово',
+    'устройство: готово',
+    `active subscription: ${checks?.matching_active_subscriptions ?? 1}`,
+    `сервер Web Push: ${checks?.web_push_configured ? 'готов' : 'не готов'}`,
+    `test gates: ${checks?.test_sender_enabled && checks?.production_test_enabled ? 'включены' : 'выключены'}`,
+    `отправка: ${checks?.ready_to_send ? 'разрешена' : 'заблокирована'}`,
+  ]
+  return lines.join('\n')
+}
+
+export async function preflightServerTestWebPush() {
+  if (!isCloudMode() || !supabase) {
+    throw new WebPushError(
+      'service_worker_unavailable',
+      'Web Push доступен только в облачном режиме'
+    )
+  }
+
+  try {
+    await ensureAuthSession()
+  } catch (err) {
+    if (err instanceof WebPushError && err.code === 'session_expired') {
+      const diagnostic = {
+        stage: 'preflight',
+        httpStatus: 401,
+        errorCode: 'session_expired',
+        authenticated: false,
+        at: new Date().toISOString(),
+        message: PREFLIGHT_ERROR_MESSAGES.session_expired,
+      }
+      persistPreflightDiagnostic(diagnostic)
+      throw new Error(diagnostic.message)
+    }
+    throw err
+  }
+
+  const deviceId = getOrCreateDeviceId()
+  if (!deviceId) {
+    throw new Error(PREFLIGHT_ERROR_MESSAGES.generic)
+  }
+
+  const { data, error } = await supabase.functions.invoke('send-test-web-push', {
+    body: {
+      action: 'preflight',
+      device_id: deviceId,
+    },
+  })
+
+  if (error) {
+    const contextBody = await parseFunctionInvokeContext(error)
+    const httpStatus = typeof error.context?.status === 'number' ? error.context.status : 0
+    const errorCode = contextBody?.code ?? 'invoke_error'
+    const message = contextBody
+      ? mapPreflightError(contextBody, PREFLIGHT_ERROR_MESSAGES.generic)
+      : isNetworkError(error)
+        ? PREFLIGHT_ERROR_MESSAGES.network
+        : PREFLIGHT_ERROR_MESSAGES.generic
+
+    persistPreflightDiagnostic({
+      stage: 'preflight',
+      httpStatus,
+      errorCode,
+      authenticated: httpStatus !== 401,
+      at: new Date().toISOString(),
+      message,
+    })
+    throw new Error(message)
+  }
+
+  if (!data?.ok) {
+    const errorCode = data?.code ?? 'preflight_failed'
+    const message = mapPreflightError(data, PREFLIGHT_ERROR_MESSAGES.generic)
+    persistPreflightDiagnostic({
+      stage: 'preflight',
+      httpStatus: 0,
+      errorCode,
+      authenticated: errorCode !== 'unauthorized',
+      at: new Date().toISOString(),
+      message,
+    })
+    throw new Error(message)
+  }
+
+  const checks = data.checks ?? {}
+  const diagnostic = {
+    stage: 'preflight',
+    httpStatus: 200,
+    errorCode: 'ok',
+    authenticated: Boolean(checks.authenticated),
+    matchingActiveSubscriptions: checks.matching_active_subscriptions ?? 0,
+    webPushConfigured: Boolean(checks.web_push_configured),
+    testSenderEnabled: Boolean(checks.test_sender_enabled),
+    productionTestEnabled: Boolean(checks.production_test_enabled),
+    readyExceptGates: Boolean(checks.ready_except_gates),
+    readyToSend: Boolean(checks.ready_to_send),
+    at: new Date().toISOString(),
+    message: PREFLIGHT_SUCCESS_MESSAGE,
+  }
+  persistPreflightDiagnostic(diagnostic)
+
+  return {
+    checks,
+    message: PREFLIGHT_SUCCESS_MESSAGE,
+    summary: formatPreflightSuccessSummary(checks),
+  }
 }
 
 export function evaluateTestSendReadiness({
@@ -814,6 +971,7 @@ export async function sendServerTestWebPush() {
 
   const { data, error } = await supabase.functions.invoke('send-test-web-push', {
     body: {
+      action: 'send',
       device_id: deviceId,
       request_id: requestId,
     },

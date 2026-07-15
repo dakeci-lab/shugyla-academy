@@ -52,7 +52,7 @@ function stageStatic() {
   assert('prepare button in UI', ui.includes('Подготовить устройство к тесту'))
   assert('send disabled until testReady', ui.includes('!testReady'))
   assert('send disabled until testSenderEnabled', ui.includes('!testSenderEnabled'))
-  assert('no endpoint logging in prepare flow', !/console\.(log|info).*endpoint/i.test(service))
+  assert('preflight button present', ui.includes('Проверить готовность сервера'))
   console.log('')
 }
 

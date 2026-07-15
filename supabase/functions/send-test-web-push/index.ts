@@ -2,6 +2,7 @@ import '@supabase/functions-js/edge-runtime.d.ts'
 import {
   adminErrorResponse,
   authorizeAuthenticatedEmployee,
+  canEmployeeLogin,
 } from '../_shared/employeeAuthorization.ts'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -40,19 +41,53 @@ const RATE_LIMIT_WINDOW_SECONDS = 60
 const RATE_LIMIT_MAX = 3
 const RATE_LIMIT_MIN_INTERVAL_SECONDS = 10
 
-function parseUuid(value: unknown, field: string): string | Response {
+type Action = 'preflight' | 'send'
+
+function parseUuid(value: unknown): string | Response {
   if (typeof value !== 'string' || !UUID_RE.test(value.trim())) {
     return adminErrorResponse('validation_error', 422)
   }
   return value.trim()
 }
 
+function resolveAction(payload: Record<string, unknown>): Action {
+  const raw = payload.action
+  if (raw == null || raw === '') return 'send'
+  if (raw === 'preflight' || raw === 'send') return raw
+  return 'send'
+}
+
+function validateAllowedKeys(payload: Record<string, unknown>, action: Action): Response | null {
+  const allowed =
+    action === 'preflight'
+      ? new Set(['action', 'device_id'])
+      : payload.action == null || payload.action === ''
+        ? new Set(['device_id', 'request_id'])
+        : new Set(['action', 'device_id', 'request_id'])
+
+  for (const key of Object.keys(payload)) {
+    if (!allowed.has(key)) {
+      return adminErrorResponse('forbidden_field', 422)
+    }
+  }
+
+  if (action === 'preflight' && payload.request_id != null) {
+    return adminErrorResponse('forbidden_field', 422)
+  }
+
+  return null
+}
+
 function isProductionTestEnabled(): boolean {
   return Deno.env.get('WEB_PUSH_PRODUCTION_TEST_ENABLED') === 'true'
 }
 
+function isTestGateEnabled(): boolean {
+  return Deno.env.get('WEB_PUSH_TEST_ENABLED') === 'true'
+}
+
 function isTestSenderEnabled(): boolean {
-  if (Deno.env.get('WEB_PUSH_TEST_ENABLED') !== 'true') {
+  if (!isTestGateEnabled()) {
     return false
   }
 
@@ -121,6 +156,70 @@ function notificationContent() {
   }
 }
 
+async function countMatchingActiveSubscriptions(
+  serviceClient: SupabaseClient,
+  employeeId: number,
+  deviceId: string
+): Promise<{ count: number; error: Response | null }> {
+  const { count, error } = await serviceClient
+    .from('notification_push_subscriptions')
+    .select('id', { count: 'exact', head: true })
+    .eq('employee_id', employeeId)
+    .eq('device_id', deviceId)
+    .eq('is_active', true)
+    .eq('permission_status', 'granted')
+
+  if (error) {
+    return { count: 0, error: adminErrorResponse('internal_error', 500) }
+  }
+
+  return { count: count ?? 0, error: null }
+}
+
+async function handlePreflight(
+  serviceClient: SupabaseClient,
+  caller: { id: number; status: string },
+  deviceId: string
+): Promise<Response> {
+  const matching = await countMatchingActiveSubscriptions(serviceClient, caller.id, deviceId)
+  if (matching.error) return matching.error
+
+  if (matching.count === 0) {
+    return jsonResponse({ ok: false, mode: 'preflight', code: 'active_subscription_not_found' }, 409)
+  }
+
+  if (matching.count > 1) {
+    return jsonResponse({ ok: false, mode: 'preflight', code: 'matching_subscription_conflict' }, 409)
+  }
+
+  const webPushConfigured = isWebPushConfigured()
+  if (!webPushConfigured) {
+    return jsonResponse({ ok: false, mode: 'preflight', code: 'web_push_not_configured' }, 503)
+  }
+
+  const testSenderEnabled = isTestGateEnabled()
+  const productionTestEnabled = isProductionTestEnabled()
+  const readyExceptGates = canEmployeeLogin(caller.status) && matching.count === 1 && webPushConfigured
+  const readyToSend = readyExceptGates && isTestSenderEnabled()
+
+  return jsonResponse({
+    ok: true,
+    mode: 'preflight',
+    checks: {
+      authenticated: true,
+      caller_active: canEmployeeLogin(caller.status),
+      current_device_registered: true,
+      matching_active_subscriptions: matching.count,
+      permission_granted: true,
+      web_push_configured: webPushConfigured,
+      test_sender_enabled: testSenderEnabled,
+      production_test_enabled: productionTestEnabled,
+      ready_except_gates: readyExceptGates,
+      ready_to_send: readyToSend,
+    },
+  })
+}
+
 async function checkRateLimit(
   serviceClient: SupabaseClient,
   employeeId: number
@@ -159,49 +258,16 @@ async function checkRateLimit(
   return null
 }
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return corsPreflightResponse()
-  }
-
-  if (req.method !== 'POST') {
-    return adminErrorResponse('method_not_allowed', 405)
-  }
-
+async function handleSend(
+  req: Request,
+  serviceClient: SupabaseClient,
+  caller: { id: number; auth_user_id: string | null },
+  deviceId: string,
+  requestId: string
+): Promise<Response> {
   if (!isTestSenderEnabled()) {
     return adminErrorResponse('test_sender_disabled', 403)
   }
-
-  let payload: Record<string, unknown>
-  try {
-    payload = (await req.json()) as Record<string, unknown>
-  } catch {
-    return adminErrorResponse('malformed_json', 400)
-  }
-
-  for (const key of Object.keys(payload)) {
-    if (FORBIDDEN_FIELDS.has(key)) {
-      return adminErrorResponse('forbidden_field', 422)
-    }
-  }
-
-  const allowedKeys = new Set(['device_id', 'request_id'])
-  for (const key of Object.keys(payload)) {
-    if (!allowedKeys.has(key)) {
-      return adminErrorResponse('forbidden_field', 422)
-    }
-  }
-
-  const authResult = await authorizeAuthenticatedEmployee(req)
-  if (authResult instanceof Response) return authResult
-
-  const { serviceClient, caller } = authResult
-
-  const deviceId = parseUuid(payload.device_id, 'device_id')
-  if (deviceId instanceof Response) return deviceId
-
-  const requestId = parseUuid(payload.request_id, 'request_id')
-  if (requestId instanceof Response) return requestId
 
   const deduplicationKey = `web_push_test:${requestId}`
 
@@ -396,4 +462,48 @@ Deno.serve(async (req) => {
     },
     502
   )
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return corsPreflightResponse()
+  }
+
+  if (req.method !== 'POST') {
+    return adminErrorResponse('method_not_allowed', 405)
+  }
+
+  let payload: Record<string, unknown>
+  try {
+    payload = (await req.json()) as Record<string, unknown>
+  } catch {
+    return adminErrorResponse('malformed_json', 400)
+  }
+
+  for (const key of Object.keys(payload)) {
+    if (FORBIDDEN_FIELDS.has(key)) {
+      return adminErrorResponse('forbidden_field', 422)
+    }
+  }
+
+  const action = resolveAction(payload)
+  const allowedKeysError = validateAllowedKeys(payload, action)
+  if (allowedKeysError) return allowedKeysError
+
+  const authResult = await authorizeAuthenticatedEmployee(req)
+  if (authResult instanceof Response) return authResult
+
+  const { serviceClient, caller } = authResult
+
+  const deviceId = parseUuid(payload.device_id)
+  if (deviceId instanceof Response) return deviceId
+
+  if (action === 'preflight') {
+    return handlePreflight(serviceClient, caller, deviceId)
+  }
+
+  const requestId = parseUuid(payload.request_id)
+  if (requestId instanceof Response) return requestId
+
+  return handleSend(req, serviceClient, caller, deviceId, requestId)
 })
