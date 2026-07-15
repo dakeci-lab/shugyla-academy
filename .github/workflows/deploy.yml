@@ -30,11 +30,24 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Resolve VAPID public key
+        id: vapid
+        run: |
+          if [ -f config/production-vapid-public.key ]; then
+            KEY="$(tr -d '\n' < config/production-vapid-public.key)"
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "public_key=$KEY" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "public_key=" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_WEB_PUSH_VAPID_PUBLIC_KEY: ${{ steps.vapid.outputs.public_key }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
