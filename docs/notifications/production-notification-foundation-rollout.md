@@ -325,7 +325,7 @@ Local docs commit: `docs: record web push diagnostics production deploy` (not pu
 |------|--------|
 | Migration | `20260715183000_notification_test_send_permits` |
 | Authorization | DB permit (TTL **5 min**, atomic consume) replaces env-gate send authorization |
-| Admin permission | `schedule.edit` (existing) |
+| Admin permission | `roles.assign_permissions` (admin-only; replaces `schedule.edit` for permit issue) |
 | Legacy test gates | **OFF** (diagnostic only) |
 | Permits total / active | **0** / **0** |
 | Notifications / deliveries | **0** / **0** |
@@ -333,6 +333,24 @@ Local docs commit: `docs: record web push diagnostics production deploy` (not pu
 | Commit | **`c957f36`** |
 
 Context: Steps 22X/22Z rejected sends with 0 records while env gates appeared ON in preflight — isolate env staleness. Permits eliminate operational dependence on Edge secret propagation for send authorization.
+
+---
+
+## Step 22AD — Admin-only permit issue gate
+
+**Date:** 2026-07-15  
+**Status:** `send-test-web-push` **v12** deployed; **`roles.assign_permissions`** gates `issue_permit`; production permit **not issued**; push **not sent**.
+
+| Item | Result |
+|------|--------|
+| Commit | **`4fbd172`** |
+| Permit issue permission | **`roles.assign_permissions`** (admin-only) |
+| `schedule.edit` | **Unchanged** in `role_permissions` |
+| Legacy test gates | **OFF / OFF** |
+| Permits total / active | **0** / **0** |
+| Notifications / deliveries / sent | **0** / **0** / **0** |
+| Rules / Cron | **0** / **0** |
+| Business baseline | **18/18** unchanged |
 
 ---
 

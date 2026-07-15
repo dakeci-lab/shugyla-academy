@@ -271,12 +271,39 @@ Diagnostics in production bundle: `session_expired`, `browser_subscription_missi
 
 1. «Подготовить устройство к тесту»
 2. «Проверить готовность сервера» (`permit_required=true`, `ready_to_send=false`)
-3. «Создать одноразовое разрешение» (admin + `schedule.edit`; stores permit in sessionStorage only; **no UUID shown**)
+3. «Создать одноразовое разрешение» (admin + `roles.assign_permissions`; stores permit in sessionStorage only; **no UUID shown**)
 4. «Отправить тестовое уведомление» (requires valid permit; one click; no auto-retry)
 
 ### Why env gates were replaced
 
 Steps 22X/22Z showed env-gate toggles are unreliable for controlled production send (isolate env staleness). Permits provide durable, auditable, exactly-once authorization bound to authenticated employee + device.
+
+---
+
+## Step 22AD — Admin-only permit issue gate (deployed)
+
+**Date:** 2026-07-15  
+**Owner confirmation:** replace `TEST_SEND_PERMIT_ISSUE_PERMISSION` with `roles.assign_permissions`; redeploy `send-test-web-push` only; **no** permit issued; **no** push sent.
+
+| Item | Result |
+|------|--------|
+| Commit | **`4fbd172`** — `fix: restrict web push permit issuance to admin` |
+| Code change | `TEST_SEND_PERMIT_ISSUE_PERMISSION`: `schedule.edit` → **`roles.assign_permissions`** |
+| `schedule.edit` RBAC | **Unchanged** — still assigned to «Администратор» + «Администратор торгового зала» |
+| Permit issue permission | **`roles.assign_permissions`** — admin-only (`assignedRoleCount = 1`) |
+| Edge Function | `send-test-web-push` **v12**, `verify_jwt=true`, **ACTIVE** |
+| Legacy env gates | **OFF / OFF** |
+| Production permits | **0** total / **0** active |
+| Notifications / deliveries / sent | **0** / **0** / **0** |
+| Subscriptions total / active | **3** / **3** |
+| Verifier | `verify:web-push-test-permits` **98/98** |
+| Business baseline | **18/18** unchanged |
+| Frontend bundle | `assets/index-CuZe510x.js` (no frontend code change) |
+| GitHub Pages | workflow **Deploy to GitHub Pages** run **29432930899** — **success** @ **`4fbd172`** |
+
+### Why `schedule.edit` was not changed
+
+Step 22AB blocked because `schedule.edit` is legitimately shared with «Администратор торгового зала». Step 22AC selected existing admin-only permission `roles.assign_permissions` instead of mutating `role_permissions`.
 
 ---
 
