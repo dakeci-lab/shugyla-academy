@@ -199,6 +199,23 @@ All must exit **0** before owner approves deploy.
 | Admin list (Edge Function) | HTTP **200** |
 | Baseline | **18/18**; fingerprint **unchanged** |
 | Business mutations | **0** |
-| Phase 2 | **not applied** |
+| Phase 2 | **applied** (`20260714210000`) |
 
-**Next gated step:** Phase 2 security cutover — separate owner approval.
+**Next gated step:** notification foundation rollout — separate owner approval.
+
+---
+
+## 14. Phase 2 production security cutover — Step 22O
+
+**Date:** 2026-07-15
+**Status:** Legacy anon access **closed**. **0** business-data mutations.
+
+| Item | Value |
+|------|-------|
+| Remote migration | `20260714210000_production_auth_security_cutover_phase2` |
+| Apply method | single-file `db query --linked` + `migration repair` |
+| `db push` | **not used** |
+| Rollback plan | [phase2-production-rollback.sql](./phase2-production-rollback.sql) |
+| Baseline | **18/18**; fingerprints unchanged |
+| Frontend | **`8d0cece`** (no redeploy) |
+| Notifications | **untouched** |

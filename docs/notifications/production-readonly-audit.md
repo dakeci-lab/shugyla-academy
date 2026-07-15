@@ -968,13 +968,75 @@ Deploy Auth-first frontend static build to GitHub Pages. No SQL, no Phase 2, no 
 | `academy_users` / linked | **18/18** |
 | `auth.users` | **18** |
 | Edge Functions | **3** ACTIVE |
-| Phase 2 | **not applied** |
-| Legacy grants/policies | **preserved** |
+| Phase 2 | **applied** (`20260714210000`) |
+| Legacy grants/policies | **Phase 2 cutover applied** — anon closed |
 | Notifications / Cron | **untouched** |
 | Business mutations | **0** |
 
-### 31.4 Next production write
+### 31.4 Next production write (superseded)
+
+> Phase 2 applied in Step 22O. See Section 32.
+
+---
+
+## 32. Phase 2 production security cutover — Step 22O
+
+**Date:** 2026-07-15
+**Status:** Legacy anon access **closed**. **0** business-data mutations. Notifications **not** rolled out.
+
+### 32.1 Migration apply
+
+| Item | Value |
+|------|-------|
+| Remote version | `20260714210000` |
+| Remote name | `production_auth_security_cutover_phase2` |
+| Prior remote migrations | `20260714172032` (Phase 1) only |
+| Notification migrations applied | **0** (`notification%` tables = **0**) |
+| Apply method | `supabase db query --linked -f` + `migration repair --status applied` |
+| `db push` | **not used** (avoids stub `20260714062253`) |
+
+### 32.2 Baseline (pre/post identical)
+
+| Metric | Value |
+|--------|-------|
+| `academy_users` / linked | **18/18** |
+| active linked | **10/10** |
+| inactive | **8** |
+| `auth.users` | **18** |
+| roles / role_permissions | **9** / **137** |
+| legacy passwords nonempty | **18** |
+| conflicts / orphans / duplicates | **0** |
+| `academy_users` fingerprint | `2db1f3bd96bab76e2dae079250882714` (**unchanged**) |
+| `academy_employee_shifts` | **190** rows; hash **unchanged** |
+| RBAC fingerprints | **unchanged** |
+
+### 32.3 Security smoke (post-apply)
+
+| Test | Result |
+|------|--------|
+| Anon `academy_users` CRUD | **denied** |
+| Anon shifts read | **denied** |
+| Authenticated own profile | **passed** |
+| Admin Auth login | **passed** |
+| Staff Auth login | **passed** |
+| Session refresh / logout | **passed** |
+| `admin-list-employees` | HTTP **200** |
+| Rating / schedule (admin team) | **degraded** (RLS-limited cache; non-outage) |
+| Time-tracker RPC | **present** (`attendance_check_in/out`) |
+
+### 32.4 Unchanged systems
+
+| System | Status |
+|--------|--------|
+| Phase 3 | **not applied** |
+| Frontend GitHub Pages | commit **`8d0cece`** |
+| Edge Functions redeploy | **none** |
+| Notification tables / functions | **absent** |
+| VAPID secrets / Cron | **untouched** |
+| Rollback executed | **no** |
+
+### 32.5 Next production write
 
 > **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
 
-Apply Phase 2 security cutover SQL. No notification rollout on same step.
+Prepare production notification foundation rollout: reconcile overlapping migrations, create notification tables, deploy notification Edge Functions, set VAPID secrets — rules **disabled**, Cron **off**.

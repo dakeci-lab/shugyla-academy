@@ -1,8 +1,8 @@
 # Production Auth Rollout Checklist
 
-**Status:** Auth-first frontend **deployed** (Step 22N). Baseline **18/18** preserved. Phase 2 **pending** separate owner approval.
+**Status:** Phase 2 security cutover **applied** (Step 22O). Baseline **18/18** preserved. Legacy anon access **closed**.
 
-Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md)
+Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md), [phase2-production-rollback.sql](./phase2-production-rollback.sql)
 
 ---
 
@@ -74,8 +74,41 @@ Run `scripts/production-auth-users-migration.mjs`.
 - [x] Session restore + logout **passed**
 - [x] Admin employee list **passed** (Edge Function HTTP **200**)
 - [x] Production baseline **18/18** unchanged after deploy
-- [ ] **BLOCKED:** Phase 2 security cutover — pending separate owner approval
-- [ ] **Do not** run Phase 2 until owner explicitly approves
+- [x] Phase 2 security cutover applied (Step 22O) — see Approval 4
+
+---
+
+## Approval 4 — Security cutover / anon revoke ✓ COMPLETED (Step 22O)
+
+**Date:** 2026-07-15
+**Owner confirmation:** prepare and apply Phase 2 security cutover closing legacy anon access; **no** notification rollout.
+
+**Production migration:** `20260714210000_production_auth_security_cutover_phase2`
+
+- [x] Pre-cutover baseline **18/18** matched expected counts
+- [x] Fingerprints captured (pre = post)
+- [x] Phase 1 present (`20260714172032`); Phase 2 absent before apply
+- [x] Notification migrations **not** applied (`notification%` tables = **0**)
+- [x] Local Phase 2 verification (`supabase:local:verify-production-auth-cutover`) exit **0**
+- [x] Rollback SQL prepared: [phase2-production-rollback.sql](./phase2-production-rollback.sql) (manual only)
+- [x] Applied via **single** `db query --linked -f` (not `db push`)
+- [x] Migration history repaired: `20260714210000` → `applied`
+- [x] Legacy permissive anon policies **removed**
+- [x] Anon SELECT/INSERT/UPDATE/DELETE/TRUNCATE on `academy_users` **denied**
+- [x] Own-profile policy `academy_users_select_own_profile` **works**
+- [x] Authenticated RBAC catalog read **works**
+- [x] Production smoke: admin + staff Auth login **passed**
+- [x] Session restore + logout **passed**
+- [x] `admin-list-employees` HTTP **200** (safe DTO)
+- [x] Baseline post-cutover **18/18**; fingerprints **unchanged**; business mutations **0**
+- [x] Legacy passwords preserved **18/18**
+- [x] Phase 3 **not** applied
+- [x] Notifications / Cron / VAPID / Edge redeploy **untouched**
+- [x] Frontend commit remains **`8d0cece`** (no redeploy)
+- [ ] **BLOCKED:** Phase 3 password cleanup — separate owner approval
+- [ ] **Do not** run notification rollout without separate owner approval
+
+**Known post-Phase-2 behavior (non-outage):** admin team rating/schedule pages use in-memory employee cache from `fetchAllData()`; after cutover authenticated users see **own profile only** via RLS — team views may show reduced data until a future admin-read path. Employee admin list uses Edge Functions (unaffected). Time-tracker check-in/out uses `attendance_check_in/out` SECURITY DEFINER RPC (unchanged).
 
 ---
 
@@ -91,21 +124,6 @@ Run `scripts/production-auth-users-migration.mjs`.
 - [x] Reconciled baseline: **18/18** linked; active **10/10**; `auth.users=18`
 - [x] Legacy passwords/policies/grants preserved
 - [x] Step 22L authenticated smoke test completed (non-mutating)
-- [ ] **Do not** deploy Auth-first frontend until separate owner approval
-
----
-
-## Approval 4 — Security cutover / anon revoke
-
-**Owner approval required.**
-
-- [ ] Apply `20260714210000_production_auth_security_cutover_phase2.sql`
-- [ ] Permissive anon policies removed
-- [ ] Anon cannot SELECT/UPDATE `academy_users`
-- [ ] Own-profile policy works
-- [ ] Staff cannot read other profiles
-- [ ] `service_role` Edge Functions still work
-- [ ] **Do not** run Phase 3 immediately
 
 ---
 

@@ -1,8 +1,72 @@
 # Production Auth Cutover Plan
 
-**Status:** Auth-first frontend **deployed** (Step 22N). Baseline **18/18** preserved. Phase 2 **pending** separate owner approval.
+**Status:** Phase 2 security cutover **applied** (Step 22O). Baseline **18/18** preserved. Legacy anon access **closed**.
 
-Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md), [../notifications/production-readonly-audit.md](../notifications/production-readonly-audit.md)
+Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md), [../notifications/production-readonly-audit.md](../notifications/production-readonly-audit.md), [phase2-production-rollback.sql](./phase2-production-rollback.sql)
+
+## Phase 2 production security cutover (Step 22O — completed)
+
+**Date:** 2026-07-15
+**Owner confirmation:** prepare and apply Phase 2 closing legacy anon access; **no** notification rollout.
+
+| Item | Value |
+|------|-------|
+| Remote migration version | `20260714210000` (`production_auth_security_cutover_phase2`) |
+| Local canonical file | `20260714210000_production_auth_security_cutover_phase2.sql` |
+| Apply method | `supabase db query --linked -f` (single file) + `migration repair --status applied` |
+| **Not used** | `supabase db push` (would risk notification stub `20260714062253`) |
+| Rollback artifact | [phase2-production-rollback.sql](./phase2-production-rollback.sql) (manual emergency only) |
+
+**Pre-cutover baseline (matched expected):**
+
+| Metric | Value |
+|--------|-------|
+| `academy_users` / linked | **18/18** |
+| active linked | **10/10** |
+| inactive | **8** |
+| `auth.users` | **18** |
+| roles / role_permissions | **9** / **137** |
+| legacy passwords nonempty | **18** |
+| orphan / duplicate links | **0** |
+| notification tables | **0** |
+| Phase 2 in `schema_migrations` | **absent** |
+
+**Fingerprints (pre = post, unchanged):**
+
+| Object | Hash (md5 aggregate) |
+|--------|----------------------|
+| `academy_users` | `2db1f3bd96bab76e2dae079250882714` |
+| `academy_employee_shifts` (190 rows) | `d073683ed209b226b0c3f85f644b7047` |
+| `roles` | `01ca13172459631e3de1a12a1017173e` |
+| `permissions` | `7fe9297b5643d1484092aac38a4ab897` |
+| `role_permissions` | `0658d2ae42184583e2bb7c83c115594a` |
+
+**Post-apply verification:**
+
+| Check | Result |
+|-------|--------|
+| Anon `academy_users` SELECT/INSERT/UPDATE/DELETE | **denied** (REST + privileges) |
+| Anon `academy_employee_shifts` SELECT | **denied** |
+| Authenticated own profile (`auth_user_id = auth.uid()`) | **passed** |
+| Admin Auth login | **passed** |
+| Active staff Auth login | **passed** |
+| Session refresh + logout | **passed** |
+| `admin-list-employees` | HTTP **200**; safe DTO |
+| RBAC catalog read (authenticated) | **passed** |
+| Rating (admin team view) | **degraded** — cache limited to own profile via RLS; page loads |
+| Schedule (admin team view) | **degraded** — same; own-shift RLS for direct reads |
+| Time-tracker RPC (`attendance_check_in/out`) | **present**; Phase 2 did not revoke |
+| Business mutations | **0** |
+| Legacy passwords | **18/18** preserved |
+| Phase 3 | **not applied** |
+| Frontend deploy | unchanged commit **`8d0cece`** |
+| Edge Functions | **3** ACTIVE (`verify_jwt=true`) |
+| Notifications / Cron / VAPID | **untouched** |
+| Rollback required | **no** (no outage) |
+
+> **Next gated step:** notification foundation rollout — separate owner approval only.
+
+---
 
 ## Phase 1 production apply (completed)
 
