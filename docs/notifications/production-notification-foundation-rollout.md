@@ -304,8 +304,18 @@ Local docs commit: `docs: record web push diagnostics production deploy` (not pu
 | Notifications / deliveries | **0** / **0** |
 | Business baseline | **18/18** unchanged |
 
+### Owner manual preflight — success
+
+| Check | Result |
+|-------|--------|
+| iPhone preflight UI | **success** |
+| Active subscription | **1** |
+| Test gates | **OFF** |
+| Push sent | **no** |
+| Notifications / deliveries | **0** / **0** |
+
 ---
 
 ## Next step (gated)
 
-Owner manual **preflight** on iPhone («Проверить готовность сервера»); **not** test-send. Rules **disabled**, Cron **off**.
+Controlled test-send only after **separate owner confirmation**; preflight confirmed `ready_except_gates=true`, `ready_to_send=false`. Rules **disabled**, Cron **off**.

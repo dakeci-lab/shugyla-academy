@@ -207,16 +207,38 @@ Diagnostics in production bundle: `session_expired`, `browser_subscription_missi
 | Notifications / deliveries | **0** / **0** |
 | Verifier | `verify:web-push-sender-preflight` **47/47** |
 
+### Owner manual preflight (iPhone) — success
+
+**Owner confirmation:** preflight completed on same iPhone; test-send **not** pressed.
+
+| Check | Result |
+|-------|--------|
+| Авторизация | **готово** |
+| Устройство | **готово** |
+| Active subscription | **1** |
+| Сервер Web Push | **готов** |
+| Test gates | **выключены** |
+| Отправка | **заблокирована** |
+| UI message | «Сервер и устройство готовы. Тестовая отправка выключена» |
+| `ready_except_gates` | **true** (inferred from UI) |
+| `ready_to_send` | **false** (inferred from UI) |
+| Test-send button clicked | **no** |
+| Push sent | **no** |
+| Notifications / deliveries / sent (post-preflight audit) | **0** / **0** / **0** |
+| Subscriptions total / active (unchanged) | **3** / **3** |
+| Rules / Cron | **0** / **0** |
+| Test gates final | **OFF** |
+
 ---
 
-## Next gated step — owner manual preflight on iPhone
+## Next gated step — controlled test-send (separate owner confirmation)
 
-After Step 22Y deploy:
+After Step 22Y preflight success:
 
-1. Prepare device if needed («Подготовить устройство к тесту»).
-2. Press **«Проверить готовность сервера»** once (not test-send).
-3. Report safe UI result to Cursor.
-4. Expected: `ready_except_gates=true`, `ready_to_send=false`, gates off message.
+1. Owner must give **separate explicit confirmation** before any test-send.
+2. Temporarily enable test gates only after confirmation.
+3. Allow **one** manual «Отправить тестовое уведомление» press (no retry).
+4. Rules **disabled**, Cron **off**.
 
 ---
 
