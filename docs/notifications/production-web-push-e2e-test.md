@@ -173,14 +173,50 @@ Diagnostics in production bundle: `session_expired`, `browser_subscription_missi
 
 ---
 
-## Next gated step — single test send
+## Step 22X — Controlled test-send attempt (rejected before INSERT)
 
-After Step 22W diagnostics deploy and **separate owner confirmation**:
+**Date:** 2026-07-15
+**Status:** one manual click; **no** notification/delivery records; gates locked down.
 
-1. Synchronize browser subscription on the owner admin device; confirm exactly **one** matching active subscription.
-2. Send **exactly one** test push via manual button press only (no automatic retry).
-3. Verify browser delivery and `notification_deliveries` tracking.
-4. Do **not** resend; do **not** enable rules or Cron.
+| Item | Result |
+|------|--------|
+| Prepare flow | **`7872a32`** deployed |
+| Device prepare | owner confirmed ready; matching active subscription **1** |
+| Test gates | temporarily **ON**, then **OFF** after click |
+| Manual click | **1**; UI: «Сервер отклонил запрос» |
+| Notifications / deliveries / sent | **0** / **0** / **0** |
+| Root cause | server rejection at `send-test-web-push` before INSERT (exact code not proven) |
+| Architecture gap | `manage-push-subscription` status vs sender gate order differed |
+
+---
+
+## Step 22Y — Sender-owned preflight (deployed)
+
+**Date:** 2026-07-15
+**Owner confirmation:** deploy safe `preflight` action without send, records, or gate enablement.
+
+| Item | Result |
+|------|--------|
+| Commit | **`49bc2eb`** |
+| Edge Function | `send-test-web-push` **deployed** (`verify_jwt=true`) |
+| GitHub Pages | run **29427630875** — **success** |
+| Action | `{ action: "preflight", device_id }` — no push/records/gates required |
+| Frontend button | «Проверить готовность сервера» |
+| Test gates | **OFF** |
+| Rules / Cron | **0** / **0** |
+| Notifications / deliveries | **0** / **0** |
+| Verifier | `verify:web-push-sender-preflight` **47/47** |
+
+---
+
+## Next gated step — owner manual preflight on iPhone
+
+After Step 22Y deploy:
+
+1. Prepare device if needed («Подготовить устройство к тесту»).
+2. Press **«Проверить готовность сервера»** once (not test-send).
+3. Report safe UI result to Cursor.
+4. Expected: `ready_except_gates=true`, `ready_to_send=false`, gates off message.
 
 ---
 

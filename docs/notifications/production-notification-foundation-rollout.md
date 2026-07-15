@@ -283,6 +283,29 @@ Local docs commit: `docs: record web push diagnostics production deploy` (not pu
 
 ---
 
+## Step 22X — Controlled test-send (server rejection, zero records)
+
+**Date:** 2026-07-15
+**Status:** one owner click; UI «Сервер отклонил запрос»; **0** notifications/deliveries; gates **OFF**.
+
+---
+
+## Step 22Y — Sender-owned preflight
+
+**Date:** 2026-07-15
+**Status:** deployed commit **`49bc2eb`**; `send-test-web-push` preflight action; gates **OFF**.
+
+| Item | Result |
+|------|--------|
+| Edge Function | `send-test-web-push` only |
+| GitHub Pages | run **29427630875** — **success** |
+| Test gates | **OFF** |
+| Rules / Cron | **0** / **0** |
+| Notifications / deliveries | **0** / **0** |
+| Business baseline | **18/18** unchanged |
+
+---
+
 ## Next step (gated)
 
-After **separate owner confirmation**: synchronize browser subscription on owner admin device, confirm one matching active subscription, then allow **one** manual test-send button press (no automatic retry). Rules **disabled**, Cron **off**.
+Owner manual **preflight** on iPhone («Проверить готовность сервера»); **not** test-send. Rules **disabled**, Cron **off**.
