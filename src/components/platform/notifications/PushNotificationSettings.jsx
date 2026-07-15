@@ -8,6 +8,7 @@ import {
   getNotificationPermission,
   getPushRegistrationStatus,
   isWebPushSupported,
+  isProductionE2eTestSendEnabled,
   sendServerTestWebPush,
   showDevelopmentTestNotification,
   WebPushError,
@@ -261,11 +262,44 @@ export default function PushNotificationSettings() {
                 type="button"
                 className="btn btn--outline btn--sm"
                 onClick={handleServerTest}
-                disabled={serverSendState === SERVER_SEND_STATE.SENDING}
+                disabled={serverSendState === SERVER_SEND_STATE.SENDING || busy}
               >
                 {serverSendState === SERVER_SEND_STATE.SENDING
                   ? 'Отправляем…'
                   : 'Отправить серверное push'}
+              </button>
+              {serverSendMessage && (
+                <p
+                  className={`push-settings__status ${
+                    serverSendState === SERVER_SEND_STATE.SUCCESS
+                      ? 'push-settings__status--success'
+                      : 'push-settings__status--warning'
+                  }`}
+                  role="status"
+                >
+                  {serverSendMessage}
+                </p>
+              )}
+            </div>
+          )}
+          {isProductionE2eTestSendEnabled() && !import.meta.env.DEV && (
+            <div className="push-settings__dev-tests">
+              <p className="push-settings__hint">
+                Одно контролируемое тестовое уведомление отправляется только на это устройство.
+              </p>
+              <button
+                type="button"
+                className="btn btn--outline btn--sm"
+                onClick={handleServerTest}
+                disabled={
+                  serverSendState === SERVER_SEND_STATE.SENDING ||
+                  serverSendState === SERVER_SEND_STATE.SUCCESS ||
+                  busy
+                }
+              >
+                {serverSendState === SERVER_SEND_STATE.SENDING
+                  ? 'Отправляем…'
+                  : 'Отправить тестовое уведомление'}
               </button>
               {serverSendMessage && (
                 <p

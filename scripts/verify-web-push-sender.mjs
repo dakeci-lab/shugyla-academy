@@ -50,6 +50,7 @@ const state = {
   tokens: {},
   deviceA: crypto.randomUUID(),
   deviceB: crypto.randomUUID(),
+  deviceC: crypto.randomUUID(),
   p256dh: null,
   authKey: null,
   subscriptionId: null,
@@ -75,6 +76,7 @@ async function main() {
     await stageFunctionAuth()
     await stageValidation()
     await stageOwnership()
+    await stageDeviceTargeting()
     await stageDeliveryTracking()
     await stageIdempotency()
     stageRateLimit()
@@ -194,12 +196,12 @@ async function invokeRegister({ token, body }) {
   return { status: response.status, json }
 }
 
-function validRegisterBody(deviceId) {
+function validRegisterBody(deviceId, endpoint = ENDPOINT) {
   return {
     action: 'register',
     device_id: deviceId,
     subscription: {
-      endpoint: ENDPOINT,
+      endpoint,
       expiration_time: null,
       keys: { p256dh: state.p256dh, auth: state.authKey },
     },
@@ -505,6 +507,8 @@ function stageStaticChecks() {
   )
   assert('sender uses isWebPushConfigured', senderFn.includes('isWebPushConfigured'))
   assert('sender WEB_PUSH_TEST_ENABLED guard', senderFn.includes("WEB_PUSH_TEST_ENABLED") && senderFn.includes("'true'"))
+  assert('sender production test gate', senderFn.includes('WEB_PUSH_PRODUCTION_TEST_ENABLED'))
+  assert('sender isTestSenderEnabled guard', senderFn.includes('isTestSenderEnabled'))
   assert('sender production marker guard', senderFn.includes(PRODUCTION_REF))
   assert('sender checkRateLimit present', senderFn.includes('checkRateLimit'))
   assert('sender deduplication_key pattern', senderFn.includes('web_push_test:${requestId}'))
@@ -525,10 +529,12 @@ function stageStaticChecks() {
   assert('service mapSendTestError rate_limited', service.includes("'rate_limited'"))
   assert('service mapSendTestError subscription_expired', service.includes("'subscription_expired'"))
   assert('service DEV guard for server send', service.includes('import.meta.env.DEV'))
+  assert('service production E2E gate', service.includes('isProductionE2eTestSendEnabled'))
 
   assert('UI imports sendServerTestWebPush', ui.includes('sendServerTestWebPush'))
   assert('UI handleServerTest handler', ui.includes('handleServerTest'))
   assert('UI server push button', ui.includes('Отправить серверное push'))
+  assert('UI production E2E button', ui.includes('Отправить тестовое уведомление'))
   assert('UI server test DEV guarded', ui.includes('import.meta.env.DEV'))
 
   console.log('')
@@ -687,7 +693,7 @@ async function stageFunctionAuth() {
   assert('malformed JSON → 400', malformed.status === 400)
 
   const senderFn = fs.readFileSync(path.join(ROOT, 'supabase/functions/send-test-web-push/index.ts'), 'utf8')
-  assert('isLocalTestEnabled guard present', senderFn.includes('isLocalTestEnabled'))
+  assert('isTestSenderEnabled guard present', senderFn.includes('isTestSenderEnabled'))
   assert('test_sender_disabled response code', senderFn.includes("'test_sender_disabled'"))
 
   console.log('')
@@ -773,6 +779,60 @@ async function stageOwnership() {
     body: validRegisterBody(state.deviceA),
   })
   assert('subscription re-enabled for delivery tests', reRegister.status === 200 && reRegister.json?.ok)
+
+  console.log('')
+}
+
+async function stageDeviceTargeting() {
+  console.log('Stage 10b: Self-device targeting')
+
+  const endpointC = `${ENDPOINT}-device-c`
+  const endpointB = `${ENDPOINT}-device-b`
+
+  const regC = await invokeRegister({
+    token: state.tokens.a,
+    body: validRegisterBody(state.deviceC, endpointC),
+  })
+  assert('second admin device registered → 200', regC.status === 200 && regC.json?.ok)
+
+  const regB = await invokeRegister({
+    token: state.tokens.b,
+    body: validRegisterBody(state.deviceB, endpointB),
+  })
+  assert('second user device registered → 200', regB.status === 200 && regB.json?.ok)
+
+  const adminActiveDevices = psqlScalar(`
+    SELECT COUNT(*) FROM public.notification_push_subscriptions
+    WHERE employee_id = ${state.users.a.employeeId}
+      AND is_active = true;
+  `)
+  assert('admin has two active devices', adminActiveDevices === '2')
+
+  const matchingActive = psqlScalar(`
+    SELECT COUNT(*) FROM public.notification_push_subscriptions
+    WHERE employee_id = ${state.users.a.employeeId}
+      AND device_id = '${state.deviceA}'::uuid
+      AND is_active = true;
+  `)
+  assert('matching active subscriptions for target device = 1', matchingActive === '1')
+
+  const otherAdminDeviceActive = psqlScalar(`
+    SELECT COUNT(*) FROM public.notification_push_subscriptions
+    WHERE employee_id = ${state.users.a.employeeId}
+      AND device_id = '${state.deviceC}'::uuid
+      AND is_active = true;
+  `)
+  assert('other admin device remains active separately', otherAdminDeviceActive === '1')
+
+  const otherUserDevice = await invokeSender({
+    token: state.tokens.b,
+    body: validSendBody(state.deviceA),
+  })
+  assert(
+    'other user cannot target admin device',
+    otherUserDevice.status === 409 &&
+      otherUserDevice.json?.code === 'active_subscription_not_found'
+  )
 
   console.log('')
 }

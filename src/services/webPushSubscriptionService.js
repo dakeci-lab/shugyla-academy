@@ -434,8 +434,12 @@ function mapSendTestError(data, fallback) {
   return fallback
 }
 
+export function isProductionE2eTestSendEnabled() {
+  return import.meta.env.VITE_WEB_PUSH_PRODUCTION_E2E_TEST === 'true'
+}
+
 export async function sendServerTestWebPush() {
-  if (!import.meta.env.DEV) {
+  if (!import.meta.env.DEV && !isProductionE2eTestSendEnabled()) {
     throw new Error('Server test push is only available in development mode')
   }
 

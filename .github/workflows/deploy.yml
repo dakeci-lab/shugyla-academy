@@ -42,12 +42,22 @@ jobs:
             echo "public_key=" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Resolve production Web Push E2E test flag
+        id: web_push_e2e
+        run: |
+          if [ -f config/production-web-push-e2e-test.flag ] && [ "$(tr -d '[:space:]' < config/production-web-push-e2e-test.flag)" = "enabled" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Build
         run: npm run build
         env:
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_WEB_PUSH_VAPID_PUBLIC_KEY: ${{ steps.vapid.outputs.public_key }}
+          VITE_WEB_PUSH_PRODUCTION_E2E_TEST: ${{ steps.web_push_e2e.outputs.enabled == 'true' && 'true' || '' }}
 
       - name: Setup Pages
         uses: actions/configure-pages@v5

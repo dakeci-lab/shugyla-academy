@@ -47,9 +47,17 @@ function parseUuid(value: unknown, field: string): string | Response {
   return value.trim()
 }
 
-function isLocalTestEnabled(): boolean {
+function isProductionTestEnabled(): boolean {
+  return Deno.env.get('WEB_PUSH_PRODUCTION_TEST_ENABLED') === 'true'
+}
+
+function isTestSenderEnabled(): boolean {
   if (Deno.env.get('WEB_PUSH_TEST_ENABLED') !== 'true') {
     return false
+  }
+
+  if (isProductionTestEnabled()) {
+    return true
   }
 
   const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').toLowerCase()
@@ -63,6 +71,23 @@ function isLocalTestEnabled(): boolean {
 }
 
 function buildPayload(notificationId: string, requestId: string) {
+  if (isProductionTestEnabled()) {
+    return {
+      title: 'Shugyla Platform',
+      body: 'Тестовое уведомление успешно доставлено',
+      icon: '/shugyla-academy/icons/icon-192.png',
+      badge: '/shugyla-academy/icons/icon-192.png',
+      tag: 'production-web-push-e2e',
+      data: {
+        url: 'https://dakeci-lab.github.io/shugyla-academy/',
+        notification_id: notificationId,
+        type: 'web_push_test',
+      },
+      requireInteraction: false,
+      timestamp: Date.now(),
+    }
+  }
+
   const shortId = requestId.replace(/-/g, '').slice(0, 8)
   return {
     title: 'Shugyla Platform',
@@ -77,6 +102,22 @@ function buildPayload(notificationId: string, requestId: string) {
     },
     requireInteraction: false,
     timestamp: Date.now(),
+  }
+}
+
+function notificationContent() {
+  if (isProductionTestEnabled()) {
+    return {
+      title: 'Shugyla Platform',
+      body: 'Тестовое уведомление успешно доставлено',
+      action_url: 'https://dakeci-lab.github.io/shugyla-academy/',
+    }
+  }
+
+  return {
+    title: 'Shugyla Platform',
+    body: 'Тестовое push-уведомление отправлено сервером',
+    action_url: '/shugyla-academy/platform/profile',
   }
 }
 
@@ -127,7 +168,7 @@ Deno.serve(async (req) => {
     return adminErrorResponse('method_not_allowed', 405)
   }
 
-  if (!isLocalTestEnabled()) {
+  if (!isTestSenderEnabled()) {
     return adminErrorResponse('test_sender_disabled', 403)
   }
 
@@ -253,6 +294,8 @@ Deno.serve(async (req) => {
     return jsonResponse({ ok: false, code: 'web_push_not_configured' }, 503)
   }
 
+  const content = notificationContent()
+
   const { data: notification, error: notificationError } = await serviceClient
     .from('notifications')
     .insert({
@@ -260,9 +303,9 @@ Deno.serve(async (req) => {
       auth_user_id: caller.auth_user_id,
       module_code: 'web_push',
       event_code: 'web_push_test',
-      title: 'Shugyla Platform',
-      body: 'Тестовое push-уведомление отправлено сервером',
-      action_url: '/shugyla-academy/platform/profile',
+      title: content.title,
+      body: content.body,
+      action_url: content.action_url,
       priority: 'normal',
       status: 'processing',
       metadata: {
@@ -286,9 +329,9 @@ Deno.serve(async (req) => {
       serviceClient,
       notification: {
         id: notification.id,
-        title: 'Shugyla Platform',
-        body: 'Тестовое push-уведомление отправлено сервером',
-        action_url: '/shugyla-academy/platform/profile',
+        title: content.title,
+        body: content.body,
+        action_url: content.action_url,
       },
       subscription,
       requestId,
