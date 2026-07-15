@@ -159,12 +159,27 @@ Run `scripts/production-auth-users-migration.mjs`.
 - [x] Real Web Push sent: **0**
 - [x] Readiness script: `npm run verify:production-notification-foundation-readiness`
 - [x] Docs: [production-notification-foundation-rollout.md](../notifications/production-notification-foundation-rollout.md)
-- [ ] **BLOCKED:** frontend `VITE_WEB_PUSH_VAPID_PUBLIC_KEY` for browser E2E — separate step
+- [x] Frontend public VAPID key deployed (Step 22S, fingerprint `3766a407dc40a509`)
 - [ ] **BLOCKED:** enable rules / Cron / scheduler HMAC — separate approvals
 
 ---
 
-## Approval 7 — Team workforce production fix ✓ COMPLETED (Step 22R)
+## Approval 8 — Production Web Push subscription setup ✓ COMPLETED (Step 22S)
+
+**Date:** 2026-07-15
+**Owner confirmation:** VAPID public key in frontend; one admin device subscription; **no test push**.
+
+- [x] VAPID pair rotated (subscriptions were **0**); fingerprint **`3766a407dc40a509`**
+- [x] Frontend deploy **`d51e79c`** — GitHub Pages run **#64** success
+- [x] Owner permission **granted** (manual)
+- [x] Subscriptions: total **2**, active **1**, admin employee **1**, duplicate endpoints **0**
+- [x] Notifications / deliveries sent **0**; rules enabled **0**; Cron **0**
+- [x] Business baseline **18/18** unchanged
+- [x] Test push **not sent** (by design)
+- [x] Docs: [production-web-push-e2e-test.md](../notifications/production-web-push-e2e-test.md)
+- [ ] **BLOCKED:** single controlled test send — next gated step
+
+---
 
 **Date:** 2026-07-15
 **Owner confirmation:** deploy `admin-team-workforce-data` + frontend **`c6e80c1`**; Phase 2 preserved; rules disabled; Cron off.
@@ -182,9 +197,10 @@ Run `scripts/production-auth-users-migration.mjs`.
 - [x] Notification rules enabled **0**; subscriptions **0**; pushes **0**; Cron **0**
 - [x] Web Push E2E **not run** (by design)
 - [x] Docs: [team-workforce-phase2-frontend-fix.md](./team-workforce-phase2-frontend-fix.md)
-- [ ] **BLOCKED:** controlled Web Push E2E — separate owner approval
 
 ---
+
+## Approval 7 — Team workforce production fix ✓ COMPLETED (Step 22R)
 
 ## Explicit prohibitions (all phases)
 

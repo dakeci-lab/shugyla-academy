@@ -192,3 +192,33 @@ After separate explicit owner confirmation: controlled production Web Push E2E t
 | VAPID secrets | unchanged | **unchanged** |
 
 Readiness verifier updated: `npm run verify:production-notification-foundation-readiness` expects **8** total functions including `admin-team-workforce-data`.
+
+---
+
+## Step 22S — Production VAPID public key + admin subscription
+
+**Date:** 2026-07-15
+**Status:** VAPID deployed to frontend; owner subscription created; **no test push sent**.
+
+| Item | Result |
+|------|--------|
+| VAPID rotation | **yes** (prior public key not recoverable; subscriptions were **0**) |
+| Backend/frontend fingerprint | **`3766a407dc40a509`** |
+| Frontend commits | `0811a45`, `d51e79c` |
+| GitHub Pages deploy | run **#64** — **success** |
+| Owner permission | **granted** (manual) |
+| Subscriptions total | **2** (active **1**, admin **1** employee, distinct devices **2**) |
+| Duplicate endpoints | **0** |
+| Notifications / deliveries sent | **0** |
+| Rules enabled | **0** |
+| Cron | **0** |
+| Business baseline | **18/18** unchanged |
+| Ready for one controlled test send | **yes** (active subscription) |
+
+See [production-web-push-e2e-test.md](./production-web-push-e2e-test.md).
+
+---
+
+## Next step (gated)
+
+Send **exactly one** production test Web Push to the **active** administrator subscription; verify browser delivery and delivery tracking. Rules **disabled**, Cron **off**.
