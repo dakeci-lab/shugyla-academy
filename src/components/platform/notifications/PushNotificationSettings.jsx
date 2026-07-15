@@ -8,14 +8,19 @@ import {
   getNotificationPermission,
   getPushRegistrationStatus,
   getDeviceTestSendStatus,
+  getTestSendPermitCountdownSeconds,
   hasAttemptedSendTestRequest,
+  isPersistedTestSendPermitValid,
   isWebPushSupported,
   isProductionE2eTestSendEnabled,
+  issueServerTestSendPermit,
   prepareDeviceForTestSend,
   PREPARE_TEST_SUCCESS_MESSAGE,
+  PERMIT_ISSUE_SUCCESS_MESSAGE,
   preflightServerTestWebPush,
   readPersistedSendTestDiagnostic,
   readPersistedSendTestRequest,
+  readPersistedTestSendPermit,
   sendServerTestWebPush,
   showDevelopmentTestNotification,
   WebPushError,
@@ -58,6 +63,15 @@ const PREFLIGHT_STATE = {
   ERROR: 'error',
 }
 
+const PERMIT_STATE = {
+  IDLE: 'idle',
+  ISSUING: 'issuing',
+  ACTIVE: 'active',
+  EXPIRED: 'expired',
+  USED: 'used',
+  ERROR: 'error',
+}
+
 export default function PushNotificationSettings() {
   const { supabaseAuthenticated } = useSession()
   const { success: showSuccess, warning: showWarning } = useToast()
@@ -69,10 +83,14 @@ export default function PushNotificationSettings() {
   const [prepareState, setPrepareState] = useState(PREPARE_STATE.IDLE)
   const [prepareMessage, setPrepareMessage] = useState('')
   const [testReady, setTestReady] = useState(false)
-  const [testSenderEnabled, setTestSenderEnabled] = useState(false)
   const [preflightState, setPreflightState] = useState(PREFLIGHT_STATE.IDLE)
   const [preflightMessage, setPreflightMessage] = useState('')
   const [preflightSummary, setPreflightSummary] = useState('')
+  const [permitState, setPermitState] = useState(PERMIT_STATE.IDLE)
+  const [permitMessage, setPermitMessage] = useState('')
+  const [permitExpiryLabel, setPermitExpiryLabel] = useState('')
+  const [permitCountdownSeconds, setPermitCountdownSeconds] = useState(0)
+  const [permitValid, setPermitValid] = useState(false)
 
   const refreshStatus = useCallback(async () => {
     if (!isCloudMode()) {
@@ -136,30 +154,47 @@ export default function PushNotificationSettings() {
   }, [])
 
   useEffect(() => {
-    if (!testReady || !isProductionE2eTestSendEnabled() || import.meta.env.DEV) return undefined
+    const persistedPermit = readPersistedTestSendPermit()
+    if (persistedPermit?.used) {
+      setPermitState(PERMIT_STATE.USED)
+      setPermitValid(false)
+      return
+    }
+    if (persistedPermit && isPersistedTestSendPermitValid()) {
+      setPermitState(PERMIT_STATE.ACTIVE)
+      setPermitValid(true)
+      setPermitExpiryLabel(
+        new Date(persistedPermit.expiresAt).toLocaleString('ru-RU', {
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          day: '2-digit',
+          month: '2-digit',
+        })
+      )
+    } else if (persistedPermit) {
+      setPermitState(PERMIT_STATE.EXPIRED)
+      setPermitValid(false)
+    }
+  }, [])
 
-    let cancelled = false
-    const pollSenderGate = async () => {
-      try {
-        const status = await getDeviceTestSendStatus()
-        if (cancelled) return
-        setTestSenderEnabled(Boolean(status.testSenderEnabled))
-        setTestReady(Boolean(status.testReady))
-      } catch {
-        // Polling is best-effort while backend gates are toggled remotely.
+  useEffect(() => {
+    if (!isProductionE2eTestSendEnabled() || import.meta.env.DEV) return undefined
+
+    const tick = () => {
+      const seconds = getTestSendPermitCountdownSeconds()
+      setPermitCountdownSeconds(seconds)
+      const valid = isPersistedTestSendPermitValid()
+      setPermitValid(valid)
+      if (!valid && readPersistedTestSendPermit()) {
+        setPermitState(PERMIT_STATE.EXPIRED)
       }
     }
 
-    void pollSenderGate()
-    const timer = window.setInterval(() => {
-      void pollSenderGate()
-    }, 5000)
-
-    return () => {
-      cancelled = true
-      window.clearInterval(timer)
-    }
-  }, [testReady])
+    tick()
+    const timer = window.setInterval(tick, 1000)
+    return () => window.clearInterval(timer)
+  }, [permitState])
 
   function resolveEnableErrorMessage(err) {
     if (err instanceof WebPushError && err.code && WEB_PUSH_ERROR_MESSAGES[err.code]) {
@@ -231,7 +266,6 @@ export default function PushNotificationSettings() {
     try {
       const status = await prepareDeviceForTestSend()
       setTestReady(Boolean(status.testReady))
-      setTestSenderEnabled(Boolean(status.testSenderEnabled))
       setPrepareState(PREPARE_STATE.READY)
       setPrepareMessage(PREPARE_TEST_SUCCESS_MESSAGE)
       showSuccess(PREPARE_TEST_SUCCESS_MESSAGE)
@@ -260,6 +294,34 @@ export default function PushNotificationSettings() {
     }
   }
 
+  async function handleIssuePermit() {
+    if (
+      permitState === PERMIT_STATE.ISSUING ||
+      busy ||
+      !testReady ||
+      preflightState !== PREFLIGHT_STATE.SUCCESS
+    ) {
+      return
+    }
+
+    setPermitState(PERMIT_STATE.ISSUING)
+    setPermitMessage('')
+    try {
+      const result = await issueServerTestSendPermit()
+      setPermitState(PERMIT_STATE.ACTIVE)
+      setPermitValid(true)
+      setPermitMessage(result.message)
+      setPermitExpiryLabel(result.expiryLabel)
+      setPermitCountdownSeconds(getTestSendPermitCountdownSeconds())
+      showSuccess(result.message)
+    } catch (err) {
+      setPermitState(PERMIT_STATE.ERROR)
+      setPermitValid(false)
+      setPermitMessage(err.message || PERMIT_ISSUE_SUCCESS_MESSAGE)
+      showWarning(err.message || 'Не удалось создать одноразовое разрешение')
+    }
+  }
+
   async function handleServerTest() {
     if (
       serverSendState === SERVER_SEND_STATE.SENDING ||
@@ -274,11 +336,15 @@ export default function PushNotificationSettings() {
     try {
       await sendServerTestWebPush()
       setServerSendState(SERVER_SEND_STATE.SUCCESS)
+      setPermitState(PERMIT_STATE.USED)
+      setPermitValid(false)
       setServerSendMessage('Серверное push-уведомление отправлено')
       showSuccess('Серверное push-уведомление отправлено')
     } catch (err) {
       const message = err.message || 'Не удалось отправить push-уведомление'
       setServerSendState(SERVER_SEND_STATE.BLOCKED)
+      setPermitState(PERMIT_STATE.USED)
+      setPermitValid(false)
       setServerSendMessage(message)
       showWarning(message)
 
@@ -459,10 +525,58 @@ export default function PushNotificationSettings() {
               <button
                 type="button"
                 className="btn btn--outline btn--sm"
+                onClick={handleIssuePermit}
+                disabled={
+                  !testReady ||
+                  preflightState !== PREFLIGHT_STATE.SUCCESS ||
+                  permitState === PERMIT_STATE.ISSUING ||
+                  permitState === PERMIT_STATE.ACTIVE ||
+                  permitState === PERMIT_STATE.USED ||
+                  busy
+                }
+              >
+                {permitState === PERMIT_STATE.ISSUING
+                  ? 'Создаём…'
+                  : 'Создать одноразовое разрешение'}
+              </button>
+              {permitMessage && (
+                <p
+                  className={`push-settings__status ${
+                    permitState === PERMIT_STATE.ACTIVE
+                      ? 'push-settings__status--success'
+                      : 'push-settings__status--warning'
+                  }`}
+                  role="status"
+                >
+                  {permitMessage}
+                </p>
+              )}
+              {permitState === PERMIT_STATE.ACTIVE && permitExpiryLabel && (
+                <p className="push-settings__hint" role="status">
+                  Разрешение активно до {permitExpiryLabel}
+                  {permitCountdownSeconds > 0 ? ` (осталось ${permitCountdownSeconds} с)` : ''}
+                </p>
+              )}
+              {permitState === PERMIT_STATE.EXPIRED && (
+                <p className="push-settings__status push-settings__status--warning" role="status">
+                  Срок одноразового разрешения истёк
+                </p>
+              )}
+              {permitState === PERMIT_STATE.USED && (
+                <p className="push-settings__status push-settings__status--warning" role="status">
+                  Одноразовое разрешение уже использовано
+                </p>
+              )}
+              <button
+                type="button"
+                className="btn btn--outline btn--sm"
                 onClick={handleServerTest}
                 disabled={
                   !testReady ||
-                  !testSenderEnabled ||
+                  preflightState !== PREFLIGHT_STATE.SUCCESS ||
+                  !permitValid ||
+                  permitState === PERMIT_STATE.USED ||
+                  permitState === PERMIT_STATE.EXPIRED ||
                   serverSendState === SERVER_SEND_STATE.SENDING ||
                   serverSendState === SERVER_SEND_STATE.SUCCESS ||
                   serverSendState === SERVER_SEND_STATE.BLOCKED ||

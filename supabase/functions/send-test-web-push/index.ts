@@ -3,10 +3,19 @@ import {
   adminErrorResponse,
   authorizeAuthenticatedEmployee,
   canEmployeeLogin,
+  roleHasPermissionCode,
 } from '../_shared/employeeAuthorization.ts'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { deliverNotificationToSubscription } from '../_shared/notificationDelivery.ts'
+import {
+  consumeTestSendPermit,
+  issueTestSendPermit,
+  loadPermitStatusForCaller,
+  TEST_SEND_PERMIT_ISSUE_PERMISSION,
+  TEST_SEND_PERMIT_TTL_SECONDS,
+  type PermitConsumeStatus,
+} from '../_shared/testSendPermits.ts'
 import { isWebPushConfigured } from '../_shared/webPushSender.ts'
 
 const UUID_RE =
@@ -36,12 +45,11 @@ const FORBIDDEN_FIELDS = new Set([
   'login',
 ])
 
-const PRODUCTION_MARKERS = ['supabase.co', 'cxadzerxndlscwvdaymk']
 const RATE_LIMIT_WINDOW_SECONDS = 60
 const RATE_LIMIT_MAX = 3
 const RATE_LIMIT_MIN_INTERVAL_SECONDS = 10
 
-type Action = 'preflight' | 'send'
+type Action = 'preflight' | 'issue_permit' | 'permit_status' | 'send'
 
 function parseUuid(value: unknown): string | Response {
   if (typeof value !== 'string' || !UUID_RE.test(value.trim())) {
@@ -50,21 +58,25 @@ function parseUuid(value: unknown): string | Response {
   return value.trim()
 }
 
-function resolveAction(payload: Record<string, unknown>): Action {
+function resolveAction(payload: Record<string, unknown>): Action | 'legacy' {
   const raw = payload.action
-  if (raw == null || raw === '') return 'send'
-  if (raw === 'preflight' || raw === 'send') return raw
+  if (raw == null || raw === '') return 'legacy'
+  if (raw === 'preflight' || raw === 'issue_permit' || raw === 'permit_status' || raw === 'send') {
+    return raw
+  }
   return 'send'
 }
 
-function validateAllowedKeys(payload: Record<string, unknown>, action: Action): Response | null {
-  const allowed =
-    action === 'preflight'
-      ? new Set(['action', 'device_id'])
-      : payload.action == null || payload.action === ''
-        ? new Set(['device_id', 'request_id'])
-        : new Set(['action', 'device_id', 'request_id'])
+function validateAllowedKeys(payload: Record<string, unknown>, action: Action | 'legacy'): Response | null {
+  const allowedByAction: Record<Action | 'legacy', Set<string>> = {
+    legacy: new Set(['device_id', 'request_id']),
+    preflight: new Set(['action', 'device_id']),
+    issue_permit: new Set(['action', 'device_id']),
+    permit_status: new Set(['action', 'device_id', 'permit_id']),
+    send: new Set(['action', 'device_id', 'request_id', 'permit_id']),
+  }
 
+  const allowed = allowedByAction[action]
   for (const key of Object.keys(payload)) {
     if (!allowed.has(key)) {
       return adminErrorResponse('forbidden_field', 422)
@@ -72,6 +84,10 @@ function validateAllowedKeys(payload: Record<string, unknown>, action: Action): 
   }
 
   if (action === 'preflight' && payload.request_id != null) {
+    return adminErrorResponse('forbidden_field', 422)
+  }
+
+  if (action === 'issue_permit' && (payload.request_id != null || payload.permit_id != null)) {
     return adminErrorResponse('forbidden_field', 422)
   }
 
@@ -86,23 +102,8 @@ function isTestGateEnabled(): boolean {
   return Deno.env.get('WEB_PUSH_TEST_ENABLED') === 'true'
 }
 
-function isTestSenderEnabled(): boolean {
-  if (!isTestGateEnabled()) {
-    return false
-  }
-
-  if (isProductionTestEnabled()) {
-    return true
-  }
-
-  const supabaseUrl = (Deno.env.get('SUPABASE_URL') ?? '').toLowerCase()
-  for (const marker of PRODUCTION_MARKERS) {
-    if (supabaseUrl.includes(marker)) {
-      return false
-    }
-  }
-
-  return true
+function legacyTestGatesEnabled(): boolean {
+  return isTestGateEnabled() && isProductionTestEnabled()
 }
 
 function buildPayload(notificationId: string, requestId: string) {
@@ -176,6 +177,23 @@ async function countMatchingActiveSubscriptions(
   return { count: count ?? 0, error: null }
 }
 
+function permitConsumeErrorResponse(status: PermitConsumeStatus): Response {
+  switch (status) {
+    case 'permit_not_found':
+    case 'permit_invalid':
+      return adminErrorResponse('permit_invalid', 403)
+    case 'permit_expired':
+      return adminErrorResponse('permit_expired', 410)
+    case 'permit_revoked':
+      return adminErrorResponse('permit_revoked', 409)
+    case 'permit_already_used':
+    case 'permit_already_used_same_request':
+      return adminErrorResponse(status, 409)
+    default:
+      return adminErrorResponse('internal_error', 500)
+  }
+}
+
 async function handlePreflight(
   serviceClient: SupabaseClient,
   caller: { id: number; status: string },
@@ -197,10 +215,8 @@ async function handlePreflight(
     return jsonResponse({ ok: false, mode: 'preflight', code: 'web_push_not_configured' }, 503)
   }
 
-  const testSenderEnabled = isTestGateEnabled()
-  const productionTestEnabled = isProductionTestEnabled()
-  const readyExceptGates = canEmployeeLogin(caller.status) && matching.count === 1 && webPushConfigured
-  const readyToSend = readyExceptGates && isTestSenderEnabled()
+  const readyExceptPermit =
+    canEmployeeLogin(caller.status) && matching.count === 1 && webPushConfigured
 
   return jsonResponse({
     ok: true,
@@ -212,11 +228,95 @@ async function handlePreflight(
       matching_active_subscriptions: matching.count,
       permission_granted: true,
       web_push_configured: webPushConfigured,
-      test_sender_enabled: testSenderEnabled,
-      production_test_enabled: productionTestEnabled,
-      ready_except_gates: readyExceptGates,
-      ready_to_send: readyToSend,
+      permit_required: true,
+      legacy_test_gates_enabled: legacyTestGatesEnabled(),
+      ready_except_permit: readyExceptPermit,
+      ready_to_send: false,
     },
+  })
+}
+
+async function handleIssuePermit(
+  serviceClient: SupabaseClient,
+  caller: { id: number; role_id: string | null; auth_user_id: string | null },
+  deviceId: string
+): Promise<Response> {
+  const permitted = await roleHasPermissionCode(
+    serviceClient,
+    caller.role_id,
+    TEST_SEND_PERMIT_ISSUE_PERMISSION
+  )
+  if (!permitted) {
+    return adminErrorResponse('permit_issue_forbidden', 403)
+  }
+
+  const matching = await countMatchingActiveSubscriptions(serviceClient, caller.id, deviceId)
+  if (matching.error) return matching.error
+
+  if (matching.count === 0) {
+    return jsonResponse({ ok: false, mode: 'permit', code: 'active_subscription_not_found' }, 409)
+  }
+
+  if (matching.count > 1) {
+    return jsonResponse({ ok: false, mode: 'permit', code: 'matching_subscription_conflict' }, 409)
+  }
+
+  if (!isWebPushConfigured()) {
+    return jsonResponse({ ok: false, mode: 'permit', code: 'web_push_not_configured' }, 503)
+  }
+
+  if (!caller.auth_user_id) {
+    return adminErrorResponse('forbidden', 403)
+  }
+
+  const issued = await issueTestSendPermit(
+    serviceClient,
+    caller.id,
+    caller.auth_user_id,
+    deviceId
+  )
+
+  if (!issued.permit) {
+    return adminErrorResponse('internal_error', 500)
+  }
+
+  return jsonResponse({
+    ok: true,
+    mode: 'permit',
+    permit: {
+      token: issued.permit.id,
+      expires_at: issued.permit.expires_at,
+      ttl_seconds: TEST_SEND_PERMIT_TTL_SECONDS,
+    },
+  })
+}
+
+async function handlePermitStatus(
+  serviceClient: SupabaseClient,
+  caller: { id: number; auth_user_id: string | null },
+  deviceId: string,
+  permitId: string
+): Promise<Response> {
+  if (!caller.auth_user_id) {
+    return adminErrorResponse('forbidden', 403)
+  }
+
+  const snapshot = await loadPermitStatusForCaller(
+    serviceClient,
+    permitId,
+    caller.id,
+    caller.auth_user_id,
+    deviceId
+  )
+
+  if (snapshot === 'permit_invalid') {
+    return adminErrorResponse('permit_invalid', 403)
+  }
+
+  return jsonResponse({
+    ok: true,
+    mode: 'permit_status',
+    permit: snapshot,
   })
 }
 
@@ -259,14 +359,42 @@ async function checkRateLimit(
 }
 
 async function handleSend(
-  req: Request,
   serviceClient: SupabaseClient,
   caller: { id: number; auth_user_id: string | null },
   deviceId: string,
-  requestId: string
+  requestId: string,
+  permitId: string
 ): Promise<Response> {
-  if (!isTestSenderEnabled()) {
-    return adminErrorResponse('test_sender_disabled', 403)
+  const matching = await countMatchingActiveSubscriptions(serviceClient, caller.id, deviceId)
+  if (matching.error) return matching.error
+
+  if (matching.count === 0) {
+    return jsonResponse({ ok: false, code: 'active_subscription_not_found' }, 409)
+  }
+
+  if (matching.count > 1) {
+    return jsonResponse({ ok: false, code: 'matching_subscription_conflict' }, 409)
+  }
+
+  if (!isWebPushConfigured()) {
+    return jsonResponse({ ok: false, code: 'web_push_not_configured' }, 503)
+  }
+
+  if (!caller.auth_user_id) {
+    return adminErrorResponse('forbidden', 403)
+  }
+
+  const consumeStatus = await consumeTestSendPermit(
+    serviceClient,
+    permitId,
+    caller.id,
+    caller.auth_user_id,
+    deviceId,
+    requestId
+  )
+
+  if (consumeStatus !== 'consumed') {
+    return permitConsumeErrorResponse(consumeStatus)
   }
 
   const deduplicationKey = `web_push_test:${requestId}`
@@ -354,10 +482,6 @@ async function handleSend(
 
   if (!subscription) {
     return jsonResponse({ ok: false, code: 'active_subscription_not_found' }, 409)
-  }
-
-  if (!isWebPushConfigured()) {
-    return jsonResponse({ ok: false, code: 'web_push_not_configured' }, 503)
   }
 
   const content = notificationContent()
@@ -490,6 +614,10 @@ Deno.serve(async (req) => {
   const allowedKeysError = validateAllowedKeys(payload, action)
   if (allowedKeysError) return allowedKeysError
 
+  if (action === 'legacy') {
+    return adminErrorResponse('permit_required', 409)
+  }
+
   const authResult = await authorizeAuthenticatedEmployee(req)
   if (authResult instanceof Response) return authResult
 
@@ -502,8 +630,21 @@ Deno.serve(async (req) => {
     return handlePreflight(serviceClient, caller, deviceId)
   }
 
+  if (action === 'issue_permit') {
+    return handleIssuePermit(serviceClient, caller, deviceId)
+  }
+
+  if (action === 'permit_status') {
+    const permitId = parseUuid(payload.permit_id)
+    if (permitId instanceof Response) return permitId
+    return handlePermitStatus(serviceClient, caller, deviceId, permitId)
+  }
+
   const requestId = parseUuid(payload.request_id)
   if (requestId instanceof Response) return requestId
 
-  return handleSend(req, serviceClient, caller, deviceId, requestId)
+  const permitId = parseUuid(payload.permit_id)
+  if (permitId instanceof Response) return permitId
+
+  return handleSend(serviceClient, caller, deviceId, requestId, permitId)
 })

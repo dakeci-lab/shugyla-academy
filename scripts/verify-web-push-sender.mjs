@@ -208,10 +208,35 @@ function validRegisterBody(deviceId, endpoint = ENDPOINT) {
   }
 }
 
-function validSendBody(deviceId, requestId = crypto.randomUUID()) {
+function issuePermitViaRpc(employeeId, authUserId, deviceId) {
+  const raw = psqlScalar(`
+    SELECT public.issue_notification_test_send_permit(
+      ${employeeId},
+      '${authUserId}'::uuid,
+      '${deviceId}'::uuid
+    )::text;
+  `)
+  return JSON.parse(raw).id
+}
+
+function validSendBody(deviceId, requestId = crypto.randomUUID(), permitId) {
+  const resolvedPermitId =
+    permitId ??
+    issuePermitViaRpc(state.users.a.employeeId, state.users.a.authUserId, deviceId)
   return {
+    action: 'send',
     device_id: deviceId,
     request_id: requestId,
+    permit_id: resolvedPermitId,
+  }
+}
+
+function authProbeBody(deviceId) {
+  return {
+    action: 'send',
+    device_id: deviceId,
+    request_id: crypto.randomUUID(),
+    permit_id: crypto.randomUUID(),
   }
 }
 
@@ -506,10 +531,9 @@ function stageStaticChecks() {
     senderFn.includes('deliverNotificationToSubscription')
   )
   assert('sender uses isWebPushConfigured', senderFn.includes('isWebPushConfigured'))
-  assert('sender WEB_PUSH_TEST_ENABLED guard', senderFn.includes("WEB_PUSH_TEST_ENABLED") && senderFn.includes("'true'"))
-  assert('sender production test gate', senderFn.includes('WEB_PUSH_PRODUCTION_TEST_ENABLED'))
-  assert('sender isTestSenderEnabled guard', senderFn.includes('isTestSenderEnabled'))
-  assert('sender production marker guard', senderFn.includes(PRODUCTION_REF))
+  assert('sender uses consumeTestSendPermit', senderFn.includes('consumeTestSendPermit'))
+  assert('sender permit_required response code', senderFn.includes("'permit_required'"))
+  assert('sender schedule.edit permission', senderFn.includes("'schedule.edit'") || senderFn.includes('TEST_SEND_PERMIT_ISSUE_PERMISSION'))
   assert('sender checkRateLimit present', senderFn.includes('checkRateLimit'))
   assert('sender deduplication_key pattern', senderFn.includes('web_push_test:${requestId}'))
   assert('sender no select(*)', !senderFn.includes("select('*')"))
@@ -531,7 +555,7 @@ function stageStaticChecks() {
   assert('service DEV guard for server send', service.includes('import.meta.env.DEV'))
   assert('service production E2E gate', service.includes('isProductionE2eTestSendEnabled'))
   assert('service parses invoke context', service.includes('parseFunctionInvokeContext'))
-  assert('service test_sender_disabled mapping', service.includes("'test_sender_disabled'"))
+  assert('service sends permit_id', service.includes('permit_id: persistedPermit.permitId'))
 
   assert('UI imports sendServerTestWebPush', ui.includes('sendServerTestWebPush'))
   assert('UI handleServerTest handler', ui.includes('handleServerTest'))
@@ -668,18 +692,18 @@ async function stageFunctionAuth() {
   const getRes = await invokeSender({ token: state.tokens.a, method: 'GET' })
   assert('GET → 405', getRes.status === 405)
 
-  const noJwt = await invokeSender({ body: validSendBody(state.deviceA) })
+  const noJwt = await invokeSender({ body: authProbeBody(state.deviceA) })
   assert('missing JWT → 401', noJwt.status === 401)
 
   const badJwt = await invokeSender({
     token: 'invalid.jwt.token',
-    body: validSendBody(state.deviceA),
+    body: authProbeBody(state.deviceA),
   })
   assert('invalid JWT → 401', badJwt.status === 401)
 
   const inactive = await invokeSender({
     token: state.tokens.inactive,
-    body: validSendBody(state.deviceA),
+    body: authProbeBody(state.deviceA),
   })
   assert('inactive user → 403', inactive.status === 403)
 
@@ -695,8 +719,8 @@ async function stageFunctionAuth() {
   assert('malformed JSON → 400', malformed.status === 400)
 
   const senderFn = fs.readFileSync(path.join(ROOT, 'supabase/functions/send-test-web-push/index.ts'), 'utf8')
-  assert('isTestSenderEnabled guard present', senderFn.includes('isTestSenderEnabled'))
-  assert('test_sender_disabled response code', senderFn.includes("'test_sender_disabled'"))
+  assert('consumeTestSendPermit guard present', senderFn.includes('consumeTestSendPermit'))
+  assert('permit_required response code', senderFn.includes("'permit_required'"))
 
   console.log('')
 }
@@ -714,25 +738,41 @@ async function stageValidation() {
 
   const missingDevice = await invokeSender({
     token: state.tokens.a,
-    body: { request_id: crypto.randomUUID() },
+    body: { action: 'send', request_id: crypto.randomUUID(), permit_id: crypto.randomUUID() },
   })
   assert('missing device_id → 422', missingDevice.status === 422)
 
   const missingRequest = await invokeSender({
     token: state.tokens.a,
-    body: { device_id: state.deviceA },
+    body: { action: 'send', device_id: state.deviceA, permit_id: crypto.randomUUID() },
   })
   assert('missing request_id → 422', missingRequest.status === 422)
 
+  const missingPermit = await invokeSender({
+    token: state.tokens.a,
+    body: { action: 'send', device_id: state.deviceA, request_id: crypto.randomUUID() },
+  })
+  assert('missing permit_id → 422', missingPermit.status === 422)
+
   const badDevice = await invokeSender({
     token: state.tokens.a,
-    body: { device_id: 'not-a-uuid', request_id: crypto.randomUUID() },
+    body: {
+      action: 'send',
+      device_id: 'not-a-uuid',
+      request_id: crypto.randomUUID(),
+      permit_id: crypto.randomUUID(),
+    },
   })
   assert('invalid device_id → 422', badDevice.status === 422)
 
   const badRequest = await invokeSender({
     token: state.tokens.a,
-    body: { device_id: state.deviceA, request_id: 'not-a-uuid' },
+    body: {
+      action: 'send',
+      device_id: state.deviceA,
+      request_id: 'not-a-uuid',
+      permit_id: crypto.randomUUID(),
+    },
   })
   assert('invalid request_id → 422', badRequest.status === 422)
 
@@ -843,9 +883,11 @@ async function stageDeliveryTracking() {
   console.log('Stage 11: Notification / delivery tracking')
 
   const requestId = crypto.randomUUID()
+  const permitId = issuePermitViaRpc(state.users.a.employeeId, state.users.a.authUserId, state.deviceA)
+  state.lastPermitId = permitId
   const res = await invokeSender({
     token: state.tokens.a,
-    body: validSendBody(state.deviceA, requestId),
+    body: validSendBody(state.deviceA, requestId, permitId),
   })
 
   const failureOk =
@@ -934,33 +976,17 @@ async function stageDeliveryTracking() {
 }
 
 async function stageIdempotency() {
-  console.log('Stage 12: Idempotency (duplicate request_id)')
+  console.log('Stage 12: Idempotency (consumed permit replay)')
 
   const res = await invokeSender({
     token: state.tokens.a,
-    body: validSendBody(state.deviceA, state.lastRequestId),
+    body: validSendBody(state.deviceA, state.lastRequestId, state.lastPermitId),
   })
 
   assert(
-    'duplicate request_id → replay without duplicate rows',
-    res.json?.notification_id === state.lastNotificationId
+    'duplicate request_id after consumed permit → permit_already_used_same_request',
+    res.status === 409 && res.json?.code === 'permit_already_used_same_request'
   )
-  assert(
-    'duplicate request_id → same delivery status',
-    res.json?.delivery?.status === state.lastDeliveryStatus
-  )
-
-  const deliveryCount = psqlScalar(`
-    SELECT COUNT(*) FROM public.notification_deliveries
-    WHERE request_id = '${state.lastRequestId}';
-  `)
-  assert('single delivery row per request_id', deliveryCount === '1')
-
-  const notificationCount = psqlScalar(`
-    SELECT COUNT(*) FROM public.notifications
-    WHERE deduplication_key = 'web_push_test:${state.lastRequestId}';
-  `)
-  assert('single notification per deduplication_key', notificationCount === '1')
 
   console.log('')
 }

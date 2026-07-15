@@ -31,6 +31,7 @@
     "verify:web-push-test-send-diagnostics": "node scripts/verify-web-push-test-send-diagnostics.mjs",
     "verify:web-push-test-send-prepare": "node scripts/verify-web-push-test-send-prepare.mjs",
     "verify:web-push-sender-preflight": "node scripts/verify-web-push-sender-preflight.mjs",
+    "verify:web-push-test-permits": "node scripts/verify-web-push-test-permits.mjs",
     "supabase:local:verify-team-workforce-admin-access": "node scripts/verify-team-workforce-admin-access.mjs"
   },
   "dependencies": {

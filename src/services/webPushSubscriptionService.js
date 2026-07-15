@@ -431,6 +431,21 @@ function mapSendTestError(data, fallback) {
   if (code === 'test_sender_disabled') {
     return SEND_TEST_ERROR_MESSAGES.test_disabled
   }
+  if (code === 'permit_required') {
+    return PERMIT_ERROR_MESSAGES.permit_required
+  }
+  if (code === 'permit_expired') {
+    return PERMIT_ERROR_MESSAGES.permit_expired
+  }
+  if (code === 'permit_already_used' || code === 'permit_already_used_same_request') {
+    return PERMIT_ERROR_MESSAGES.permit_already_used
+  }
+  if (code === 'permit_invalid' || code === 'permit_revoked') {
+    return PERMIT_ERROR_MESSAGES.permit_invalid
+  }
+  if (code === 'permit_issue_forbidden') {
+    return PERMIT_ERROR_MESSAGES.permit_issue_forbidden
+  }
   if (code === 'unauthorized') {
     return SEND_TEST_ERROR_MESSAGES.session_expired
   }
@@ -456,10 +471,24 @@ export const SEND_TEST_ERROR_MESSAGES = {
 const SEND_TEST_DIAGNOSTIC_STORAGE_KEY = 'shugyla.web_push.last_test_send_diagnostic'
 const SEND_TEST_REQUEST_STORAGE_KEY = 'shugyla.web_push.test_send_request_id'
 const PREFLIGHT_DIAGNOSTIC_STORAGE_KEY = 'shugyla.web_push.last_preflight_diagnostic'
+const PERMIT_STORAGE_KEY = 'shugyla.web_push.test_send_permit'
+const PERMIT_USED_STORAGE_KEY = 'shugyla.web_push.test_send_permit_used'
 const DEVICE_ID_UUID_RE = /^[0-9a-f-]{36}$/i
 
 export const PREPARE_TEST_SUCCESS_MESSAGE = 'Устройство готово к тестовому уведомлению'
-export const PREFLIGHT_SUCCESS_MESSAGE = 'Сервер и устройство готовы. Тестовая отправка выключена'
+export const PREFLIGHT_SUCCESS_MESSAGE = 'Сервер и устройство готовы. Для отправки нужно одноразовое разрешение'
+export const PERMIT_ISSUE_SUCCESS_MESSAGE = 'Одноразовое разрешение создано на 5 минут'
+
+export const PERMIT_ERROR_MESSAGES = {
+  permit_required: 'Сначала создайте одноразовое разрешение',
+  permit_expired: 'Срок одноразового разрешения истёк',
+  permit_already_used: 'Одноразовое разрешение уже использовано',
+  permit_already_used_same_request: 'Одноразовое разрешение уже использовано',
+  permit_invalid: 'Одноразовое разрешение недействительно',
+  permit_revoked: 'Одноразовое разрешение недействительно',
+  permit_issue_forbidden: 'Нет доступа для создания тестового разрешения',
+  generic: 'Не удалось обработать одноразовое разрешение',
+}
 
 export const PREFLIGHT_ERROR_MESSAGES = {
   session_expired: 'Сессия истекла',
@@ -518,9 +547,18 @@ function resolveSendTestMessage(stage, httpStatus, errorCode) {
   if (stage === 'session') return SEND_TEST_ERROR_MESSAGES.session_expired
   if (stage === 'device') return SEND_TEST_ERROR_MESSAGES.device_not_registered
   if (stage === 'subscription') return SEND_TEST_ERROR_MESSAGES.device_not_registered
-  if (stage === 'flag') return SEND_TEST_ERROR_MESSAGES.test_disabled
+  if (errorCode === 'permit_required') return PERMIT_ERROR_MESSAGES.permit_required
+  if (errorCode === 'permit_expired') return PERMIT_ERROR_MESSAGES.permit_expired
+  if (errorCode === 'permit_already_used' || errorCode === 'permit_already_used_same_request') {
+    return PERMIT_ERROR_MESSAGES.permit_already_used
+  }
+  if (errorCode === 'permit_invalid' || errorCode === 'permit_revoked') {
+    return PERMIT_ERROR_MESSAGES.permit_invalid
+  }
+  if (errorCode === 'permit_issue_forbidden') return PERMIT_ERROR_MESSAGES.permit_issue_forbidden
+  if (stage === 'flag' && errorCode === 'test_sender_disabled') return SEND_TEST_ERROR_MESSAGES.test_disabled
+  if (stage === 'flag') return PERMIT_ERROR_MESSAGES.permit_required
   if (stage === 'network') return SEND_TEST_ERROR_MESSAGES.network
-  if (errorCode === 'test_sender_disabled') return SEND_TEST_ERROR_MESSAGES.test_disabled
   if (errorCode === 'active_subscription_not_found' || errorCode === 'subscription_expired') {
     return SEND_TEST_ERROR_MESSAGES.device_not_registered
   }
@@ -608,6 +646,174 @@ export function hasAttemptedSendTestRequest() {
   return Boolean(readPersistedSendTestRequest())
 }
 
+export function readPersistedTestSendPermit() {
+  if (!hasWindow()) return null
+  try {
+    const raw = window.sessionStorage.getItem(PERMIT_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    if (!parsed.permitId || !parsed.expiresAt) return null
+    return {
+      permitId: String(parsed.permitId),
+      expiresAt: String(parsed.expiresAt),
+      used: Boolean(parsed.used),
+    }
+  } catch {
+    return null
+  }
+}
+
+export function persistTestSendPermit({ permitId, expiresAt }) {
+  if (!hasWindow()) return
+  try {
+    window.sessionStorage.setItem(
+      PERMIT_STORAGE_KEY,
+      JSON.stringify({
+        permitId,
+        expiresAt,
+        used: false,
+      })
+    )
+    window.sessionStorage.removeItem(PERMIT_USED_STORAGE_KEY)
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+export function markPersistedTestSendPermitUsed() {
+  if (!hasWindow()) return
+  try {
+    const current = readPersistedTestSendPermit()
+    if (!current) return
+    window.sessionStorage.setItem(
+      PERMIT_STORAGE_KEY,
+      JSON.stringify({
+        permitId: current.permitId,
+        expiresAt: current.expiresAt,
+        used: true,
+      })
+    )
+    window.sessionStorage.setItem(PERMIT_USED_STORAGE_KEY, '1')
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+export function clearPersistedTestSendPermit() {
+  if (!hasWindow()) return
+  try {
+    window.sessionStorage.removeItem(PERMIT_STORAGE_KEY)
+    window.sessionStorage.removeItem(PERMIT_USED_STORAGE_KEY)
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+export function isPersistedTestSendPermitValid(nowMs = Date.now()) {
+  const permit = readPersistedTestSendPermit()
+  if (!permit || permit.used) return false
+  const expiresAtMs = Date.parse(permit.expiresAt)
+  if (!Number.isFinite(expiresAtMs)) return false
+  return expiresAtMs > nowMs
+}
+
+export function getTestSendPermitCountdownSeconds(nowMs = Date.now()) {
+  const permit = readPersistedTestSendPermit()
+  if (!permit || permit.used) return 0
+  const expiresAtMs = Date.parse(permit.expiresAt)
+  if (!Number.isFinite(expiresAtMs)) return 0
+  return Math.max(0, Math.ceil((expiresAtMs - nowMs) / 1000))
+}
+
+export function formatPermitExpiryLabel(expiresAt) {
+  if (!expiresAt) return ''
+  const date = new Date(expiresAt)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleString('ru-RU', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    day: '2-digit',
+    month: '2-digit',
+  })
+}
+
+export async function issueServerTestSendPermit() {
+  if (!isCloudMode() || !supabase) {
+    throw new Error(PERMIT_ERROR_MESSAGES.generic)
+  }
+
+  await ensureAuthSession()
+
+  const deviceId = getOrCreateDeviceId()
+  if (!deviceId) {
+    throw new Error(PERMIT_ERROR_MESSAGES.generic)
+  }
+
+  const { data, error } = await supabase.functions.invoke('send-test-web-push', {
+    body: {
+      action: 'issue_permit',
+      device_id: deviceId,
+    },
+  })
+
+  if (error) {
+    const contextBody = await parseFunctionInvokeContext(error)
+    const message = contextBody
+      ? mapSendTestError(contextBody, PERMIT_ERROR_MESSAGES.generic)
+      : isNetworkError(error)
+        ? SEND_TEST_ERROR_MESSAGES.network
+        : PERMIT_ERROR_MESSAGES.generic
+    throw new Error(message)
+  }
+
+  if (!data?.ok || !data?.permit?.token || !data?.permit?.expires_at) {
+    const message = mapSendTestError(data ?? {}, PERMIT_ERROR_MESSAGES.generic)
+    throw new Error(message)
+  }
+
+  persistTestSendPermit({
+    permitId: data.permit.token,
+    expiresAt: data.permit.expires_at,
+  })
+
+  return {
+    expiresAt: data.permit.expires_at,
+    ttlSeconds: data.permit.ttl_seconds ?? 300,
+    message: PERMIT_ISSUE_SUCCESS_MESSAGE,
+    expiryLabel: formatPermitExpiryLabel(data.permit.expires_at),
+  }
+}
+
+export async function fetchServerTestSendPermitStatus() {
+  const permit = readPersistedTestSendPermit()
+  if (!permit?.permitId) return null
+
+  if (!isCloudMode() || !supabase) return null
+
+  try {
+    await ensureAuthSession()
+  } catch {
+    return null
+  }
+
+  const deviceId = getOrCreateDeviceId()
+  if (!deviceId) return null
+
+  const { data, error } = await supabase.functions.invoke('send-test-web-push', {
+    body: {
+      action: 'permit_status',
+      device_id: deviceId,
+      permit_id: permit.permitId,
+    },
+  })
+
+  if (error || !data?.ok) return null
+
+  return data.permit ?? null
+}
+
 function mapPreflightError(data, fallback) {
   const code = data?.code
   if (code === 'unauthorized') return PREFLIGHT_ERROR_MESSAGES.session_expired
@@ -648,7 +854,8 @@ export function formatPreflightSuccessSummary(checks) {
     'устройство: готово',
     `active subscription: ${checks?.matching_active_subscriptions ?? 1}`,
     `сервер Web Push: ${checks?.web_push_configured ? 'готов' : 'не готов'}`,
-    `test gates: ${checks?.test_sender_enabled && checks?.production_test_enabled ? 'включены' : 'выключены'}`,
+    `legacy gates: ${checks?.legacy_test_gates_enabled ? 'включены (диагностика)' : 'выключены'}`,
+    `разрешение: ${checks?.permit_required ? 'требуется' : 'не требуется'}`,
     `отправка: ${checks?.ready_to_send ? 'разрешена' : 'заблокирована'}`,
   ]
   return lines.join('\n')
@@ -735,9 +942,9 @@ export async function preflightServerTestWebPush() {
     authenticated: Boolean(checks.authenticated),
     matchingActiveSubscriptions: checks.matching_active_subscriptions ?? 0,
     webPushConfigured: Boolean(checks.web_push_configured),
-    testSenderEnabled: Boolean(checks.test_sender_enabled),
-    productionTestEnabled: Boolean(checks.production_test_enabled),
-    readyExceptGates: Boolean(checks.ready_except_gates),
+    legacyTestGatesEnabled: Boolean(checks.legacy_test_gates_enabled),
+    permitRequired: Boolean(checks.permit_required),
+    readyExceptPermit: Boolean(checks.ready_except_permit),
     readyToSend: Boolean(checks.ready_to_send),
     at: new Date().toISOString(),
     message: PREFLIGHT_SUCCESS_MESSAGE,
@@ -907,6 +1114,17 @@ export async function sendServerTestWebPush() {
     )
   }
 
+  const persistedPermit = readPersistedTestSendPermit()
+  if (!persistedPermit?.permitId || persistedPermit.used || !isPersistedTestSendPermitValid()) {
+    throwSendTestFailure(
+      classifySendTestFailure({
+        stage: 'flag',
+        errorCode: persistedPermit?.used ? 'permit_already_used' : 'permit_required',
+        attempted: false,
+      })
+    )
+  }
+
   const readiness = await getDeviceTestSendStatus()
   if (!readiness.testReady) {
     throwSendTestFailure(
@@ -918,7 +1136,9 @@ export async function sendServerTestWebPush() {
     )
   }
 
-  if (!import.meta.env.DEV && !readiness.testSenderEnabled) {
+  if (!import.meta.env.DEV) {
+    // Production controlled send is authorized by DB permit, not legacy env gates.
+  } else if (!readiness.testSenderEnabled) {
     throwSendTestFailure(
       classifySendTestFailure({ stage: 'flag', errorCode: 'test_sender_disabled', attempted: false })
     )
@@ -974,6 +1194,7 @@ export async function sendServerTestWebPush() {
       action: 'send',
       device_id: deviceId,
       request_id: requestId,
+      permit_id: persistedPermit.permitId,
     },
   })
 
@@ -997,6 +1218,7 @@ export async function sendServerTestWebPush() {
   }
 
   if (!data?.ok) {
+    markPersistedTestSendPermitUsed()
     const errorCode = data?.code ?? 'delivery_failed'
     throwSendTestFailure({
       stage: 'invoke',
@@ -1008,6 +1230,7 @@ export async function sendServerTestWebPush() {
   }
 
   clearPersistedSendTestDiagnostic()
+  markPersistedTestSendPermitUsed()
 
   return {
     notificationId: data.notification_id,

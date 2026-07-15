@@ -176,18 +176,17 @@ function validPreflightBody(deviceId) {
   return { action: 'preflight', device_id: deviceId }
 }
 
-function validSendBody(deviceId, requestId = crypto.randomUUID()) {
-  return { action: 'send', device_id: deviceId, request_id: requestId }
+function validSendBody(deviceId, requestId = crypto.randomUUID(), permitId) {
+  return { action: 'send', device_id: deviceId, request_id: requestId, permit_id: permitId }
 }
 
 function legacySendBody(deviceId, requestId = crypto.randomUUID()) {
   return { device_id: deviceId, request_id: requestId }
 }
 
-function computeReadyFlags({ testGate, productionGate, matching, configured, callerActive }) {
-  const readyExceptGates = callerActive && matching === 1 && configured
-  const readyToSend = readyExceptGates && testGate === 'true' && productionGate === 'true'
-  return { readyExceptGates, readyToSend }
+function computeReadyFlags({ matching, configured, callerActive }) {
+  const readyExceptPermit = callerActive && matching === 1 && configured
+  return { readyExceptPermit, readyToSend: false }
 }
 
 function stageStatic() {
@@ -197,11 +196,12 @@ function stageStatic() {
   const ui = read('src/components/platform/notifications/PushNotificationSettings.jsx')
 
   assert('preflight action supported', senderFn.includes("'preflight'"))
+  assert('issue_permit action supported', senderFn.includes("'issue_permit'"))
   assert('send action supported', senderFn.includes("'send'"))
   assert('auth before preflight branch', senderFn.indexOf('authorizeAuthenticatedEmployee') < senderFn.indexOf("action === 'preflight'"))
   assert('preflight before send branch', senderFn.indexOf('handlePreflight') < senderFn.indexOf('handleSend'))
-  assert('gate check not before auth', !/Deno\.serve[\s\S]{0,400}isTestSenderEnabled\(\)/.test(senderFn))
-  assert('gate check in handleSend', senderFn.includes('async function handleSend') && senderFn.includes('if (!isTestSenderEnabled())'))
+  assert('consume before notification insert', senderFn.indexOf('consumeTestSendPermit') < senderFn.indexOf(".from('notifications')"))
+  assert('legacy returns permit_required', senderFn.includes("'permit_required'"))
   const preflightBlock = senderFn.slice(
     senderFn.indexOf('async function handlePreflight'),
     senderFn.indexOf('async function checkRateLimit')
@@ -211,7 +211,8 @@ function stageStatic() {
   assert('preflight skips notification insert call', !preflightBlock.includes('.insert('))
   assert('preflight response mode field', senderFn.includes("mode: 'preflight'"))
   assert('matching_subscription_conflict code', senderFn.includes("'matching_subscription_conflict'"))
-  assert('ready_except_gates field', senderFn.includes('ready_except_gates'))
+  assert('ready_except_permit field', senderFn.includes('ready_except_permit'))
+  assert('permit_required field', senderFn.includes('permit_required'))
   assert('ready_to_send field', senderFn.includes('ready_to_send'))
   assert('preflightServerTestWebPush exported', service.includes('export async function preflightServerTestWebPush'))
   assert('preflight invoke action', service.includes("action: 'preflight'"))
@@ -233,24 +234,19 @@ function stageStatic() {
 function stageUnitReadiness() {
   console.log('Stage 2: Readiness unit logic')
   const gatesOff = computeReadyFlags({
-    testGate: 'false',
-    productionGate: 'false',
     matching: 1,
     configured: true,
     callerActive: true,
   })
-  assert('gates OFF ready_except_gates true', gatesOff.readyExceptGates === true)
-  assert('gates OFF ready_to_send false', gatesOff.readyToSend === false)
+  assert('ready_except_permit true', gatesOff.readyExceptPermit === true)
+  assert('ready_to_send false without permit', gatesOff.readyToSend === false)
 
   const gatesOn = computeReadyFlags({
-    testGate: 'true',
-    productionGate: 'true',
     matching: 1,
     configured: true,
     callerActive: true,
   })
-  assert('gates ON ready_except_gates true', gatesOn.readyExceptGates === true)
-  assert('gates ON ready_to_send true', gatesOn.readyToSend === true)
+  assert('preflight ready_to_send remains false', gatesOn.readyToSend === false)
   console.log('')
 }
 
@@ -351,7 +347,9 @@ async function stagePreflightIntegration() {
   assert('preflight matching=1 → 200', ok.status === 200 && ok.json?.ok === true)
   assert('preflight mode field', ok.json?.mode === 'preflight')
   assert('preflight matching count 1', ok.json?.checks?.matching_active_subscriptions === 1)
-  assert('preflight ready_except_gates true', ok.json?.checks?.ready_except_gates === true)
+  assert('preflight ready_except_permit true', ok.json?.checks?.ready_except_permit === true)
+  assert('preflight ready_to_send false', ok.json?.checks?.ready_to_send === false)
+  assert('preflight permit_required true', ok.json?.checks?.permit_required === true)
   assert('preflight response no endpoint', !JSON.stringify(ok.json).includes(ENDPOINT))
   assert('preflight response no p256dh', !JSON.stringify(ok.json).includes('p256dh'))
 
@@ -409,11 +407,11 @@ async function stageSendRegression() {
 
   const explicit = await invokeSender({
     token: state.tokens.a,
-    body: validSendBody(state.deviceA),
+    body: validSendBody(state.deviceA, crypto.randomUUID(), crypto.randomUUID()),
   })
   assert(
-    'explicit send action accepted',
-    explicit.status === 200 || explicit.status === 502 || explicit.status === 503,
+    'explicit send without valid permit rejected',
+    explicit.status === 403 || explicit.status === 409 || explicit.status === 410,
     `status=${explicit.status}`
   )
 
@@ -421,14 +419,10 @@ async function stageSendRegression() {
     token: state.tokens.a,
     body: legacySendBody(state.deviceA),
   })
-  assert(
-    'legacy send contract still accepted',
-    legacy.status === 200 || legacy.status === 429 || legacy.status === 502 || legacy.status === 503,
-    `status=${legacy.status}`
-  )
+  assert('legacy send contract requires permit', legacy.status === 409 && legacy.json?.code === 'permit_required')
 
   const afterNotifications = Number(psqlScalar('SELECT COUNT(*) FROM public.notifications;'))
-  assert('send path still creates notification when allowed', afterNotifications >= beforeNotifications)
+  assert('send path without permit creates no notification', afterNotifications === beforeNotifications)
 
   console.log('')
 }
