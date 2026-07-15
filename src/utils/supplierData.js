@@ -255,6 +255,26 @@ export function formatSupplierCategories(categories) {
   return categories.join(', ')
 }
 
+/** Текст условий оплаты для списков и карточек */
+export function formatSupplierPaymentTerms(supplier) {
+  if (!supplier?.paymentType) return '—'
+
+  const baseLabel = PAYMENT_TYPE_LABELS[supplier.paymentType]
+  if (!baseLabel) return '—'
+
+  const deferralDays = Number(supplier.deferralDays)
+  if (
+    (supplier.paymentType === PAYMENT_TYPE.DEFERRAL ||
+      supplier.paymentType === PAYMENT_TYPE.MIXED) &&
+    Number.isFinite(deferralDays) &&
+    deferralDays > 0
+  ) {
+    return `${baseLabel} ${deferralDays} дней`
+  }
+
+  return baseLabel
+}
+
 export function formatMinOrderAmount(amount) {
   if (amount == null || Number.isNaN(amount)) return '—'
   return `${Number(amount).toLocaleString('ru-RU')} ₸`

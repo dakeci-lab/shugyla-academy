@@ -117,18 +117,23 @@ export function resolveSimpleReceivingDocument(order, documents) {
   })
 }
 
+function buildSupplierMapById(suppliers) {
+  return new Map((suppliers || []).map((supplier) => [supplier.id, supplier]))
+}
+
 /** Записи простой приёмки для списка / чек-листа */
-export function buildSimpleReceivingEntries(orders, documents) {
+export function buildSimpleReceivingEntries(orders, documents, suppliers = []) {
   const simpleOrders = filterSimplePurchases(orders)
   const orderIds = new Set(simpleOrders.map((order) => order.id))
   const relevantDocuments = filterSimpleReceivingDocuments(documents, orderIds)
+  const supplierById = buildSupplierMapById(suppliers)
 
   return simpleOrders
     .map((order) => ({
       source: RECEIVING_ENTRY_SOURCE.PURCHASE,
       order,
       document: resolveSimpleReceivingDocument(order, relevantDocuments),
-      supplier: null,
+      supplier: order.supplierId ? supplierById.get(order.supplierId) ?? null : null,
       dateKey: order.expectedDeliveryDate || '',
       id: order.id,
     }))
@@ -199,13 +204,25 @@ export function buildExpectedDeliveryEntries(suppliers, weekStartKey, orders = [
 
 /** Объединить реальные закупы и записи плана закупок по расписанию */
 export function buildMergedReceivingEntries(orders, documents, suppliers, weekStartKey) {
-  const purchaseEntries = buildSimpleReceivingEntries(orders, documents)
+  const purchaseEntries = buildSimpleReceivingEntries(orders, documents, suppliers)
   const expectedEntries = buildExpectedDeliveryEntries(suppliers, weekStartKey, orders)
   return [...purchaseEntries, ...expectedEntries]
 }
 
 export function isExpectedReceivingEntry(entry) {
   return entry?.source === RECEIVING_ENTRY_SOURCE.EXPECTED
+}
+
+/** Поставщик только по расписанию, без созданной закупки */
+export function isScheduleOnlyReceivingEntry(entry) {
+  return isExpectedReceivingEntry(entry)
+}
+
+/** Реально созданная закупка */
+export function isCreatedPurchaseReceivingEntry(entry) {
+  return (
+    entry?.source === RECEIVING_ENTRY_SOURCE.PURCHASE && Boolean(entry?.order?.id)
+  )
 }
 
 export function getReceivingEntrySupplierName(entry) {

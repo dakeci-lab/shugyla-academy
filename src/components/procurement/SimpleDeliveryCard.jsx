@@ -1,6 +1,6 @@
 import { formatPurchaseAmount } from '../../utils/purchaseData'
+import { formatSupplierPaymentTerms } from '../../utils/supplierData'
 import {
-  EXPECTED_DELIVERY_LABEL,
   RECEIVING_ENTRY_SOURCE,
   resolveSimpleDeliveryStatus,
   SIMPLE_DELIVERY_LABELS,
@@ -22,18 +22,13 @@ export default function SimpleDeliveryCard({
   canCreatePurchase = false,
   onCreatePurchase,
 }) {
-  const isExpected = entrySource === RECEIVING_ENTRY_SOURCE.EXPECTED
+  const isScheduleOnly = entrySource === RECEIVING_ENTRY_SOURCE.EXPECTED
+  const isCreatedPurchase = !isScheduleOnly
   const deliveryStatus = isReceived ? 'received' : resolveSimpleDeliveryStatus(document)
   const amount = order?.totalAmount ?? document?.totalAmount ?? 0
   const supplierName = supplier?.name || order?.supplierName || document?.supplierName || '—'
-  const statusLabel = syncStatusLabel
-    ? syncStatusLabel
-    : isExpected
-      ? EXPECTED_DELIVERY_LABEL
-      : isReceived
-        ? 'Поставка принята'
-        : SIMPLE_DELIVERY_LABELS[deliveryStatus]
-  const interactive = !isExpected && canAccept && Boolean(document?.id) && !syncStatusLabel
+  const paymentTermsLabel = formatSupplierPaymentTerms(supplier)
+  const interactive = isCreatedPurchase && canAccept && Boolean(document?.id) && !syncStatusLabel
 
   function handleToggle(event) {
     event.preventDefault()
@@ -47,7 +42,7 @@ export default function SimpleDeliveryCard({
     onCreatePurchase?.()
   }
 
-  const rowClass = isExpected
+  const rowClass = isScheduleOnly
     ? 'simple-delivery-row--expected'
     : isReceived
       ? 'received'
@@ -70,22 +65,19 @@ export default function SimpleDeliveryCard({
         </label>
       ) : (
         <span className="simple-delivery-row__check simple-delivery-row__check--readonly" aria-hidden="true">
-          {isReceived ? '☑' : isExpected ? '◌' : '☐'}
+          {isReceived ? '☑' : isScheduleOnly ? '◌' : '☐'}
         </span>
       )}
 
       <div className="simple-delivery-row__body simple-delivery-row__body--static">
         <div className="simple-delivery-row__main">
           <span className="simple-delivery-row__supplier">{supplierName}</span>
-          {isExpected && (
-            <span className="simple-delivery-row__badge">По расписанию</span>
-          )}
         </div>
-        <span className="simple-delivery-row__meta">
-          <span className="simple-delivery-row__amount">
-            {isExpected ? '—' : formatPurchaseAmount(amount)}
-          </span>
-          <span className="simple-delivery-row__status">
+        {isCreatedPurchase && (
+          <span className="simple-delivery-row__meta">
+            <span className="simple-delivery-row__amount">
+              {formatPurchaseAmount(amount)}
+            </span>
             {syncStatusLabel ? (
               <span className="purchase-sync-status purchase-sync-status--pending">
                 {syncPending && (
@@ -94,13 +86,15 @@ export default function SimpleDeliveryCard({
                 {syncStatusLabel}
               </span>
             ) : (
-              statusLabel
+              <span className="simple-delivery-row__payment-terms" title={paymentTermsLabel}>
+                {paymentTermsLabel}
+              </span>
             )}
           </span>
-        </span>
+        )}
       </div>
 
-      {isExpected && canCreatePurchase && (
+      {isScheduleOnly && canCreatePurchase && (
         <button
           type="button"
           className="btn btn--primary btn--sm simple-delivery-row__create-btn"
