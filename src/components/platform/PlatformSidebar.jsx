@@ -35,7 +35,7 @@ function useMediaQuery(query) {
  * Desktop: hover-раскрытие + активный раздел всегда открыт
  * Mobile: drawer со всеми разделами сразу раскрытыми
  */
-export default function PlatformSidebar({ isOpen = false, onClose, onNavigate }) {
+export default function PlatformSidebar({ isOpen = false, onNavigate }) {
   const { user } = useSession()
   const { pathname } = useLocation()
   const isMobile = useMediaQuery(MOBILE_QUERY)
@@ -112,14 +112,6 @@ export default function PlatformSidebar({ isOpen = false, onClose, onNavigate })
             </div>
           </div>
         )}
-        <button
-          type="button"
-          className="platform-sidebar__close"
-          onClick={onClose}
-          aria-label="Закрыть меню"
-        >
-          ×
-        </button>
       </div>
 
       <nav className="platform-sidebar__nav" aria-label="Разделы платформы">

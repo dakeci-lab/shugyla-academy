@@ -35,7 +35,14 @@ function PlatformLayoutShell() {
       return undefined
     }
     document.body.style.overflow = 'hidden'
+
+    function handleEscape(event) {
+      if (event.key === 'Escape') setDrawerOpen(false)
+    }
+
+    document.addEventListener('keydown', handleEscape)
     return () => {
+      document.removeEventListener('keydown', handleEscape)
       document.body.style.overflow = ''
     }
   }, [drawerOpen])
@@ -62,7 +69,6 @@ function PlatformLayoutShell() {
 
       <PlatformSidebar
         isOpen={drawerOpen}
-        onClose={closeDrawer}
         onNavigate={closeDrawer}
       />
 
@@ -72,9 +78,7 @@ function PlatformLayoutShell() {
 
           <PlatformMobileHeader
             title={pageTitle}
-            user={user}
             onMenuOpen={() => setDrawerOpen(true)}
-            onLogout={handleLogout}
           />
 
           <header className="platform-layout__topbar">

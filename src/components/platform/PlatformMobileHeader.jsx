@@ -2,7 +2,7 @@ import PlatformHeaderActions from './PlatformHeaderActions'
 import './PlatformMobileHeader.css'
 
 /** Компактный header для mobile/PWA — название текущей страницы по центру */
-export default function PlatformMobileHeader({ title, user, onMenuOpen, onLogout }) {
+export default function PlatformMobileHeader({ title, onMenuOpen }) {
   const pageTitle = title || 'Shugyla Platform'
 
   return (
@@ -23,7 +23,7 @@ export default function PlatformMobileHeader({ title, user, onMenuOpen, onLogout
       </h1>
 
       <div className="platform-mobile-header__actions">
-        <PlatformHeaderActions user={user} onLogout={onLogout} compact bellVariant="mobile" />
+        <PlatformHeaderActions bellVariant="mobile" showUserMenu={false} />
       </div>
     </header>
   )

@@ -44,7 +44,8 @@
     "verify:mobile-page-header": "node scripts/verify-mobile-page-header.mjs",
     "verify:procurement-calendar-filter": "node scripts/verify-procurement-calendar-filter.mjs",
     "verify:modal-scroll-lock": "node scripts/verify-modal-scroll-lock.mjs",
-    "verify:mobile-profile": "node scripts/verify-mobile-profile.mjs"
+    "verify:mobile-profile": "node scripts/verify-mobile-profile.mjs",
+    "verify:mobile-shell": "node scripts/verify-mobile-shell.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",
