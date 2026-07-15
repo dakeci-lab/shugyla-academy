@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   getSuppliers,
@@ -9,8 +9,7 @@ import {
 } from '../../../services/academyDataService'
 import {
   filterSuppliers,
-  SUPPLIER_STATUS,
-  formatActiveSuppliersCount,
+  SUPPLIER_LIST_DEFAULT_STATUS,
 } from '../../../utils/supplierData'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
@@ -19,6 +18,7 @@ import {
   canEditSuppliers,
   canDeleteSuppliers,
 } from '../../../config/permissions'
+import useMediaQuery from '../../../hooks/useMediaQuery'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../../../components/admin/AdminModal'
 import ConfirmDialog from '../../../components/admin/ConfirmDialog'
@@ -29,10 +29,13 @@ import SupplierForm, {
   formToSupplierCreatePayload,
   formToSupplierUpdatePayload,
 } from '../../../components/suppliers/SupplierForm'
+import SupplierFilterPopover from '../../../components/suppliers/SupplierFilterPopover'
 import SupplierTable from '../../../components/suppliers/SupplierTable'
-import { SearchIcon } from '../../../components/icons/PlatformIcons'
+import { FilterIcon, PlusIcon, SearchIcon } from '../../../components/icons/PlatformIcons'
 import '../../../components/admin/admin-shared.css'
 import './SuppliersPage.css'
+
+const NARROW_SEARCH_QUERY = '(max-width: 480px)'
 
 /** Страница списка поставщиков — /platform/suppliers */
 export function SuppliersListPage() {
@@ -41,7 +44,12 @@ export function SuppliersListPage() {
   const { version, refresh } = useAdminRefresh()
   const location = useLocation()
   const navigate = useNavigate()
+  const filterButtonRef = useRef(null)
+  const isNarrowSearch = useMediaQuery(NARROW_SEARCH_QUERY)
   const [search, setSearch] = useState('')
+  const [appliedStatus, setAppliedStatus] = useState(SUPPLIER_LIST_DEFAULT_STATUS)
+  const [draftStatus, setDraftStatus] = useState(SUPPLIER_LIST_DEFAULT_STATUS)
+  const [filterOpen, setFilterOpen] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(EMPTY_SUPPLIER_FORM)
@@ -57,14 +65,15 @@ export function SuppliersListPage() {
   void version
 
   const suppliers = getSuppliers()
-  const activeSuppliers = useMemo(
-    () => suppliers.filter((supplier) => supplier.status === SUPPLIER_STATUS.ACTIVE),
-    [suppliers, version]
-  )
   const filtered = useMemo(
-    () => filterSuppliers(activeSuppliers, { search, status: 'all' }),
-    [activeSuppliers, search, version]
+    () => filterSuppliers(suppliers, { search, status: appliedStatus }),
+    [suppliers, search, appliedStatus, version]
   )
+  const filterPreviewCount = useMemo(
+    () => filterSuppliers(suppliers, { search, status: draftStatus }).length,
+    [suppliers, search, draftStatus, version]
+  )
+  const filtersActive = appliedStatus !== SUPPLIER_LIST_DEFAULT_STATUS
 
   useEffect(() => {
     const openEditId = location.state?.openEditId
@@ -103,6 +112,30 @@ export function SuppliersListPage() {
     setShowForm(false)
     setEditId(null)
     setFormError('')
+  }
+
+  function toggleFilter() {
+    if (filterOpen) {
+      closeFilter()
+      return
+    }
+    setDraftStatus(appliedStatus)
+    setFilterOpen(true)
+  }
+
+  function closeFilter() {
+    setFilterOpen(false)
+  }
+
+  function applyFilter() {
+    setAppliedStatus(draftStatus)
+    setFilterOpen(false)
+  }
+
+  function resetFilter() {
+    setDraftStatus(SUPPLIER_LIST_DEFAULT_STATUS)
+    setAppliedStatus(SUPPLIER_LIST_DEFAULT_STATUS)
+    setFilterOpen(false)
   }
 
   async function handleSave() {
@@ -150,10 +183,12 @@ export function SuppliersListPage() {
     }
   }
 
+  const searchPlaceholder = isNarrowSearch
+    ? 'Поиск поставщика…'
+    : 'Поиск по названию, менеджеру, телефону…'
+
   return (
     <div className="suppliers-page">
-      <p className="suppliers-page__count">{formatActiveSuppliersCount(activeSuppliers.length)}</p>
-
       <div className="suppliers-page__toolbar">
         <label className="suppliers-page__search-wrap">
           <span className="suppliers-page__search-icon" aria-hidden="true">
@@ -162,26 +197,58 @@ export function SuppliersListPage() {
           <input
             type="search"
             className="suppliers-page__search"
-            placeholder="Поиск по названию, менеджеру, телефону…"
+            placeholder={searchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             aria-label="Поиск поставщиков"
           />
         </label>
+
+        <div className="suppliers-page__filter-wrap">
+          <button
+            ref={filterButtonRef}
+            type="button"
+            className={`suppliers-page__icon-btn suppliers-page__filter-btn${
+              filtersActive ? ' suppliers-page__icon-btn--active' : ''
+            }`}
+            onClick={toggleFilter}
+            aria-expanded={filterOpen}
+            aria-label="Фильтр поставщиков"
+            title="Фильтр поставщиков"
+          >
+            <FilterIcon size={20} />
+            {filtersActive && (
+              <span className="suppliers-page__filter-indicator" aria-hidden="true" />
+            )}
+          </button>
+          <SupplierFilterPopover
+            open={filterOpen}
+            draftStatus={draftStatus}
+            onChange={setDraftStatus}
+            resultCount={filterPreviewCount}
+            onApply={applyFilter}
+            onReset={resetFilter}
+            onClose={closeFilter}
+            anchorRef={filterButtonRef}
+          />
+        </div>
+
         {canEdit && (
           <button
             type="button"
-            className="btn btn--primary btn--sm suppliers-page__add-btn"
+            className="suppliers-page__icon-btn suppliers-page__create-btn"
             onClick={openCreate}
+            aria-label="Добавить поставщика"
+            title="Добавить поставщика"
           >
-            + Добавить поставщика
+            <PlusIcon size={20} />
           </button>
         )}
       </div>
 
       {filtered.length === 0 ? (
         <div className="suppliers-page__empty">
-          {activeSuppliers.length === 0
+          {suppliers.length === 0
             ? 'Поставщики ещё не добавлены.'
             : 'По вашему запросу ничего не найдено.'}
         </div>

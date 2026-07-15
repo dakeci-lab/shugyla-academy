@@ -46,7 +46,8 @@
     "verify:modal-scroll-lock": "node scripts/verify-modal-scroll-lock.mjs",
     "verify:mobile-profile": "node scripts/verify-mobile-profile.mjs",
     "verify:mobile-shell": "node scripts/verify-mobile-shell.mjs",
-    "verify:suppliers-simplify": "node scripts/verify-suppliers-simplify.mjs"
+    "verify:suppliers-simplify": "node scripts/verify-suppliers-simplify.mjs",
+    "verify:suppliers-toolbar": "node scripts/verify-suppliers-toolbar.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",

@@ -53,6 +53,27 @@ export const SUPPLIER_STATUS_FILTER_OPTIONS = [
   { id: SUPPLIER_STATUS.ARCHIVED, label: SUPPLIER_STATUS_LABELS.archived },
 ]
 
+/** Значение фильтра списка поставщиков по умолчанию */
+export const SUPPLIER_LIST_DEFAULT_STATUS = SUPPLIER_STATUS.ACTIVE
+
+/** Варианты фильтра статуса на странице поставщиков */
+export const SUPPLIER_LIST_STATUS_FILTER_OPTIONS = [
+  { id: 'all', label: 'Все' },
+  { id: SUPPLIER_STATUS.ACTIVE, label: 'Активные' },
+  { id: SUPPLIER_STATUS.INACTIVE, label: 'Деактивированные' },
+  { id: SUPPLIER_STATUS.ARCHIVED, label: 'Архивные' },
+]
+
+/** Компактная подпись количества в фильтре поставщиков */
+export function formatSupplierFilterCount(status, count) {
+  const total = Number(count) || 0
+  if (status === 'all') return `Найдено: ${total}`
+  if (status === SUPPLIER_STATUS.ACTIVE) return `Активных поставщиков: ${total}`
+  if (status === SUPPLIER_STATUS.INACTIVE) return `Деактивированных поставщиков: ${total}`
+  if (status === SUPPLIER_STATUS.ARCHIVED) return `Архивных поставщиков: ${total}`
+  return `Найдено: ${total}`
+}
+
 /** Дни недели для расписания поставщика (ISO: пн → вс) */
 export const SUPPLIER_WEEKDAYS = [
   { id: 'mon', label: 'Пн' },
