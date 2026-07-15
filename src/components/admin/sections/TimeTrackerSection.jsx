@@ -241,7 +241,18 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
     debugLogTimeTracker('audit', audit)
   }, [loading, employeeId, user?.role, shift, state, computedStatus, canCheckIn, canCheckOut, disabledReason, now, loadError])
 
-  async function runWithGeolocation(action) {
+  function sanitizeActionError(message, context) {
+    const fallback =
+      context === 'checkout'
+        ? 'Не удалось отметить уход. Проверьте интернет и повторите попытку.'
+        : 'Не удалось отметить приход. Проверьте интернет и повторите попытку.'
+    if (!message) return fallback
+    const text = String(message).trim()
+    if (/permission denied/i.test(text) || /42501/.test(text)) return fallback
+    return text
+  }
+
+  async function runWithGeolocation(action, context) {
     setActing(true)
     setActionError('')
     setSuccess('')
@@ -252,21 +263,29 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
       if (accuracyError) throw new Error(accuracyError)
       const updated = await action(coords)
       setShift(updated)
+      return true
     } catch (err) {
-      setActionError(err.message || 'Не удалось выполнить действие')
+      setActionError(sanitizeActionError(err.message, context))
+      return false
     } finally {
       setActing(false)
     }
   }
 
   async function handleCheckIn() {
-    await runWithGeolocation((coords) => checkInEmployee(employeeId, coords))
-    setSuccess('Приход отмечен')
+    const ok = await runWithGeolocation(
+      (coords) => checkInEmployee(employeeId, coords),
+      'checkin'
+    )
+    if (ok) setSuccess('Приход отмечен')
   }
 
   async function handleCheckOut() {
-    await runWithGeolocation((coords) => checkOutEmployee(employeeId, coords))
-    setSuccess('Уход отмечен')
+    const ok = await runWithGeolocation(
+      (coords) => checkOutEmployee(employeeId, coords),
+      'checkout'
+    )
+    if (ok) setSuccess('Уход отмечен')
   }
 
   const welcomeName = user?.name?.split(/\s+/)[0] || user?.name || 'сотрудник'

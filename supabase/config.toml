@@ -478,3 +478,9 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/run-time-tracker-notification-scheduler/deno.json"
 entrypoint = "./functions/run-time-tracker-notification-scheduler/index.ts"
+
+[functions.employee-time-tracker-action]
+enabled = true
+verify_jwt = true
+import_map = "./functions/employee-time-tracker-action/deno.json"
+entrypoint = "./functions/employee-time-tracker-action/index.ts"

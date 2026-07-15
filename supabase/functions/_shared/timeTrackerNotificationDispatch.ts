@@ -306,7 +306,7 @@ function buildTimeTrackerPushPayload(notificationId: string, requestId: string, 
     badge: '/shugyla-academy/icons/icon-192.png',
     tag: `shugyla-time-tracker-${shortId}`,
     data: {
-      url: notification.action_url ?? '/shugyla-academy/platform/time-tracker',
+      url: notification.action_url ?? '/shugyla-academy/platform',
       notification_id: notificationId,
       type: 'time_tracker',
     },

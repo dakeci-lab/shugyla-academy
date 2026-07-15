@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabaseClient'
+import { normalizeTimeTrackerActionUrl } from '../utils/timeTrackerRoutes'
 
 /** Поля in-app уведомления — RLS ограничивает строки текущим пользователем */
 export const NOTIFICATION_SELECT_FIELDS =
@@ -146,5 +147,5 @@ export function validateNotificationActionUrl(actionUrl) {
   if (trimmed.startsWith('//')) return null
   if (/^(https?:|javascript:|data:)/i.test(trimmed)) return null
 
-  return trimmed
+  return normalizeTimeTrackerActionUrl(trimmed) ?? trimmed
 }

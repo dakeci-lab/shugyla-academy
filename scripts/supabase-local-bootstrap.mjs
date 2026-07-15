@@ -30,6 +30,7 @@ const REQUIRED_FILES = [
   'supabase/functions/admin-update-employee/index.ts',
   'supabase/functions/manage-push-subscription/index.ts',
   'supabase/functions/send-test-web-push/index.ts',
+  'supabase/functions/employee-time-tracker-action/index.ts',
 ]
 
 const TIMESTAMP_MIGRATIONS = [

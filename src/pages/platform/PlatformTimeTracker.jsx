@@ -1,10 +1,6 @@
-import TimeTrackerSection from '../../components/admin/sections/TimeTrackerSection'
-import '../../components/admin/admin-shared.css'
+import { Navigate } from 'react-router-dom'
 
+/** Legacy route — перенаправление на главную с новым тайм-трекером */
 export default function PlatformTimeTracker() {
-  return (
-    <div className="platform-time-tracker">
-      <TimeTrackerSection />
-    </div>
-  )
+  return <Navigate to="/platform" replace />
 }

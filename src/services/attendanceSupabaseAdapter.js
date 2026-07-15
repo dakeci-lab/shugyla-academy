@@ -1,5 +1,49 @@
 import { supabase } from '../lib/supabaseClient'
 import { normalizeShift } from '../utils/shiftData'
+
+const CHECK_IN_ERROR = 'Не удалось отметить приход. Проверьте интернет и повторите попытку.'
+const CHECK_OUT_ERROR = 'Не удалось отметить уход. Проверьте интернет и повторите попытку.'
+
+function extractFunctionError(error) {
+  const contextBody = error?.context?.json ?? error?.context?.body
+  if (contextBody && typeof contextBody === 'object') return contextBody
+  return null
+}
+
+function sanitizeAttendanceError(message, context) {
+  const fallback = context === 'checkout' ? CHECK_OUT_ERROR : CHECK_IN_ERROR
+  if (!message) return fallback
+  const text = String(message).trim()
+  if (/permission denied/i.test(text) || /42501/.test(text)) return fallback
+  if (/^[А-Яа-яЁё]/.test(text)) return text.replace(/^.*?:\s*/, '')
+  return fallback
+}
+
+function mapTimeTrackerActionError(errorBody, context) {
+  const code = errorBody?.code ?? errorBody?.error?.code
+  if (code === 'unauthorized') return 'Сессия истекла. Войдите в аккаунт заново'
+  if (code === 'forbidden' || code === 'inactive_caller' || code === 'forbidden_field') {
+    return context === 'checkout' ? CHECK_OUT_ERROR : CHECK_IN_ERROR
+  }
+  if (errorBody?.message) return sanitizeAttendanceError(errorBody.message, context)
+  return context === 'checkout' ? CHECK_OUT_ERROR : CHECK_IN_ERROR
+}
+
+async function invokeTimeTrackerAction(body, context) {
+  const { data, error } = await supabase.functions.invoke('employee-time-tracker-action', {
+    body,
+  })
+
+  if (error) {
+    throw new Error(mapTimeTrackerActionError(extractFunctionError(error), context))
+  }
+
+  if (!data?.ok) {
+    throw new Error(mapTimeTrackerActionError(data, context))
+  }
+
+  return data
+}
 import {
   normalizeWorkLocation,
   normalizeAttendanceSettings,
@@ -94,30 +138,34 @@ export async function saveAttendanceSettings(settings, updatedBy = null) {
   return normalizeAttendanceSettings(saved)
 }
 
-export async function checkInEmployee(employeeId, coords) {
-  const row = await throwIfError(
-    await supabase.rpc('attendance_check_in', {
-      p_employee_id: Number(employeeId),
-      p_latitude: coords.latitude,
-      p_longitude: coords.longitude,
-      p_accuracy: coords.accuracy,
-    }),
-    'Отметка прихода'
+export async function checkInEmployee(_employeeId, coords) {
+  const result = await invokeTimeTrackerAction(
+    {
+      action: 'clock_in',
+      coords: {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        accuracy: coords.accuracy ?? null,
+      },
+    },
+    'checkin'
   )
-  return rowToShift(row)
+  return rowToShift(result.shift)
 }
 
-export async function checkOutEmployee(employeeId, coords) {
-  const row = await throwIfError(
-    await supabase.rpc('attendance_check_out', {
-      p_employee_id: Number(employeeId),
-      p_latitude: coords.latitude,
-      p_longitude: coords.longitude,
-      p_accuracy: coords.accuracy,
-    }),
-    'Отметка ухода'
+export async function checkOutEmployee(_employeeId, coords) {
+  const result = await invokeTimeTrackerAction(
+    {
+      action: 'clock_out',
+      coords: {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        accuracy: coords.accuracy ?? null,
+      },
+    },
+    'checkout'
   )
-  return rowToShift(row)
+  return rowToShift(result.shift)
 }
 
 export async function getTodayShiftForEmployee(employeeId) {

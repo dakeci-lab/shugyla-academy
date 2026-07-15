@@ -1,7 +1,8 @@
 /* Shugyla Academy — базовый service worker (MVP PWA) */
 
 const BASE = '/shugyla-academy/'
-const CACHE_NAME = 'shugyla-academy-shell-v1'
+const CACHE_NAME = 'shugyla-academy-shell-v2'
+const CANONICAL_PLATFORM_PATH = `${BASE.replace(/\/$/, '')}/platform`
 
 const SHELL_URLS = [
   `${BASE}`,
@@ -16,6 +17,43 @@ const SHELL_URLS = [
 function isSupabaseOrExternal(url) {
   if (url.origin !== self.location.origin) return true
   return url.hostname.includes('supabase.co')
+}
+
+function normalizeNotificationDestination(rawUrl) {
+  const origin = self.location.origin
+  const fallback = `${origin}${CANONICAL_PLATFORM_PATH}`
+
+  if (!rawUrl || typeof rawUrl !== 'string') return fallback
+
+  const trimmed = rawUrl.trim()
+  if (/^(javascript|data):/i.test(trimmed)) return fallback
+
+  try {
+    const url = new URL(trimmed, origin)
+    if (url.origin !== origin) return fallback
+
+    const basePath = BASE.replace(/\/$/, '')
+    const pathname = url.pathname.replace(/\/+$/, '') || '/'
+    const suffix = `${url.search}${url.hash}`
+
+    const legacyPatterns = [
+      `${basePath}/platform/time-tracker`,
+      '/platform/time-tracker',
+    ]
+
+    if (legacyPatterns.some((legacy) => pathname === legacy || pathname.startsWith(`${legacy}/`))) {
+      return `${origin}${CANONICAL_PLATFORM_PATH}${suffix}`
+    }
+
+    if (pathname === `${basePath}/platform` || pathname === '/platform') {
+      return `${origin}${CANONICAL_PLATFORM_PATH}${suffix}`
+    }
+
+    if (!pathname.startsWith(basePath)) return fallback
+    return url.href
+  } catch {
+    return fallback
+  }
 }
 
 self.addEventListener('install', (event) => {
@@ -79,22 +117,7 @@ self.addEventListener('fetch', (event) => {
 })
 
 function resolveSafeNotificationUrl(rawUrl) {
-  const origin = self.location.origin
-  const fallback = `${origin}${BASE}`
-  if (!rawUrl || typeof rawUrl !== 'string') return fallback
-
-  const trimmed = rawUrl.trim()
-  if (/^(javascript|data):/i.test(trimmed)) return fallback
-
-  try {
-    const url = new URL(trimmed, origin)
-    if (url.origin !== origin) return fallback
-    const basePath = BASE.replace(/\/$/, '')
-    if (!url.pathname.startsWith(basePath)) return fallback
-    return url.href
-  } catch {
-    return fallback
-  }
+  return normalizeNotificationDestination(rawUrl)
 }
 
 function parsePushPayload(event) {
@@ -104,7 +127,7 @@ function parsePushPayload(event) {
     icon: `${BASE}icons/icon-192.png`,
     badge: `${BASE}icons/icon-192.png`,
     tag: 'shugyla-notification',
-    data: { url: `${BASE}platform/profile` },
+    data: { url: `${CANONICAL_PLATFORM_PATH}` },
     actions: [],
     requireInteraction: false,
   }
@@ -121,7 +144,7 @@ function parsePushPayload(event) {
       badge: typeof payload.badge === 'string' ? payload.badge : fallback.badge,
       tag: typeof payload.tag === 'string' && payload.tag.trim() ? payload.tag.trim() : fallback.tag,
       data: {
-        url: resolveSafeNotificationUrl(data.url || payload.url),
+        url: normalizeNotificationDestination(data.url || payload.url),
         notification_id: data.notification_id ?? null,
         type: data.type ?? null,
       },
@@ -173,10 +196,10 @@ self.addEventListener('notificationclick', (event) => {
   event.notification.close()
 
   const data = event.notification.data || {}
-  let targetUrl = resolveSafeNotificationUrl(data.url)
+  let targetUrl = normalizeNotificationDestination(data.url)
 
   if (event.action && typeof event.action === 'string') {
-    targetUrl = resolveSafeNotificationUrl(event.action)
+    targetUrl = normalizeNotificationDestination(event.action)
   }
 
   event.waitUntil(focusOrOpenClient(targetUrl))

@@ -707,7 +707,7 @@ values
     'shift_start_soon',
     'Смена скоро начнётся',
     'Ваша смена начинается через {{minutes}} минут. Не забудьте отметиться по прибытии.',
-    '/platform/time-tracker',
+    '/platform',
     'normal'
   ),
   (
@@ -716,7 +716,7 @@ values
     'clock_in_missing',
     'Не забудьте отметиться',
     'Ваша смена уже началась. Нажмите «Я на работе», чтобы зафиксировать приход.',
-    '/platform/time-tracker',
+    '/platform',
     'high'
   ),
   (
@@ -725,7 +725,7 @@ values
     'shift_end_reached',
     'Завершите смену',
     'Ваша смена завершилась. Не забудьте нажать «Я ухожу».',
-    '/platform/time-tracker',
+    '/platform',
     'normal'
   ),
   (
@@ -734,7 +734,7 @@ values
     'clock_out_missing',
     'Отметка ухода не зафиксирована',
     'Вы ещё не завершили смену в тайм-трекере. Зафиксируйте уход.',
-    '/platform/time-tracker',
+    '/platform',
     'high'
   )
 on conflict (code) do nothing;
