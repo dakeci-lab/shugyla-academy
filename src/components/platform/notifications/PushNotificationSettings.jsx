@@ -7,9 +7,14 @@ import {
   enablePushNotifications,
   getNotificationPermission,
   getPushRegistrationStatus,
+  getDeviceTestSendStatus,
+  hasAttemptedSendTestRequest,
   isWebPushSupported,
   isProductionE2eTestSendEnabled,
+  prepareDeviceForTestSend,
+  PREPARE_TEST_SUCCESS_MESSAGE,
   readPersistedSendTestDiagnostic,
+  readPersistedSendTestRequest,
   sendServerTestWebPush,
   showDevelopmentTestNotification,
   WebPushError,
@@ -35,6 +40,14 @@ const SERVER_SEND_STATE = {
   SENDING: 'sending',
   SUCCESS: 'success',
   ERROR: 'error',
+  BLOCKED: 'blocked',
+}
+
+const PREPARE_STATE = {
+  IDLE: 'idle',
+  PREPARING: 'preparing',
+  READY: 'ready',
+  ERROR: 'error',
 }
 
 export default function PushNotificationSettings() {
@@ -45,6 +58,10 @@ export default function PushNotificationSettings() {
   const [serverSendState, setServerSendState] = useState(SERVER_SEND_STATE.IDLE)
   const [serverSendMessage, setServerSendMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [prepareState, setPrepareState] = useState(PREPARE_STATE.IDLE)
+  const [prepareMessage, setPrepareMessage] = useState('')
+  const [testReady, setTestReady] = useState(false)
+  const [testSenderEnabled, setTestSenderEnabled] = useState(false)
 
   const refreshStatus = useCallback(async () => {
     if (!isCloudMode()) {
@@ -96,10 +113,42 @@ export default function PushNotificationSettings() {
 
   useEffect(() => {
     const persisted = readPersistedSendTestDiagnostic()
-    if (!persisted?.message) return
-    setServerSendState(SERVER_SEND_STATE.ERROR)
-    setServerSendMessage(persisted.message)
+    if (persisted?.message) {
+      setServerSendState(SERVER_SEND_STATE.ERROR)
+      setServerSendMessage(persisted.message)
+    }
+    if (readPersistedSendTestRequest()) {
+      setServerSendState((current) =>
+        current === SERVER_SEND_STATE.SUCCESS ? current : SERVER_SEND_STATE.BLOCKED
+      )
+    }
   }, [])
+
+  useEffect(() => {
+    if (!testReady || !isProductionE2eTestSendEnabled() || import.meta.env.DEV) return undefined
+
+    let cancelled = false
+    const pollSenderGate = async () => {
+      try {
+        const status = await getDeviceTestSendStatus()
+        if (cancelled) return
+        setTestSenderEnabled(Boolean(status.testSenderEnabled))
+        setTestReady(Boolean(status.testReady))
+      } catch {
+        // Polling is best-effort while backend gates are toggled remotely.
+      }
+    }
+
+    void pollSenderGate()
+    const timer = window.setInterval(() => {
+      void pollSenderGate()
+    }, 5000)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(timer)
+    }
+  }, [testReady])
 
   function resolveEnableErrorMessage(err) {
     if (err instanceof WebPushError && err.code && WEB_PUSH_ERROR_MESSAGES[err.code]) {
@@ -163,8 +212,33 @@ export default function PushNotificationSettings() {
     }
   }
 
+  async function handlePrepareTest() {
+    if (prepareState === PREPARE_STATE.PREPARING || busy) return
+    setPrepareState(PREPARE_STATE.PREPARING)
+    setPrepareMessage('')
+    setTestReady(false)
+    try {
+      const status = await prepareDeviceForTestSend()
+      setTestReady(Boolean(status.testReady))
+      setTestSenderEnabled(Boolean(status.testSenderEnabled))
+      setPrepareState(PREPARE_STATE.READY)
+      setPrepareMessage(PREPARE_TEST_SUCCESS_MESSAGE)
+      showSuccess(PREPARE_TEST_SUCCESS_MESSAGE)
+    } catch (err) {
+      setPrepareState(PREPARE_STATE.ERROR)
+      setPrepareMessage(err.message || 'Не удалось подготовить устройство к тесту')
+      showWarning(err.message || 'Не удалось подготовить устройство к тесту')
+    }
+  }
+
   async function handleServerTest() {
-    if (serverSendState === SERVER_SEND_STATE.SENDING) return
+    if (
+      serverSendState === SERVER_SEND_STATE.SENDING ||
+      serverSendState === SERVER_SEND_STATE.BLOCKED ||
+      hasAttemptedSendTestRequest()
+    ) {
+      return
+    }
 
     setServerSendState(SERVER_SEND_STATE.SENDING)
     setServerSendMessage('')
@@ -175,7 +249,7 @@ export default function PushNotificationSettings() {
       showSuccess('Серверное push-уведомление отправлено')
     } catch (err) {
       const message = err.message || 'Не удалось отправить push-уведомление'
-      setServerSendState(SERVER_SEND_STATE.ERROR)
+      setServerSendState(SERVER_SEND_STATE.BLOCKED)
       setServerSendMessage(message)
       showWarning(message)
 
@@ -294,15 +368,47 @@ export default function PushNotificationSettings() {
           {isProductionE2eTestSendEnabled() && !import.meta.env.DEV && (
             <div className="push-settings__dev-tests">
               <p className="push-settings__hint">
-                Одно контролируемое тестовое уведомление отправляется только на это устройство.
+                Сначала синхронизируйте это устройство, затем отправьте одно контролируемое тестовое уведомление.
               </p>
+              <button
+                type="button"
+                className="btn btn--outline btn--sm"
+                onClick={handlePrepareTest}
+                disabled={
+                  prepareState === PREPARE_STATE.PREPARING ||
+                  busy ||
+                  serverSendState === SERVER_SEND_STATE.SENDING ||
+                  serverSendState === SERVER_SEND_STATE.SUCCESS ||
+                  serverSendState === SERVER_SEND_STATE.BLOCKED
+                }
+              >
+                {prepareState === PREPARE_STATE.PREPARING
+                  ? 'Подготавливаем…'
+                  : 'Подготовить устройство к тесту'}
+              </button>
+              {prepareMessage && (
+                <p
+                  className={`push-settings__status ${
+                    prepareState === PREPARE_STATE.READY
+                      ? 'push-settings__status--success'
+                      : 'push-settings__status--warning'
+                  }`}
+                  role="status"
+                >
+                  {prepareMessage}
+                </p>
+              )}
               <button
                 type="button"
                 className="btn btn--outline btn--sm"
                 onClick={handleServerTest}
                 disabled={
+                  !testReady ||
+                  !testSenderEnabled ||
                   serverSendState === SERVER_SEND_STATE.SENDING ||
                   serverSendState === SERVER_SEND_STATE.SUCCESS ||
+                  serverSendState === SERVER_SEND_STATE.BLOCKED ||
+                  hasAttemptedSendTestRequest() ||
                   busy
                 }
               >

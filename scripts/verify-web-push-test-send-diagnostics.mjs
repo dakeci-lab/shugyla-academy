@@ -46,6 +46,8 @@ function stageStatic() {
   assert('UI reads persisted diagnostic', ui.includes('readPersistedSendTestDiagnostic'))
   assert('UI alert role for test message', ui.includes('role="alert"'))
   assert('production button blocks after success', ui.includes('SERVER_SEND_STATE.SUCCESS'))
+  assert('prepare flow exported', service.includes('export async function prepareDeviceForTestSend'))
+  assert('request id persistence', service.includes('shugyla.web_push.test_send_request_id'))
   console.log('')
 }
 

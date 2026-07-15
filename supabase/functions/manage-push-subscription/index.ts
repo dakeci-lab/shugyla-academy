@@ -44,14 +44,28 @@ const FORBIDDEN_SUBSCRIPTION = new Set([
 
 type Action = 'register' | 'disable' | 'remove' | 'status'
 
-function subscriptionResponse(registered: boolean, active: boolean, permission: string) {
+function isTestSenderEnabled(): boolean {
+  return (
+    Deno.env.get('WEB_PUSH_TEST_ENABLED') === 'true' &&
+    Deno.env.get('WEB_PUSH_PRODUCTION_TEST_ENABLED') === 'true'
+  )
+}
+
+function subscriptionResponse(
+  registered: boolean,
+  active: boolean,
+  permission: string,
+  matchingSubscriptions = registered && active ? 1 : 0
+) {
   return jsonResponse({
     ok: true,
     subscription: {
       registered,
       active,
       permission,
+      matching_subscriptions: matchingSubscriptions,
     },
+    test_sender_enabled: isTestSenderEnabled(),
   })
 }
 
@@ -150,17 +164,19 @@ Deno.serve(async (req) => {
     }
 
     if (!data) {
-      return subscriptionResponse(false, false, 'default')
+      return subscriptionResponse(false, false, 'default', 0)
     }
 
+    const active = Boolean(data.is_active)
     return jsonResponse({
       ok: true,
       subscription: {
         registered: true,
-        active: Boolean(data.is_active),
+        active,
         permission: data.permission_status ?? 'default',
-        last_seen_at: data.last_used_at ?? null,
+        matching_subscriptions: active ? 1 : 0,
       },
+      test_sender_enabled: isTestSenderEnabled(),
     })
   }
 

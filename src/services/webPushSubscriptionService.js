@@ -454,6 +454,18 @@ export const SEND_TEST_ERROR_MESSAGES = {
 }
 
 const SEND_TEST_DIAGNOSTIC_STORAGE_KEY = 'shugyla.web_push.last_test_send_diagnostic'
+const SEND_TEST_REQUEST_STORAGE_KEY = 'shugyla.web_push.test_send_request_id'
+const DEVICE_ID_UUID_RE = /^[0-9a-f-]{36}$/i
+
+export const PREPARE_TEST_SUCCESS_MESSAGE = 'Устройство готово к тестовому уведомлению'
+
+export const PREPARE_TEST_ERROR_MESSAGES = {
+  permission_denied: 'Уведомления не разрешены в настройках браузера',
+  no_browser_subscription: 'Не удалось получить подписку браузера',
+  backend_not_active: 'Устройство не зарегистрировано на сервере',
+  matching_not_one: 'Не удалось подтвердить единственную активную подписку для этого устройства',
+  vapid_mismatch: 'Подписка браузера не соответствует production VAPID key',
+}
 
 export async function parseFunctionInvokeContext(error) {
   if (!error?.context) return null
@@ -559,6 +571,156 @@ export function clearPersistedSendTestDiagnostic() {
   }
 }
 
+export function readPersistedSendTestRequest() {
+  if (!hasWindow()) return null
+  try {
+    const raw = window.sessionStorage.getItem(SEND_TEST_REQUEST_STORAGE_KEY)
+    return raw && DEVICE_ID_UUID_RE.test(raw) ? raw : null
+  } catch {
+    return null
+  }
+}
+
+export function persistSendTestRequest(requestId) {
+  if (!hasWindow()) return
+  try {
+    window.sessionStorage.setItem(SEND_TEST_REQUEST_STORAGE_KEY, requestId)
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+export function hasAttemptedSendTestRequest() {
+  return Boolean(readPersistedSendTestRequest())
+}
+
+export function evaluateTestSendReadiness({
+  permission,
+  browserSubscriptionPresent,
+  registered,
+  active,
+  matchingSubscriptions,
+}) {
+  return {
+    testReady:
+      permission === 'granted' &&
+      browserSubscriptionPresent &&
+      registered &&
+      active &&
+      matchingSubscriptions === 1,
+    matchingSubscriptions,
+  }
+}
+
+export async function fingerprintDeviceId(deviceId) {
+  if (!deviceId || !hasWindow() || !window.crypto?.subtle) return null
+  const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(deviceId))
+  return Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 12)
+}
+
+export async function getDeviceTestSendStatus() {
+  const permission = getNotificationPermission()
+  const deviceId = getOrCreateDeviceId()
+  if (!deviceId || permission !== 'granted') {
+    return {
+      ...evaluateTestSendReadiness({
+        permission,
+        browserSubscriptionPresent: false,
+        registered: false,
+        active: false,
+        matchingSubscriptions: 0,
+      }),
+      testSenderEnabled: false,
+    }
+  }
+
+  const browserSub = await getExistingBrowserSubscription()
+  const data = await invokeManageSubscription({ action: 'status', device_id: deviceId })
+  const readiness = evaluateTestSendReadiness({
+    permission,
+    browserSubscriptionPresent: Boolean(browserSub),
+    registered: Boolean(data.subscription?.registered),
+    active: Boolean(data.subscription?.active),
+    matchingSubscriptions: Number(data.subscription?.matching_subscriptions ?? 0),
+  })
+
+  return {
+    ...readiness,
+    testSenderEnabled: Boolean(data.test_sender_enabled),
+  }
+}
+
+export async function prepareDeviceForTestSend() {
+  if (!isWebPushSupported()) {
+    throw new WebPushError(
+      'service_worker_unavailable',
+      WEB_PUSH_ERROR_MESSAGES.service_worker_unavailable
+    )
+  }
+
+  if (getNotificationPermission() !== 'granted') {
+    throw new WebPushError('permission_denied', PREPARE_TEST_ERROR_MESSAGES.permission_denied)
+  }
+
+  const vapidPublicKey = getVapidPublicKey()
+  if (!vapidPublicKey) {
+    throw new WebPushError(
+      'backend_registration_failed',
+      WEB_PUSH_ERROR_MESSAGES.backend_registration_failed
+    )
+  }
+
+  const registration = await getServiceWorkerRegistration()
+  if (!registration) {
+    throw new WebPushError(
+      'service_worker_unavailable',
+      WEB_PUSH_ERROR_MESSAGES.service_worker_unavailable
+    )
+  }
+
+  const deviceId = getOrCreateDeviceId()
+  if (!deviceId) {
+    throw new WebPushError(
+      'backend_registration_failed',
+      WEB_PUSH_ERROR_MESSAGES.backend_registration_failed
+    )
+  }
+
+  let subscription = await resolveBrowserSubscription(registration, vapidPublicKey)
+  if (!subscription) {
+    throw new WebPushError('browser_subscribe_failed', PREPARE_TEST_ERROR_MESSAGES.no_browser_subscription)
+  }
+
+  if (!subscriptionMatchesVapid(subscription, vapidPublicKey)) {
+    throw new WebPushError('browser_subscribe_failed', PREPARE_TEST_ERROR_MESSAGES.vapid_mismatch)
+  }
+
+  try {
+    await registerBrowserSubscriptionWithBackend(deviceId, subscription)
+  } catch (err) {
+    if (!(err instanceof WebPushError) || err.code !== 'backend_registration_failed') {
+      throw err
+    }
+
+    await subscription.unsubscribe().catch(() => {})
+    subscription = await createBrowserSubscription(registration, vapidPublicKey)
+    await registerBrowserSubscriptionWithBackend(deviceId, subscription)
+  }
+
+  const status = await getDeviceTestSendStatus()
+  if (!status.testReady) {
+    if (status.matchingSubscriptions > 1) {
+      throw new WebPushError('backend_registration_failed', PREPARE_TEST_ERROR_MESSAGES.matching_not_one)
+    }
+    throw new WebPushError('backend_registration_failed', PREPARE_TEST_ERROR_MESSAGES.backend_not_active)
+  }
+
+  return status
+}
+
 function throwSendTestFailure(diagnostic) {
   const payload = {
     ...diagnostic,
@@ -576,9 +738,32 @@ export function isProductionE2eTestSendEnabled() {
 }
 
 export async function sendServerTestWebPush() {
+  if (hasAttemptedSendTestRequest()) {
+    throwSendTestFailure(
+      classifySendTestFailure({ stage: 'flag', errorCode: 'request_already_attempted', attempted: true })
+    )
+  }
+
   if (!import.meta.env.DEV && !isProductionE2eTestSendEnabled()) {
     throwSendTestFailure(
       classifySendTestFailure({ stage: 'flag', errorCode: 'production_test_disabled', attempted: false })
+    )
+  }
+
+  const readiness = await getDeviceTestSendStatus()
+  if (!readiness.testReady) {
+    throwSendTestFailure(
+      classifySendTestFailure({
+        stage: 'subscription',
+        errorCode: readiness.matchingSubscriptions === 0 ? 'active_subscription_not_found' : 'matching_not_one',
+        attempted: false,
+      })
+    )
+  }
+
+  if (!import.meta.env.DEV && !readiness.testSenderEnabled) {
+    throwSendTestFailure(
+      classifySendTestFailure({ stage: 'flag', errorCode: 'test_sender_disabled', attempted: false })
     )
   }
 
@@ -622,6 +807,7 @@ export async function sendServerTestWebPush() {
   }
 
   const requestId = crypto.randomUUID()
+  persistSendTestRequest(requestId)
   logSendTestDiagnostic(
     classifySendTestFailure({ stage: 'invoke', errorCode: 'invoke_started', attempted: true })
   )
