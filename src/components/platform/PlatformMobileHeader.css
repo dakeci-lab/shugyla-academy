@@ -1,8 +1,10 @@
 .platform-mobile-header {
   display: none;
   align-items: center;
-  gap: 12px;
-  padding: 10px 14px;
+  grid-template-columns: minmax(44px, 1fr) minmax(0, auto) minmax(44px, 1fr);
+  gap: 8px;
+  padding: 8px 12px;
+  padding-top: max(8px, env(safe-area-inset-top, 0px));
   background: var(--color-white);
   border-bottom: 1px solid var(--color-border);
   position: sticky;
@@ -15,14 +17,14 @@
   flex-direction: column;
   justify-content: center;
   gap: 5px;
-  width: 40px;
-  height: 40px;
-  padding: 8px;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
   border: none;
   border-radius: 8px;
   background: transparent;
   cursor: pointer;
-  flex-shrink: 0;
+  justify-self: start;
 }
 
 .platform-mobile-header__burger span {
@@ -37,42 +39,30 @@
   background: var(--color-bg);
 }
 
-.platform-mobile-header__brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-  flex: 1;
-}
-
-.platform-mobile-header__logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: var(--color-primary);
-  color: white;
+.platform-mobile-header__title {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 16px;
   font-weight: 700;
-  font-size: 13px;
-  border-radius: 7px;
-  flex-shrink: 0;
-}
-
-.platform-mobile-header__name {
-  font-size: 14px;
-  font-weight: 700;
+  line-height: 1.2;
+  color: var(--color-text);
+  text-align: center;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  max-width: 100%;
+  justify-self: center;
 }
 
-.platform-mobile-header__profile {
-  flex-shrink: 0;
+.platform-mobile-header__actions {
+  display: flex;
+  justify-content: flex-end;
+  justify-self: end;
+  min-width: 44px;
 }
 
 @media (max-width: 900px) {
   .platform-mobile-header {
-    display: flex;
+    display: grid;
   }
 }

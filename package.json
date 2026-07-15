@@ -40,7 +40,8 @@
     "verify:time-tracker-attendance-routing": "node scripts/verify-time-tracker-attendance-routing.mjs",
     "verify:stale-shift-release": "node scripts/verify-stale-shift-release.mjs",
     "verify:rating-eligibility": "node scripts/verify-rating-eligibility.mjs",
-    "verify:receiving-row-display": "node scripts/verify-receiving-row-display.mjs"
+    "verify:receiving-row-display": "node scripts/verify-receiving-row-display.mjs",
+    "verify:mobile-page-header": "node scripts/verify-mobile-page-header.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",

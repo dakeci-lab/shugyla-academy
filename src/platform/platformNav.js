@@ -328,5 +328,39 @@ export function getPlatformSection(pathname) {
 
   if (nested) return nested
 
+  const dynamic = getDynamicPlatformSection(pathname, flat)
+  if (dynamic) return dynamic
+
   return flat[0] || { title: 'Shugyla Platform', description: '' }
+}
+
+function getDynamicPlatformSection(pathname, flat) {
+  if (/^\/platform\/employees\/\d+\/schedule/.test(pathname)) {
+    return flat.find((item) => item.id === 'employees-schedule') || null
+  }
+
+  if (/^\/platform\/suppliers\/[^/]+/.test(pathname)) {
+    const suppliers = flat.find((item) => item.id === 'suppliers')
+    return {
+      title: 'Поставщик',
+      description: suppliers?.description || '',
+    }
+  }
+
+  if (/^\/platform\/receiving\/[^/]+/.test(pathname)) {
+    return flat.find((item) => item.id === 'receiving') || null
+  }
+
+  if (/^\/platform\/procurement\/analytics\/[^/]+/.test(pathname)) {
+    return {
+      title: 'Аналитика закупок',
+      description: 'Детализация закупки и показатели.',
+    }
+  }
+
+  if (/^\/platform\/procurement\/[^/]+/.test(pathname)) {
+    return flat.find((item) => item.id === 'procurement') || null
+  }
+
+  return null
 }

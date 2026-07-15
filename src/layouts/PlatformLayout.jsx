@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import PlatformHeaderActions from '../components/platform/PlatformHeaderActions'
 import PlatformMobileHeader from '../components/platform/PlatformMobileHeader'
@@ -6,6 +6,7 @@ import AppInstallBanner from '../components/platform/AppInstallBanner'
 import PlatformSidebar from '../components/platform/PlatformSidebar'
 import PullToRefresh from '../components/platform/PullToRefresh'
 import { PullToRefreshProvider } from '../context/PullToRefreshContext'
+import { PlatformPageTitleProvider, usePlatformPageTitleContext } from '../context/PlatformPageTitleContext'
 import { useAcademyData } from '../context/AcademyDataContext'
 import { useProcurementRealtime } from '../hooks/useProcurementRealtime'
 import { getPlatformSection } from '../platform/platformNav'
@@ -13,18 +14,15 @@ import { useSession } from '../context/SessionContext'
 import { LOGIN_PATH } from '../router/authRoutes'
 import './PlatformLayout.css'
 
-/** Оболочка Shugyla Platform — sidebar + контент */
-export default function PlatformLayout() {
+function PlatformLayoutShell() {
   const { user, logout } = useSession()
   const { reload } = useAcademyData()
   useProcurementRealtime(Boolean(user))
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const section = getPlatformSection(pathname)
-  const compactMobileHead =
-    pathname === '/platform/procurement' ||
-    (pathname.startsWith('/platform/procurement/') &&
-      !pathname.startsWith('/platform/procurement/analytics'))
+  const titleContext = usePlatformPageTitleContext()
+  const section = useMemo(() => getPlatformSection(pathname), [pathname])
+  const pageTitle = titleContext?.override?.title || section.title || 'Shugyla Platform'
   const [drawerOpen, setDrawerOpen] = useState(false)
 
   useEffect(() => {
@@ -73,6 +71,7 @@ export default function PlatformLayout() {
           <AppInstallBanner />
 
           <PlatformMobileHeader
+            title={pageTitle}
             user={user}
             onMenuOpen={() => setDrawerOpen(true)}
             onLogout={handleLogout}
@@ -86,22 +85,20 @@ export default function PlatformLayout() {
             <PlatformHeaderActions user={user} onLogout={handleLogout} bellVariant="desktop" />
           </header>
 
-          <div
-            className={`platform-layout__mobile-head${
-              compactMobileHead ? ' platform-layout__mobile-head--compact' : ''
-            }`}
-          >
-            <h1 className="platform-layout__title">{section.title}</h1>
-            {!compactMobileHead && (
-              <p className="platform-layout__desc">{section.description}</p>
-            )}
-          </div>
-
           <div className="platform-layout__content">
             <Outlet />
           </div>
         </PullToRefresh>
       </PullToRefreshProvider>
     </div>
+  )
+}
+
+/** Оболочка Shugyla Platform — sidebar + контент */
+export default function PlatformLayout() {
+  return (
+    <PlatformPageTitleProvider>
+      <PlatformLayoutShell />
+    </PlatformPageTitleProvider>
   )
 }
