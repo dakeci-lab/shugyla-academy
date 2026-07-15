@@ -234,6 +234,12 @@ function stageStaticFrontend() {
   assert('workforce service has no service_role', !workforce.includes('SERVICE_ROLE'))
   assert('OwnerDashboard uses fetchTeamWorkforceData', owner.includes('fetchTeamWorkforceData'))
   assert('WorkScheduleSection uses fetchTeamWorkforceData', schedule.includes('fetchTeamWorkforceData'))
+  assert('WorkScheduleSection passes week query to editor', schedule.includes('?week='))
+  const editor = fs.readFileSync(
+    path.join(ROOT, 'src/components/admin/sections/EmployeeScheduleSection.jsx'),
+    'utf8'
+  )
+  assert('EmployeeScheduleSection uses fetchEmployeeWorkforceBundle', editor.includes('fetchEmployeeWorkforceBundle'))
   assert('EmployeeRatingSection uses fetchTeamWorkforceForMonth', rating.includes('fetchTeamWorkforceForMonth'))
   assert('OwnerDashboard cloud path avoids direct team cache only', owner.includes('isCloudMode()'))
   assert('schedule error does not masquerade as empty list', schedule.includes('!error && employees.length === 0'))

@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { isCloudMode } from '../../../lib/dataMode'
-import { canViewTeamSchedule } from '../../../config/permissions'
+import { canEditEmployeeSchedule, canViewTeamSchedule } from '../../../config/permissions'
 import { getStaffEmployees } from '../../../utils/employeeData'
 import {
   shiftsToMap,
@@ -13,6 +13,7 @@ import {
   addWeeks,
   buildWeekDates,
   getMonthsForWeek,
+  isDateKey,
 } from '../../../utils/shiftData'
 import { getTeamShiftsForMonth } from '../../../services/academyDataService'
 import { fetchTeamWorkforceData } from '../../../services/workforceAdminService'
@@ -33,10 +34,15 @@ import '../TeamScheduleMobile.css'
 /** Общий график всех сотрудников (недельный вид) */
 export default function WorkScheduleSection() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user } = useSession()
   const viewTeam = canViewTeamSchedule(user)
+  const canEditSchedule = canEditEmployeeSchedule(user)
   const selfEmployeeId = user?.id != null ? Number(user.id) : null
-  const [weekStartKey, setWeekStartKey] = useState(getInitialWeekStartKey)
+  const [weekStartKey, setWeekStartKey] = useState(() => {
+    const weekFromUrl = searchParams.get('week')
+    return isDateKey(weekFromUrl) ? weekFromUrl : getInitialWeekStartKey()
+  })
   const [shifts, setShifts] = useState([])
   const [loadedEmployees, setLoadedEmployees] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -107,6 +113,13 @@ export default function WorkScheduleSection() {
     loadShifts()
   }, [loadShifts])
 
+  useEffect(() => {
+    const weekFromUrl = searchParams.get('week')
+    if (isDateKey(weekFromUrl) && weekFromUrl !== weekStartKey) {
+      setWeekStartKey(weekFromUrl)
+    }
+  }, [searchParams, weekStartKey])
+
   const shiftsByEmployee = useMemo(() => {
     const map = new Map()
     employees.forEach((emp) =>
@@ -124,7 +137,9 @@ export default function WorkScheduleSection() {
   }
 
   function openEmployeeSchedule(employeeId) {
-    navigate(`/platform/employees/${employeeId}/schedule`)
+    if (!canEditSchedule) return
+    const weekQuery = isDateKey(weekStartKey) ? `?week=${encodeURIComponent(weekStartKey)}` : ''
+    navigate(`/platform/employees/${employeeId}/schedule${weekQuery}`)
   }
 
   function openDaySheet(employee, date, shift) {
@@ -177,11 +192,12 @@ export default function WorkScheduleSection() {
               <tr key={emp.id}>
                 <td className="team-schedule-table__index">{index + 1}</td>
                 <td className="team-schedule-table__employee">
-                  {viewTeam ? (
+                  {canEditSchedule ? (
                     <button
                       type="button"
                       className="team-schedule-table__employee-btn"
                       onClick={() => openEmployeeSchedule(emp.id)}
+                      aria-label={`Редактировать график сотрудника ${emp.name}`}
                     >
                       {emp.name}
                     </button>
@@ -225,7 +241,7 @@ export default function WorkScheduleSection() {
             todayKey={todayKey}
             onDayOpen={openDaySheet}
             onEmployeeOpen={openEmployeeSchedule}
-            canOpenEmployee={viewTeam}
+            canOpenEmployee={canEditSchedule}
           />
         ))}
       </div>

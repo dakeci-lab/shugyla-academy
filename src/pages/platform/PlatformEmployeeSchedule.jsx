@@ -1,4 +1,4 @@
-import { Navigate, useParams } from 'react-router-dom'
+import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext'
 import {
   canViewEmployeeSchedule,
@@ -10,7 +10,9 @@ import '../../components/admin/admin-shared.css'
 /** Страница персонального графика сотрудника (редактирование — только для администратора) */
 export default function PlatformEmployeeSchedule() {
   const { employeeId } = useParams()
+  const [searchParams] = useSearchParams()
   const { user } = useSession()
+  const weekStartKey = searchParams.get('week')
 
   if (!canViewEmployeeSchedule(user, employeeId)) {
     return <Navigate to="/platform/academy/cabinet" replace />
@@ -22,7 +24,7 @@ export default function PlatformEmployeeSchedule() {
 
   return (
     <div className="platform-employee-schedule">
-      <EmployeeScheduleSection employeeId={employeeId} />
+      <EmployeeScheduleSection employeeId={employeeId} weekStartKey={weekStartKey} />
     </div>
   )
 }

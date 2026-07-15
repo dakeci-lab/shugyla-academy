@@ -112,9 +112,10 @@ export default function TeamScheduleMobileCard({
         <span className="team-schedule-mobile-card__identity">
           {canOpenEmployee ? (
             <span
-              role="link"
+              role="button"
               tabIndex={0}
               className="team-schedule-mobile-card__name team-schedule-mobile-card__name--link"
+              aria-label={`Редактировать график сотрудника ${employee.name}`}
               onClick={(event) => {
                 event.stopPropagation()
                 onEmployeeOpen?.(employee.id)

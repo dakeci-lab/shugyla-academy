@@ -421,6 +421,10 @@ export function formatMonthYearLabel(year, month) {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
+export function isDateKey(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
+}
+
 export function toDateKey(date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')

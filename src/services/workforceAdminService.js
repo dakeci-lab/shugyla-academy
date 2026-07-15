@@ -135,3 +135,30 @@ export async function fetchTeamWorkforceForMonth(year, month, view) {
   const { dateFrom, dateTo } = monthToDateRange(year, month)
   return fetchTeamWorkforceData({ dateFrom, dateTo, view })
 }
+
+/** Canonical workforce employee id (`academy_users.id`). */
+export function normalizeWorkforceEmployeeId(value) {
+  const id = Number(value)
+  return Number.isFinite(id) ? id : null
+}
+
+/**
+ * Resolve one employee and their shifts for a calendar month via workforce Edge Function.
+ * Cloud-only; callers should fall back to local adapters when not in cloud mode.
+ */
+export async function fetchEmployeeWorkforceBundle(employeeId, year, month, view = 'schedule') {
+  const normalizedId = normalizeWorkforceEmployeeId(employeeId)
+  if (normalizedId == null) {
+    return { employee: null, shifts: [], teamScope: false }
+  }
+
+  const bundle = await fetchTeamWorkforceForMonth(year, month, view)
+  const employee = bundle.employees.find((row) => Number(row.id) === normalizedId) ?? null
+  const shifts = bundle.shifts.filter((row) => Number(row.employeeId) === normalizedId)
+
+  return {
+    employee,
+    shifts,
+    teamScope: bundle.teamScope,
+  }
+}

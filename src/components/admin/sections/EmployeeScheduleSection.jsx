@@ -6,12 +6,15 @@ import {
   shiftsToMap,
   formatMonthYearLabel,
   parseDateKey,
+  isDateKey,
 } from '../../../utils/shiftData'
 import {
   getEmployeeShiftsForMonth,
   saveEmployeeShift,
   applyBulkEmployeeShifts,
 } from '../../../services/academyDataService'
+import { fetchEmployeeWorkforceBundle } from '../../../services/workforceAdminService'
+import { isCloudMode } from '../../../lib/dataMode'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { canEditEmployeeSchedule } from '../../../config/permissions'
 import { useSession } from '../../../context/SessionContext'
@@ -24,7 +27,11 @@ import '../../EmployeeAvatar.css'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
 
-function getInitialMonth() {
+function getInitialMonth(weekStartKey) {
+  if (isDateKey(weekStartKey)) {
+    const date = parseDateKey(weekStartKey)
+    return { year: date.getFullYear(), month: date.getMonth() + 1 }
+  }
   const now = new Date()
   return { year: now.getFullYear(), month: now.getMonth() + 1 }
 }
@@ -38,15 +45,16 @@ function formatDateLabel(dateKey) {
 }
 
 /** Персональный график сотрудника */
-export default function EmployeeScheduleSection({ employeeId }) {
+export default function EmployeeScheduleSection({ employeeId, weekStartKey = null }) {
   const navigate = useNavigate()
   const { user } = useSession()
-  const employee = getEmployeeById(Number(employeeId))
   const canEdit = canEditEmployeeSchedule(user)
 
-  const [{ year, month }, setMonthState] = useState(getInitialMonth)
+  const [{ year, month }, setMonthState] = useState(() => getInitialMonth(weekStartKey))
+  const [employee, setEmployee] = useState(null)
   const [shifts, setShifts] = useState([])
   const [loading, setLoading] = useState(true)
+  const [employeeMissing, setEmployeeMissing] = useState(false)
   const [error, setError] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [editDateKey, setEditDateKey] = useState(null)
@@ -56,13 +64,28 @@ export default function EmployeeScheduleSection({ employeeId }) {
 
   const shiftMap = useMemo(() => shiftsToMap(shifts), [shifts])
 
-  const loadShifts = useCallback(async () => {
+  const loadScheduleData = useCallback(async () => {
     if (!employeeId) return
     setLoading(true)
     setError('')
+    setEmployeeMissing(false)
     try {
-      const rows = await getEmployeeShiftsForMonth(employeeId, year, month)
-      setShifts(rows)
+      if (isCloudMode()) {
+        const bundle = await fetchEmployeeWorkforceBundle(employeeId, year, month, 'schedule')
+        setEmployee(bundle.employee)
+        setShifts(bundle.shifts)
+        setEmployeeMissing(!bundle.employee)
+      } else {
+        const localEmployee = getEmployeeById(Number(employeeId))
+        setEmployee(localEmployee)
+        setEmployeeMissing(!localEmployee)
+        if (localEmployee) {
+          const rows = await getEmployeeShiftsForMonth(employeeId, year, month)
+          setShifts(rows)
+        } else {
+          setShifts([])
+        }
+      }
     } catch (err) {
       setError(err.message || 'Не удалось загрузить график')
     } finally {
@@ -70,11 +93,11 @@ export default function EmployeeScheduleSection({ employeeId }) {
     }
   }, [employeeId, year, month])
 
-  usePlatformPageRefresh(loadShifts)
+  usePlatformPageRefresh(loadScheduleData)
 
   useEffect(() => {
-    loadShifts()
-  }, [loadShifts])
+    loadScheduleData()
+  }, [loadScheduleData])
 
   function changeMonth(delta) {
     setMonthState((prev) => {
@@ -84,7 +107,15 @@ export default function EmployeeScheduleSection({ employeeId }) {
   }
 
   function goToday() {
-    setMonthState(getInitialMonth())
+    setMonthState(getInitialMonth(null))
+  }
+
+  function goBack() {
+    if (isDateKey(weekStartKey)) {
+      navigate(`/platform/employees/schedule?week=${encodeURIComponent(weekStartKey)}`)
+      return
+    }
+    navigate(-1)
   }
 
   async function handleSaveShift(payload) {
@@ -92,7 +123,7 @@ export default function EmployeeScheduleSection({ employeeId }) {
     setError('')
     try {
       await saveEmployeeShift(employeeId, payload, user?.id || null)
-      await loadShifts()
+      await loadScheduleData()
       setEditDateKey(null)
       setSuccessMessage('График сотрудника сохранён')
     } catch (err) {
@@ -111,7 +142,7 @@ export default function EmployeeScheduleSection({ employeeId }) {
         ...options,
         createdBy: user?.id || null,
       })
-      await loadShifts()
+      await loadScheduleData()
       setShowBulkModal(false)
       setSuccessMessage('График сотрудника сохранён')
     } catch (err) {
@@ -121,7 +152,11 @@ export default function EmployeeScheduleSection({ employeeId }) {
     }
   }
 
-  if (!employee) {
+  if (loading && !employee) {
+    return <div className="schedule-loading">Загрузка графика…</div>
+  }
+
+  if (employeeMissing || !employee) {
     return <p className="admin-form__error">Сотрудник не найден</p>
   }
 
@@ -131,7 +166,7 @@ export default function EmployeeScheduleSection({ employeeId }) {
   return (
     <>
       <div className="schedule-header">
-        <button type="button" className="btn btn--outline btn--sm" onClick={() => navigate(-1)}>
+        <button type="button" className="btn btn--outline btn--sm" onClick={goBack}>
           ← Назад
         </button>
         <div className="schedule-header__profile">
