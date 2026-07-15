@@ -148,6 +148,18 @@ export async function updateProfileName(userId, fullName) {
   })
 }
 
+export async function updateProfile(userId, { firstName, lastName, contactEmail }) {
+  const trimmedFirst = firstName.trim()
+  const trimmedLast = lastName.trim()
+  const fullName = `${trimmedFirst} ${trimmedLast}`.trim()
+  localUpdateEmployee(userId, {
+    firstName: trimmedFirst,
+    lastName: trimmedLast,
+    name: fullName,
+    contactEmail: contactEmail?.trim() ? contactEmail.trim().toLowerCase() : '',
+  })
+}
+
 export async function getCourses() {
   return getAllCoursesLocal()
 }

@@ -150,6 +150,7 @@ export function normalizeEmployee(raw) {
     ),
     assignedCourseIds: Array.isArray(raw.assignedCourseIds) ? raw.assignedCourseIds : [],
     avatarUrl: raw.avatarUrl ?? raw.avatar_url ?? null,
+    contactEmail: raw.contactEmail ?? raw.contact_email ?? '',
     workLocationId: raw.workLocationId ?? raw.work_location_id ?? null,
   }
 }

@@ -1,17 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { signOut } from '../../services/authService'
 import { getRoleDisplayName } from '../../config/permissions'
 import EmployeeAvatar from '../EmployeeAvatar'
 import './PlatformUserMenu.css'
 
-/** Блок пользователя с выпадающим меню */
+/** Блок пользователя с выпадающим меню (desktop) или переходом в профиль (mobile) */
 export default function PlatformUserMenu({ user, onLogout, compact = false }) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
 
   useEffect(() => {
+    if (compact) return undefined
+
     function handlePointerDown(event) {
       if (!rootRef.current?.contains(event.target)) {
         setOpen(false)
@@ -28,7 +29,7 @@ export default function PlatformUserMenu({ user, onLogout, compact = false }) {
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [])
+  }, [compact])
 
   async function handleLogout() {
     setOpen(false)
@@ -42,7 +43,11 @@ export default function PlatformUserMenu({ user, onLogout, compact = false }) {
     navigate('/platform/profile')
   }
 
-  function toggleMenu() {
+  function handleAvatarClick() {
+    if (compact) {
+      navigate('/platform/profile')
+      return
+    }
     setOpen((value) => !value)
   }
 
@@ -62,18 +67,23 @@ export default function PlatformUserMenu({ user, onLogout, compact = false }) {
         avatarUrl={user?.avatarUrl}
         size="xs"
         asButton
-        onClick={toggleMenu}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        alt="Меню профиля"
+        onClick={handleAvatarClick}
+        aria-expanded={compact ? undefined : open}
+        aria-haspopup={compact ? undefined : 'menu'}
+        alt={compact ? 'Открыть профиль' : 'Меню профиля'}
       />
 
-      {open && (
+      {!compact && open && (
         <div className="platform-user-menu__dropdown" role="menu">
           <button type="button" className="platform-user-menu__item" role="menuitem" onClick={goProfile}>
             Профиль
           </button>
-          <button type="button" className="platform-user-menu__item platform-user-menu__item--danger" role="menuitem" onClick={handleLogout}>
+          <button
+            type="button"
+            className="platform-user-menu__item platform-user-menu__item--danger"
+            role="menuitem"
+            onClick={handleLogout}
+          >
             Выйти
           </button>
         </div>

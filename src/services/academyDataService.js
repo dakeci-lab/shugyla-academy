@@ -270,6 +270,30 @@ export async function updateProfileName(userId, fullName) {
   }
 }
 
+export async function updateProfile(userId, { firstName, lastName, contactEmail }) {
+  const trimmedFirst = firstName?.trim() || ''
+  const trimmedLast = lastName?.trim() || ''
+  const fullName = `${trimmedFirst} ${trimmedLast}`.trim()
+
+  if (!trimmedFirst) {
+    throw new Error('Укажите имя')
+  }
+  if (fullName.length < 2) {
+    throw new Error('Имя и фамилия должны содержать минимум 2 символа')
+  }
+
+  try {
+    await getAdapter().updateProfile(userId, {
+      firstName: trimmedFirst,
+      lastName: trimmedLast,
+      contactEmail: contactEmail?.trim() || '',
+    })
+    if (isCloudMode()) await refreshData()
+  } catch (err) {
+    throw new Error(err.message || 'Не удалось сохранить профиль. Попробуйте позже.')
+  }
+}
+
 export async function updateEmployeeAvatar(userId, avatarUrl, { previousAvatarUrl } = {}) {
   if (previousAvatarUrl && previousAvatarUrl !== avatarUrl) {
     const { deleteEmployeeAvatarFile } = await import('./employeeAvatarService')

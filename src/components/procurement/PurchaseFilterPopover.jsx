@@ -139,11 +139,6 @@ export default function PurchaseFilterPopover({
     return () => document.removeEventListener('mousedown', handlePointerDown)
   }, [open, isMobile, onClose, anchorRef])
 
-  useEffect(() => {
-    if (open || !isMobile) return undefined
-    anchorRef?.current?.focus()
-  }, [open, isMobile, anchorRef])
-
   if (!open) return null
 
   function handleReset() {
@@ -164,7 +159,12 @@ export default function PurchaseFilterPopover({
 
   if (isMobile) {
     return (
-      <AdminModal title="Фильтр" onClose={onClose} footer={actions}>
+      <AdminModal
+        title="Фильтр"
+        onClose={onClose}
+        returnFocusRef={anchorRef}
+        footer={actions}
+      >
         <PurchaseFilterFields draft={draft} onChange={onChange} />
       </AdminModal>
     )

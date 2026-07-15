@@ -28,7 +28,7 @@ const APP_BASE = getAppBasePath()
 
 /** Safe academy_users columns for Auth-first cloud queries (never includes password). */
 export const ACADEMY_PROFILE_SAFE_FIELDS =
-  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, auth_user_id'
+  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, auth_user_id, contact_email'
 
 const DEACTIVATED_ACCOUNT_MESSAGE =
   'Аккаунт деактивирован. Обратитесь к администратору.'

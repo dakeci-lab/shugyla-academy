@@ -4,6 +4,7 @@ import {
   usesSupabaseAuth,
 } from '../services/authService'
 import { validatePasswordChangeForm } from '../utils/passwordValidation'
+import { useToast } from '../context/ToastContext'
 import './ProfileChangePasswordForm.css'
 
 function EyeIcon() {
@@ -80,7 +81,8 @@ function PasswordField({
 }
 
 /** Форма смены пароля в личном кабинете */
-export default function ProfileChangePasswordForm({ userLogin }) {
+export default function ProfileChangePasswordForm({ userLogin, variant = 'page', onSuccess }) {
+  const { success: showSuccess } = useToast()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -125,7 +127,12 @@ export default function ProfileChangePasswordForm({ userLogin }) {
       })
       clearForm()
       setFieldErrors({})
-      setSuccess('Пароль успешно изменён')
+      if (variant === 'modal') {
+        showSuccess('Пароль изменён')
+        onSuccess?.()
+      } else {
+        setSuccess('Пароль успешно изменён')
+      }
     } catch (err) {
       setFormError(err.message || 'Произошла ошибка. Попробуйте ещё раз')
     } finally {
@@ -136,7 +143,9 @@ export default function ProfileChangePasswordForm({ userLogin }) {
   if (!supabaseAuthEnabled) {
     return (
       <section className="profile-password">
-        <h2 className="profile-password__title">Изменение пароля</h2>
+        {!variant || variant === 'page' ? (
+          <h2 className="profile-password__title">Изменение пароля</h2>
+        ) : null}
         <p className="profile-page__hint">
           Смена пароля доступна в облачном режиме с Supabase Auth.
         </p>
@@ -146,10 +155,14 @@ export default function ProfileChangePasswordForm({ userLogin }) {
 
   return (
     <section className="profile-password">
-      <h2 className="profile-password__title">Изменение пароля</h2>
-      <p className="profile-page__hint">
-        Для безопасности сначала подтвердите текущий пароль.
-      </p>
+      {variant === 'page' && (
+        <>
+          <h2 className="profile-password__title">Изменение пароля</h2>
+          <p className="profile-page__hint">
+            Для безопасности сначала подтвердите текущий пароль.
+          </p>
+        </>
+      )}
 
       <form className="profile-password__form" onSubmit={handleSubmit} autoComplete="off">
         <PasswordField
@@ -191,7 +204,7 @@ export default function ProfileChangePasswordForm({ userLogin }) {
           </p>
         )}
 
-        {success && (
+        {success && variant === 'page' && (
           <div className="profile-password__success" role="status">
             <p className="profile-page__success">{success}</p>
             <p className="profile-page__hint">
@@ -201,8 +214,13 @@ export default function ProfileChangePasswordForm({ userLogin }) {
         )}
 
         <div className="profile-password__actions">
+          {variant === 'modal' && (
+            <button type="button" className="btn btn--ghost" onClick={onSuccess}>
+              Отмена
+            </button>
+          )}
           <button type="submit" className="btn btn--primary" disabled={loading}>
-            {loading ? 'Изменение…' : 'Изменить пароль'}
+            {loading ? 'Изменение…' : variant === 'modal' ? 'Сохранить' : 'Изменить пароль'}
           </button>
         </div>
       </form>

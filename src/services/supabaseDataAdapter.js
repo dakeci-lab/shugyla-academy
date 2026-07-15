@@ -181,6 +181,7 @@ export async function fetchAllData() {
       employmentStatus: row.status,
       assignedCourseIds: assignmentMap.get(row.id) || [],
       avatarUrl: row.avatar_url,
+      contactEmail: row.contact_email || '',
       workLocationId: row.work_location_id,
     })
   )
@@ -378,6 +379,25 @@ export async function updateProfileName(userId, fullName) {
         full_name: trimmed,
         first_name: firstName,
         last_name: lastName,
+      })
+      .eq('id', userId),
+    'Обновление профиля'
+  )
+}
+
+export async function updateProfile(userId, { firstName, lastName, contactEmail }) {
+  const trimmedFirst = firstName.trim()
+  const trimmedLast = lastName.trim()
+  const fullName = `${trimmedFirst} ${trimmedLast}`.trim()
+
+  await throwIfError(
+    await supabase
+      .from('academy_users')
+      .update({
+        first_name: trimmedFirst,
+        last_name: trimmedLast,
+        full_name: fullName,
+        contact_email: contactEmail?.trim() ? contactEmail.trim().toLowerCase() : null,
       })
       .eq('id', userId),
     'Обновление профиля'

@@ -8,6 +8,7 @@ import {
   isNavItemActive,
 } from '../../platform/platformNav'
 import { filterPlatformNav } from '../../platform/platformAccess'
+import PlatformSidebarMobileProfile from './PlatformSidebarMobileProfile'
 import './PlatformSidebar.css'
 
 const MOBILE_QUERY = '(max-width: 900px)'
@@ -100,13 +101,17 @@ export default function PlatformSidebar({ isOpen = false, onClose, onNavigate })
   return (
     <aside className={`platform-sidebar ${isOpen ? 'platform-sidebar--open' : ''}`}>
       <div className="platform-sidebar__header">
-        <div className="platform-sidebar__brand-row">
-          <span className="platform-sidebar__logo-icon">S</span>
-          <div className="platform-sidebar__brand">
-            <span className="platform-sidebar__title">Shugyla Platform</span>
-            <span className="platform-sidebar__subtitle">Внутренняя платформа</span>
+        {isMobile ? (
+          <PlatformSidebarMobileProfile user={user} onNavigate={handleNavClick} />
+        ) : (
+          <div className="platform-sidebar__brand-row">
+            <span className="platform-sidebar__logo-icon">S</span>
+            <div className="platform-sidebar__brand">
+              <span className="platform-sidebar__title">Shugyla Platform</span>
+              <span className="platform-sidebar__subtitle">Внутренняя платформа</span>
+            </div>
           </div>
-        </div>
+        )}
         <button
           type="button"
           className="platform-sidebar__close"
