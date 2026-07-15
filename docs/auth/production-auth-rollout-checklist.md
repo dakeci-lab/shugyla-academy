@@ -1,6 +1,6 @@
 # Production Auth Rollout Checklist
 
-**Status:** Reconciled baseline **18/18 linked** (Step 22K). Authenticated smoke test (22I retry) pending. **Auth-first frontend blocked** until smoke passes.
+**Status:** Reconciled baseline **18/18 linked** (Step 22K). Authenticated smoke test **passed** (Step 22L). **Auth-first frontend deploy** pending separate owner approval.
 
 Related: [production-auth-cutover-plan.md](./production-auth-cutover-plan.md)
 
@@ -58,14 +58,17 @@ Run `scripts/production-auth-users-migration.mjs`.
 - [x] Deploy `admin-list-employees` — ACTIVE, `verify_jwt=true`
 - [x] Deploy `admin-update-employee` — ACTIVE, `verify_jwt=true`
 - [x] Unauthorized smoke: all three return **401** without JWT
-- [ ] **BLOCKED:** Authenticated smoke test (Step 22I retry) — pending owner approval (baseline now 18/18)
-- [ ] **BLOCKED:** Deploy Auth-first frontend — requires smoke pass
-- [ ] Authenticated smoke: admin login — pending owner approval
-- [ ] Smoke: cashier login — **blocked until smoke pass**
+- [x] Authenticated smoke test (Step 22L) — non-mutating; baseline **18/18** unchanged
+- [x] Admin sign-in + RBAC (`employees.view/create/edit`) confirmed
+- [x] `admin-list-employees` HTTP **200**; **17** items; no password/raw auth fields
+- [x] `admin-create-employee` negative: HTTP **422**; **0** mutations
+- [x] `admin-update-employee` negative: HTTP **422**; **0** mutations
+- [ ] **BLOCKED:** Deploy Auth-first frontend — pending separate owner approval
+- [ ] Smoke: cashier login — after frontend deploy
 - [ ] Smoke: procurement/receiver login
 - [ ] Smoke: inactive employee blocked
 - [ ] Session restore + logout verified
-- [ ] **Do not** run Phase 2 until authenticated smoke passes
+- [ ] **Do not** run Phase 2 until Auth-first frontend smoke passes
 
 ---
 
@@ -80,8 +83,8 @@ Run `scripts/production-auth-users-migration.mjs`.
 - [x] Targeted provisioning `--apply`: **1** Auth user created, **1** row linked
 - [x] Reconciled baseline: **18/18** linked; active **10/10**; `auth.users=18`
 - [x] Legacy passwords/policies/grants preserved
-- [ ] Re-run Step 22I authenticated smoke test — **pending owner approval**
-- [ ] **Do not** deploy Auth-first frontend until smoke passes
+- [x] Step 22L authenticated smoke test completed (non-mutating)
+- [ ] **Do not** deploy Auth-first frontend until separate owner approval
 
 ---
 

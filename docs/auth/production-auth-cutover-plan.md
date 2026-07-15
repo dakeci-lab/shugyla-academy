@@ -1,6 +1,6 @@
 # Production Auth Cutover Plan
 
-**Status:** Reconciled baseline **18/18 linked** (Step 22K). Authenticated smoke test (22I retry) pending owner approval. **Auth-first frontend still blocked** until smoke passes. Phase 2 pending.
+**Status:** Reconciled baseline **18/18 linked** (Step 22K). Authenticated smoke test **passed** (Step 22L). **Auth-first frontend deploy** pending separate owner approval. Phase 2 pending.
 
 Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checklist.md), [../notifications/production-readonly-audit.md](../notifications/production-readonly-audit.md)
 
@@ -31,7 +31,31 @@ Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checkl
 3. Create `employee_owned_by_current_auth()` (requires column)
 4. `notify pgrst, 'reload schema'`
 
-**Next production write:** Repeat Step 22I authenticated smoke test — separate owner approval. **Do not** deploy Auth-first frontend or Phase 2 until smoke passes.
+**Next production write:** Prepare Auth-first frontend deploy — separate owner approval. **Do not** apply Phase 2 until frontend smoke passes.
+
+---
+
+## Authenticated employee admin smoke test (Step 22L — completed)
+
+**Date:** 2026-07-15
+**Owner confirmation:** non-mutating authenticated smoke test on reconciled baseline 18/18.
+
+| Check | Result |
+|-------|--------|
+| Baseline pre/post | **18/18** linked; unlinked **0**; active linked **10/10**; inactive **8**; `auth.users=18`; legacy passwords **18** nonempty |
+| Active admin sign-in | **success** |
+| RBAC | `employees.view`, `employees.create`, `employees.edit` **confirmed** |
+| `admin-list-employees` | HTTP **200**; **17** items (pagination total **17**); no password / raw auth fields |
+| `admin-create-employee` negative | HTTP **422** (empty `{}` rejected before mutation) |
+| `admin-update-employee` negative | HTTP **422** (missing `employee_id` rejected before DB update) |
+| Production mutations | **0** (`academy_users` / `auth.users` / roles unchanged) |
+| Aggregate fingerprint | **unchanged** |
+| Edge Functions | **3** ACTIVE, `verify_jwt=true` |
+| Frontend | **legacy** (not deployed) |
+| Phase 2 | **not applied** |
+| Notifications / Cron / secrets | **untouched** |
+
+> Auth-first frontend deploy is the next gated step — requires separate owner approval.
 
 ---
 
@@ -87,7 +111,7 @@ Related: [production-auth-rollout-checklist.md](./production-auth-rollout-checkl
 - `auth.users` = **18**
 - conflicts = **0**
 
-> **Auth-first frontend remains blocked** until authenticated smoke test (22I retry) succeeds.
+> **Auth-first frontend deploy** requires separate owner approval (Step 22L smoke passed).
 
 ---
 

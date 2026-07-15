@@ -848,3 +848,56 @@ Drift cause accepted: new employee manually added via legacy frontend after Step
 > **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
 
 Repeat Step 22I authenticated non-mutating smoke test against reconciled baseline 18/18. No frontend deploy, no Phase 2.
+
+---
+
+## 29. Authenticated employee admin smoke test — Step 22L
+
+**Date:** 2026-07-15
+**Status:** Non-mutating authenticated smoke **completed**. **0** production business mutations.
+
+### 29.1 Baseline (pre/post identical)
+
+| Metric | Value |
+|--------|-------|
+| `academy_users` | **18** |
+| linked | **18** |
+| unlinked | **0** |
+| active linked | **10/10** |
+| inactive | **8** |
+| `auth.users` | **18** |
+| legacy passwords nonempty | **18** |
+| conflicts / orphans / duplicates | **0** |
+| aggregate fingerprint | **unchanged** |
+| max `created_at` / `updated_at` | **unchanged** |
+
+### 29.2 Auth and RBAC
+
+- Active administrator sign-in: **success**
+- Permissions confirmed: `employees.view`, `employees.create`, `employees.edit`
+
+### 29.3 Edge Function results
+
+| Function | Result |
+|----------|--------|
+| `admin-list-employees` | HTTP **200**; **17** items (pagination total **17**); password / raw `auth_user_id` / Auth internal fields **absent** |
+| `admin-create-employee` (negative `{}`) | HTTP **422**; rejected before Auth/DB mutation |
+| `admin-update-employee` (negative, no target id) | HTTP **422**; rejected before DB update |
+
+### 29.4 System status (unchanged)
+
+- Edge Functions: **3** ACTIVE, `verify_jwt=true`
+- Legacy policies / anon grants: **preserved**
+- Frontend: **legacy**
+- Phase 2: **not applied**
+- Phase 3: **not applied**
+- Notification tables: **absent**
+- Notification functions: **not deployed**
+- Cron: **not configured**
+- Manual secrets set/unset: **none**
+
+### 29.5 Next production write
+
+> **DO NOT RUN WITHOUT NEW OWNER APPROVAL**
+
+Prepare Auth-first frontend production deploy. No Phase 2, no notification rollout, no secrets changes.

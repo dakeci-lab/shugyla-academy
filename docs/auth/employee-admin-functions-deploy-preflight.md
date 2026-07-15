@@ -219,4 +219,25 @@ Static scan: `service_role` absent in `src/`; no `select('*')` in the three func
 | Notification tables | **absent** |
 | Manual secrets set/unset | **none** |
 | Cron | **not configured** |
-| `academy_users` linked | **17/17** (unchanged) |
+| `academy_users` linked | **18/18** (after 22K reconciliation) |
+
+---
+
+## 13. Authenticated smoke test (Step 22L — completed)
+
+**Date:** 2026-07-15
+**Owner confirmation:** non-mutating authenticated smoke on baseline **18/18**.
+
+| Test | Result |
+|------|--------|
+| Baseline pre/post | **18** academy_users; **18** linked; **18** auth.users; fingerprint **unchanged** |
+| Admin sign-in | **success** (active admin with view/create/edit) |
+| `admin-list-employees` | HTTP **200**; **17** items returned; forbidden keys **absent** |
+| `admin-create-employee` (negative `{}`) | HTTP **422**; validation before `createUser`; **0** rows created |
+| `admin-update-employee` (negative, no `employee_id`) | HTTP **422**; validation before DB update; **0** rows updated |
+| Production mutations | **0** |
+| Edge Functions | **3** ACTIVE, `verify_jwt=true` |
+| Frontend | **legacy** |
+| Phase 2 | **not applied** |
+
+**Next gated step:** Auth-first frontend deploy — separate owner approval required.
