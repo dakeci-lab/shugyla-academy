@@ -2,6 +2,9 @@ import { isPwaStandalone } from '../utils/pwaStandalone'
 
 const NON_PASSIVE = { passive: false }
 
+let installed = false
+let teardown = null
+
 function preventGesture(event) {
   event.preventDefault()
 }
@@ -13,25 +16,40 @@ function preventMultiTouchZoom(event) {
 }
 
 /**
- * Blocks pinch/double-finger zoom in installed PWA only.
- * Single-finger pan/scroll is preserved.
+ * Optional progressive enhancement: blocks pinch zoom in installed PWA only.
+ * Failures must not block app bootstrap.
  */
-export function setupPwaZoomGuard() {
-  if (!isPwaStandalone()) return () => {}
+export function installPwaZoomGuard() {
+  if (installed) return teardown || (() => {})
 
-  document.addEventListener('gesturestart', preventGesture, NON_PASSIVE)
-  document.addEventListener('gesturechange', preventGesture, NON_PASSIVE)
-  document.addEventListener('gestureend', preventGesture, NON_PASSIVE)
-  document.addEventListener('touchmove', preventMultiTouchZoom, NON_PASSIVE)
+  try {
+    if (!isPwaStandalone()) return () => {}
 
-  const teardown = () => {
-    document.removeEventListener('gesturestart', preventGesture, NON_PASSIVE)
-    document.removeEventListener('gesturechange', preventGesture, NON_PASSIVE)
-    document.removeEventListener('gestureend', preventGesture, NON_PASSIVE)
-    document.removeEventListener('touchmove', preventMultiTouchZoom, NON_PASSIVE)
+    document.addEventListener('gesturestart', preventGesture, NON_PASSIVE)
+    document.addEventListener('gesturechange', preventGesture, NON_PASSIVE)
+    document.addEventListener('gestureend', preventGesture, NON_PASSIVE)
+    document.addEventListener('touchmove', preventMultiTouchZoom, NON_PASSIVE)
+
+    const cleanup = () => {
+      document.removeEventListener('gesturestart', preventGesture, NON_PASSIVE)
+      document.removeEventListener('gesturechange', preventGesture, NON_PASSIVE)
+      document.removeEventListener('gestureend', preventGesture, NON_PASSIVE)
+      document.removeEventListener('touchmove', preventMultiTouchZoom, NON_PASSIVE)
+      installed = false
+      teardown = null
+    }
+
+    window.addEventListener('pagehide', cleanup, { once: true })
+    installed = true
+    teardown = cleanup
+    return cleanup
+  } catch (error) {
+    console.warn('PWA zoom guard could not be installed', error)
+    return () => {}
   }
+}
 
-  window.addEventListener('pagehide', teardown, { once: true })
-
-  return teardown
+/** @deprecated Use installPwaZoomGuard */
+export function setupPwaZoomGuard() {
+  return installPwaZoomGuard()
 }

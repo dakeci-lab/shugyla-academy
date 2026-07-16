@@ -82,9 +82,13 @@ function main() {
 
   console.log('Stage 5: Chunk load recovery')
 
-  assert('chunk reload uses sessionStorage flag', main.includes('sessionStorage'))
-  assert('chunk reload flag cleared on load', main.includes("sessionStorage.removeItem"))
-  assert('vite preload error handler', main.includes('vite:preloadError'))
+  const recovery = read('src/pwa/pwaRecovery.js')
+
+  assert('shell recovery setup in main', main.includes('setupShellLoadRecovery'))
+  assert('chunk recovery uses sessionStorage guard', recovery.includes('PWA_SHELL_RECOVERY_KEY'))
+  assert('recovery flag cleared on load', recovery.includes("sessionStorage.removeItem"))
+  assert('vite preload error handler', recovery.includes('vite:preloadError'))
+  assert('error boundary reload uses recoverPwaShell', errorBoundary.includes('recoverPwaShell'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

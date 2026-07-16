@@ -2,33 +2,29 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import App from './App'
 import { registerServiceWorker } from './pwa/registerServiceWorker'
-import { setupPwaZoomGuard } from './pwa/pwaZoomGuard'
+import { installPwaZoomGuard } from './pwa/pwaZoomGuard'
+import { setupShellLoadRecovery } from './pwa/pwaRecovery'
 import { setupPwaStandaloneDocument } from './utils/pwaStandalone'
 import './index.css'
 import './styles/mobile.css'
 
-const CHUNK_RELOAD_KEY = 'platform-chunk-reload'
-
-function setupChunkLoadRecovery() {
-  window.addEventListener('load', () => {
-    sessionStorage.removeItem(CHUNK_RELOAD_KEY)
-  })
-
-  window.addEventListener('vite:preloadError', (event) => {
-    event.preventDefault()
-    if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return
-    sessionStorage.setItem(CHUNK_RELOAD_KEY, '1')
-    window.location.reload()
-  })
-}
-
-setupChunkLoadRecovery()
+setupShellLoadRecovery()
 registerServiceWorker()
-setupPwaStandaloneDocument()
-setupPwaZoomGuard()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />
   </StrictMode>
 )
+
+try {
+  setupPwaStandaloneDocument()
+} catch (error) {
+  console.warn('Optional PWA standalone setup failed', error)
+}
+
+try {
+  installPwaZoomGuard()
+} catch (error) {
+  console.warn('Optional PWA zoom protection failed', error)
+}

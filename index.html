@@ -5,18 +5,26 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <script>
       (function () {
-        var isStandalone =
-          window.matchMedia('(display-mode: standalone)').matches ||
-          window.matchMedia('(display-mode: fullscreen)').matches ||
-          window.navigator.standalone === true
-        if (!isStandalone) return
-        document.documentElement.classList.add('pwa-standalone')
-        var viewport = document.querySelector('meta[name="viewport"]')
-        if (viewport) {
-          viewport.setAttribute(
-            'content',
-            'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'
-          )
+        try {
+          var standalone =
+            (window.matchMedia &&
+              (window.matchMedia('(display-mode: standalone)').matches ||
+                window.matchMedia('(display-mode: fullscreen)').matches)) ||
+            window.navigator.standalone === true
+
+          if (!standalone) return
+
+          document.documentElement.classList.add('pwa-standalone')
+
+          var viewport = document.querySelector('meta[name="viewport"]')
+          if (viewport) {
+            viewport.setAttribute(
+              'content',
+              'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'
+            )
+          }
+        } catch (error) {
+          console.warn('Early PWA setup failed', error)
         }
       })()
     </script>

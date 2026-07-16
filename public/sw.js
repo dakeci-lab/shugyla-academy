@@ -1,12 +1,11 @@
-/* Shugyla Academy — базовый service worker (MVP PWA) */
+/* Shugyla Academy — service worker (PWA shell + push) */
 
 const BASE = '/shugyla-academy/'
-const CACHE_NAME = 'shugyla-academy-shell-v3'
+const CACHE_NAME = 'shugyla-academy-shell-v4'
+const SHELL_CACHE_PREFIX = 'shugyla-academy-shell-'
 const CANONICAL_PLATFORM_PATH = `${BASE.replace(/\/$/, '')}/platform`
 
 const SHELL_URLS = [
-  `${BASE}`,
-  `${BASE}index.html`,
   `${BASE}offline.html`,
   `${BASE}manifest.webmanifest`,
   `${BASE}icons/icon-192.png`,
@@ -17,6 +16,85 @@ const SHELL_URLS = [
 function isSupabaseOrExternal(url) {
   if (url.origin !== self.location.origin) return true
   return url.hostname.includes('supabase.co')
+}
+
+function isHashedAsset(pathname) {
+  return pathname.includes('/assets/')
+}
+
+function isHtmlResponse(response) {
+  const type = response.headers.get('content-type') || ''
+  return type.includes('text/html')
+}
+
+function isJavaScriptResponse(response) {
+  const type = response.headers.get('content-type') || ''
+  return type.includes('javascript') || type.includes('ecmascript')
+}
+
+function isCssResponse(response) {
+  const type = response.headers.get('content-type') || ''
+  return type.includes('text/css')
+}
+
+function shouldCacheResponse(request, response, url) {
+  if (!response || !response.ok) return false
+  if (response.type && response.type !== 'basic' && response.type !== 'cors') return false
+
+  if (request.mode === 'navigate') {
+    return isHtmlResponse(response)
+  }
+
+  if (isHashedAsset(url.pathname)) {
+    return isJavaScriptResponse(response) || isCssResponse(response)
+  }
+
+  return true
+}
+
+async function cacheResponse(request, response) {
+  const cache = await caches.open(CACHE_NAME)
+  await cache.put(request, response)
+}
+
+async function handleNavigate(request) {
+  try {
+    const response = await fetch(request)
+    if (shouldCacheResponse(request, response, new URL(request.url))) {
+      await cacheResponse(request, response.clone())
+    }
+    return response
+  } catch (error) {
+    const cached = await caches.match(request)
+    if (cached) return cached
+
+    const offline = await caches.match(`${BASE}offline.html`)
+    if (offline) return offline
+
+    const shellIndex = await caches.match(`${BASE}index.html`)
+    if (shellIndex) return shellIndex
+
+    throw error
+  }
+}
+
+async function handleStaticAsset(request, url) {
+  // Hashed Vite assets must always come from network to avoid stale chunk mismatch.
+  if (isHashedAsset(url.pathname)) {
+    return fetch(request)
+  }
+
+  try {
+    const response = await fetch(request)
+    if (shouldCacheResponse(request, response, url)) {
+      await cacheResponse(request, response.clone())
+    }
+    return response
+  } catch (error) {
+    const cached = await caches.match(request)
+    if (cached) return cached
+    throw error
+  }
 }
 
 function normalizeNotificationDestination(rawUrl) {
@@ -56,17 +134,33 @@ function normalizeNotificationDestination(rawUrl) {
   }
 }
 
+self.addEventListener('message', (event) => {
+  if (event?.data?.type === 'SKIP_WAITING') {
+    self.skipWaiting()
+  }
+})
+
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS)).then(() => self.skipWaiting())
+    caches
+      .open(CACHE_NAME)
+      .then((cache) => cache.addAll(SHELL_URLS))
+      .then(() => self.skipWaiting())
   )
 })
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key)))
-    ).then(() => self.clients.claim())
+    caches
+      .keys()
+      .then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key.startsWith(SHELL_CACHE_PREFIX) && key !== CACHE_NAME)
+            .map((key) => caches.delete(key))
+        )
+      )
+      .then(() => self.clients.claim())
   )
 })
 
@@ -83,37 +177,11 @@ self.addEventListener('fetch', (event) => {
   if (!url.pathname.startsWith(basePath)) return
 
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((response) => {
-          if (response.ok) {
-            const clone = response.clone()
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
-          }
-          return response
-        })
-        .catch(async () => {
-          const cached = await caches.match(request)
-          if (cached) return cached
-          const offline = await caches.match(`${BASE}offline.html`)
-          if (offline) return offline
-          return caches.match(`${BASE}index.html`)
-        })
-    )
+    event.respondWith(handleNavigate(request))
     return
   }
 
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response.ok && url.pathname.includes('/assets/')) {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put(request, clone))
-        }
-        return response
-      })
-      .catch(() => caches.match(request))
-  )
+  event.respondWith(handleStaticAsset(request, url))
 })
 
 function resolveSafeNotificationUrl(rawUrl) {

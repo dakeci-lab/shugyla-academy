@@ -5,32 +5,53 @@ export const PWA_STANDALONE_VIEWPORT =
 
 /** Installed PWA / iOS home screen / Android standalone launcher. */
 export function isPwaStandalone() {
-  if (typeof window === 'undefined') return false
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    window.matchMedia('(display-mode: fullscreen)').matches ||
-    window.navigator.standalone === true
-  )
+  if (typeof window === 'undefined' || typeof navigator === 'undefined') {
+    return false
+  }
+
+  try {
+    return (
+      window.matchMedia?.('(display-mode: standalone)')?.matches === true ||
+      window.matchMedia?.('(display-mode: fullscreen)')?.matches === true ||
+      window.navigator?.standalone === true
+    )
+  } catch (error) {
+    console.warn('Failed to detect PWA standalone mode', error)
+    return false
+  }
 }
 
 export function applyPwaStandaloneViewport() {
   if (!isPwaStandalone()) return
-  const viewport = document.querySelector('meta[name="viewport"]')
-  if (viewport) {
-    viewport.setAttribute('content', PWA_STANDALONE_VIEWPORT)
+  try {
+    const viewport = document.querySelector('meta[name="viewport"]')
+    if (viewport) {
+      viewport.setAttribute('content', PWA_STANDALONE_VIEWPORT)
+    }
+  } catch (error) {
+    console.warn('Failed to apply PWA viewport', error)
   }
 }
 
 export function markPwaStandaloneRoot() {
   if (!isPwaStandalone()) return
-  document.documentElement.classList.add(PWA_STANDALONE_CLASS)
+  try {
+    document.documentElement.classList.add(PWA_STANDALONE_CLASS)
+  } catch (error) {
+    console.warn('Failed to mark PWA standalone root', error)
+  }
 }
 
 export function setupPwaStandaloneDocument() {
   if (!isPwaStandalone()) return () => {}
 
-  markPwaStandaloneRoot()
-  applyPwaStandaloneViewport()
+  try {
+    markPwaStandaloneRoot()
+    applyPwaStandaloneViewport()
+  } catch (error) {
+    console.warn('PWA standalone document setup failed', error)
+    return () => {}
+  }
 
   const onOrientationChange = () => {
     applyPwaStandaloneViewport()
