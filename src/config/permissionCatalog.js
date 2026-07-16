@@ -69,6 +69,7 @@ export const PERMISSION_CODES = {
 
   SETTINGS_VIEW: 'settings.view',
   SETTINGS_MANAGE: 'settings.manage',
+  NOTIFICATIONS_MANAGE: 'notifications.manage',
 }
 
 /** @deprecated используйте PERMISSION_CODES */
@@ -210,6 +211,7 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.FINANCE_MANAGE, name: 'Управление финансами', module: 'finance', sortOrder: 151 },
   { code: PERMISSION_CODES.SETTINGS_VIEW, name: 'Просмотр настроек', module: 'settings', sortOrder: 160 },
   { code: PERMISSION_CODES.SETTINGS_MANAGE, name: 'Управление настройками', module: 'settings', sortOrder: 161 },
+  { code: PERMISSION_CODES.NOTIFICATIONS_MANAGE, name: 'Управление уведомлениями', module: 'settings', sortOrder: 162 },
 ]
 
 export const ALL_PERMISSION_CODES = PERMISSION_CATALOG.map((item) => item.code)

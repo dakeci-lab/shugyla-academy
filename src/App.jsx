@@ -26,6 +26,7 @@ import PlatformAcademy from './pages/platform/PlatformAcademy'
 import PlatformSettings from './pages/platform/PlatformSettings'
 import PlatformSettingsGeneral from './pages/platform/PlatformSettingsGeneral'
 import PlatformSettingsRoles from './pages/platform/PlatformSettingsRoles'
+import PlatformSettingsNotifications from './pages/platform/PlatformSettingsNotifications'
 import PlatformEmployees from './pages/platform/PlatformEmployees'
 import PlatformEmployeesRedirect from './pages/platform/PlatformEmployeesRedirect'
 import PlatformWorkSchedule from './pages/platform/PlatformWorkSchedule'
@@ -343,6 +344,14 @@ export default function App() {
             element={
               <PlatformRoute routeKey={ROUTE_KEYS.SETTINGS_ROLES}>
                 <PlatformSettingsRoles />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="settings/notifications"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.SETTINGS_NOTIFICATIONS}>
+                <PlatformSettingsNotifications />
               </PlatformRoute>
             }
           />

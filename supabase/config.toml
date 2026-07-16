@@ -455,6 +455,12 @@ verify_jwt = true
 import_map = "./functions/admin-update-employee/deno.json"
 entrypoint = "./functions/admin-update-employee/index.ts"
 
+[functions.admin-notification-settings]
+enabled = true
+verify_jwt = true
+import_map = "./functions/admin-notification-settings/deno.json"
+entrypoint = "./functions/admin-notification-settings/index.ts"
+
 [functions.manage-push-subscription]
 enabled = true
 verify_jwt = true

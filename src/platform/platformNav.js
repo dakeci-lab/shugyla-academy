@@ -236,6 +236,15 @@ export const PLATFORM_NAV = [
         title: 'Роли и доступы',
         description: 'Роли сотрудников и матрица разрешений.',
       },
+      {
+        id: 'settings-notifications',
+        path: '/platform/settings/notifications',
+        label: 'Настройки уведомлений',
+        end: true,
+        routeKey: ROUTE_KEYS.SETTINGS_NOTIFICATIONS,
+        title: 'Настройки уведомлений',
+        description: 'Автоматические уведомления тайм-трекера по графику смен.',
+      },
     ],
   },
 ]

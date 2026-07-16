@@ -55,7 +55,8 @@
     "verify:home-dashboard": "node scripts/verify-home-dashboard.mjs",
     "verify:hidden-scrollbars": "node scripts/verify-hidden-scrollbars.mjs",
     "verify:pwa-zoom-guard": "node scripts/verify-pwa-zoom-guard.mjs",
-    "verify:pwa-base-path": "node scripts/verify-pwa-base-path.mjs"
+    "verify:pwa-base-path": "node scripts/verify-pwa-base-path.mjs",
+    "verify:notification-settings-admin": "node scripts/verify-notification-settings-admin.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",
