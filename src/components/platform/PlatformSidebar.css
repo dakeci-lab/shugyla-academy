@@ -292,16 +292,6 @@
     align-items: center;
   }
 
-  .platform-sidebar__nav {
-    scrollbar-width: none;
-  }
-
-  .platform-sidebar__nav::-webkit-scrollbar {
-    width: 0;
-    height: 0;
-    display: none;
-  }
-
   .platform-sidebar__group-toggle,
   .platform-sidebar__link {
     padding-top: 12px;

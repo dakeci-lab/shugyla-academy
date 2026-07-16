@@ -29,8 +29,31 @@
   box-sizing: border-box;
 }
 
+/*
+ * Shugyla Platform UI standard:
+ * Все страницы и прокручиваемые контейнеры прокручиваются без видимого scrollbar.
+ * Не удалять. Не использовать локальные кастомные scrollbar.
+ */
+html,
+body,
+#root,
+* {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+#root::-webkit-scrollbar,
+*::-webkit-scrollbar {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
 html {
   scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
 }
 
 body {

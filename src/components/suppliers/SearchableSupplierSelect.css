@@ -109,21 +109,6 @@
   max-height: 300px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border) transparent;
-}
-
-.searchable-supplier-select__list::-webkit-scrollbar {
-  width: 8px;
-}
-
-.searchable-supplier-select__list::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.searchable-supplier-select__list::-webkit-scrollbar-thumb {
-  background: var(--color-border);
-  border-radius: 999px;
 }
 
 .searchable-supplier-select__option {

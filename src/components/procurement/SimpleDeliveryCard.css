@@ -291,8 +291,6 @@
   overflow-y: auto;
   overscroll-behavior: contain;
   padding-right: 0.125rem;
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-border, #e5e7eb) transparent;
 }
 
 .simple-receiving-week__hint {

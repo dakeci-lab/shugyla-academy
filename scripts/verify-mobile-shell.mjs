@@ -78,8 +78,9 @@ function main() {
   console.log('Stage 5: Scroll and layout')
 
   assert('nav keeps overflow-y auto', sidebarCss.includes('overflow-y: auto'))
-  assert('mobile scrollbar hidden via scrollbar-width', sidebarCss.match(/max-width: 900px[\s\S]*scrollbar-width: none/))
-  assert('mobile scrollbar hidden via webkit', sidebarCss.includes('::-webkit-scrollbar'))
+  const indexCss = read('src/index.css')
+  assert('global scrollbar hidden via scrollbar-width', indexCss.includes('scrollbar-width: none'))
+  assert('global scrollbar hidden via webkit', indexCss.includes('*::-webkit-scrollbar'))
   assert('drawer width not full screen', sidebarCss.includes('min(360px, 86vw)'))
   assert('desktop sidebar sticky preserved', sidebarCss.match(/min-width: 901px[\s\S]*position: sticky/))
 

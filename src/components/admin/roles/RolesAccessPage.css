@@ -107,7 +107,6 @@
   overflow-x: auto;
   padding-bottom: 4px;
   -webkit-overflow-scrolling: touch;
-  scrollbar-width: thin;
 }
 
 .roles-matrix__module-tab {
