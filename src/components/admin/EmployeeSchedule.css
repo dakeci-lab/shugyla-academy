@@ -664,3 +664,32 @@
     gap: 0.15rem;
   }
 }
+
+.schedule-bulk-status {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 10px;
+  background: #f3f7f5;
+  color: #2f4f3f;
+  font-size: 0.9375rem;
+}
+
+.schedule-bulk-status--error {
+  background: #fff4f4;
+  color: #8b1e1e;
+  border: 1px solid #f3c7c7;
+}
+
+.schedule-bulk-status__dismiss {
+  margin-left: auto;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0.125rem 0.375rem;
+}

@@ -13,7 +13,7 @@ import { isCloudMode } from '../../../lib/dataMode'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { canEditEmployeeSchedule } from '../../../config/permissions'
 import { useSession } from '../../../context/SessionContext'
-import { useScheduleBackgroundSync } from '../../../hooks/useScheduleBackgroundSync'
+import { useScheduleBackgroundSync, BULK_OPERATION_STATUS } from '../../../hooks/useScheduleBackgroundSync'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeScheduleCalendar from '../EmployeeScheduleCalendar'
 import ShiftDayEditModal from '../ShiftDayEditModal'
@@ -55,11 +55,6 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
   const [editDateKey, setEditDateKey] = useState(null)
   const [showBulkModal, setShowBulkModal] = useState(false)
 
-  const { syncMetaByDate, enqueueSave, enqueueBulkSave, retrySave } = useScheduleBackgroundSync({
-    employeeId,
-    userId: user?.id || null,
-  })
-
   const shiftMap = useMemo(() => shiftsToMap(shifts), [shifts])
 
   const loadScheduleData = useCallback(async () => {
@@ -92,6 +87,13 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
     }
   }, [employeeId, year, month])
 
+  const { syncMetaByDate, bulkOperation, enqueueSave, enqueueBulkSave, retryBulkSave, retrySave, dismissBulkStatus } =
+    useScheduleBackgroundSync({
+      employeeId,
+      userId: user?.id || null,
+      onBulkSuccess: loadScheduleData,
+    })
+
   usePlatformPageRefresh(loadScheduleData)
 
   useEffect(() => {
@@ -123,9 +125,16 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
     enqueueSave(payload, existingShift, setShifts)
   }
 
-  function handleBulkApply(entries, options) {
-    enqueueBulkSave(entries, options, setShifts, () => setShowBulkModal(false))
+  function handleBulkApply(snapshot) {
+    return enqueueBulkSave(snapshot, setShifts, () => setShowBulkModal(false))
   }
+
+  function handleRetryBulkSave() {
+    retryBulkSave(setShifts)
+  }
+
+  const bulkSaving = bulkOperation.status === BULK_OPERATION_STATUS.SAVING
+  const bulkFailed = bulkOperation.status === BULK_OPERATION_STATUS.ERROR
 
   function handleRetrySync(dateKey) {
     retrySave(dateKey, setShifts)
@@ -170,12 +179,35 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
             <ChevronRightIcon />
           </button>
           {canEdit && (
-            <button type="button" className="btn btn--primary btn--sm" onClick={() => setShowBulkModal(true)}>
+            <button
+              type="button"
+              className="btn btn--primary btn--sm"
+              onClick={() => setShowBulkModal(true)}
+              disabled={bulkSaving}
+            >
               Настроить график
             </button>
           )}
         </div>
       </div>
+
+      {bulkSaving && (
+        <p className="schedule-bulk-status" role="status">
+          График сохраняется…
+        </p>
+      )}
+
+      {bulkFailed && (
+        <div className="schedule-bulk-status schedule-bulk-status--error" role="alert">
+          <span>Не удалось сохранить график</span>
+          <button type="button" className="btn btn--outline btn--sm" onClick={handleRetryBulkSave}>
+            Повторить
+          </button>
+          <button type="button" className="schedule-bulk-status__dismiss" onClick={dismissBulkStatus} aria-label="Скрыть">
+            ×
+          </button>
+        </div>
+      )}
 
       {error && <p className="admin-form__error">{error}</p>}
 
@@ -214,7 +246,6 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
         <BulkScheduleModal
           onClose={() => setShowBulkModal(false)}
           onApply={handleBulkApply}
-          applying={false}
         />
       )}
     </>

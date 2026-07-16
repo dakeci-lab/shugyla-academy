@@ -21,7 +21,7 @@ const EMPTY_BULK_FORM = {
 }
 
 /** Модальное окно массовой настройки графика */
-export default function BulkScheduleModal({ onClose, onApply, applying = false }) {
+export default function BulkScheduleModal({ onClose, onApply }) {
   const [form, setForm] = useState(EMPTY_BULK_FORM)
   const [errors, setErrors] = useState({})
   const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false)
@@ -35,19 +35,23 @@ export default function BulkScheduleModal({ onClose, onApply, applying = false }
     })
   }
 
-  async function submit(overwrite = form.overwrite) {
-    const payload = { ...form, overwrite }
-    const validationErrors = validateBulkScheduleForm(payload)
+  function submit(overwrite = form.overwrite) {
+    const formSnapshot = { ...form, overwrite }
+    const validationErrors = validateBulkScheduleForm(formSnapshot)
     setErrors(validationErrors)
-    if (Object.keys(validationErrors).length > 0) return
+    if (Object.keys(validationErrors).length > 0) return false
 
-    const entries = buildBulkShiftEntries(payload)
+    const entries = buildBulkShiftEntries(formSnapshot)
     if (!entries.length) {
       setErrors({ weekdays: 'Нет дней для применения в выбранном периоде' })
-      return
+      return false
     }
 
-    await onApply(entries, { overwrite })
+    return onApply({
+      entries,
+      options: { overwrite },
+      form: formSnapshot,
+    })
   }
 
   function handleApplyClick() {
@@ -66,11 +70,11 @@ export default function BulkScheduleModal({ onClose, onApply, applying = false }
         wide
         footer={
           <>
-            <button type="button" className="btn btn--outline" onClick={onClose} disabled={applying}>
+            <button type="button" className="btn btn--outline" onClick={onClose}>
               Отмена
             </button>
-            <button type="button" className="btn btn--primary" onClick={handleApplyClick} disabled={applying}>
-              {applying ? 'Применение…' : 'Применить график'}
+            <button type="button" className="btn btn--primary" onClick={handleApplyClick}>
+              Применить график
             </button>
           </>
         }
@@ -181,11 +185,10 @@ export default function BulkScheduleModal({ onClose, onApply, applying = false }
           message="Уже существующие смены в выбранном периоде будут заменены новыми значениями."
           confirmLabel="Перезаписать"
           onCancel={() => setShowOverwriteConfirm(false)}
-          onConfirm={async () => {
+          onConfirm={() => {
             setShowOverwriteConfirm(false)
-            await submit(true)
+            submit(true)
           }}
-          loading={applying}
         />
       )}
     </>

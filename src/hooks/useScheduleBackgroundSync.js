@@ -13,6 +13,20 @@ export const SYNC_STATUS = {
   ERROR: 'error',
 }
 
+export const BULK_OPERATION_STATUS = {
+  IDLE: 'idle',
+  SAVING: 'saving',
+  SUCCESS: 'success',
+  ERROR: 'error',
+}
+
+const IDLE_BULK_OPERATION = {
+  status: BULK_OPERATION_STATUS.IDLE,
+  operationId: null,
+  payload: null,
+  error: null,
+}
+
 function payloadToRawShift(employeeId, payload, existingShift) {
   return {
     id: existingShift?.id ?? `local-${payload.shiftDate}-${Date.now()}`,
@@ -47,10 +61,12 @@ export function upsertShiftInList(shifts, nextShift) {
 }
 
 /** Фоновая синхронизация графика с optimistic UI */
-export function useScheduleBackgroundSync({ employeeId, userId }) {
+export function useScheduleBackgroundSync({ employeeId, userId, onBulkSuccess }) {
   const [syncMetaByDate, setSyncMetaByDate] = useState({})
+  const [bulkOperation, setBulkOperation] = useState(IDLE_BULK_OPERATION)
   const mutationVersionsRef = useRef(new Map())
   const inFlightRef = useRef(new Map())
+  const bulkInFlightRef = useRef(null)
 
   const hasUnsyncedChanges = Object.values(syncMetaByDate).some((meta) =>
     [SYNC_STATUS.SAVING, SYNC_STATUS.UNSYNCED, SYNC_STATUS.ERROR].includes(meta.syncStatus)
@@ -163,14 +179,74 @@ export function useScheduleBackgroundSync({ employeeId, userId }) {
     [enqueueSave, syncMetaByDate]
   )
 
-  const enqueueBulkSave = useCallback(
-    async (entries, options, setShifts, closeModal) => {
-      if (!entries.length) {
-        closeModal?.()
-        return
-      }
+  const runBulkSave = useCallback(
+    async (operationId, snapshot, setShifts) => {
+      const { entries, options } = snapshot
+      const flight = { operationId }
+      bulkInFlightRef.current = flight
 
-      toastWarning('Сохраняем график…', 2200)
+      try {
+        await applyBulkEmployeeShifts(employeeId, entries, {
+          ...options,
+          createdBy: userId,
+        })
+
+        if (bulkInFlightRef.current?.operationId !== operationId) return
+
+        entries.forEach((entry) => {
+          setSyncMeta(entry.shiftDate, {
+            syncStatus: SYNC_STATUS.SYNCED,
+            errorMessage: null,
+          })
+        })
+
+        setBulkOperation({
+          status: BULK_OPERATION_STATUS.SUCCESS,
+          operationId,
+          payload: snapshot,
+          error: null,
+        })
+        toastSuccess('График успешно сохранён')
+        await onBulkSuccess?.()
+      } catch (error) {
+        if (bulkInFlightRef.current?.operationId !== operationId) return
+
+        const message = error.message || 'Не удалось сохранить график'
+        entries.forEach((entry) => {
+          setSyncMeta(entry.shiftDate, {
+            syncStatus: SYNC_STATUS.ERROR,
+            errorMessage: message,
+          })
+        })
+        setBulkOperation({
+          status: BULK_OPERATION_STATUS.ERROR,
+          operationId,
+          payload: snapshot,
+          error: message,
+        })
+        toastError('Не удалось сохранить график')
+      } finally {
+        if (bulkInFlightRef.current?.operationId === operationId) {
+          bulkInFlightRef.current = null
+        }
+      }
+    },
+    [employeeId, onBulkSuccess, setSyncMeta, userId]
+  )
+
+  const enqueueBulkSave = useCallback(
+    (snapshot, setShifts, closeModal) => {
+      const entries = snapshot?.entries || []
+      if (!entries.length) return false
+      if (bulkOperation.status === BULK_OPERATION_STATUS.SAVING) return false
+
+      const operationId = crypto.randomUUID()
+      setBulkOperation({
+        status: BULK_OPERATION_STATUS.SAVING,
+        operationId,
+        payload: snapshot,
+        error: null,
+      })
 
       entries.forEach((entry) => {
         const optimistic = buildOptimisticShift(employeeId, entry, null)
@@ -184,38 +260,35 @@ export function useScheduleBackgroundSync({ employeeId, userId }) {
       })
 
       closeModal?.()
-
-      try {
-        await applyBulkEmployeeShifts(employeeId, entries, {
-          ...options,
-          createdBy: userId,
-        })
-
-        entries.forEach((entry) => {
-          setSyncMeta(entry.shiftDate, {
-            syncStatus: SYNC_STATUS.SYNCED,
-            errorMessage: null,
-          })
-        })
-        toastSuccess('График сохранён')
-      } catch (error) {
-        entries.forEach((entry) => {
-          setSyncMeta(entry.shiftDate, {
-            syncStatus: SYNC_STATUS.ERROR,
-            errorMessage: error.message || 'Не удалось сохранить график',
-          })
-        })
-        toastError('Не удалось сохранить график')
-      }
+      toastWarning('График сохраняется…', 5000)
+      void runBulkSave(operationId, snapshot, setShifts)
+      return true
     },
-    [employeeId, setSyncMeta, userId]
+    [bulkOperation.status, employeeId, runBulkSave, setSyncMeta]
   )
+
+  const retryBulkSave = useCallback(
+    (setShifts) => {
+      const snapshot = bulkOperation.payload
+      if (!snapshot?.entries?.length) return false
+      if (bulkOperation.status === BULK_OPERATION_STATUS.SAVING) return false
+      return enqueueBulkSave(snapshot, setShifts)
+    },
+    [bulkOperation.payload, bulkOperation.status, enqueueBulkSave]
+  )
+
+  const dismissBulkStatus = useCallback(() => {
+    setBulkOperation(IDLE_BULK_OPERATION)
+  }, [])
 
   return {
     syncMetaByDate,
+    bulkOperation,
     hasUnsyncedChanges,
     enqueueSave,
     enqueueBulkSave,
+    retryBulkSave,
     retrySave,
+    dismissBulkStatus,
   }
 }

@@ -133,8 +133,16 @@ function stagePerformanceAndNotifications() {
   assert('fetchAllData parallel secondary loads', dataAdapter.includes('Promise.allSettled'))
 
   const scheduleSection = read('src/components/admin/sections/EmployeeScheduleSection.jsx')
+  const bulkModal = read('src/components/admin/BulkScheduleModal.jsx')
+  const syncHook = read('src/hooks/useScheduleBackgroundSync.js')
   assert('schedule uses background sync hook', scheduleSection.includes('useScheduleBackgroundSync'))
   assert('schedule save no longer blocks on reload', !scheduleSection.includes('await loadScheduleData()'))
+  assert('bulk modal does not await apply', !bulkModal.includes('await onApply'))
+  assert('bulk modal passes operation snapshot', bulkModal.includes('form: formSnapshot'))
+  assert('bulk background status banner', scheduleSection.includes('График сохраняется'))
+  assert('bulk retry action', scheduleSection.includes('Повторить'))
+  assert('bulk operation state model', syncHook.includes('BULK_OPERATION_STATUS'))
+  assert('bulk save closes before network', syncHook.includes('closeModal?.()') && syncHook.includes('void runBulkSave'))
 
   const toastContext = read('src/context/ToastContext.jsx')
   assert('toast context value memoized', toastContext.includes('useMemo'))
