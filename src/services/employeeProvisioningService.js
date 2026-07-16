@@ -1,26 +1,42 @@
 import { supabase } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
+import {
+  extractFunctionErrorBody,
+  isGenericInvokeErrorMessage,
+} from '../utils/edgeFunctionErrors'
 
 const ERROR_MESSAGES = {
   forbidden: 'У вас нет прав на создание сотрудников',
-  conflict_login: 'Сотрудник с таким логином уже существует',
+  conflict_login: 'Логин уже используется другим сотрудником',
   conflict_auth: 'Аккаунт с таким логином уже существует',
   validation: 'Проверьте заполненные поля',
-  unauthorized: 'Сессия истекла. Войдите в аккаунт заново',
-  default: 'Не удалось создать сотрудника',
+  password: 'Пароль должен содержать минимум 6 символов',
+  role: 'Выбранная роль недоступна',
+  unauthorized: 'Сессия завершена. Войдите повторно',
+  default: 'Не удалось создать сотрудника. Повторите попытку',
 }
 
 function mapProvisioningError(errorBody, fallbackMessage) {
-  const code = errorBody?.error?.code
-  const message = errorBody?.error?.message
+  const code = errorBody?.error?.code ?? errorBody?.code
+  const message = errorBody?.error?.message ?? errorBody?.message ?? ''
 
   if (code === 'forbidden') return ERROR_MESSAGES.forbidden
   if (code === 'conflict') {
     if (message?.toLowerCase().includes('auth')) return ERROR_MESSAGES.conflict_auth
     return ERROR_MESSAGES.conflict_login
   }
-  if (code === 'validation_error' || code === 'malformed_json') return ERROR_MESSAGES.validation
+  if (code === 'validation_error') {
+    const normalized = message.toLowerCase()
+    if (normalized.includes('password')) return ERROR_MESSAGES.password
+    if (normalized.includes('role')) return ERROR_MESSAGES.role
+    if (normalized.includes('login')) return 'Укажите корректный логин'
+    return ERROR_MESSAGES.validation
+  }
+  if (code === 'malformed_json') return ERROR_MESSAGES.validation
   if (code === 'unauthorized') return ERROR_MESSAGES.unauthorized
+  if (code === 'provisioning_error' || code === 'rollback_failed') {
+    return ERROR_MESSAGES.default
+  }
   return fallbackMessage || ERROR_MESSAGES.default
 }
 
@@ -47,16 +63,17 @@ export async function createEmployeeWithAuth(payload) {
     role_id: payload.roleId,
     position: payload.position?.trim() || undefined,
     avatar_url: payload.avatarUrl || undefined,
+    source_candidate_id: payload.sourceCandidateId || undefined,
   }
 
   const { data, error } = await supabase.functions.invoke('admin-create-employee', { body })
 
   if (error) {
-    const contextBody = error.context?.json ?? error.context?.body
-    if (contextBody && typeof contextBody === 'object') {
-      throw new Error(mapProvisioningError(contextBody, ERROR_MESSAGES.default))
-    }
-    throw new Error(mapProvisioningError(null, error.message))
+    const contextBody = await extractFunctionErrorBody(error)
+    const fallback = isGenericInvokeErrorMessage(error.message)
+      ? ERROR_MESSAGES.default
+      : error.message
+    throw new Error(mapProvisioningError(contextBody, fallback))
   }
 
   if (!data?.ok || !data?.employee) {

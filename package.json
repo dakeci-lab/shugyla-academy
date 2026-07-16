@@ -49,6 +49,7 @@
     "verify:suppliers-simplify": "node scripts/verify-suppliers-simplify.mjs",
     "verify:suppliers-toolbar": "node scripts/verify-suppliers-toolbar.mjs",
     "verify:employees-list": "node scripts/verify-employees-list.mjs",
+    "verify:employee-create-fix": "node scripts/verify-employee-create-fix.mjs",
     "verify:app-bootstrap": "node scripts/verify-app-bootstrap.mjs",
     "verify:supplier-form-focus": "node scripts/verify-supplier-form-focus.mjs",
     "verify:home-dashboard": "node scripts/verify-home-dashboard.mjs",

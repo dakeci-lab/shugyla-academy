@@ -27,7 +27,7 @@ Forbidden from client body: `role`, `status`, `auth_user_id`, `password`, `id`, 
 | Field | Required |
 |---|---|
 | `login` | yes |
-| `temporary_password` | yes (min 12 chars) |
+| `temporary_password` | yes (min 6 chars) |
 | `full_name` or `first_name` + `last_name` | yes |
 | `role_id` | yes (UUID from `roles`) |
 | `position`, `avatar_url` | optional |

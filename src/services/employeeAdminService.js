@@ -1,6 +1,10 @@
 import { supabase } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
 import { normalizeEmployee } from '../utils/employeeData'
+import {
+  extractFunctionErrorBody,
+  isGenericInvokeErrorMessage,
+} from '../utils/edgeFunctionErrors'
 
 const ERROR_MESSAGES = {
   forbidden: 'У вас нет прав для просмотра сотрудников',
@@ -11,8 +15,8 @@ const ERROR_MESSAGES = {
   selfStatus: 'Нельзя изменить собственную роль или статус',
   lastAdmin: 'Нельзя деактивировать последнего администратора',
   validation: 'Проверьте заполненные поля',
-  unauthorized: 'Сессия истекла. Войдите в аккаунт заново',
-  listDefault: 'Не удалось загрузить сотрудников',
+  unauthorized: 'Сессия завершена. Войдите повторно',
+  listDefault: 'Не удалось загрузить список сотрудников',
   updateDefault: 'Не удалось сохранить изменения',
 }
 
@@ -20,7 +24,7 @@ function mapAdminError(errorBody, fallbackMessage, { edit = false } = {}) {
   const code = errorBody?.code ?? errorBody?.error?.code
 
   if (code === 'forbidden' || code === 'inactive_caller') {
-    return edit ? 'У вас нет прав для редактирования сотрудников' : ERROR_MESSAGES.forbidden
+    return edit ? ERROR_MESSAGES.editForbidden : ERROR_MESSAGES.forbidden
   }
   if (code === 'unauthorized') return ERROR_MESSAGES.unauthorized
   if (code === 'employee_not_found') return ERROR_MESSAGES.notFound
@@ -39,6 +43,9 @@ function mapAdminError(errorBody, fallbackMessage, { edit = false } = {}) {
   ) {
     return ERROR_MESSAGES.validation
   }
+  if (code === 'internal_error') {
+    return edit ? ERROR_MESSAGES.updateDefault : ERROR_MESSAGES.listDefault
+  }
   return fallbackMessage || (edit ? ERROR_MESSAGES.updateDefault : ERROR_MESSAGES.listDefault)
 }
 
@@ -56,14 +63,6 @@ function serverEmployeeToUi(row) {
     avatarUrl: row.avatar_url,
     authLinked: row.auth_linked === true,
   })
-}
-
-function extractFunctionError(error) {
-  const contextBody = error?.context?.json ?? error?.context?.body
-  if (contextBody && typeof contextBody === 'object') {
-    return contextBody
-  }
-  return null
 }
 
 async function ensureCloudSession() {
@@ -96,7 +95,11 @@ export async function listEmployeesForAdmin(options = {}) {
   const { data, error } = await supabase.functions.invoke('admin-list-employees', { body })
 
   if (error) {
-    throw new Error(mapAdminError(extractFunctionError(error), error.message))
+    const contextBody = await extractFunctionErrorBody(error)
+    const fallback = isGenericInvokeErrorMessage(error.message)
+      ? ERROR_MESSAGES.listDefault
+      : error.message
+    throw new Error(mapAdminError(contextBody, fallback))
   }
 
   if (!data?.ok || !Array.isArray(data.employees)) {
@@ -137,7 +140,11 @@ export async function updateEmployeeAsAdmin(employeeId, changes) {
   })
 
   if (error) {
-    throw new Error(mapAdminError(extractFunctionError(error), error.message, { edit: true }))
+    const contextBody = await extractFunctionErrorBody(error)
+    const fallback = isGenericInvokeErrorMessage(error.message)
+      ? ERROR_MESSAGES.updateDefault
+      : error.message
+    throw new Error(mapAdminError(contextBody, fallback, { edit: true }))
   }
 
   if (!data?.ok || !data?.employee) {

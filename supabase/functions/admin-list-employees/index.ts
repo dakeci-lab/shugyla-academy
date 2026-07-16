@@ -43,6 +43,8 @@ function parseBodyNumbers(payload: Record<string, unknown>) {
 }
 
 Deno.serve(async (req) => {
+  const requestId = crypto.randomUUID()
+
   if (req.method === 'OPTIONS') {
     return corsPreflightResponse()
   }
@@ -154,12 +156,29 @@ Deno.serve(async (req) => {
     .range(from, to)
 
   if (error) {
-    console.error('admin_list_employees_failed', { category: error.message })
+    console.error('admin_list_employees_failed', {
+      requestId,
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    })
     return adminErrorResponse('internal_error', 500)
   }
 
   const total = count ?? 0
-  const employees = (data ?? []).map((row) => mapSafeEmployee(row as DbEmployeeRow))
+  const employees = []
+  for (const row of data ?? []) {
+    try {
+      employees.push(mapSafeEmployee(row as DbEmployeeRow))
+    } catch (mapError) {
+      console.error('admin_list_employees_map_failed', {
+        requestId,
+        employeeId: (row as DbEmployeeRow)?.id,
+        category: mapError instanceof Error ? mapError.message : 'unknown',
+      })
+    }
+  }
 
   return jsonResponse({
     ok: true,

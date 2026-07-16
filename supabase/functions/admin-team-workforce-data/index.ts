@@ -66,6 +66,8 @@ async function resolveWorkforceScope(
 }
 
 Deno.serve(async (req) => {
+  const requestId = crypto.randomUUID()
+
   if (req.method === 'OPTIONS') {
     return corsPreflightResponse()
   }
@@ -135,13 +137,28 @@ Deno.serve(async (req) => {
 
   const { data: employeeRows, error: employeeError } = await employeeQuery
   if (employeeError) {
-    console.error('admin_team_workforce_employees_failed', { category: employeeError.message })
+    console.error('admin_team_workforce_employees_failed', {
+      requestId,
+      code: employeeError.code,
+      message: employeeError.message,
+      details: employeeError.details,
+      hint: employeeError.hint,
+    })
     return adminErrorResponse('internal_error', 500)
   }
 
-  const employees = (employeeRows ?? []).map((row) =>
-    mapSafeWorkforceEmployee(row as DbWorkforceEmployeeRow)
-  )
+  const employees = []
+  for (const row of employeeRows ?? []) {
+    try {
+      employees.push(mapSafeWorkforceEmployee(row as DbWorkforceEmployeeRow))
+    } catch (mapError) {
+      console.error('admin_team_workforce_map_failed', {
+        requestId,
+        employeeId: (row as DbWorkforceEmployeeRow)?.id,
+        category: mapError instanceof Error ? mapError.message : 'unknown',
+      })
+    }
+  }
   const employeeIds = employees.map((employee) => employee.id)
 
   let shiftQuery = serviceClient
@@ -171,11 +188,28 @@ Deno.serve(async (req) => {
 
   const { data: shiftRows, error: shiftError } = await shiftQuery
   if (shiftError) {
-    console.error('admin_team_workforce_shifts_failed', { category: shiftError.message })
+    console.error('admin_team_workforce_shifts_failed', {
+      requestId,
+      code: shiftError.code,
+      message: shiftError.message,
+      details: shiftError.details,
+      hint: shiftError.hint,
+    })
     return adminErrorResponse('internal_error', 500)
   }
 
-  const shifts = (shiftRows ?? []).map((row) => mapSafeWorkforceShift(row as Record<string, unknown>))
+  const shifts = []
+  for (const row of shiftRows ?? []) {
+    try {
+      shifts.push(mapSafeWorkforceShift(row as Record<string, unknown>))
+    } catch (mapError) {
+      console.error('admin_team_workforce_shift_map_failed', {
+        requestId,
+        shiftId: row?.id,
+        category: mapError instanceof Error ? mapError.message : 'unknown',
+      })
+    }
+  }
 
   return jsonResponse({
     ok: true,

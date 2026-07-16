@@ -308,6 +308,18 @@ async function stageValidationTests() {
   })
   if (shortPwd.status !== 422) fail(`Short password expected 422, got ${shortPwd.status}`)
 
+  const minPwd = await invokeFunction({
+    token: state.tokens.admin,
+    body: { ...validCreateBody(`${FIXTURE_TAG}-min-pwd`), temporary_password: 'six123' },
+  })
+  if (minPwd.status !== 201 && minPwd.status !== 200) {
+    fail(`6-char password expected 201/200, got ${minPwd.status}`)
+  }
+  if (minPwd.body?.employee?.login) {
+    state.createdEmployeeLogins.push(minPwd.body.employee.login)
+    state.createdAuthUserIds.push(minPwd.body.employee.auth_user_id)
+  }
+
   const badRole = await invokeFunction({
     token: state.tokens.admin,
     body: { ...validCreateBody(`${FIXTURE_TAG}-bad-role`), role_id: crypto.randomUUID() },

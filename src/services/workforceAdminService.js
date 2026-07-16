@@ -2,6 +2,10 @@ import { supabase } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
 import { normalizeEmployee } from '../utils/employeeData'
 import { normalizeShift } from '../utils/shiftData'
+import {
+  extractFunctionErrorBody,
+  isGenericInvokeErrorMessage,
+} from '../utils/edgeFunctionErrors'
 
 const APP_TIMEZONE = 'Asia/Almaty'
 
@@ -13,12 +17,11 @@ const ERROR_MESSAGES = {
   default: 'Не удалось загрузить данные',
 }
 
-function extractFunctionError(error) {
-  const contextBody = error?.context?.json ?? error?.context?.body
-  if (contextBody && typeof contextBody === 'object') {
-    return contextBody
-  }
-  return null
+
+async function resolveFunctionError(error, fallbackMessage = ERROR_MESSAGES.default) {
+  const contextBody = await extractFunctionErrorBody(error)
+  const fallback = isGenericInvokeErrorMessage(error?.message) ? fallbackMessage : error?.message
+  return mapWorkforceError(contextBody, fallback)
 }
 
 function mapWorkforceError(errorBody, fallbackMessage = ERROR_MESSAGES.default) {
@@ -116,8 +119,7 @@ export async function fetchTeamWorkforceData({ dateFrom, dateTo, view }) {
   })
 
   if (error) {
-    const mapped = mapWorkforceError(extractFunctionError(error), ERROR_MESSAGES.default)
-    throw new Error(mapped)
+    throw new Error(await resolveFunctionError(error, ERROR_MESSAGES.default))
   }
 
   if (!data?.ok || !Array.isArray(data.employees) || !Array.isArray(data.shifts)) {

@@ -10,9 +10,12 @@ import { buildFullName, MAX_NAME_LENGTH } from '../_shared/employeeFields.ts'
 
 const PERMISSION_CREATE = 'employees.create'
 const ACTIVE_STATUS = 'active'
-const MIN_PASSWORD_LENGTH = 12
+const MIN_PASSWORD_LENGTH = 6
 const MAX_PASSWORD_LENGTH = 128
 const MAX_LOGIN_LENGTH = 128
+
+const EMPLOYEE_RETURN_SELECT =
+  'id, login, full_name, first_name, last_name, role, role_id, status, position, avatar_url, created_at, auth_user_id'
 
 const FORBIDDEN_BODY_KEYS = new Set([
   'id',
@@ -73,7 +76,40 @@ async function rollbackAuthUser(serviceClient: SupabaseClient, authUserId: strin
   }
 }
 
+async function findEmployeeByLogin(serviceClient: SupabaseClient, login: string) {
+  const { data, error } = await serviceClient
+    .from('academy_users')
+    .select(EMPLOYEE_RETURN_SELECT)
+    .eq('login', login)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
+async function findEmployeeByCandidateId(serviceClient: SupabaseClient, candidateId: string) {
+  const { data, error } = await serviceClient
+    .from('academy_candidates')
+    .select('created_user_id')
+    .eq('id', candidateId)
+    .maybeSingle()
+
+  if (error) throw error
+  if (!data?.created_user_id) return null
+
+  const { data: employee, error: employeeError } = await serviceClient
+    .from('academy_users')
+    .select(EMPLOYEE_RETURN_SELECT)
+    .eq('id', data.created_user_id)
+    .maybeSingle()
+
+  if (employeeError) throw employeeError
+  return employee
+}
+
 Deno.serve(async (req) => {
+  const requestId = crypto.randomUUID()
+
   if (req.method === 'OPTIONS') {
     return corsPreflightResponse()
   }
@@ -112,18 +148,19 @@ Deno.serve(async (req) => {
   const temporaryPassword =
     typeof payload.temporary_password === 'string' ? payload.temporary_password : ''
   const roleId = typeof payload.role_id === 'string' ? payload.role_id.trim() : ''
+  const sourceCandidateId =
+    typeof payload.source_candidate_id === 'string' ? payload.source_candidate_id.trim() : ''
 
   const canonical = canonicalLogin(loginRaw)
   if (!canonical || canonical.length > MAX_LOGIN_LENGTH) {
     return errorResponse('validation_error', 'Invalid login', 422)
   }
 
-  if (
-    !temporaryPassword ||
-    temporaryPassword.length < MIN_PASSWORD_LENGTH ||
-    temporaryPassword.length > MAX_PASSWORD_LENGTH
-  ) {
+  if (!temporaryPassword || temporaryPassword.length > MAX_PASSWORD_LENGTH) {
     return errorResponse('validation_error', 'Invalid temporary password', 422)
+  }
+  if (temporaryPassword.length < MIN_PASSWORD_LENGTH) {
+    return errorResponse('validation_error', 'Password must be at least 6 characters', 422)
   }
 
   if (!roleId) {
@@ -174,75 +211,117 @@ Deno.serve(async (req) => {
 
   const { serviceClient } = authResult
 
-  const { data: targetRole, error: roleError } = await serviceClient
-    .from('roles')
-    .select('id, code, is_active')
-    .eq('id', roleId)
-    .maybeSingle()
-
-  if (roleError || !targetRole?.id || targetRole.is_active === false) {
-    return errorResponse('validation_error', 'Invalid role', 422)
-  }
-
-  const { data: loginConflict } = await serviceClient
-    .from('academy_users')
-    .select('id')
-    .eq('login', canonical)
-    .maybeSingle()
-
-  if (loginConflict) {
-    return errorResponse('conflict', 'Login already exists', 409)
-  }
-
-  const { data: createdAuth, error: createAuthError } = await serviceClient.auth.admin.createUser({
-    email: technicalEmail,
-    password: temporaryPassword,
-    email_confirm: true,
-  })
-
-  if (createAuthError || !createdAuth.user?.id) {
-    const message = createAuthError?.message?.toLowerCase() ?? ''
-    if (
-      message.includes('already') ||
-      message.includes('exists') ||
-      message.includes('registered') ||
-      createAuthError?.status === 422
-    ) {
-      return errorResponse('conflict', 'Auth account already exists', 409)
-    }
-    console.error('auth_user_create_failed', { category: createAuthError?.message ?? 'unknown' })
-    return errorResponse('provisioning_error', 'Could not create employee', 500)
-  }
-
-  const createdAuthUserId = createdAuth.user.id
-
   try {
-    const employeeId = await nextEmployeeId(serviceClient)
-
-    const insertRow = {
-      id: employeeId,
-      first_name: firstName || fullName.split(' ')[0] || '',
-      last_name: lastName || fullName.split(' ').slice(1).join(' ') || '',
-      full_name: fullName,
-      login: canonical,
-      role: targetRole.code,
-      role_id: targetRole.id,
-      position: position || '',
-      status: ACTIVE_STATUS,
-      auth_user_id: createdAuthUserId,
-      avatar_url: avatarUrl,
+    if (sourceCandidateId) {
+      const candidateEmployee = await findEmployeeByCandidateId(serviceClient, sourceCandidateId)
+      if (candidateEmployee?.auth_user_id) {
+        return jsonResponse({ ok: true, employee: candidateEmployee, idempotent: true }, 200)
+      }
     }
 
-    const { data: inserted, error: insertError } = await serviceClient
-      .from('academy_users')
-      .insert(insertRow)
-      .select(
-        'id, login, full_name, first_name, last_name, role, role_id, status, position, avatar_url, created_at, auth_user_id'
-      )
-      .single()
+    const { data: targetRole, error: roleError } = await serviceClient
+      .from('roles')
+      .select('id, code, is_active')
+      .eq('id', roleId)
+      .maybeSingle()
 
-    if (insertError || !inserted) {
-      console.error('academy_user_insert_failed', { category: insertError?.message ?? 'unknown' })
+    if (roleError || !targetRole?.id || targetRole.is_active === false) {
+      return errorResponse('validation_error', 'Invalid role', 422)
+    }
+
+    const existingEmployee = await findEmployeeByLogin(serviceClient, canonical)
+    if (existingEmployee?.auth_user_id) {
+      return jsonResponse({ ok: true, employee: existingEmployee, idempotent: true }, 200)
+    }
+    if (existingEmployee) {
+      return errorResponse('conflict', 'Login already exists', 409)
+    }
+
+    const { data: createdAuth, error: createAuthError } = await serviceClient.auth.admin.createUser({
+      email: technicalEmail,
+      password: temporaryPassword,
+      email_confirm: true,
+    })
+
+    if (createAuthError || !createdAuth.user?.id) {
+      const message = createAuthError?.message?.toLowerCase() ?? ''
+      if (
+        message.includes('already') ||
+        message.includes('exists') ||
+        message.includes('registered') ||
+        createAuthError?.status === 422
+      ) {
+        const { data: authUsers } = await serviceClient.auth.admin.listUsers()
+        const existingAuth = authUsers.users.find(
+          (user) => user.email?.toLowerCase() === technicalEmail.toLowerCase()
+        )
+        if (existingAuth?.id) {
+          const { data: linkedEmployee } = await serviceClient
+            .from('academy_users')
+            .select(EMPLOYEE_RETURN_SELECT)
+            .eq('auth_user_id', existingAuth.id)
+            .maybeSingle()
+          if (linkedEmployee?.id) {
+            return jsonResponse({ ok: true, employee: linkedEmployee, idempotent: true }, 200)
+          }
+        }
+        return errorResponse('conflict', 'Auth account already exists', 409)
+      }
+      console.error('auth_user_create_failed', {
+        requestId,
+        category: createAuthError?.message ?? 'unknown',
+      })
+      return errorResponse('provisioning_error', 'Could not create employee', 500)
+    }
+
+    const createdAuthUserId = createdAuth.user.id
+
+    try {
+      const employeeId = await nextEmployeeId(serviceClient)
+
+      const insertRow = {
+        id: employeeId,
+        first_name: firstName || fullName.split(' ')[0] || '',
+        last_name: lastName || fullName.split(' ').slice(1).join(' ') || '',
+        full_name: fullName,
+        login: canonical,
+        role: targetRole.code,
+        role_id: targetRole.id,
+        position: position || '',
+        status: ACTIVE_STATUS,
+        auth_user_id: createdAuthUserId,
+        avatar_url: avatarUrl,
+      }
+
+      const { data: inserted, error: insertError } = await serviceClient
+        .from('academy_users')
+        .insert(insertRow)
+        .select(EMPLOYEE_RETURN_SELECT)
+        .single()
+
+      if (insertError || !inserted) {
+        console.error('academy_user_insert_failed', {
+          requestId,
+          code: insertError?.code,
+          message: insertError?.message,
+          details: insertError?.details,
+          hint: insertError?.hint,
+        })
+        try {
+          await rollbackAuthUser(serviceClient, createdAuthUserId)
+        } catch {
+          return errorResponse('rollback_failed', 'Could not create employee', 500)
+        }
+        return errorResponse('provisioning_error', 'Could not create employee', 500)
+      }
+
+      return jsonResponse({ ok: true, employee: inserted }, 201)
+    } catch (err) {
+      console.error('provisioning_unexpected', {
+        requestId,
+        category: err instanceof Error ? err.message : 'unknown',
+        stack: err instanceof Error ? err.stack : undefined,
+      })
       try {
         await rollbackAuthUser(serviceClient, createdAuthUserId)
       } catch {
@@ -250,25 +329,15 @@ Deno.serve(async (req) => {
       }
       return errorResponse('provisioning_error', 'Could not create employee', 500)
     }
-
-    return jsonResponse(
-      {
-        ok: true,
-        employee: inserted,
-      },
-      201
-    )
   } catch (err) {
-    console.error('provisioning_unexpected', {
-      category: err instanceof Error ? err.message : 'unknown',
+    console.error('admin_create_employee_failed', {
+      requestId,
+      code: (err as { code?: string })?.code,
+      message: err instanceof Error ? err.message : 'unknown',
+      details: (err as { details?: string })?.details,
+      hint: (err as { hint?: string })?.hint,
+      stack: err instanceof Error ? err.stack : undefined,
     })
-    if (createdAuthUserId) {
-      try {
-        await rollbackAuthUser(serviceClient, createdAuthUserId)
-      } catch {
-        return errorResponse('rollback_failed', 'Could not create employee', 500)
-      }
-    }
     return errorResponse('provisioning_error', 'Could not create employee', 500)
   }
 })

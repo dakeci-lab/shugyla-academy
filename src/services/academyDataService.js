@@ -197,6 +197,7 @@ export async function createEmployee(data) {
       roleId: data.roleId,
       position: data.position,
       avatarUrl: data.avatarUrl,
+      sourceCandidateId: data.sourceCandidateId,
     })
 
     const store = getCloudStore()

@@ -33,6 +33,10 @@ import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacSe
 import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
 import { isCloudMode } from '../../../lib/dataMode'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
+import {
+  MIN_EMPLOYEE_TEMP_PASSWORD_LENGTH,
+  validateEmployeeTemporaryPassword,
+} from '../../../utils/employeePasswordValidation'
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue'
 import useMediaQuery from '../../../hooks/useMediaQuery'
 import { useSession } from '../../../context/SessionContext'
@@ -70,6 +74,8 @@ export default function EmployeesSection() {
   const [searchParams] = useSearchParams()
   const filterButtonRef = useRef(null)
   const hasLoadedOnceRef = useRef(false)
+  const activeCandidateIdRef = useRef(null)
+  const formTouchedRef = useRef(false)
   const isNarrowSearch = useMediaQuery(NARROW_SEARCH_QUERY)
 
   const [searchInput, setSearchInput] = useState('')
@@ -247,11 +253,16 @@ export default function EmployeesSection() {
 
   useEffect(() => {
     const candidateId = searchParams.get('createFromCandidate')
-    if (!candidateId) return
+    if (!candidateId) {
+      activeCandidateIdRef.current = null
+      return
+    }
 
     const candidate = getCandidateById(candidateId)
     if (!candidate) {
-      setActionError('Кандидат не найден')
+      if (activeCandidateIdRef.current !== candidateId) {
+        setActionError('Кандидат не найден')
+      }
       return
     }
 
@@ -265,24 +276,40 @@ export default function EmployeesSection() {
       return
     }
 
+    const candidateChanged = activeCandidateIdRef.current !== candidateId
+    if (!candidateChanged && formTouchedRef.current) {
+      if (!showForm) setShowForm(true)
+      return
+    }
+
     const vacancy = candidate.vacancyId ? getVacancyById(candidate.vacancyId) : null
     const role = getVacancyEmployeeRole(vacancy) || EMPTY_EMPLOYEE_FORM.role
+
+    if (candidateChanged) {
+      activeCandidateIdRef.current = candidateId
+      formTouchedRef.current = false
+      setForm({
+        ...EMPTY_EMPLOYEE_FORM,
+        firstName: candidate.firstName || '',
+        lastName: candidate.lastName || '',
+        role,
+        avatarUrl: candidate.photoUrl || '',
+        employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
+      })
+      setFormError('')
+    }
 
     setSourceCandidateId(candidateId)
     setCandidatePhone(candidate.phone || '')
     setEditId(null)
     setEditingEmployee(null)
-    setForm({
-      ...EMPTY_EMPLOYEE_FORM,
-      firstName: candidate.firstName || '',
-      lastName: candidate.lastName || '',
-      role,
-      avatarUrl: candidate.photoUrl || '',
-      employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
-    })
-    setFormError('')
     setShowForm(true)
-  }, [searchParams, version])
+  }, [searchParams, version, showForm])
+
+  function patchForm(patch) {
+    formTouchedRef.current = true
+    setForm((current) => ({ ...current, ...patch }))
+  }
 
   function clearCandidateQuery() {
     if (searchParams.get('createFromCandidate')) {
@@ -294,6 +321,8 @@ export default function EmployeesSection() {
     setSuccessMessage('')
     setSourceCandidateId(null)
     setCandidatePhone('')
+    activeCandidateIdRef.current = null
+    formTouchedRef.current = false
     setEditId(null)
     setEditingEmployee(null)
     setForm(EMPTY_EMPLOYEE_FORM)
@@ -305,6 +334,8 @@ export default function EmployeesSection() {
   function openEdit(emp) {
     setSourceCandidateId(null)
     setCandidatePhone('')
+    activeCandidateIdRef.current = null
+    formTouchedRef.current = false
     setEditId(emp.id)
     setEditingEmployee(emp)
     setForm(employeeToForm(emp))
@@ -320,6 +351,8 @@ export default function EmployeesSection() {
     setFormError('')
     setSourceCandidateId(null)
     setCandidatePhone('')
+    activeCandidateIdRef.current = null
+    formTouchedRef.current = false
     setForm((current) => ({ ...current, password: '' }))
     clearCandidateQuery()
   }
@@ -364,9 +397,12 @@ export default function EmployeesSection() {
     e.preventDefault()
     if (submitting) return
 
-    if (!editId && cloudMode && form.password.trim().length < 12) {
-      setFormError('Временный пароль должен содержать не менее 12 символов')
-      return
+    if (!editId && cloudMode) {
+      const passwordError = validateEmployeeTemporaryPassword(form.password)
+      if (passwordError) {
+        setFormError(passwordError)
+        return
+      }
     }
 
     const error = validateEmployeeForm(form, editId)
@@ -380,6 +416,11 @@ export default function EmployeesSection() {
       getRoleByCode(form.role) ||
       assignableRoles.find((role) => role.code === form.role)
     const roleCode = selectedRole?.code || form.role
+
+    if (!editId && cloudMode && (!selectedRole?.id || selectedRole.isActive === false)) {
+      setFormError('Выбранная роль недоступна')
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -419,15 +460,16 @@ export default function EmployeesSection() {
           position: selectedRole?.name || getRoleLabel(roleCode),
           employmentStatus: form.employmentStatus,
           workLocationId: form.workLocationId || null,
+          sourceCandidateId: sourceCandidateId || undefined,
           ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
           ...(form.password?.trim() ? { password: form.password } : {}),
         }
         const newUserId = await createEmployee(payload)
         if (sourceCandidateId) {
           await linkCandidateToEmployee(sourceCandidateId, newUserId)
-          setSuccessMessage('Сотрудник успешно создан')
         }
         closeForm()
+        setSuccessMessage('Сотрудник успешно создан')
       }
       await afterCloudMutation()
     } catch (err) {
@@ -716,7 +758,7 @@ export default function EmployeesSection() {
                 <input
                   className="admin-form__input"
                   value={form.firstName}
-                  onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                  onChange={(e) => patchForm({ firstName: e.target.value })}
                   required
                 />
               </label>
@@ -725,7 +767,7 @@ export default function EmployeesSection() {
                 <input
                   className="admin-form__input"
                   value={form.lastName}
-                  onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                  onChange={(e) => patchForm({ lastName: e.target.value })}
                 />
               </label>
             </div>
@@ -739,8 +781,7 @@ export default function EmployeesSection() {
                 onChange={(e) => {
                   const value = e.target.value
                   const role = assignableRoles.find((item) => item.id === value)
-                  setForm({
-                    ...form,
+                  patchForm({
                     roleId: role?.id || '',
                     role: role?.code || value,
                   })
@@ -806,7 +847,7 @@ export default function EmployeesSection() {
                 <select
                   className="admin-form__select"
                   value={form.workLocationId || ''}
-                  onChange={(e) => setForm({ ...form, workLocationId: e.target.value })}
+                  onChange={(e) => patchForm({ workLocationId: e.target.value })}
                 >
                   <option value="">По умолчанию (активная точка)</option>
                   {workLocations.filter((loc) => loc.isActive).map((loc) => (
@@ -824,7 +865,7 @@ export default function EmployeesSection() {
                 <input
                   className="admin-form__input"
                   value={form.login}
-                  onChange={(e) => setForm({ ...form, login: e.target.value })}
+                  onChange={(e) => patchForm({ login: e.target.value })}
                   required={!editId}
                   disabled={Boolean(editId && cloudMode)}
                   readOnly={Boolean(editId && cloudMode)}
@@ -842,8 +883,9 @@ export default function EmployeesSection() {
                     className="admin-form__input"
                     type="password"
                     value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    onChange={(e) => patchForm({ password: e.target.value })}
                     required
+                    minLength={MIN_EMPLOYEE_TEMP_PASSWORD_LENGTH}
                     autoComplete="new-password"
                   />
                   {cloudMode && (
@@ -860,7 +902,7 @@ export default function EmployeesSection() {
                     className="admin-form__input"
                     type="password"
                     value={form.password}
-                    onChange={(e) => setForm({ ...form, password: e.target.value })}
+                    onChange={(e) => patchForm({ password: e.target.value })}
                     autoComplete="new-password"
                   />
                 </label>
@@ -873,9 +915,7 @@ export default function EmployeesSection() {
                 className="admin-form__select"
                 value={form.employmentStatus}
                 disabled={editingSelf}
-                onChange={(e) =>
-                  setForm({ ...form, employmentStatus: e.target.value })
-                }
+                onChange={(e) => patchForm({ employmentStatus: e.target.value })}
               >
                 {EMPLOYEE_STATUS_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
