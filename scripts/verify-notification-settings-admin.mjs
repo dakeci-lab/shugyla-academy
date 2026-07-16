@@ -65,10 +65,24 @@ function main() {
   assert('panel offset validation', panel.includes('validateOffsetMinutes'))
   assert('four rule metadata entries', (utils.match(/time_tracker\.rule\./g) || []).length >= 4)
   assert('shift start rule title', utils.includes('Напоминание о начале смены'))
-  assert('no test send button', !panel.includes('тестов'))
+  assert('test broadcast section component exists', fs.existsSync(path.join(ROOT, 'src/components/admin/NotificationTestBroadcastSection.jsx')))
+
+  console.log('Stage 2c: Test broadcast block')
+
+  const broadcastSection = read('src/components/admin/NotificationTestBroadcastSection.jsx')
+  const broadcastShared = read('supabase/functions/_shared/testBroadcastPush.ts')
+  const broadcastMigration = read('supabase/migrations/20260718220000_notification_test_broadcast_audits.sql')
+
+  assert('broadcast section title', broadcastSection.includes('Проверка уведомлений'))
+  assert('broadcast button label', broadcastSection.includes('Отправить тестовое уведомление'))
+  assert('broadcast permission gate', broadcastSection.includes('NOTIFICATIONS_MANAGE'))
+  assert('broadcast confirmation modal', broadcastSection.includes('Отправить всем'))
+  assert('get_test_broadcast_summary action', edgeFn.includes("'get_test_broadcast_summary'"))
+  assert('send_test_broadcast action', edgeFn.includes("'send_test_broadcast'"))
+  assert('broadcast reuses delivery helper', broadcastShared.includes('deliverNotificationToSubscription'))
+  assert('broadcast audit migration', broadcastMigration.includes('notification_test_broadcast_audits'))
 
   console.log('Stage 2b: Mobile PWA layout')
-
   assert('card intro separated from toggle', panel.includes('notification-settings-card__intro'))
   assert('toggle on dedicated row', panel.includes('notification-settings-card__toggle-row'))
   assert('offset prefix label', panel.includes('notification-settings-card__offset-prefix'))

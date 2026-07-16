@@ -1,6 +1,12 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { authorizeEmployeeAdmin, adminErrorResponse } from '../_shared/employeeAuthorization.ts'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
+import {
+  findRecentBroadcastCooldown,
+  getTestBroadcastSummary,
+  sendTestBroadcast,
+} from '../_shared/testBroadcastPush.ts'
 
 const PERMISSION_MANAGE = 'notifications.manage'
 
@@ -13,8 +19,6 @@ const TIME_TRACKER_RULE_CODES = [
 
 const RULE_SELECT =
   'id, code, event_code, is_enabled, offset_minutes, repeat_after_minutes, max_attempts, updated_at'
-
-const ALLOWED_BODY_KEYS = new Set(['action', 'settings'])
 
 const FORBIDDEN_BODY_KEYS = new Set([
   'id',
@@ -30,7 +34,24 @@ const FORBIDDEN_BODY_KEYS = new Set([
   'employee_id',
   'auth_user_id',
   'role',
+  'subscription_id',
+  'endpoint',
+  'p256dh',
+  'auth',
+  'title',
+  'body',
+  'url',
+  'vapid_private_key',
 ])
+
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+type Action =
+  | 'get_settings'
+  | 'update_settings'
+  | 'get_test_broadcast_summary'
+  | 'send_test_broadcast'
 
 type RuleCode = (typeof TIME_TRACKER_RULE_CODES)[number]
 
@@ -54,8 +75,48 @@ type SettingInput = {
 const MIN_OFFSET = 0
 const MAX_OFFSET = 1440
 
+const ALLOWED_KEYS_BY_ACTION: Record<Action, Set<string>> = {
+  get_settings: new Set(['action']),
+  update_settings: new Set(['action', 'settings']),
+  get_test_broadcast_summary: new Set(['action']),
+  send_test_broadcast: new Set(['action', 'request_id']),
+}
+
 function isRuleCode(value: string): value is RuleCode {
   return TIME_TRACKER_RULE_CODES.includes(value as RuleCode)
+}
+
+function parseAction(payload: Record<string, unknown>): Action | Response {
+  const action = typeof payload.action === 'string' ? payload.action.trim() : ''
+  if (
+    action === 'get_settings' ||
+    action === 'update_settings' ||
+    action === 'get_test_broadcast_summary' ||
+    action === 'send_test_broadcast'
+  ) {
+    return action
+  }
+  return adminErrorResponse('validation_error', 422)
+}
+
+function validateAllowedKeys(payload: Record<string, unknown>, action: Action): Response | null {
+  const allowed = ALLOWED_KEYS_BY_ACTION[action]
+  for (const key of Object.keys(payload)) {
+    if (FORBIDDEN_BODY_KEYS.has(key)) {
+      return adminErrorResponse('forbidden_field', 422)
+    }
+    if (!allowed.has(key)) {
+      return adminErrorResponse('forbidden_field', 422)
+    }
+  }
+  return null
+}
+
+function parseUuid(value: unknown): string | Response {
+  if (typeof value !== 'string' || !UUID_RE.test(value.trim())) {
+    return adminErrorResponse('validation_error', 422)
+  }
+  return value.trim()
 }
 
 function displayOffsetMinutes(eventCode: string, storedOffset: number): number {
@@ -149,6 +210,98 @@ function parseSettingsInput(payload: Record<string, unknown>): SettingInput[] | 
   return parsed
 }
 
+async function handleGetTestBroadcastSummary(serviceClient: SupabaseClient): Promise<Response> {
+  try {
+    const summary = await getTestBroadcastSummary(serviceClient)
+    return jsonResponse({
+      ok: true,
+      summary,
+    })
+  } catch (error) {
+    console.error('Test notification broadcast summary failed', {
+      code: (error as { code?: string })?.code,
+      message: (error as Error)?.message,
+    })
+    return adminErrorResponse('internal_error', 500)
+  }
+}
+
+async function handleSendTestBroadcast(
+  serviceClient: SupabaseClient,
+  caller: { id: number; auth_user_id: string | null },
+  requestId: string
+): Promise<Response> {
+  if (!caller.auth_user_id) {
+    return adminErrorResponse('forbidden', 403)
+  }
+
+  try {
+    const { data: existingAudit } = await serviceClient
+      .from('notification_test_broadcast_audits')
+      .select(
+        'request_id, active_employee_count, employees_with_subscriptions_count, subscription_count, sent_count, failed_count, invalidated_count, status'
+      )
+      .eq('request_id', requestId)
+      .maybeSingle()
+
+    if (existingAudit?.request_id) {
+      return jsonResponse({
+        ok: true,
+        broadcast_id: existingAudit.request_id,
+        active_employees: existingAudit.active_employee_count,
+        employees_with_subscriptions: existingAudit.employees_with_subscriptions_count,
+        connected_devices: existingAudit.subscription_count,
+        sent_count: existingAudit.sent_count,
+        failed_count: existingAudit.failed_count,
+        invalidated_count: existingAudit.invalidated_count,
+        replay: true,
+      })
+    }
+
+    const cooldown = await findRecentBroadcastCooldown(serviceClient, caller.id)
+    if (cooldown) {
+      return jsonResponse(
+        {
+          ok: false,
+          code: 'broadcast_cooldown',
+          retry_after_seconds: cooldown.retry_after_seconds,
+        },
+        429
+      )
+    }
+
+    const result = await sendTestBroadcast(serviceClient, {
+      broadcastId: requestId,
+      initiatedByEmployeeId: caller.id,
+      initiatedByAuthUserId: caller.auth_user_id,
+    })
+
+    return jsonResponse({
+      ok: true,
+      broadcast_id: result.broadcast_id,
+      active_employees: result.active_employees,
+      employees_with_subscriptions: result.employees_with_subscriptions,
+      connected_devices: result.connected_devices,
+      sent_count: result.sent_count,
+      failed_count: result.failed_count,
+      invalidated_count: result.invalidated_count,
+    })
+  } catch (error) {
+    const message = (error as Error)?.message
+    if (message === 'web_push_not_configured') {
+      return jsonResponse({ ok: false, code: 'web_push_not_configured' }, 503)
+    }
+
+    console.error('Test notification broadcast failed', {
+      requestId,
+      requestedByEmployeeId: caller.id,
+      code: (error as { code?: string })?.code,
+      message,
+    })
+    return adminErrorResponse('internal_error', 500)
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return corsPreflightResponse()
@@ -165,24 +318,26 @@ Deno.serve(async (req) => {
     return adminErrorResponse('malformed_json', 400)
   }
 
-  for (const key of Object.keys(payload)) {
-    if (FORBIDDEN_BODY_KEYS.has(key)) {
-      return adminErrorResponse('forbidden_field', 422)
-    }
-    if (!ALLOWED_BODY_KEYS.has(key)) {
-      return adminErrorResponse('forbidden_field', 422)
-    }
-  }
+  const action = parseAction(payload)
+  if (action instanceof Response) return action
 
-  const action = typeof payload.action === 'string' ? payload.action.trim() : ''
-  if (action !== 'get_settings' && action !== 'update_settings') {
-    return adminErrorResponse('validation_error', 422)
-  }
+  const allowedKeysError = validateAllowedKeys(payload, action)
+  if (allowedKeysError) return allowedKeysError
 
   const authResult = await authorizeEmployeeAdmin(req, PERMISSION_MANAGE)
   if (authResult instanceof Response) return authResult
 
-  const { serviceClient } = authResult
+  const { serviceClient, caller } = authResult
+
+  if (action === 'get_test_broadcast_summary') {
+    return handleGetTestBroadcastSummary(serviceClient)
+  }
+
+  if (action === 'send_test_broadcast') {
+    const requestId = parseUuid(payload.request_id)
+    if (requestId instanceof Response) return requestId
+    return handleSendTestBroadcast(serviceClient, caller, requestId)
+  }
 
   const { data: rules, error: rulesError } = await serviceClient
     .from('notification_rules')

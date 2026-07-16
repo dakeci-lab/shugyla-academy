@@ -1,0 +1,104 @@
+.notification-test-broadcast-section {
+  margin-top: 16px;
+  min-width: 0;
+}
+
+.notification-test-broadcast-section__button {
+  width: 100%;
+  max-width: 100%;
+  min-height: 48px;
+  margin-top: 4px;
+  white-space: normal;
+}
+
+.notification-test-broadcast-modal__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.notification-test-broadcast-modal__lead {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.notification-test-broadcast-modal__stats {
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.notification-test-broadcast-modal__stats div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.notification-test-broadcast-modal__stats dt {
+  margin: 0;
+  color: var(--color-text-secondary, #64748b);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.notification-test-broadcast-modal__stats dd {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+}
+
+.notification-test-broadcast-modal__warning {
+  margin: 0;
+  color: var(--color-text-secondary, #64748b);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.notification-test-broadcast-modal__empty {
+  margin: 0;
+  color: #b42318;
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.notification-test-broadcast-modal__footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+}
+
+.notification-test-broadcast-modal__confirm {
+  min-height: 48px;
+}
+
+@media (max-width: 900px) {
+  .notification-test-broadcast-section.admin-panel-card {
+    padding: 16px;
+  }
+
+  .notification-test-broadcast-section__button {
+    min-height: 48px;
+  }
+
+  .notification-test-broadcast-modal__footer {
+    flex-direction: column-reverse;
+  }
+
+  .notification-test-broadcast-modal__footer .btn {
+    width: 100%;
+    min-height: 48px;
+  }
+}
+
+@media (max-width: 360px) {
+  .notification-test-broadcast-section.admin-panel-card {
+    padding: 12px;
+  }
+}
