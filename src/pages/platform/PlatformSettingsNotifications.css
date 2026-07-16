@@ -1,0 +1,11 @@
+.platform-settings--notifications {
+  width: 100%;
+  max-width: 720px;
+}
+
+@media (max-width: 900px) {
+  .platform-settings--notifications {
+    max-width: none;
+    gap: 12px;
+  }
+}

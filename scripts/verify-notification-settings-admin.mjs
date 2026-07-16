@@ -39,6 +39,8 @@ function main() {
   const catalog = read('src/config/permissionCatalog.js')
   const app = read('src/App.jsx')
   const panel = read('src/components/admin/NotificationSettingsPanel.jsx')
+  const panelCss = read('src/components/admin/NotificationSettingsPanel.css')
+  const pageCss = read('src/pages/platform/PlatformSettingsNotifications.css')
   const service = read('src/services/notificationSettingsAdminService.js')
   const utils = read('src/utils/notificationRuleSettings.js')
   const edgeFn = read('supabase/functions/admin-notification-settings/index.ts')
@@ -64,6 +66,21 @@ function main() {
   assert('four rule metadata entries', (utils.match(/time_tracker\.rule\./g) || []).length >= 4)
   assert('shift start rule title', utils.includes('Напоминание о начале смены'))
   assert('no test send button', !panel.includes('тестов'))
+
+  console.log('Stage 2b: Mobile PWA layout')
+
+  assert('card intro separated from toggle', panel.includes('notification-settings-card__intro'))
+  assert('toggle on dedicated row', panel.includes('notification-settings-card__toggle-row'))
+  assert('offset prefix label', panel.includes('notification-settings-card__offset-prefix'))
+  assert('offset prefix metadata', utils.includes('offsetPrefix'))
+  assert('mobile sticky save bar', panel.includes('notification-settings-panel__actions--mobile'))
+  assert('desktop save action preserved', panel.includes('notification-settings-panel__actions--desktop'))
+  assert('input font-size 16px', panelCss.includes('font-size: 16px'))
+  assert('safe-area inset bottom', panelCss.includes('safe-area-inset-bottom'))
+  assert('mobile breakpoint 900px', panelCss.includes('max-width: 900px'))
+  assert('overflow wrap on card text', panelCss.includes('overflow-wrap'))
+  assert('notifications page mobile width', pageCss.includes('platform-settings--notifications'))
+  assert('toggle row uses space-between', panelCss.includes('notification-settings-card__toggle-row'))
 
   console.log('Stage 3: Edge Function API')
 

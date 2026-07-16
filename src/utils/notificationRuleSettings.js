@@ -14,24 +14,28 @@ export const TIME_TRACKER_RULE_META = {
   'time_tracker.rule.shift_start_soon': {
     title: 'Напоминание о начале смены',
     description: 'Уведомление сотруднику перед запланированным началом смены.',
+    offsetPrefix: 'Отправлять за',
     offsetLabel: 'минут до начала смены',
     defaultOffsetMinutes: 10,
   },
   'time_tracker.rule.clock_in_missing': {
     title: 'Не отмечен приход',
     description: 'Напоминание, если сотрудник не нажал «Я на работе» после начала смены.',
+    offsetPrefix: 'Отправлять через',
     offsetLabel: 'минут после начала смены',
     defaultOffsetMinutes: 5,
   },
   'time_tracker.rule.shift_end_reached': {
     title: 'Завершение смены',
     description: 'Уведомление в момент запланированного окончания смены.',
+    offsetPrefix: 'Отправлять через',
     offsetLabel: 'минут после окончания смены',
     defaultOffsetMinutes: 0,
   },
   'time_tracker.rule.clock_out_missing': {
     title: 'Не отмечен уход',
     description: 'Напоминание, если сотрудник не нажал «Я ухожу» после окончания смены.',
+    offsetPrefix: 'Отправлять через',
     offsetLabel: 'минут после окончания смены',
     defaultOffsetMinutes: 10,
   },
@@ -69,11 +73,16 @@ export function normalizeOffsetInput(value) {
 
 export function enrichNotificationSetting(row) {
   const meta = TIME_TRACKER_RULE_META[row.code] || {}
+  const defaultOffsetMinutes = row.default_offset_minutes ?? meta.defaultOffsetMinutes ?? 0
+  const offsetLabel = meta.offsetLabel || 'минут'
+
   return {
     ...row,
     title: meta.title || row.code,
     description: meta.description || '',
-    offsetLabel: meta.offsetLabel || 'минут',
-    defaultOffsetMinutes: row.default_offset_minutes ?? meta.defaultOffsetMinutes ?? 0,
+    offsetPrefix: meta.offsetPrefix || 'Отправлять через',
+    offsetLabel,
+    defaultOffsetMinutes,
+    defaultOffsetText: `Стандартное значение: ${defaultOffsetMinutes} ${offsetLabel}`,
   }
 }

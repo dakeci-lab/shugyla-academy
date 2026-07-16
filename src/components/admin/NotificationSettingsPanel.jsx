@@ -143,22 +143,25 @@ export default function NotificationSettingsPanel() {
 
   return (
     <section className="admin-panel-card notification-settings-panel">
-      <div className="notification-settings-panel__header">
-        <div>
+      <div className="notification-settings-panel__top">
+        <div className="notification-settings-panel__intro">
           <h2 className="admin-panel-card__title">Автоматические уведомления</h2>
           <p className="admin-panel-card__desc">
-            Управление напоминаниями тайм-трекера по графику смен. Изменения применяются
-            при следующем запуске планировщика без обновления приложения.
+            Напоминания тайм-трекера по графику смен. Изменения применяются при
+            следующем запуске планировщика.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn--primary"
-          onClick={handleSave}
-          disabled={saving}
-        >
-          {saving ? 'Сохранение…' : 'Сохранить настройки'}
-        </button>
+
+        <div className="notification-settings-panel__actions notification-settings-panel__actions--desktop">
+          <button
+            type="button"
+            className="btn btn--primary notification-settings-panel__save"
+            onClick={handleSave}
+            disabled={saving}
+          >
+            {saving ? 'Сохранение…' : 'Сохранить настройки'}
+          </button>
+        </div>
       </div>
 
       <div className="notification-settings-panel__list">
@@ -168,11 +171,13 @@ export default function NotificationSettingsPanel() {
 
           return (
             <article key={rule.code} className="notification-settings-card">
-              <div className="notification-settings-card__head">
-                <div>
-                  <h3 className="notification-settings-card__title">{rule.title}</h3>
-                  <p className="notification-settings-card__desc">{rule.description}</p>
-                </div>
+              <div className="notification-settings-card__intro">
+                <h3 className="notification-settings-card__title">{rule.title}</h3>
+                <p className="notification-settings-card__desc">{rule.description}</p>
+              </div>
+
+              <div className="notification-settings-card__toggle-row">
+                <span className="notification-settings-card__toggle-label">Включено</span>
                 <label className="notification-settings-card__toggle">
                   <input
                     type="checkbox"
@@ -181,31 +186,40 @@ export default function NotificationSettingsPanel() {
                       updateDraftItem(rule.code, { is_enabled: event.target.checked })
                     }
                   />
-                  <span>Включено</span>
+                  <span className="visually-hidden">
+                    {draftItem.is_enabled ? 'Уведомление включено' : 'Уведомление выключено'}
+                  </span>
                 </label>
               </div>
 
-              <div className="notification-settings-card__offset">
-                <span className="notification-settings-card__offset-label">Отправлять за:</span>
-                <input
-                  type="number"
-                  min={0}
-                  max={1440}
-                  step={1}
-                  inputMode="numeric"
-                  className="notification-settings-card__offset-input"
-                  value={draftItem.offset_minutes}
-                  onChange={(event) =>
-                    updateDraftItem(rule.code, { offset_minutes: event.target.value })
-                  }
-                  disabled={!draftItem.is_enabled}
-                />
-                <span className="notification-settings-card__offset-unit">{rule.offsetLabel}</span>
+              <div
+                className={`notification-settings-card__offset${
+                  draftItem.is_enabled ? '' : ' notification-settings-card__offset--disabled'
+                }`}
+              >
+                <p className="notification-settings-card__offset-prefix">{rule.offsetPrefix}</p>
+                <div className="notification-settings-card__offset-controls">
+                  <input
+                    type="number"
+                    min={0}
+                    max={1440}
+                    step={1}
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    autoComplete="off"
+                    aria-label={`${rule.offsetPrefix} ${rule.offsetLabel}`}
+                    className="notification-settings-card__offset-input"
+                    value={draftItem.offset_minutes}
+                    onChange={(event) =>
+                      updateDraftItem(rule.code, { offset_minutes: event.target.value })
+                    }
+                    disabled={!draftItem.is_enabled}
+                  />
+                  <span className="notification-settings-card__offset-unit">{rule.offsetLabel}</span>
+                </div>
               </div>
 
-              <p className="notification-settings-card__default">
-                Стандартное значение: {rule.defaultOffsetMinutes} {rule.offsetLabel}
-              </p>
+              <p className="notification-settings-card__default">{rule.defaultOffsetText}</p>
 
               {fieldErrors[rule.code] && (
                 <p className="notification-settings-card__error" role="alert">
@@ -215,6 +229,17 @@ export default function NotificationSettingsPanel() {
             </article>
           )
         })}
+      </div>
+
+      <div className="notification-settings-panel__actions notification-settings-panel__actions--mobile">
+        <button
+          type="button"
+          className="btn btn--primary notification-settings-panel__save"
+          onClick={handleSave}
+          disabled={saving}
+        >
+          {saving ? 'Сохранение…' : 'Сохранить настройки'}
+        </button>
       </div>
     </section>
   )
