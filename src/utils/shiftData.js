@@ -107,14 +107,22 @@ export function normalizeShift(raw) {
   const facts = normalizeShiftFacts(raw)
   if (!facts) return null
   const computed = computeShiftStatus(facts)
+  const safeComputed = computed ?? {
+    code: SHIFT_RESULT_CODE.SCHEDULED,
+    label: '',
+    variant: 'scheduled',
+    lateMinutes: 0,
+    earlyLeaveMinutes: 0,
+    workedMinutes: 0,
+  }
   return {
     ...facts,
-    lateMinutes: computed.lateMinutes,
-    earlyLeaveMinutes: computed.earlyLeaveMinutes,
-    workedMinutes: computed.workedMinutes,
-    missingCheckIn: computed.code === SHIFT_RESULT_CODE.ABSENCE,
-    missingCheckOut: computed.code === SHIFT_RESULT_CODE.MISSING_CHECKOUT,
-    computedStatus: computed,
+    lateMinutes: safeComputed.lateMinutes,
+    earlyLeaveMinutes: safeComputed.earlyLeaveMinutes,
+    workedMinutes: safeComputed.workedMinutes,
+    missingCheckIn: safeComputed.code === SHIFT_RESULT_CODE.ABSENCE,
+    missingCheckOut: safeComputed.code === SHIFT_RESULT_CODE.MISSING_CHECKOUT,
+    computedStatus: safeComputed,
   }
 }
 
@@ -173,7 +181,9 @@ function isShiftPlannedEndPassed(shift, now = new Date()) {
 }
 
 function isPastShiftDay(shift, now = new Date()) {
+  if (!shift?.shiftDate) return false
   const day = parseDateKey(shift.shiftDate)
+  if (Number.isNaN(day.getTime())) return false
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
   return day < today
 }
@@ -434,6 +444,9 @@ export function toDateKey(date) {
 }
 
 export function parseDateKey(dateKey) {
+  if (!dateKey || typeof dateKey !== 'string') {
+    return new Date(Number.NaN)
+  }
   const [year, month, day] = dateKey.split('-').map(Number)
   return new Date(year, month - 1, day)
 }

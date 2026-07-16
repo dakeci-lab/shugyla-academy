@@ -6,7 +6,7 @@ import './PlatformErrorBoundary.css'
 export default class PlatformErrorBoundary extends Component {
   constructor(props) {
     super(props)
-    this.state = { error: null }
+    this.state = { error: null, retryKey: 0 }
     this.handleRetry = this.handleRetry.bind(this)
     this.handleReload = this.handleReload.bind(this)
     this.handleLogout = this.handleLogout.bind(this)
@@ -17,13 +17,17 @@ export default class PlatformErrorBoundary extends Component {
   }
 
   componentDidCatch(error, info) {
+    console.error('[PlatformErrorBoundary]', error?.message || String(error))
     if (import.meta.env.DEV) {
-      console.error('[PlatformErrorBoundary]', error, info?.componentStack)
+      console.error('[PlatformErrorBoundary] component stack:', info?.componentStack)
     }
   }
 
   handleRetry() {
-    this.setState({ error: null })
+    this.setState((current) => ({
+      error: null,
+      retryKey: current.retryKey + 1,
+    }))
   }
 
   handleReload() {
@@ -43,7 +47,9 @@ export default class PlatformErrorBoundary extends Component {
     const { error } = this.state
     const { children } = this.props
 
-    if (!error) return children
+    if (!error) {
+      return <div key={this.state.retryKey}>{children}</div>
+    }
 
     return (
       <div className="platform-error-boundary">

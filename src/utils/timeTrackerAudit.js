@@ -14,6 +14,7 @@ import {
   isShiftEndingAtMidnight,
   isFalseMidnightAbsence,
 } from './shiftMidnightEnd'
+import { isOpenShiftWorkWindowActive } from './shiftWorkWindow'
 import { toDateKeyInAppTimezone } from './timezone'
 
 /** Можно ли отметить приход — только для UI тайм-трекера */
@@ -33,7 +34,7 @@ export function resolveCanCheckIn(shift, state, { loading, loadError, now = new 
   if (isShiftPlannedEndReached(shift, now)) {
     return { value: false, reason: 'shift_ended_without_checkin' }
   }
-  if (state.code !== 'ready_check_in') {
+  if (state?.code && state.code !== 'ready_check_in') {
     return { value: true, reason: `override_from_${state.code}` }
   }
   return { value: true, reason: null }
@@ -50,30 +51,31 @@ export function resolveCanCheckOut(shift, state, { loading, loadError, now = new
   if (shift.actualStartTime && !shift.actualEndTime) {
     return { value: true, reason: null }
   }
-  if (state.code === 'checked_in') {
+  if (state?.code === 'checked_in') {
     return { value: true, reason: null }
   }
-  return { value: false, reason: state.code || 'not_checked_in' }
+  return { value: false, reason: state?.code || 'not_checked_in' }
 }
 
 /** Текст статуса для тайм-трекера (не влияет на график/рейтинг) */
 export function resolveTimeTrackerDisplayStatus(shift, state, computedStatus, now = new Date()) {
+  const stateCode = state?.code
   if (
     shift &&
     isWorkingShiftStatus(shift.status) &&
     !shift.actualStartTime &&
     !isShiftPlannedEndReached(shift, now) &&
-    (state.code === 'missed' ||
+    (stateCode === 'missed' ||
       isFalseMidnightAbsence(shift, computedStatus?.code, now))
   ) {
     return 'Смена ещё не начата'
   }
 
-  if (state.code === 'ready_check_in') return 'Смена ещё не начата'
-  if (state.code === 'checked_in') return 'Вы на работе'
-  if (state.code === 'completed') return 'Смена завершена'
-  if (state.code === 'missed') return 'Смена завершена без отметки прихода'
-  if (!shift) return state.message
+  if (stateCode === 'ready_check_in') return 'Смена ещё не начата'
+  if (stateCode === 'checked_in') return 'Вы на работе'
+  if (stateCode === 'completed') return 'Смена завершена'
+  if (stateCode === 'missed') return 'Смена завершена без отметки прихода'
+  if (!shift) return state?.message || 'На сегодня график не установлен'
 
   const computedCode = computedStatus?.code
   if (
@@ -91,7 +93,7 @@ export function resolveTimeTrackerDisplayStatus(shift, state, computedStatus, no
     return computedStatus.label
   }
 
-  return state.message
+  return state?.message || 'Статус смены'
 }
 
 /** Одна строка аудита для сотрудника */

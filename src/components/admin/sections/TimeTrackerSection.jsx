@@ -291,7 +291,8 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
     if (ok) setSuccess('Уход отмечен')
   }
 
-  const welcomeName = user?.name?.split(/\s+/)[0] || user?.name || 'сотрудник'
+  const welcomeName =
+    user?.name?.split(/\s+/)[0] || user?.name || user?.roleName || 'сотрудник'
 
   if (isHome) {
     return (

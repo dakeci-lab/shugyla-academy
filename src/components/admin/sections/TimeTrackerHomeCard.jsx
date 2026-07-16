@@ -40,9 +40,10 @@ export function resolveHomeCardVariant({
   canCheckOut,
   isWorkingShift,
 }) {
-  if (state.code === 'completed') return 'completed'
+  const stateCode = state?.code
+  if (stateCode === 'completed') return 'completed'
   if (
-    state.code === 'missed' ||
+    stateCode === 'missed' ||
     computedStatus?.code === SHIFT_RESULT_CODE.ABSENCE ||
     shift?.status === 'absence'
   ) {
@@ -172,7 +173,7 @@ export default function TimeTrackerHomeCard({
     if (variant === 'late') return 'Вы опоздали'
     if (variant === 'completed') return 'Смена завершена'
     if (variant === 'absence') return 'Отсутствие'
-    if (variant === 'empty') return 'График не установлен'
+    if (variant === 'empty') return 'На сегодня смена не назначена'
     if (variant === 'dayoff') return SHIFT_STATUS_LABELS[shift?.status] || 'Выходной'
     return displayStatus || 'Статус смены'
   }, [variant, displayStatus, shift?.status])
