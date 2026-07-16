@@ -160,11 +160,12 @@ function stageStaticSources() {
   assert('get_today_status returns previousShiftMissedClockOut', edgeFn.includes('previousShiftMissedClockOut'))
   assert('clock_out checks work window', edgeFn.includes('isOpenShiftWorkWindowActive'))
   assert('clock_out returns clock_in_required', edgeFn.includes("'clock_in_required'"))
-  assert('clock_out updates by shift id', edgeFn.includes(".eq('id', shiftId)"))
+  assert('clock_out uses attendance_check_out RPC', edgeFn.includes("rpc('attendance_check_out'"))
+  assert('clock_out no direct shift update', !edgeFn.includes(".from('academy_employee_shifts').update"))
 
   const adapter = read('src/services/attendanceSupabaseAdapter.js')
   assert('adapter uses get_today_status', adapter.includes("action: 'get_today_status'"))
-  assert('adapter maps clock_in_required', adapter.includes("'clock_in_required'"))
+  assert('adapter uses shared attendance errors', adapter.includes('attendanceActionErrors'))
 
   const section = read('src/components/admin/sections/TimeTrackerSection.jsx')
   assert('UI shows missed checkout hint prop', section.includes('previousShiftMissedClockOut'))

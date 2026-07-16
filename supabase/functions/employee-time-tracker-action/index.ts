@@ -57,14 +57,18 @@ function mapAttendanceError(message: string, action: 'clock_in' | 'clock_out'): 
   const trimmed = message.trim()
   if (!trimmed) {
     return action === 'clock_out'
-      ? 'Не удалось отметить уход. Проверьте интернет и повторите попытку.'
-      : 'Не удалось отметить приход. Проверьте интернет и повторите попытку.'
+      ? 'Не удалось завершить смену. Повторите попытку.'
+      : 'Не удалось отметить приход. Повторите попытку.'
   }
 
-  if (/permission denied/i.test(trimmed) || /42501/.test(trimmed)) {
+  if (/permission denied/i.test(trimmed) || /42501/.test(trimmed) || /row-level security/i.test(trimmed)) {
     return action === 'clock_out'
-      ? 'Не удалось отметить уход. Проверьте интернет и повторите попытку.'
-      : 'Не удалось отметить приход. Проверьте интернет и повторите попытку.'
+      ? 'Не удалось завершить смену из-за ошибки доступа. Обратитесь к администратору.'
+      : 'Не удалось отметить приход из-за ошибки доступа. Обратитесь к администратору.'
+  }
+
+  if (/активная смена не найдена/i.test(trimmed)) {
+    return 'Активная смена не найдена. Обновите страницу или обратитесь к администратору.'
   }
 
   if (/^[А-Яа-яЁё]/.test(trimmed)) {
@@ -72,8 +76,25 @@ function mapAttendanceError(message: string, action: 'clock_in' | 'clock_out'): 
   }
 
   return action === 'clock_out'
-    ? 'Не удалось отметить уход. Проверьте интернет и повторите попытку.'
-    : 'Не удалось отметить приход. Проверьте интернет и повторите попытку.'
+    ? 'Не удалось завершить смену. Повторите попытку.'
+    : 'Не удалось отметить приход. Повторите попытку.'
+}
+
+function mapAttendanceErrorCode(message: string): string {
+  const trimmed = message.trim()
+  if (/permission denied/i.test(trimmed) || /42501/.test(trimmed) || /row-level security/i.test(trimmed)) {
+    return 'access_denied'
+  }
+  if (/активная смена не найдена/i.test(trimmed)) {
+    return 'active_shift_not_found'
+  }
+  if (/сначала отметьте приход/i.test(trimmed)) {
+    return 'clock_in_required'
+  }
+  if (/уход уже отмечен/i.test(trimmed)) {
+    return 'already_checked_out'
+  }
+  return 'attendance_error'
 }
 
 function parseCoords(value: unknown): Coords | null {
@@ -118,58 +139,6 @@ async function resolveShiftContext(
 ) {
   const rows = await loadRecentShiftRows(serviceClient, employeeId, now)
   return resolveWorkWindowShift(rows, now)
-}
-
-async function validateGeolocation(
-  serviceClient: SupabaseClient,
-  employeeId: number,
-  coords: Coords
-): Promise<Response | null> {
-  const { data: location, error: locError } = await serviceClient.rpc(
-    'platform_get_employee_work_location',
-    { p_employee_id: employeeId }
-  )
-
-  if (locError || !location?.id) {
-    return jsonResponse(
-      {
-        ok: false,
-        code: 'attendance_error',
-        message: 'Рабочая территория ещё не настроена. Обратитесь к администратору',
-      },
-      422
-    )
-  }
-
-  const { data: distance, error: distanceError } = await serviceClient.rpc(
-    'platform_haversine_meters',
-    {
-      lat1: location.latitude,
-      lon1: location.longitude,
-      lat2: coords.latitude,
-      lon2: coords.longitude,
-    }
-  )
-
-  if (distanceError) {
-    return jsonResponse(
-      { ok: false, code: 'attendance_error', message: mapAttendanceError(distanceError.message ?? '', 'clock_in') },
-      422
-    )
-  }
-
-  if (Number(distance) > Number(location.radius_meters)) {
-    return jsonResponse(
-      {
-        ok: false,
-        code: 'attendance_error',
-        message: `Вы находитесь вне рабочей территории (~${Math.round(Number(distance))} м)`,
-      },
-      422
-    )
-  }
-
-  return null
 }
 
 async function handleGetTodayStatus(
@@ -221,68 +190,6 @@ async function handleClockIn(
   )
 }
 
-async function performClockOutOnShift(
-  serviceClient: SupabaseClient,
-  employeeId: number,
-  shift: ShiftLike,
-  coords: Coords
-) {
-  const geoError = await validateGeolocation(serviceClient, employeeId, coords)
-  if (geoError) return geoError
-
-  const shiftId = (shift as Record<string, unknown>).id
-  if (!shiftId) {
-    return jsonResponse(
-      { ok: false, code: 'attendance_error', message: 'Не удалось отметить уход. Проверьте интернет и повторите попытку.' },
-      422
-    )
-  }
-
-  const nowIso = new Date().toISOString()
-  const { data, error } = await serviceClient
-    .from('academy_employee_shifts')
-    .update({
-      actual_end_time: nowIso,
-      check_out_latitude: coords.latitude,
-      check_out_longitude: coords.longitude,
-      check_out_accuracy: coords.accuracy,
-      updated_at: nowIso,
-    })
-    .eq('id', shiftId)
-    .eq('employee_id', employeeId)
-    .is('actual_end_time', null)
-    .not('actual_start_time', 'is', null)
-    .select('*')
-    .maybeSingle()
-
-  if (error) {
-    return jsonResponse(
-      { ok: false, code: 'attendance_error', message: mapAttendanceError(error.message ?? '', 'clock_out') },
-      422
-    )
-  }
-
-  if (data) {
-    return jsonResponse({ ok: true, shift: data, idempotent: false })
-  }
-
-  const { data: existing } = await serviceClient
-    .from('academy_employee_shifts')
-    .select('*')
-    .eq('id', shiftId)
-    .eq('employee_id', employeeId)
-    .maybeSingle()
-
-  if (existing?.actual_end_time) {
-    return jsonResponse({ ok: true, shift: existing, idempotent: true })
-  }
-
-  return jsonResponse(
-    { ok: false, code: 'clock_in_required', message: 'Сначала отметьте приход' },
-    422
-  )
-}
-
 async function handleClockOut(
   serviceClient: SupabaseClient,
   employeeId: number,
@@ -301,7 +208,11 @@ async function handleClockOut(
 
   if (!isOpenShiftWorkWindowActive(activeShift, now)) {
     return jsonResponse(
-      { ok: false, code: 'clock_in_required', message: 'Сначала отметьте приход' },
+      {
+        ok: false,
+        code: 'active_shift_not_found',
+        message: 'Активная смена не найдена. Обновите страницу или обратитесь к администратору',
+      },
       422
     )
   }
@@ -310,7 +221,42 @@ async function handleClockOut(
     return jsonResponse({ ok: true, shift: activeShift, idempotent: true })
   }
 
-  return performClockOutOnShift(serviceClient, employeeId, activeShift, coords)
+  const { data, error } = await serviceClient.rpc('attendance_check_out', {
+    p_employee_id: employeeId,
+    p_latitude: coords.latitude,
+    p_longitude: coords.longitude,
+    p_accuracy: coords.accuracy,
+  })
+
+  if (!error) {
+    return jsonResponse({ ok: true, shift: data, idempotent: false })
+  }
+
+  console.error('Failed to finish shift', {
+    message: error.message,
+    code: error.code,
+    details: error.details,
+    hint: error.hint,
+    employeeId,
+  })
+
+  const message = extractRpcMessage(error)
+  if (isAlreadyCheckedOutMessage(message)) {
+    const refreshed = await resolveShiftContext(serviceClient, employeeId, now)
+    const shift = refreshed.activeShift
+    if (shift?.actual_end_time) {
+      return jsonResponse({ ok: true, shift, idempotent: true })
+    }
+  }
+
+  return jsonResponse(
+    {
+      ok: false,
+      code: mapAttendanceErrorCode(message),
+      message: mapAttendanceError(message, 'clock_out'),
+    },
+    422
+  )
 }
 
 function rejectForbiddenFields(body: Record<string, unknown>): Response | null {

@@ -7,9 +7,11 @@ import {
   clampRadiusMeters,
 } from '../utils/attendanceData'
 import { toDateKeyInAppTimezone, addDaysToDateKey } from '../utils/timezone'
-
-const CHECK_IN_ERROR = 'Не удалось отметить приход. Проверьте интернет и повторите попытку.'
-const CHECK_OUT_ERROR = 'Не удалось отметить уход. Проверьте интернет и повторите попытку.'
+import {
+  isNetworkError,
+  logAttendanceActionFailure,
+  mapAttendanceActionUserMessage,
+} from '../utils/attendanceActionErrors'
 
 function extractFunctionError(error) {
   const contextBody = error?.context?.json ?? error?.context?.body
@@ -17,37 +19,29 @@ function extractFunctionError(error) {
   return null
 }
 
-function sanitizeAttendanceError(message, context) {
-  const fallback = context === 'checkout' ? CHECK_OUT_ERROR : CHECK_IN_ERROR
-  if (!message) return fallback
-  const text = String(message).trim()
-  if (/permission denied/i.test(text) || /42501/.test(text)) return fallback
-  if (/^[А-Яа-яЁё]/.test(text)) return text.replace(/^.*?:\s*/, '')
-  return fallback
-}
-
-function mapTimeTrackerActionError(errorBody, context) {
-  const code = errorBody?.code ?? errorBody?.error?.code
-  if (code === 'clock_in_required') return 'Сначала отметьте приход'
-  if (code === 'unauthorized') return 'Сессия истекла. Войдите в аккаунт заново'
-  if (code === 'forbidden' || code === 'inactive_caller' || code === 'forbidden_field') {
-    return context === 'checkout' ? CHECK_OUT_ERROR : CHECK_IN_ERROR
-  }
-  if (errorBody?.message) return sanitizeAttendanceError(errorBody.message, context)
-  return context === 'checkout' ? CHECK_OUT_ERROR : CHECK_IN_ERROR
+function mapTimeTrackerActionError(error, context, errorBody = null) {
+  return mapAttendanceActionUserMessage(error, context, errorBody)
 }
 
 async function invokeTimeTrackerAction(body, context) {
+  const actionName = body.action === 'clock_out' ? 'finish shift' : 'start shift'
+
   const { data, error } = await supabase.functions.invoke('employee-time-tracker-action', {
     body,
   })
 
   if (error) {
-    throw new Error(mapTimeTrackerActionError(extractFunctionError(error), context))
+    const errorBody = extractFunctionError(error)
+    logAttendanceActionFailure(actionName, error, { errorBody, context })
+    if (isNetworkError(error)) {
+      throw new Error(mapTimeTrackerActionError(error, context, { code: 'network_error' }))
+    }
+    throw new Error(mapTimeTrackerActionError(error, context, errorBody))
   }
 
   if (!data?.ok) {
-    throw new Error(mapTimeTrackerActionError(data, context))
+    logAttendanceActionFailure(actionName, data, { context })
+    throw new Error(mapTimeTrackerActionError(data, context, data))
   }
 
   return data

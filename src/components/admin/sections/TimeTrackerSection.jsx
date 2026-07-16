@@ -19,6 +19,10 @@ import {
   buildTimeTrackerAuditRow,
 } from '../../../utils/timeTrackerAudit'
 import {
+  logAttendanceActionFailure,
+  mapAttendanceActionUserMessage,
+} from '../../../utils/attendanceActionErrors'
+import {
   getTodayShiftForEmployee,
   checkInEmployee,
   checkOutEmployee,
@@ -244,15 +248,8 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
     debugLogTimeTracker('audit', audit)
   }, [loading, employeeId, user?.role, shift, state, computedStatus, canCheckIn, canCheckOut, disabledReason, now, loadError])
 
-  function sanitizeActionError(message, context) {
-    const fallback =
-      context === 'checkout'
-        ? 'Не удалось отметить уход. Проверьте интернет и повторите попытку.'
-        : 'Не удалось отметить приход. Проверьте интернет и повторите попытку.'
-    if (!message) return fallback
-    const text = String(message).trim()
-    if (/permission denied/i.test(text) || /42501/.test(text)) return fallback
-    return text
+  function sanitizeActionError(error, context) {
+    return mapAttendanceActionUserMessage(error, context)
   }
 
   async function runWithGeolocation(action, context) {
@@ -268,7 +265,9 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
       setShift(updated)
       return true
     } catch (err) {
-      setActionError(sanitizeActionError(err.message, context))
+      const actionName = context === 'checkout' ? 'finish shift' : 'start shift'
+      logAttendanceActionFailure(actionName, err, { context })
+      setActionError(sanitizeActionError(err, context))
       return false
     } finally {
       setActing(false)

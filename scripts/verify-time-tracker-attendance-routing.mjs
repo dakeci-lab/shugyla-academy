@@ -105,8 +105,22 @@ function stageStaticWritePath() {
   assert('uses authorizeAuthenticatedEmployee', fn.includes('authorizeAuthenticatedEmployee'))
   assert('rejects employee_id in payload', fn.includes("'employee_id'"))
   assert('uses caller.id for RPC', fn.includes('caller.id'))
+  assert('clock_in uses attendance_check_in RPC', fn.includes("rpc('attendance_check_in'"))
+  assert('clock_out uses attendance_check_out RPC', fn.includes("rpc('attendance_check_out'"))
+  assert('clock_out no direct shift update', !fn.includes(".from('academy_employee_shifts').update"))
   assert('clock_out idempotent handler', fn.includes('isAlreadyCheckedOutMessage'))
-  assert('maps permission denied', fn.includes('permission denied'))
+  assert('maps permission denied to access message', fn.includes('ошибки доступа'))
+  assert('logs failed finish shift', fn.includes("Failed to finish shift"))
+
+  const migration = read('supabase/migrations/20260716220000_fix_time_tracker_checkout_after_rls.sql')
+  assert('checkout migration exists', migration.includes('attendance_check_out'))
+  assert('service_role shift write grant', migration.includes('grant select, insert, update, delete'))
+  assert('attendance RPC execute service_role only', migration.includes('grant execute on function public.attendance_check_out'))
+
+  const errors = read('src/utils/attendanceActionErrors.js')
+  assert('shared attendance error mapper', errors.includes('mapAttendanceActionUserMessage'))
+  assert('network-only internet message', errors.includes('Нет соединения с интернетом'))
+  assert('access denied user message', errors.includes('ошибки доступа'))
 
   const adapter = read('src/services/attendanceSupabaseAdapter.js')
   assert('adapter invokes employee-time-tracker-action', adapter.includes("invoke('employee-time-tracker-action'"))
@@ -115,7 +129,7 @@ function stageStaticWritePath() {
   assert('no direct shift upsert', !adapter.includes(".from('academy_employee_shifts').upsert"))
   assert('no direct shift update', !adapter.includes(".from('academy_employee_shifts').update"))
   assert('no direct shift insert', !adapter.includes(".from('academy_employee_shifts').insert"))
-  assert('sanitizes permission denied', adapter.includes('permission denied'))
+  assert('adapter logs finish shift failures', adapter.includes("finish shift"))
   console.log('')
 }
 
@@ -125,8 +139,9 @@ function stageStaticUi() {
   assert('success only after runWithGeolocation ok', /if \(ok\) setSuccess\('Уход отмечен'\)/.test(section))
   assert('runWithGeolocation returns boolean', section.includes('return true') && section.includes('return false'))
   assert('acting disables buttons', section.includes('disabled={!canCheckOut || acting'))
-  assert('sanitize permission denied in UI', section.includes('permission denied'))
-  assert('checkout user message', section.includes('Не удалось отметить уход'))
+  assert('uses shared attendance error mapper', section.includes('mapAttendanceActionUserMessage'))
+  assert('logs attendance failures', section.includes('logAttendanceActionFailure'))
+  assert('checkout user message not generic internet', !section.includes('Проверьте интернет и повторите попытку'))
   console.log('')
 }
 
@@ -388,15 +403,12 @@ async function setupFixture() {
   `)
 
   const today = new Date().toISOString().slice(0, 10)
-  state.createdShiftId = Number(
-    psqlScalar(`SELECT COALESCE(MAX(id), 0) + 1 FROM public.academy_employee_shifts;`)
-  )
-  psqlExec(`
+  state.createdShiftId = psqlScalar(`
     INSERT INTO public.academy_employee_shifts (
-      id, employee_id, shift_date, status, planned_start_time, planned_end_time, comment
+      employee_id, shift_date, status, planned_start_time, planned_end_time, comment
     ) VALUES (
-      ${state.createdShiftId}, ${state.employeeId}, '${today}', 'working', '09:00', '18:00', '${FIXTURE_TAG}'
-    );
+      ${state.employeeId}, '${today}', 'working', '09:00', '18:00', '${FIXTURE_TAG}'
+    ) RETURNING id::text;
   `)
 
   const anon = createClient(state.apiUrl, state.anonKey, {
@@ -412,7 +424,7 @@ async function stageCleanup() {
 
   try {
     if (state.createdShiftId) {
-      psqlExec(`DELETE FROM public.academy_employee_shifts WHERE id = ${state.createdShiftId};`)
+      psqlExec(`DELETE FROM public.academy_employee_shifts WHERE id = '${state.createdShiftId}'::uuid;`)
     }
     psqlExec(`DELETE FROM public.academy_employee_shifts WHERE comment = '${FIXTURE_TAG}';`)
     if (state.createdLocationId) {
