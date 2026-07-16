@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import PlatformHeaderActions from '../components/platform/PlatformHeaderActions'
 import PlatformMobileHeader from '../components/platform/PlatformMobileHeader'
@@ -16,11 +16,10 @@ import { useSession } from '../context/SessionContext'
 import { LOGIN_PATH } from '../router/authRoutes'
 import './PlatformLayout.css'
 
-function PlatformLayoutShell() {
-  const { user, logout } = useSession()
+function PlatformLayoutShell({ onLogout }) {
+  const { user } = useSession()
   const { reload } = useAcademyData()
   useProcurementRealtime(Boolean(user))
-  const navigate = useNavigate()
   const { pathname } = useLocation()
   const titleContext = usePlatformPageTitleContext()
   const section = useMemo(() => getPlatformSection(pathname), [pathname])
@@ -48,11 +47,6 @@ function PlatformLayoutShell() {
       document.body.style.overflow = ''
     }
   }, [drawerOpen])
-
-  async function handleLogout() {
-    await logout()
-    navigate(LOGIN_PATH)
-  }
 
   function closeDrawer() {
     setDrawerOpen(false)
@@ -88,11 +82,11 @@ function PlatformLayoutShell() {
               <h1 className="platform-layout__title">{section.title}</h1>
               <p className="platform-layout__desc">{section.description}</p>
             </div>
-            <PlatformHeaderActions user={user} onLogout={handleLogout} bellVariant="desktop" />
+            <PlatformHeaderActions user={user} onLogout={onLogout} bellVariant="desktop" />
           </header>
 
           <div className="platform-layout__content">
-            <PlatformErrorBoundary onLogout={logout}>
+            <PlatformErrorBoundary onLogout={onLogout}>
               <Outlet />
             </PlatformErrorBoundary>
           </div>
@@ -105,10 +99,16 @@ function PlatformLayoutShell() {
 /** Оболочка Shugyla Platform — sidebar + контент */
 function PlatformLayoutRoot() {
   const { logout } = useSession()
+  const navigate = useNavigate()
+
+  const handleLogout = useCallback(async () => {
+    await logout()
+    navigate(LOGIN_PATH, { replace: true })
+  }, [logout, navigate])
 
   return (
-    <PlatformErrorBoundary onLogout={logout}>
-      <PlatformLayoutShell />
+    <PlatformErrorBoundary onLogout={handleLogout}>
+      <PlatformLayoutShell onLogout={handleLogout} />
     </PlatformErrorBoundary>
   )
 }

@@ -1,10 +1,11 @@
 import { isPwaStandalone } from '../utils/pwaStandalone'
+import { getAppUrl, getRecoveryTargetUrl, isInsideAppBase } from '../router/basename'
 import { clearShellCaches } from './pwaShellCache'
 
 export const PWA_SHELL_RECOVERY_KEY = 'shugyla-pwa-shell-recovery'
 export const PLATFORM_CHUNK_RELOAD_KEY = 'platform-chunk-reload'
 
-export function isShellLoadError(error) {
+export function isPwaShellLoadError(error) {
   const message = String(error?.message || error || '').toLowerCase()
   const name = String(error?.name || '').toLowerCase()
 
@@ -20,25 +21,31 @@ export function isShellLoadError(error) {
   )
 }
 
+/** @deprecated Use isPwaShellLoadError */
+export const isShellLoadError = isPwaShellLoadError
+
 export function createPlatformErrorId() {
   return `pwa-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
 }
 
 export function logPlatformBootstrapFailure(error, extra = {}) {
   console.error('Platform bootstrap failed', {
+    errorId: extra.errorId,
     name: error?.name,
     message: error?.message,
     stack: error?.stack,
     cause: error?.cause,
-    route: typeof window !== 'undefined' ? window.location.pathname : '',
+    pathname: typeof window !== 'undefined' ? window.location.pathname : '',
+    href: typeof window !== 'undefined' ? window.location.href : '',
+    baseUrl: import.meta.env.BASE_URL,
     standalone: isPwaStandalone(),
-    serviceWorkerController: Boolean(navigator?.serviceWorker?.controller),
+    serviceWorkerController: Boolean(typeof navigator !== 'undefined' && navigator?.serviceWorker?.controller),
     ...extra,
   })
 }
 
 /**
- * Clears only app-shell caches, updates SW, reloads once.
+ * Clears only app-shell caches, updates SW, reloads once at the correct app URL.
  * Does not touch Supabase Auth storage.
  */
 export async function recoverPwaShell({ reason = 'manual' } = {}) {
@@ -68,7 +75,12 @@ export async function recoverPwaShell({ reason = 'manual' } = {}) {
     })
   }
 
-  window.location.reload()
+  const targetUrl = getRecoveryTargetUrl()
+  if (typeof window !== 'undefined' && window.location.href !== targetUrl) {
+    window.location.replace(targetUrl)
+  } else if (typeof window !== 'undefined') {
+    window.location.reload()
+  }
   return true
 }
 
@@ -76,6 +88,14 @@ export function setupShellLoadRecovery() {
   window.addEventListener('load', () => {
     sessionStorage.removeItem(PLATFORM_CHUNK_RELOAD_KEY)
     sessionStorage.removeItem(PWA_SHELL_RECOVERY_KEY)
+
+    if (!isInsideAppBase()) {
+      console.warn('App opened outside GitHub Pages base path, redirecting', {
+        pathname: window.location.pathname,
+        target: getAppUrl(),
+      })
+      window.location.replace(getAppUrl())
+    }
   })
 
   window.addEventListener('vite:preloadError', (event) => {
@@ -93,7 +113,7 @@ export function setupShellLoadRecovery() {
   })
 
   window.addEventListener('unhandledrejection', (event) => {
-    if (!isShellLoadError(event?.reason)) return
+    if (!isPwaShellLoadError(event?.reason)) return
     if (sessionStorage.getItem(PWA_SHELL_RECOVERY_KEY)) return
     event.preventDefault()
     void recoverPwaShell({ reason: 'unhandled-chunk-error' })

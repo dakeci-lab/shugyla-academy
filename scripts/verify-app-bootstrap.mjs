@@ -88,7 +88,8 @@ function main() {
   assert('chunk recovery uses sessionStorage guard', recovery.includes('PWA_SHELL_RECOVERY_KEY'))
   assert('recovery flag cleared on load', recovery.includes("sessionStorage.removeItem"))
   assert('vite preload error handler', recovery.includes('vite:preloadError'))
-  assert('error boundary reload uses recoverPwaShell', errorBoundary.includes('recoverPwaShell'))
+  assert('error boundary reload uses recoverPwaShell for shell errors', errorBoundary.includes('recoverPwaShell'))
+  assert('error boundary logout uses parent handler', errorBoundary.includes('this.props.onLogout'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

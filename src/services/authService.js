@@ -22,9 +22,7 @@ import {
   technicalEmailToLogin,
 } from '../utils/phoneUtils'
 
-import { getAppBasePath } from '../router/basename'
-
-const APP_BASE = getAppBasePath()
+import { getAppUrl } from '../router/basename'
 
 /** Safe academy_users columns for Auth-first cloud queries (never includes password). */
 export const ACADEMY_PROFILE_SAFE_FIELDS =
@@ -38,10 +36,7 @@ export function usesSupabaseAuth() {
 }
 
 export function getPasswordResetRedirectUrl() {
-  if (typeof window === 'undefined') {
-    return `${APP_BASE}/reset-password`
-  }
-  return `${window.location.origin}${APP_BASE}/reset-password`
+  return getAppUrl('reset-password')
 }
 
 function buildSessionUser(employee, phone = null) {

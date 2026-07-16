@@ -103,8 +103,9 @@ function main() {
   assert('recovery uses sessionStorage guard', recovery.includes('PWA_SHELL_RECOVERY_KEY'))
   assert('recovery clears shell caches only', recovery.includes('clearShellCaches'))
   assert('recovery does not clear auth storage', !recovery.includes('localStorage.clear'))
-  assert('isShellLoadError detects chunk errors', recovery.includes('chunkloaderror'))
-  assert('bootstrap failure logging', recovery.includes("console.error('Platform bootstrap failed'"))
+  assert('isPwaShellLoadError export', recovery.includes('export function isPwaShellLoadError'))
+  assert('recovery uses getRecoveryTargetUrl', recovery.includes('getRecoveryTargetUrl'))
+  assert('bootstrap failure logging includes href', recovery.includes('href:'))
   assert('shell cache prefix matches SW', shellCache.includes('shugyla-academy-shell-'))
 
   console.log('Stage 7: Error boundary recovery')

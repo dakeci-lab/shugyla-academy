@@ -54,7 +54,8 @@
     "verify:supplier-form-focus": "node scripts/verify-supplier-form-focus.mjs",
     "verify:home-dashboard": "node scripts/verify-home-dashboard.mjs",
     "verify:hidden-scrollbars": "node scripts/verify-hidden-scrollbars.mjs",
-    "verify:pwa-zoom-guard": "node scripts/verify-pwa-zoom-guard.mjs"
+    "verify:pwa-zoom-guard": "node scripts/verify-pwa-zoom-guard.mjs",
+    "verify:pwa-base-path": "node scripts/verify-pwa-base-path.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",

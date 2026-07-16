@@ -25,7 +25,7 @@ export default function AppInstallBanner() {
     return () => window.removeEventListener('beforeinstallprompt', onBeforeInstall)
   }, [])
 
-  if (dismissed || isStandalone()) return null
+  if (dismissed || isPwaStandalone()) return null
 
   async function handleOpen() {
     if (deferredPrompt) {

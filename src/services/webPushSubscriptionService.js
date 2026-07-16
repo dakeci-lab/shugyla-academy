@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
+import { getAppBasePath, getAppUrl } from '../router/basename'
 
 const DEVICE_ID_STORAGE_KEY = 'shugyla.web_push.device_id'
 const REGISTERED_VAPID_FINGERPRINT_KEY = 'shugyla.web_push.registered_vapid_fingerprint'
@@ -238,8 +239,8 @@ async function resolveBrowserSubscription(registration, vapidPublicKey) {
 
 export async function getServiceWorkerRegistration() {
   if (!isWebPushSupported()) return null
-  await navigator.serviceWorker.register(`${import.meta.env.BASE_URL}sw.js`, {
-    scope: import.meta.env.BASE_URL,
+  await navigator.serviceWorker.register(getAppUrl('sw.js'), {
+    scope: getAppBasePath(),
   })
   return navigator.serviceWorker.ready
 }

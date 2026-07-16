@@ -1,3 +1,5 @@
+import { getAppBasePath, getAppUrl } from '../router/basename'
+
 /** Регистрация service worker — production и local Web Push dev */
 export function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return
@@ -6,10 +8,11 @@ export function registerServiceWorker() {
   if (!import.meta.env.PROD && !hasVapidKey) return
 
   window.addEventListener('load', () => {
-    const swUrl = `${import.meta.env.BASE_URL}sw.js`
+    const swUrl = getAppUrl('sw.js')
+    const scope = getAppBasePath()
 
     navigator.serviceWorker
-      .register(swUrl, { scope: import.meta.env.BASE_URL })
+      .register(swUrl, { scope })
       .catch((err) => {
         console.warn('Service worker registration failed:', err)
       })
