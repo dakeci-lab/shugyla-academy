@@ -1,14 +1,18 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Can from '../auth/Can'
 import { PERMISSION_CODES } from '../../config/permissionCatalog'
 import { useToast } from '../../context/ToastContext'
 import { isCloudMode } from '../../lib/dataMode'
-import AdminModal from './AdminModal'
 import {
   fetchTestBroadcastSummary,
   formatTestBroadcastResult,
   sendTestBroadcast,
 } from '../../services/notificationSettingsAdminService'
+import {
+  getDevicePushDiagnostics,
+  reconnectDevicePushNotifications,
+} from '../../services/webPushSubscriptionService'
+import AdminModal from './AdminModal'
 import './NotificationTestBroadcastSection.css'
 
 function createRequestId() {
@@ -20,6 +24,43 @@ function createRequestId() {
     const value = char === 'x' ? random : (random & 0x3) | 0x8
     return value.toString(16)
   })
+}
+
+function labelForPermission(permission) {
+  if (permission === 'granted') return 'Разрешено'
+  if (permission === 'denied') return 'Запрещено'
+  if (permission === 'default') return 'Не запрошено'
+  return 'Не поддерживается'
+}
+
+function labelForServiceWorker(state) {
+  if (state === 'active') return 'Активен'
+  if (state === 'installing') return 'Обновляется'
+  if (state === 'waiting') return 'Ожидает активации'
+  return 'Не готов'
+}
+
+function labelForStandalone(standalone) {
+  return standalone ? 'Установленное PWA' : 'Браузерная вкладка'
+}
+
+function issueMessage(issue) {
+  switch (issue) {
+    case 'missing_browser_subscription':
+      return 'Разрешение выдано, но push-подписка отсутствует'
+    case 'vapid_mismatch':
+      return 'Подписка устарела после обновления ключей. Переподключите уведомления.'
+    case 'missing_server_registration':
+      return 'Подписка браузера не синхронизирована с сервером'
+    case 'ios_not_standalone':
+      return 'На iPhone системные push работают только в установленном PWA'
+    case 'scope_mismatch':
+      return 'Service Worker зарегистрирован вне /shugyla-academy/'
+    case 'permission_denied':
+      return 'Разрешите уведомления в настройках устройства'
+    default:
+      return null
+  }
 }
 
 function BroadcastConfirmModal({
@@ -83,7 +124,8 @@ function BroadcastConfirmModal({
         )}
 
         <p className="notification-test-broadcast-modal__warning">
-          Уведомление будет отправлено всем подключённым устройствам.
+          Уведомление будет отправлено всем подключённым устройствам. Системное уведомление
+          появится только на устройствах с активной push-подпиской.
         </p>
 
         {!loadingSummary && !hasDevices && (
@@ -106,6 +148,26 @@ export default function NotificationTestBroadcastSection() {
   const [summary, setSummary] = useState(null)
   const [loadingSummary, setLoadingSummary] = useState(false)
   const [sending, setSending] = useState(false)
+  const [diagnostics, setDiagnostics] = useState(null)
+  const [loadingDiagnostics, setLoadingDiagnostics] = useState(true)
+  const [reconnecting, setReconnecting] = useState(false)
+
+  const refreshDiagnostics = useCallback(async () => {
+    setLoadingDiagnostics(true)
+    try {
+      const next = await getDevicePushDiagnostics()
+      setDiagnostics(next)
+    } catch {
+      setDiagnostics(null)
+    } finally {
+      setLoadingDiagnostics(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!cloudMode) return
+    void refreshDiagnostics()
+  }, [cloudMode, refreshDiagnostics])
 
   const closeModal = useCallback(() => {
     if (sending) return
@@ -151,14 +213,31 @@ export default function NotificationTestBroadcastSection() {
 
       setModalOpen(false)
       setSummary(null)
+      await refreshDiagnostics()
     } catch (error) {
       showError(error.message || 'Не удалось отправить тестовое уведомление')
     } finally {
       setSending(false)
     }
-  }, [loadingSummary, sending, showError, showSuccess, showWarning, summary])
+  }, [loadingSummary, refreshDiagnostics, sending, showError, showSuccess, showWarning, summary])
+
+  const handleReconnect = useCallback(async () => {
+    if (reconnecting || sending) return
+    setReconnecting(true)
+    try {
+      await reconnectDevicePushNotifications()
+      await refreshDiagnostics()
+      showSuccess('Push-подписка переподключена')
+    } catch (error) {
+      showError(error.message || 'Не удалось переподключить уведомления')
+    } finally {
+      setReconnecting(false)
+    }
+  }, [reconnecting, refreshDiagnostics, sending, showError, showSuccess])
 
   if (!cloudMode) return null
+
+  const issueText = issueMessage(diagnostics?.issue)
 
   return (
     <Can permission={PERMISSION_CODES.NOTIFICATIONS_MANAGE}>
@@ -169,12 +248,59 @@ export default function NotificationTestBroadcastSection() {
           push-уведомления.
         </p>
 
+        <div className="notification-test-broadcast-section__device-status">
+          <h3 className="notification-test-broadcast-section__device-title">Это устройство</h3>
+          {loadingDiagnostics ? (
+            <p className="notification-test-broadcast-section__device-line">Загрузка статуса…</p>
+          ) : (
+            <dl className="notification-test-broadcast-section__device-list">
+              <div>
+                <dt>Системное разрешение</dt>
+                <dd>{labelForPermission(diagnostics?.permission)}</dd>
+              </div>
+              <div>
+                <dt>Service Worker</dt>
+                <dd>{labelForServiceWorker(diagnostics?.serviceWorker)}</dd>
+              </div>
+              <div>
+                <dt>Push-подписка</dt>
+                <dd>{diagnostics?.pushSubscription ? 'Подключена' : 'Отсутствует'}</dd>
+              </div>
+              <div>
+                <dt>Серверная регистрация</dt>
+                <dd>{diagnostics?.serverRegistration ? 'Активна' : 'Не активна'}</dd>
+              </div>
+              <div>
+                <dt>Режим приложения</dt>
+                <dd>{labelForStandalone(diagnostics?.standalone)}</dd>
+              </div>
+            </dl>
+          )}
+
+          {issueText && (
+            <p className="notification-test-broadcast-section__device-issue" role="alert">
+              {issueText}
+            </p>
+          )}
+
+          {diagnostics?.needsReconnect && (
+            <button
+              type="button"
+              className="btn btn--secondary notification-test-broadcast-section__reconnect"
+              onClick={handleReconnect}
+              disabled={reconnecting || sending}
+            >
+              {reconnecting ? 'Переподключение…' : 'Переподключить уведомления'}
+            </button>
+          )}
+        </div>
+
         <button
           ref={triggerRef}
           type="button"
           className="btn btn--secondary notification-test-broadcast-section__button"
           onClick={openModal}
-          disabled={sending}
+          disabled={sending || reconnecting}
         >
           {sending ? 'Отправка…' : 'Отправить тестовое уведомление'}
         </button>

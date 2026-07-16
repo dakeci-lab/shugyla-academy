@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { deliverNotificationToSubscription, type WebPushSenderFn } from './notificationDelivery.ts'
 import { sendWebPush } from './webPushSender.ts'
+import { buildTimeTrackerPushPayload } from './webPushPayload.ts'
 
 export const APP_TIMEZONE = 'Asia/Almaty'
 
@@ -291,28 +292,6 @@ export function evaluateTimeTrackerRule(params: {
 
 function renderTemplate(template: string, context: { minutes?: number }): string {
   return template.replace(/\{\{minutes\}\}/g, String(context.minutes ?? 0))
-}
-
-function buildTimeTrackerPushPayload(notificationId: string, requestId: string, notification: {
-  title: string
-  body: string
-  action_url?: string | null
-}) {
-  const shortId = requestId.replace(/-/g, '').slice(0, 8)
-  return {
-    title: notification.title,
-    body: notification.body,
-    icon: '/shugyla-academy/icons/icon-192.png',
-    badge: '/shugyla-academy/icons/icon-192.png',
-    tag: `shugyla-time-tracker-${shortId}`,
-    data: {
-      url: notification.action_url ?? '/shugyla-academy/platform',
-      notification_id: notificationId,
-      type: 'time_tracker',
-    },
-    requireInteraction: false,
-    timestamp: Date.now(),
-  }
 }
 
 function isDuplicateKeyError(error: { code?: string; message?: string } | null): boolean {

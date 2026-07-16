@@ -73,6 +73,15 @@ export async function deliverNotificationToSubscription(
     topic: input.pushOptions?.topic ?? (typeof pushPayload.tag === 'string' ? pushPayload.tag : undefined),
   })
 
+  console.info('Web Push delivery result', {
+    requestId: input.requestId,
+    subscriptionId: input.subscription.id,
+    status: pushResult.statusCode,
+    ok: pushResult.ok,
+    classification: pushResult.classification,
+    provider: pushResult.provider ?? 'unknown',
+  })
+
   if (pushResult.classification === 'accepted') {
     await input.serviceClient
       .from('notification_deliveries')
@@ -149,13 +158,18 @@ export async function deliverNotificationToSubscription(
   }
 
   if (pushResult.classification === 'configuration_error') {
+    const configErrorCode =
+      pushResult.statusCode === 403 ? 'vapid_rejected' : 'web_push_not_configured'
     await input.serviceClient
       .from('notification_deliveries')
       .update({
         status: 'failed',
         provider_status_code: pushResult.statusCode,
-        error_code: 'web_push_not_configured',
-        error_message: 'Web push configuration error',
+        error_code: configErrorCode,
+        error_message:
+          configErrorCode === 'vapid_rejected'
+            ? 'Push provider rejected VAPID credentials'
+            : 'Web push configuration error',
         failed_at: now,
       })
       .eq('id', delivery.id)

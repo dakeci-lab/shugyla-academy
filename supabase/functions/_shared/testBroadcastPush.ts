@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { deliverNotificationToSubscription, type PushSubscriptionRow } from './notificationDelivery.ts'
 import { isWebPushConfigured } from './webPushSender.ts'
+import { buildTestBroadcastPayload } from './webPushPayload.ts'
 
 export const TEST_BROADCAST_COOLDOWN_SECONDS = 60
 export const TEST_BROADCAST_CONCURRENCY = 5
@@ -47,26 +48,7 @@ export function getTestBroadcastAppUrl(): string {
   return '/shugyla-academy/platform/settings/notifications'
 }
 
-export function buildTestBroadcastPayload(notificationId: string, broadcastId: string) {
-  const shortId = broadcastId.replace(/-/g, '').slice(0, 8)
-  const appUrl = getTestBroadcastAppUrl()
-
-  return {
-    title: TEST_BROADCAST_TITLE,
-    body: TEST_BROADCAST_BODY,
-    icon: '/shugyla-academy/icons/icon-192.png',
-    badge: '/shugyla-academy/icons/icon-192.png',
-    tag: `test-broadcast-${shortId}`,
-    data: {
-      url: appUrl,
-      notification_id: notificationId,
-      type: 'test_broadcast',
-      broadcast_id: broadcastId,
-    },
-    requireInteraction: false,
-    timestamp: Date.now(),
-  }
-}
+export { buildTestBroadcastPayload }
 
 function isValidSubscriptionRow(row: Record<string, unknown>): row is BroadcastSubscriptionRow {
   return (

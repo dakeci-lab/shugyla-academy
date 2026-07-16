@@ -261,7 +261,7 @@ export function SessionProvider({ children }) {
     if (!isCloudMode() || !supabaseAuthenticated) return
 
     import('../services/webPushSubscriptionService')
-      .then(({ syncExistingPushSubscription }) => syncExistingPushSubscription())
+      .then(({ ensurePushNotificationsReady }) => ensurePushNotificationsReady())
       .catch(() => {})
   }, [supabaseAuthenticated, user?.id])
 

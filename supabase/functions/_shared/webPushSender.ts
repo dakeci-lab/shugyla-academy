@@ -23,6 +23,20 @@ export type WebPushSendResult = {
   ok: boolean
   statusCode: number | null
   classification: PushClassification
+  provider?: string
+}
+
+export function resolvePushProvider(endpoint: string): string {
+  try {
+    const host = new URL(endpoint).hostname
+    if (host.includes('apple')) return 'apple'
+    if (host.includes('mozilla')) return 'mozilla'
+    if (host.includes('google') || host.includes('fcm')) return 'fcm'
+    if (host.includes('windows')) return 'windows'
+    return 'unknown'
+  } catch {
+    return 'unknown'
+  }
 }
 
 type VapidConfig = {
@@ -144,12 +158,14 @@ function classifyPushResponseStatus(
 }
 
 export async function sendWebPush(input: WebPushSendInput): Promise<WebPushSendResult> {
+  const provider = resolvePushProvider(input.endpoint)
   const vapid = readVapidConfig()
   if (!vapid) {
     return {
       ok: false,
       statusCode: null,
       classification: 'configuration_error',
+      provider,
     }
   }
 
@@ -177,6 +193,7 @@ export async function sendWebPush(input: WebPushSendInput): Promise<WebPushSendR
         ok: true,
         statusCode: 201,
         classification: 'accepted',
+        provider,
       }
     } finally {
       clearTimeout(timeout)
@@ -192,6 +209,7 @@ export async function sendWebPush(input: WebPushSendInput): Promise<WebPushSendR
         ok: false,
         statusCode: responseStatus,
         classification,
+        provider,
       }
     }
 
@@ -208,6 +226,7 @@ export async function sendWebPush(input: WebPushSendInput): Promise<WebPushSendR
       ok: false,
       statusCode: Number.isFinite(statusCode) ? statusCode : null,
       classification,
+      provider,
     }
   }
 }

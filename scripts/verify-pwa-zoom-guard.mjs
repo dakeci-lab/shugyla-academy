@@ -119,7 +119,7 @@ function main() {
 
   assert('manifest display standalone', manifest.includes('"display": "standalone"'))
   assert('manifest not browser mode', !manifest.includes('"display": "browser"'))
-  assert('service worker cache v4', sw.includes('shugyla-academy-shell-v4'))
+  assert('service worker cache v5', sw.includes('shugyla-academy-shell-v5'))
   assert('SW deletes old shell caches', sw.includes('SHELL_CACHE_PREFIX'))
   assert('SW network-first navigation', sw.includes('handleNavigate'))
   assert('SW does not cache Supabase', sw.includes('supabase.co'))

@@ -17,6 +17,7 @@ import {
   type PermitConsumeStatus,
 } from '../_shared/testSendPermits.ts'
 import { isWebPushConfigured } from '../_shared/webPushSender.ts'
+import { buildWebPushPayload } from '../_shared/webPushPayload.ts'
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -108,37 +109,26 @@ function legacyTestGatesEnabled(): boolean {
 
 function buildPayload(notificationId: string, requestId: string) {
   if (isProductionTestEnabled()) {
-    return {
+    return buildWebPushPayload({
       title: 'Shugyla Platform',
       body: 'Тестовое уведомление успешно доставлено',
-      icon: '/shugyla-academy/icons/icon-192.png',
-      badge: '/shugyla-academy/icons/icon-192.png',
+      url: '/shugyla-academy/',
+      type: 'web_push_test',
       tag: 'production-web-push-e2e',
-      data: {
-        url: 'https://dakeci-lab.github.io/shugyla-academy/',
-        notification_id: notificationId,
-        type: 'web_push_test',
-      },
-      requireInteraction: false,
-      timestamp: Date.now(),
-    }
+      notificationId,
+      requestId,
+    })
   }
 
-  const shortId = requestId.replace(/-/g, '').slice(0, 8)
-  return {
+  return buildWebPushPayload({
     title: 'Shugyla Platform',
     body: 'Тестовое push-уведомление отправлено сервером',
-    icon: '/shugyla-academy/icons/icon-192.png',
-    badge: '/shugyla-academy/icons/icon-192.png',
-    tag: `shugyla-server-test-${shortId}`,
-    data: {
-      url: '/shugyla-academy/platform/profile',
-      notification_id: notificationId,
-      type: 'web_push_test',
-    },
-    requireInteraction: false,
-    timestamp: Date.now(),
-  }
+    url: '/shugyla-academy/platform/profile',
+    type: 'web_push_test',
+    tag: `shugyla-server-test-${requestId.replace(/-/g, '').slice(0, 8)}`,
+    notificationId,
+    requestId,
+  })
 }
 
 function notificationContent() {

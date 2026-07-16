@@ -1,7 +1,7 @@
 /* Shugyla Academy — service worker (PWA shell + push) */
 
 const BASE = '/shugyla-academy/'
-const CACHE_NAME = 'shugyla-academy-shell-v4'
+const CACHE_NAME = 'shugyla-academy-shell-v5'
 const SHELL_CACHE_PREFIX = 'shugyla-academy-shell-'
 const CANONICAL_PLATFORM_PATH = `${BASE.replace(/\/$/, '')}/platform`
 
@@ -188,58 +188,151 @@ function resolveSafeNotificationUrl(rawUrl) {
   return normalizeNotificationDestination(rawUrl)
 }
 
-function parsePushPayload(event) {
+function resolveAssetUrl(relativePath) {
+  const normalized = String(relativePath || '').trim()
+  if (!normalized) return `${self.location.origin}${BASE}icons/icon-192.png`
+  if (/^https?:\/\//i.test(normalized)) return normalized
+  const path = normalized.startsWith('/') ? normalized : `${BASE}${normalized.replace(/^\/+/, '')}`
+  return new URL(path, self.location.origin).href
+}
+
+function normalizePushPayload(event) {
   const fallback = {
     title: 'Shugyla Platform',
     body: 'У вас новое уведомление',
-    icon: `${BASE}icons/icon-192.png`,
-    badge: `${BASE}icons/icon-192.png`,
+    icon: resolveAssetUrl(`${BASE}icons/icon-192.png`),
+    badge: resolveAssetUrl(`${BASE}icons/icon-192.png`),
     tag: 'shugyla-notification',
-    data: { url: `${CANONICAL_PLATFORM_PATH}` },
+    data: {
+      url: normalizeNotificationDestination(`${CANONICAL_PLATFORM_PATH}`),
+      notification_id: null,
+      type: null,
+    },
     actions: [],
     requireInteraction: false,
+    renotify: false,
   }
 
-  if (!event.data) return fallback
+  if (!event?.data) return fallback
+
+  let raw = null
+  try {
+    raw = event.data.json()
+  } catch {
+    try {
+      const text = event.data.text()
+      if (text) {
+        raw = JSON.parse(text)
+      }
+    } catch {
+      const text = typeof event.data.text === 'function' ? event.data.text() : ''
+      if (typeof text === 'string' && text.trim()) {
+        return {
+          ...fallback,
+          body: text.trim(),
+        }
+      }
+      return fallback
+    }
+  }
+
+  const payload = raw?.notification && typeof raw.notification === 'object' ? raw.notification : raw
+  const nestedData =
+    payload?.data && typeof payload.data === 'object'
+      ? payload.data
+      : raw?.data && typeof raw.data === 'object'
+        ? raw.data
+        : {}
+
+  const title =
+    typeof payload?.title === 'string' && payload.title.trim()
+      ? payload.title.trim()
+      : typeof raw?.title === 'string' && raw.title.trim()
+        ? raw.title.trim()
+        : fallback.title
+
+  const body =
+    typeof payload?.body === 'string' && payload.body.trim()
+      ? payload.body.trim()
+      : typeof raw?.body === 'string' && raw.body.trim()
+        ? raw.body.trim()
+        : fallback.body
+
+  const tag =
+    typeof payload?.tag === 'string' && payload.tag.trim()
+      ? payload.tag.trim()
+      : typeof raw?.tag === 'string' && raw.tag.trim()
+        ? raw.tag.trim()
+        : fallback.tag
+
+  const rawUrl = nestedData.url || payload?.url || raw?.url || fallback.data.url
+
+  return {
+    title,
+    body,
+    icon: resolveAssetUrl(payload?.icon || raw?.icon || fallback.icon),
+    badge: resolveAssetUrl(payload?.badge || raw?.badge || fallback.badge),
+    tag,
+    data: {
+      url: normalizeNotificationDestination(rawUrl),
+      notification_id: nestedData.notification_id ?? payload?.notification_id ?? null,
+      type: nestedData.type ?? payload?.type ?? null,
+      broadcast_id: nestedData.broadcast_id ?? null,
+      request_id: nestedData.request_id ?? null,
+    },
+    actions: Array.isArray(payload?.actions) ? payload.actions.slice(0, 2) : [],
+    requireInteraction: payload?.requireInteraction === true,
+    renotify: payload?.renotify === true || Boolean(tag),
+  }
+}
+
+async function notifyOpenClients(payload) {
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+  for (const client of clients) {
+    if (!client.url.includes(BASE.replace(/\/$/, ''))) continue
+    client.postMessage({
+      type: 'PUSH_NOTIFICATION_SHOWN',
+      notification_id: payload.data?.notification_id ?? null,
+      tag: payload.tag ?? null,
+    })
+  }
+}
+
+async function handlePushEvent(event) {
+  const payload = normalizePushPayload(event)
 
   try {
-    const payload = event.data.json()
-    const data = payload?.data && typeof payload.data === 'object' ? payload.data : {}
-    return {
-      title: typeof payload.title === 'string' && payload.title.trim() ? payload.title.trim() : fallback.title,
-      body: typeof payload.body === 'string' && payload.body.trim() ? payload.body.trim() : fallback.body,
-      icon: typeof payload.icon === 'string' ? payload.icon : fallback.icon,
-      badge: typeof payload.badge === 'string' ? payload.badge : fallback.badge,
-      tag: typeof payload.tag === 'string' && payload.tag.trim() ? payload.tag.trim() : fallback.tag,
-      data: {
-        url: normalizeNotificationDestination(data.url || payload.url),
-        notification_id: data.notification_id ?? null,
-        type: data.type ?? null,
-      },
-      actions: Array.isArray(payload.actions) ? payload.actions.slice(0, 2) : [],
-      requireInteraction: payload.requireInteraction === true,
-    }
-  } catch {
-    return fallback
+    await self.registration.showNotification(payload.title, {
+      body: payload.body,
+      icon: payload.icon,
+      badge: payload.badge,
+      tag: payload.tag,
+      data: payload.data,
+      actions: payload.actions,
+      renotify: payload.renotify,
+      requireInteraction: payload.requireInteraction,
+    })
+    await notifyOpenClients(payload)
+  } catch (error) {
+    console.error('push_show_notification_failed', {
+      message: error?.message ?? 'unknown',
+      tag: payload.tag ?? null,
+      type: payload.data?.type ?? null,
+    })
+
+    await self.registration.showNotification('Shugyla Platform', {
+      body: payload.body || 'У вас новое уведомление',
+      icon: resolveAssetUrl(`${BASE}icons/icon-192.png`),
+      badge: resolveAssetUrl(`${BASE}icons/icon-192.png`),
+      tag: payload.tag || 'shugyla-notification-fallback',
+      data: payload.data,
+      renotify: false,
+    })
   }
 }
 
 self.addEventListener('push', (event) => {
-  event.waitUntil(
-    (async () => {
-      const payload = parsePushPayload(event)
-      await self.registration.showNotification(payload.title, {
-        body: payload.body,
-        icon: payload.icon,
-        badge: payload.badge,
-        tag: payload.tag,
-        data: payload.data,
-        actions: payload.actions,
-        renotify: Boolean(payload.tag),
-        requireInteraction: payload.requireInteraction,
-      })
-    })()
-  )
+  event.waitUntil(handlePushEvent(event))
 })
 
 async function focusOrOpenClient(targetUrl) {

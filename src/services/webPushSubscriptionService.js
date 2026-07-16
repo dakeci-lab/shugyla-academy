@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
 import { getAppBasePath, getAppUrl } from '../router/basename'
+import { isPwaStandalone } from '../utils/pwaStandalone'
 
 const DEVICE_ID_STORAGE_KEY = 'shugyla.web_push.device_id'
 const REGISTERED_VAPID_FINGERPRINT_KEY = 'shugyla.web_push.registered_vapid_fingerprint'
@@ -305,6 +306,165 @@ export async function syncExistingPushSubscription() {
   })
 
   return data.subscription
+}
+
+/** Ensure browser push subscription exists and is synced with backend when permission is granted. */
+export async function ensurePushNotificationsReady() {
+  if (!isWebPushSupported()) return null
+  if (getNotificationPermission() !== 'granted') return null
+
+  const vapidPublicKey = getVapidPublicKey()
+  if (!vapidPublicKey) return null
+
+  const registration = await getServiceWorkerRegistration()
+  if (!registration) return null
+
+  const deviceId = getOrCreateDeviceId()
+  if (!deviceId) return null
+
+  if (await registeredVapidFingerprintMismatch(vapidPublicKey)) {
+    await clearStaleBrowserSubscriptionForVapidRotation(registration)
+  }
+
+  let subscription = await registration.pushManager.getSubscription()
+
+  if (subscription && !subscriptionMatchesVapid(subscription, vapidPublicKey)) {
+    await subscription.unsubscribe().catch(() => {})
+    subscription = null
+  }
+
+  if (!subscription) {
+    subscription = await createBrowserSubscription(registration, vapidPublicKey)
+  }
+
+  if (!subscription) return null
+
+  try {
+    await registerBrowserSubscriptionWithBackend(deviceId, subscription, vapidPublicKey)
+  } catch (err) {
+    if (err instanceof WebPushError && err.code === 'backend_registration_failed') {
+      await subscription.unsubscribe().catch(() => {})
+      subscription = await createBrowserSubscription(registration, vapidPublicKey)
+      await registerBrowserSubscriptionWithBackend(deviceId, subscription, vapidPublicKey)
+    } else {
+      throw err
+    }
+  }
+
+  return subscription
+}
+
+function formatDiagnosticScope(scope) {
+  if (!scope || typeof scope !== 'string') return null
+  try {
+    const pathname = new URL(scope).pathname
+    return pathname.endsWith('/') ? pathname : `${pathname}/`
+  } catch {
+    return null
+  }
+}
+
+/** Read-only device diagnostics for admin push troubleshooting (no secrets). */
+export async function getDevicePushDiagnostics() {
+  const permission = getNotificationPermission()
+  const supported = isWebPushSupported()
+  const standalone = isPwaStandalone()
+  const appBasePath = getAppBasePath()
+
+  const base = {
+    permission,
+    supported,
+    standalone,
+    serviceWorker: 'unsupported',
+    pushSubscription: false,
+    serverRegistration: false,
+    scopeMatchesApp: false,
+    vapidConfigured: Boolean(getVapidPublicKey()),
+    needsReconnect: false,
+    issue: null,
+  }
+
+  if (!supported) {
+    return { ...base, issue: 'unsupported' }
+  }
+
+  if (permission === 'denied') {
+    return { ...base, issue: 'permission_denied' }
+  }
+
+  if (!standalone && /iphone|ipad|ipod/i.test(navigator.userAgent || '')) {
+    return {
+      ...base,
+      issue: 'ios_not_standalone',
+    }
+  }
+
+  if (permission !== 'granted') {
+    return { ...base, issue: 'permission_not_granted' }
+  }
+
+  try {
+    const registration = await getServiceWorkerRegistration()
+    if (!registration) {
+      return { ...base, issue: 'service_worker_unavailable' }
+    }
+
+    const scopePath = formatDiagnosticScope(registration.scope)
+    const scopeMatchesApp = scopePath === appBasePath
+
+    let serviceWorker = 'waiting'
+    if (registration.active) serviceWorker = 'active'
+    else if (registration.installing) serviceWorker = 'installing'
+
+    const browserSub = await registration.pushManager.getSubscription()
+    const pushSubscription = Boolean(browserSub)
+
+    let serverRegistration = false
+    const deviceId = getOrCreateDeviceId()
+    if (deviceId) {
+      try {
+        const status = await invokeManageSubscription({ action: 'status', device_id: deviceId })
+        serverRegistration = Boolean(status.subscription?.active)
+      } catch {
+        serverRegistration = false
+      }
+    }
+
+    const vapidPublicKey = getVapidPublicKey()
+    const vapidMatches =
+      pushSubscription && vapidPublicKey
+        ? subscriptionMatchesVapid(browserSub, vapidPublicKey)
+        : false
+
+    const needsReconnect =
+      permission === 'granted' &&
+      (!pushSubscription || !serverRegistration || !vapidMatches || !scopeMatchesApp)
+
+    let issue = null
+    if (!pushSubscription) issue = 'missing_browser_subscription'
+    else if (!vapidMatches) issue = 'vapid_mismatch'
+    else if (!serverRegistration) issue = 'missing_server_registration'
+    else if (!scopeMatchesApp) issue = 'scope_mismatch'
+
+    return {
+      permission,
+      supported,
+      standalone,
+      serviceWorker,
+      pushSubscription,
+      serverRegistration,
+      scopeMatchesApp,
+      vapidConfigured: Boolean(vapidPublicKey),
+      needsReconnect,
+      issue,
+    }
+  } catch {
+    return { ...base, issue: 'diagnostic_error' }
+  }
+}
+
+export async function reconnectDevicePushNotifications() {
+  return enablePushNotifications()
 }
 
 export async function enablePushNotifications() {

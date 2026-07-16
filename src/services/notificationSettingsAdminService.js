@@ -182,7 +182,7 @@ export function formatTestBroadcastResult(result) {
 
   return {
     title: 'Тестовое уведомление отправлено',
-    message: `Сотрудников с уведомлениями: ${employeesWithSubscriptions}. Подключённых устройств: ${connectedDevices}. Успешно отправлено: ${sentCount}.`,
+    message: `Сервер принял отправку: ${sentCount} из ${connectedDevices} устройств. Системное уведомление появится на устройствах с активной push-подпиской.`,
     variant: 'success',
   }
 }
