@@ -1,7 +1,7 @@
 /* Shugyla Academy — базовый service worker (MVP PWA) */
 
 const BASE = '/shugyla-academy/'
-const CACHE_NAME = 'shugyla-academy-shell-v2'
+const CACHE_NAME = 'shugyla-academy-shell-v3'
 const CANONICAL_PLATFORM_PATH = `${BASE.replace(/\/$/, '')}/platform`
 
 const SHELL_URLS = [

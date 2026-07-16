@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { isPwaStandalone } from '../utils/pwaStandalone'
 import './PWAInstallPrompt.css'
 
 function isIosDevice() {
@@ -9,14 +10,6 @@ function isIosDevice() {
   )
 }
 
-function isStandalone() {
-  if (typeof window === 'undefined') return false
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    window.navigator.standalone === true
-  )
-}
-
 /** Ненавязчивый баннер установки PWA */
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState(null)
@@ -24,7 +17,7 @@ export default function PWAInstallPrompt() {
   const [showIosHint, setShowIosHint] = useState(false)
 
   useEffect(() => {
-    if (isStandalone()) return
+    if (isPwaStandalone()) return
 
     const dismissedKey = 'shugyla_pwa_install_dismissed'
     if (localStorage.getItem(dismissedKey) === '1') {
@@ -56,7 +49,7 @@ export default function PWAInstallPrompt() {
     }
   }, [])
 
-  if (dismissed || isStandalone()) return null
+  if (dismissed || isPwaStandalone()) return null
   if (!deferredPrompt && !showIosHint) return null
 
   async function handleInstall() {

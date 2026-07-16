@@ -68,6 +68,22 @@ body {
   min-height: 100vh;
 }
 
+/* ===== PWA standalone: fixed scale, preserve scroll ===== */
+html.pwa-standalone,
+html.pwa-standalone body,
+html.pwa-standalone #root {
+  touch-action: pan-x pan-y;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+html.pwa-standalone input,
+html.pwa-standalone select,
+html.pwa-standalone textarea {
+  font-size: 16px;
+}
+
 /* ===== Утилиты ===== */
 .container {
   max-width: 1200px;

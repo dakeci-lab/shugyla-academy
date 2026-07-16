@@ -1,13 +1,6 @@
 import { useEffect, useState } from 'react'
+import { isPwaStandalone } from '../../utils/pwaStandalone'
 import './AppInstallBanner.css'
-
-function isStandalone() {
-  if (typeof window === 'undefined') return false
-  return (
-    window.matchMedia('(display-mode: standalone)').matches ||
-    window.navigator.standalone === true
-  )
-}
 
 /** Баннер установки PWA — только mobile */
 export default function AppInstallBanner() {
@@ -16,7 +9,7 @@ export default function AppInstallBanner() {
   const [hint, setHint] = useState('')
 
   useEffect(() => {
-    if (isStandalone()) return
+    if (isPwaStandalone()) return
 
     if (localStorage.getItem('shugyla_app_banner_dismissed') === '1') {
       setDismissed(true)
