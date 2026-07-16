@@ -18,6 +18,7 @@ import {
 } from '../_shared/testSendPermits.ts'
 import { isWebPushConfigured } from '../_shared/webPushSender.ts'
 import { buildWebPushPayload } from '../_shared/webPushPayload.ts'
+import { getCurrentServerVapidFingerprint } from '../_shared/vapidFingerprint.ts'
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
@@ -152,6 +153,11 @@ async function countMatchingActiveSubscriptions(
   employeeId: number,
   deviceId: string
 ): Promise<{ count: number; error: Response | null }> {
+  const currentVapidFingerprint = await getCurrentServerVapidFingerprint()
+  if (!currentVapidFingerprint) {
+    return { count: 0, error: adminErrorResponse('web_push_not_configured', 503) }
+  }
+
   const { count, error } = await serviceClient
     .from('notification_push_subscriptions')
     .select('id', { count: 'exact', head: true })
@@ -159,6 +165,7 @@ async function countMatchingActiveSubscriptions(
     .eq('device_id', deviceId)
     .eq('is_active', true)
     .eq('permission_status', 'granted')
+    .eq('vapid_key_fingerprint', currentVapidFingerprint)
 
   if (error) {
     return { count: 0, error: adminErrorResponse('internal_error', 500) }
@@ -457,9 +464,14 @@ async function handleSend(
   const rateLimited = await checkRateLimit(serviceClient, caller.id)
   if (rateLimited) return rateLimited
 
+  const currentVapidFingerprint = await getCurrentServerVapidFingerprint()
+  if (!currentVapidFingerprint) {
+    return jsonResponse({ ok: false, code: 'web_push_not_configured' }, 503)
+  }
+
   const { data: subscription, error: subscriptionError } = await serviceClient
     .from('notification_push_subscriptions')
-    .select('id, endpoint, p256dh_key, auth_key, failure_count')
+    .select('id, endpoint, p256dh_key, auth_key, failure_count, vapid_key_fingerprint')
     .eq('employee_id', caller.id)
     .eq('device_id', deviceId)
     .eq('is_active', true)
@@ -472,6 +484,10 @@ async function handleSend(
 
   if (!subscription) {
     return jsonResponse({ ok: false, code: 'active_subscription_not_found' }, 409)
+  }
+
+  if (subscription.vapid_key_fingerprint !== currentVapidFingerprint) {
+    return jsonResponse({ ok: false, code: 'vapid_subscription_outdated' }, 409)
   }
 
   const content = notificationContent()
@@ -544,10 +560,12 @@ async function handleSend(
   }
 
   if (deliveryOutcome.classification === 'configuration_error') {
+    const errorCode =
+      deliveryOutcome.classification === 'configuration_error' ? 'vapid_rejected' : 'web_push_not_configured'
     return jsonResponse(
       {
         ok: false,
-        code: 'web_push_not_configured',
+        code: errorCode,
         notification_id: notification.id,
         delivery: { status: 'failed' },
       },

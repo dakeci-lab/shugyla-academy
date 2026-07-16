@@ -40,6 +40,12 @@ function labelForServiceWorker(state) {
   return 'Не готов'
 }
 
+function labelForVapidKeyStatus(status) {
+  if (status === 'current') return 'Актуальный'
+  if (status === 'reconnect_required') return 'Требуется переподключение'
+  return 'Не удалось определить'
+}
+
 function labelForStandalone(standalone) {
   return standalone ? 'Установленное PWA' : 'Браузерная вкладка'
 }
@@ -49,7 +55,7 @@ function issueMessage(issue) {
     case 'missing_browser_subscription':
       return 'Разрешение выдано, но push-подписка отсутствует'
     case 'vapid_mismatch':
-      return 'Подписка устарела после обновления ключей. Переподключите уведомления.'
+      return 'Подписка создана со старым ключом. Переподключите уведомления.'
     case 'missing_server_registration':
       return 'Подписка браузера не синхронизирована с сервером'
     case 'ios_not_standalone':
@@ -71,7 +77,10 @@ function BroadcastConfirmModal({
   onConfirm,
   returnFocusRef,
 }) {
-  const hasDevices = (summary?.connected_devices ?? 0) > 0
+  const hasDevices = (summary?.will_send ?? summary?.current_vapid_subscriptions ?? 0) > 0
+  const allOutdated =
+    (summary?.connected_devices ?? 0) > 0 &&
+    (summary?.will_send ?? summary?.current_vapid_subscriptions ?? 0) === 0
 
   return (
     <AdminModal
@@ -120,6 +129,18 @@ function BroadcastConfirmModal({
               <dt>Подключённых устройств</dt>
               <dd>{summary?.connected_devices ?? 0}</dd>
             </div>
+            <div>
+              <dt>Актуальных подписок</dt>
+              <dd>{summary?.current_vapid_subscriptions ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Требуют переподключения</dt>
+              <dd>{summary?.outdated_subscriptions ?? 0}</dd>
+            </div>
+            <div>
+              <dt>Будет отправлено</dt>
+              <dd>{summary?.will_send ?? summary?.current_vapid_subscriptions ?? 0}</dd>
+            </div>
           </dl>
         )}
 
@@ -128,7 +149,13 @@ function BroadcastConfirmModal({
           появится только на устройствах с активной push-подпиской.
         </p>
 
-        {!loadingSummary && !hasDevices && (
+        {!loadingSummary && allOutdated && (
+          <p className="notification-test-broadcast-modal__empty" role="alert">
+            Все зарегистрированные устройства требуют переподключения уведомлений.
+          </p>
+        )}
+
+        {!loadingSummary && !hasDevices && !allOutdated && (
           <p className="notification-test-broadcast-modal__empty" role="alert">
             Нет подключённых устройств для отправки уведомления.
           </p>
@@ -194,7 +221,7 @@ export default function NotificationTestBroadcastSection() {
   }, [cloudMode, sending, showError])
 
   const handleConfirm = useCallback(async () => {
-    if (sending || loadingSummary || !(summary?.connected_devices > 0)) return
+    if (sending || loadingSummary || !(summary?.will_send > 0 || summary?.current_vapid_subscriptions > 0)) return
 
     setSending(true)
     const requestId = createRequestId()
@@ -263,12 +290,16 @@ export default function NotificationTestBroadcastSection() {
                 <dd>{labelForServiceWorker(diagnostics?.serviceWorker)}</dd>
               </div>
               <div>
-                <dt>Push-подписка</dt>
-                <dd>{diagnostics?.pushSubscription ? 'Подключена' : 'Отсутствует'}</dd>
+                <dt>VAPID-ключ подписки</dt>
+                <dd>{labelForVapidKeyStatus(diagnostics?.vapidKeyStatus)}</dd>
               </div>
               <div>
                 <dt>Серверная регистрация</dt>
                 <dd>{diagnostics?.serverRegistration ? 'Активна' : 'Не активна'}</dd>
+              </div>
+              <div>
+                <dt>Push-подписка</dt>
+                <dd>{diagnostics?.pushSubscription ? 'Подключена' : 'Отсутствует'}</dd>
               </div>
               <div>
                 <dt>Режим приложения</dt>

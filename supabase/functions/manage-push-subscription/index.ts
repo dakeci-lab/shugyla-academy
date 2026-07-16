@@ -4,6 +4,7 @@ import {
   authorizeAuthenticatedEmployee,
 } from '../_shared/employeeAuthorization.ts'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
+import { getCurrentServerVapidFingerprint } from '../_shared/vapidFingerprint.ts'
 
 const MAX_ENDPOINT_LENGTH = 2048
 const MAX_KEY_LENGTH = 512
@@ -55,7 +56,8 @@ function subscriptionResponse(
   registered: boolean,
   active: boolean,
   permission: string,
-  matchingSubscriptions = registered && active ? 1 : 0
+  matchingSubscriptions = registered && active ? 1 : 0,
+  extras: Record<string, unknown> = {}
 ) {
   return jsonResponse({
     ok: true,
@@ -64,6 +66,7 @@ function subscriptionResponse(
       active,
       permission,
       matching_subscriptions: matchingSubscriptions,
+      ...extras,
     },
     test_sender_enabled: isTestSenderEnabled(),
   })
@@ -151,9 +154,11 @@ Deno.serve(async (req) => {
   const authUserId = caller.auth_user_id
 
   if (action === 'status') {
+    const currentVapidFingerprint = await getCurrentServerVapidFingerprint()
+
     const { data, error } = await serviceClient
       .from('notification_push_subscriptions')
-      .select('is_active, permission_status, last_used_at')
+      .select('is_active, permission_status, last_used_at, vapid_key_fingerprint')
       .eq('employee_id', employeeId)
       .eq('device_id', deviceId)
       .maybeSingle()
@@ -164,19 +169,22 @@ Deno.serve(async (req) => {
     }
 
     if (!data) {
-      return subscriptionResponse(false, false, 'default', 0)
+      return subscriptionResponse(false, false, 'default', 0, {
+        vapid_key_current: false,
+      })
     }
 
     const active = Boolean(data.is_active)
-    return jsonResponse({
-      ok: true,
-      subscription: {
-        registered: true,
-        active,
-        permission: data.permission_status ?? 'default',
-        matching_subscriptions: active ? 1 : 0,
-      },
-      test_sender_enabled: isTestSenderEnabled(),
+    const permission = data.permission_status ?? 'default'
+    const vapidKeyCurrent =
+      active &&
+      permission === 'granted' &&
+      Boolean(currentVapidFingerprint) &&
+      data.vapid_key_fingerprint === currentVapidFingerprint
+
+    return subscriptionResponse(active && permission === 'granted', vapidKeyCurrent, permission, vapidKeyCurrent ? 1 : 0, {
+      vapid_key_current: vapidKeyCurrent,
+      vapid_key_fingerprint: data.vapid_key_fingerprint ?? null,
     })
   }
 
@@ -213,6 +221,7 @@ Deno.serve(async (req) => {
     const expirationTime = parseExpiration(sub.expiration_time)
     const userAgent = req.headers.get('user-agent')?.slice(0, 512) ?? null
     const now = new Date().toISOString()
+    const vapidKeyFingerprint = await getCurrentServerVapidFingerprint()
 
     const row = {
       employee_id: employeeId,
@@ -227,6 +236,7 @@ Deno.serve(async (req) => {
       is_active: true,
       revoked_at: null,
       last_used_at: now,
+      vapid_key_fingerprint: vapidKeyFingerprint,
     }
 
     const { data: deviceRow, error: deviceLookupError } = await serviceClient
@@ -283,6 +293,7 @@ Deno.serve(async (req) => {
           is_active: true,
           revoked_at: null,
           last_used_at: now,
+          vapid_key_fingerprint: vapidKeyFingerprint,
         })
         .eq('id', deviceRow.id)
         .eq('employee_id', employeeId)

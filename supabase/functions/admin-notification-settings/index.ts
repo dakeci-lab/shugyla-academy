@@ -282,14 +282,21 @@ async function handleSendTestBroadcast(
       active_employees: result.active_employees,
       employees_with_subscriptions: result.employees_with_subscriptions,
       connected_devices: result.connected_devices,
+      current_vapid_subscriptions: result.current_vapid_subscriptions,
+      outdated_subscriptions: result.outdated_subscriptions,
+      will_send: result.will_send,
       sent_count: result.sent_count,
       failed_count: result.failed_count,
       invalidated_count: result.invalidated_count,
+      vapid_rejected_count: result.vapid_rejected_count,
     })
   } catch (error) {
     const message = (error as Error)?.message
     if (message === 'web_push_not_configured') {
       return jsonResponse({ ok: false, code: 'web_push_not_configured' }, 503)
+    }
+    if (message === 'no_current_vapid_subscriptions') {
+      return jsonResponse({ ok: false, code: 'no_current_vapid_subscriptions' }, 409)
     }
 
     console.error('Test notification broadcast failed', {

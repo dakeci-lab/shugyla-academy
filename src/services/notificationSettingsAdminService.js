@@ -16,6 +16,8 @@ const ERROR_MESSAGES = {
   send: 'Не удалось отправить тестовое уведомление',
   cooldown: 'Тестовое уведомление уже отправлялось недавно. Повторите через несколько секунд.',
   noSubscriptions: 'Нет подключённых устройств для отправки уведомления.',
+  noCurrentSubscriptions:
+    'Все зарегистрированные устройства требуют переподключения уведомлений.',
   webPushNotConfigured: 'Web Push не настроен на сервере',
   offline: 'Нет подключения к интернету',
 }
@@ -39,6 +41,7 @@ function mapBroadcastError(errorBody, fallbackMessage) {
   const code = errorBody?.code ?? errorBody?.error?.code
 
   if (code === 'broadcast_cooldown') return ERROR_MESSAGES.cooldown
+  if (code === 'no_current_vapid_subscriptions') return ERROR_MESSAGES.noCurrentSubscriptions
   if (code === 'web_push_not_configured') return ERROR_MESSAGES.webPushNotConfigured
   return mapSettingsError(errorBody, fallbackMessage)
 }
@@ -150,9 +153,13 @@ export async function sendTestBroadcast(requestId) {
 export function formatTestBroadcastResult(result) {
   const {
     connected_devices: connectedDevices = 0,
+    current_vapid_subscriptions: currentVapidSubscriptions = 0,
+    outdated_subscriptions: outdatedSubscriptions = 0,
+    will_send: willSend = 0,
     sent_count: sentCount = 0,
     failed_count: failedCount = 0,
     invalidated_count: invalidatedCount = 0,
+    vapid_rejected_count: vapidRejectedCount = 0,
     employees_with_subscriptions: employeesWithSubscriptions = 0,
   } = result
 
@@ -164,10 +171,22 @@ export function formatTestBroadcastResult(result) {
     }
   }
 
+  if (willSend === 0 || currentVapidSubscriptions === 0) {
+    return {
+      title: 'Отправка недоступна',
+      message: `Подключённых устройств: ${connectedDevices}. Актуальных подписок: 0. Требуют переподключения: ${outdatedSubscriptions || connectedDevices}.`,
+      variant: 'error',
+    }
+  }
+
   if (sentCount === 0 && failedCount > 0) {
+    const vapidHint =
+      vapidRejectedCount > 0
+        ? ' Серверный ключ push-уведомлений не соответствует подпискам устройств.'
+        : ''
     return {
       title: 'Не удалось отправить тестовое уведомление',
-      message: `Подключённых устройств: ${connectedDevices}. Не удалось отправить: ${failedCount}.`,
+      message: `Подключённых устройств: ${connectedDevices}. Актуальных подписок: ${currentVapidSubscriptions}. Будет отправлено: ${willSend}. Не удалось отправить: ${failedCount}.${vapidHint}`,
       variant: 'error',
     }
   }
@@ -175,14 +194,14 @@ export function formatTestBroadcastResult(result) {
   if (failedCount > 0) {
     return {
       title: 'Уведомление отправлено частично',
-      message: `Уведомление отправлено частично: ${sentCount} из ${connectedDevices} устройств. Сотрудников с уведомлениями: ${employeesWithSubscriptions}. Не удалось отправить: ${failedCount}. Неактивных подписок отключено: ${invalidatedCount}.`,
+      message: `Уведомление отправлено частично: ${sentCount} из ${willSend} актуальных устройств. Подключённых устройств: ${connectedDevices}. Требуют переподключения: ${outdatedSubscriptions}. Сотрудников с уведомлениями: ${employeesWithSubscriptions}. Не удалось отправить: ${failedCount}. Неактивных подписок отключено: ${invalidatedCount}.`,
       variant: 'warning',
     }
   }
 
   return {
     title: 'Тестовое уведомление отправлено',
-    message: `Сервер принял отправку: ${sentCount} из ${connectedDevices} устройств. Системное уведомление появится на устройствах с активной push-подпиской.`,
+    message: `Сервер принял отправку: ${sentCount} из ${willSend} актуальных устройств. Подключённых устройств: ${connectedDevices}. Требуют переподключения: ${outdatedSubscriptions}. Системное уведомление появится на устройствах с активной push-подпиской.`,
     variant: 'success',
   }
 }

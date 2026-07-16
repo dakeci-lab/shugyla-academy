@@ -83,12 +83,14 @@ function main() {
   assert('session uses ensure not sync only', session.includes('ensurePushNotificationsReady'))
   assert('sw controllerchange resync', swRegister.includes("addEventListener('controllerchange'"))
   assert('device diagnostics export', service.includes('export async function getDevicePushDiagnostics'))
+  assert('diagnostics vapid key status', service.includes('vapidKeyStatus'))
   assert('reconnect export', service.includes('export async function reconnectDevicePushNotifications'))
   assert('ios standalone check', service.includes('ios_not_standalone'))
 
   console.log('Stage 5: Admin diagnostics UI')
 
   assert('device status block', section.includes('Это устройство'))
+  assert('vapid key status label', section.includes('VAPID-ключ подписки'))
   assert('reconnect button', section.includes('Переподключить уведомления'))
   assert('no endpoint in UI', !section.includes('endpoint'))
 

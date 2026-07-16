@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { deliverNotificationToSubscription, type WebPushSenderFn } from './notificationDelivery.ts'
 import { sendWebPush } from './webPushSender.ts'
 import { buildTimeTrackerPushPayload } from './webPushPayload.ts'
+import { getCurrentServerVapidFingerprint } from './vapidFingerprint.ts'
 
 export const APP_TIMEZONE = 'Asia/Almaty'
 
@@ -505,14 +506,21 @@ export async function dispatchTimeTrackerNotifications(params: {
 
       const { data: subscriptions, error: subscriptionError } = await params.serviceClient
         .from('notification_push_subscriptions')
-        .select('id, endpoint, p256dh_key, auth_key, failure_count')
+        .select('id, endpoint, p256dh_key, auth_key, failure_count, vapid_key_fingerprint')
         .eq('employee_id', shift.employee_id)
         .eq('is_active', true)
         .eq('permission_status', 'granted')
 
       if (subscriptionError) throw new Error('subscription_load_error')
 
-      if (!subscriptions?.length) {
+      const currentVapidFingerprint = await getCurrentServerVapidFingerprint()
+      const deliverableSubscriptions = (subscriptions ?? []).filter(
+        (subscription) =>
+          currentVapidFingerprint &&
+          subscription.vapid_key_fingerprint === currentVapidFingerprint
+      )
+
+      if (!deliverableSubscriptions.length) {
         result.noActiveSubscriptions += 1
         await params.serviceClient
           .from('notifications')
@@ -525,7 +533,7 @@ export async function dispatchTimeTrackerNotifications(params: {
       let acceptedCount = 0
       let failedCount = 0
 
-      for (const subscription of subscriptions) {
+      for (const subscription of deliverableSubscriptions) {
         const delivery = await deliverNotificationToSubscription({
           serviceClient: params.serviceClient,
           notification,

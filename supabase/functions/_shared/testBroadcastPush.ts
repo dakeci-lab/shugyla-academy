@@ -1,5 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { deliverNotificationToSubscription, type PushSubscriptionRow } from './notificationDelivery.ts'
+import {
+  loadCurrentVapidPushSubscriptions,
+  type PushSubscriptionRecord,
+} from './pushSubscriptionSelection.ts'
+import { getVapidDiagnostics } from './vapidFingerprint.ts'
 import { isWebPushConfigured } from './webPushSender.ts'
 import { buildTestBroadcastPayload } from './webPushPayload.ts'
 
@@ -19,7 +24,11 @@ export type BroadcastSummary = {
   active_employees: number
   employees_with_subscriptions: number
   connected_devices: number
+  current_vapid_subscriptions: number
+  outdated_subscriptions: number
+  will_send: number
   web_push_configured: boolean
+  vapid_pair_valid: boolean
   ready_to_send: boolean
 }
 
@@ -28,9 +37,13 @@ export type BroadcastSendResult = {
   active_employees: number
   employees_with_subscriptions: number
   connected_devices: number
+  current_vapid_subscriptions: number
+  outdated_subscriptions: number
+  will_send: number
   sent_count: number
   failed_count: number
   invalidated_count: number
+  vapid_rejected_count: number
 }
 
 export function isActiveEmployeeStatus(status: string | null | undefined): boolean {
@@ -59,7 +72,9 @@ function isValidSubscriptionRow(row: Record<string, unknown>): row is BroadcastS
     row.p256dh_key.trim().length > 0 &&
     typeof row.auth_key === 'string' &&
     row.auth_key.trim().length > 0 &&
-    typeof row.employee_id === 'number'
+    typeof row.employee_id === 'number' &&
+    typeof row.vapid_key_fingerprint === 'string' &&
+    row.vapid_key_fingerprint.trim().length > 0
   )
 }
 
@@ -94,17 +109,10 @@ export async function countActiveEmployees(serviceClient: SupabaseClient): Promi
   return (data ?? []).filter((row) => isActiveEmployeeStatus(row.status)).length
 }
 
-export async function loadDeliverableBroadcastSubscriptions(
-  serviceClient: SupabaseClient
+async function filterActiveEmployeeSubscriptions(
+  serviceClient: SupabaseClient,
+  subscriptions: PushSubscriptionRecord[]
 ): Promise<BroadcastSubscriptionRow[]> {
-  const { data: subscriptions, error: subscriptionError } = await serviceClient
-    .from('notification_push_subscriptions')
-    .select('id, employee_id, auth_user_id, endpoint, p256dh_key, auth_key, failure_count')
-    .eq('is_active', true)
-    .eq('permission_status', 'granted')
-
-  if (subscriptionError) throw new Error('subscription_load_error')
-
   const { data: employees, error: employeeError } = await serviceClient
     .from('academy_users')
     .select('id, status')
@@ -117,31 +125,52 @@ export async function loadDeliverableBroadcastSubscriptions(
       .map((row) => row.id)
   )
 
-  const filtered = (subscriptions ?? []).filter(
+  const filtered = subscriptions.filter(
     (row) =>
-      activeEmployeeIds.has(row.employee_id) && isValidSubscriptionRow(row as Record<string, unknown>)
+      typeof row.employee_id === 'number' &&
+      activeEmployeeIds.has(row.employee_id) &&
+      isValidSubscriptionRow(row as Record<string, unknown>)
   ) as BroadcastSubscriptionRow[]
 
   return dedupeSubscriptionsByEndpoint(filtered)
 }
 
+export async function loadDeliverableBroadcastSubscriptions(
+  serviceClient: SupabaseClient
+): Promise<BroadcastSubscriptionRow[]> {
+  const { current } = await loadCurrentVapidPushSubscriptions(serviceClient)
+  return filterActiveEmployeeSubscriptions(serviceClient, current)
+}
+
 export async function getTestBroadcastSummary(
   serviceClient: SupabaseClient
 ): Promise<BroadcastSummary> {
-  const [activeEmployees, subscriptions] = await Promise.all([
+  const [activeEmployees, vapidState, vapidDiagnostics] = await Promise.all([
     countActiveEmployees(serviceClient),
-    loadDeliverableBroadcastSubscriptions(serviceClient),
+    loadCurrentVapidPushSubscriptions(serviceClient),
+    getVapidDiagnostics(),
   ])
 
-  const employeeIds = new Set(subscriptions.map((row) => row.employee_id))
-  const webPushConfigured = isWebPushConfigured()
+  const [allActiveForEmployees, deliverable] = await Promise.all([
+    filterActiveEmployeeSubscriptions(serviceClient, vapidState.allActive),
+    filterActiveEmployeeSubscriptions(serviceClient, vapidState.current),
+  ])
+
+  const employeeIds = new Set(allActiveForEmployees.map((row) => row.employee_id))
+  const webPushConfigured = isWebPushConfigured() && vapidDiagnostics.configured
+  const vapidPairValid = vapidDiagnostics.pairMatches
+  const willSend = deliverable.length
 
   return {
     active_employees: activeEmployees,
     employees_with_subscriptions: employeeIds.size,
-    connected_devices: subscriptions.length,
+    connected_devices: allActiveForEmployees.length,
+    current_vapid_subscriptions: deliverable.length,
+    outdated_subscriptions: Math.max(0, allActiveForEmployees.length - deliverable.length),
+    will_send: willSend,
     web_push_configured: webPushConfigured,
-    ready_to_send: webPushConfigured && subscriptions.length > 0,
+    vapid_pair_valid: vapidPairValid,
+    ready_to_send: webPushConfigured && vapidPairValid && willSend > 0,
   }
 }
 
@@ -233,6 +262,18 @@ export async function sendTestBroadcast(
     throw new Error('web_push_not_configured')
   }
 
+  if (summary.will_send === 0) {
+    await serviceClient
+      .from('notification_test_broadcast_audits')
+      .update({
+        status: 'completed',
+        completed_at: new Date().toISOString(),
+      })
+      .eq('id', params.broadcastId)
+
+    throw new Error('no_current_vapid_subscriptions')
+  }
+
   if (subscriptions.length === 0) {
     await serviceClient
       .from('notification_test_broadcast_audits')
@@ -246,10 +287,14 @@ export async function sendTestBroadcast(
       broadcast_id: params.broadcastId,
       active_employees: summary.active_employees,
       employees_with_subscriptions: 0,
-      connected_devices: 0,
+      connected_devices: summary.connected_devices,
+      current_vapid_subscriptions: 0,
+      outdated_subscriptions: summary.outdated_subscriptions,
+      will_send: 0,
       sent_count: 0,
       failed_count: 0,
       invalidated_count: 0,
+      vapid_rejected_count: 0,
     }
   }
 
@@ -293,6 +338,7 @@ export async function sendTestBroadcast(
   let sentCount = 0
   let failedCount = 0
   let invalidatedCount = 0
+  let vapidRejectedCount = 0
 
   await runWithConcurrency(subscriptions, TEST_BROADCAST_CONCURRENCY, async (subscription) => {
     const deliveryRequestId = crypto.randomUUID()
@@ -315,6 +361,9 @@ export async function sendTestBroadcast(
         failedCount += 1
         if (outcome.classification === 'subscription_expired') {
           invalidatedCount += 1
+        }
+        if (outcome.classification === 'configuration_error') {
+          vapidRejectedCount += 1
         }
       }
     } catch {
@@ -345,9 +394,13 @@ export async function sendTestBroadcast(
     broadcast_id: params.broadcastId,
     active_employees: summary.active_employees,
     employees_with_subscriptions: summary.employees_with_subscriptions,
-    connected_devices: subscriptions.length,
+    connected_devices: summary.connected_devices,
+    current_vapid_subscriptions: summary.current_vapid_subscriptions,
+    outdated_subscriptions: summary.outdated_subscriptions,
+    will_send: subscriptions.length,
     sent_count: sentCount,
     failed_count: failedCount,
     invalidated_count: invalidatedCount,
+    vapid_rejected_count: vapidRejectedCount,
   }
 }

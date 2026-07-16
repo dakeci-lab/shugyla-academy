@@ -290,22 +290,7 @@ export async function getPushRegistrationStatus() {
 }
 
 export async function syncExistingPushSubscription() {
-  if (!isWebPushSupported()) return null
-  if (getNotificationPermission() !== 'granted') return null
-
-  const deviceId = getOrCreateDeviceId()
-  if (!deviceId) return null
-
-  const browserSub = await getExistingBrowserSubscription()
-  if (!browserSub) return null
-
-  const data = await invokeManageSubscription({
-    action: 'register',
-    device_id: deviceId,
-    subscription: serializeSubscription(browserSub),
-  })
-
-  return data.subscription
+  return ensurePushNotificationsReady()
 }
 
 /** Ensure browser push subscription exists and is synced with backend when permission is granted. */
@@ -380,6 +365,7 @@ export async function getDevicePushDiagnostics() {
     serverRegistration: false,
     scopeMatchesApp: false,
     vapidConfigured: Boolean(getVapidPublicKey()),
+    vapidKeyStatus: 'unknown',
     needsReconnect: false,
     issue: null,
   }
@@ -420,29 +406,47 @@ export async function getDevicePushDiagnostics() {
     const pushSubscription = Boolean(browserSub)
 
     let serverRegistration = false
+    let vapidKeyStatus = 'unknown'
     const deviceId = getOrCreateDeviceId()
-    if (deviceId) {
-      try {
-        const status = await invokeManageSubscription({ action: 'status', device_id: deviceId })
-        serverRegistration = Boolean(status.subscription?.active)
-      } catch {
-        serverRegistration = false
-      }
-    }
-
     const vapidPublicKey = getVapidPublicKey()
-    const vapidMatches =
+    const browserVapidMatches =
       pushSubscription && vapidPublicKey
         ? subscriptionMatchesVapid(browserSub, vapidPublicKey)
         : false
 
+    if (deviceId) {
+      try {
+        const status = await invokeManageSubscription({ action: 'status', device_id: deviceId })
+        serverRegistration = Boolean(status.subscription?.vapid_key_current)
+        if (status.subscription?.vapid_key_current) {
+          vapidKeyStatus = 'current'
+        } else if (status.subscription?.registered) {
+          vapidKeyStatus = 'reconnect_required'
+        } else if (browserVapidMatches) {
+          vapidKeyStatus = 'current'
+        } else if (pushSubscription) {
+          vapidKeyStatus = 'reconnect_required'
+        }
+      } catch {
+        serverRegistration = false
+        vapidKeyStatus = browserVapidMatches ? 'current' : pushSubscription ? 'reconnect_required' : 'unknown'
+      }
+    } else if (browserVapidMatches) {
+      vapidKeyStatus = 'current'
+    } else if (pushSubscription) {
+      vapidKeyStatus = 'reconnect_required'
+    }
+
     const needsReconnect =
       permission === 'granted' &&
-      (!pushSubscription || !serverRegistration || !vapidMatches || !scopeMatchesApp)
+      (!pushSubscription ||
+        !serverRegistration ||
+        vapidKeyStatus === 'reconnect_required' ||
+        !scopeMatchesApp)
 
     let issue = null
     if (!pushSubscription) issue = 'missing_browser_subscription'
-    else if (!vapidMatches) issue = 'vapid_mismatch'
+    else if (vapidKeyStatus === 'reconnect_required') issue = 'vapid_mismatch'
     else if (!serverRegistration) issue = 'missing_server_registration'
     else if (!scopeMatchesApp) issue = 'scope_mismatch'
 
@@ -453,6 +457,7 @@ export async function getDevicePushDiagnostics() {
       serviceWorker,
       pushSubscription,
       serverRegistration,
+      vapidKeyStatus,
       scopeMatchesApp,
       vapidConfigured: Boolean(vapidPublicKey),
       needsReconnect,
@@ -464,7 +469,49 @@ export async function getDevicePushDiagnostics() {
 }
 
 export async function reconnectDevicePushNotifications() {
-  return enablePushNotifications()
+  if (!isWebPushSupported()) {
+    throw new WebPushError(
+      'service_worker_unavailable',
+      WEB_PUSH_ERROR_MESSAGES.service_worker_unavailable
+    )
+  }
+
+  if (getNotificationPermission() !== 'granted') {
+    throw new WebPushError('permission_denied', WEB_PUSH_ERROR_MESSAGES.permission_denied)
+  }
+
+  const vapidPublicKey = getVapidPublicKey()
+  if (!vapidPublicKey) {
+    throw new WebPushError(
+      'backend_registration_failed',
+      WEB_PUSH_ERROR_MESSAGES.backend_registration_failed
+    )
+  }
+
+  const registration = await getServiceWorkerRegistration()
+  if (!registration) {
+    throw new WebPushError(
+      'service_worker_unavailable',
+      WEB_PUSH_ERROR_MESSAGES.service_worker_unavailable
+    )
+  }
+
+  const deviceId = getOrCreateDeviceId()
+  if (!deviceId) {
+    throw new WebPushError(
+      'backend_registration_failed',
+      WEB_PUSH_ERROR_MESSAGES.backend_registration_failed
+    )
+  }
+
+  const existing = await registration.pushManager.getSubscription()
+  if (existing) {
+    await existing.unsubscribe().catch(() => {})
+  }
+
+  const subscription = await createBrowserSubscription(registration, vapidPublicKey)
+  await registerBrowserSubscriptionWithBackend(deviceId, subscription, vapidPublicKey)
+  return subscription
 }
 
 export async function enablePushNotifications() {
