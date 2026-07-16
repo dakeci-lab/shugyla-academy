@@ -15,7 +15,7 @@ export default function ProtectedRoute({
   requireAdmin = false,
   requiredPermission = null,
 }) {
-  const { user, authStatus, supabaseAuthenticated } = useSession()
+  const { user, authStatus, supabaseAuthenticated, rbacReady } = useSession()
   const location = useLocation()
   const cloudAuthRequired = isCloudMode() && usesSupabaseAuth()
 
@@ -32,12 +32,16 @@ export default function ProtectedRoute({
     return <Navigate to={getLoginUrl(redirectPath)} replace />
   }
 
+  if (!rbacReady) {
+    return <AuthLoadingScreen />
+  }
+
   if (requireAdmin && !canManageAdmin(user.role)) {
-    return <Navigate to={getDefaultPlatformPath(user.role)} replace />
+    return <Navigate to={getDefaultPlatformPath(user)} replace />
   }
 
   if (requiredPermission && !roleHasPermission(user.role, requiredPermission)) {
-    return <Navigate to={getDefaultPlatformPath(user.role)} replace />
+    return <Navigate to={getDefaultPlatformPath(user)} replace />
   }
 
   return children

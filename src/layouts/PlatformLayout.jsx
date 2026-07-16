@@ -5,6 +5,8 @@ import PlatformMobileHeader from '../components/platform/PlatformMobileHeader'
 import AppInstallBanner from '../components/platform/AppInstallBanner'
 import PlatformSidebar from '../components/platform/PlatformSidebar'
 import PullToRefresh from '../components/platform/PullToRefresh'
+import PlatformErrorBoundary from '../components/platform/PlatformErrorBoundary'
+import PlatformSessionGate from '../components/platform/PlatformSessionGate'
 import { PullToRefreshProvider } from '../context/PullToRefreshContext'
 import { PlatformPageTitleProvider, usePlatformPageTitleContext } from '../context/PlatformPageTitleContext'
 import { useAcademyData } from '../context/AcademyDataContext'
@@ -90,7 +92,9 @@ function PlatformLayoutShell() {
           </header>
 
           <div className="platform-layout__content">
-            <Outlet />
+            <PlatformErrorBoundary onLogout={logout}>
+              <Outlet />
+            </PlatformErrorBoundary>
           </div>
         </PullToRefresh>
       </PullToRefreshProvider>
@@ -99,10 +103,22 @@ function PlatformLayoutShell() {
 }
 
 /** Оболочка Shugyla Platform — sidebar + контент */
+function PlatformLayoutRoot() {
+  const { logout } = useSession()
+
+  return (
+    <PlatformErrorBoundary onLogout={logout}>
+      <PlatformLayoutShell />
+    </PlatformErrorBoundary>
+  )
+}
+
 export default function PlatformLayout() {
   return (
     <PlatformPageTitleProvider>
-      <PlatformLayoutShell />
+      <PlatformSessionGate>
+        <PlatformLayoutRoot />
+      </PlatformSessionGate>
     </PlatformPageTitleProvider>
   )
 }

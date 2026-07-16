@@ -48,7 +48,9 @@
     "verify:mobile-shell": "node scripts/verify-mobile-shell.mjs",
     "verify:suppliers-simplify": "node scripts/verify-suppliers-simplify.mjs",
     "verify:suppliers-toolbar": "node scripts/verify-suppliers-toolbar.mjs",
-    "verify:employees-list": "node scripts/verify-employees-list.mjs"
+    "verify:employees-list": "node scripts/verify-employees-list.mjs",
+    "verify:app-bootstrap": "node scripts/verify-app-bootstrap.mjs",
+    "verify:supplier-form-focus": "node scripts/verify-supplier-form-focus.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",

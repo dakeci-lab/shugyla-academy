@@ -50,6 +50,8 @@ function main() {
   assert('shared backdrop token used', modalCss.includes('--platform-modal-backdrop'))
   assert('admin modal uses lock utility', modal.includes('lockModalScroll'))
   assert('admin modal unlocks on cleanup', modal.includes('unlockModalScroll'))
+  assert('admin modal onClose stored in ref', modal.includes('onCloseRef'))
+  assert('admin modal focus effect isolated', modal.includes('autoFocusClose'))
   assert('body scroll hook delegates to utility', hook.includes('lockModalScroll'))
   assert('filter modal passes return focus ref', read('src/components/procurement/PurchaseFilterPopover.jsx').includes('returnFocusRef={anchorRef}'))
 

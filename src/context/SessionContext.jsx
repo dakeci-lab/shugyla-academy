@@ -70,9 +70,11 @@ export function SessionProvider({ children }) {
     let unsubscribeAuth = () => {}
 
     async function applyRestoredSession(restored) {
-      if (cancelled || initId !== initGenerationRef.current || sessionEstablishedRef.current) {
+      if (cancelled || initId !== initGenerationRef.current) {
         return
       }
+
+      const shouldApplyUser = !sessionEstablishedRef.current
 
       const trustPermissions = restored.sessionType === SESSION_TYPE.LEGACY
       const normalized = restored.user
@@ -85,20 +87,23 @@ export function SessionProvider({ children }) {
           )
         : null
 
-      if (normalized) {
-        saveUser(normalized)
+      if (shouldApplyUser) {
+        if (normalized) {
+          saveUser(normalized)
+        }
+
+        if (cancelled || initId !== initGenerationRef.current) {
+          return
+        }
+
+        setUser(normalized)
+        setSessionType(restored.sessionType)
+        setSupabaseAuthenticated(restored.supabaseAuthenticated)
+        setAuthStatus(
+          normalized ? AUTH_STATUS.AUTHENTICATED : AUTH_STATUS.UNAUTHENTICATED
+        )
       }
 
-      if (cancelled || initId !== initGenerationRef.current || sessionEstablishedRef.current) {
-        return
-      }
-
-      setUser(normalized)
-      setSessionType(restored.sessionType)
-      setSupabaseAuthenticated(restored.supabaseAuthenticated)
-      setAuthStatus(
-        normalized ? AUTH_STATUS.AUTHENTICATED : AUTH_STATUS.UNAUTHENTICATED
-      )
       setRbacReady(true)
     }
 
@@ -137,6 +142,7 @@ export function SessionProvider({ children }) {
           setSessionType(null)
           setSupabaseAuthenticated(false)
           setAuthStatus(AUTH_STATUS.UNAUTHENTICATED)
+          setRbacReady(false)
           return
         }
 
@@ -158,6 +164,7 @@ export function SessionProvider({ children }) {
               setSessionType(null)
               setSupabaseAuthenticated(false)
               setAuthStatus(AUTH_STATUS.UNAUTHENTICATED)
+              setRbacReady(true)
             }
             return
           }
@@ -175,6 +182,7 @@ export function SessionProvider({ children }) {
             setSessionType(null)
             setSupabaseAuthenticated(false)
             setAuthStatus(AUTH_STATUS.UNAUTHENTICATED)
+            setRbacReady(true)
           }
         }
       })
@@ -204,6 +212,7 @@ export function SessionProvider({ children }) {
     setAuthStatus(
       normalized ? AUTH_STATUS.AUTHENTICATED : AUTH_STATUS.UNAUTHENTICATED
     )
+    setRbacReady(true)
   }, [])
 
   const setSessionUser = useCallback((sessionUser, options = {}) => {
@@ -227,6 +236,7 @@ export function SessionProvider({ children }) {
     setSessionType(nextSessionType)
     setSupabaseAuthenticated(nextSupabaseAuthenticated)
     setAuthStatus(AUTH_STATUS.AUTHENTICATED)
+    setRbacReady(true)
   }, [])
 
   const updateSessionUser = useCallback((patch) => {
@@ -275,6 +285,7 @@ export function SessionProvider({ children }) {
     setSessionType(null)
     setSupabaseAuthenticated(false)
     setAuthStatus(AUTH_STATUS.UNAUTHENTICATED)
+    setRbacReady(false)
   }, [])
 
   const sessionReady = authStatus !== AUTH_STATUS.LOADING

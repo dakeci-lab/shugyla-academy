@@ -7,7 +7,6 @@ import {
   canAccessRoute,
   canViewMenuItem,
   filterPlatformNav as filterNav,
-  getDefaultPlatformPath,
   canManageRoles,
   canManageSettings,
   can,
@@ -19,6 +18,12 @@ import {
   PERMISSION_KEYS,
   resolveUserRole,
 } from '../config/permissions'
+import {
+  getDefaultPlatformPath,
+  getFirstAllowedPlatformPath,
+  resolvePlatformStartPath,
+  isPlatformProfileReady,
+} from './platformBootstrap'
 
 /** @deprecated используйте ROUTE_KEYS */
 export const ACCESS = {
@@ -38,6 +43,9 @@ export const ACCESS = {
 export {
   ROUTE_KEYS,
   getDefaultPlatformPath,
+  getFirstAllowedPlatformPath,
+  resolvePlatformStartPath,
+  isPlatformProfileReady,
   resolveUserRole,
   canManageRoles,
   canManageSettings,

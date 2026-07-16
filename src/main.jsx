@@ -5,6 +5,22 @@ import { registerServiceWorker } from './pwa/registerServiceWorker'
 import './index.css'
 import './styles/mobile.css'
 
+const CHUNK_RELOAD_KEY = 'platform-chunk-reload'
+
+function setupChunkLoadRecovery() {
+  window.addEventListener('load', () => {
+    sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+  })
+
+  window.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault()
+    if (sessionStorage.getItem(CHUNK_RELOAD_KEY)) return
+    sessionStorage.setItem(CHUNK_RELOAD_KEY, '1')
+    window.location.reload()
+  })
+}
+
+setupChunkLoadRecovery()
 registerServiceWorker()
 
 createRoot(document.getElementById('root')).render(

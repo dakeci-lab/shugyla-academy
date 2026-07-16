@@ -7,7 +7,8 @@ import {
   normalizeRoleId,
   ROLE_IDS,
 } from '../data/roles'
-import { resolveUserRole, getDefaultPlatformPath } from '../config/permissions'
+import { resolveUserRole } from '../config/permissions'
+import { getDefaultPlatformPath } from '../platform/platformAccess'
 import { LOGIN_PATH } from '../router/authRoutes'
 import { getAllCourses } from './adminData'
 import { saveUser, clearUser } from './storage'

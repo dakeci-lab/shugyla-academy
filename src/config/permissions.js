@@ -240,15 +240,26 @@ export function canViewMenuItem(user, menuItem) {
   return canAccessRoute(user, menuItem.routeKey)
 }
 
-export function getDefaultPlatformPath(userOrRole) {
-  const role =
-    typeof userOrRole === 'object'
-      ? resolveUserRole(userOrRole)
-      : normalizeRoleId(userOrRole)
+/** Первый доступный path из отфильтрованной навигации (порядок = PLATFORM_NAV). */
+export function getFirstAllowedPathFromNav(nav, user) {
+  const filtered = filterPlatformNav(nav, user)
+  for (const item of filtered) {
+    if (item.path) return item.path
+    const child = item.children?.find((entry) => entry.path)
+    if (child?.path) return child.path
+  }
+  return null
+}
 
-  if (!role) return '/platform/academy/cabinet'
-  if (canAccessRoute({ role }, ROUTE_KEYS.HOME)) return '/platform'
-  if (canAccessRoute({ role }, ROUTE_KEYS.ACADEMY)) return '/platform/academy/cabinet'
+export function getDefaultPlatformPath(userOrRole) {
+  const user =
+    typeof userOrRole === 'object' && userOrRole !== null
+      ? userOrRole
+      : { role: normalizeRoleId(userOrRole) }
+
+  if (!resolveUserRole(user)) return '/platform/profile'
+  if (canAccessRoute(user, ROUTE_KEYS.HOME)) return '/platform'
+  if (canAccessRoute(user, ROUTE_KEYS.ACADEMY)) return '/platform/academy/cabinet'
   return '/platform/profile'
 }
 

@@ -12,30 +12,40 @@ export default function AdminModal({
   wide = false,
   xwide = false,
   returnFocusRef,
+  autoFocusClose = true,
 }) {
   const sizeClass = xwide ? 'admin-modal--xwide' : wide ? 'admin-modal--wide' : ''
   const titleId = useId()
   const closeButtonRef = useRef(null)
+  const onCloseRef = useRef(onClose)
+
+  onCloseRef.current = onClose
 
   useEffect(() => {
     lockModalScroll()
 
     function handleEscape(event) {
-      if (event.key === 'Escape') onClose?.()
+      if (event.key === 'Escape') onCloseRef.current?.()
     }
 
     document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('keydown', handleEscape)
+      unlockModalScroll()
+      returnFocusRef?.current?.focus()
+    }
+  }, [returnFocusRef])
+
+  useEffect(() => {
+    if (!autoFocusClose) return undefined
+
     const focusTimer = window.setTimeout(() => {
       closeButtonRef.current?.focus()
     }, 0)
 
-    return () => {
-      document.removeEventListener('keydown', handleEscape)
-      window.clearTimeout(focusTimer)
-      unlockModalScroll()
-      returnFocusRef?.current?.focus()
-    }
-  }, [onClose, returnFocusRef])
+    return () => window.clearTimeout(focusTimer)
+  }, [autoFocusClose])
 
   return createPortal(
     <div className="admin-modal-overlay" onClick={onClose} role="presentation">

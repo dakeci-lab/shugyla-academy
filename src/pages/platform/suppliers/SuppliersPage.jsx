@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   getSuppliers,
@@ -90,10 +90,6 @@ export function SuppliersListPage() {
     navigate(location.pathname, { replace: true, state: null })
   }, [location.state?.openEditId, canEdit, location.pathname, navigate])
 
-  if (!canView) {
-    return <PlatformAccessDenied title="Нет доступа к поставщикам" />
-  }
-
   function openCreate() {
     setEditId(null)
     setForm(EMPTY_SUPPLIER_FORM)
@@ -108,11 +104,11 @@ export function SuppliersListPage() {
     setShowForm(true)
   }
 
-  function closeForm() {
+  const closeForm = useCallback(() => {
     setShowForm(false)
     setEditId(null)
     setFormError('')
-  }
+  }, [])
 
   function toggleFilter() {
     if (filterOpen) {
@@ -138,7 +134,7 @@ export function SuppliersListPage() {
     setFilterOpen(false)
   }
 
-  async function handleSave() {
+  const handleSave = useCallback(async () => {
     setFormError('')
     if (!form.name.trim()) {
       setFormError('Укажите название поставщика')
@@ -159,13 +155,44 @@ export function SuppliersListPage() {
     } finally {
       setSaving(false)
     }
-  }
+  }, [closeForm, editId, form, refresh])
 
-  function requestDelete() {
+  const requestDelete = useCallback(() => {
     if (!editId) return
     const supplier = getSupplierById(editId)
     if (supplier) setDeleteTarget(supplier)
-  }
+  }, [editId])
+
+  const modalFooter = useMemo(
+    () => (
+      <div className="suppliers-modal-footer">
+        {editId && canDelete && (
+          <button
+            type="button"
+            className="btn suppliers-modal-footer__delete"
+            disabled={saving || deleting}
+            onClick={requestDelete}
+          >
+            Удалить поставщика
+          </button>
+        )}
+        <div className="suppliers-modal-footer__actions">
+          <button type="button" className="btn btn--ghost" onClick={closeForm}>
+            Отмена
+          </button>
+          <button
+            type="button"
+            className="btn btn--primary"
+            disabled={saving || deleting}
+            onClick={handleSave}
+          >
+            {saving ? 'Сохранение…' : 'Сохранить'}
+          </button>
+        </div>
+      </div>
+    ),
+    [editId, canDelete, saving, deleting, closeForm, requestDelete, handleSave]
+  )
 
   async function confirmDelete() {
     if (!deleteTarget) return
@@ -186,6 +213,10 @@ export function SuppliersListPage() {
   const searchPlaceholder = isNarrowSearch
     ? 'Поиск поставщика…'
     : 'Поиск по названию, менеджеру, телефону…'
+
+  if (!canView) {
+    return <PlatformAccessDenied title="Нет доступа к поставщикам" />
+  }
 
   return (
     <div className="suppliers-page">
@@ -272,33 +303,8 @@ export function SuppliersListPage() {
           title={editId ? 'Редактировать поставщика' : 'Добавить поставщика'}
           onClose={closeForm}
           wide
-          footer={
-            <div className="suppliers-modal-footer">
-              {editId && canDelete && (
-                <button
-                  type="button"
-                  className="btn suppliers-modal-footer__delete"
-                  disabled={saving || deleting}
-                  onClick={requestDelete}
-                >
-                  Удалить поставщика
-                </button>
-              )}
-              <div className="suppliers-modal-footer__actions">
-                <button type="button" className="btn btn--ghost" onClick={closeForm}>
-                  Отмена
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--primary"
-                  disabled={saving || deleting}
-                  onClick={handleSave}
-                >
-                  {saving ? 'Сохранение…' : 'Сохранить'}
-                </button>
-              </div>
-            </div>
-          }
+          autoFocusClose={false}
+          footer={modalFooter}
         >
           <SupplierForm form={form} onChange={setForm} error={formError} />
         </AdminModal>

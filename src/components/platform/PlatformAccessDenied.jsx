@@ -13,7 +13,7 @@ export default function PlatformAccessDenied({ title = 'Нет доступа' }
       <p className="platform-access-denied__text">
         У вашей роли нет прав для просмотра этого раздела.
       </p>
-      <Link to={getDefaultPlatformPath(user?.role)} className="btn btn--primary">
+      <Link to={getDefaultPlatformPath(user)} className="btn btn--primary">
         На главную
       </Link>
     </div>

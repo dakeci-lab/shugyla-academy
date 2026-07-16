@@ -1,0 +1,37 @@
+.platform-session-gate {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  background: var(--platform-bg, #f4f6f8);
+}
+
+.platform-session-gate__card {
+  width: min(100%, 420px);
+  padding: 28px 24px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 8px 32px rgb(15 23 42 / 8%);
+  text-align: center;
+}
+
+.platform-session-gate__title {
+  margin: 0 0 12px;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.platform-session-gate__text {
+  margin: 0 0 20px;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: #64748b;
+}
+
+.platform-session-gate__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
