@@ -5,7 +5,10 @@ import { getRoleLabel } from '../../../data/roles'
 import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
 import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
 import { isCloudMode } from '../../../lib/dataMode'
-import { getEmployeeForAdmin } from '../../../services/employeeAdminService'
+import {
+  EmployeeAdminError,
+  getEmployeeForAdmin,
+} from '../../../services/employeeAdminService'
 import { fetchEmployeeWorkforceBundle } from '../../../services/workforceAdminService'
 import { getAttendanceSettings } from '../../../services/academyDataService'
 import {
@@ -114,32 +117,55 @@ export default function EmployeeProfileSection({ employeeId }) {
       let nextShowLogin = false
 
       if (cloudMode) {
-        const now = new Date()
-        const bundle = await fetchEmployeeWorkforceBundle(
-          employeeId,
-          now.getFullYear(),
-          now.getMonth() + 1,
-          'schedule'
-        )
-        nextEmployee = bundle.employee
-        nextShowLogin = false
-
-        if (canSeeAdminFields && nextEmployee) {
+        if (canSeeAdminFields) {
           try {
-            const adminEmployee = await getEmployeeForAdmin(employeeId, {
-              searchHint: nextEmployee.name || nextEmployee.login || '',
+            // Primary admin path: exact employee_id lookup (no full list load).
+            nextEmployee = await getEmployeeForAdmin(employeeId, {
+              allowSearchFallback: false,
             })
-            if (adminEmployee) {
-              nextEmployee = {
-                ...nextEmployee,
-                ...adminEmployee,
-                login: adminEmployee.login ?? nextEmployee.login,
-              }
-              nextShowLogin = true
+            nextShowLogin = true
+          } catch (err) {
+            if (err instanceof EmployeeAdminError && err.code === 'employee_not_found') {
+              throw err
             }
-          } catch {
-            // Login enrichment is optional; workforce identity is enough for the card.
+            if (
+              err instanceof EmployeeAdminError &&
+              (err.code === 'unauthorized' ||
+                err.code === 'forbidden' ||
+                err.code === 'inactive_caller')
+            ) {
+              throw err
+            }
+
+            // Temporary compatibility: older Edge builds reject employee_id.
+            // Resolve a name hint via workforce, then run a single search fallback.
+            const now = new Date()
+            const bundle = await fetchEmployeeWorkforceBundle(
+              employeeId,
+              now.getFullYear(),
+              now.getMonth() + 1,
+              'schedule'
+            )
+            if (!bundle.employee) {
+              throw new EmployeeAdminError('Сотрудник не найден', 'employee_not_found')
+            }
+            nextEmployee = await getEmployeeForAdmin(employeeId, {
+              searchHint: bundle.employee.name || '',
+              allowSearchFallback: true,
+            })
+            nextShowLogin = true
           }
+        } else {
+          // Schedule viewers without employees.view use workforce identity only.
+          const now = new Date()
+          const bundle = await fetchEmployeeWorkforceBundle(
+            employeeId,
+            now.getFullYear(),
+            now.getMonth() + 1,
+            'schedule'
+          )
+          nextEmployee = bundle.employee
+          nextShowLogin = false
         }
       } else {
         nextEmployee = getEmployeeById(Number(employeeId))
@@ -180,6 +206,15 @@ export default function EmployeeProfileSection({ employeeId }) {
       }
     } catch (err) {
       if (!mountedRef.current) return
+
+      if (err instanceof EmployeeAdminError && err.code === 'employee_not_found') {
+        setEmployee(null)
+        setEmployeeMissing(true)
+        setShowLogin(false)
+        setEmployeeError('')
+        return
+      }
+
       const message = err.message || 'Не удалось загрузить сотрудника'
       setEmployeeError(message)
       setEmployee(null)

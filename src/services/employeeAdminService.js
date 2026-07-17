@@ -20,18 +20,35 @@ const ERROR_MESSAGES = {
   updateDefault: 'Не удалось сохранить изменения',
 }
 
+export class EmployeeAdminError extends Error {
+  constructor(message, code = 'internal_error') {
+    super(message)
+    this.name = 'EmployeeAdminError'
+    this.code = code
+  }
+}
+
 function mapAdminError(errorBody, fallbackMessage, { edit = false } = {}) {
   const code = errorBody?.code ?? errorBody?.error?.code
 
   if (code === 'forbidden' || code === 'inactive_caller') {
-    return edit ? ERROR_MESSAGES.editForbidden : ERROR_MESSAGES.forbidden
+    return {
+      code: code || 'forbidden',
+      message: edit ? ERROR_MESSAGES.editForbidden : ERROR_MESSAGES.forbidden,
+    }
   }
-  if (code === 'unauthorized') return ERROR_MESSAGES.unauthorized
-  if (code === 'employee_not_found') return ERROR_MESSAGES.notFound
+  if (code === 'unauthorized') {
+    return { code: 'unauthorized', message: ERROR_MESSAGES.unauthorized }
+  }
+  if (code === 'employee_not_found') {
+    return { code: 'employee_not_found', message: ERROR_MESSAGES.notFound }
+  }
   if (code === 'self_role_change_forbidden' || code === 'self_status_change_forbidden') {
-    return ERROR_MESSAGES.selfRole
+    return { code, message: ERROR_MESSAGES.selfRole }
   }
-  if (code === 'last_admin_protected') return ERROR_MESSAGES.lastAdmin
+  if (code === 'last_admin_protected') {
+    return { code, message: ERROR_MESSAGES.lastAdmin }
+  }
   if (
     code === 'validation_error' ||
     code === 'malformed_json' ||
@@ -41,12 +58,26 @@ function mapAdminError(errorBody, fallbackMessage, { edit = false } = {}) {
     code === 'invalid_pagination' ||
     code === 'invalid_sort'
   ) {
-    return ERROR_MESSAGES.validation
+    return {
+      code: code || 'validation_error',
+      message: ERROR_MESSAGES.validation,
+    }
   }
   if (code === 'internal_error') {
-    return edit ? ERROR_MESSAGES.updateDefault : ERROR_MESSAGES.listDefault
+    return {
+      code: 'internal_error',
+      message: edit ? ERROR_MESSAGES.updateDefault : ERROR_MESSAGES.listDefault,
+    }
   }
-  return fallbackMessage || (edit ? ERROR_MESSAGES.updateDefault : ERROR_MESSAGES.listDefault)
+  return {
+    code: code || 'internal_error',
+    message: fallbackMessage || (edit ? ERROR_MESSAGES.updateDefault : ERROR_MESSAGES.listDefault),
+  }
+}
+
+function throwMappedAdminError(errorBody, fallbackMessage, options) {
+  const mapped = mapAdminError(errorBody, fallbackMessage, options)
+  throw new EmployeeAdminError(mapped.message, mapped.code)
 }
 
 function serverEmployeeToUi(row) {
@@ -67,12 +98,12 @@ function serverEmployeeToUi(row) {
 
 async function ensureCloudSession() {
   if (!isCloudMode() || !supabase) {
-    throw new Error('Доступно только в облачном режиме')
+    throw new EmployeeAdminError('Доступно только в облачном режиме', 'unavailable')
   }
 
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
   if (sessionError || !sessionData?.session?.access_token) {
-    throw new Error(ERROR_MESSAGES.unauthorized)
+    throw new EmployeeAdminError(ERROR_MESSAGES.unauthorized, 'unauthorized')
   }
 }
 
@@ -100,11 +131,11 @@ export async function listEmployeesForAdmin(options = {}) {
     const fallback = isGenericInvokeErrorMessage(error.message)
       ? ERROR_MESSAGES.listDefault
       : error.message
-    throw new Error(mapAdminError(contextBody, fallback))
+    throwMappedAdminError(contextBody, fallback)
   }
 
   if (!data?.ok || !Array.isArray(data.employees)) {
-    throw new Error(mapAdminError(data, ERROR_MESSAGES.listDefault))
+    throwMappedAdminError(data, ERROR_MESSAGES.listDefault)
   }
 
   return {
@@ -118,14 +149,25 @@ export async function listEmployeesForAdmin(options = {}) {
   }
 }
 
+function isLegacyEmployeeIdRejection(error) {
+  return (
+    error instanceof EmployeeAdminError &&
+    (error.code === 'forbidden_field' || error.code === 'validation_error')
+  )
+}
+
 /**
  * Cloud-only: load one employee for admin profile (employees.view).
- * Prefers employee_id filter; falls back to search hint for older Edge Function builds.
+ * Primary path: exact employee_id lookup.
+ *
+ * Temporary fallback: search by name/login hint when the deployed Edge Function
+ * still rejects the employee_id body key (pre-redeploy compatibility).
+ * Auth errors (401/403) are never masked by the fallback.
  */
-export async function getEmployeeForAdmin(employeeId, { searchHint = '' } = {}) {
+export async function getEmployeeForAdmin(employeeId, { searchHint = '', allowSearchFallback = true } = {}) {
   const normalizedId = Number(employeeId)
   if (!Number.isFinite(normalizedId) || normalizedId <= 0) {
-    return null
+    throw new EmployeeAdminError(ERROR_MESSAGES.notFound, 'employee_not_found')
   }
 
   try {
@@ -137,12 +179,34 @@ export async function getEmployeeForAdmin(employeeId, { searchHint = '' } = {}) 
     })
     const exact = byId.employees.find((row) => Number(row.id) === normalizedId)
     if (exact) return exact
-  } catch {
-    // Older admin-list-employees builds reject unknown employee_id.
+    throw new EmployeeAdminError(ERROR_MESSAGES.notFound, 'employee_not_found')
+  } catch (error) {
+    if (
+      error instanceof EmployeeAdminError &&
+      (error.code === 'unauthorized' ||
+        error.code === 'forbidden' ||
+        error.code === 'inactive_caller' ||
+        error.code === 'employee_not_found')
+    ) {
+      throw error
+    }
+
+    if (!allowSearchFallback || !isLegacyEmployeeIdRejection(error)) {
+      throw error
+    }
+
+    // Without a search hint the temporary fallback cannot run safely.
+    const hint = String(searchHint || '').trim()
+    if (!hint) {
+      throw error
+    }
   }
 
+  // Temporary fallback for older admin-list-employees builds without employee_id support.
   const hint = String(searchHint || '').trim()
-  if (!hint) return null
+  if (!hint) {
+    throw new EmployeeAdminError(ERROR_MESSAGES.notFound, 'employee_not_found')
+  }
 
   const bySearch = await listEmployeesForAdmin({
     page: 1,
@@ -151,7 +215,11 @@ export async function getEmployeeForAdmin(employeeId, { searchHint = '' } = {}) 
     search: hint,
   })
 
-  return bySearch.employees.find((row) => Number(row.id) === normalizedId) ?? null
+  const matched = bySearch.employees.find((row) => Number(row.id) === normalizedId)
+  if (!matched) {
+    throw new EmployeeAdminError(ERROR_MESSAGES.notFound, 'employee_not_found')
+  }
+  return matched
 }
 
 /**
@@ -181,11 +249,11 @@ export async function updateEmployeeAsAdmin(employeeId, changes) {
     const fallback = isGenericInvokeErrorMessage(error.message)
       ? ERROR_MESSAGES.updateDefault
       : error.message
-    throw new Error(mapAdminError(contextBody, fallback, { edit: true }))
+    throwMappedAdminError(contextBody, fallback, { edit: true })
   }
 
   if (!data?.ok || !data?.employee) {
-    throw new Error(mapAdminError(data, ERROR_MESSAGES.updateDefault, { edit: true }))
+    throwMappedAdminError(data, ERROR_MESSAGES.updateDefault, { edit: true })
   }
 
   return serverEmployeeToUi(data.employee)

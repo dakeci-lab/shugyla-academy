@@ -197,6 +197,11 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Exact employee_id lookup: unknown id must be a not-found response, not an empty list.
+  if (employeeIdFilter != null && employees.length === 0) {
+    return adminErrorResponse('employee_not_found', 404)
+  }
+
   return jsonResponse({
     ok: true,
     employees,

@@ -29,6 +29,8 @@ import { PERMISSION_CODES } from '../../../config/permissions'
 import AdminModal from '../AdminModal'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import ProfileAvatarEditor from '../../ProfileAvatarEditor'
+import '../RecruitmentSection.css'
+import './EmployeeEditModal.css'
 
 /**
  * Shared create/edit employee modal used by the list and employee profile.
@@ -40,6 +42,7 @@ export default function EmployeeEditModal({
   candidatePhone = '',
   onClose,
   onSaved,
+  onFormDirty,
   onRequestDeactivate,
   onRequestActivate,
   deactivating = false,
@@ -47,7 +50,7 @@ export default function EmployeeEditModal({
 }) {
   const cloudMode = isCloudMode()
   const { user: sessionUser } = useSession()
-  const { success: showSuccess } = useToast()
+  const { success: showSuccess, error: showError } = useToast()
   const editId = employee?.id ?? null
   const [form, setForm] = useState(() =>
     employee ? employeeToForm(employee) : { ...EMPTY_EMPLOYEE_FORM, ...(initialForm || {}) }
@@ -56,6 +59,7 @@ export default function EmployeeEditModal({
   const [submitting, setSubmitting] = useState(false)
   const [workLocations, setWorkLocations] = useState([])
   const [assignableRoles, setAssignableRoles] = useState([])
+  const [avatarRevision, setAvatarRevision] = useState(0)
 
   useEffect(() => {
     setForm(
@@ -64,6 +68,7 @@ export default function EmployeeEditModal({
         : { ...EMPTY_EMPLOYEE_FORM, ...(initialForm || {}) }
     )
     setFormError('')
+    setAvatarRevision(0)
   }, [employee, initialForm, sourceCandidateId])
 
   useEffect(() => {
@@ -98,12 +103,13 @@ export default function EmployeeEditModal({
     typeof onRequestActivate === 'function'
 
   function patchForm(patch) {
+    onFormDirty?.()
     setForm((current) => ({ ...current, ...patch }))
   }
 
   async function handleSave(event) {
     event.preventDefault()
-    if (submitting) return
+    if (submitting || deactivating || activating) return
 
     if (!editId && cloudMode) {
       const passwordError = validateEmployeeTemporaryPassword(form.password)
@@ -131,6 +137,7 @@ export default function EmployeeEditModal({
     }
 
     setSubmitting(true)
+    setFormError('')
     try {
       if (editId) {
         if (cloudMode) {
@@ -156,8 +163,8 @@ export default function EmployeeEditModal({
             ...(form.password?.trim() ? { password: form.password } : {}),
           })
         }
-        showSuccess('Сотрудник сохранён')
         await onSaved?.({ id: editId, mode: 'update' })
+        showSuccess('Сотрудник сохранён')
         onClose?.()
       } else {
         const payload = {
@@ -177,21 +184,29 @@ export default function EmployeeEditModal({
         if (sourceCandidateId) {
           await linkCandidateToEmployee(sourceCandidateId, newUserId)
         }
-        showSuccess('Сотрудник успешно создан')
         await onSaved?.({ id: newUserId, mode: 'create' })
+        showSuccess('Сотрудник успешно создан')
         onClose?.()
       }
     } catch (err) {
-      setFormError(err.message || 'Не удалось сохранить сотрудника')
+      const message = err.message || 'Не удалось сохранить сотрудника'
+      setFormError(message)
+      showError(message)
     } finally {
       setSubmitting(false)
     }
   }
 
+  const saveLabel = submitting
+    ? 'Сохранение…'
+    : sourceCandidateId
+      ? 'Создать сотрудника'
+      : 'Сохранить'
+
   return (
     <AdminModal
       title={editId ? 'Редактировать сотрудника' : 'Добавить сотрудника'}
-      onClose={onClose}
+      onClose={submitting ? () => {} : onClose}
       wide
       footer={
         <div className="employees-modal-footer">
@@ -220,7 +235,12 @@ export default function EmployeeEditModal({
             </Can>
           )}
           <div className="employees-modal-footer__actions">
-            <button type="button" className="btn btn--outline" onClick={onClose}>
+            <button
+              type="button"
+              className="btn btn--outline"
+              onClick={onClose}
+              disabled={submitting}
+            >
               Отмена
             </button>
             <button
@@ -228,8 +248,9 @@ export default function EmployeeEditModal({
               className="btn btn--primary"
               form="employee-form"
               disabled={submitting || deactivating || activating}
+              aria-busy={submitting}
             >
-              {sourceCandidateId ? 'Создать сотрудника' : 'Сохранить'}
+              {saveLabel}
             </button>
           </div>
         </div>
@@ -260,6 +281,7 @@ export default function EmployeeEditModal({
 
         {editId && !cloudMode && (
           <ProfileAvatarEditor
+            key={`${editId}-${avatarRevision}`}
             employeeId={editId}
             employee={{
               ...form,
@@ -268,7 +290,10 @@ export default function EmployeeEditModal({
                 getStaffEmployees('all').find((item) => item.id === editId)?.avatarUrl ||
                 form.avatarUrl,
             }}
-            onAvatarChange={() => {}}
+            onAvatarChange={async () => {
+              setAvatarRevision((value) => value + 1)
+              await onSaved?.({ id: editId, mode: 'avatar' })
+            }}
           />
         )}
 
@@ -280,6 +305,7 @@ export default function EmployeeEditModal({
               value={form.firstName}
               onChange={(e) => patchForm({ firstName: e.target.value })}
               required
+              disabled={submitting}
             />
           </label>
           <label className="admin-form__label">
@@ -288,6 +314,7 @@ export default function EmployeeEditModal({
               className="admin-form__input"
               value={form.lastName}
               onChange={(e) => patchForm({ lastName: e.target.value })}
+              disabled={submitting}
             />
           </label>
         </div>
@@ -297,7 +324,7 @@ export default function EmployeeEditModal({
           <select
             className="admin-form__select"
             value={form.roleId || form.role}
-            disabled={editingSelf}
+            disabled={editingSelf || submitting}
             onChange={(e) => {
               const value = e.target.value
               const role = assignableRoles.find((item) => item.id === value)
@@ -366,6 +393,7 @@ export default function EmployeeEditModal({
               className="admin-form__select"
               value={form.workLocationId || ''}
               onChange={(e) => patchForm({ workLocationId: e.target.value })}
+              disabled={submitting}
             >
               <option value="">По умолчанию (активная точка)</option>
               {workLocations
@@ -387,7 +415,7 @@ export default function EmployeeEditModal({
               value={form.login}
               onChange={(e) => patchForm({ login: e.target.value })}
               required={!editId}
-              disabled={Boolean(editId && cloudMode)}
+              disabled={Boolean(editId && cloudMode) || submitting}
               readOnly={Boolean(editId && cloudMode)}
             />
             {editId && cloudMode && (
@@ -407,6 +435,7 @@ export default function EmployeeEditModal({
                 required
                 minLength={MIN_EMPLOYEE_TEMP_PASSWORD_LENGTH}
                 autoComplete="new-password"
+                disabled={submitting}
               />
               {cloudMode && (
                 <span className="admin-form__hint">
@@ -424,6 +453,7 @@ export default function EmployeeEditModal({
                 value={form.password}
                 onChange={(e) => patchForm({ password: e.target.value })}
                 autoComplete="new-password"
+                disabled={submitting}
               />
             </label>
           )}
@@ -434,7 +464,7 @@ export default function EmployeeEditModal({
           <select
             className="admin-form__select"
             value={form.employmentStatus}
-            disabled={editingSelf}
+            disabled={editingSelf || submitting}
             onChange={(e) => patchForm({ employmentStatus: e.target.value })}
           >
             {EMPLOYEE_STATUS_OPTIONS.map((opt) => (

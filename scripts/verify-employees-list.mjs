@@ -36,6 +36,7 @@ function main() {
 
   const section = read('src/components/admin/sections/EmployeesSection.jsx')
   const sectionCss = read('src/components/admin/sections/EmployeesSection.css')
+  const editModal = read('src/components/admin/employees/EmployeeEditModal.jsx')
   const filter = read('src/components/admin/employees/EmployeeFilterPopover.jsx')
   const table = read('src/components/admin/employees/EmployeeListTable.jsx')
   const tableCss = read('src/components/admin/employees/EmployeeListTable.css')
@@ -77,8 +78,9 @@ function main() {
   assert('card avatar', table.includes('EmployeeAvatar'))
   assert('card role and login', table.includes('Роль:') && table.includes('Логин:'))
   assert('card no trash icon', !table.includes('TrashIcon'))
-  assert('card clickable edit', table.includes('employee-card-item--clickable'))
-  assert('card edit aria label', table.includes('Редактировать сотрудника'))
+  assert('card clickable opens profile', table.includes('employee-card-item--clickable'))
+  assert('card profile aria label', table.includes('Открыть карточку сотрудника'))
+  assert('pencil edit action present', table.includes('Редактировать сотрудника'))
   assert('no schedule navigation in table', !table.includes('openSchedule'))
   assert('no schedule route in section', !section.includes('/schedule'))
 
@@ -86,12 +88,14 @@ function main() {
 
   assert('number column', table.includes('employee-list-table__num-col'))
   assert('edit action only', table.includes('PencilIcon') && !table.includes('TrashIcon'))
-  assert('name opens edit', table.includes('employee-name-link'))
+  assert('name link present', table.includes('employee-name-link'))
+  assert('row opens profile', table.includes('employee-list-table__row--clickable'))
+  assert('shared edit modal used by list', section.includes('EmployeeEditModal'))
 
   console.log('Stage 5: Status actions in modal')
 
-  assert('deactivate in edit modal', section.includes('Деактивировать сотрудника'))
-  assert('activate in edit modal', section.includes('Активировать сотрудника'))
+  assert('deactivate in edit modal', editModal.includes('Деактивировать сотрудника'))
+  assert('activate in edit modal', editModal.includes('Активировать сотрудника'))
   assert('deactivate uses ConfirmDialog', section.includes('ConfirmDialog'))
   assert('deactivate uses deactivateEmployee', section.includes('deactivateEmployee'))
   assert('activate uses restoreEmployee', section.includes('restoreEmployee'))
@@ -99,6 +103,7 @@ function main() {
   assert('deactivate toast', section.includes("showSuccess('Сотрудник деактивирован')"))
   assert('activate toast', section.includes("showSuccess('Сотрудник активирован')"))
   assert('loading not over ready list', section.includes('showInitialLoading'))
+  assert('inline AdminModal form removed from list', !section.includes('<AdminModal'))
 
   console.log('Stage 6: Layout')
 

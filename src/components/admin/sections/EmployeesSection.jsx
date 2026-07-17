@@ -3,24 +3,17 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   getStaffEmployees,
   EMPTY_EMPLOYEE_FORM,
-  employeeToForm,
-  validateEmployeeForm,
   EMPLOYMENT_STATUS,
-  EMPLOYEE_STATUS_OPTIONS,
   EMPLOYEE_LIST_DEFAULT_STATUS,
   filterEmployees,
   isDeactivatedStaffEmployee,
   isActiveStaffEmployee,
 } from '../../../utils/employeeData'
 import {
-  createEmployee,
-  updateEmployee,
   deactivateEmployee,
   restoreEmployee,
   getCandidateById,
   getVacancyById,
-  linkCandidateToEmployee,
-  getWorkLocations,
 } from '../../../services/academyDataService'
 import { listEmployeesForAdmin } from '../../../services/employeeAdminService'
 import {
@@ -33,24 +26,21 @@ import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacSe
 import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
 import { isCloudMode } from '../../../lib/dataMode'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
-import {
-  MIN_EMPLOYEE_TEMP_PASSWORD_LENGTH,
-  validateEmployeeTemporaryPassword,
-} from '../../../utils/employeePasswordValidation'
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue'
 import useMediaQuery from '../../../hooks/useMediaQuery'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
 import Can from '../../auth/Can'
-import { PERMISSION_CODES, canManageEmployees } from '../../../config/permissions'
-import AdminModal from '../AdminModal'
+import {
+  PERMISSION_CODES,
+  canEditEmployees,
+  canManageEmployees,
+} from '../../../config/permissions'
 import ConfirmDialog from '../ConfirmDialog'
 import EmployeeFilterPopover from '../employees/EmployeeFilterPopover'
 import EmployeeListTable from '../employees/EmployeeListTable'
-import EmployeeAvatar from '../../EmployeeAvatar'
-import ProfileAvatarEditor from '../../ProfileAvatarEditor'
+import EmployeeEditModal from '../employees/EmployeeEditModal'
 import { FilterIcon, PlusIcon, SearchIcon } from '../../icons/PlatformIcons'
-import '../../EmployeeAvatar.css'
 import '../admin-shared.css'
 import '../RecruitmentSection.css'
 import './EmployeesSection.css'
@@ -94,26 +84,21 @@ export default function EmployeesSection() {
   const [listError, setListError] = useState('')
 
   const [showForm, setShowForm] = useState(false)
-  const [editId, setEditId] = useState(null)
   const [editingEmployee, setEditingEmployee] = useState(null)
-  const [form, setForm] = useState(EMPTY_EMPLOYEE_FORM)
-  const [formError, setFormError] = useState('')
+  const [createInitialForm, setCreateInitialForm] = useState(null)
   const [actionError, setActionError] = useState('')
-  const [successMessage, setSuccessMessage] = useState('')
   const [sourceCandidateId, setSourceCandidateId] = useState(null)
   const [candidatePhone, setCandidatePhone] = useState('')
   const [deactivateTarget, setDeactivateTarget] = useState(null)
   const [activateTarget, setActivateTarget] = useState(null)
   const [deactivating, setDeactivating] = useState(false)
   const [activating, setActivating] = useState(false)
-  const [workLocations, setWorkLocations] = useState([])
-  const [assignableRoles, setAssignableRoles] = useState([])
   const [filterRoles, setFilterRoles] = useState([])
-  const [submitting, setSubmitting] = useState(false)
 
   void version
 
-  const canEdit = canManageEmployees(sessionUser)
+  const canViewList = canManageEmployees(sessionUser)
+  const canEdit = canEditEmployees(sessionUser)
 
   const filtersActive =
     appliedStatus !== EMPLOYEE_LIST_DEFAULT_STATUS || Boolean(appliedRoleId)
@@ -155,21 +140,9 @@ export default function EmployeesSection() {
   }, [appliedStatus, debouncedSearch, appliedRoleId])
 
   useEffect(() => {
-    getRolesForEmployeeForm(form.role, form.roleId)
-      .then(setAssignableRoles)
-      .catch(() => setAssignableRoles([]))
-  }, [version, form.role, form.roleId])
-
-  useEffect(() => {
     getRolesForEmployeeForm('', '')
       .then(setFilterRoles)
       .catch(() => setFilterRoles([]))
-  }, [version])
-
-  useEffect(() => {
-    getWorkLocations()
-      .then(setWorkLocations)
-      .catch(() => setWorkLocations([]))
   }, [version])
 
   useEffect(() => {
@@ -222,7 +195,6 @@ export default function EmployeesSection() {
     version,
   ])
 
-  const editingSelf = Boolean(editId && sessionUser?.id === editId)
   const rowOffset = cloudMode ? (page - 1) * CLOUD_PAGE_SIZE : 0
   const totalPages = cloudPagination?.total_pages ?? 1
   const showInitialLoading =
@@ -235,9 +207,8 @@ export default function EmployeesSection() {
   function getRoleLabelForEmployee(employee) {
     const role =
       filterRoles.find((item) => item.id === employee.roleId) ||
-      assignableRoles.find((item) => item.id === employee.roleId) ||
       getRoleByCode(employee.role)
-    if (role) return formatRoleDisplayLabel(role, filterRoles.length ? filterRoles : assignableRoles)
+    if (role) return formatRoleDisplayLabel(role, filterRoles)
     return getRoleLabel(employee.role)
   }
 
@@ -249,6 +220,47 @@ export default function EmployeesSection() {
     if (appliedStatus === 'active') return 'Активные сотрудники не найдены.'
     if (appliedStatus === 'deactivated') return 'Деактивированные сотрудники не найдены.'
     return 'Сотрудники не найдены.'
+  }
+
+  function clearCandidateQuery() {
+    if (searchParams.get('createFromCandidate')) {
+      navigate('/platform/employees/list', { replace: true })
+    }
+  }
+
+  function closeForm() {
+    setShowForm(false)
+    setEditingEmployee(null)
+    setCreateInitialForm(null)
+    setSourceCandidateId(null)
+    setCandidatePhone('')
+    activeCandidateIdRef.current = null
+    formTouchedRef.current = false
+    clearCandidateQuery()
+  }
+
+  function openAdd() {
+    setActionError('')
+    setSourceCandidateId(null)
+    setCandidatePhone('')
+    activeCandidateIdRef.current = null
+    formTouchedRef.current = false
+    setEditingEmployee(null)
+    setCreateInitialForm({ ...EMPTY_EMPLOYEE_FORM })
+    clearCandidateQuery()
+    setShowForm(true)
+  }
+
+  function openEdit(emp) {
+    setActionError('')
+    setSourceCandidateId(null)
+    setCandidatePhone('')
+    activeCandidateIdRef.current = null
+    formTouchedRef.current = false
+    setCreateInitialForm(null)
+    setEditingEmployee(emp)
+    clearCandidateQuery()
+    setShowForm(true)
   }
 
   useEffect(() => {
@@ -288,7 +300,7 @@ export default function EmployeesSection() {
     if (candidateChanged) {
       activeCandidateIdRef.current = candidateId
       formTouchedRef.current = false
-      setForm({
+      setCreateInitialForm({
         ...EMPTY_EMPLOYEE_FORM,
         firstName: candidate.firstName || '',
         lastName: candidate.lastName || '',
@@ -296,66 +308,13 @@ export default function EmployeesSection() {
         avatarUrl: candidate.photoUrl || '',
         employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
       })
-      setFormError('')
     }
 
     setSourceCandidateId(candidateId)
     setCandidatePhone(candidate.phone || '')
-    setEditId(null)
     setEditingEmployee(null)
     setShowForm(true)
   }, [searchParams, version, showForm])
-
-  function patchForm(patch) {
-    formTouchedRef.current = true
-    setForm((current) => ({ ...current, ...patch }))
-  }
-
-  function clearCandidateQuery() {
-    if (searchParams.get('createFromCandidate')) {
-      navigate('/platform/employees/list', { replace: true })
-    }
-  }
-
-  function openAdd() {
-    setSuccessMessage('')
-    setSourceCandidateId(null)
-    setCandidatePhone('')
-    activeCandidateIdRef.current = null
-    formTouchedRef.current = false
-    setEditId(null)
-    setEditingEmployee(null)
-    setForm(EMPTY_EMPLOYEE_FORM)
-    setFormError('')
-    clearCandidateQuery()
-    setShowForm(true)
-  }
-
-  function openEdit(emp) {
-    setSourceCandidateId(null)
-    setCandidatePhone('')
-    activeCandidateIdRef.current = null
-    formTouchedRef.current = false
-    setEditId(emp.id)
-    setEditingEmployee(emp)
-    setForm(employeeToForm(emp))
-    setFormError('')
-    clearCandidateQuery()
-    setShowForm(true)
-  }
-
-  function closeForm() {
-    setShowForm(false)
-    setEditId(null)
-    setEditingEmployee(null)
-    setFormError('')
-    setSourceCandidateId(null)
-    setCandidatePhone('')
-    activeCandidateIdRef.current = null
-    formTouchedRef.current = false
-    setForm((current) => ({ ...current, password: '' }))
-    clearCandidateQuery()
-  }
 
   function toggleFilter() {
     if (filterOpen) {
@@ -393,100 +352,9 @@ export default function EmployeesSection() {
     }
   }
 
-  async function handleSave(e) {
-    e.preventDefault()
-    if (submitting) return
-
-    if (!editId && cloudMode) {
-      const passwordError = validateEmployeeTemporaryPassword(form.password)
-      if (passwordError) {
-        setFormError(passwordError)
-        return
-      }
-    }
-
-    const error = validateEmployeeForm(form, editId)
-    if (error) {
-      setFormError(error)
-      return
-    }
-
-    const selectedRole =
-      assignableRoles.find((role) => role.id === form.roleId) ||
-      getRoleByCode(form.role) ||
-      assignableRoles.find((role) => role.code === form.role)
-    const roleCode = selectedRole?.code || form.role
-
-    if (!editId && cloudMode && (!selectedRole?.id || selectedRole.isActive === false)) {
-      setFormError('Выбранная роль недоступна')
-      return
-    }
-
-    setSubmitting(true)
-    try {
-      if (editId) {
-        if (cloudMode) {
-          await updateEmployee(editId, {
-            firstName: form.firstName.trim(),
-            lastName: form.lastName.trim(),
-            roleId: selectedRole?.id || form.roleId || null,
-            position: selectedRole?.name || getRoleLabel(roleCode),
-            employmentStatus: form.employmentStatus,
-            avatarUrl: form.avatarUrl || null,
-          })
-        } else {
-          const payload = {
-            firstName: form.firstName.trim(),
-            lastName: form.lastName.trim(),
-            role: roleCode,
-            roleId: selectedRole?.id || form.roleId || null,
-            login: form.login.trim(),
-            position: selectedRole?.name || getRoleLabel(roleCode),
-            employmentStatus: form.employmentStatus,
-            workLocationId: form.workLocationId || null,
-            ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
-            ...(form.password?.trim() ? { password: form.password } : {}),
-          }
-          await updateEmployee(editId, payload)
-        }
-        closeForm()
-      } else {
-        const payload = {
-          firstName: form.firstName.trim(),
-          lastName: form.lastName.trim(),
-          role: roleCode,
-          roleId: selectedRole?.id || form.roleId || null,
-          login: form.login.trim(),
-          position: selectedRole?.name || getRoleLabel(roleCode),
-          employmentStatus: form.employmentStatus,
-          workLocationId: form.workLocationId || null,
-          sourceCandidateId: sourceCandidateId || undefined,
-          ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
-          ...(form.password?.trim() ? { password: form.password } : {}),
-        }
-        const newUserId = await createEmployee(payload)
-        if (sourceCandidateId) {
-          await linkCandidateToEmployee(sourceCandidateId, newUserId)
-        }
-        closeForm()
-        setSuccessMessage('Сотрудник успешно создан')
-      }
-      await afterCloudMutation()
-    } catch (err) {
-      setFormError(err.message || 'Не удалось сохранить сотрудника')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  function requestDeactivateFromModal() {
-    if (!editingEmployee) return
-    setDeactivateTarget(editingEmployee)
-  }
-
-  function requestActivateFromModal() {
-    if (!editingEmployee) return
-    setActivateTarget(editingEmployee)
+  async function handleEmployeeSaved() {
+    await afterCloudMutation()
+    refresh()
   }
 
   async function confirmDeactivate() {
@@ -499,6 +367,7 @@ export default function EmployeesSection() {
       closeForm()
       showSuccess('Сотрудник деактивирован')
       await afterCloudMutation()
+      refresh()
     } catch (err) {
       showError(err.message || 'Не удалось деактивировать сотрудника')
     } finally {
@@ -517,23 +386,13 @@ export default function EmployeesSection() {
       setAppliedStatus(EMPLOYEE_LIST_DEFAULT_STATUS)
       showSuccess('Сотрудник активирован')
       await afterCloudMutation()
+      refresh()
     } catch (err) {
       showError(err.message || 'Не удалось активировать сотрудника')
     } finally {
       setActivating(false)
     }
   }
-
-  const showDeactivateAction =
-    editId &&
-    editingEmployee &&
-    isActiveStaffEmployee(editingEmployee) &&
-    !editingSelf
-  const showActivateAction =
-    editId &&
-    editingEmployee &&
-    isDeactivatedStaffEmployee(editingEmployee) &&
-    !editingSelf
 
   return (
     <>
@@ -597,12 +456,6 @@ export default function EmployeesSection() {
         </Can>
       </div>
 
-      {successMessage && (
-        <p className="admin-success-banner" role="status">
-          {successMessage}
-        </p>
-      )}
-
       {listError && <p className="admin-form__error">{listError}</p>}
       {actionError && <p className="admin-form__error">{actionError}</p>}
 
@@ -617,7 +470,11 @@ export default function EmployeesSection() {
           getRoleLabelForEmployee={getRoleLabelForEmployee}
           canEdit={canEdit}
           onEdit={canEdit ? openEdit : null}
-          onOpen={(employee) => navigate(`/platform/employees/${employee.id}`)}
+          onOpen={
+            canViewList
+              ? (employee) => navigate(`/platform/employees/${employee.id}`)
+              : null
+          }
           emptyMessage={getEmptyMessage()}
         />
       )}
@@ -633,7 +490,8 @@ export default function EmployeesSection() {
             Предыдущая
           </button>
           <span className="admin-form__hint">
-            Страница {page} из {totalPages} · найдено {cloudPagination?.total ?? filteredEmployees.length}
+            Страница {page} из {totalPages} · найдено{' '}
+            {cloudPagination?.total ?? filteredEmployees.length}
           </span>
           <button
             type="button"
@@ -670,270 +528,37 @@ export default function EmployeesSection() {
       )}
 
       {showForm && (
-        <AdminModal
-          title={editId ? 'Редактировать сотрудника' : 'Добавить сотрудника'}
-          onClose={closeForm}
-          wide
-          footer={
-            <div className="employees-modal-footer">
-              {showDeactivateAction && (
-                <Can permission={PERMISSION_CODES.EMPLOYEES_DEACTIVATE}>
-                  <button
-                    type="button"
-                    className="btn employees-modal-footer__status-action employees-modal-footer__status-action--danger"
-                    disabled={submitting || deactivating || activating}
-                    onClick={requestDeactivateFromModal}
-                  >
-                    Деактивировать сотрудника
-                  </button>
-                </Can>
-              )}
-              {showActivateAction && (
-                <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
-                  <button
-                    type="button"
-                    className="btn employees-modal-footer__status-action employees-modal-footer__status-action--success"
-                    disabled={submitting || deactivating || activating}
-                    onClick={requestActivateFromModal}
-                  >
-                    Активировать сотрудника
-                  </button>
-                </Can>
-              )}
-              <div className="employees-modal-footer__actions">
-                <button type="button" className="btn btn--outline" onClick={closeForm}>
-                  Отмена
-                </button>
-                <button
-                  type="submit"
-                  className="btn btn--primary"
-                  form="employee-form"
-                  disabled={submitting || deactivating || activating}
-                >
-                  {sourceCandidateId ? 'Создать сотрудника' : 'Сохранить'}
-                </button>
-              </div>
-            </div>
+        <Can
+          permission={
+            editingEmployee
+              ? PERMISSION_CODES.EMPLOYEES_EDIT
+              : PERMISSION_CODES.EMPLOYEES_CREATE
           }
         >
-          <form id="employee-form" className="admin-form" onSubmit={handleSave}>
-            {sourceCandidateId && (
-              <div className="employee-form-candidate-meta">
-                {form.avatarUrl && (
-                  <EmployeeAvatar
-                    name={`${form.firstName} ${form.lastName}`.trim()}
-                    avatarUrl={form.avatarUrl}
-                    size="lg"
-                  />
-                )}
-                <div className="employee-form-candidate-meta__info">
-                  <p className="admin-form__hint">
-                    Данные заполнены из карточки кандидата. Логин и пароль укажите вручную.
-                  </p>
-                  {candidatePhone && (
-                    <p><strong>Телефон:</strong> {candidatePhone}</p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {editId && !cloudMode && (
-              <ProfileAvatarEditor
-                employeeId={editId}
-                employee={{
-                  ...form,
-                  name: `${form.firstName} ${form.lastName}`.trim(),
-                  avatarUrl:
-                    getStaffEmployees('all').find((item) => item.id === editId)?.avatarUrl ||
-                    form.avatarUrl,
-                }}
-                onAvatarChange={async () => {
-                  await refresh()
-                }}
-              />
-            )}
-
-            <div className="admin-form__row">
-              <label className="admin-form__label">
-                Имя *
-                <input
-                  className="admin-form__input"
-                  value={form.firstName}
-                  onChange={(e) => patchForm({ firstName: e.target.value })}
-                  required
-                />
-              </label>
-              <label className="admin-form__label">
-                Фамилия
-                <input
-                  className="admin-form__input"
-                  value={form.lastName}
-                  onChange={(e) => patchForm({ lastName: e.target.value })}
-                />
-              </label>
-            </div>
-
-            <label className="admin-form__label">
-              Роль в системе *
-              <select
-                className="admin-form__select"
-                value={form.roleId || form.role}
-                disabled={editingSelf}
-                onChange={(e) => {
-                  const value = e.target.value
-                  const role = assignableRoles.find((item) => item.id === value)
-                  patchForm({
-                    roleId: role?.id || '',
-                    role: role?.code || value,
-                  })
-                }}
-              >
-                {!form.roleId &&
-                  form.role &&
-                  !assignableRoles.some((role) => role.code === form.role) && (
-                    <option value={form.role}>
-                      {getRoleLabel(form.role)} (legacy)
-                    </option>
-                  )}
-                {editId &&
-                  form.roleId &&
-                  !assignableRoles.some((role) => role.id === form.roleId) && (
-                    <option value={form.roleId}>
-                      {formatRoleDisplayLabel(
-                        getRoleByCode(form.role) || {
-                          code: form.role,
-                          name: getRoleLabel(form.role),
-                          employeeCount: 0,
-                        },
-                        assignableRoles
-                      )}{' '}
-                      (неактивна)
-                    </option>
-                  )}
-                {assignableRoles.length === 0 &&
-                  [form.role].filter(Boolean).map((roleCode) => (
-                    <option key={roleCode} value={roleCode}>
-                      {formatRoleDisplayLabel(
-                        getRoleByCode(roleCode) || {
-                          code: roleCode,
-                          name: getRoleLabel(roleCode),
-                          employeeCount: 0,
-                        },
-                        assignableRoles
-                      )}
-                    </option>
-                  ))}
-                {assignableRoles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {formatRoleDisplayLabel(role, assignableRoles)}
-                    {!role.isActive ? ' (неактивна)' : ''}
-                  </option>
-                ))}
-              </select>
-              {editingSelf && (
-                <span className="admin-form__hint">
-                  Нельзя изменить собственную роль.
-                </span>
-              )}
-              {!editingSelf && (
-                <span className="admin-form__hint">
-                  Роль определяет доступ к разделам платформы через RBAC.
-                </span>
-              )}
-            </label>
-
-            {!cloudMode && workLocations.length > 0 && (
-              <label className="admin-form__label">
-                Рабочая точка
-                <select
-                  className="admin-form__select"
-                  value={form.workLocationId || ''}
-                  onChange={(e) => patchForm({ workLocationId: e.target.value })}
-                >
-                  <option value="">По умолчанию (активная точка)</option>
-                  {workLocations.filter((loc) => loc.isActive).map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            <div className="admin-form__row">
-              <label className="admin-form__label">
-                Логин *
-                <input
-                  className="admin-form__input"
-                  value={form.login}
-                  onChange={(e) => patchForm({ login: e.target.value })}
-                  required={!editId}
-                  disabled={Boolean(editId && cloudMode)}
-                  readOnly={Boolean(editId && cloudMode)}
-                />
-                {editId && cloudMode && (
-                  <span className="admin-form__hint">
-                    Изменение логина и данных входа будет доступно после безопасной синхронизации с Auth.
-                  </span>
-                )}
-              </label>
-              {!editId && (
-                <label className="admin-form__label">
-                  {cloudMode ? 'Временный пароль *' : 'Пароль *'}
-                  <input
-                    className="admin-form__input"
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => patchForm({ password: e.target.value })}
-                    required
-                    minLength={MIN_EMPLOYEE_TEMP_PASSWORD_LENGTH}
-                    autoComplete="new-password"
-                  />
-                  {cloudMode && (
-                    <span className="admin-form__hint">
-                      Используется для первого входа сотрудника через Supabase Auth.
-                    </span>
-                  )}
-                </label>
-              )}
-              {editId && !cloudMode && (
-                <label className="admin-form__label">
-                  Пароль (оставьте пустым, чтобы не менять)
-                  <input
-                    className="admin-form__input"
-                    type="password"
-                    value={form.password}
-                    onChange={(e) => patchForm({ password: e.target.value })}
-                    autoComplete="new-password"
-                  />
-                </label>
-              )}
-            </div>
-
-            <label className="admin-form__label">
-              Статус
-              <select
-                className="admin-form__select"
-                value={form.employmentStatus}
-                disabled={editingSelf}
-                onChange={(e) => patchForm({ employmentStatus: e.target.value })}
-              >
-                {EMPLOYEE_STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              {editingSelf && (
-                <span className="admin-form__hint">
-                  Нельзя изменить собственный статус.
-                </span>
-              )}
-            </label>
-
-            {formError && <p className="admin-form__error">{formError}</p>}
-          </form>
-        </AdminModal>
+          <EmployeeEditModal
+            employee={editingEmployee}
+            initialForm={editingEmployee ? null : createInitialForm}
+            sourceCandidateId={sourceCandidateId}
+            candidatePhone={candidatePhone}
+            onClose={closeForm}
+            onSaved={handleEmployeeSaved}
+            onFormDirty={() => {
+              formTouchedRef.current = true
+            }}
+            onRequestDeactivate={
+              editingEmployee && isActiveStaffEmployee(editingEmployee)
+                ? setDeactivateTarget
+                : undefined
+            }
+            onRequestActivate={
+              editingEmployee && isDeactivatedStaffEmployee(editingEmployee)
+                ? setActivateTarget
+                : undefined
+            }
+            deactivating={deactivating}
+            activating={activating}
+          />
+        </Can>
       )}
     </>
   )

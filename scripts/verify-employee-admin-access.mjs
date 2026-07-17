@@ -247,15 +247,21 @@ function stageFunctionConfig() {
 function stageStaticFrontend() {
   console.log('Stage 4: Frontend static checks')
   const section = fs.readFileSync(path.join(ROOT, 'src/components/admin/sections/EmployeesSection.jsx'), 'utf8')
+  const editModal = fs.readFileSync(
+    path.join(ROOT, 'src/components/admin/employees/EmployeeEditModal.jsx'),
+    'utf8'
+  )
   const adminService = fs.readFileSync(path.join(ROOT, 'src/services/employeeAdminService.js'), 'utf8')
   const academy = fs.readFileSync(path.join(ROOT, 'src/services/academyDataService.js'), 'utf8')
 
   assert('EmployeesSection uses listEmployeesForAdmin', section.includes('listEmployeesForAdmin'))
-  assert('EmployeesSection cloud edit uses updateEmployee', section.includes('updateEmployee(editId'))
-  assert('double submit blocked', section.includes('if (submitting) return'))
-  assert('cloud login disabled on edit', section.includes('disabled={Boolean(editId && cloudMode)}'))
+  assert('EmployeesSection uses shared EmployeeEditModal', section.includes('EmployeeEditModal'))
+  assert('EmployeeEditModal cloud edit uses updateEmployee', editModal.includes('await updateEmployee(editId'))
+  assert('double submit blocked', editModal.includes('if (submitting || deactivating || activating) return'))
+  assert('cloud login disabled on edit', editModal.includes('disabled={Boolean(editId && cloudMode) || submitting}'))
   assert('employeeAdminService uses functions.invoke', adminService.includes("supabase.functions.invoke('admin-list-employees'"))
   assert('cloud update uses admin function', adminService.includes("supabase.functions.invoke('admin-update-employee'"))
+  assert('direct employee_id lookup helper', adminService.includes('export async function getEmployeeForAdmin'))
   assert('academyDataService cloud update uses updateEmployeeAsAdmin', academy.includes('updateEmployeeAsAdmin'))
   assert('no service key in employeeAdminService', !adminService.includes('SERVICE_ROLE'))
   console.log('')
@@ -558,9 +564,30 @@ async function stageListValidation() {
 
   const extraField = await invoke(state.listUrl, {
     token: state.tokens.admin1,
-    body: { employee_id: 1 },
+    body: { unexpected_field: true },
   })
   assert('extra list field → 422', extraField.status === 422)
+
+  const byId = await invoke(state.listUrl, {
+    token: state.tokens.admin1,
+    body: { employee_id: state.targets.cashier.id, status: 'all' },
+  })
+  assert(
+    'exact employee_id lookup → 200',
+    byId.status === 200 &&
+      byId.json?.ok &&
+      byId.json.employees?.length === 1 &&
+      Number(byId.json.employees[0].id) === Number(state.targets.cashier.id)
+  )
+
+  const unknownId = await invoke(state.listUrl, {
+    token: state.tokens.admin1,
+    body: { employee_id: 999999999, status: 'all' },
+  })
+  assert(
+    'unknown employee_id → 404',
+    unknownId.status === 404 && unknownId.json?.code === 'employee_not_found'
+  )
 
   console.log('')
 }
