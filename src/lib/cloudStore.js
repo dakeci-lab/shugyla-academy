@@ -34,8 +34,17 @@ export function isCloudStoreLoaded() {
   return store.loaded
 }
 
+/** Ensure in-memory store can accept procurement patches even after a partial boot. */
+export function ensureCloudStoreReady() {
+  if (store.loaded) return
+  store = { ...emptyStore, loaded: true }
+}
+
 export function patchCloudStore(patch) {
-  if (!store.loaded || !patch) return
+  if (!patch) return
+  if (!store.loaded) {
+    ensureCloudStoreReady()
+  }
   if (patch.purchases !== undefined) store.purchases = patch.purchases
   if (patch.receivingDocuments !== undefined) {
     store.receivingDocuments = patch.receivingDocuments

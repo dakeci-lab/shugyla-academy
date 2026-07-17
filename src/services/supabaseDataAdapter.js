@@ -148,6 +148,23 @@ async function throwIfError(result, context) {
   return result.data
 }
 
+function settleTableResult(result, context, fallback = []) {
+  if (result?.error) {
+    console.error(`[${context}]`, result.error)
+    if (import.meta.env.DEV) {
+      console.error('[DataLoad]', {
+        context,
+        code: result.error.code,
+        message: result.error.message,
+        details: result.error.details,
+        hint: result.error.hint,
+      })
+    }
+    return fallback
+  }
+  return result?.data ?? fallback
+}
+
 export async function fetchAllData() {
   const [usersRes, coursesRes, lessonsRes, assignmentsRes, progressRes] =
     await Promise.all([
@@ -158,12 +175,12 @@ export async function fetchAllData() {
       supabase.from('academy_progress').select('*'),
     ])
 
-  // Auth-first RLS: authenticated users cannot list all employees yet (admin policy pending).
-  const users = usersRes.error ? [] : await throwIfError(usersRes, 'Загрузка сотрудников')
-  const courses = await throwIfError(coursesRes, 'Загрузка курсов')
-  const lessons = await throwIfError(lessonsRes, 'Загрузка уроков')
-  const assignments = await throwIfError(assignmentsRes, 'Загрузка назначений')
-  const progressRows = await throwIfError(progressRes, 'Загрузка прогресса')
+  // Soft-fail non-procurement tables so one RLS/grant failure cannot blank purchases.
+  const users = settleTableResult(usersRes, 'Загрузка сотрудников', [])
+  const courses = settleTableResult(coursesRes, 'Загрузка курсов', [])
+  const lessons = settleTableResult(lessonsRes, 'Загрузка уроков', [])
+  const assignments = settleTableResult(assignmentsRes, 'Загрузка назначений', [])
+  const progressRows = settleTableResult(progressRes, 'Загрузка прогресса', [])
 
   const assignmentMap = groupAssignments(assignments)
   const normalizedLessons = lessons.map(rowToLesson)
@@ -235,10 +252,30 @@ export async function fetchAllData() {
       : { vacancies: [], questions: [], candidates: [] }
   const suppliersData =
     suppliersResult.status === 'fulfilled' ? suppliersResult.value : { suppliers: [] }
-  const purchasesData =
-    purchasesResult.status === 'fulfilled' ? purchasesResult.value : { orders: [] }
-  const receivingData =
-    receivingResult.status === 'fulfilled' ? receivingResult.value : { documents: [] }
+  if (purchasesResult.status === 'rejected') {
+    console.error('[Загрузка закупов]', purchasesResult.reason)
+    if (import.meta.env.DEV) {
+      console.error('[DataLoad]', {
+        context: 'Загрузка закупов',
+        message: purchasesResult.reason?.message,
+        details: purchasesResult.reason?.details,
+        hint: purchasesResult.reason?.hint,
+      })
+    }
+    throw purchasesResult.reason instanceof Error
+      ? purchasesResult.reason
+      : new Error('Не удалось загрузить закупы с сервера')
+  }
+
+  if (receivingResult.status === 'rejected') {
+    console.error('[Загрузка приёмки]', receivingResult.reason)
+    throw receivingResult.reason instanceof Error
+      ? receivingResult.reason
+      : new Error('Не удалось загрузить документы приёмки с сервера')
+  }
+
+  const purchasesData = purchasesResult.value
+  const receivingData = receivingResult.value
 
   return {
     employees,

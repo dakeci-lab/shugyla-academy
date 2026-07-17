@@ -59,7 +59,8 @@
     "verify:notification-settings-admin": "node scripts/verify-notification-settings-admin.mjs",
     "verify:notification-test-broadcast": "node scripts/verify-notification-test-broadcast.mjs",
     "verify:web-push-background-delivery": "node scripts/verify-web-push-background-delivery.mjs",
-    "verify:web-push-vapid-consistency": "node scripts/verify-web-push-vapid-consistency.mjs"
+    "verify:web-push-vapid-consistency": "node scripts/verify-web-push-vapid-consistency.mjs",
+    "verify:procurement-cross-device-sync": "node scripts/verify-procurement-cross-device-sync.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",

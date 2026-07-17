@@ -1,6 +1,8 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
+import { useAcademyData } from '../../../context/AcademyDataContext'
+import { useToast } from '../../../context/ToastContext'
 import {
   canViewPurchases,
   canCreatePurchase,
@@ -18,6 +20,9 @@ import {
   deleteSimplePurchaseOptimistic,
   retrySimplePurchaseSync,
 } from '../../../services/purchaseOptimisticService'
+import { isCloudMode } from '../../../lib/dataMode'
+import { isCloudStoreLoaded } from '../../../lib/cloudStore'
+import { toUserErrorMessage } from '../../../utils/userErrorMessage'
 import {
   buildExpectedDeliveryEntries,
   filterSimplePurchases,
@@ -52,6 +57,8 @@ export default function ProcurementPage() {
   const { user } = useSession()
   const location = useLocation()
   const navigate = useNavigate()
+  const { error: showError } = useToast()
+  const { loadError, reloadProcurement } = useAcademyData()
   const { version, refresh, notifyChange } = useAdminRefresh()
   const {
     weekStartKey,
@@ -74,12 +81,58 @@ export default function ProcurementPage() {
   const [filterOpen, setFilterOpen] = useState(false)
   const [appliedFilters, setAppliedFilters] = useState(createDefaultPurchaseFilters)
   const [draftFilters, setDraftFilters] = useState(createDefaultPurchaseFilters)
+  const [procurementLoadError, setProcurementLoadError] = useState(null)
+  const [procurementRefreshing, setProcurementRefreshing] = useState(false)
 
   const canView = canViewPurchases(user)
   const canCreate = canCreatePurchase(user)
   const showActions = canEditPurchase(user)
 
   void version
+
+  useEffect(() => {
+    if (!canView || !isCloudMode()) return undefined
+
+    let cancelled = false
+
+    async function syncFromServer() {
+      setProcurementRefreshing(true)
+      try {
+        await reloadProcurement()
+        if (!cancelled) setProcurementLoadError(null)
+      } catch (error) {
+        const message = toUserErrorMessage(
+          error,
+          'Не удалось загрузить закупы с сервера.'
+        )
+        if (!cancelled) {
+          setProcurementLoadError(message)
+          showError(message)
+        }
+        if (import.meta.env.DEV) {
+          console.error('[ProcurementPage] reload failed', {
+            message: error?.message,
+            details: error?.details,
+            hint: error?.hint,
+            code: error?.code,
+          })
+        }
+      } finally {
+        if (!cancelled) setProcurementRefreshing(false)
+      }
+    }
+
+    void syncFromServer()
+    return () => {
+      cancelled = true
+    }
+  }, [canView, reloadProcurement, showError])
+
+  useEffect(() => {
+    if (loadError?.message) {
+      setProcurementLoadError(loadError.message)
+    }
+  }, [loadError])
 
   const simpleOrders = useMemo(() => {
     return filterSimplePurchases(getPurchaseOrdersSync())
@@ -303,6 +356,10 @@ export default function ProcurementPage() {
   }
 
   function getEmptyMessage() {
+    if (procurementLoadError) return procurementLoadError
+    if (isCloudMode() && !isCloudStoreLoaded() && procurementRefreshing) {
+      return 'Загрузка закупов…'
+    }
     if (!selectedDateKey) return 'Выберите день недели'
     if (simpleOrders.length === 0) return 'Закупы не созданы'
     if (appliedFilters.supplierId && dayOrders.length === 0) {

@@ -1,5 +1,11 @@
 import { isCloudMode, getDataModeLabel, getDataModeVariant } from '../lib/dataMode'
-import { setCloudStore, clearCloudStore, patchCloudStore, getCloudStore } from '../lib/cloudStore'
+import {
+  setCloudStore,
+  clearCloudStore,
+  patchCloudStore,
+  ensureCloudStoreReady,
+  getCloudStore,
+} from '../lib/cloudStore'
 import { normalizeEmployee } from '../utils/employeeData'
 import { createEmployeeWithAuth } from './employeeProvisioningService'
 import { updateEmployeeAsAdmin } from './employeeAdminService'
@@ -151,19 +157,27 @@ export async function refreshProcurementData() {
     import('./receivingSupabaseAdapter'),
   ])
 
-  const [purchasesData, receivingData] = await Promise.all([
+  const [purchasesResult, receivingResult] = await Promise.allSettled([
     fetchPurchasesDataCloud(),
     fetchReceivingDataCloud(),
   ])
 
+  if (purchasesResult.status === 'rejected') {
+    throw purchasesResult.reason
+  }
+  if (receivingResult.status === 'rejected') {
+    throw receivingResult.reason
+  }
+
+  ensureCloudStoreReady()
   patchCloudStore({
-    purchases: purchasesData.orders,
-    receivingDocuments: receivingData.documents,
+    purchases: purchasesResult.value.orders,
+    receivingDocuments: receivingResult.value.documents,
   })
 
   return {
-    purchases: purchasesData.orders,
-    receivingDocuments: receivingData.documents,
+    purchases: purchasesResult.value.orders,
+    receivingDocuments: receivingResult.value.documents,
   }
 }
 
