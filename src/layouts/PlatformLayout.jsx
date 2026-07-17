@@ -19,8 +19,15 @@ import './PlatformLayout.css'
 function PlatformLayoutShell({ onLogout }) {
   const { user } = useSession()
   const { reload } = useAcademyData()
-  useProcurementRealtime(Boolean(user))
   const { pathname } = useLocation()
+  const procurementRealtimeEnabled = useMemo(() => {
+    if (!user) return false
+    return (
+      pathname.includes('/platform/procurement') ||
+      pathname.includes('/platform/receiving')
+    )
+  }, [user, pathname])
+  useProcurementRealtime(procurementRealtimeEnabled)
   const titleContext = usePlatformPageTitleContext()
   const section = useMemo(() => getPlatformSection(pathname), [pathname])
   const pageTitle = titleContext?.override?.title || section.title || 'Shugyla Platform'

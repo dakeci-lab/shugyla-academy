@@ -1,31 +1,55 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import StatCard from '../../components/admin/StatCard'
 import { getOverviewStats } from '../../utils/adminStats'
 import { getActiveSuppliersCount } from '../../utils/supplierData'
 import { isCloudMode, getDataModeLabel } from '../../lib/dataMode'
+import { isModuleReady } from '../../lib/cloudStore'
+import { useAcademyData } from '../../context/AcademyDataContext'
 import '../../components/admin/admin-shared.css'
 import './PlatformDashboard.css'
 
+function formatStatValue(ready, value) {
+  if (!ready) return '…'
+  return value
+}
+
 /** Панель управления Shugyla Platform */
 export default function PlatformDashboard() {
-  const stats = getOverviewStats()
+  const { ensureModules, version } = useAcademyData()
   const cloudMode = isCloudMode()
-  const activeSuppliers = getActiveSuppliersCount()
+
+  useEffect(() => {
+    if (!cloudMode) return
+    void ensureModules(['employees', 'courses', 'suppliers'])
+  }, [cloudMode, ensureModules])
+
+  void version
+
+  const employeesReady = !cloudMode || isModuleReady('employees')
+  const coursesReady = !cloudMode || isModuleReady('courses')
+  const suppliersReady = !cloudMode || isModuleReady('suppliers')
+
+  const stats = employeesReady && coursesReady ? getOverviewStats() : {
+    totalEmployees: 0,
+    totalCourses: 0,
+  }
+  const activeSuppliers = suppliersReady ? getActiveSuppliersCount() : 0
 
   const cards = [
     {
       icon: '👥',
-      value: stats.totalEmployees,
+      value: formatStatValue(employeesReady, stats.totalEmployees),
       label: 'Сотрудники',
-      hint: 'Активные сотрудники магазина',
+      hint: employeesReady ? 'Активные сотрудники магазина' : 'Загрузка…',
       to: '/platform/employees',
       variant: 'default',
     },
     {
       icon: '📚',
-      value: stats.totalCourses,
+      value: formatStatValue(coursesReady, stats.totalCourses),
       label: 'Курсы',
-      hint: 'Курсы в модуле Academy',
+      hint: coursesReady ? 'Курсы в модуле Academy' : 'Загрузка…',
       to: '/platform/academy',
       variant: 'info',
     },
@@ -39,25 +63,25 @@ export default function PlatformDashboard() {
     },
     {
       icon: '◫',
-      value: activeSuppliers,
+      value: formatStatValue(suppliersReady, activeSuppliers),
       label: 'Поставщики',
-      hint: 'Активные поставщики',
+      hint: suppliersReady ? 'Активные поставщики' : 'Загрузка…',
       to: '/platform/suppliers',
       variant: 'default',
     },
     {
       icon: '⇄',
-      value: 0,
+      value: '—',
       label: 'Активные закупы',
-      hint: 'Закупки в работе',
+      hint: 'Откройте раздел закупа',
       to: '/platform/procurement',
       variant: 'warning',
     },
     {
       icon: '↧',
-      value: 0,
+      value: '—',
       label: 'Ожидаемые приёмки',
-      hint: 'Поставки к приёмке',
+      hint: 'Откройте раздел приёмки',
       to: '/platform/receiving',
       variant: 'warning',
     },

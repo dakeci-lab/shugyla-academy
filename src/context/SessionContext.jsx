@@ -286,6 +286,10 @@ export function SessionProvider({ children }) {
     setSupabaseAuthenticated(false)
     setAuthStatus(AUTH_STATUS.UNAUTHENTICATED)
     setRbacReady(false)
+    if (isCloudMode()) {
+      const { resetCloudBootstrapState } = await import('../services/academyDataService')
+      resetCloudBootstrapState()
+    }
   }, [])
 
   const sessionReady = authStatus !== AUTH_STATUS.LOADING

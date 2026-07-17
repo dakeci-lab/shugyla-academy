@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { getAllCourses } from '../../../utils/adminData'
 import {
   createCourse,
@@ -7,6 +7,9 @@ import {
   archiveCourse,
   restoreCourse,
 } from '../../../services/academyDataService'
+import { useAcademyData } from '../../../context/AcademyDataContext'
+import { isCloudMode } from '../../../lib/dataMode'
+import { isModuleReady, isModuleLoading } from '../../../lib/cloudStore'
 import {
   COURSE_STATUS,
   COURSE_STATUS_LABELS,
@@ -47,6 +50,7 @@ function formatUpdatedAt(value) {
 /** Раздел «Курсы» — полный CRUD */
 export default function CoursesSection() {
   const { version, refresh } = useAdminRefresh()
+  const { ensureModules } = useAcademyData()
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -56,7 +60,14 @@ export default function CoursesSection() {
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [search, setSearch] = useState('')
 
+  useEffect(() => {
+    if (!isCloudMode()) return
+    void ensureModules(['courses', 'academyLearning'])
+  }, [ensureModules])
+
   void version
+  const coursesLoading =
+    isCloudMode() && (isModuleLoading('courses') || !isModuleReady('courses'))
 
   const courses = getAllCourses()
 
@@ -236,7 +247,9 @@ export default function CoursesSection() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={8} className="admin-empty">Курсы не найдены</td>
+                <td colSpan={8} className="admin-empty">
+                  {coursesLoading ? 'Загрузка курсов…' : 'Курсы не найдены'}
+                </td>
               </tr>
             ) : (
               filtered.map((course) => (

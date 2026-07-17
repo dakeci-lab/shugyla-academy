@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getAllEmployees } from '../../utils/adminData'
 import { getAssignableCourses } from '../../utils/courseAccess'
@@ -8,12 +8,16 @@ import {
 } from '../../services/academyDataService'
 import { ACADEMY_COURSE_ROLES, getAcademyCourseRoleLabel } from '../../data/roles'
 import { useAdminRefresh } from '../../hooks/useAdminRefresh'
+import { useAcademyData } from '../../context/AcademyDataContext'
+import { isCloudMode } from '../../lib/dataMode'
+import { isModuleReady, isModuleLoading, getModuleError } from '../../lib/cloudStore'
 import '../admin/admin-shared.css'
 import '../../pages/platform/PlatformAcademy.css'
 
 /** Назначение обучения — курсы сотрудникам и ролям */
 export default function AcademyAssignmentContent() {
   const { refresh } = useAdminRefresh()
+  const { ensureModules, version } = useAcademyData()
   const [mode, setMode] = useState('role')
   const [employeeId, setEmployeeId] = useState('')
   const [roleId, setRoleId] = useState(ACADEMY_COURSE_ROLES[0]?.id || 'cashier')
@@ -22,8 +26,24 @@ export default function AcademyAssignmentContent() {
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
 
-  const employees = getAllEmployees().filter((e) => e.employmentStatus !== 'inactive')
-  const courses = getAssignableCourses()
+  useEffect(() => {
+    if (!isCloudMode()) return
+    void ensureModules(['employees', 'courses', 'academyLearning'])
+  }, [ensureModules])
+
+  void version
+  const dataLoading =
+    isCloudMode() &&
+    (isModuleLoading('employees') ||
+      isModuleLoading('courses') ||
+      !isModuleReady('employees') ||
+      !isModuleReady('courses'))
+  const dataError =
+    (isCloudMode() && (getModuleError('employees') || getModuleError('courses'))) || null
+  const employees = dataLoading || dataError
+    ? []
+    : getAllEmployees().filter((e) => e.employmentStatus !== 'inactive')
+  const courses = dataLoading || dataError ? [] : getAssignableCourses()
 
   async function handleAssign(e) {
     e.preventDefault()
@@ -75,6 +95,14 @@ export default function AcademyAssignmentContent() {
 
       {message && <p className="admin-form__success">{message}</p>}
       {error && <p className="admin-form__error">{error}</p>}
+      {dataError && (
+        <p className="admin-form__error">
+          Не удалось загрузить сотрудников или курсы. Попробуйте обновить страницу.
+        </p>
+      )}
+      {dataLoading && !dataError && (
+        <p className="admin-form__hint">Загрузка сотрудников и курсов…</p>
+      )}
 
       <form className="admin-form platform-academy__assignment-form" onSubmit={handleAssign}>
         <div className="admin-form__label">

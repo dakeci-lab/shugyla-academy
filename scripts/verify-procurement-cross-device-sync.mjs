@@ -50,28 +50,39 @@ function main() {
   assert('exposes loadError', academyCtx.includes('loadError'))
   assert('classifies access errors', academyCtx.includes("code: 'access'"))
 
-  console.log('Stage 2: Purchase fetch is not silently emptied')
+  console.log('Stage 2: Purchase fetch failure isolation (Stage 1)')
   assert('soft-fails non-procurement tables', supabaseAdapter.includes('settleTableResult'))
-  assert('throws on purchase load failure', supabaseAdapter.includes("throw purchasesResult.reason"))
-  assert('throws on receiving load failure', supabaseAdapter.includes("throw receivingResult.reason"))
+  assert(
+    'fetchAllData does not hard-throw purchases',
+    !/purchasesResult\.status === 'rejected'[\s\S]{0,120}throw purchasesResult/.test(supabaseAdapter)
+  )
+  assert(
+    'fetchAllData does not hard-throw receiving',
+    !/receivingResult\.status === 'rejected'[\s\S]{0,120}throw receivingResult/.test(supabaseAdapter)
+  )
+  assert('module load states for procurement', cloudStore.includes("'procurement'"))
+  assert('purchases loading vs ready helpers', purchaseService.includes('isPurchasesDataReady'))
 
   console.log('Stage 3: Procurement refresh works after partial boot')
   assert('ensureCloudStoreReady exists', cloudStore.includes('ensureCloudStoreReady'))
   assert('patchCloudStore boots store if needed', cloudStore.includes('if (!store.loaded)'))
   assert('refreshProcurement uses ensureCloudStoreReady', academyService.includes('ensureCloudStoreReady()'))
   assert('refreshProcurement surfaces purchase errors', academyService.includes("throw purchasesResult.reason"))
+  assert('refreshProcurement marks module error', academyService.includes("markModuleError('procurement'"))
 
   console.log('Stage 4: Procurement page sync + error UX')
   assert('page reloads procurement on open', page.includes('reloadProcurement()'))
   assert('page shows toast on load error', page.includes('showError(message)'))
   assert('empty state uses load error message', page.includes('if (procurementLoadError) return procurementLoadError'))
   assert('does not treat load error as empty catalog only', page.includes('procurementLoadError'))
+  assert('empty state waits for module loading', page.includes('isPurchasesDataLoading'))
+  assert('empty state shows loading copy', page.includes('Загрузка закупов'))
 
   console.log('Stage 5: Source of truth')
   assert('cloud list reads cloudStore + overlay', purchaseService.includes('getCloudPurchases()'))
+  assert('sync source gated on module ready', purchaseService.includes("isModuleReady('procurement')"))
   assert('optimistic create syncs to supabase', optimistic.includes('syncSimplePurchaseCloud'))
   assert('overlay is merge-only for pending/error', read('src/services/purchaseOptimisticStore.js').includes('getOptimisticOverlayForMerge'))
-
   console.log('Stage 6: Secure RLS migration')
   assert('migration revokes anon purchase_orders', migration.includes('revoke all on table public.purchase_orders from anon'))
   assert('migration requires active employee helper', migration.includes('current_employee_is_active'))

@@ -198,10 +198,14 @@ export default function StandardsPage({ embedded = false, basePath = '/standards
   const { slug } = useParams()
   const navigate = useNavigate()
   const { user } = useSession()
-  const { version, reload } = useAcademyData()
+  const { version, reload, ensureModules } = useAcademyData()
   const [search, setSearch] = useState('')
   const [readFilter, setReadFilter] = useState('all')
   const [categoryId, setCategoryId] = useState('')
+
+  useEffect(() => {
+    void ensureModules(['standards'])
+  }, [ensureModules])
 
   void version
 

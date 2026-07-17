@@ -1,4 +1,23 @@
-/** In-memory cache for cloud mode — populated after Supabase fetch */
+/** In-memory cache for cloud mode — populated progressively after Auth */
+
+export const MODULE_STATUS = {
+  IDLE: 'idle',
+  LOADING: 'loading',
+  READY: 'ready',
+  ERROR: 'error',
+}
+
+/** Logical cloud data modules (bootstrap / route readiness). */
+export const CLOUD_MODULES = [
+  'employees',
+  'courses',
+  'academyLearning',
+  'standards',
+  'recruitment',
+  'suppliers',
+  'procurement',
+  'receiving',
+]
 
 const emptyStore = {
   loaded: false,
@@ -24,12 +43,25 @@ const emptyStore = {
   receivingDocuments: [],
 }
 
+function createIdleModuleStates() {
+  return Object.fromEntries(CLOUD_MODULES.map((name) => [name, MODULE_STATUS.IDLE]))
+}
+
 let store = { ...emptyStore }
+let moduleStates = createIdleModuleStates()
+let moduleErrors = {}
+
+function assertModuleName(moduleName) {
+  if (!CLOUD_MODULES.includes(moduleName)) {
+    throw new Error(`Unknown cloud module: ${moduleName}`)
+  }
+}
 
 export function getCloudStore() {
   return store
 }
 
+/** @deprecated Prefer getModuleLoadState / isModuleReady. Kept for compatibility. */
 export function isCloudStoreLoaded() {
   return store.loaded
 }
@@ -37,7 +69,55 @@ export function isCloudStoreLoaded() {
 /** Ensure in-memory store can accept procurement patches even after a partial boot. */
 export function ensureCloudStoreReady() {
   if (store.loaded) return
-  store = { ...emptyStore, loaded: true }
+  store = { ...store, loaded: true }
+}
+
+export function getModuleLoadState(moduleName) {
+  assertModuleName(moduleName)
+  return moduleStates[moduleName] || MODULE_STATUS.IDLE
+}
+
+export function getAllModuleLoadStates() {
+  return { ...moduleStates }
+}
+
+export function isModuleReady(moduleName) {
+  return getModuleLoadState(moduleName) === MODULE_STATUS.READY
+}
+
+export function isModuleLoading(moduleName) {
+  return getModuleLoadState(moduleName) === MODULE_STATUS.LOADING
+}
+
+export function getModuleError(moduleName) {
+  assertModuleName(moduleName)
+  return moduleErrors[moduleName] || null
+}
+
+export function markModuleLoading(moduleName) {
+  assertModuleName(moduleName)
+  moduleStates = { ...moduleStates, [moduleName]: MODULE_STATUS.LOADING }
+  delete moduleErrors[moduleName]
+}
+
+export function markModuleReady(moduleName) {
+  assertModuleName(moduleName)
+  moduleStates = { ...moduleStates, [moduleName]: MODULE_STATUS.READY }
+  delete moduleErrors[moduleName]
+  ensureCloudStoreReady()
+}
+
+export function markModuleError(moduleName, error) {
+  assertModuleName(moduleName)
+  moduleStates = { ...moduleStates, [moduleName]: MODULE_STATUS.ERROR }
+  moduleErrors[moduleName] =
+    error instanceof Error ? error : new Error(String(error || 'Module load failed'))
+  ensureCloudStoreReady()
+}
+
+export function resetModuleLoadStates() {
+  moduleStates = createIdleModuleStates()
+  moduleErrors = {}
 }
 
 export function patchCloudStore(patch) {
@@ -45,6 +125,32 @@ export function patchCloudStore(patch) {
   if (!store.loaded) {
     ensureCloudStoreReady()
   }
+  if (patch.employees !== undefined) store.employees = patch.employees
+  if (patch.courses !== undefined) store.courses = patch.courses
+  if (patch.lessons !== undefined) store.lessons = patch.lessons
+  if (patch.assignments !== undefined) store.assignments = patch.assignments
+  if (patch.progress !== undefined) store.progress = patch.progress
+  if (patch.tests !== undefined) store.tests = patch.tests
+  if (patch.testQuestions !== undefined) store.testQuestions = patch.testQuestions
+  if (patch.testAttempts !== undefined) store.testAttempts = patch.testAttempts
+  if (patch.learningPaths !== undefined) store.learningPaths = patch.learningPaths
+  if (patch.learningPathCourses !== undefined) {
+    store.learningPathCourses = patch.learningPathCourses
+  }
+  if (patch.userLearningPaths !== undefined) store.userLearningPaths = patch.userLearningPaths
+  if (patch.standardCategories !== undefined) {
+    store.standardCategories = patch.standardCategories
+  }
+  if (patch.standardArticles !== undefined) store.standardArticles = patch.standardArticles
+  if (patch.standardArticleReads !== undefined) {
+    store.standardArticleReads = patch.standardArticleReads
+  }
+  if (patch.vacancies !== undefined) store.vacancies = patch.vacancies
+  if (patch.candidateQuestions !== undefined) {
+    store.candidateQuestions = patch.candidateQuestions
+  }
+  if (patch.candidates !== undefined) store.candidates = patch.candidates
+  if (patch.suppliers !== undefined) store.suppliers = patch.suppliers
   if (patch.purchases !== undefined) store.purchases = patch.purchases
   if (patch.receivingDocuments !== undefined) {
     store.receivingDocuments = patch.receivingDocuments
@@ -75,86 +181,96 @@ export function setCloudStore(data) {
     purchases: data.purchases || [],
     receivingDocuments: data.receivingDocuments || [],
   }
+
+  for (const name of CLOUD_MODULES) {
+    markModuleReady(name)
+  }
 }
 
 export function clearCloudStore() {
   store = { ...emptyStore }
+  resetModuleLoadStates()
+}
+
+function readWhenReady(moduleName, value) {
+  return isModuleReady(moduleName) ? value : null
 }
 
 export function getCloudEmployees() {
-  return store.loaded ? store.employees : null
+  return readWhenReady('employees', store.employees)
 }
 
 export function getCloudCourses() {
-  return store.loaded ? store.courses : null
+  return readWhenReady('courses', store.courses)
 }
 
 export function getCloudLessons() {
-  return store.loaded ? store.lessons : null
+  // Lessons/progress arrive with core employees+courses fetch.
+  return readWhenReady('employees', store.lessons)
 }
 
 export function getCloudProgress() {
-  return store.loaded ? store.progress : null
+  return readWhenReady('employees', store.progress)
 }
 
 export function getCloudTests() {
-  return store.loaded ? store.tests : null
+  return readWhenReady('academyLearning', store.tests)
 }
 
 export function getCloudTestQuestions() {
-  return store.loaded ? store.testQuestions : null
+  return readWhenReady('academyLearning', store.testQuestions)
 }
 
 export function getCloudTestAttempts() {
-  return store.loaded ? store.testAttempts : null
+  return readWhenReady('academyLearning', store.testAttempts)
 }
 
 export function getCloudLearningPaths() {
-  return store.loaded ? store.learningPaths : null
+  return readWhenReady('academyLearning', store.learningPaths)
 }
 
 export function getCloudLearningPathCourses() {
-  return store.loaded ? store.learningPathCourses : null
+  return readWhenReady('academyLearning', store.learningPathCourses)
 }
 
 export function getCloudUserLearningPaths() {
-  return store.loaded ? store.userLearningPaths : null
+  return readWhenReady('academyLearning', store.userLearningPaths)
 }
 
 export function getCloudStandardCategories() {
-  return store.loaded ? store.standardCategories : null
+  return readWhenReady('standards', store.standardCategories)
 }
 
 export function getCloudStandardArticles() {
-  return store.loaded ? store.standardArticles : null
+  return readWhenReady('standards', store.standardArticles)
 }
 
 export function getCloudStandardArticleReads() {
-  return store.loaded ? store.standardArticleReads : null
+  return readWhenReady('standards', store.standardArticleReads)
 }
 
 export function getCloudVacancies() {
-  return store.loaded ? store.vacancies : null
+  return readWhenReady('recruitment', store.vacancies)
 }
 
 export function getCloudCandidateQuestions() {
-  return store.loaded ? store.candidateQuestions : null
+  return readWhenReady('recruitment', store.candidateQuestions)
 }
 
 export function getCloudCandidates() {
-  return store.loaded ? store.candidates : null
+  return readWhenReady('recruitment', store.candidates)
 }
 
 export function getCloudSuppliers() {
-  return store.loaded ? store.suppliers : null
+  return readWhenReady('suppliers', store.suppliers)
 }
 
 export function getCloudPurchases() {
-  return store.loaded ? store.purchases : null
+  return readWhenReady('procurement', store.purchases)
 }
 
 export function getCloudReceivingDocuments() {
-  return store.loaded ? store.receivingDocuments : null
+  return readWhenReady('receiving', store.receivingDocuments)
 }
 
 export function upsertCloudPurchase(order) {

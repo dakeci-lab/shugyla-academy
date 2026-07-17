@@ -165,7 +165,8 @@ function settleTableResult(result, context, fallback = []) {
   return result?.data ?? fallback
 }
 
-export async function fetchAllData() {
+/** Core academy tables (employees / courses / lessons / assignments / progress). */
+export async function fetchCoreAcademyData() {
   const [usersRes, coursesRes, lessonsRes, assignmentsRes, progressRes] =
     await Promise.all([
       supabase.from('academy_users').select(ACADEMY_PROFILE_SAFE_FIELDS).order('id'),
@@ -175,7 +176,6 @@ export async function fetchAllData() {
       supabase.from('academy_progress').select('*'),
     ])
 
-  // Soft-fail non-procurement tables so one RLS/grant failure cannot blank purchases.
   const users = settleTableResult(usersRes, 'Загрузка сотрудников', [])
   const courses = settleTableResult(coursesRes, 'Загрузка курсов', [])
   const lessons = settleTableResult(lessonsRes, 'Загрузка уроков', [])
@@ -208,29 +208,20 @@ export async function fetchAllData() {
     normalizedLessons
   )
 
-  const [
-    testsResult,
-    pathsResult,
-    standardsResult,
-    recruitmentResult,
-    suppliersResult,
-    purchasesResult,
-    receivingResult,
-  ] = await Promise.allSettled([
+  return {
+    employees,
+    courses: normalizedCourses,
+    lessons: normalizedLessons,
+    assignments,
+    progress: buildProgressMap(progressRows),
+  }
+}
+
+export async function fetchAcademyLearningExtras() {
+  const [testsResult, pathsResult] = await Promise.allSettled([
     fetchTestsData(),
     import('./learningPathSupabaseAdapter').then(({ fetchLearningPathsData }) =>
       fetchLearningPathsData()
-    ),
-    import('./standardsSupabaseAdapter').then(({ fetchStandardsData }) => fetchStandardsData()),
-    import('./recruitmentSupabaseAdapter').then(({ fetchRecruitmentData }) =>
-      fetchRecruitmentData()
-    ),
-    import('./suppliersSupabaseAdapter').then(({ fetchSuppliersData }) => fetchSuppliersData()),
-    import('./purchaseSupabaseAdapter').then(({ fetchPurchasesDataCloud }) =>
-      fetchPurchasesDataCloud()
-    ),
-    import('./receivingSupabaseAdapter').then(({ fetchReceivingDataCloud }) =>
-      fetchReceivingDataCloud()
     ),
   ])
 
@@ -242,62 +233,137 @@ export async function fetchAllData() {
     pathsResult.status === 'fulfilled'
       ? pathsResult.value
       : { paths: [], pathCourses: [], userPaths: [] }
-  const standardsData =
-    standardsResult.status === 'fulfilled'
-      ? standardsResult.value
-      : { categories: [], articles: [], reads: [] }
-  const recruitmentData =
-    recruitmentResult.status === 'fulfilled'
-      ? recruitmentResult.value
-      : { vacancies: [], questions: [], candidates: [] }
-  const suppliersData =
-    suppliersResult.status === 'fulfilled' ? suppliersResult.value : { suppliers: [] }
-  if (purchasesResult.status === 'rejected') {
-    console.error('[Загрузка закупов]', purchasesResult.reason)
-    if (import.meta.env.DEV) {
-      console.error('[DataLoad]', {
-        context: 'Загрузка закупов',
-        message: purchasesResult.reason?.message,
-        details: purchasesResult.reason?.details,
-        hint: purchasesResult.reason?.hint,
-      })
-    }
-    throw purchasesResult.reason instanceof Error
-      ? purchasesResult.reason
-      : new Error('Не удалось загрузить закупы с сервера')
-  }
 
-  if (receivingResult.status === 'rejected') {
-    console.error('[Загрузка приёмки]', receivingResult.reason)
-    throw receivingResult.reason instanceof Error
-      ? receivingResult.reason
-      : new Error('Не удалось загрузить документы приёмки с сервера')
+  if (testsResult.status === 'rejected') {
+    console.error('[Загрузка тестов]', testsResult.reason)
   }
-
-  const purchasesData = purchasesResult.value
-  const receivingData = receivingResult.value
+  if (pathsResult.status === 'rejected') {
+    console.error('[Загрузка learning paths]', pathsResult.reason)
+  }
 
   return {
-    employees,
-    courses: normalizedCourses,
-    lessons: normalizedLessons,
-    assignments,
-    progress: buildProgressMap(progressRows),
     tests: testsData.tests,
     testQuestions: testsData.questions,
     testAttempts: testsData.attempts,
     learningPaths: pathsData.paths,
     learningPathCourses: pathsData.pathCourses,
     userLearningPaths: pathsData.userPaths,
-    standardCategories: standardsData.categories,
-    standardArticles: standardsData.articles,
-    standardArticleReads: standardsData.reads,
-    vacancies: recruitmentData.vacancies,
-    candidateQuestions: recruitmentData.questions,
-    candidates: recruitmentData.candidates,
-    suppliers: suppliersData.suppliers,
-    purchases: purchasesData.orders,
-    receivingDocuments: receivingData.documents,
+  }
+}
+
+export async function fetchStandardsModuleData() {
+  const { fetchStandardsData } = await import('./standardsSupabaseAdapter')
+  const data = await fetchStandardsData()
+  return {
+    standardCategories: data.categories,
+    standardArticles: data.articles,
+    standardArticleReads: data.reads,
+  }
+}
+
+export async function fetchRecruitmentModuleData() {
+  const { fetchRecruitmentData } = await import('./recruitmentSupabaseAdapter')
+  const data = await fetchRecruitmentData()
+  return {
+    vacancies: data.vacancies,
+    candidateQuestions: data.questions,
+    candidates: data.candidates,
+  }
+}
+
+export async function fetchSuppliersModuleData() {
+  const { fetchSuppliersData } = await import('./suppliersSupabaseAdapter')
+  const data = await fetchSuppliersData()
+  return { suppliers: data.suppliers }
+}
+
+export async function fetchPurchasesModuleData() {
+  const { fetchPurchasesDataCloud } = await import('./purchaseSupabaseAdapter')
+  const data = await fetchPurchasesDataCloud()
+  return { purchases: data.orders }
+}
+
+export async function fetchReceivingModuleData() {
+  const { fetchReceivingDataCloud } = await import('./receivingSupabaseAdapter')
+  const data = await fetchReceivingDataCloud()
+  return { receivingDocuments: data.documents }
+}
+
+/**
+ * Full dump for legacy callers. Soft-isolates optional modules (including procurement).
+ * Prefer progressive bootstrap via academyDataService.ensureModuleLoaded.
+ */
+export async function fetchAllData() {
+  const core = await fetchCoreAcademyData()
+
+  const [
+    learningResult,
+    standardsResult,
+    recruitmentResult,
+    suppliersResult,
+    purchasesResult,
+    receivingResult,
+  ] = await Promise.allSettled([
+    fetchAcademyLearningExtras(),
+    fetchStandardsModuleData(),
+    fetchRecruitmentModuleData(),
+    fetchSuppliersModuleData(),
+    fetchPurchasesModuleData(),
+    fetchReceivingModuleData(),
+  ])
+
+  const learning =
+    learningResult.status === 'fulfilled'
+      ? learningResult.value
+      : {
+          tests: [],
+          testQuestions: [],
+          testAttempts: [],
+          learningPaths: [],
+          learningPathCourses: [],
+          userLearningPaths: [],
+        }
+  const standards =
+    standardsResult.status === 'fulfilled'
+      ? standardsResult.value
+      : { standardCategories: [], standardArticles: [], standardArticleReads: [] }
+  const recruitment =
+    recruitmentResult.status === 'fulfilled'
+      ? recruitmentResult.value
+      : { vacancies: [], candidateQuestions: [], candidates: [] }
+  const suppliers =
+    suppliersResult.status === 'fulfilled' ? suppliersResult.value : { suppliers: [] }
+
+  if (purchasesResult.status === 'rejected') {
+    console.error('[Загрузка закупов]', purchasesResult.reason)
+  }
+  if (receivingResult.status === 'rejected') {
+    console.error('[Загрузка приёмки]', receivingResult.reason)
+  }
+
+  const purchases =
+    purchasesResult.status === 'fulfilled' ? purchasesResult.value : { purchases: [] }
+  const receiving =
+    receivingResult.status === 'fulfilled'
+      ? receivingResult.value
+      : { receivingDocuments: [] }
+
+  return {
+    ...core,
+    ...learning,
+    ...standards,
+    ...recruitment,
+    ...suppliers,
+    ...purchases,
+    ...receiving,
+    _moduleFailures: {
+      academyLearning: learningResult.status === 'rejected' ? learningResult.reason : null,
+      standards: standardsResult.status === 'rejected' ? standardsResult.reason : null,
+      recruitment: recruitmentResult.status === 'rejected' ? recruitmentResult.reason : null,
+      suppliers: suppliersResult.status === 'rejected' ? suppliersResult.reason : null,
+      procurement: purchasesResult.status === 'rejected' ? purchasesResult.reason : null,
+      receiving: receivingResult.status === 'rejected' ? receivingResult.reason : null,
+    },
   }
 }
 

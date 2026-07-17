@@ -1,10 +1,19 @@
 import { isCloudMode, getDataModeLabel, getDataModeVariant } from '../lib/dataMode'
 import {
-  setCloudStore,
   clearCloudStore,
   patchCloudStore,
   ensureCloudStoreReady,
   getCloudStore,
+  getCloudEmployees,
+  getCloudCourses,
+  getCloudLessons,
+  isModuleReady,
+  getModuleLoadState,
+  markModuleLoading,
+  markModuleReady,
+  markModuleError,
+  resetModuleLoadStates,
+  MODULE_STATUS,
 } from '../lib/cloudStore'
 import { normalizeEmployee } from '../utils/employeeData'
 import { createEmployeeWithAuth } from './employeeProvisioningService'
@@ -123,44 +132,366 @@ function getAttendanceAdapter() {
 export { isCloudMode, getDataModeLabel, getDataModeVariant }
 
 let pendingInitialize = null
+let bootstrapUserId = null
+const modulePromises = {}
+let backgroundPrefetchScheduled = false
+let onModulesChanged = null
 
-/** Load all academy data into memory (cloud) or no-op (local) */
-export async function initializeData() {
+/** Prefetched after shell; procurement/receiving stay route-triggered. */
+const BACKGROUND_MODULES = ['standards', 'recruitment', 'suppliers']
+
+function notifyModulesChanged() {
+  if (typeof onModulesChanged === 'function') {
+    onModulesChanged()
+  }
+}
+
+export function setCloudBootstrapListener(listener) {
+  onModulesChanged = listener
+}
+
+export function resetCloudBootstrapState() {
+  pendingInitialize = null
+  bootstrapUserId = null
+  backgroundPrefetchScheduled = false
+  Object.keys(modulePromises).forEach((key) => {
+    delete modulePromises[key]
+  })
+  clearCloudStore()
+}
+
+/** Map pathname → modules needed before page can show real empty/error states. */
+export function getRouteCriticalModules(pathname = '') {
+  const path = String(pathname || '')
+  if (path.includes('/platform/procurement') || path.includes('/platform/receiving')) {
+    return ['suppliers', 'procurement', 'receiving']
+  }
+  if (path.includes('/platform/suppliers')) {
+    return ['suppliers']
+  }
+  if (path.includes('/platform/standards') || path.includes('/standards')) {
+    return ['standards']
+  }
+  if (
+    path.includes('/platform/recruitment') ||
+    path.includes('/vacancies') ||
+    path.includes('/candidates')
+  ) {
+    return ['recruitment']
+  }
+  if (
+    path.includes('/platform/academy') ||
+    path.includes('/platform/admin') ||
+    path.includes('/courses') ||
+    path.includes('/course/')
+  ) {
+    return ['employees', 'courses', 'academyLearning']
+  }
+  if (path === '/platform' || path === '/platform/') {
+    return ['employees', 'courses', 'suppliers']
+  }
+  return []
+}
+
+const CORE_MODULE_KEY = '__coreEmployeesCourses'
+
+async function loadEmployeesCoursesCore() {
+  const core = await supabaseAdapter.fetchCoreAcademyData()
+  ensureCloudStoreReady()
+  patchCloudStore({
+    employees: core.employees,
+    courses: core.courses,
+    lessons: core.lessons,
+    assignments: core.assignments,
+    progress: core.progress,
+  })
+  markModuleReady('employees')
+  markModuleReady('courses')
+  return core
+}
+
+async function ensureEmployeesCoursesCore() {
+  if (isModuleReady('employees') && isModuleReady('courses')) {
+    return getCloudStore()
+  }
+  if (modulePromises[CORE_MODULE_KEY]) {
+    return modulePromises[CORE_MODULE_KEY]
+  }
+
+  markModuleLoading('employees')
+  markModuleLoading('courses')
+  notifyModulesChanged()
+
+  modulePromises[CORE_MODULE_KEY] = (async () => {
+    try {
+      await loadEmployeesCoursesCore()
+      notifyModulesChanged()
+      return getCloudStore()
+    } catch (error) {
+      markModuleError('employees', error)
+      markModuleError('courses', error)
+      notifyModulesChanged()
+      throw error
+    } finally {
+      delete modulePromises[CORE_MODULE_KEY]
+    }
+  })()
+
+  return modulePromises[CORE_MODULE_KEY]
+}
+
+async function loadAcademyLearningModule() {
+  await ensureEmployeesCoursesCore()
+  const extras = await supabaseAdapter.fetchAcademyLearningExtras()
+  ensureCloudStoreReady()
+  patchCloudStore({
+    tests: extras.tests,
+    testQuestions: extras.testQuestions,
+    testAttempts: extras.testAttempts,
+    learningPaths: extras.learningPaths,
+    learningPathCourses: extras.learningPathCourses,
+    userLearningPaths: extras.userLearningPaths,
+  })
+  markModuleReady('academyLearning')
+  return extras
+}
+
+async function loadModule(moduleName) {
+  switch (moduleName) {
+    case 'employees':
+    case 'courses': {
+      await ensureEmployeesCoursesCore()
+      return
+    }
+    case 'academyLearning': {
+      await loadAcademyLearningModule()
+      return
+    }
+    case 'standards': {
+      const data = await supabaseAdapter.fetchStandardsModuleData()
+      patchCloudStore(data)
+      markModuleReady('standards')
+      return
+    }
+    case 'recruitment': {
+      const data = await supabaseAdapter.fetchRecruitmentModuleData()
+      patchCloudStore(data)
+      markModuleReady('recruitment')
+      return
+    }
+    case 'suppliers': {
+      const data = await supabaseAdapter.fetchSuppliersModuleData()
+      patchCloudStore(data)
+      markModuleReady('suppliers')
+      return
+    }
+    case 'procurement': {
+      const data = await supabaseAdapter.fetchPurchasesModuleData()
+      patchCloudStore(data)
+      markModuleReady('procurement')
+      return
+    }
+    case 'receiving': {
+      const data = await supabaseAdapter.fetchReceivingModuleData()
+      patchCloudStore(data)
+      markModuleReady('receiving')
+      return
+    }
+    default:
+      throw new Error(`Unknown module: ${moduleName}`)
+  }
+}
+
+/**
+ * Load a single cloud module once. Concurrent callers share the same promise.
+ * Safe to call from pages after shell is ready.
+ */
+export async function ensureModuleLoaded(moduleName) {
+  if (!isCloudMode()) return null
+
+  if (isModuleReady(moduleName)) return getCloudStore()
+
+  if (moduleName === 'employees' || moduleName === 'courses') {
+    return ensureEmployeesCoursesCore()
+  }
+
+  if (modulePromises[moduleName]) {
+    return modulePromises[moduleName]
+  }
+
+  markModuleLoading(moduleName)
+  notifyModulesChanged()
+
+  modulePromises[moduleName] = (async () => {
+    try {
+      await loadModule(moduleName)
+      notifyModulesChanged()
+      return getCloudStore()
+    } catch (error) {
+      markModuleError(moduleName, error)
+      notifyModulesChanged()
+      throw error
+    } finally {
+      delete modulePromises[moduleName]
+    }
+  })()
+
+  return modulePromises[moduleName]
+}
+
+export async function ensureModulesLoaded(moduleNames = []) {
+  const unique = [...new Set(moduleNames)]
+  await Promise.allSettled(unique.map((name) => ensureModuleLoaded(name)))
+  return getCloudStore()
+}
+
+function scheduleBackgroundPrefetch(priorityModules = []) {
+  if (backgroundPrefetchScheduled || !isCloudMode()) return
+  backgroundPrefetchScheduled = true
+
+  const run = async () => {
+    const priority = [...new Set(priorityModules)]
+    for (const name of priority) {
+      try {
+        await ensureModuleLoaded(name)
+      } catch {
+        // isolated — page will surface module error
+      }
+    }
+
+    // Core academy cache for sync getters / dashboard (does not block shell).
+    try {
+      await ensureModuleLoaded('employees')
+      await ensureModuleLoaded('courses')
+      await ensureModuleLoaded('academyLearning')
+    } catch {
+      // isolated
+    }
+
+    const remaining = BACKGROUND_MODULES.filter(
+      (name) => !isModuleReady(name) && getModuleLoadState(name) !== MODULE_STATUS.LOADING
+    )
+
+    // Small waves to avoid network storms.
+    for (let i = 0; i < remaining.length; i += 2) {
+      const wave = remaining.slice(i, i + 2)
+      await Promise.allSettled(wave.map((name) => ensureModuleLoaded(name)))
+    }
+  }
+
+  if (typeof queueMicrotask === 'function') {
+    queueMicrotask(() => {
+      void run()
+    })
+  } else {
+    void run()
+  }
+}
+
+/**
+ * Progressive cloud bootstrap:
+ * - does not block app shell
+ * - prioritizes route-critical modules
+ * - soft-isolates module failures
+ */
+export async function initializeData(options = {}) {
+  const { mode = 'progressive', pathname = '', userId = null } = options
+
   if (!isCloudMode()) {
     clearCloudStore()
     return localAdapter.initializeLocal()
   }
 
-  if (pendingInitialize) return pendingInitialize
+  if (userId && bootstrapUserId && bootstrapUserId !== userId) {
+    resetCloudBootstrapState()
+  }
+  if (userId) bootstrapUserId = userId
 
-  pendingInitialize = (async () => {
-    try {
-      markDevPerf('academy-data-load')
-      const data = await supabaseAdapter.fetchAllData()
-      logDevPerf('academy-data-load')
-      setCloudStore(data)
-      return data
-    } finally {
-      pendingInitialize = null
-    }
-  })()
+  if (mode === 'full') {
+    if (pendingInitialize) return pendingInitialize
+    pendingInitialize = (async () => {
+      try {
+        markDevPerf('academy-data-load')
+        const data = await supabaseAdapter.fetchAllData()
+        logDevPerf('academy-data-load')
+        applyFullFetchResult(data)
+        notifyModulesChanged()
+        return data
+      } finally {
+        pendingInitialize = null
+      }
+    })()
+    return pendingInitialize
+  }
 
-  return pendingInitialize
+  // Progressive: kick route + background loads; resolve without waiting for full dump.
+  const routeModules = getRouteCriticalModules(pathname)
+  scheduleBackgroundPrefetch(routeModules)
+  return getCloudStore()
+}
+
+function applyFullFetchResult(data) {
+  const failures = data._moduleFailures || {}
+  const {
+    _moduleFailures: _ignored,
+    ...storeData
+  } = data
+
+  ensureCloudStoreReady()
+  patchCloudStore(storeData)
+
+  markModuleReady('employees')
+  markModuleReady('courses')
+
+  if (failures.academyLearning) markModuleError('academyLearning', failures.academyLearning)
+  else markModuleReady('academyLearning')
+
+  if (failures.standards) markModuleError('standards', failures.standards)
+  else markModuleReady('standards')
+
+  if (failures.recruitment) markModuleError('recruitment', failures.recruitment)
+  else markModuleReady('recruitment')
+
+  if (failures.suppliers) markModuleError('suppliers', failures.suppliers)
+  else markModuleReady('suppliers')
+
+  if (failures.procurement) markModuleError('procurement', failures.procurement)
+  else markModuleReady('procurement')
+
+  if (failures.receiving) markModuleError('receiving', failures.receiving)
+  else markModuleReady('receiving')
 }
 
 /** Обновить только закуп и приёмку (Realtime / polling) */
 export async function refreshProcurementData() {
   if (!isCloudMode()) return null
 
-  const [{ fetchPurchasesDataCloud }, { fetchReceivingDataCloud }] = await Promise.all([
-    import('./purchaseSupabaseAdapter'),
-    import('./receivingSupabaseAdapter'),
-  ])
+  markModuleLoading('procurement')
+  markModuleLoading('receiving')
+  notifyModulesChanged()
 
   const [purchasesResult, receivingResult] = await Promise.allSettled([
-    fetchPurchasesDataCloud(),
-    fetchReceivingDataCloud(),
+    supabaseAdapter.fetchPurchasesModuleData(),
+    supabaseAdapter.fetchReceivingModuleData(),
   ])
+
+  ensureCloudStoreReady()
+
+  if (purchasesResult.status === 'fulfilled') {
+    patchCloudStore(purchasesResult.value)
+    markModuleReady('procurement')
+  } else {
+    markModuleError('procurement', purchasesResult.reason)
+  }
+
+  if (receivingResult.status === 'fulfilled') {
+    patchCloudStore(receivingResult.value)
+    markModuleReady('receiving')
+  } else {
+    markModuleError('receiving', receivingResult.reason)
+  }
+
+  notifyModulesChanged()
 
   if (purchasesResult.status === 'rejected') {
     throw purchasesResult.reason
@@ -169,29 +500,37 @@ export async function refreshProcurementData() {
     throw receivingResult.reason
   }
 
-  ensureCloudStoreReady()
-  patchCloudStore({
-    purchases: purchasesResult.value.orders,
-    receivingDocuments: receivingResult.value.documents,
-  })
-
   return {
-    purchases: purchasesResult.value.orders,
-    receivingDocuments: receivingResult.value.documents,
+    purchases: purchasesResult.value.purchases,
+    receivingDocuments: receivingResult.value.receivingDocuments,
   }
 }
 
 export async function refreshData() {
-  return initializeData()
+  if (!isCloudMode()) {
+    return initializeData()
+  }
+
+  resetModuleLoadStates()
+  Object.keys(modulePromises).forEach((key) => {
+    delete modulePromises[key]
+  })
+  backgroundPrefetchScheduled = false
+
+  markDevPerf('academy-data-load')
+  const data = await supabaseAdapter.fetchAllData()
+  logDevPerf('academy-data-load')
+  applyFullFetchResult(data)
+  notifyModulesChanged()
+  return data
 }
 
 // --- Employees ---
 
 export async function getEmployees() {
   if (isCloudMode()) {
-    const data = await supabaseAdapter.fetchAllData()
-    setCloudStore(data)
-    return data.employees
+    await ensureModuleLoaded('employees')
+    return getCloudEmployees() || []
   }
   return localAdapter.getEmployees()
 }
@@ -332,9 +671,8 @@ export async function removeEmployeeAvatar(userId) {
 
 export async function getCourses() {
   if (isCloudMode()) {
-    const data = await supabaseAdapter.fetchAllData()
-    setCloudStore(data)
-    return data.courses
+    await ensureModuleLoaded('courses')
+    return getCloudCourses() || []
   }
   return localAdapter.getCourses()
 }
@@ -372,9 +710,9 @@ export async function archiveCourse(courseId) {
 
 export async function getLessonsByCourse(courseId) {
   if (isCloudMode()) {
-    const data = await supabaseAdapter.fetchAllData()
-    setCloudStore(data)
-    return data.lessons.filter((l) => l.courseId === courseId)
+    await ensureModuleLoaded('courses')
+    const lessons = getCloudLessons() || []
+    return lessons.filter((l) => l.courseId === courseId)
   }
   return localAdapter.getCourseLessons(courseId)
 }

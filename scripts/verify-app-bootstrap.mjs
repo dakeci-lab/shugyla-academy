@@ -91,6 +91,18 @@ function main() {
   assert('error boundary reload uses recoverPwaShell for shell errors', errorBoundary.includes('recoverPwaShell'))
   assert('error boundary logout uses parent handler', errorBoundary.includes('this.props.onLogout'))
 
+  console.log('Stage 6: Progressive data bootstrap (shell after Auth)')
+
+  const academyCtx = read('src/context/AcademyDataContext.jsx')
+  assert(
+    'AcademyDataProvider unblocks shell before full cloud dump',
+    !academyCtx.includes('(loading || !ready) && !isPublicRoute')
+  )
+  assert(
+    'AcademyDataProvider still gates on AUTH loading',
+    academyCtx.includes('AUTH_STATUS.LOADING')
+  )
+
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }
 

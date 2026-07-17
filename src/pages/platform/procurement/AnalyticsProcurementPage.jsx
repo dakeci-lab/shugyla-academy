@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
+import { useAcademyData } from '../../../context/AcademyDataContext'
 import {
   canViewPurchases,
   canEditPurchase,
@@ -10,7 +11,10 @@ import {
   getPurchaseOrdersSync,
   createPurchaseOrder,
   cancelPurchaseOrder,
+  isPurchasesDataReady,
+  isPurchasesDataLoading,
 } from '../../../services/purchaseDataService'
+import { isCloudMode } from '../../../lib/dataMode'
 import { filterActivePurchases } from '../../../utils/purchaseData'
 import { isSimpleWorkflow } from '../../../utils/procurementWorkflow'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
@@ -28,6 +32,7 @@ import './ProcurementPage.css'
 export default function AnalyticsProcurementPage() {
   const { user } = useSession()
   const navigate = useNavigate()
+  const { ensureModules } = useAcademyData()
   const { version, refresh } = useAdminRefresh()
   const [showCreate, setShowCreate] = useState(false)
   const [showImport, setShowImport] = useState(false)
@@ -41,9 +46,16 @@ export default function AnalyticsProcurementPage() {
   const canEdit = canEditPurchase(user)
   const canCreate = canCreatePurchase(user)
 
+  useEffect(() => {
+    if (!isCloudMode()) return
+    void ensureModules(['procurement', 'suppliers'])
+  }, [ensureModules])
+
   void version
 
-  const allOrders = getPurchaseOrdersSync()
+  const purchasesLoading =
+    isCloudMode() && (isPurchasesDataLoading() || !isPurchasesDataReady())
+  const allOrders = purchasesLoading ? [] : getPurchaseOrdersSync()
   const activeOrders = useMemo(
     () => filterActivePurchases(allOrders).filter((o) => !isSimpleWorkflow(o)),
     [allOrders, version]

@@ -1,7 +1,15 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { isCloudMode } from '../lib/dataMode'
-import { initializeData, refreshProcurementData } from '../services/academyDataService'
+import {
+  initializeData,
+  refreshProcurementData,
+  ensureModulesLoaded,
+  getRouteCriticalModules,
+  setCloudBootstrapListener,
+  resetCloudBootstrapState,
+} from '../services/academyDataService'
+import { getAllModuleLoadStates } from '../lib/cloudStore'
 import { isPublicAppPath } from '../router/authRoutes'
 import { useSession, AUTH_STATUS } from './SessionContext'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
@@ -12,8 +20,10 @@ const AcademyDataContext = createContext({
   loading: false,
   loadError: null,
   version: 0,
+  moduleStates: {},
   reload: async () => {},
   reloadProcurement: async () => {},
+  ensureModules: async () => {},
   notifyChange: () => {},
 })
 
@@ -80,41 +90,67 @@ function classifyDataLoadError(error) {
 export function AcademyDataProvider({ children }) {
   const { pathname } = useLocation()
   const isPublicRoute = isPublicAppPath(pathname)
-  const { authStatus, supabaseAuthenticated } = useSession()
+  const { authStatus, supabaseAuthenticated, user } = useSession()
   const cloudMode = isCloudMode()
 
   const [ready, setReady] = useState(!cloudMode)
   const [loading, setLoading] = useState(cloudMode)
   const [loadError, setLoadError] = useState(null)
   const [version, setVersion] = useState(0)
+  const [moduleStates, setModuleStates] = useState(() => getAllModuleLoadStates())
+
+  const bumpVersion = useCallback(() => {
+    setVersion((v) => v + 1)
+    setModuleStates(getAllModuleLoadStates())
+  }, [])
 
   const reload = useCallback(async () => {
     if (cloudMode) {
-      await initializeData()
+      await initializeData({ mode: 'full', pathname, userId: user?.id })
       setLoadError(null)
     }
-    setVersion((v) => v + 1)
-  }, [cloudMode])
+    bumpVersion()
+  }, [cloudMode, pathname, user?.id, bumpVersion])
 
   const reloadProcurement = useCallback(async () => {
     if (cloudMode) {
       await refreshProcurementData()
       setLoadError(null)
     }
-    setVersion((v) => v + 1)
-  }, [cloudMode])
+    bumpVersion()
+  }, [cloudMode, bumpVersion])
+
+  const ensureModules = useCallback(
+    async (moduleNames = []) => {
+      if (!cloudMode) return
+      try {
+        await ensureModulesLoaded(moduleNames)
+        setLoadError(null)
+      } catch (error) {
+        // Module errors stay in module state; do not gate the whole shell.
+        if (import.meta.env.DEV) {
+          console.error('[AcademyDataEnsureModules]', error)
+        }
+      } finally {
+        bumpVersion()
+      }
+    },
+    [cloudMode, bumpVersion]
+  )
 
   const notifyChange = useCallback(() => {
-    setVersion((v) => v + 1)
-  }, [])
+    bumpVersion()
+  }, [bumpVersion])
+
+  useEffect(() => {
+    setCloudBootstrapListener(bumpVersion)
+    return () => setCloudBootstrapListener(null)
+  }, [bumpVersion])
 
   useEffect(() => {
     let cancelled = false
-    let loadId = 0
 
-    async function load() {
-      const currentLoadId = ++loadId
-
+    async function syncShell() {
       if (!cloudMode) {
         setReady(true)
         setLoading(false)
@@ -129,55 +165,92 @@ export function AcademyDataProvider({ children }) {
       }
 
       if (authStatus !== AUTH_STATUS.AUTHENTICATED || !supabaseAuthenticated) {
-        if (currentLoadId === loadId && !cancelled) {
+        if (!cancelled) {
+          resetCloudBootstrapState()
           setReady(true)
           setLoading(false)
           setLoadError(null)
+          setModuleStates(getAllModuleLoadStates())
         }
         return
       }
 
-      setLoading(true)
+      // Shell-critical: Auth + profile + RBAC already handled by Session/PlatformSessionGate.
+      // Unblock layout immediately; load modules progressively.
+      if (!cancelled) {
+        setReady(true)
+        setLoading(false)
+        setLoadError(null)
+      }
+
       try {
-        await initializeData()
-        if (!cancelled && currentLoadId === loadId) {
-          setLoadError(null)
+        await initializeData({
+          mode: 'progressive',
+          pathname,
+          userId: user?.id,
+        })
+        if (!cancelled) {
+          bumpVersion()
         }
       } catch (error) {
-        console.error('Academy data load failed:', error)
-        if (import.meta.env.DEV) {
-          console.error('[AcademyDataLoad]', {
-            code: error?.code,
-            message: error?.message,
-            details: error?.details,
-            hint: error?.hint,
-          })
-        }
-        if (!cancelled && currentLoadId === loadId) {
+        console.error('Academy progressive bootstrap failed:', error)
+        if (!cancelled) {
+          // Progressive bootstrap should not hard-fail the shell.
           setLoadError(classifyDataLoadError(error))
-        }
-      } finally {
-        if (!cancelled && currentLoadId === loadId) {
-          setReady(true)
-          setLoading(false)
+          bumpVersion()
         }
       }
     }
 
-    void load()
+    void syncShell()
 
     return () => {
       cancelled = true
     }
-  }, [cloudMode, authStatus, supabaseAuthenticated])
+  }, [cloudMode, authStatus, supabaseAuthenticated, user?.id, bumpVersion])
 
-  if ((loading || !ready) && !isPublicRoute) {
+  // Route changes: prioritize modules for the active page (no full re-bootstrap).
+  useEffect(() => {
+    if (!cloudMode) return
+    if (authStatus !== AUTH_STATUS.AUTHENTICATED || !supabaseAuthenticated) return
+
+    const modules = getRouteCriticalModules(pathname)
+    if (modules.length === 0) return
+
+    let cancelled = false
+    void ensureModulesLoaded(modules)
+      .catch((error) => {
+        if (import.meta.env.DEV) {
+          console.error('[AcademyRouteModules]', error)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) bumpVersion()
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [cloudMode, authStatus, supabaseAuthenticated, pathname, bumpVersion])
+
+  // Auth loading only — never block the shell on background module sync.
+  if (cloudMode && authStatus === AUTH_STATUS.LOADING && !isPublicRoute) {
     return <DataLoadingScreen />
   }
 
   return (
     <AcademyDataContext.Provider
-      value={{ ready, loading, loadError, version, reload, reloadProcurement, notifyChange }}
+      value={{
+        ready,
+        loading,
+        loadError,
+        version,
+        moduleStates,
+        reload,
+        reloadProcurement,
+        ensureModules,
+        notifyChange,
+      }}
     >
       {children}
     </AcademyDataContext.Provider>

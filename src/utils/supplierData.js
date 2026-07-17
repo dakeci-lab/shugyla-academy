@@ -248,7 +248,7 @@ export function normalizeSupplier(raw) {
 function getSuppliersSource() {
   if (isCloudMode()) {
     const cloud = getCloudSuppliers()
-    if (cloud) return cloud
+    return cloud || []
   }
   return getLocalSuppliersBundle().suppliers
 }

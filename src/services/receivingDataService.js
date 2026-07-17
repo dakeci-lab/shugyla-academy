@@ -1,6 +1,12 @@
 import { isCloudMode } from '../lib/dataMode'
-import { getCloudReceivingDocuments, isCloudStoreLoaded } from '../lib/cloudStore'
-import { refreshData } from './academyDataService'
+import {
+  getCloudReceivingDocuments,
+  isModuleReady,
+  getModuleError,
+  getModuleLoadState,
+  MODULE_STATUS,
+} from '../lib/cloudStore'
+import { refreshProcurementData } from './academyDataService'
 import * as local from './receivingLocalAdapter'
 import * as cloud from './receivingSupabaseAdapter'
 import {
@@ -9,9 +15,24 @@ import {
   mergeReceivingDocuments,
 } from './purchaseOptimisticStore'
 
+export function isReceivingDataReady() {
+  return !isCloudMode() || isModuleReady('receiving')
+}
+
+export function isReceivingDataLoading() {
+  if (!isCloudMode()) return false
+  const state = getModuleLoadState('receiving')
+  return state === MODULE_STATUS.IDLE || state === MODULE_STATUS.LOADING
+}
+
+export function getReceivingDataError() {
+  if (!isCloudMode()) return null
+  return getModuleError('receiving')
+}
+
 function getReceivingSource() {
   if (isCloudMode()) {
-    if (!isCloudStoreLoaded()) return []
+    if (!isModuleReady('receiving')) return []
     const documents = getCloudReceivingDocuments() || []
     const overlay = getOptimisticOverlayForMerge()
     const deletedOrderIds = getOptimisticDeletedOrderIds()
@@ -22,7 +43,7 @@ function getReceivingSource() {
 
 async function afterReceivingMutation() {
   if (isCloudMode()) {
-    await refreshData()
+    await refreshProcurementData()
   }
 }
 

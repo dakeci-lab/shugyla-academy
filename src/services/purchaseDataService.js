@@ -1,6 +1,12 @@
 import { isCloudMode } from '../lib/dataMode'
-import { getCloudPurchases, isCloudStoreLoaded } from '../lib/cloudStore'
-import { refreshData } from './academyDataService'
+import {
+  getCloudPurchases,
+  isModuleReady,
+  getModuleError,
+  getModuleLoadState,
+  MODULE_STATUS,
+} from '../lib/cloudStore'
+import { refreshProcurementData } from './academyDataService'
 import * as local from './purchaseLocalAdapter'
 import * as cloud from './purchaseSupabaseAdapter'
 import {
@@ -9,13 +15,24 @@ import {
   mergePurchaseOrders,
 } from './purchaseOptimisticStore'
 
-function getAdapter() {
-  return isCloudMode() ? cloud : local
+export function isPurchasesDataReady() {
+  return !isCloudMode() || isModuleReady('procurement')
+}
+
+export function isPurchasesDataLoading() {
+  if (!isCloudMode()) return false
+  const state = getModuleLoadState('procurement')
+  return state === MODULE_STATUS.IDLE || state === MODULE_STATUS.LOADING
+}
+
+export function getPurchasesDataError() {
+  if (!isCloudMode()) return null
+  return getModuleError('procurement')
 }
 
 function getPurchasesSource() {
   if (isCloudMode()) {
-    if (!isCloudStoreLoaded()) return []
+    if (!isModuleReady('procurement')) return []
     const orders = getCloudPurchases() || []
     const overlay = getOptimisticOverlayForMerge()
     const deletedOrderIds = getOptimisticDeletedOrderIds()
@@ -26,7 +43,7 @@ function getPurchasesSource() {
 
 async function afterPurchaseMutation() {
   if (isCloudMode()) {
-    await refreshData()
+    await refreshProcurementData()
   }
 }
 

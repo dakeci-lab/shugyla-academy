@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { getPublishedCourses } from '../../utils/courseAccess'
 import { useSession } from '../../context/SessionContext'
 import { useLanguage } from '../../context/LanguageContext'
+import { useAcademyData } from '../../context/AcademyDataContext'
+import { isCloudMode } from '../../lib/dataMode'
+import { isModuleReady, isModuleLoading, getModuleError } from '../../lib/cloudStore'
 import { normalizeRoleId } from '../../data/roles'
 import CategoryFilter from '../CategoryFilter'
 import CourseCard from '../CourseCard'
@@ -14,8 +17,18 @@ export default function AcademyCatalogContent() {
   const [roleFilter, setRoleFilter] = useState('all')
   const { t } = useLanguage()
   const { user } = useSession()
+  const { ensureModules, version } = useAcademyData()
 
-  const courses = getPublishedCourses()
+  useEffect(() => {
+    if (!isCloudMode()) return
+    void ensureModules(['courses', 'academyLearning'])
+  }, [ensureModules])
+
+  void version
+  const coursesLoading =
+    isCloudMode() && (isModuleLoading('courses') || !isModuleReady('courses'))
+  const coursesError = isCloudMode() ? getModuleError('courses') : null
+  const courses = coursesLoading || coursesError ? [] : getPublishedCourses()
   const userRole = normalizeRoleId(user?.role)
 
   const filteredCourses = useMemo(() => {
@@ -83,7 +96,13 @@ export default function AcademyCatalogContent() {
           ))}
         </div>
 
-        {filteredCourses.length === 0 && (
+        {coursesError && (
+          <p className="academy-page__empty">Не удалось загрузить курсы. Попробуйте обновить страницу.</p>
+        )}
+        {!coursesError && coursesLoading && (
+          <p className="academy-page__empty">Загрузка курсов…</p>
+        )}
+        {!coursesError && !coursesLoading && filteredCourses.length === 0 && (
           <p className="academy-page__empty">{t.emptyCourses}</p>
         )}
       </div>

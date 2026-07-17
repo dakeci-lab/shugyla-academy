@@ -2,9 +2,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSession } from '../../context/SessionContext'
 import { canAcceptSimpleDelivery } from '../../config/permissions'
 import { isCloudMode } from '../../lib/dataMode'
-import { getReceivingDocumentsSync } from '../../services/receivingDataService'
-import { getPurchaseOrdersSync } from '../../services/purchaseDataService'
+import {
+  getReceivingDocumentsSync,
+  isReceivingDataReady,
+  isReceivingDataLoading,
+  getReceivingDataError,
+} from '../../services/receivingDataService'
+import {
+  getPurchaseOrdersSync,
+  isPurchasesDataReady,
+  isPurchasesDataLoading,
+  getPurchasesDataError,
+} from '../../services/purchaseDataService'
 import { getAllSuppliersSync } from '../../utils/supplierData'
+import { useAcademyData } from '../../context/AcademyDataContext'
+import { toUserErrorMessage } from '../../utils/userErrorMessage'
 import {
   acceptSimpleDeliveryOptimistic,
   unacceptSimpleDeliveryOptimistic,
@@ -28,6 +40,7 @@ import './SimpleDeliveryCard.css'
 export default function SimpleReceivingWeekView() {
   const { user } = useSession()
   const { version, notifyChange } = useAdminRefresh()
+  const { ensureModules } = useAcademyData()
   const {
     weekStartKey,
     selectedDateKey,
@@ -42,11 +55,23 @@ export default function SimpleReceivingWeekView() {
   const [togglingId, setTogglingId] = useState(null)
 
   useEffect(() => {
+    if (!isCloudMode()) return
+    void ensureModules(['suppliers', 'procurement', 'receiving'])
+  }, [ensureModules])
+
+  useEffect(() => {
     setCheckedOverrides({})
     setTogglingId(null)
   }, [version])
 
   const canAccept = canAcceptSimpleDelivery(user)
+  const moduleError = getPurchasesDataError() || getReceivingDataError()
+  const modulesLoading =
+    isCloudMode() &&
+    (isPurchasesDataLoading() ||
+      isReceivingDataLoading() ||
+      !isPurchasesDataReady() ||
+      !isReceivingDataReady())
 
   const allEntries = useMemo(() => {
     return buildMergedReceivingEntries(
@@ -150,7 +175,13 @@ export default function SimpleReceivingWeekView() {
         onSelectDate={setSelectedDateKey}
       />
 
-      {!selectedDateKey ? (
+      {moduleError ? (
+        <p className="simple-receiving-week__empty">
+          {toUserErrorMessage(moduleError, 'Не удалось загрузить данные приёмки.')}
+        </p>
+      ) : modulesLoading ? (
+        <p className="simple-receiving-week__hint">Загрузка приёмки…</p>
+      ) : !selectedDateKey ? (
         <p className="simple-receiving-week__hint">
           Выберите день недели, чтобы посмотреть поставки.
         </p>

@@ -12,6 +12,9 @@ import {
 import {
   getPurchaseOrdersSync,
   updatePurchaseOrder,
+  isPurchasesDataReady,
+  isPurchasesDataLoading,
+  getPurchasesDataError,
 } from '../../../services/purchaseDataService'
 import { getReceivingDocumentsSync } from '../../../services/receivingDataService'
 import { getAllSuppliersSync, getSupplierByIdSync } from '../../../utils/supplierData'
@@ -21,7 +24,6 @@ import {
   retrySimplePurchaseSync,
 } from '../../../services/purchaseOptimisticService'
 import { isCloudMode } from '../../../lib/dataMode'
-import { isCloudStoreLoaded } from '../../../lib/cloudStore'
 import { toUserErrorMessage } from '../../../utils/userErrorMessage'
 import {
   buildExpectedDeliveryEntries,
@@ -58,8 +60,13 @@ export default function ProcurementPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { error: showError } = useToast()
-  const { loadError, reloadProcurement } = useAcademyData()
+  const { loadError, reloadProcurement, ensureModules, version: dataVersion } = useAcademyData()
   const { version, refresh, notifyChange } = useAdminRefresh()
+
+  useEffect(() => {
+    if (!isCloudMode()) return
+    void ensureModules(['suppliers', 'procurement', 'receiving'])
+  }, [ensureModules])
   const {
     weekStartKey,
     selectedDateKey,
@@ -357,7 +364,14 @@ export default function ProcurementPage() {
 
   function getEmptyMessage() {
     if (procurementLoadError) return procurementLoadError
-    if (isCloudMode() && !isCloudStoreLoaded() && procurementRefreshing) {
+    const moduleError = getPurchasesDataError()
+    if (moduleError) {
+      return toUserErrorMessage(moduleError, 'Не удалось загрузить закупы с сервера.')
+    }
+    if (
+      isCloudMode() &&
+      (isPurchasesDataLoading() || procurementRefreshing || !isPurchasesDataReady())
+    ) {
       return 'Загрузка закупов…'
     }
     if (!selectedDateKey) return 'Выберите день недели'
@@ -367,6 +381,8 @@ export default function ProcurementPage() {
     }
     return 'На этот день закупок нет'
   }
+
+  void dataVersion
 
   const modalOpen = showCreate || Boolean(editingOrder)
   const emptyMessage = getEmptyMessage()
