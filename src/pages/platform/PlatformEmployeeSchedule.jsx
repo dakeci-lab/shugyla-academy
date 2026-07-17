@@ -1,30 +1,21 @@
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
-import { useSession } from '../../context/SessionContext'
-import {
-  canViewEmployeeSchedule,
-  canViewTeamSchedule,
-} from '../../config/permissions'
-import EmployeeScheduleSection from '../../components/admin/sections/EmployeeScheduleSection'
-import '../../components/admin/admin-shared.css'
+import { getEmployeeProfilePath } from '../../config/permissions'
 
-/** Страница персонального графика сотрудника (редактирование — только для администратора) */
+/**
+ * Совместимость: старый персональный график
+ * `/platform/employees/:employeeId/schedule` → карточка сотрудника.
+ */
 export default function PlatformEmployeeSchedule() {
   const { employeeId } = useParams()
   const [searchParams] = useSearchParams()
-  const { user } = useSession()
-  const weekStartKey = searchParams.get('week')
 
-  if (!canViewEmployeeSchedule(user, employeeId)) {
-    return <Navigate to="/platform/academy/cabinet" replace />
+  if (!employeeId || !/^\d+$/.test(employeeId)) {
+    return <Navigate to="/platform/employees/list" replace />
   }
 
-  if (!canViewTeamSchedule(user)) {
-    return <Navigate to="/platform/employees/schedule" replace />
-  }
+  const nextParams = new URLSearchParams(searchParams)
+  const query = nextParams.toString()
+  const target = `${getEmployeeProfilePath(employeeId)}${query ? `?${query}` : ''}#schedule`
 
-  return (
-    <div className="platform-employee-schedule">
-      <EmployeeScheduleSection employeeId={employeeId} weekStartKey={weekStartKey} />
-    </div>
-  )
+  return <Navigate to={target} replace />
 }

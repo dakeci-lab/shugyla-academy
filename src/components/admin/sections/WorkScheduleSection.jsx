@@ -139,7 +139,7 @@ export default function WorkScheduleSection() {
   function openEmployeeSchedule(employeeId) {
     if (!canEditSchedule) return
     const weekQuery = isDateKey(weekStartKey) ? `?week=${encodeURIComponent(weekStartKey)}` : ''
-    navigate(`/platform/employees/${employeeId}/schedule${weekQuery}`)
+    navigate(`/platform/employees/${employeeId}${weekQuery}#schedule`)
   }
 
   function openDaySheet(employee, date, shift) {

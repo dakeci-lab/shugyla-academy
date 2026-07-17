@@ -42,8 +42,13 @@ function main() {
   const workforce = read('src/services/workforceAdminService.js')
   const permissions = read('src/config/permissions.js')
 
+  const profile = read('src/components/admin/sections/EmployeeProfileSection.jsx')
+
   console.log('Stage 1: Weekly table click flow')
-  assert('openEmployeeSchedule navigates to employee schedule route', schedule.includes('/platform/employees/${employeeId}/schedule'))
+  assert(
+    'openEmployeeSchedule navigates to employee profile schedule section',
+    schedule.includes('/platform/employees/${employeeId}${weekQuery}#schedule')
+  )
   assert('week query preserved in navigation', schedule.includes('?week='))
   assert('click uses employee id from row', schedule.includes('openEmployeeSchedule(emp.id)'))
   assert('edit permission gates open action', schedule.includes('canEditEmployeeSchedule'))
@@ -62,6 +67,8 @@ function main() {
   assert('existing calendar editor reused', editor.includes('EmployeeScheduleCalendar'))
   assert('existing day modal reused', editor.includes('ShiftDayEditModal'))
   assert('existing bulk modal reused', editor.includes('BulkScheduleModal'))
+  assert('profile embeds schedule section', profile.includes('<EmployeeScheduleSection'))
+  assert('profile embeds with schedule anchor', profile.includes('id="schedule"'))
   console.log('')
 
   console.log('Stage 3: ID contract')
@@ -78,7 +85,8 @@ function main() {
   assert('mobile keyboard open supported', mobile.includes("event.key === 'Enter'"))
   assert('mobile aria-label present', mobile.includes('Редактировать график сотрудника'))
   assert('mobile name click stops card toggle propagation', mobile.includes('event.stopPropagation()'))
-  assert('route passes weekStartKey prop', page.includes('weekStartKey={weekStartKey}'))
+  assert('legacy schedule route redirects to profile', page.includes('getEmployeeProfilePath(employeeId)'))
+  assert('legacy redirect preserves week query and schedule hash', page.includes('#schedule'))
   console.log('')
 
   console.log('Stage 6: Cloud write path')

@@ -31,6 +31,7 @@ import PlatformEmployees from './pages/platform/PlatformEmployees'
 import PlatformEmployeesRedirect from './pages/platform/PlatformEmployeesRedirect'
 import PlatformWorkSchedule from './pages/platform/PlatformWorkSchedule'
 import PlatformEmployeeSchedule from './pages/platform/PlatformEmployeeSchedule'
+import PlatformEmployeeProfile from './pages/platform/PlatformEmployeeProfile'
 import PlatformEmployeeRating from './pages/platform/PlatformEmployeeRating'
 import PlatformTimeTracker from './pages/platform/PlatformTimeTracker'
 import PlatformHrVacancies from './pages/platform/PlatformHrVacancies'
@@ -122,14 +123,6 @@ export default function App() {
             }
           />
           <Route
-            path="employees/:employeeId/schedule"
-            element={
-              <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_SCHEDULE}>
-                <PlatformEmployeeSchedule />
-              </PlatformRoute>
-            }
-          />
-          <Route
             path="employees/rating"
             element={
               <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_RATING}>
@@ -155,6 +148,14 @@ export default function App() {
                 />
               </PlatformRoute>
             }
+          />
+          <Route
+            path="employees/:employeeId/schedule"
+            element={<PlatformEmployeeSchedule />}
+          />
+          <Route
+            path="employees/:employeeId"
+            element={<PlatformEmployeeProfile />}
           />
           <Route
             path="employees/hiring"

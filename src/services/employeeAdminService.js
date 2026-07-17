@@ -90,6 +90,7 @@ export async function listEmployeesForAdmin(options = {}) {
     role_id: options.roleId ?? undefined,
     sort_by: options.sortBy ?? 'full_name',
     sort_direction: options.sortDirection ?? 'asc',
+    employee_id: options.employeeId != null ? Number(options.employeeId) : undefined,
   }
 
   const { data, error } = await supabase.functions.invoke('admin-list-employees', { body })
@@ -115,6 +116,42 @@ export async function listEmployeesForAdmin(options = {}) {
       total_pages: 1,
     },
   }
+}
+
+/**
+ * Cloud-only: load one employee for admin profile (employees.view).
+ * Prefers employee_id filter; falls back to search hint for older Edge Function builds.
+ */
+export async function getEmployeeForAdmin(employeeId, { searchHint = '' } = {}) {
+  const normalizedId = Number(employeeId)
+  if (!Number.isFinite(normalizedId) || normalizedId <= 0) {
+    return null
+  }
+
+  try {
+    const byId = await listEmployeesForAdmin({
+      page: 1,
+      pageSize: 1,
+      status: 'all',
+      employeeId: normalizedId,
+    })
+    const exact = byId.employees.find((row) => Number(row.id) === normalizedId)
+    if (exact) return exact
+  } catch {
+    // Older admin-list-employees builds reject unknown employee_id.
+  }
+
+  const hint = String(searchHint || '').trim()
+  if (!hint) return null
+
+  const bySearch = await listEmployeesForAdmin({
+    page: 1,
+    pageSize: 50,
+    status: 'all',
+    search: hint,
+  })
+
+  return bySearch.employees.find((row) => Number(row.id) === normalizedId) ?? null
 }
 
 /**

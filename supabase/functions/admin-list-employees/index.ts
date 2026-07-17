@@ -24,6 +24,7 @@ const ALLOWED_BODY_KEYS = new Set([
   'role_id',
   'sort_by',
   'sort_direction',
+  'employee_id',
 ])
 
 const DEACTIVATED_STATUSES = ['inactive', 'deactivated', 'terminated']
@@ -112,6 +113,18 @@ Deno.serve(async (req) => {
     roleIdFilter = payload.role_id.trim()
   }
 
+  let employeeIdFilter: number | null = null
+  if (payload.employee_id != null) {
+    const rawId =
+      typeof payload.employee_id === 'number'
+        ? payload.employee_id
+        : Number(payload.employee_id)
+    if (!Number.isInteger(rawId) || rawId <= 0) {
+      return adminErrorResponse('validation_error', 422)
+    }
+    employeeIdFilter = rawId
+  }
+
   const authResult = await authorizeEmployeeAdmin(req, PERMISSION_VIEW)
   if (authResult instanceof Response) return authResult
 
@@ -121,6 +134,10 @@ Deno.serve(async (req) => {
     .from('academy_users')
     .select(SAFE_EMPLOYEE_SELECT, { count: 'exact' })
     .neq('role', 'admin')
+
+  if (employeeIdFilter != null) {
+    query = query.eq('id', employeeIdFilter)
+  }
 
   if (statusFilter === 'deactivated') {
     query = query.in('status', DEACTIVATED_STATUSES)

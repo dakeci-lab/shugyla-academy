@@ -215,7 +215,9 @@ export function computeWorkedMinutesFromTimes(shift) {
   }
   const start = timeToMinutes(formatTimeValue(facts.actualStartTime))
   const end = timeToMinutes(formatTimeValue(facts.actualEndTime))
-  if (start == null || end == null || end <= start) return 0
+  if (start == null || end == null) return 0
+  // Overnight shifts (e.g. 13:00–00:00) end earlier on the clock than they start.
+  if (end <= start) return end + 24 * 60 - start
   return end - start
 }
 

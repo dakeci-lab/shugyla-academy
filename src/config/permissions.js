@@ -388,6 +388,19 @@ export function canManageEmployees(user) {
   ])
 }
 
+export function canEditEmployees(user) {
+  return can(user, PERMISSION_CODES.EMPLOYEES_EDIT)
+}
+
+export function canViewEmployeeProfile(user, employeeId) {
+  if (canManageEmployees(user)) return true
+  return canViewEmployeeSchedule(user, employeeId)
+}
+
+export function canViewEmployeeRating(user) {
+  return can(user, PERMISSION_CODES.RATING_VIEW)
+}
+
 export function canCreateEmployees(user) {
   return can(user, PERMISSION_CODES.EMPLOYEES_CREATE)
 }
@@ -438,10 +451,14 @@ export function canEditEmployeeSchedule(user) {
   return canAny(user, [PERMISSION_CODES.SCHEDULE_EDIT, PERMISSION_CODES.SCHEDULE_BULK_EDIT])
 }
 
+export function getEmployeeProfilePath(employeeId) {
+  return `/platform/employees/${employeeId}`
+}
+
 export function getEmployeeSchedulePath(user, employeeId = null) {
   if (canViewTeamSchedule(user)) {
     return employeeId
-      ? `/platform/employees/${employeeId}/schedule`
+      ? getEmployeeProfilePath(employeeId)
       : '/platform/employees/schedule'
   }
   return '/platform/employees/schedule'

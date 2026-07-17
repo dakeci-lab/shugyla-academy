@@ -25,6 +25,21 @@
   white-space: nowrap;
 }
 
+.employee-list-table__row--clickable {
+  cursor: pointer;
+}
+
+.employee-list-table__row--clickable:hover {
+  background: rgba(5, 150, 105, 0.04);
+}
+
+.employee-card-item__head-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .employee-name-link {
   padding: 0;
   border: none;

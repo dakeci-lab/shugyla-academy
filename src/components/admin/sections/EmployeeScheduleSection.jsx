@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getEmployeeById } from '../../../utils/employeeData'
 import { getRoleLabel } from '../../../data/roles'
@@ -40,20 +40,37 @@ function formatDateLabel(dateKey) {
   })
 }
 
-/** Персональный график сотрудника */
-export default function EmployeeScheduleSection({ employeeId, weekStartKey = null }) {
+/**
+ * Персональный график сотрудника.
+ * embedded — блок внутри карточки сотрудника (без дублирующего header/back).
+ */
+export default function EmployeeScheduleSection({
+  employeeId,
+  weekStartKey = null,
+  embedded = false,
+  sharedEmployee = null,
+  onPeriodChange = null,
+  onEmployeeSync = null,
+}) {
   const navigate = useNavigate()
   const { user } = useSession()
   const canEdit = canEditEmployeeSchedule(user)
 
   const [{ year, month }, setMonthState] = useState(() => getInitialMonth(weekStartKey))
-  const [employee, setEmployee] = useState(null)
+  const [employee, setEmployee] = useState(sharedEmployee)
   const [shifts, setShifts] = useState([])
   const [loading, setLoading] = useState(true)
   const [employeeMissing, setEmployeeMissing] = useState(false)
   const [error, setError] = useState('')
   const [editDateKey, setEditDateKey] = useState(null)
   const [showBulkModal, setShowBulkModal] = useState(false)
+  const sharedEmployeeRef = useRef(sharedEmployee)
+  const onEmployeeSyncRef = useRef(onEmployeeSync)
+  const onPeriodChangeRef = useRef(onPeriodChange)
+
+  sharedEmployeeRef.current = sharedEmployee
+  onEmployeeSyncRef.current = onEmployeeSync
+  onPeriodChangeRef.current = onPeriodChange
 
   const shiftMap = useMemo(() => shiftsToMap(shifts), [shifts])
 
@@ -65,17 +82,22 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
     try {
       if (isCloudMode()) {
         const bundle = await fetchEmployeeWorkforceBundle(employeeId, year, month, 'schedule')
-        setEmployee(bundle.employee)
+        const nextEmployee = bundle.employee || sharedEmployeeRef.current || null
+        setEmployee(nextEmployee)
         setShifts(bundle.shifts)
-        setEmployeeMissing(!bundle.employee)
+        setEmployeeMissing(!nextEmployee)
+        if (bundle.employee) {
+          onEmployeeSyncRef.current?.(bundle.employee)
+        }
       } else {
-        const localEmployee = getEmployeeById(Number(employeeId))
+        const localEmployee = getEmployeeById(Number(employeeId)) || sharedEmployeeRef.current
         setEmployee(localEmployee)
         setEmployeeMissing(!localEmployee)
         if (localEmployee) {
           const { getEmployeeShiftsForMonth } = await import('../../../services/academyDataService')
           const rows = await getEmployeeShiftsForMonth(employeeId, year, month)
           setShifts(rows)
+          onEmployeeSyncRef.current?.(localEmployee)
         } else {
           setShifts([])
         }
@@ -99,6 +121,22 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
   useEffect(() => {
     loadScheduleData()
   }, [loadScheduleData])
+
+  useEffect(() => {
+    if (sharedEmployee) {
+      setEmployee((current) => current || sharedEmployee)
+    }
+  }, [sharedEmployee])
+
+  useEffect(() => {
+    onPeriodChangeRef.current?.({
+      year,
+      month,
+      shifts,
+      loading,
+      error,
+    })
+  }, [year, month, shifts, loading, error])
 
   function changeMonth(delta) {
     setMonthState((prev) => {
@@ -140,42 +178,59 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
     retrySave(dateKey, setShifts)
   }
 
-  if (loading && !employee) {
+  if (!embedded && loading && !employee) {
     return <div className="schedule-loading">Загрузка графика…</div>
   }
 
-  if (employeeMissing || !employee) {
+  if (!embedded && (employeeMissing || !employee)) {
     return <p className="admin-form__error">Сотрудник не найден</p>
   }
 
+  const resolvedEmployee = employee || sharedEmployee
   const hasShifts = shifts.length > 0
   const editShift = editDateKey ? shiftMap.get(editDateKey) : null
 
   return (
     <>
-      <div className="schedule-header">
-        <button type="button" className="btn btn--outline btn--sm" onClick={goBack}>
-          ← Назад
-        </button>
-        <div className="schedule-header__profile">
-          <EmployeeAvatar name={employee.name} avatarUrl={employee.avatarUrl} size="lg" />
-          <div className="schedule-header__meta">
-            <h1>{employee.name}</h1>
-            <p>{employee.position || getRoleLabel(employee.role)}</p>
+      {!embedded && (
+        <div className="schedule-header">
+          <button type="button" className="btn btn--outline btn--sm" onClick={goBack}>
+            ← Назад
+          </button>
+          <div className="schedule-header__profile">
+            <EmployeeAvatar
+              name={resolvedEmployee?.name}
+              avatarUrl={resolvedEmployee?.avatarUrl}
+              size="lg"
+            />
+            <div className="schedule-header__meta">
+              <h1>{resolvedEmployee?.name}</h1>
+              <p>{resolvedEmployee?.position || getRoleLabel(resolvedEmployee?.role)}</p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="schedule-month-nav">
+      <div className={`schedule-month-nav${embedded ? ' schedule-month-nav--embedded' : ''}`}>
         <h2 className="schedule-month-nav__title">{formatMonthYearLabel(year, month)}</h2>
         <div className="schedule-month-nav__controls">
-          <button type="button" className="btn btn--outline btn--sm" onClick={() => changeMonth(-1)} aria-label="Предыдущий месяц">
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={() => changeMonth(-1)}
+            aria-label="Предыдущий месяц"
+          >
             <ChevronLeftIcon />
           </button>
           <button type="button" className="btn btn--outline btn--sm" onClick={goToday}>
             Сегодня
           </button>
-          <button type="button" className="btn btn--outline btn--sm" onClick={() => changeMonth(1)} aria-label="Следующий месяц">
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={() => changeMonth(1)}
+            aria-label="Следующий месяц"
+          >
             <ChevronRightIcon />
           </button>
           {canEdit && (
@@ -203,7 +258,12 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
           <button type="button" className="btn btn--outline btn--sm" onClick={handleRetryBulkSave}>
             Повторить
           </button>
-          <button type="button" className="schedule-bulk-status__dismiss" onClick={dismissBulkStatus} aria-label="Скрыть">
+          <button
+            type="button"
+            className="schedule-bulk-status__dismiss"
+            onClick={dismissBulkStatus}
+            aria-label="Скрыть"
+          >
             ×
           </button>
         </div>
@@ -230,9 +290,9 @@ export default function EmployeeScheduleSection({ employeeId, weekStartKey = nul
         </>
       )}
 
-      {editDateKey && canEdit && (
+      {editDateKey && canEdit && resolvedEmployee && (
         <ShiftDayEditModal
-          employeeName={employee.name}
+          employeeName={resolvedEmployee.name}
           dateKey={editDateKey}
           dateLabel={formatDateLabel(editDateKey)}
           shift={editShift}

@@ -16,10 +16,10 @@ function displayValue(value) {
   return value
 }
 
-function handleCardKeyDown(event, onEdit, employee) {
+function handleCardKeyDown(event, onOpen, employee) {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
-    onEdit(employee)
+    onOpen(employee)
   }
 }
 
@@ -30,8 +30,14 @@ export default function EmployeeListTable({
   getRoleLabelForEmployee,
   canEdit = false,
   onEdit,
+  onOpen,
   emptyMessage,
 }) {
+  function openProfile(employee, event) {
+    event?.stopPropagation?.()
+    onOpen?.(employee)
+  }
+
   function openEdit(employee, event) {
     event?.stopPropagation?.()
     onEdit?.(employee)
@@ -61,14 +67,20 @@ export default function EmployeeListTable({
                 </tr>
               ) : (
                 employees.map((employee, index) => (
-                  <tr key={employee.id} className="employee-list-table__row">
+                  <tr
+                    key={employee.id}
+                    className={`employee-list-table__row${
+                      onOpen ? ' employee-list-table__row--clickable' : ''
+                    }`}
+                    onClick={onOpen ? () => onOpen(employee) : undefined}
+                  >
                     <td className="employee-list-table__num">{rowOffset + index + 1}</td>
                     <td className="employee-list-table__name">
-                      {canEdit && onEdit ? (
+                      {onOpen ? (
                         <button
                           type="button"
                           className="employee-name-link"
-                          onClick={(event) => openEdit(employee, event)}
+                          onClick={(event) => openProfile(employee, event)}
                         >
                           <span className="employee-table-cell">
                             <EmployeeAvatar
@@ -100,14 +112,14 @@ export default function EmployeeListTable({
                         type={getEmploymentStatusBadgeType(employee.employmentStatus)}
                       />
                     </td>
-                    <td>
+                    <td onClick={(event) => event.stopPropagation()}>
                       <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
-                        {onEdit && (
+                        {canEdit && onEdit && (
                           <div className="admin-table__actions">
                             <IconActionButton
                               label="Редактировать сотрудника"
                               variant="primary"
-                              onClick={() => onEdit(employee)}
+                              onClick={(event) => openEdit(employee, event)}
                             >
                               <PencilIcon />
                             </IconActionButton>
@@ -128,7 +140,7 @@ export default function EmployeeListTable({
           <li className="employee-cards__empty">{emptyMessage}</li>
         ) : (
           employees.map((employee, index) => {
-            const isInteractive = canEdit && onEdit
+            const isInteractive = Boolean(onOpen)
 
             return (
               <li
@@ -138,9 +150,9 @@ export default function EmployeeListTable({
                   ? {
                       role: 'button',
                       tabIndex: 0,
-                      'aria-label': `Редактировать сотрудника ${employee.name}`,
-                      onClick: () => onEdit(employee),
-                      onKeyDown: (event) => handleCardKeyDown(event, onEdit, employee),
+                      'aria-label': `Открыть карточку сотрудника ${employee.name}`,
+                      onClick: () => onOpen(employee),
+                      onKeyDown: (event) => handleCardKeyDown(event, onOpen, employee),
                     }
                   : {})}
               >
@@ -154,10 +166,23 @@ export default function EmployeeListTable({
                     />
                     <h3 className="employee-card-item__title">{employee.name}</h3>
                   </div>
-                  <StatusBadge
-                    label={getEmploymentStatusLabel(employee.employmentStatus)}
-                    type={getEmploymentStatusBadgeType(employee.employmentStatus)}
-                  />
+                  <div className="employee-card-item__head-actions">
+                    <StatusBadge
+                      label={getEmploymentStatusLabel(employee.employmentStatus)}
+                      type={getEmploymentStatusBadgeType(employee.employmentStatus)}
+                    />
+                    <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
+                      {canEdit && onEdit && (
+                        <IconActionButton
+                          label="Редактировать сотрудника"
+                          variant="primary"
+                          onClick={(event) => openEdit(employee, event)}
+                        >
+                          <PencilIcon />
+                        </IconActionButton>
+                      )}
+                    </Can>
+                  </div>
                 </div>
 
                 <div className="employee-card-item__meta">

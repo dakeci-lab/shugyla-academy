@@ -344,8 +344,11 @@ export function getPlatformSection(pathname) {
 }
 
 function getDynamicPlatformSection(pathname, flat) {
-  if (/^\/platform\/employees\/\d+\/schedule/.test(pathname)) {
-    return flat.find((item) => item.id === 'employees-schedule') || null
+  if (/^\/platform\/employees\/\d+(\/schedule)?\/?$/.test(pathname)) {
+    return {
+      title: 'Карточка сотрудника',
+      description: 'Профиль, статистика и персональный график сотрудника.',
+    }
   }
 
   if (/^\/platform\/suppliers\/[^/]+/.test(pathname)) {

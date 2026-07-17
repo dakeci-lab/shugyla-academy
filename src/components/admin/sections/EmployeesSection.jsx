@@ -617,6 +617,7 @@ export default function EmployeesSection() {
           getRoleLabelForEmployee={getRoleLabelForEmployee}
           canEdit={canEdit}
           onEdit={canEdit ? openEdit : null}
+          onOpen={(employee) => navigate(`/platform/employees/${employee.id}`)}
           emptyMessage={getEmptyMessage()}
         />
       )}
