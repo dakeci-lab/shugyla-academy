@@ -102,19 +102,23 @@ export function isEffectivePlannedEndReached(shift: ShiftLike, now = new Date())
   return now.getTime() >= plannedEnd.getTime()
 }
 
-export function isOpenShiftWorkWindowActive(shift: ShiftLike, now = new Date()): boolean {
+/** Незавершённая отметка прихода — независимо от планового конца / графика */
+export function hasOpenAttendance(shift: ShiftLike | null | undefined): boolean {
+  if (!shift) return false
   const actualStart = readField(shift, 'actual_start_time', 'actualStartTime')
   const actualEnd = readField(shift, 'actual_end_time', 'actualEndTime')
-  if (!actualStart || actualEnd) return false
+  return Boolean(actualStart) && !actualEnd
+}
+
+export function isOpenShiftWorkWindowActive(shift: ShiftLike, now = new Date()): boolean {
+  if (!hasOpenAttendance(shift)) return false
   const plannedEnd = buildEffectivePlannedEndAt(shift)
   if (!plannedEnd) return true
   return now.getTime() < plannedEnd.getTime()
 }
 
 export function isStaleOpenShift(shift: ShiftLike, now = new Date()): boolean {
-  const actualStart = readField(shift, 'actual_start_time', 'actualStartTime')
-  const actualEnd = readField(shift, 'actual_end_time', 'actualEndTime')
-  if (!actualStart || actualEnd) return false
+  if (!hasOpenAttendance(shift)) return false
   return isEffectivePlannedEndReached(shift, now)
 }
 
@@ -131,9 +135,18 @@ export function resolveWorkWindowShift(shifts: ShiftLike[], now = new Date()) {
   const todayShift = byDate.get(todayKey) ?? null
   const yesterdayShift = byDate.get(yesterdayKey) ?? null
 
-  if (yesterdayShift && isOpenShiftWorkWindowActive(yesterdayShift, now)) {
+  if (hasOpenAttendance(yesterdayShift)) {
     return {
       activeShift: yesterdayShift,
+      todayShift,
+      yesterdayShift,
+      previousShiftMissedClockOut: false,
+    }
+  }
+
+  if (hasOpenAttendance(todayShift)) {
+    return {
+      activeShift: todayShift,
       todayShift,
       yesterdayShift,
       previousShiftMissedClockOut: false,
@@ -144,19 +157,18 @@ export function resolveWorkWindowShift(shifts: ShiftLike[], now = new Date()) {
     activeShift: todayShift,
     todayShift,
     yesterdayShift,
-    previousShiftMissedClockOut: Boolean(yesterdayShift && isStaleOpenShift(yesterdayShift, now)),
+    previousShiftMissedClockOut: false,
   }
 }
 
-export function deriveTrackerStatus(shift: ShiftLike | null, now = new Date()) {
+export function deriveTrackerStatus(shift: ShiftLike | null, _now = new Date()) {
   if (!shift) return 'no_shift'
-  if (shift.status === 'day_off') return 'day_off'
-  if (shift.status === 'vacation' || shift.status === 'sick_leave') return 'day_off'
-  if (shift.status !== 'working') return 'no_shift'
   const actualStart = readField(shift, 'actual_start_time', 'actualStartTime')
   const actualEnd = readField(shift, 'actual_end_time', 'actualEndTime')
   if (actualStart && actualEnd) return 'completed'
-  if (actualStart && isOpenShiftWorkWindowActive(shift, now)) return 'working'
-  if (actualStart && isStaleOpenShift(shift, now)) return 'completed'
+  if (hasOpenAttendance(shift)) return 'working'
+  if (shift.status === 'day_off') return 'day_off'
+  if (shift.status === 'vacation' || shift.status === 'sick_leave') return 'day_off'
+  if (shift.status !== 'working') return 'no_shift'
   return 'not_started'
 }

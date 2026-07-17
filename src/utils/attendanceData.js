@@ -381,14 +381,15 @@ export function getTodayShiftState(shift, settings, now = new Date()) {
   if (!shift) {
     return { code: 'no_schedule', message: 'На сегодня график не установлен' }
   }
-  if (!isWorkingShiftStatus(shift.status)) {
-    return { code: 'not_working', message: 'Сегодня у вас нет запланированной рабочей смены' }
-  }
   if (shift.actualStartTime && shift.actualEndTime) {
     return { code: 'completed', message: 'Смена завершена' }
   }
-  if (shift.actualStartTime) {
+  // Незавершённый приход важнее статуса графика (выходной / смена плана после старта).
+  if (shift.actualStartTime && !shift.actualEndTime) {
     return { code: 'checked_in', message: 'Вы на работе' }
+  }
+  if (!isWorkingShiftStatus(shift.status)) {
+    return { code: 'not_working', message: 'Сегодня у вас нет запланированной рабочей смены' }
   }
   if (isShiftEnded(shift, now) && !shift.actualStartTime) {
     return { code: 'missed', message: 'Смена завершена без отметки прихода' }

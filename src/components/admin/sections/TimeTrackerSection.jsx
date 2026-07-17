@@ -162,11 +162,18 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
   const [previousShiftMissedClockOut, setPreviousShiftMissedClockOut] = useState(false)
   const [now, setNow] = useState(new Date())
 
-  const loadShift = useCallback(async () => {
+  const loadShift = useCallback(async (options = {}) => {
     if (!employeeId) return
-    setLoading(true)
+    // Ignore synthetic click events from onClick={loadShift}
+    const quiet =
+      options && typeof options === 'object' && !('nativeEvent' in options)
+        ? Boolean(options.quiet)
+        : false
+    if (!quiet) {
+      setLoading(true)
+      setActionError('')
+    }
     setLoadError(false)
-    setActionError('')
     try {
       const row = await getTodayShiftForEmployee(employeeId)
       setShift(row)
@@ -179,13 +186,16 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
           ? formatTimeRange(row.plannedStartTime, row.plannedEndTime)
           : null,
         status: row?.status ?? null,
+        quiet,
       })
     } catch {
-      setLoadError(true)
-      setShift(null)
-      debugLogTimeTracker('loadShiftError', { employeeId })
+      if (!quiet) {
+        setLoadError(true)
+        setShift(null)
+      }
+      debugLogTimeTracker('loadShiftError', { employeeId, quiet })
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [employeeId])
 
@@ -253,6 +263,7 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
   }
 
   async function runWithGeolocation(action, context) {
+    if (acting) return false
     setActing(true)
     setActionError('')
     setSuccess('')
@@ -275,19 +286,28 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
   }
 
   async function handleCheckIn() {
+    if (acting || loading || loadError || !canCheckIn) return
     const ok = await runWithGeolocation(
       (coords) => checkInEmployee(employeeId, coords),
       'checkin'
     )
-    if (ok) setSuccess('Приход отмечен')
+    if (ok) {
+      setSuccess('Приход отмечен')
+      // Точечный refresh get_today_status — без полного bootstrap и без skeleton
+      void loadShift({ quiet: true })
+    }
   }
 
   async function handleCheckOut() {
+    if (acting || loading || loadError || !canCheckOut) return
     const ok = await runWithGeolocation(
       (coords) => checkOutEmployee(employeeId, coords),
       'checkout'
     )
-    if (ok) setSuccess('Уход отмечен')
+    if (ok) {
+      setSuccess('Уход отмечен')
+      void loadShift({ quiet: true })
+    }
   }
 
   const welcomeName =

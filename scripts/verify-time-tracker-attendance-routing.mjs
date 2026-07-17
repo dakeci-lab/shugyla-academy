@@ -136,7 +136,11 @@ function stageStaticWritePath() {
 function stageStaticUi() {
   console.log('Stage 2: UI success/error handling')
   const section = read('src/components/admin/sections/TimeTrackerSection.jsx')
-  assert('success only after runWithGeolocation ok', /if \(ok\) setSuccess\('Уход отмечен'\)/.test(section))
+  assert(
+    'success only after runWithGeolocation ok',
+    /if \(ok\) \{\s*setSuccess\('Уход отмечен'\)/.test(section) ||
+      /if \(ok\) setSuccess\('Уход отмечен'\)/.test(section)
+  )
   assert('runWithGeolocation returns boolean', section.includes('return true') && section.includes('return false'))
   assert('acting disables buttons', section.includes('disabled={!canCheckOut || acting'))
   assert('uses shared attendance error mapper', section.includes('mapAttendanceActionUserMessage'))

@@ -9,7 +9,7 @@ import {
   addDaysToDateKey,
   deriveTrackerStatus,
   getDateKeyInTimezone,
-  isOpenShiftWorkWindowActive,
+  hasOpenAttendance,
   resolveWorkWindowShift,
 } from '../_shared/shiftWorkWindow.ts'
 
@@ -178,9 +178,9 @@ async function handleClockIn(
   const message = extractRpcMessage(error)
   if (isAlreadyCheckedInMessage(message)) {
     const context = await resolveShiftContext(serviceClient, employeeId, now)
-    const todayShift = context.todayShift
-    if (todayShift?.actual_start_time && isOpenShiftWorkWindowActive(todayShift, now)) {
-      return jsonResponse({ ok: true, shift: todayShift, idempotent: true })
+    const openShift = context.activeShift
+    if (hasOpenAttendance(openShift)) {
+      return jsonResponse({ ok: true, shift: openShift, idempotent: true })
     }
   }
 
@@ -199,26 +199,14 @@ async function handleClockOut(
   const context = await resolveShiftContext(serviceClient, employeeId, now)
   const activeShift = context.activeShift
 
-  if (!activeShift?.actual_start_time) {
+  if (!hasOpenAttendance(activeShift)) {
+    if (activeShift?.actual_end_time || activeShift?.actualEndTime) {
+      return jsonResponse({ ok: true, shift: activeShift, idempotent: true })
+    }
     return jsonResponse(
       { ok: false, code: 'clock_in_required', message: 'Сначала отметьте приход' },
       422
     )
-  }
-
-  if (!isOpenShiftWorkWindowActive(activeShift, now)) {
-    return jsonResponse(
-      {
-        ok: false,
-        code: 'active_shift_not_found',
-        message: 'Активная смена не найдена. Обновите страницу или обратитесь к администратору',
-      },
-      422
-    )
-  }
-
-  if (activeShift.actual_end_time) {
-    return jsonResponse({ ok: true, shift: activeShift, idempotent: true })
   }
 
   const { data, error } = await serviceClient.rpc('attendance_check_out', {

@@ -65,9 +65,14 @@ export function isEffectivePlannedEndReached(shift, now = new Date()) {
   return now.getTime() >= plannedEnd.getTime()
 }
 
+/** Есть незавершённая отметка прихода (независимо от планового конца / графика) */
+export function hasOpenAttendance(shift) {
+  return Boolean(shift?.actualStartTime) && !shift?.actualEndTime
+}
+
 /** Открытая смена всё ещё в рабочем окне (ночная смена после полуночи) */
 export function isOpenShiftWorkWindowActive(shift, now = new Date()) {
-  if (!shift?.actualStartTime || shift?.actualEndTime) return false
+  if (!hasOpenAttendance(shift)) return false
   const plannedEnd = buildEffectivePlannedEndAt(shift)
   if (!plannedEnd) return true
   return now.getTime() < plannedEnd.getTime()
@@ -75,7 +80,7 @@ export function isOpenShiftWorkWindowActive(shift, now = new Date()) {
 
 /** Прошлая смена с приходом без ухода после effectivePlannedEndAt */
 export function isStaleOpenShift(shift, now = new Date()) {
-  if (!shift?.actualStartTime || shift?.actualEndTime) return false
+  if (!hasOpenAttendance(shift)) return false
   return isEffectivePlannedEndReached(shift, now)
 }
 
@@ -96,7 +101,9 @@ export function resolveWorkWindowShift(shifts, now = new Date()) {
   const todayShift = byDate.get(todayKey) ?? null
   const yesterdayShift = byDate.get(yesterdayKey) ?? null
 
-  if (yesterdayShift && isOpenShiftWorkWindowActive(yesterdayShift, now)) {
+  // Незавершённая смена всегда остаётся активной для тайм-трекера (в т.ч. stale / после
+  // смены графика). Сначала вчерашняя (overnight), затем сегодняшняя.
+  if (hasOpenAttendance(yesterdayShift)) {
     return {
       activeShift: yesterdayShift,
       todayShift,
@@ -105,14 +112,20 @@ export function resolveWorkWindowShift(shifts, now = new Date()) {
     }
   }
 
-  const missedYesterday =
-    Boolean(yesterdayShift) && isMissedClockOutShift(yesterdayShift, now)
+  if (hasOpenAttendance(todayShift)) {
+    return {
+      activeShift: todayShift,
+      todayShift,
+      yesterdayShift,
+      previousShiftMissedClockOut: false,
+    }
+  }
 
   return {
     activeShift: todayShift,
     todayShift,
     yesterdayShift,
-    previousShiftMissedClockOut: missedYesterday,
+    previousShiftMissedClockOut: false,
   }
 }
 
@@ -123,11 +136,11 @@ export function resolveActiveShiftForToday(shifts, now = new Date()) {
 
 export function deriveTrackerStatus(shift, now = new Date()) {
   if (!shift) return 'no_shift'
+  if (shift.actualStartTime && shift.actualEndTime) return 'completed'
+  // Незавершённая смена важнее текущего статуса графика (выходной / смена плана).
+  if (hasOpenAttendance(shift)) return 'working'
   if (shift.status === 'day_off') return 'day_off'
   if (shift.status === 'vacation' || shift.status === 'sick_leave') return 'day_off'
   if (shift.status !== 'working') return 'no_shift'
-  if (shift.actualStartTime && shift.actualEndTime) return 'completed'
-  if (shift.actualStartTime && isOpenShiftWorkWindowActive(shift, now)) return 'working'
-  if (shift.actualStartTime && isStaleOpenShift(shift, now)) return 'completed'
   return 'not_started'
 }

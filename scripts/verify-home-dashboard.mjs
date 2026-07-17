@@ -51,12 +51,12 @@ function main() {
 
   console.log('Stage 2: Time tracker audit imports')
 
-  assert('isOpenShiftWorkWindowActive imported', audit.includes('isOpenShiftWorkWindowActive'))
+  assert('hasOpenAttendance imported', audit.includes('hasOpenAttendance'))
   assert(
     'import from shiftWorkWindow',
-    audit.includes("from './shiftWorkWindow'") && audit.includes('isOpenShiftWorkWindowActive')
+    audit.includes("from './shiftWorkWindow'") && audit.includes('hasOpenAttendance')
   )
-  assert('resolveCanCheckOut uses work window helper', audit.includes('isOpenShiftWorkWindowActive(shift, now)'))
+  assert('resolveCanCheckOut allows open attendance', audit.includes('hasOpenAttendance(shift)'))
 
   console.log('Stage 3: Null-safe shift handling')
 

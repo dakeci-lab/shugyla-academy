@@ -41,24 +41,24 @@ export function resolveHomeCardVariant({
   isWorkingShift,
 }) {
   const stateCode = state?.code
+  const hasOpenShift =
+    Boolean(canCheckOut) ||
+    stateCode === 'checked_in' ||
+    (Boolean(shift?.actualStartTime) && !shift?.actualEndTime)
+
   if (stateCode === 'completed') return 'completed'
+  // Активная смена всегда в working/late — даже если график уже «выходной».
+  if (hasOpenShift) {
+    if (computedStatus?.code === SHIFT_RESULT_CODE.LATE) return 'late'
+    return 'working'
+  }
   if (
     stateCode === 'missed' ||
     computedStatus?.code === SHIFT_RESULT_CODE.ABSENCE ||
     shift?.status === 'absence'
   ) {
-    if (canCheckIn || canCheckOut) {
-      // Ложное «отсутствие» до конца смены — показываем ожидание
-      if (canCheckIn) return 'waiting'
-      if (canCheckOut) {
-        return computedStatus?.code === SHIFT_RESULT_CODE.LATE ? 'late' : 'working'
-      }
-    }
+    if (canCheckIn) return 'waiting'
     return 'absence'
-  }
-  if (canCheckOut) {
-    if (computedStatus?.code === SHIFT_RESULT_CODE.LATE) return 'late'
-    return 'working'
   }
   if (canCheckIn) return 'waiting'
   if (!shift) return 'empty'

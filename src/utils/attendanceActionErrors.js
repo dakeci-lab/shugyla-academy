@@ -21,12 +21,18 @@ function normalizeMessage(error) {
 }
 
 export function isNetworkError(error) {
+  const code = String(error?.code ?? '').toLowerCase()
+  const status = Number(error?.status ?? error?.statusCode ?? 0)
+  // HTTP application errors (401/403/422/5xx) are not "no internet"
+  if (status >= 400) return false
+  if (code && code !== 'network_error' && /^(access_|unauthorized|forbidden|attendance_|clock_|active_|validation_)/.test(code)) {
+    return false
+  }
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return true
   const message = normalizeMessage(error).toLowerCase()
-  const code = String(error?.code ?? '').toLowerCase()
   return (
     code === 'network_error' ||
-    /failed to fetch|networkerror|network request failed|load failed|fetch failed|timeout|econnrefused|enotfound|err_internet_disconnected/.test(
+    /failed to fetch|networkerror|network request failed|load failed|fetch failed|econnrefused|enotfound|err_internet_disconnected/.test(
       message
     )
   )

@@ -14,6 +14,7 @@ import { useProcurementRealtime } from '../hooks/useProcurementRealtime'
 import { getPlatformSection } from '../platform/platformNav'
 import { useSession } from '../context/SessionContext'
 import { LOGIN_PATH } from '../router/authRoutes'
+import { lockModalScroll, unlockModalScroll } from '../utils/modalScrollLock'
 import './PlatformLayout.css'
 
 function PlatformLayoutShell({ onLogout }) {
@@ -38,11 +39,9 @@ function PlatformLayoutShell({ onLogout }) {
   }, [pathname])
 
   useEffect(() => {
-    if (!drawerOpen) {
-      document.body.style.overflow = ''
-      return undefined
-    }
-    document.body.style.overflow = 'hidden'
+    if (!drawerOpen) return undefined
+
+    lockModalScroll()
 
     function handleEscape(event) {
       if (event.key === 'Escape') setDrawerOpen(false)
@@ -51,7 +50,7 @@ function PlatformLayoutShell({ onLogout }) {
     document.addEventListener('keydown', handleEscape)
     return () => {
       document.removeEventListener('keydown', handleEscape)
-      document.body.style.overflow = ''
+      unlockModalScroll()
     }
   }, [drawerOpen])
 

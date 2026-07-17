@@ -14,7 +14,7 @@ import {
   isShiftEndingAtMidnight,
   isFalseMidnightAbsence,
 } from './shiftMidnightEnd'
-import { isOpenShiftWorkWindowActive } from './shiftWorkWindow'
+import { hasOpenAttendance } from './shiftWorkWindow'
 import { toDateKeyInAppTimezone } from './timezone'
 
 /** Можно ли отметить приход — только для UI тайм-трекера */
@@ -22,14 +22,14 @@ export function resolveCanCheckIn(shift, state, { loading, loadError, now = new 
   if (loading) return { value: false, reason: 'loading' }
   if (loadError) return { value: false, reason: 'load_error' }
   if (!shift) return { value: false, reason: 'shift_not_loaded' }
-  if (!isWorkingShiftStatus(shift.status)) {
-    return { value: false, reason: `shift_status_${shift.status}` }
+  if (hasOpenAttendance(shift) || state?.code === 'checked_in') {
+    return { value: false, reason: 'already_checked_in' }
   }
   if (shift.actualStartTime && shift.actualEndTime) {
     return { value: false, reason: 'shift_completed' }
   }
-  if (shift.actualStartTime) {
-    return { value: false, reason: 'already_checked_in' }
+  if (!isWorkingShiftStatus(shift.status)) {
+    return { value: false, reason: `shift_status_${shift.status}` }
   }
   if (isShiftPlannedEndReached(shift, now)) {
     return { value: false, reason: 'shift_ended_without_checkin' }
@@ -40,18 +40,17 @@ export function resolveCanCheckIn(shift, state, { loading, loadError, now = new 
   return { value: true, reason: null }
 }
 
-/** Можно ли отметить уход — только для UI тайм-трекера */
+/**
+ * Можно ли отметить уход — только для UI тайм-трекера.
+ * Незавершённая смена всегда завершаема: плановый конец, выходной и смена графика
+ * не скрывают кнопку «Завершить смену».
+ */
 export function resolveCanCheckOut(shift, state, { loading, loadError, now = new Date() }) {
+  void now
   if (loading) return { value: false, reason: 'loading' }
   if (loadError) return { value: false, reason: 'load_error' }
   if (!shift) return { value: false, reason: 'shift_not_loaded' }
-  if (!isOpenShiftWorkWindowActive(shift, now)) {
-    return { value: false, reason: 'shift_not_active' }
-  }
-  if (shift.actualStartTime && !shift.actualEndTime) {
-    return { value: true, reason: null }
-  }
-  if (state?.code === 'checked_in') {
+  if (hasOpenAttendance(shift) || state?.code === 'checked_in') {
     return { value: true, reason: null }
   }
   return { value: false, reason: state?.code || 'not_checked_in' }

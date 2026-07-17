@@ -110,9 +110,10 @@ function stageStaleVsToday() {
   const now = new Date('2026-07-16T10:00:00+05:00')
 
   const resolved = resolveWorkWindowShift([yesterdayStale, todayNew], now)
-  assert('returns today shift as active', resolved.activeShift?.shiftDate === '2026-07-16')
-  assert('flags previous missed checkout', resolved.previousShiftMissedClockOut === true)
-  assert('tracker status not_started', deriveTrackerStatus(resolved.activeShift, now) === 'not_started')
+  // Open unfinished attendance stays active so the employee can still clock out.
+  assert('returns yesterday open shift as active', resolved.activeShift?.shiftDate === '2026-07-15')
+  assert('missed checkout flag false while open', resolved.previousShiftMissedClockOut === false)
+  assert('tracker status working', deriveTrackerStatus(resolved.activeShift, now) === 'working')
 
   const stateCode =
     resolved.activeShift?.actualStartTime && resolved.activeShift?.actualEndTime
@@ -120,15 +121,12 @@ function stageStaleVsToday() {
       : resolved.activeShift?.actualStartTime
         ? 'checked_in'
         : 'ready_check_in'
-  assert('UI state ready_check_in', stateCode === 'ready_check_in')
+  assert('UI state checked_in for open shift', stateCode === 'checked_in')
 
   const checkOutAllowed = Boolean(
-    resolved.activeShift &&
-      isOpenShiftWorkWindowActive(resolved.activeShift, now) &&
-      resolved.activeShift.actualStartTime &&
-      !resolved.activeShift.actualEndTime
+    resolved.activeShift?.actualStartTime && !resolved.activeShift?.actualEndTime
   )
-  assert('checkout disabled for not_started today', checkOutAllowed === false)
+  assert('checkout allowed for open stale shift', checkOutAllowed === true)
 
   console.log('')
 }
@@ -158,7 +156,7 @@ function stageStaticSources() {
   const edgeFn = read('supabase/functions/employee-time-tracker-action/index.ts')
   assert('edge uses resolveWorkWindowShift', edgeFn.includes('resolveWorkWindowShift'))
   assert('get_today_status returns previousShiftMissedClockOut', edgeFn.includes('previousShiftMissedClockOut'))
-  assert('clock_out checks work window', edgeFn.includes('isOpenShiftWorkWindowActive'))
+  assert('clock_out uses hasOpenAttendance', edgeFn.includes('hasOpenAttendance'))
   assert('clock_out returns clock_in_required', edgeFn.includes("'clock_in_required'"))
   assert('clock_out uses attendance_check_out RPC', edgeFn.includes("rpc('attendance_check_out'"))
   assert('clock_out no direct shift update', !edgeFn.includes(".from('academy_employee_shifts').update"))
