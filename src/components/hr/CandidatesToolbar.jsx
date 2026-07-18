@@ -1,6 +1,8 @@
 import { useRef, useState, useEffect } from 'react'
-import { FilterIcon } from '../icons/PlatformIcons'
-import CandidateSearch from './CandidateSearch'
+import PlatformSearchToolbar, {
+  PlatformFilterButton,
+  PlatformToolbarActionWrap,
+} from '../platform/PlatformSearchToolbar'
 import CandidateFiltersPopover from './CandidateFiltersPopover'
 import CandidateFiltersSheet from './CandidateFiltersSheet'
 import CandidateFilterChips from './CandidateFilterChips'
@@ -53,10 +55,9 @@ export default function CandidatesToolbar({
   const isMobile = useIsMobileViewport()
 
   useEffect(() => {
-    if (!isMobile && filterOpen) {
-      setFilterOpen(false)
-    }
-  }, [isMobile, filterOpen])
+    // При переходе на desktop закрываем мобильный sheet/popover
+    setFilterOpen(false)
+  }, [isMobile])
 
   const activeFilterCount = countActiveCandidateFilters(appliedFilters)
   const filtersActive = hasActiveCandidateFilters(appliedFilters)
@@ -90,48 +91,41 @@ export default function CandidatesToolbar({
 
   return (
     <div className="candidates-page">
-      <div className="candidates-toolbar">
-        <CandidateSearch
-          value={searchInput}
-          onChange={onSearchInputChange}
-          onClear={onSearchClear}
-        />
-
-        <div className="candidates-toolbar__filters-wrap">
-          <button
-            ref={filterButtonRef}
-            type="button"
-            className={`candidates-toolbar__filter-btn${
-              filtersActive ? ' candidates-toolbar__filter-btn--active' : ''
-            }`}
-            onClick={toggleFilters}
-            aria-expanded={filterOpen}
-            aria-controls={isMobile ? 'candidate-filters-sheet' : undefined}
-            aria-label={
-              activeFilterCount > 0 ? `Фильтры, активно ${activeFilterCount}` : 'Фильтры'
-            }
-          >
-            <FilterIcon size={18} />
-            <span className="candidates-toolbar__filter-label">Фильтры</span>
-            {activeFilterCount > 0 && (
-              <span className="candidates-toolbar__filter-count">{activeFilterCount}</span>
-            )}
-          </button>
-
-          {!isMobile && (
-            <CandidateFiltersPopover
-              open={filterOpen}
-              draft={draftFilters}
-              vacancies={vacancies}
-              onChange={onDraftChange}
-              onApply={applyFilters}
-              onReset={onResetFilters}
-              onClose={() => setFilterOpen(false)}
-              anchorRef={filterButtonRef}
+      <PlatformSearchToolbar
+        value={searchInput}
+        onChange={(event) => onSearchInputChange(event.target.value)}
+        placeholder="Поиск по ФИО или телефону"
+        ariaLabel="Поиск по ФИО или телефону"
+        showClear
+        onClear={onSearchClear}
+        actions={
+          <PlatformToolbarActionWrap>
+            <PlatformFilterButton
+              buttonRef={filterButtonRef}
+              active={filtersActive}
+              count={activeFilterCount > 0 ? activeFilterCount : null}
+              onClick={toggleFilters}
+              ariaExpanded={filterOpen}
+              ariaLabel={
+                activeFilterCount > 0 ? `Фильтр, активно ${activeFilterCount}` : 'Фильтр'
+              }
+              title="Фильтр"
             />
-          )}
-        </div>
-      </div>
+            {!isMobile && (
+              <CandidateFiltersPopover
+                open={filterOpen}
+                draft={draftFilters}
+                vacancies={vacancies}
+                onChange={onDraftChange}
+                onApply={applyFilters}
+                onReset={onResetFilters}
+                onClose={() => setFilterOpen(false)}
+                anchorRef={filterButtonRef}
+              />
+            )}
+          </PlatformToolbarActionWrap>
+        }
+      />
 
       <div className="candidates-toolbar__meta">
         <p className="candidates-toolbar__count">{countLabel}</p>

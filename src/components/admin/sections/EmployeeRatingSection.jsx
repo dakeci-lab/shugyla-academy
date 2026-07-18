@@ -17,7 +17,7 @@ import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeRatingDetailModal from '../EmployeeRatingDetailModal'
 import RatingScoreBar from '../RatingScoreBar'
 import SchedulePeriodBar from '../SchedulePeriodBar'
-import EmployeeSearchToolbar from '../EmployeeSearchToolbar'
+import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
 import '../EmployeeRating.css'
@@ -206,7 +206,12 @@ export default function EmployeeRatingSection() {
         </div>
       )}
 
-      <EmployeeSearchToolbar value={search} onChange={(e) => setSearch(e.target.value)} />
+      <PlatformSearchToolbar
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Поиск по ФИО"
+        ariaLabel="Поиск по ФИО"
+      />
 
       {error && (
         <div className="schedule-error">

@@ -49,7 +49,11 @@ import SimplePurchaseCardList from '../../../components/procurement/SimplePurcha
 import PurchaseFilterPopover from '../../../components/procurement/PurchaseFilterPopover'
 import WeekScheduleNav from '../../../components/procurement/WeekScheduleNav'
 import ProcurementPlanDayList from '../../../components/procurement/ProcurementPlanDayList'
-import { FilterIcon, PlusIcon } from '../../../components/icons/PlatformIcons'
+import { PlusIcon } from '../../../components/icons/PlatformIcons'
+import {
+  PlatformFilterButton,
+  PlatformToolbarActionWrap,
+} from '../../../components/platform/PlatformSearchToolbar'
 import '../../../components/admin/admin-shared.css'
 import './ProcurementPage.css'
 import '../../../components/procurement/SimpleDeliveryCard.css'
@@ -416,27 +420,15 @@ export default function ProcurementPage() {
             </button>
           )}
 
-          <div className="procurement-page__filter-wrap">
-            <button
-              ref={filterButtonRef}
-              type="button"
-              className={`procurement-page__filter-trigger${
-                filtersActive ? ' procurement-page__filter-trigger--active' : ''
-              }`}
+          <PlatformToolbarActionWrap>
+            <PlatformFilterButton
+              buttonRef={filterButtonRef}
+              active={filtersActive}
               onClick={toggleFilter}
-              aria-expanded={filterOpen}
-              aria-label="Фильтр"
-            >
-              <span className="procurement-page__filter-trigger-desktop">
-                <FilterIcon size={16} />
-                Фильтр
-                {filtersActive && <span className="procurement-page__filter-badge" aria-hidden="true" />}
-              </span>
-              <span className="procurement-page__filter-trigger-mobile">
-                <FilterIcon size={20} />
-                {filtersActive && <span className="procurement-page__filter-badge" aria-hidden="true" />}
-              </span>
-            </button>
+              ariaExpanded={filterOpen}
+              ariaLabel="Фильтр"
+              title="Фильтр"
+            />
             <PurchaseFilterPopover
               open={filterOpen}
               draft={draftFilters}
@@ -446,7 +438,7 @@ export default function ProcurementPage() {
               onClose={() => setFilterOpen(false)}
               anchorRef={filterButtonRef}
             />
-          </div>
+          </PlatformToolbarActionWrap>
         </div>
 
         {filtersActive && filterSummary.length > 0 && (

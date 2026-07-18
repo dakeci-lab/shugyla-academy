@@ -27,6 +27,7 @@ import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
 import CourseLessonManager from '../CourseLessonManager'
 import StatusBadge from '../StatusBadge'
+import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
 import '../admin-shared.css'
 
 const CATEGORY_OPTIONS = CATEGORIES.filter((c) => c.id !== 'all')
@@ -184,16 +185,15 @@ export default function CoursesSection() {
 
   return (
     <>
+      <PlatformSearchToolbar
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Поиск по названию…"
+        ariaLabel="Поиск по названию"
+      />
       <div className="admin-toolbar admin-toolbar--wrap">
         <span className="admin-toolbar__info">{filtered.length} из {courses.length} курсов</span>
         <div className="admin-toolbar__filters">
-          <input
-            type="search"
-            className="admin-search"
-            placeholder="Поиск по названию…"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-          />
           <select
             className="admin-form__select admin-form__select--sm"
             value={statusFilter}

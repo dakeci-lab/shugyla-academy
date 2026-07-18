@@ -31,7 +31,12 @@ import SupplierForm, {
 } from '../../../components/suppliers/SupplierForm'
 import SupplierFilterPopover from '../../../components/suppliers/SupplierFilterPopover'
 import SupplierTable from '../../../components/suppliers/SupplierTable'
-import { FilterIcon, PlusIcon, SearchIcon } from '../../../components/icons/PlatformIcons'
+import { PlusIcon } from '../../../components/icons/PlatformIcons'
+import PlatformSearchToolbar, {
+  PlatformFilterButton,
+  PlatformToolbarActionWrap,
+  PlatformToolbarIconButton,
+} from '../../../components/platform/PlatformSearchToolbar'
 import '../../../components/admin/admin-shared.css'
 import './SuppliersPage.css'
 
@@ -220,62 +225,46 @@ export function SuppliersListPage() {
 
   return (
     <div className="suppliers-page">
-      <div className="suppliers-page__toolbar">
-        <label className="suppliers-page__search-wrap">
-          <span className="suppliers-page__search-icon" aria-hidden="true">
-            <SearchIcon size={18} />
-          </span>
-          <input
-            type="search"
-            className="suppliers-page__search"
-            placeholder={searchPlaceholder}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            aria-label="Поиск поставщиков"
-          />
-        </label>
-
-        <div className="suppliers-page__filter-wrap">
-          <button
-            ref={filterButtonRef}
-            type="button"
-            className={`suppliers-page__icon-btn suppliers-page__filter-btn${
-              filtersActive ? ' suppliers-page__icon-btn--active' : ''
-            }`}
-            onClick={toggleFilter}
-            aria-expanded={filterOpen}
-            aria-label="Фильтр поставщиков"
-            title="Фильтр поставщиков"
-          >
-            <FilterIcon size={20} />
-            {filtersActive && (
-              <span className="suppliers-page__filter-indicator" aria-hidden="true" />
+      <PlatformSearchToolbar
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder={searchPlaceholder}
+        ariaLabel="Поиск поставщиков"
+        actions={
+          <>
+            <PlatformToolbarActionWrap>
+              <PlatformFilterButton
+                buttonRef={filterButtonRef}
+                active={filtersActive}
+                onClick={toggleFilter}
+                ariaExpanded={filterOpen}
+                ariaLabel="Фильтр"
+                title="Фильтр"
+              />
+              <SupplierFilterPopover
+                open={filterOpen}
+                draftStatus={draftStatus}
+                onChange={setDraftStatus}
+                resultCount={filterPreviewCount}
+                onApply={applyFilter}
+                onReset={resetFilter}
+                onClose={closeFilter}
+                anchorRef={filterButtonRef}
+              />
+            </PlatformToolbarActionWrap>
+            {canEdit && (
+              <PlatformToolbarIconButton
+                create
+                onClick={openCreate}
+                aria-label="Добавить поставщика"
+                title="Добавить поставщика"
+              >
+                <PlusIcon size={20} />
+              </PlatformToolbarIconButton>
             )}
-          </button>
-          <SupplierFilterPopover
-            open={filterOpen}
-            draftStatus={draftStatus}
-            onChange={setDraftStatus}
-            resultCount={filterPreviewCount}
-            onApply={applyFilter}
-            onReset={resetFilter}
-            onClose={closeFilter}
-            anchorRef={filterButtonRef}
-          />
-        </div>
-
-        {canEdit && (
-          <button
-            type="button"
-            className="suppliers-page__icon-btn suppliers-page__create-btn"
-            onClick={openCreate}
-            aria-label="Добавить поставщика"
-            title="Добавить поставщика"
-          >
-            <PlusIcon size={20} />
-          </button>
-        )}
-      </div>
+          </>
+        }
+      />
 
       {filtered.length === 0 ? (
         <div className="suppliers-page__empty">

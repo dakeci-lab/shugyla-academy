@@ -41,7 +41,12 @@ import ConfirmDialog from '../ConfirmDialog'
 import EmployeeFilterPopover from '../employees/EmployeeFilterPopover'
 import EmployeeListTable from '../employees/EmployeeListTable'
 import EmployeeEditModal from '../employees/EmployeeEditModal'
-import { FilterIcon, PlusIcon, SearchIcon } from '../../icons/PlatformIcons'
+import { PlusIcon } from '../../icons/PlatformIcons'
+import PlatformSearchToolbar, {
+  PlatformFilterButton,
+  PlatformToolbarActionWrap,
+  PlatformToolbarIconButton,
+} from '../../platform/PlatformSearchToolbar'
 import '../admin-shared.css'
 import '../RecruitmentSection.css'
 import './EmployeesSection.css'
@@ -210,8 +215,8 @@ export default function EmployeesSection() {
     cloudMode && listLoading && !hasLoadedOnceRef.current && filteredEmployees.length === 0
 
   const searchPlaceholder = isNarrowSearch
-    ? 'Поиск сотрудника…'
-    : 'Имя, логин, должность…'
+    ? 'Поиск по ФИО'
+    : 'Поиск по ФИО, логину, должности…'
 
   function getRoleLabelForEmployee(employee) {
     const role =
@@ -405,65 +410,49 @@ export default function EmployeesSection() {
 
   return (
     <>
-      <div className="employees-section__toolbar">
-        <label className="employees-section__search-wrap">
-          <span className="employees-section__search-icon" aria-hidden="true">
-            <SearchIcon size={18} />
-          </span>
-          <input
-            type="search"
-            className="employees-section__search"
-            placeholder={searchPlaceholder}
-            value={searchInput}
-            onChange={(event) => setSearchInput(event.target.value)}
-            aria-label="Поиск сотрудников"
-          />
-        </label>
-
-        <div className="employees-section__filter-wrap">
-          <button
-            ref={filterButtonRef}
-            type="button"
-            className={`employees-section__icon-btn${
-              filtersActive ? ' employees-section__icon-btn--active' : ''
-            }`}
-            onClick={toggleFilter}
-            aria-expanded={filterOpen}
-            aria-label="Фильтр сотрудников"
-            title="Фильтр сотрудников"
-          >
-            <FilterIcon size={20} />
-            {filtersActive && (
-              <span className="employees-section__filter-indicator" aria-hidden="true" />
-            )}
-          </button>
-          <EmployeeFilterPopover
-            open={filterOpen}
-            draftStatus={draftStatus}
-            draftRoleId={draftRoleId}
-            roles={filterRoles}
-            onStatusChange={setDraftStatus}
-            onRoleChange={setDraftRoleId}
-            resultCount={filterPreviewCount}
-            onApply={applyFilter}
-            onReset={resetFilter}
-            onClose={closeFilter}
-            anchorRef={filterButtonRef}
-          />
-        </div>
-
-        <Can permission={PERMISSION_CODES.EMPLOYEES_CREATE}>
-          <button
-            type="button"
-            className="employees-section__icon-btn employees-section__create-btn"
-            onClick={openAdd}
-            aria-label="Добавить сотрудника"
-            title="Добавить сотрудника"
-          >
-            <PlusIcon size={20} />
-          </button>
-        </Can>
-      </div>
+      <PlatformSearchToolbar
+        value={searchInput}
+        onChange={(event) => setSearchInput(event.target.value)}
+        placeholder={searchPlaceholder}
+        ariaLabel="Поиск по ФИО"
+        actions={
+          <>
+            <PlatformToolbarActionWrap>
+              <PlatformFilterButton
+                buttonRef={filterButtonRef}
+                active={filtersActive}
+                onClick={toggleFilter}
+                ariaExpanded={filterOpen}
+                ariaLabel="Фильтр"
+                title="Фильтр"
+              />
+              <EmployeeFilterPopover
+                open={filterOpen}
+                draftStatus={draftStatus}
+                draftRoleId={draftRoleId}
+                roles={filterRoles}
+                onStatusChange={setDraftStatus}
+                onRoleChange={setDraftRoleId}
+                resultCount={filterPreviewCount}
+                onApply={applyFilter}
+                onReset={resetFilter}
+                onClose={closeFilter}
+                anchorRef={filterButtonRef}
+              />
+            </PlatformToolbarActionWrap>
+            <Can permission={PERMISSION_CODES.EMPLOYEES_CREATE}>
+              <PlatformToolbarIconButton
+                create
+                onClick={openAdd}
+                aria-label="Добавить сотрудника"
+                title="Добавить сотрудника"
+              >
+                <PlusIcon size={20} />
+              </PlatformToolbarIconButton>
+            </Can>
+          </>
+        }
+      />
 
       {listError && <p className="admin-form__error">{listError}</p>}
       {actionError && <p className="admin-form__error">{actionError}</p>}

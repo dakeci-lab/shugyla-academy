@@ -62,7 +62,10 @@ function main() {
   assert('detail route', app.includes('employees/payroll/records/:recordId'))
   assert('month bar', list.includes('SchedulePeriodBar'))
   assert('filter popover', list.includes('PayrollFilterPopover'))
-  assert('search without label toolbar', list.includes('Поиск по ФИО') && !list.includes('EmployeeSearchToolbar'))
+  assert(
+    'unified search toolbar',
+    list.includes('PlatformSearchToolbar') && list.includes('Поиск по ФИО'),
+  )
   assert('comment modal', list.includes('PayrollCommentModal'))
   assert('table list', list.includes('payroll-table') && list.includes('Комментарий'))
   assert('manual blocks', detail.includes('Основной оклад') && detail.includes('Начисления') && detail.includes('Удержания'))

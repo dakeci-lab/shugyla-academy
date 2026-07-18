@@ -27,6 +27,7 @@ import { ALL_EMPLOYEE_ROLES, ROLES } from '../../../data/roles'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
 import StatusBadge from '../StatusBadge'
+import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
 import '../admin-shared.css'
 import '../../../pages/Standards.css'
 
@@ -243,14 +244,13 @@ export default function StandardsSection() {
         </div>
       </div>
 
+      <PlatformSearchToolbar
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Поиск по стандартам…"
+        ariaLabel="Поиск по стандартам"
+      />
       <div className="admin-toolbar">
-        <input
-          type="search"
-          className="admin-search"
-          placeholder="Поиск по стандартам…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
         <select
           className="admin-form__select"
           value={statusFilter}

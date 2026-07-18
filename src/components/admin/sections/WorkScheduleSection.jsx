@@ -24,7 +24,7 @@ import TeamScheduleMobileCard from '../TeamScheduleMobileCard'
 import TeamScheduleDaySheet from '../TeamScheduleDaySheet'
 import TeamScheduleMobileLegend from '../TeamScheduleMobileLegend'
 import SchedulePeriodBar from '../SchedulePeriodBar'
-import EmployeeSearchToolbar from '../EmployeeSearchToolbar'
+import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
 import useMediaQuery, { MOBILE_SCHEDULE_QUERY } from '../../../hooks/useMediaQuery'
 import { buildTeamScheduleDaySheetModel } from '../../../utils/teamScheduleMobileUtils'
 import '../admin-shared.css'
@@ -262,7 +262,12 @@ export default function WorkScheduleSection() {
       />
 
       {viewTeam && (
-        <EmployeeSearchToolbar value={search} onChange={(e) => setSearch(e.target.value)} />
+        <PlatformSearchToolbar
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Поиск по ФИО"
+          ariaLabel="Поиск по ФИО"
+        />
       )}
 
       {error && (

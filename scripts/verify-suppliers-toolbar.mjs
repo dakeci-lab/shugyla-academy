@@ -44,17 +44,17 @@ function main() {
 
   assert('count header removed', !page.includes('suppliers-page__count'))
   assert('count header removed from css', !pageCss.includes('suppliers-page__count'))
-  assert('toolbar contains search', page.includes('suppliers-page__search'))
-  assert('toolbar grid one row', pageCss.includes('grid-template-columns: minmax(0, 1fr) auto auto'))
-  assert('toolbar uses grid layout', /\.suppliers-page__toolbar\s*\{[\s\S]*?display:\s*grid/.test(pageCss))
-  assert('search min-width zero', pageCss.includes('min-width: 0'))
-  assert('icon buttons 44px', pageCss.includes('width: 44px') && pageCss.includes('height: 44px'))
+  assert('toolbar contains search', page.includes('PlatformSearchToolbar'))
+  const searchToolbarCss = read('src/components/platform/PlatformSearchToolbar.css')
+  assert('unified search toolbar styles', searchToolbarCss.includes('.platform-search-toolbar'))
+  assert('search stretches', searchToolbarCss.includes('flex: 1 1 auto'))
+  assert('icon buttons 44px', searchToolbarCss.includes('width: 44px') && searchToolbarCss.includes('height: 44px'))
 
   console.log('Stage 2: Actions')
 
-  assert('filter icon button', page.includes('FilterIcon'))
+  assert('filter icon button', page.includes('PlatformFilterButton'))
   assert('create icon button', page.includes('PlusIcon'))
-  assert('filter aria-label', page.includes('aria-label="Фильтр поставщиков"'))
+  assert('filter aria-label', page.includes('ariaLabel="Фильтр"'))
   assert('create aria-label', page.includes('aria-label="Добавить поставщика"'))
   assert('large text create removed', !page.includes('Добавить поставщика</'))
   assert('create uses openCreate', page.includes('onClick={openCreate}'))
@@ -77,7 +77,7 @@ function main() {
   assert('mobile filter uses AdminModal', filter.includes('AdminModal'))
   assert('desktop filter popover', filter.includes('supplier-filter-popover'))
   assert('filter count label helper', supplierData.includes('formatSupplierFilterCount'))
-  assert('active filter indicator', page.includes('suppliers-page__filter-indicator'))
+  assert('active filter indicator', page.includes('active={filtersActive}'))
   assert('focus returns to filter button', filter.includes('returnFocusRef={anchorRef}'))
   assert('apply closes filter', page.includes('setFilterOpen(false)'))
 

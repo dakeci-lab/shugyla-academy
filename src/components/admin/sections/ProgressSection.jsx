@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { getProgressRows } from '../../../utils/adminStats'
 import { ROLES } from '../../../data/roles'
 import StatusBadge from '../StatusBadge'
+import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
 import '../admin-shared.css'
 
 /** Раздел «Прогресс» — по курсам сотрудников */
@@ -21,16 +22,15 @@ export default function ProgressSection() {
 
   return (
     <>
-      <div className="admin-toolbar">
-        <span className="admin-toolbar__info">{filtered.length} сотрудников</span>
-        <input
-          type="search"
-          className="admin-search"
-          placeholder="Поиск по сотруднику или курсу…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-      </div>
+      <PlatformSearchToolbar
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Поиск по сотруднику или курсу…"
+        ariaLabel="Поиск по сотруднику или курсу"
+      />
+      <p className="admin-toolbar__info platform-search-toolbar-meta">
+        {filtered.length} сотрудников
+      </p>
 
       <div className="admin-table-wrap">
         <table className="admin-table">

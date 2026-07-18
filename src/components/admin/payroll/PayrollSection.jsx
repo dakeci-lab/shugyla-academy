@@ -21,12 +21,15 @@ import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
 import SchedulePeriodBar from '../SchedulePeriodBar'
 import StatusBadge from '../StatusBadge'
-import { CommentIcon, FilterIcon, SearchIcon } from '../../icons/PlatformIcons'
+import { CommentIcon } from '../../icons/PlatformIcons'
+import PlatformSearchToolbar, {
+  PlatformFilterButton,
+  PlatformToolbarActionWrap,
+} from '../../platform/PlatformSearchToolbar'
 import PayrollFilterPopover from './PayrollFilterPopover'
 import PayrollCommentModal from './PayrollCommentModal'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
-import '../sections/EmployeesSection.css'
 import './PayrollSection.css'
 
 /** admin-list-employees отклоняет page_size > 100 (invalid_pagination). */
@@ -258,53 +261,35 @@ export default function PayrollSection() {
         nextLabel="Следующий месяц"
       />
 
-      <div className="employees-section__toolbar payroll-section__toolbar">
-        <label className="employees-section__search-wrap">
-          <span className="employees-section__search-icon" aria-hidden="true">
-            <SearchIcon size={18} />
-          </span>
-          <input
-            type="search"
-            className="employees-section__search"
-            placeholder="Поиск по ФИО"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            aria-label="Поиск по ФИО"
-            autoComplete="off"
-          />
-        </label>
-
-        <div className="employees-section__filter-wrap">
-          <button
-            ref={filterButtonRef}
-            type="button"
-            className={`employees-section__icon-btn${
-              filtersActive ? ' employees-section__icon-btn--active' : ''
-            }`}
-            onClick={toggleFilter}
-            aria-expanded={filterOpen}
-            aria-label="Фильтр"
-            title="Фильтр"
-          >
-            <FilterIcon size={20} />
-            {filtersActive && (
-              <span className="employees-section__filter-indicator" aria-hidden="true" />
-            )}
-          </button>
-          <PayrollFilterPopover
-            open={filterOpen}
-            draftRoleId={draftRoleId}
-            draftStatus={draftStatus}
-            onRoleChange={setDraftRoleId}
-            onStatusChange={setDraftStatus}
-            resultCount={draftPreviewCount}
-            onApply={applyFilter}
-            onReset={resetFilter}
-            onClose={closeFilter}
-            anchorRef={filterButtonRef}
-          />
-        </div>
-      </div>
+      <PlatformSearchToolbar
+        value={search}
+        onChange={(event) => setSearch(event.target.value)}
+        placeholder="Поиск по ФИО"
+        ariaLabel="Поиск по ФИО"
+        flush
+        actions={
+          <PlatformToolbarActionWrap>
+            <PlatformFilterButton
+              buttonRef={filterButtonRef}
+              active={filtersActive}
+              onClick={toggleFilter}
+              ariaExpanded={filterOpen}
+            />
+            <PayrollFilterPopover
+              open={filterOpen}
+              draftRoleId={draftRoleId}
+              draftStatus={draftStatus}
+              onRoleChange={setDraftRoleId}
+              onStatusChange={setDraftStatus}
+              resultCount={draftPreviewCount}
+              onApply={applyFilter}
+              onReset={resetFilter}
+              onClose={closeFilter}
+              anchorRef={filterButtonRef}
+            />
+          </PlatformToolbarActionWrap>
+        }
+      />
 
       {error && <p className="payroll-section__error">{error}</p>}
 
