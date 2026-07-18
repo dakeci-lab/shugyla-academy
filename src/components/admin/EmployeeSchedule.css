@@ -686,3 +686,186 @@
   cursor: pointer;
   padding: 0.125rem 0.375rem;
 }
+
+/* WEB desktop team schedule — align with payroll table design system.
+   Scoped to --desktop wrap only; mobile cards stay unchanged. */
+.team-schedule-wrap--desktop {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-white);
+  overflow: auto;
+  max-height: calc(100dvh - 220px);
+}
+
+.team-schedule-wrap--desktop .team-schedule-table {
+  font-size: 12.5px;
+  line-height: 1.25;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table th,
+.team-schedule-wrap--desktop .team-schedule-table td {
+  padding: 5px 8px;
+  height: 40px;
+  border-bottom: 1px solid #e4ebe6;
+  border-right: 1px solid #eef2ef;
+  vertical-align: middle;
+  font-size: 12.5px;
+  line-height: 1.25;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table thead th {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #5f6b63;
+  background: #eef3ef;
+  white-space: nowrap;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table__index {
+  width: 36px;
+  min-width: 36px;
+  max-width: 36px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+  background: #fff;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table thead .team-schedule-table__index {
+  background: #eef3ef;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table__employee {
+  left: 36px;
+  width: 200px;
+  min-width: 160px;
+  max-width: 200px;
+  padding-left: 8px;
+  padding-right: 8px;
+  font-weight: 400;
+  background: #fff;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table thead .team-schedule-table__employee {
+  background: #eef3ef;
+  font-weight: 700;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table__person {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  text-align: left;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table__name {
+  display: block;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table__employee-btn.team-schedule-table__name {
+  width: 100%;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table__role {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  text-align: left;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table__day {
+  min-width: 5rem;
+  width: calc((100% - 236px) / 7);
+}
+
+.team-schedule-wrap--desktop .team-schedule-table__day-weekday {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #5f6b63;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table__day-number {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.team-schedule-wrap--desktop .team-schedule-table__today-badge {
+  min-width: 2rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
+  gap: 0;
+}
+
+.team-schedule-wrap--desktop .team-schedule-cell {
+  padding: 2px 4px;
+  vertical-align: middle;
+  background: transparent;
+}
+
+.team-schedule-wrap--desktop .team-schedule-cell__inner {
+  height: 28px;
+  min-height: 28px;
+  max-height: 28px;
+  padding: 0 2px;
+  gap: 0;
+}
+
+.team-schedule-wrap--desktop .team-schedule-cell__box--has-comment .team-schedule-cell__inner {
+  padding-right: 1.15rem;
+}
+
+.team-schedule-wrap--desktop .team-schedule-cell__planned,
+.team-schedule-wrap--desktop .team-schedule-cell__status {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.team-schedule-wrap--desktop .team-schedule-cell__status {
+  font-size: 11.5px;
+  color: var(--color-text-secondary, #4a524d);
+}
+
+.team-schedule-wrap--desktop .team-schedule-cell__status--empty {
+  visibility: hidden;
+}
+
+.team-schedule-wrap--desktop .team-schedule-cell__comment-btn {
+  width: 1.1rem;
+  height: 1.1rem;
+  border-radius: 4px;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table tbody tr:nth-child(even) {
+  background: #fbfcfb;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table tbody tr:nth-child(even) .team-schedule-table__index,
+.team-schedule-wrap--desktop .team-schedule-table tbody tr:nth-child(even) .team-schedule-table__employee {
+  background: #fbfcfb;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table tbody tr:hover {
+  background: #f1f7f2;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table tbody tr:hover .team-schedule-table__index,
+.team-schedule-wrap--desktop .team-schedule-table tbody tr:hover .team-schedule-table__employee {
+  background: #f1f7f2;
+}

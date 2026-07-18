@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { isCloudMode } from '../../../lib/dataMode'
 import { canEditEmployeeSchedule, canViewTeamSchedule } from '../../../config/permissions'
+import { getRoleLabel } from '../../../data/roles'
 import {
   getScheduleEligibleEmployees,
   participatesInStoreSchedule,
@@ -196,18 +197,23 @@ export default function WorkScheduleSection() {
               <tr key={emp.id}>
                 <td className="team-schedule-table__index">{index + 1}</td>
                 <td className="team-schedule-table__employee">
-                  {canEditSchedule ? (
-                    <button
-                      type="button"
-                      className="team-schedule-table__employee-btn"
-                      onClick={() => openEmployeeSchedule(emp.id)}
-                      aria-label={`Редактировать график сотрудника ${emp.name}`}
-                    >
-                      {emp.name}
-                    </button>
-                  ) : (
-                    <span>{emp.name}</span>
-                  )}
+                  <div className="team-schedule-table__person">
+                    {canEditSchedule ? (
+                      <button
+                        type="button"
+                        className="team-schedule-table__employee-btn team-schedule-table__name"
+                        onClick={() => openEmployeeSchedule(emp.id)}
+                        aria-label={`Редактировать график сотрудника ${emp.name}`}
+                      >
+                        {emp.name}
+                      </button>
+                    ) : (
+                      <span className="team-schedule-table__name">{emp.name}</span>
+                    )}
+                    <span className="team-schedule-table__role">
+                      {emp.position || getRoleLabel(emp.role) || '—'}
+                    </span>
+                  </div>
                 </td>
                 {weekDates.map((date) => {
                   const dateKey = toDateKey(date)
