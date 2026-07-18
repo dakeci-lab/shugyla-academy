@@ -1,5 +1,4 @@
 import { ChevronLeftIcon } from '../icons/PlatformIcons'
-import PlatformHeaderActions from './PlatformHeaderActions'
 import './PlatformMobileHeader.css'
 
 /** Компактный header для mobile/PWA — название текущей страницы по центру */
@@ -8,6 +7,7 @@ export default function PlatformMobileHeader({
   onMenuOpen,
   showBack = false,
   onBack,
+  actions = null,
 }) {
   const pageTitle = title || 'Shugyla Platform'
 
@@ -39,9 +39,7 @@ export default function PlatformMobileHeader({
         {pageTitle}
       </h1>
 
-      <div className="platform-mobile-header__actions">
-        <PlatformHeaderActions bellVariant="mobile" showUserMenu={false} />
-      </div>
+      <div className="platform-mobile-header__actions">{actions}</div>
     </header>
   )
 }

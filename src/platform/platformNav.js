@@ -254,6 +254,11 @@ export const PROFILE_SECTION = {
   description: 'Личные данные пользователя',
 }
 
+export const NOTIFICATIONS_SECTION = {
+  title: 'Уведомления',
+  description: 'Лента уведомлений платформы.',
+}
+
 function flattenNav(nav = PLATFORM_NAV) {
   const items = []
   for (const item of nav) {
@@ -312,6 +317,10 @@ import { getAcademySection } from './academyNav'
 import { getStandardsSection } from './standardsNav'
 
 export function getPlatformSection(pathname) {
+  if (pathname === '/platform/notifications' || pathname.startsWith('/platform/notifications/')) {
+    return NOTIFICATIONS_SECTION
+  }
+
   if (pathname === '/platform/profile' || pathname.startsWith('/platform/profile/')) {
     return PROFILE_SECTION
   }

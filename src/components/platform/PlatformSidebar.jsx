@@ -14,6 +14,15 @@ import './PlatformSidebar.css'
 const MOBILE_QUERY = '(max-width: 900px)'
 const HOVER_COLLAPSE_DELAY_MS = 220
 
+const MOBILE_NOTIFICATIONS_ITEM = {
+  id: 'notifications-inbox',
+  path: '/platform/notifications',
+  label: 'Уведомления',
+  end: true,
+  title: 'Уведомления',
+  description: 'Лента уведомлений платформы.',
+}
+
 function useMediaQuery(query) {
   const [matches, setMatches] = useState(
     () => typeof window !== 'undefined' && window.matchMedia(query).matches
@@ -30,18 +39,41 @@ function useMediaQuery(query) {
   return matches
 }
 
+function insertMobileNotificationsItem(navItems) {
+  const items = []
+  let inserted = false
+
+  for (const item of navItems) {
+    items.push(item)
+    if (item.id === 'home') {
+      items.push(MOBILE_NOTIFICATIONS_ITEM)
+      inserted = true
+    }
+  }
+
+  if (!inserted) {
+    items.unshift(MOBILE_NOTIFICATIONS_ITEM)
+  }
+
+  return items
+}
+
 /**
  * Боковое меню Shugyla Platform
  * Desktop: hover-раскрытие + активный раздел всегда открыт
- * Mobile: drawer со всеми разделами сразу раскрытыми
+ * Mobile: иерархия Umag-style (серые группы + пункты без иконок/аккордеона)
  */
 export default function PlatformSidebar({ isOpen = false, onNavigate }) {
   const { user } = useSession()
   const { pathname } = useLocation()
   const isMobile = useMediaQuery(MOBILE_QUERY)
-  const navItems = useMemo(
+  const filteredNav = useMemo(
     () => filterPlatformNav(PLATFORM_NAV, user),
     [user]
+  )
+  const navItems = useMemo(
+    () => (isMobile ? insertMobileNotificationsItem(filteredNav) : filteredNav),
+    [filteredNav, isMobile]
   )
 
   const pinnedGroupIds = useMemo(
@@ -98,6 +130,95 @@ export default function PlatformSidebar({ isOpen = false, onNavigate }) {
     onNavigate?.()
   }
 
+  function renderLink(item, { sub = false } = {}) {
+    return (
+      <NavLink
+        key={item.id}
+        to={item.path}
+        end={item.end}
+        onClick={handleNavClick}
+        className={() =>
+          [
+            'platform-sidebar__link',
+            sub ? 'platform-sidebar__link--sub' : '',
+            isNavItemActive(pathname, item) ? 'platform-sidebar__link--active' : '',
+          ]
+            .filter(Boolean)
+            .join(' ')
+        }
+      >
+        {!isMobile && item.icon && (
+          <span className="platform-sidebar__icon" aria-hidden="true">
+            {item.icon}
+          </span>
+        )}
+        {item.label}
+      </NavLink>
+    )
+  }
+
+  function renderMobileSection(item) {
+    if (item.children?.length) {
+      return (
+        <section key={item.id} className="platform-sidebar__section">
+          <h2 className="platform-sidebar__section-label">{item.label}</h2>
+          <div className="platform-sidebar__section-items">
+            {item.children.map((child) => renderLink(child, { sub: true }))}
+          </div>
+        </section>
+      )
+    }
+
+    return (
+      <section key={item.id} className="platform-sidebar__section">
+        <h2 className="platform-sidebar__section-label">{item.label}</h2>
+        <div className="platform-sidebar__section-items">{renderLink(item, { sub: true })}</div>
+      </section>
+    )
+  }
+
+  function renderDesktopItem(item) {
+    if (item.children) {
+      return (
+        <div
+          key={item.id}
+          className={`platform-sidebar__group${
+            isGroupOpen(item.id) ? ' platform-sidebar__group--open' : ''
+          }${pinnedGroupIds.has(item.id) ? ' platform-sidebar__group--pinned' : ''}`}
+          onMouseEnter={() => handleGroupEnter(item.id)}
+          onMouseLeave={() => handleGroupLeave(item.id)}
+        >
+          <div
+            className="platform-sidebar__group-toggle"
+            aria-expanded={isGroupOpen(item.id)}
+          >
+            <span className="platform-sidebar__group-label">
+              {item.icon && (
+                <span className="platform-sidebar__icon" aria-hidden="true">
+                  {item.icon}
+                </span>
+              )}
+              <span>{item.label}</span>
+            </span>
+            <span className="platform-sidebar__caret" aria-hidden="true" />
+          </div>
+
+          <div
+            className={`platform-sidebar__subnav${
+              isGroupOpen(item.id) ? ' platform-sidebar__subnav--open' : ''
+            }`}
+          >
+            <div className="platform-sidebar__subnav-inner">
+              {item.children.map((child) => renderLink(child, { sub: true }))}
+            </div>
+          </div>
+        </div>
+      )
+    }
+
+    return renderLink(item)
+  }
+
   return (
     <aside className={`platform-sidebar ${isOpen ? 'platform-sidebar--open' : ''}`}>
       <div className="platform-sidebar__header">
@@ -114,86 +235,13 @@ export default function PlatformSidebar({ isOpen = false, onNavigate }) {
         )}
       </div>
 
-      <nav className="platform-sidebar__nav" aria-label="Разделы платформы">
-        {navItems.map((item) =>
-          item.children ? (
-            <div
-              key={item.id}
-              className={`platform-sidebar__group${
-                isGroupOpen(item.id) ? ' platform-sidebar__group--open' : ''
-              }${pinnedGroupIds.has(item.id) ? ' platform-sidebar__group--pinned' : ''}`}
-              onMouseEnter={() => handleGroupEnter(item.id)}
-              onMouseLeave={() => handleGroupLeave(item.id)}
-            >
-              <div
-                className="platform-sidebar__group-toggle"
-                aria-expanded={isGroupOpen(item.id)}
-              >
-                <span className="platform-sidebar__group-label">
-                  {item.icon && (
-                    <span className="platform-sidebar__icon" aria-hidden="true">
-                      {item.icon}
-                    </span>
-                  )}
-                  <span>{item.label}</span>
-                </span>
-                <span className="platform-sidebar__caret" aria-hidden="true" />
-              </div>
-
-              <div
-                className={`platform-sidebar__subnav${
-                  isGroupOpen(item.id) ? ' platform-sidebar__subnav--open' : ''
-                }`}
-              >
-                <div className="platform-sidebar__subnav-inner">
-                  {item.children.map((child) => (
-                    <NavLink
-                      key={child.id}
-                      to={child.path}
-                      end={child.end}
-                      onClick={handleNavClick}
-                      className={() =>
-                        [
-                          'platform-sidebar__link',
-                          'platform-sidebar__link--sub',
-                          isNavItemActive(pathname, child)
-                            ? 'platform-sidebar__link--active'
-                            : '',
-                        ]
-                          .filter(Boolean)
-                          .join(' ')
-                      }
-                    >
-                      {child.label}
-                    </NavLink>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <NavLink
-              key={item.id}
-              to={item.path}
-              end={item.end}
-              onClick={handleNavClick}
-              className={({ isActive }) =>
-                [
-                  'platform-sidebar__link',
-                  isActive ? 'platform-sidebar__link--active' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')
-              }
-            >
-              {item.icon && (
-                <span className="platform-sidebar__icon" aria-hidden="true">
-                  {item.icon}
-                </span>
-              )}
-              {item.label}
-            </NavLink>
-          )
-        )}
+      <nav
+        className={`platform-sidebar__nav${isMobile ? ' platform-sidebar__nav--mobile' : ''}`}
+        aria-label="Разделы платформы"
+      >
+        {isMobile
+          ? navItems.map((item) => renderMobileSection(item))
+          : navItems.map((item) => renderDesktopItem(item))}
       </nav>
 
       <div className="platform-sidebar__footer">

@@ -13,6 +13,7 @@ import { useToast } from './ToastContext'
 import {
   loadNotifications,
   loadUnreadNotificationCount,
+  markAllNotificationsRead,
   markNotificationRead,
   PAGE_SIZE,
   validateNotificationActionUrl,
@@ -193,6 +194,59 @@ export function NotificationInboxProvider({ children }) {
     [notifications, showWarningToast]
   )
 
+  const markAllAsRead = useCallback(async () => {
+    if (!canUseInbox) return { ok: false }
+
+    const unreadIds = notifications
+      .filter((item) => isNotificationUnread(item))
+      .map((item) => item.id)
+
+    if (unreadIds.length === 0 && unreadCount <= 0) {
+      return { ok: true }
+    }
+
+    const previousNotifications = notifications
+    const previousUnreadCount = unreadCount
+    const readAt = new Date().toISOString()
+
+    setNotifications((prev) =>
+      prev.map((item) =>
+        isNotificationUnread(item) ? { ...item, read_at: readAt } : item
+      )
+    )
+    setUnreadCount(0)
+
+    const bulk = await markAllNotificationsRead()
+    if (bulk.ok) {
+      return { ok: true }
+    }
+
+    // Safe fallback: mark currently loaded unread items one-by-one
+    if (unreadIds.length > 0) {
+      const results = await Promise.allSettled(
+        unreadIds.map((id) => markNotificationRead(id))
+      )
+      const failed = results.some(
+        (result) => result.status === 'rejected' || result.value?.ok === false
+      )
+      if (!failed) {
+        await refreshUnreadCount()
+        return { ok: true }
+      }
+    }
+
+    setNotifications(previousNotifications)
+    setUnreadCount(previousUnreadCount)
+    showWarningToast('Не удалось отметить все уведомления прочитанными')
+    return { ok: false }
+  }, [
+    canUseInbox,
+    notifications,
+    unreadCount,
+    refreshUnreadCount,
+    showWarningToast,
+  ])
+
   const handleNotificationClick = useCallback(
     async (notification) => {
       if (!notification) return
@@ -299,6 +353,7 @@ export function NotificationInboxProvider({ children }) {
       refreshNotifications,
       loadMore,
       markAsRead,
+      markAllAsRead,
       handleNotificationClick,
       resetNotificationState,
     }),
@@ -319,6 +374,7 @@ export function NotificationInboxProvider({ children }) {
       refreshNotifications,
       loadMore,
       markAsRead,
+      markAllAsRead,
       handleNotificationClick,
       resetNotificationState,
     ]

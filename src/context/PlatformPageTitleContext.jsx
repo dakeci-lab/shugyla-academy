@@ -32,15 +32,17 @@ export function usePlatformPageTitleContext() {
  *
  * options.showBack — круглая кнопка Back в мобильном header вместо burger.
  * options.backFallback — куда идти, если history назад недоступна.
+ * options.actions — правый слот мобильного header (React node).
  */
 export function usePlatformPageTitle(title, description = '', options = {}) {
   const context = usePlatformPageTitleContext()
   const showBack = options?.showBack === true
   const backFallback = options?.backFallback || ''
+  const actions = options?.actions ?? null
 
   useEffect(() => {
     if (!context || !title) return undefined
-    context.setPageTitle({ title, description, showBack, backFallback })
+    context.setPageTitle({ title, description, showBack, backFallback, actions })
     return () => context.clearPageTitle()
-  }, [context, title, description, showBack, backFallback])
+  }, [context, title, description, showBack, backFallback, actions])
 }

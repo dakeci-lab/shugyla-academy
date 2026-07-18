@@ -96,6 +96,7 @@ function PlatformLayoutShell({ onLogout }) {
             onMenuOpen={() => setDrawerOpen(true)}
             showBack={showMobileBack}
             onBack={handleMobileBack}
+            actions={titleContext?.override?.actions ?? null}
           />
 
           <header className="platform-layout__topbar">

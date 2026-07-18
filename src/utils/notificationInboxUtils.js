@@ -22,6 +22,27 @@ export function getNotificationDateGroup(isoString) {
   return 'earlier'
 }
 
+/** Подпись группы: Сегодня / Вчера / 18 июля */
+export function formatNotificationDateGroupLabel(dateKey) {
+  if (!dateKey) return DATE_GROUP_LABELS.earlier
+
+  const todayKey = toDateKeyInAppTimezone()
+  const yesterdayKey = getYesterdayDateKeyInAppTimezone()
+
+  if (dateKey === todayKey) return DATE_GROUP_LABELS.today
+  if (dateKey === yesterdayKey) return DATE_GROUP_LABELS.yesterday
+
+  const [year, month, day] = dateKey.split('-').map(Number)
+  if (!year || !month || !day) return DATE_GROUP_LABELS.earlier
+
+  const date = new Date(Date.UTC(year, month - 1, day, 12))
+  return date.toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    timeZone: APP_TIMEZONE,
+  })
+}
+
 export function formatNotificationTime(isoString) {
   if (!isoString) return ''
 
@@ -52,9 +73,16 @@ export function groupNotificationsByDate(notifications) {
   let currentGroup = null
 
   for (const notification of notifications) {
-    const key = getNotificationDateGroup(notification.created_at)
+    const key = notification?.created_at
+      ? toDateKeyInAppTimezone(new Date(notification.created_at))
+      : 'unknown'
+
     if (!currentGroup || currentGroup.key !== key) {
-      currentGroup = { key, label: DATE_GROUP_LABELS[key], items: [] }
+      currentGroup = {
+        key,
+        label: formatNotificationDateGroupLabel(key),
+        items: [],
+      }
       groups.push(currentGroup)
     }
     currentGroup.items.push(notification)

@@ -61,8 +61,12 @@ function stageLayoutAndHeader() {
   assert('logo removed', !header.includes('platform-mobile-header__logo'))
   assert('circular back button supported', header.includes('platform-mobile-header__back'))
   assert('back replaces burger when showBack', header.includes('showBack') && header.includes('onBack'))
+  assert('mobile header has no notification bell', !header.includes('PlatformHeaderActions'))
+  assert('mobile header supports actions slot', header.includes('actions'))
   assert('layout passes showBack', layout.includes('showBack={showMobileBack}'))
   assert('layout handles history fallback', layout.includes('mobileBackFallback') && layout.includes('navigate(-1)'))
+  assert('layout passes header actions', layout.includes('actions={titleContext?.override?.actions'))
+  assert('desktop topbar still has bell actions', layout.includes('bellVariant="desktop"'))
 
   const headerCss = read('src/components/platform/PlatformMobileHeader.css')
   assert('grid layout for centering', headerCss.includes('grid-template-columns'))

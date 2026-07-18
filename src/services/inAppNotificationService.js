@@ -143,6 +143,31 @@ export async function markNotificationRead(notificationId) {
   }
 }
 
+/**
+ * Отметить все непрочитанные уведомления текущего пользователя.
+ * Предпочитает RPC mark_all_notifications_read; при отсутствии — fallback=true.
+ */
+export async function markAllNotificationsRead() {
+  const { client, error: authError } = await getAuthenticatedClient()
+  if (authError || !client) {
+    return { ok: false, fallback: true, error: authError ?? new Error('No auth session') }
+  }
+
+  try {
+    const { data, error } = await client.rpc('mark_all_notifications_read')
+    if (error) {
+      // RPC may not be deployed yet — caller can fall back to per-item marks
+      return { ok: false, fallback: true, error }
+    }
+    if (data !== true) {
+      return { ok: false, fallback: true, error: new Error('RPC returned false') }
+    }
+    return { ok: true, fallback: false, error: null }
+  } catch (error) {
+    return { ok: false, fallback: true, error }
+  }
+}
+
 export function validateNotificationActionUrl(actionUrl) {
   if (typeof actionUrl !== 'string') return null
 
