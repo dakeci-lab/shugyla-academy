@@ -46,31 +46,46 @@
 .platform-layout__topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   height: var(--platform-topbar-height);
   min-height: var(--platform-topbar-height);
-  padding: 0 28px;
+  padding: 0 20px 0 16px;
   background: var(--color-white);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
 }
 
-.platform-layout__topbar-info {
-  min-width: 0;
-  display: flex;
+.platform-layout__logo {
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-decoration: none;
+  border-radius: 10px;
 }
 
-.platform-layout__title {
-  font-size: 20px;
+.platform-layout__logo:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.platform-layout__logo-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
+  color: white;
   font-weight: 700;
-  margin: 0;
-  letter-spacing: -0.3px;
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  border-radius: 10px;
+  font-size: 15px;
+}
+
+.platform-layout__topbar .platform-header-actions,
+.platform-layout__topbar .platform-layout__topbar-user {
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .platform-layout__topbar-user {
@@ -166,6 +181,7 @@
     height: 100%;
     min-height: 0;
     overflow: hidden;
+    width: 100%;
   }
 
   .platform-layout__topbar {
@@ -173,6 +189,11 @@
     top: 0;
     z-index: 30;
     flex-shrink: 0;
+  }
+
+  /* Permanent left sidebar removed on WEB — reclaim ~270px */
+  .platform-sidebar {
+    display: none !important;
   }
 
   .platform-layout__refresh {

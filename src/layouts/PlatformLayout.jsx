@@ -3,6 +3,9 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import PlatformHeaderActions from '../components/platform/PlatformHeaderActions'
 import PlatformMobileHeader from '../components/platform/PlatformMobileHeader'
 import AppInstallBanner from '../components/platform/AppInstallBanner'
+import PlatformDesktopNav, {
+  PlatformDesktopLogo,
+} from '../components/platform/PlatformDesktopNav'
 import PlatformSidebar from '../components/platform/PlatformSidebar'
 import PullToRefresh from '../components/platform/PullToRefresh'
 import PlatformErrorBoundary from '../components/platform/PlatformErrorBoundary'
@@ -140,11 +143,13 @@ function PlatformLayoutShell({ onLogout }) {
         />
       )}
 
-      <PlatformSidebar
-        isOpen={drawerOpen}
-        onNavigate={closeDrawer}
-        panelRef={sidebarRef}
-      />
+      {isMobile && (
+        <PlatformSidebar
+          isOpen={drawerOpen}
+          onNavigate={closeDrawer}
+          panelRef={sidebarRef}
+        />
+      )}
 
       <PullToRefreshProvider onGlobalRefresh={reload}>
         <div className="platform-layout__main">
@@ -159,12 +164,13 @@ function PlatformLayoutShell({ onLogout }) {
             actions={titleContext?.override?.actions ?? null}
           />
 
-          <header className="platform-layout__topbar">
-            <div className="platform-layout__topbar-info">
-              <h1 className="platform-layout__title">{pageTitle}</h1>
-            </div>
-            <PlatformHeaderActions user={user} onLogout={onLogout} bellVariant="desktop" />
-          </header>
+          {!isMobile && (
+            <header className="platform-layout__topbar">
+              <PlatformDesktopLogo />
+              <PlatformDesktopNav />
+              <PlatformHeaderActions user={user} onLogout={onLogout} bellVariant="desktop" />
+            </header>
+          )}
 
           <PullToRefresh disabled={drawerOpen || drawerDragging} className="platform-layout__refresh">
             <div className="platform-layout__content">
@@ -179,7 +185,7 @@ function PlatformLayoutShell({ onLogout }) {
   )
 }
 
-/** Оболочка Shugyla Platform — sidebar + контент */
+/** Оболочка Shugyla Platform — desktop top nav / mobile drawer + контент */
 function PlatformLayoutRoot() {
   const { logout } = useSession()
   const navigate = useNavigate()
