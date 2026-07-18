@@ -154,3 +154,82 @@ export function changePayrollMonth(year, month, delta) {
     month: date.getMonth() + 1,
   }
 }
+
+function pad2(value) {
+  return String(value).padStart(2, '0')
+}
+
+/** YYYY-MM-DD for payroll membership checks (hire / termination / month bounds). */
+function toPayrollDateKey(value) {
+  if (value == null || value === '') return null
+  if (typeof value === 'string') {
+    const match = value.trim().match(/^(\d{4}-\d{2}-\d{2})/)
+    return match ? match[1] : null
+  }
+  return null
+}
+
+/** Границы расчётного месяца как YYYY-MM-DD (включительно). */
+export function getPayrollMonthBounds(year, month) {
+  const y = Number(year)
+  const m = Number(month)
+  const start = `${y}-${pad2(m)}-01`
+  const lastDay = new Date(y, m, 0).getDate()
+  const end = `${y}-${pad2(m)}-${pad2(lastDay)}`
+  return { start, end }
+}
+
+/**
+ * Сотрудник попадает в ведомость, если период работы пересекается
+ * с расчётным месяцем хотя бы на один календарный день.
+ * Дата увольнения отсутствует → сотрудник считается работающим дальше.
+ * Статус Работает/Уволен здесь не используется.
+ */
+export function employmentOverlapsPayrollMonth(employee, year, month) {
+  const hiredAt = toPayrollDateKey(employee?.hiredAt ?? employee?.hired_at)
+  if (!hiredAt) return false
+
+  const { start: periodStart, end: periodEnd } = getPayrollMonthBounds(year, month)
+  const terminatedAt = toPayrollDateKey(employee?.terminatedAt ?? employee?.terminated_at)
+  const employmentEnd = terminatedAt || '9999-12-31'
+
+  return hiredAt <= periodEnd && employmentEnd >= periodStart
+}
+
+/**
+ * Состав ведомости за месяц:
+ * — сотрудники с пересечением периода работы;
+ * — плюс сотрудники из includeEmployeeIds (уже есть salary_record — история).
+ */
+export function selectEmployeesForPayrollMonth(
+  employees,
+  year,
+  month,
+  { includeEmployeeIds = [] } = {}
+) {
+  const byId = new Map()
+
+  for (const employee of employees || []) {
+    if (!employee?.id) continue
+    if (employmentOverlapsPayrollMonth(employee, year, month)) {
+      byId.set(Number(employee.id), employee)
+    }
+  }
+
+  const index = new Map(
+    (employees || [])
+      .filter((employee) => employee?.id != null)
+      .map((employee) => [Number(employee.id), employee])
+  )
+
+  for (const rawId of includeEmployeeIds || []) {
+    const id = Number(rawId)
+    if (!Number.isFinite(id) || byId.has(id)) continue
+    const employee = index.get(id)
+    if (employee) byId.set(id, employee)
+  }
+
+  return [...byId.values()].sort((left, right) =>
+    String(left.name || '').localeCompare(String(right.name || ''), 'ru')
+  )
+}

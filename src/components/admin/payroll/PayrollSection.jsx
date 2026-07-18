@@ -10,10 +10,14 @@ import {
   formatMoneyCompact,
   formatMoneyKzt,
   getPayrollLedgerAmounts,
+  selectEmployeesForPayrollMonth,
   sumPayrollLedgerRows,
   toMoneyNumber,
 } from '../../../utils/salaryPayroll'
-import { listEmployeesForAdmin } from '../../../services/employeeAdminService'
+import {
+  getEmployeeForAdmin,
+  listEmployeesForAdmin,
+} from '../../../services/employeeAdminService'
 import {
   addSalaryAllowance,
   addSalaryDeduction,
@@ -48,7 +52,8 @@ import './PayrollSection.css'
 const EMPLOYEE_PAGE_SIZE = 100
 const DEDUCTION_PRESETS = SALARY_DEDUCTION_PRESETS.filter((item) => item.kind !== 'advance')
 
-async function listAllActiveEmployeesForPayroll() {
+/** Все сотрудники (без фильтра по статусу) — состав ведомости режется по датам. */
+async function listAllStaffEmployeesForPayroll() {
   const employees = []
   let page = 1
   let totalPages = 1
@@ -57,7 +62,7 @@ async function listAllActiveEmployeesForPayroll() {
     const result = await listEmployeesForAdmin({
       page,
       pageSize: EMPLOYEE_PAGE_SIZE,
-      status: 'active',
+      status: 'all',
       sortBy: 'full_name',
       sortDirection: 'asc',
     })
@@ -67,6 +72,40 @@ async function listAllActiveEmployeesForPayroll() {
   } while (page <= totalPages)
 
   return employees
+}
+
+/**
+ * Сотрудники ведомости за месяц:
+ * пересечение периода работы + сотрудники с уже существующими записями (история).
+ */
+async function listEmployeesForPayrollMonth(year, month, records) {
+  const staff = await listAllStaffEmployeesForPayroll()
+  const recordEmployeeIds = (records || []).map((row) => Number(row.employeeId))
+  let selected = selectEmployeesForPayrollMonth(staff, year, month, {
+    includeEmployeeIds: recordEmployeeIds,
+  })
+
+  const selectedIds = new Set(selected.map((employee) => Number(employee.id)))
+  const missingIds = recordEmployeeIds.filter(
+    (id) => Number.isFinite(id) && !selectedIds.has(id)
+  )
+
+  if (missingIds.length > 0) {
+    const extras = await Promise.all(
+      missingIds.map(async (employeeId) => {
+        try {
+          return await getEmployeeForAdmin(employeeId, { allowSearchFallback: false })
+        } catch {
+          return null
+        }
+      })
+    )
+    selected = selectEmployeesForPayrollMonth([...staff, ...extras.filter(Boolean)], year, month, {
+      includeEmployeeIds: recordEmployeeIds,
+    })
+  }
+
+  return selected
 }
 
 function hasRecordNotes(record) {
@@ -120,10 +159,8 @@ export default function PayrollSection() {
         const nextPeriod = await ensureSalaryPeriod(year, month)
         setPeriod(nextPeriod)
 
-        const [employeeRows, records] = await Promise.all([
-          listAllActiveEmployeesForPayroll(),
-          listSalaryRecordsForPeriod(nextPeriod.id),
-        ])
+        const records = await listSalaryRecordsForPeriod(nextPeriod.id)
+        const employeeRows = await listEmployeesForPayrollMonth(year, month, records)
         const advances = await listAdvanceLinesForRecords(records.map((row) => row.id))
 
         setEmployees(employeeRows)

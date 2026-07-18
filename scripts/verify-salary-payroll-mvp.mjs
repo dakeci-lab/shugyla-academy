@@ -8,7 +8,7 @@
 
 import fs from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
+import { fileURLToPath, pathToFileURL } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -96,16 +96,66 @@ function main() {
     'employee pageSize within edge limit',
     list.includes('EMPLOYEE_PAGE_SIZE = 100') && !list.includes('pageSize: 200')
   )
-  assert('list built from employees not only records', list.includes('listAllActiveEmployeesForPayroll'))
+  assert(
+    'list built from employment period not active status',
+    list.includes('listEmployeesForPayrollMonth') &&
+      list.includes("status: 'all'") &&
+      list.includes('selectEmployeesForPayrollMonth') &&
+      !list.includes("status: 'active'")
+  )
+  assert(
+    'period overlap helpers',
+    utils.includes('employmentOverlapsPayrollMonth') &&
+      utils.includes('getPayrollMonthBounds') &&
+      utils.includes('selectEmployeesForPayrollMonth')
+  )
+  assert('history preserves record employees', list.includes('includeEmployeeIds') || list.includes('recordEmployeeIds'))
 
   const sidebar = read('src/components/platform/PlatformSidebar.jsx')
   assert('payroll hidden on mobile nav', sidebar.includes('hideDesktopOnlyNavItems') && sidebar.includes('employees-payroll'))
+}
 
-  console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
+async function runOverlapScenarios() {
+  console.log('\nStage 4: Employment period overlap')
+  const {
+    employmentOverlapsPayrollMonth,
+    selectEmployeesForPayrollMonth,
+  } = await import(pathToFileURL(path.join(ROOT, 'src/utils/salaryPayroll.js')).href)
+
+  const working = { id: 1, name: 'A', hiredAt: '2026-03-15', terminatedAt: null }
+  assert('working appears in current month', employmentOverlapsPayrollMonth(working, 2026, 7) === true)
+  assert('working missing before hire', employmentOverlapsPayrollMonth(working, 2026, 2) === false)
+  assert('working appears in hire month', employmentOverlapsPayrollMonth(working, 2026, 3) === true)
+
+  const midHire = { id: 2, name: 'B', hiredAt: '2026-07-20', terminatedAt: null }
+  assert('mid-month hire skips prior month', employmentOverlapsPayrollMonth(midHire, 2026, 6) === false)
+  assert('mid-month hire in hire month', employmentOverlapsPayrollMonth(midHire, 2026, 7) === true)
+
+  const fired = { id: 3, name: 'C', hiredAt: '2026-01-10', terminatedAt: '2026-07-15' }
+  assert('fired appears in termination month', employmentOverlapsPayrollMonth(fired, 2026, 7) === true)
+  assert('fired missing after termination month', employmentOverlapsPayrollMonth(fired, 2026, 8) === false)
+  assert('fired remains in prior month', employmentOverlapsPayrollMonth(fired, 2026, 6) === true)
+
+  const augustNatural = selectEmployeesForPayrollMonth([working, midHire, fired], 2026, 8)
+  assert(
+    'august excludes already terminated employee',
+    !augustNatural.some((row) => Number(row.id) === 3) &&
+      augustNatural.some((row) => Number(row.id) === 2)
+  )
+
+  const augustWithHistory = selectEmployeesForPayrollMonth([working, midHire, fired], 2026, 8, {
+    includeEmployeeIds: [3],
+  })
+  assert(
+    'history keeps terminated employee via record id',
+    augustWithHistory.some((row) => Number(row.id) === 3)
+  )
 }
 
 try {
   main()
+  await runOverlapScenarios()
+  console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 } catch (error) {
   console.error(`\nVerification failed (${testsPassed}/${testsRun} tests): ${error.message}\n`)
   process.exit(1)
