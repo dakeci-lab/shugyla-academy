@@ -42,7 +42,7 @@ export default function PlatformUserMenu({ user, onLogout, compact = false }) {
     navigate('/platform/profile')
   }
 
-  function handleAvatarClick() {
+  function handleTriggerClick() {
     if (compact) {
       navigate('/platform/profile')
       return
@@ -50,21 +50,33 @@ export default function PlatformUserMenu({ user, onLogout, compact = false }) {
     setOpen((value) => !value)
   }
 
+  const avatar = (
+    <EmployeeAvatar
+      name={user?.name}
+      avatarUrl={user?.avatarUrl}
+      size="xs"
+      asButton={compact}
+      onClick={compact ? handleTriggerClick : undefined}
+      alt={compact ? 'Открыть профиль' : undefined}
+    />
+  )
+
   return (
     <div className={`platform-user-menu ${compact ? 'platform-user-menu--compact' : ''}`} ref={rootRef}>
-      <EmployeeAvatar
-        name={user?.name}
-        avatarUrl={user?.avatarUrl}
-        size="xs"
-        asButton
-        onClick={handleAvatarClick}
-        aria-expanded={compact ? undefined : open}
-        aria-haspopup={compact ? undefined : 'menu'}
-        alt={compact ? 'Открыть профиль' : 'Меню профиля'}
-      />
-
-      {!compact && (
-        <span className="platform-user-menu__name">{user?.name}</span>
+      {compact ? (
+        avatar
+      ) : (
+        <button
+          type="button"
+          className="platform-user-menu__trigger"
+          onClick={handleTriggerClick}
+          aria-expanded={open}
+          aria-haspopup="menu"
+          aria-label="Меню профиля"
+        >
+          {avatar}
+          <span className="platform-user-menu__name">{user?.name}</span>
+        </button>
       )}
 
       {!compact && open && (

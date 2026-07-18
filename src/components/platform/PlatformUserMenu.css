@@ -2,13 +2,33 @@
   position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
   padding: 0;
   background: transparent;
 }
 
-.platform-user-menu--compact {
-  gap: 0;
+.platform-user-menu__trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.platform-user-menu__trigger:focus {
+  outline: none;
+}
+
+.platform-user-menu__trigger:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
 }
 
 .platform-user-menu__name {
