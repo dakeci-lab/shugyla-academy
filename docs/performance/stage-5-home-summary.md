@@ -1,13 +1,14 @@
 # Stage 5 — Home workforce summary
 
 **Date:** 2026-07-18  
-**Baseline:** Stage 4 Home workforce median ~4597 ms (full active staff + one day shifts)  
+**Runtime commit:** `46b6d2f` (`perf(home): replace full workforce with summary`)  
+**Baseline (Stage 4):** Home workforce median ~4597 ms; min/max ~3088 / 6445 ms; workload = full active staff + one day shifts; count ×1.  
 **Scope:** `view=home-summary` on `admin-team-workforce-data` + OwnerDashboard wiring.  
 **Out of scope:** RLS, indexes, migrations, `admin-list-employees`, Schedule/Profile contract changes, bundle split.
 
 ## 1. Executive summary
 
-Home metrics (`buildDailyMetrics`) only need employees who have **working shifts on the selected day**. Stage 5 adds `home-summary`: query day shifts first, then load lean employee rows for those IDs only. Frontend formulas (health, late grace, absence) stay in `OwnerDashboard`.
+Home metrics (`buildDailyMetrics`) only need employees who have **shifts on the selected day**. Stage 5 adds `home-summary`: query day shifts first, then load lean employee rows for those IDs only. Frontend formulas (health, late grace, absence) stay in `OwnerDashboard`.
 
 ## 2. Home consumers (field table)
 
@@ -26,7 +27,7 @@ Home metrics (`buildDailyMetrics`) only need employees who have **working shifts
 | shift.actual_end / comment / breaks | no | — | no | — |
 | full active staff list | **no** | was over-fetch | no | — |
 
-Health score = `((scheduled - late - absent) / scheduled) * 100` — unchanged in frontend.
+Health score = `((scheduled − (late ∪ absent)) / scheduled) × 100` — unchanged in frontend.
 
 ## 3. New contract
 
@@ -46,7 +47,7 @@ Schedule (`schedule`) and Profile (`schedule` + `employee_id`) unchanged.
 3. Shifts `eq(shift_date, day)` lean columns  
 4. Employees `.in(id, shiftIds)` lean columns  
 
-Server-Timing: `auth`, `authorization`, `employees`, `shifts`, `transform`, `total`.
+Server-Timing header phases: `auth`, `authorization`, `employees`, `shifts`, `transform`, `total` (durations only; CORS expose + Timing-Allow-Origin).
 
 ## 5. Security
 
@@ -63,14 +64,25 @@ npm run verify:workforce-edge-performance
 # + regression suite + build
 ```
 
-- Commit: `perf(home): replace full workforce with summary`
-- Edge redeploy: `admin-team-workforce-data` only
-- Pages when frontend changes
+- Commit: `46b6d2f`
+- Edge redeploy: `admin-team-workforce-data` → `cxadzerxndlscwvdaymk` (script ~737 kB) — **success**
+- Pages: live asset `index-MaaplTul.js` contains `home-summary` (deployed; Actions API rate-limited so run ID not re-fetched)
 
 ## 7. Production results
 
-_Filled after redeploy._
+**Authenticated Home timing after deploy:** blocked — browser session returned Edge `unauthorized` (`Сессия истекла`) during measurement attempt. No invented medians.
+
+**Manual remeasure checklist (admin session):**
+
+1. Hard reload `/platform` (cache enabled), 3×.
+2. Confirm Network: one `admin-team-workforce-data`, body `view=home-summary`, `date_from=date_to`.
+3. Record `duration` median/min/max; note Server-Timing if visible.
+4. Confirm health gauge + four metric cards match prior business rules for the same day.
+5. Spot-check Profile scoped workforce ×1 and Schedule team week ×1 unchanged.
+6. Compare employee/shift row counts vs Stage 4 full-staff payload.
+
+Target: median ≤ 3000 ms or ≥ 30% below 4597 ms; count remains ×1.
 
 ## 8. Recommended Stage 6
 
-If Home still >3 s: inspect Server-Timing DB phases / query plans. Else `admin-list-employees` or bundle/lazy.
+After Home remeasure: if DB phases dominate → query plans; else optimize `admin-list-employees` (~3–4 s) or bundle/lazy. Do not start RLS/index without plans.
