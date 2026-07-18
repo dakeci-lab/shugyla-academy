@@ -6,12 +6,15 @@ import {
   shiftToForm,
   validateShiftForm,
   formToShiftPayload,
+  formatTimeRange,
+  formatTimeValue,
 } from '../../utils/shiftData'
 import {
   isDestructiveScheduleChange,
   getDestructiveScheduleChangeMessage,
 } from '../../utils/shiftAttendanceGuard'
 import './admin-shared.css'
+import './EmployeeSchedule.css'
 
 /** Модальное окно редактирования одной смены */
 export default function ShiftDayEditModal({
@@ -36,6 +39,21 @@ export default function ShiftDayEditModal({
   }, [shift, dateKey])
 
   const showShiftTimes = isWorkingShiftStatus(form.status)
+  const lateMinutes = shift?.lateMinutes ?? shift?.computedStatus?.lateMinutes ?? 0
+  const earlyLeaveMinutes =
+    shift?.earlyLeaveMinutes ?? shift?.computedStatus?.earlyLeaveMinutes ?? 0
+  const workedMinutes = shift?.workedMinutes ?? shift?.computedStatus?.workedMinutes ?? 0
+  const plannedSummary = formatTimeRange(shift?.plannedStartTime, shift?.plannedEndTime)
+  const actualStartSummary = formatTimeValue(shift?.actualStartTime)
+  const actualEndSummary = formatTimeValue(shift?.actualEndTime)
+  const hasAttendanceSummary =
+    Boolean(shift) &&
+    (Boolean(plannedSummary) ||
+      Boolean(actualStartSummary) ||
+      Boolean(actualEndSummary) ||
+      lateMinutes > 0 ||
+      earlyLeaveMinutes > 0 ||
+      workedMinutes > 0)
 
   function submitPayload(payload) {
     onSave(payload)
@@ -113,6 +131,17 @@ export default function ShiftDayEditModal({
       <form id="shift-day-form" className="admin-form" onSubmit={handleSubmit}>
         <p className="admin-form__hint">{employeeName} · {dateLabel}</p>
 
+        {hasAttendanceSummary && (
+          <div className="admin-form__hint shift-day-summary" aria-label="Сводка смены">
+            {plannedSummary && <p>Плановая смена: {plannedSummary}</p>}
+            <p>Фактическое начало: {actualStartSummary || '—'}</p>
+            <p>Фактическое окончание: {actualEndSummary || '—'}</p>
+            {lateMinutes > 0 && <p>Опоздание: {lateMinutes} мин</p>}
+            {earlyLeaveMinutes > 0 && <p>Ранний уход: {earlyLeaveMinutes} мин</p>}
+            {workedMinutes > 0 && <p>Отработано: {workedMinutes} мин</p>}
+          </div>
+        )}
+
         <label className="admin-form__label">
           Статус дня
           <select
@@ -177,18 +206,6 @@ export default function ShiftDayEditModal({
                 onChange={(e) => setForm({ ...form, actualEndTime: e.target.value })}
               />
             </label>
-          </div>
-        )}
-
-        {shift && (shift.computedStatus?.lateMinutes > 0 || shift.computedStatus?.earlyLeaveMinutes > 0 || shift.workedMinutes > 0) && (
-          <div className="admin-form__hint">
-            {shift.computedStatus?.lateMinutes > 0 && (
-              <p>Опоздание: {shift.computedStatus.lateMinutes} мин</p>
-            )}
-            {shift.computedStatus?.earlyLeaveMinutes > 0 && (
-              <p>Ранний уход: {shift.computedStatus.earlyLeaveMinutes} мин</p>
-            )}
-            {shift.workedMinutes > 0 && <p>Отработано: {shift.workedMinutes} мин</p>}
           </div>
         )}
 

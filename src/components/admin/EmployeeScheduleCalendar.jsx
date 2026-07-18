@@ -22,72 +22,81 @@ function ShiftDayCell({ date, shift, syncMeta, editable, onEdit, onRetrySync }) 
   const statusClass = status ? SHIFT_STATUS_CSS[status] : 'shift-day--empty'
   const isToday = toDateKey(new Date()) === dateKey
   const syncFailed = syncMeta?.syncStatus === SYNC_STATUS.ERROR || syncMeta?.syncStatus === SYNC_STATUS.UNSYNCED
+  const interactive = Boolean(editable && onEdit)
 
-  function handleClick() {
-    if (editable) onEdit(dateKey)
+  function openDay() {
+    if (interactive) onEdit(dateKey)
   }
 
   function handleEditClick(event) {
     event.stopPropagation()
-    if (editable) onEdit(dateKey)
+    openDay()
   }
 
   return (
     <div className="schedule-calendar__cell">
       <div
-        className={`shift-day ${statusClass}${syncFailed ? ' shift-day--sync-error' : ''}`}
-        onClick={handleClick}
-        role={editable ? 'button' : undefined}
-        tabIndex={editable ? 0 : undefined}
+        className={[
+          'shift-day',
+          statusClass,
+          isToday ? 'shift-day--today' : '',
+          syncFailed ? 'shift-day--sync-error' : '',
+          interactive ? 'shift-day--interactive' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+        onClick={openDay}
+        role={interactive ? 'button' : undefined}
+        tabIndex={interactive ? 0 : undefined}
         onKeyDown={(event) => {
-          if (editable && (event.key === 'Enter' || event.key === ' ')) {
+          if (interactive && (event.key === 'Enter' || event.key === ' ')) {
             event.preventDefault()
-            onEdit(dateKey)
+            openDay()
           }
         }}
       >
-        <span className="shift-day__number">{date.getDate()}{isToday ? ' ·' : ''}</span>
+        <div className="shift-day__top">
+          <span className="shift-day__number">{date.getDate()}</span>
+          {editable && (
+            <button
+              type="button"
+              className="shift-day__edit"
+              onClick={handleEditClick}
+              aria-label="Открыть смену"
+            >
+              <PencilIcon size={12} />
+            </button>
+          )}
+        </div>
+
         {shift ? (
           <>
-            {isWorkingShiftStatus(status) && (
-              <span className="shift-day__time">
-                {formatTimeRange(shift.plannedStartTime, shift.plannedEndTime)}
-              </span>
-            )}
-            <span className="shift-day__status">{SHIFT_STATUS_LABELS[status]}</span>
-            {(shift.actualStartTime || shift.actualEndTime) && (
-              <span className="shift-day__actual">
-                Факт: {formatTimeRange(shift.actualStartTime, shift.actualEndTime)}
-              </span>
-            )}
-            {shift.lateMinutes > 0 && (
-              <span className="shift-day__actual">Опозд: {shift.lateMinutes} мин</span>
-            )}
-            {shift.earlyLeaveMinutes > 0 && (
-              <span className="shift-day__actual">Ранний уход: {shift.earlyLeaveMinutes} мин</span>
-            )}
-            {syncFailed && (
-              <>
-                <span className="shift-day__sync-status">Не синхронизировано</span>
-                <button
-                  type="button"
-                  className="shift-day__retry"
-                  onClick={(event) => {
-                    event.stopPropagation()
-                    onRetrySync?.(dateKey)
-                  }}
-                >
-                  Повторить
-                </button>
-              </>
-            )}
+            <span className="shift-day__time">
+              {isWorkingShiftStatus(status)
+                ? formatTimeRange(shift.plannedStartTime, shift.plannedEndTime)
+                : '—'}
+            </span>
+            <span className="shift-day__status">{SHIFT_STATUS_LABELS[status] || '—'}</span>
           </>
         ) : (
-          <span className="shift-day__status">—</span>
+          <>
+            <span className="shift-day__time">—</span>
+            <span className="shift-day__status">Нет смены</span>
+          </>
         )}
-        {editable && (
-          <button type="button" className="shift-day__edit" onClick={handleEditClick} aria-label="Редактировать день">
-            <PencilIcon size={14} />
+
+        {syncFailed && (
+          <button
+            type="button"
+            className="shift-day__retry"
+            onClick={(event) => {
+              event.stopPropagation()
+              onRetrySync?.(dateKey)
+            }}
+            aria-label="Повторить синхронизацию"
+            title="Не синхронизировано — повторить"
+          >
+            !
           </button>
         )}
       </div>

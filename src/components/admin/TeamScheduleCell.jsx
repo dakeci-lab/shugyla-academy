@@ -1,14 +1,15 @@
-import { formatTeamScheduleCell } from '../../utils/shiftData'
+import { formatTeamScheduleCell, isWorkingShiftStatus, SHIFT_STATUS_LABELS } from '../../utils/shiftData'
 import { CommentIcon } from '../icons/PlatformIcons'
 
-/** Ячейка недельного графика: план, факт и бейдж без tooltip */
+/** Компактная ячейка недельного графика: план / статус дня */
 export default function TeamScheduleCell({ shift, onCommentClick }) {
   if (!shift) return null
 
-  const { plannedTime, actualTime, showPlan, showActual, badge, comment } =
-    formatTeamScheduleCell(shift)
+  const { plannedTime, showPlan, badge, comment } = formatTeamScheduleCell(shift)
+  const working = isWorkingShiftStatus(shift.status)
+  const dayStatusLabel = SHIFT_STATUS_LABELS[shift.status] || badge?.label
 
-  if (!showPlan && !badge && !comment) return null
+  if (!showPlan && !dayStatusLabel && !comment) return null
 
   return (
     <div className={`team-schedule-cell__box${comment ? ' team-schedule-cell__box--has-comment' : ''}`}>
@@ -27,20 +28,10 @@ export default function TeamScheduleCell({ shift, onCommentClick }) {
       )}
 
       <div className="team-schedule-cell__inner">
-        {showPlan && plannedTime && (
+        {working && showPlan && plannedTime ? (
           <span className="team-schedule-cell__planned">{plannedTime}</span>
-        )}
-
-        {showActual && (
-          <span className="team-schedule-cell__actual">
-            Факт: {actualTime || '—'}
-          </span>
-        )}
-
-        {badge && (
-          <span className={`team-schedule-badge team-schedule-badge--${badge.variant}`}>
-            {badge.label}
-          </span>
+        ) : (
+          <span className="team-schedule-cell__status">{dayStatusLabel || '—'}</span>
         )}
       </div>
     </div>
