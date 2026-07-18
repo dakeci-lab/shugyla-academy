@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getRoleDisplayName } from '../../config/permissions'
 import EmployeeAvatar from '../EmployeeAvatar'
 import './PlatformUserMenu.css'
 
@@ -51,17 +50,8 @@ export default function PlatformUserMenu({ user, onLogout, compact = false }) {
     setOpen((value) => !value)
   }
 
-  const roleLabel = user?.position || getRoleDisplayName(user)
-
   return (
     <div className={`platform-user-menu ${compact ? 'platform-user-menu--compact' : ''}`} ref={rootRef}>
-      {!compact && (
-        <div className="platform-user-menu__info">
-          <span className="platform-user-menu__name">{user?.name}</span>
-          <span className="platform-user-menu__role">{roleLabel}</span>
-        </div>
-      )}
-
       <EmployeeAvatar
         name={user?.name}
         avatarUrl={user?.avatarUrl}
@@ -72,6 +62,10 @@ export default function PlatformUserMenu({ user, onLogout, compact = false }) {
         aria-haspopup={compact ? undefined : 'menu'}
         alt={compact ? 'Открыть профиль' : 'Меню профиля'}
       />
+
+      {!compact && (
+        <span className="platform-user-menu__name">{user?.name}</span>
+      )}
 
       {!compact && open && (
         <div className="platform-user-menu__dropdown" role="menu">
