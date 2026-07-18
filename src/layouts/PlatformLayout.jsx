@@ -12,6 +12,7 @@ import { PlatformPageTitleProvider, usePlatformPageTitleContext } from '../conte
 import { useAcademyData } from '../context/AcademyDataContext'
 import { useProcurementRealtime } from '../hooks/useProcurementRealtime'
 import useMediaQuery from '../hooks/useMediaQuery'
+import useBlockMobileBrowserBack from '../hooks/useBlockMobileBrowserBack'
 import useMobileDrawerEdgeSwipe from '../hooks/useMobileDrawerEdgeSwipe'
 import { getPlatformSection } from '../platform/platformNav'
 import { useSession } from '../context/SessionContext'
@@ -45,25 +46,27 @@ function PlatformLayoutShell({ onLogout }) {
   const sidebarRef = useRef(null)
   const overlayRef = useRef(null)
   const edgeRef = useRef(null)
-  /** Пока активен перехват edge→Back, не закрываем drawer на смене pathname */
-  const edgeBackInterceptUntilRef = useRef(0)
+  /** Не закрывать drawer на pathname, пока откатываем системный Back */
+  const suppressPathCloseRef = useRef(false)
 
-  const restorePathAfterEdgeBack = useCallback(
-    (path) => {
-      edgeBackInterceptUntilRef.current = Date.now() + 1200
-      if (!path) return
-      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
-      if (current === path) return
-      navigate(path, { replace: true })
-    },
-    [navigate]
-  )
+  const handleBlockedBrowserBack = useCallback(() => {
+    suppressPathCloseRef.current = true
+    // Системный Back поглощён: toggle drawer вместо ухода со страницы.
+    setDrawerOpen((open) => !open)
+    window.setTimeout(() => {
+      suppressPathCloseRef.current = false
+    }, 400)
+  }, [])
+
+  const { allowNextBack } = useBlockMobileBrowserBack({
+    enabled: isMobile,
+    onBlockedBack: handleBlockedBrowserBack,
+  })
 
   const { isDragging: drawerDragging } = useMobileDrawerEdgeSwipe({
     enabled: isMobile,
     isOpen: drawerOpen,
     onOpenChange: setDrawerOpen,
-    onRestorePath: restorePathAfterEdgeBack,
     layoutRef,
     sidebarRef,
     overlayRef,
@@ -73,17 +76,15 @@ function PlatformLayoutShell({ onLogout }) {
   const handleMobileBack = useCallback(() => {
     const historyIdx = window.history.state?.idx
     if (typeof historyIdx === 'number' && historyIdx > 0) {
+      allowNextBack()
       navigate(-1)
       return
     }
     navigate(mobileBackFallback)
-  }, [navigate, mobileBackFallback])
+  }, [allowNextBack, navigate, mobileBackFallback])
 
   useEffect(() => {
-    if (Date.now() < edgeBackInterceptUntilRef.current) {
-      setDrawerOpen(true)
-      return
-    }
+    if (suppressPathCloseRef.current) return
     setDrawerOpen(false)
   }, [pathname])
 

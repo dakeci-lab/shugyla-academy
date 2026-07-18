@@ -40,6 +40,7 @@ function main() {
   const sidebarCss = read('src/components/platform/PlatformSidebar.css')
   const scrollLock = read('src/utils/modalScrollLock.js')
   const edgeSwipe = read('src/hooks/useMobileDrawerEdgeSwipe.js')
+  const backBlock = read('src/hooks/useBlockMobileBrowserBack.js')
 
   console.log('Stage 1: Scroll lock')
   assert('uses lockModalScroll', layout.includes('lockModalScroll'))
@@ -74,10 +75,16 @@ function main() {
   assert('pull-to-refresh disabled while dragging', layout.includes('drawerDragging'))
   assert('edge strip touch-action none', layoutCss.includes('touch-action: none'))
   assert('early preventDefault from edge', edgeSwipe.includes('fromEdge') && edgeSwipe.includes('preventDefault'))
-  assert('popstate guard restores path', edgeSwipe.includes('onRestorePath') && layout.includes('restorePathAfterEdgeBack'))
-  assert('unified under PlatformLayout', layout.includes('edgeRef') && !layout.includes('insertMobileNotificationsItem'))
-  assert('blocks back while drawer open', edgeSwipe.includes('block-back') && edgeSwipe.includes('persistent'))
+  assert('blocks right swipe while open', edgeSwipe.includes('block-back'))
   assert('overlay blocks touch while open', layoutCss.includes('touch-action: none'))
+
+  console.log('\nStage 5: Global browser back block')
+  assert('global back block hook', backBlock.includes('useBlockMobileBrowserBack'))
+  assert('history sentinel marker', backBlock.includes('MOBILE_BACK_BLOCK_KEY') || backBlock.includes('__shugylaBlockBrowserBack'))
+  assert('popstate trap', backBlock.includes("addEventListener('popstate'"))
+  assert('allow intentional UI back', backBlock.includes('allowNextBack'))
+  assert('wired in PlatformLayout', layout.includes('useBlockMobileBrowserBack') && layout.includes('allowNextBack'))
+  assert('no per-gesture restore path', !layout.includes('restorePathAfterEdgeBack') && !edgeSwipe.includes('onRestorePath'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

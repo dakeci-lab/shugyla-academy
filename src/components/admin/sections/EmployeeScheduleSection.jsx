@@ -14,6 +14,7 @@ import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { canEditEmployeeSchedule } from '../../../config/permissions'
 import { useSession } from '../../../context/SessionContext'
 import { useScheduleBackgroundSync, BULK_OPERATION_STATUS } from '../../../hooks/useScheduleBackgroundSync'
+import { allowMobileBrowserBackOnce } from '../../../hooks/useBlockMobileBrowserBack'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeScheduleCalendar from '../EmployeeScheduleCalendar'
 import ShiftDayEditModal from '../ShiftDayEditModal'
@@ -155,6 +156,7 @@ export default function EmployeeScheduleSection({
       navigate(`/platform/employees/schedule?week=${encodeURIComponent(weekStartKey)}`)
       return
     }
+    allowMobileBrowserBackOnce()
     navigate(-1)
   }
 
