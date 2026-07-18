@@ -95,6 +95,16 @@ function stageFuturePages() {
   const context = read('src/context/PlatformPageTitleContext.jsx')
   assert('usePlatformPageTitle exported', context.includes('export function usePlatformPageTitle'))
   assert('override in layout shell', read('src/layouts/PlatformLayout.jsx').includes('titleContext?.override'))
+  assert('setPageTitle is useCallback-stable', context.includes('const setPageTitle = useCallback'))
+  assert('clearPageTitle is useCallback-stable', context.includes('const clearPageTitle = useCallback'))
+  assert(
+    'hook does not depend on whole context identity',
+    !context.includes('[context, title, description, showBack, backFallback, actions]')
+  )
+  assert(
+    'hook depends on stable setters',
+    context.includes('[setPageTitle, clearPageTitle, title, description, showBack, backFallback, actions]')
+  )
 }
 
 function main() {
