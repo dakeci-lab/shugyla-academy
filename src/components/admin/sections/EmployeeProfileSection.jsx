@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { usePlatformPageTitle } from '../../../context/PlatformPageTitleContext'
 import { getEmployeeById } from '../../../utils/employeeData'
 import { getRoleLabel } from '../../../data/roles'
 import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
@@ -90,6 +91,11 @@ export default function EmployeeProfileSection({ employeeId }) {
     : canViewTeamSchedule(user)
       ? '/platform/employees/schedule'
       : '/platform'
+
+  usePlatformPageTitle('Карточка сотрудника', '', {
+    showBack: true,
+    backFallback: backPath,
+  })
 
   useEffect(() => {
     mountedRef.current = true
@@ -332,11 +338,6 @@ export default function EmployeeProfileSection({ employeeId }) {
   if (employeeLoading && !employee) {
     return (
       <div className="employee-profile-section">
-        <div className="employee-profile-section__nav">
-          <Link to={backPath} className="btn btn--outline btn--sm">
-            ← Назад
-          </Link>
-        </div>
         <div className="employee-profile-section__loading" role="status">
           Загрузка карточки сотрудника…
         </div>
@@ -347,11 +348,6 @@ export default function EmployeeProfileSection({ employeeId }) {
   if (employeeMissing || (!employee && !employeeLoading)) {
     return (
       <div className="employee-profile-section">
-        <div className="employee-profile-section__nav">
-          <Link to={backPath} className="btn btn--outline btn--sm">
-            ← Назад
-          </Link>
-        </div>
         <div className="employee-profile-section__empty" role="status">
           <h1>Сотрудник не найден</h1>
           <p>Сотрудник удалён или недоступен для просмотра.</p>
@@ -370,11 +366,6 @@ export default function EmployeeProfileSection({ employeeId }) {
   if (employeeError && !employee) {
     return (
       <div className="employee-profile-section">
-        <div className="employee-profile-section__nav">
-          <Link to={backPath} className="btn btn--outline btn--sm">
-            ← Назад
-          </Link>
-        </div>
         <div className="employee-profile-section__empty" role="alert">
           <h1>Не удалось загрузить</h1>
           <p>{employeeError}</p>
@@ -388,12 +379,6 @@ export default function EmployeeProfileSection({ employeeId }) {
 
   return (
     <div className="employee-profile-section">
-      <div className="employee-profile-section__nav">
-        <Link to={backPath} className="btn btn--outline btn--sm">
-          ← Назад
-        </Link>
-      </div>
-
       <EmployeeProfileHeader
         employee={employee}
         roleLabel={roleLabel}

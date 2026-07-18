@@ -5,14 +5,6 @@
   min-width: 0;
 }
 
-.employee-profile-section__nav {
-  margin-bottom: 12px;
-}
-
-.employee-profile-section__nav .btn {
-  min-height: 40px;
-}
-
 .employee-profile-section__loading,
 .employee-profile-section__empty {
   padding: 28px 18px;

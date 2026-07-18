@@ -29,10 +29,22 @@ function PlatformLayoutShell({ onLogout }) {
     )
   }, [user, pathname])
   useProcurementRealtime(procurementRealtimeEnabled)
+  const navigate = useNavigate()
   const titleContext = usePlatformPageTitleContext()
   const section = useMemo(() => getPlatformSection(pathname), [pathname])
   const pageTitle = titleContext?.override?.title || section.title || 'Shugyla Platform'
+  const showMobileBack = titleContext?.override?.showBack === true
+  const mobileBackFallback = titleContext?.override?.backFallback || '/platform'
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  const handleMobileBack = useCallback(() => {
+    const historyIdx = window.history.state?.idx
+    if (typeof historyIdx === 'number' && historyIdx > 0) {
+      navigate(-1)
+      return
+    }
+    navigate(mobileBackFallback)
+  }, [navigate, mobileBackFallback])
 
   useEffect(() => {
     setDrawerOpen(false)
@@ -81,6 +93,8 @@ function PlatformLayoutShell({ onLogout }) {
           <PlatformMobileHeader
             title={pageTitle}
             onMenuOpen={() => setDrawerOpen(true)}
+            showBack={showMobileBack}
+            onBack={handleMobileBack}
           />
 
           <header className="platform-layout__topbar">

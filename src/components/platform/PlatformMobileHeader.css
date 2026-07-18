@@ -39,6 +39,38 @@
   background: var(--color-bg);
 }
 
+.platform-mobile-header__back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 50%;
+  background: var(--color-white, #fff);
+  color: var(--color-text, #0f172a);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  justify-self: start;
+  flex-shrink: 0;
+  transition: background 0.15s, box-shadow 0.15s, border-color 0.15s;
+}
+
+.platform-mobile-header__back:hover {
+  background: var(--color-bg, #f8fafc);
+  box-shadow: 0 2px 6px rgba(15, 23, 42, 0.1);
+}
+
+.platform-mobile-header__back:focus-visible {
+  outline: 2px solid var(--color-primary, #059669);
+  outline-offset: 2px;
+}
+
+.platform-mobile-header__back:active {
+  transform: scale(0.96);
+}
+
 .platform-mobile-header__title {
   margin: 0;
   padding: 0 4px;
