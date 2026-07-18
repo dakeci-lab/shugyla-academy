@@ -231,6 +231,12 @@
   text-align: center;
 }
 
+.tt-home-btn:disabled + .tt-home-actions__hint,
+.tt-home-actions__hint[role='status'] {
+  color: var(--color-text-muted, #64748b);
+  font-variant-numeric: tabular-nums;
+}
+
 .tt-home-btn {
   display: inline-flex;
   align-items: center;

@@ -19,6 +19,10 @@ import {
   buildTimeTrackerAuditRow,
 } from '../../../utils/timeTrackerAudit'
 import {
+  formatCheckoutCooldownHint,
+  getCheckoutCooldownRemainingMs,
+} from '../../../utils/checkoutCooldown'
+import {
   logAttendanceActionFailure,
   mapAttendanceActionUserMessage,
 } from '../../../utils/attendanceActionErrors'
@@ -57,6 +61,8 @@ function TimeTrackerLegacyCard({
   computedStatus,
   canCheckIn,
   canCheckOut,
+  checkoutDisabled,
+  checkoutCooldownHint,
   acting,
   handleCheckIn,
   handleCheckOut,
@@ -135,12 +141,19 @@ function TimeTrackerLegacyCard({
         <button
           type="button"
           className="btn btn--outline time-tracker-card__action-btn"
-          disabled={!canCheckOut || acting || loading || loadError}
+          disabled={checkoutDisabled}
           onClick={handleCheckOut}
+          aria-disabled={checkoutDisabled}
         >
           {acting ? 'Проверка…' : 'Я ухожу'}
         </button>
       </div>
+
+      {checkoutCooldownHint && canCheckOut && (
+        <p className="admin-form__hint time-tracker-card__cooldown" role="status">
+          {checkoutCooldownHint}
+        </p>
+      )}
 
       {success && <p className="admin-success-banner">{success}</p>}
       {actionError && <p className="admin-form__error">{actionError}</p>}
@@ -232,12 +245,31 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
   const canCheckIn = checkInResult.value
   const canCheckOut = checkOutResult.value
 
+  const checkoutCooldownRemainingMs = useMemo(() => {
+    if (!shift?.actualStartTime || shift?.actualEndTime) return 0
+    return getCheckoutCooldownRemainingMs(shift.actualStartTime, now)
+  }, [shift?.actualStartTime, shift?.actualEndTime, now])
+
+  const checkoutCooldownHint = useMemo(
+    () => formatCheckoutCooldownHint(checkoutCooldownRemainingMs),
+    [checkoutCooldownRemainingMs]
+  )
+
+  const checkoutDisabled =
+    !canCheckOut || acting || loading || loadError || checkoutCooldownRemainingMs > 0
+
   useEffect(() => {
+    const hasOpenShift = Boolean(shift?.actualStartTime && !shift?.actualEndTime)
     const intervalMs =
-      shift?.actualStartTime && !shift?.actualEndTime && canCheckOut ? 30000 : 60000
+      checkoutCooldownRemainingMs > 0 ? 1000 : hasOpenShift && canCheckOut ? 30000 : 60000
     const timer = setInterval(() => setNow(new Date()), intervalMs)
     return () => clearInterval(timer)
-  }, [shift?.actualStartTime, shift?.actualEndTime, canCheckOut])
+  }, [
+    shift?.actualStartTime,
+    shift?.actualEndTime,
+    canCheckOut,
+    checkoutCooldownRemainingMs,
+  ])
 
   const disabledReason = acting
     ? 'acting'
@@ -300,6 +332,7 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
 
   async function handleCheckOut() {
     if (acting || loading || loadError || !canCheckOut) return
+    if (getCheckoutCooldownRemainingMs(shift?.actualStartTime, new Date()) > 0) return
     const ok = await runWithGeolocation(
       (coords) => checkOutEmployee(employeeId, coords),
       'checkout'
@@ -323,6 +356,8 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
         displayStatus={displayStatus}
         canCheckIn={canCheckIn}
         canCheckOut={canCheckOut}
+        checkoutDisabled={checkoutDisabled}
+        checkoutCooldownHint={checkoutCooldownHint}
         acting={acting}
         loading={loading}
         loadError={loadError}
@@ -349,6 +384,8 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
       computedStatus={computedStatus}
       canCheckIn={canCheckIn}
       canCheckOut={canCheckOut}
+      checkoutDisabled={checkoutDisabled}
+      checkoutCooldownHint={checkoutCooldownHint}
       acting={acting}
       handleCheckIn={handleCheckIn}
       handleCheckOut={handleCheckOut}

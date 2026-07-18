@@ -15,6 +15,11 @@ import {
   deriveTrackerStatus,
   isStaleOpenShift,
 } from '../src/utils/shiftWorkWindow.js'
+import {
+  CHECKOUT_COOLDOWN_MS,
+  formatCheckoutCooldownHint,
+  getCheckoutCooldownRemainingMs,
+} from '../src/utils/checkoutCooldown.js'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -122,6 +127,37 @@ function main() {
   assert('no employees.edit in TimeTrackerSection', !section.includes('employees.edit'))
   assert('HTTP 4xx not mapped as offline', errors.includes('if (status >= 400) return false'))
   assert('loading state shows skeleton not working title', homeCard.includes('HomeSkeleton'))
+
+  console.log('\nStage 6: Checkout cooldown after shift start')
+  const startAt = new Date('2026-07-17T09:00:00+05:00')
+  const at20s = new Date(startAt.getTime() + 20_000)
+  const at60s = new Date(startAt.getTime() + 60_000)
+  const at90s = new Date(startAt.getTime() + 90_000)
+  assert('cooldown is 60 seconds', CHECKOUT_COOLDOWN_MS === 60_000)
+  assert(
+    '20s after start still blocked',
+    getCheckoutCooldownRemainingMs(startAt.toISOString(), at20s) === 40_000
+  )
+  assert(
+    'exactly 60s unlocks',
+    getCheckoutCooldownRemainingMs(startAt.toISOString(), at60s) === 0
+  )
+  assert(
+    'after 60s remains unlocked',
+    getCheckoutCooldownRemainingMs(startAt.toISOString(), at90s) === 0
+  )
+  assert(
+    'no start time means no cooldown',
+    getCheckoutCooldownRemainingMs(null, at20s) === 0
+  )
+  assert(
+    'hint uses mm:ss',
+    formatCheckoutCooldownHint(58_000) === 'Будет доступно через 00:58'
+  )
+  assert('section uses checkout cooldown helper', section.includes('getCheckoutCooldownRemainingMs'))
+  assert('section disables checkout during cooldown', section.includes('checkoutDisabled'))
+  assert('home card shows cooldown hint', homeCard.includes('checkoutCooldownHint'))
+  assert('checkout handler re-checks cooldown', section.includes('getCheckoutCooldownRemainingMs(shift?.actualStartTime'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

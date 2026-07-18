@@ -121,6 +121,8 @@ export default function TimeTrackerHomeCard({
   displayStatus,
   canCheckIn,
   canCheckOut,
+  checkoutDisabled = false,
+  checkoutCooldownHint = '',
   acting,
   loading,
   loadError,
@@ -287,15 +289,18 @@ export default function TimeTrackerHomeCard({
               <button
                 type="button"
                 className={`tt-home-btn tt-home-btn--end${variant === 'late' ? ' tt-home-btn--end-late' : ''}`}
-                disabled={acting}
+                disabled={checkoutDisabled}
                 onClick={onCheckOut}
+                aria-disabled={checkoutDisabled}
               >
                 <span className="tt-home-btn__icon" aria-hidden="true">
                   ⏹
                 </span>
                 {acting ? 'Проверка…' : 'Завершить смену'}
               </button>
-              <p className="tt-home-actions__hint">Отметить уход</p>
+              <p className="tt-home-actions__hint" role={checkoutCooldownHint ? 'status' : undefined}>
+                {checkoutCooldownHint || 'Отметить уход'}
+              </p>
             </div>
           )}
 

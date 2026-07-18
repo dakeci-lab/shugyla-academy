@@ -248,6 +248,11 @@
   margin-top: 1rem;
 }
 
+.time-tracker-card__cooldown {
+  margin: 0.5rem 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
 .time-tracker-card__action-btn {
   min-height: 48px;
   padding-top: 0.75rem;
