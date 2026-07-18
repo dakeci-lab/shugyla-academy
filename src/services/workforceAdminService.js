@@ -74,6 +74,9 @@ function workforceEmployeeToUi(row) {
     position: row.position,
     employmentStatus: row.status,
     avatarUrl: row.avatar_url,
+    hiredAt: row.hired_at,
+    terminatedAt: row.terminated_at,
+    createdAt: row.created_at,
   })
 }
 

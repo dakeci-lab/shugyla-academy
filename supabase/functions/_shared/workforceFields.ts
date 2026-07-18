@@ -1,5 +1,5 @@
 export const WORKFORCE_EMPLOYEE_SELECT =
-  'id, first_name, last_name, full_name, role, role_id, status, position, avatar_url'
+  'id, first_name, last_name, full_name, role, role_id, status, position, avatar_url, hired_at, terminated_at, created_at'
 
 // Break columns omitted from SELECT (not used by Home/Schedule/Rating/Profile consumers).
 // mapSafeWorkforceShift still returns break keys as null for response-contract stability.
@@ -38,6 +38,9 @@ export type DbWorkforceEmployeeRow = {
   status: string
   position: string
   avatar_url: string | null
+  hired_at?: string | null
+  terminated_at?: string | null
+  created_at?: string | null
 }
 
 export type SafeWorkforceEmployee = {
@@ -50,6 +53,9 @@ export type SafeWorkforceEmployee = {
   status: string
   position: string
   avatar_url: string | null
+  hired_at: string | null
+  terminated_at: string | null
+  created_at: string | null
 }
 
 export type SafeWorkforceShift = {
@@ -68,6 +74,12 @@ export type SafeWorkforceShift = {
   comment: string | null
 }
 
+function toDateKey(value: string | null | undefined): string | null {
+  if (!value) return null
+  const match = String(value).trim().match(/^(\d{4}-\d{2}-\d{2})/)
+  return match ? match[1] : null
+}
+
 export function mapSafeWorkforceEmployee(row: DbWorkforceEmployeeRow): SafeWorkforceEmployee {
   return {
     id: row.id,
@@ -79,6 +91,9 @@ export function mapSafeWorkforceEmployee(row: DbWorkforceEmployeeRow): SafeWorkf
     status: row.status,
     position: row.position,
     avatar_url: row.avatar_url,
+    hired_at: toDateKey(row.hired_at) ?? toDateKey(row.created_at),
+    terminated_at: toDateKey(row.terminated_at),
+    created_at: row.created_at ?? null,
   }
 }
 
@@ -100,6 +115,9 @@ export function mapHomeSummaryEmployee(row: {
     status: 'active',
     position: row.position,
     avatar_url: null,
+    hired_at: null,
+    terminated_at: null,
+    created_at: null,
   }
 }
 
