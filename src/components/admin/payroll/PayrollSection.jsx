@@ -26,6 +26,30 @@ import '../admin-shared.css'
 import '../EmployeeSchedule.css'
 import './PayrollSection.css'
 
+/** admin-list-employees отклоняет page_size > 100 (invalid_pagination). */
+const EMPLOYEE_PAGE_SIZE = 100
+
+async function listAllActiveEmployeesForPayroll() {
+  const employees = []
+  let page = 1
+  let totalPages = 1
+
+  do {
+    const result = await listEmployeesForAdmin({
+      page,
+      pageSize: EMPLOYEE_PAGE_SIZE,
+      status: 'active',
+      sortBy: 'full_name',
+      sortDirection: 'asc',
+    })
+    employees.push(...(result.employees || []))
+    totalPages = Number(result.pagination?.total_pages) || 1
+    page += 1
+  } while (page <= totalPages)
+
+  return employees
+}
+
 /** Список расчётов зарплаты за месяц */
 export default function PayrollSection() {
   const navigate = useNavigate()
@@ -58,18 +82,14 @@ export default function PayrollSection() {
         const nextPeriod = await ensureSalaryPeriod(year, month)
         setPeriod(nextPeriod)
 
-        const [empResult, records] = await Promise.all([
-          listEmployeesForAdmin({
-            page: 1,
-            pageSize: 200,
-            status: 'active',
-            sortBy: 'full_name',
-            sortDirection: 'asc',
-          }),
+        // Список строится из academy_users (через admin-list-employees),
+        // а не из salary_records — иначе пустой месяц выглядел бы как «нет сотрудников».
+        const [employeeRows, records] = await Promise.all([
+          listAllActiveEmployeesForPayroll(),
           listSalaryRecordsForPeriod(nextPeriod.id),
         ])
 
-        setEmployees(empResult.employees || [])
+        setEmployees(employeeRows)
         const map = new Map()
         for (const record of records) {
           map.set(Number(record.employeeId), record)
@@ -179,8 +199,12 @@ export default function PayrollSection() {
 
       {loading ? (
         <p className="payroll-section__empty">Загрузка…</p>
-      ) : rows.length === 0 ? (
-        <p className="payroll-section__empty">Сотрудники не найдены</p>
+      ) : error ? null : rows.length === 0 ? (
+        <p className="payroll-section__empty">
+          {search || roleFilter !== 'all' || statusFilter !== 'all'
+            ? 'Сотрудники не найдены по текущим фильтрам'
+            : 'Нет активных сотрудников для расчёта'}
+        </p>
       ) : (
         <div className="payroll-table-wrap">
           <table className="payroll-table">

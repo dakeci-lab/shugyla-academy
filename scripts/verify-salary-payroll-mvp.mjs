@@ -65,6 +65,11 @@ function main() {
   assert('manual blocks', detail.includes('Основной оклад') && detail.includes('Начисления') && detail.includes('Удержания'))
   assert('no time-tracker import in payroll', !list.includes('timeTracker') && !detail.includes('timeTracker'))
   assert('verify script registered', pkg.includes('verify:salary-payroll-mvp'))
+  assert(
+    'employee pageSize within edge limit',
+    list.includes('EMPLOYEE_PAGE_SIZE = 100') && !list.includes('pageSize: 200')
+  )
+  assert('list built from employees not only records', list.includes('listAllActiveEmployeesForPayroll'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }
