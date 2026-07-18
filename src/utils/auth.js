@@ -176,7 +176,9 @@ async function loginCloud(loginValue, password) {
     clearUser()
     return {
       success: false,
-      error: isAuthNetworkError(err) ? LOGIN_ERROR.NETWORK : LOGIN_ERROR.INVALID,
+      error: isAuthNetworkError(err)
+        ? LOGIN_ERROR.NETWORK
+        : 'Не удалось загрузить профиль. Обновите страницу или обратитесь к администратору.',
     }
   }
 

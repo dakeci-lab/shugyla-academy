@@ -1,5 +1,8 @@
 import { supabase } from '../lib/supabaseClient'
-import { ACADEMY_PROFILE_SAFE_FIELDS } from './authService'
+import {
+  ACADEMY_AUTH_PROFILE_FIELDS,
+  ACADEMY_PROFILE_SAFE_FIELDS,
+} from './authService'
 import {
   normalizeEmployee,
   canEmployeeLogin,
@@ -171,14 +174,23 @@ function settleTableResult(result, context, fallback = []) {
 
 /** Core academy tables (employees / courses / lessons / assignments / progress). */
 export async function fetchCoreAcademyData() {
-  const [usersRes, coursesRes, lessonsRes, assignmentsRes, progressRes] =
-    await Promise.all([
-      supabase.from('academy_users').select(ACADEMY_PROFILE_SAFE_FIELDS).order('id'),
-      supabase.from('academy_courses').select('*').order('id'),
-      supabase.from('academy_lessons').select('*').eq('is_deleted', false).order('sort_order'),
-      supabase.from('academy_course_assignments').select('*'),
-      supabase.from('academy_progress').select('*'),
-    ])
+  let usersRes = await supabase
+    .from('academy_users')
+    .select(ACADEMY_PROFILE_SAFE_FIELDS)
+    .order('id')
+  if (usersRes.error) {
+    usersRes = await supabase
+      .from('academy_users')
+      .select(ACADEMY_AUTH_PROFILE_FIELDS)
+      .order('id')
+  }
+
+  const [coursesRes, lessonsRes, assignmentsRes, progressRes] = await Promise.all([
+    supabase.from('academy_courses').select('*').order('id'),
+    supabase.from('academy_lessons').select('*').eq('is_deleted', false).order('sort_order'),
+    supabase.from('academy_course_assignments').select('*'),
+    supabase.from('academy_progress').select('*'),
+  ])
 
   const users = settleTableResult(usersRes, 'Загрузка сотрудников', [])
   const courses = settleTableResult(coursesRes, 'Загрузка курсов', [])
@@ -458,7 +470,6 @@ async function updateUser(id, updates) {
 }
 
 export async function deactivateEmployee(id) {
-  const { todayEmployeeDateKey } = await import('../utils/employeeData')
   await updateUser(id, {
     employmentStatus: 'terminated',
     terminatedAt: todayEmployeeDateKey(),

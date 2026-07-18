@@ -24,9 +24,17 @@ import {
 
 import { getAppUrl } from '../router/basename'
 
+/**
+ * Minimal profile columns for Auth login/session restore.
+ * Intentionally excludes employment-date columns so PostgREST schema-cache lag
+ * after migrations cannot break sign-in.
+ */
+export const ACADEMY_AUTH_PROFILE_FIELDS =
+  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, auth_user_id, contact_email, created_at'
+
 /** Safe academy_users columns for Auth-first cloud queries (never includes password). */
 export const ACADEMY_PROFILE_SAFE_FIELDS =
-  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, hired_at, terminated_at, created_at, auth_user_id, contact_email'
+  `${ACADEMY_AUTH_PROFILE_FIELDS}, hired_at, terminated_at`
 
 const DEACTIVATED_ACCOUNT_MESSAGE =
   'Доступ закрыт: сотрудник уволен. Обратитесь к администратору.'
@@ -101,14 +109,36 @@ export async function loadAcademyAssignmentsForEmployee(employeeId) {
  * Auth-first profile lookup: academy_users.auth_user_id = Supabase Auth user id.
  * Must only be called after a valid Auth session exists.
  */
+/**
+ * Load academy_users row. Auth path uses columns that always exist so a
+ * PostgREST schema-cache lag after migrations cannot break sign-in.
+ * Employment dates are attached when the extended select succeeds.
+ */
+async function loadAcademyUserRow(match) {
+  const authResult = await match(ACADEMY_AUTH_PROFILE_FIELDS)
+  if (authResult.error || !authResult.data) return authResult
+
+  const datesResult = await match('id, hired_at, terminated_at')
+  if (!datesResult.error && datesResult.data) {
+    return {
+      ...authResult,
+      data: {
+        ...authResult.data,
+        hired_at: datesResult.data.hired_at ?? null,
+        terminated_at: datesResult.data.terminated_at ?? null,
+      },
+    }
+  }
+
+  return authResult
+}
+
 export async function loadAcademyProfileByAuthUserId(authUserId) {
   if (!authUserId || !supabase) return null
 
-  const result = await supabase
-    .from('academy_users')
-    .select(ACADEMY_PROFILE_SAFE_FIELDS)
-    .eq('auth_user_id', authUserId)
-    .maybeSingle()
+  const result = await loadAcademyUserRow((fields) =>
+    supabase.from('academy_users').select(fields).eq('auth_user_id', authUserId).maybeSingle()
+  )
 
   if (result.error) {
     throw new Error('Не удалось загрузить профиль сотрудника')
@@ -178,11 +208,9 @@ export async function loadAcademyProfileByLogin(loginValue) {
   if (!login) return null
 
   if (isCloudMode() && supabase) {
-    const result = await supabase
-      .from('academy_users')
-      .select(ACADEMY_PROFILE_SAFE_FIELDS)
-      .eq('login', login)
-      .maybeSingle()
+    const result = await loadAcademyUserRow((fields) =>
+      supabase.from('academy_users').select(fields).eq('login', login).maybeSingle()
+    )
 
     if (result.error) {
       throw new Error('Не удалось загрузить профиль сотрудника')
@@ -227,11 +255,9 @@ export async function loadAcademyProfileById(userId) {
   if (userId === undefined || userId === null || userId === '') return null
 
   if (isCloudMode() && supabase) {
-    const result = await supabase
-      .from('academy_users')
-      .select(ACADEMY_PROFILE_SAFE_FIELDS)
-      .eq('id', userId)
-      .maybeSingle()
+    const result = await loadAcademyUserRow((fields) =>
+      supabase.from('academy_users').select(fields).eq('id', userId).maybeSingle()
+    )
 
     if (result.error) {
       throw new Error('Не удалось загрузить профиль сотрудника')
