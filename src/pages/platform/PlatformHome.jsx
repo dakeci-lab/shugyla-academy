@@ -1,5 +1,6 @@
 import { useSession } from '../../context/SessionContext'
 import { isAdmin } from '../../data/roles'
+import { participatesInStoreSchedule } from '../../utils/employeeData'
 import TimeTrackerSection from '../../components/admin/sections/TimeTrackerSection'
 import OwnerDashboard from '../../components/admin/OwnerDashboard'
 import './PlatformHome.css'
@@ -14,6 +15,11 @@ export default function PlatformHome() {
         <OwnerDashboard />
       </div>
     )
+  }
+
+  // Online (remote) staff are outside store presence / shift check-in UI.
+  if (!participatesInStoreSchedule(user)) {
+    return <div className="platform-home" />
   }
 
   return (

@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { isCloudMode } from '../../lib/dataMode'
-import { getStaffEmployees } from '../../utils/employeeData'
+import {
+  getScheduleEligibleEmployees,
+  participatesInStoreSchedule,
+} from '../../utils/employeeData'
 import { RATING_UPDATED_EVENT } from '../../utils/attendanceData'
 import { APP_TIMEZONE, addDaysToDateKey, toDateKeyInAppTimezone } from '../../utils/timezone'
 import {
@@ -265,10 +268,10 @@ export default function OwnerDashboard() {
 
   const todayKey = toDateKeyInAppTimezone(now)
   const cloudMode = isCloudMode()
-  const employees = useMemo(
-    () => (cloudMode ? teamEmployees : getStaffEmployees('active')),
-    [cloudMode, teamEmployees]
-  )
+  const employees = useMemo(() => {
+    const base = cloudMode ? teamEmployees : getScheduleEligibleEmployees('active')
+    return base.filter(participatesInStoreSchedule)
+  }, [cloudMode, teamEmployees])
   const employeeIds = useMemo(() => employees.map((emp) => emp.id), [employees])
   // Cloud workforce ignores employeeIds; including the key re-triggers load after setTeamEmployees.
   const localEmployeeIdsKey = cloudMode ? '' : employeeIds.join(',')

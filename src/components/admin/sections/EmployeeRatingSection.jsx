@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { isCloudMode } from '../../../lib/dataMode'
-import { getStaffEmployees } from '../../../utils/employeeData'
+import {
+  getScheduleEligibleEmployees,
+  participatesInStoreSchedule,
+} from '../../../utils/employeeData'
 import { getRoleLabel } from '../../../data/roles'
 import {
   getCurrentMonthState,
@@ -94,9 +97,13 @@ export default function EmployeeRatingSection() {
   const [detailEmployee, setDetailEmployee] = useState(null)
 
   const employees = useMemo(() => {
-    const base = isCloudMode() && loadedEmployees != null ? loadedEmployees : getStaffEmployees('active')
+    const base =
+      isCloudMode() && loadedEmployees != null
+        ? loadedEmployees
+        : getScheduleEligibleEmployees('active')
     const q = search.trim().toLowerCase()
     return base.filter((emp) => {
+      if (!participatesInStoreSchedule(emp)) return false
       if (!q) return true
       return emp.name.toLowerCase().includes(q)
     })
@@ -122,7 +129,7 @@ export default function EmployeeRatingSection() {
         )
         setRatingsByEmployee(ratings)
       } else {
-        const employeeIds = getStaffEmployees('active').map((emp) => emp.id)
+        const employeeIds = getScheduleEligibleEmployees('active').map((emp) => emp.id)
         const ratings = await computeEmployeeRatingsForMonth(year, month, employeeIds)
         setRatingsByEmployee(ratings)
       }

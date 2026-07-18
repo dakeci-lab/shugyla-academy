@@ -34,6 +34,9 @@ function mapScheduleWriteError(errorBody, fallbackMessage = ERROR_MESSAGES.defau
   if (code === 'shift_has_attendance_history') {
     return 'По этой смене уже есть фактические данные. Удаление или замена на выходной запрещены без подтверждения.'
   }
+  if (code === 'online_employee_not_schedulable') {
+    return 'Для сотрудников с режимом «Онлайн» график смен не используется.'
+  }
   return fallbackMessage
 }
 

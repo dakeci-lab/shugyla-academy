@@ -214,6 +214,7 @@ Deno.serve(async (req) => {
       .eq('shift_date', dateFrom)
       .eq('academy_users.status', 'active')
       .neq('academy_users.role', 'admin')
+      .eq('academy_users.work_mode', 'offline')
       .order('employee_id', { ascending: true })
     const workforceDbMs = Math.round(performance.now() - workforceDbStart)
 
@@ -331,7 +332,11 @@ Deno.serve(async (req) => {
     })
 
   if (scopedEmployeeId != null) {
+    // Single-employee profile/own lookup keeps online staff (card still loads).
     employeeQuery = employeeQuery.eq('id', scopedEmployeeId)
+  } else {
+    // Team schedule / dashboard / rating: online (remote) staff are not in store presence.
+    employeeQuery = employeeQuery.eq('work_mode', 'offline')
   }
 
   const workforceRes = await employeeQuery

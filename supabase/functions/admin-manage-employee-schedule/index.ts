@@ -42,12 +42,16 @@ async function assertTargetInScope(
 
   const { data: target, error } = await serviceClient
     .from('academy_users')
-    .select('id, status, role')
+    .select('id, status, role, work_mode')
     .eq('id', targetEmployeeId)
     .maybeSingle()
 
   if (error || !target || !canEmployeeLogin(target.status) || target.role === 'admin') {
     return adminErrorResponse('forbidden', 403)
+  }
+
+  if (target.work_mode === 'online') {
+    return adminErrorResponse('online_employee_not_schedulable', 422)
   }
 
   return null

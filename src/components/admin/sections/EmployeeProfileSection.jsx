@@ -41,6 +41,7 @@ import {
 import {
   isActiveStaffEmployee,
   isDeactivatedStaffEmployee,
+  participatesInStoreSchedule,
 } from '../../../utils/employeeData'
 import './EmployeeProfileSection.css'
 
@@ -106,13 +107,15 @@ export default function EmployeeProfileSection({ employeeId }) {
     }
   }, [])
 
+  const showStoreSchedule = Boolean(employee && participatesInStoreSchedule(employee))
+
   useEffect(() => {
-    if (window.location.hash !== '#schedule') return undefined
+    if (!showStoreSchedule || window.location.hash !== '#schedule') return undefined
     const timer = window.setTimeout(() => {
       document.getElementById('schedule')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 120)
     return () => window.clearTimeout(timer)
-  }, [employeeId, employeeLoading])
+  }, [employeeId, employeeLoading, showStoreSchedule])
 
   const loadEmployee = useCallback(async (options = {}) => {
     if (!employeeId) return
@@ -248,6 +251,15 @@ export default function EmployeeProfileSection({ employeeId }) {
   }, [loadEmployee])
 
   useEffect(() => {
+    if (!showStoreSchedule) {
+      setRating(null)
+      setRatingLoading(false)
+      setPeriodShifts([])
+      setScheduleLoading(false)
+      setScheduleError('')
+      return undefined
+    }
+
     if (!showRating || scheduleLoading) {
       if (!showRating) {
         setRating(null)
@@ -288,7 +300,7 @@ export default function EmployeeProfileSection({ employeeId }) {
     return () => {
       cancelled = true
     }
-  }, [showRating, scheduleLoading, periodShifts])
+  }, [showStoreSchedule, showRating, scheduleLoading, periodShifts])
 
   const handleSchedulePeriodChange = useCallback(({ year, month, shifts, loading, error }) => {
     setPeriod({ year, month })
@@ -400,36 +412,40 @@ export default function EmployeeProfileSection({ employeeId }) {
         onDocuments={() => navigate(getEmployeeDocumentsPath(employeeId))}
       />
 
-      <EmployeePeriodSummary
-        year={period.year}
-        month={period.month}
-        shifts={periodShifts}
-        loading={scheduleLoading}
-        rating={rating}
-        ratingLoading={ratingLoading}
-        showRating={showRating}
-      />
+      {showStoreSchedule && (
+        <>
+          <EmployeePeriodSummary
+            year={period.year}
+            month={period.month}
+            shifts={periodShifts}
+            loading={scheduleLoading}
+            rating={rating}
+            ratingLoading={ratingLoading}
+            showRating={showRating}
+          />
 
-      {scheduleError && (
-        <p className="admin-form__error employee-profile-section__schedule-error">
-          {scheduleError}
-        </p>
+          {scheduleError && (
+            <p className="admin-form__error employee-profile-section__schedule-error">
+              {scheduleError}
+            </p>
+          )}
+
+          <section
+            id="schedule"
+            className="employee-profile-section__schedule"
+            aria-label="Персональный график"
+          >
+            <EmployeeScheduleSection
+              employeeId={employeeId}
+              weekStartKey={weekStartKey}
+              embedded
+              sharedEmployee={employee}
+              onPeriodChange={handleSchedulePeriodChange}
+              onEmployeeSync={handleScheduleEmployeeSync}
+            />
+          </section>
+        </>
       )}
-
-      <section
-        id="schedule"
-        className="employee-profile-section__schedule"
-        aria-label="Персональный график"
-      >
-        <EmployeeScheduleSection
-          employeeId={employeeId}
-          weekStartKey={weekStartKey}
-          embedded
-          sharedEmployee={employee}
-          onPeriodChange={handleSchedulePeriodChange}
-          onEmployeeSync={handleScheduleEmployeeSync}
-        />
-      </section>
 
       {showEdit && employee && (
         <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>

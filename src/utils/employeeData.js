@@ -70,7 +70,7 @@ export const EMPLOYEE_STATUS_OPTIONS = [
   { value: EMPLOYMENT_STATUS.TERMINATED, label: 'Уволен' },
 ]
 
-/** Режим работы сотрудника (пока только хранение / отображение) */
+/** Режим работы сотрудника (offline — магазин / online — удалённо) */
 export const WORK_MODE = {
   OFFLINE: 'offline',
   ONLINE: 'online',
@@ -127,6 +127,29 @@ export function getSalaryCalculationTypeLabel(value) {
     SALARY_CALCULATION_TYPE_LABELS[normalizeSalaryCalculationType(value)] ||
     SALARY_CALCULATION_TYPE_LABELS.shift_based
   )
+}
+
+function resolveWorkModeValue(employeeOrMode) {
+  if (employeeOrMode == null) return WORK_MODE.OFFLINE
+  if (typeof employeeOrMode === 'string') return employeeOrMode
+  return employeeOrMode.workMode ?? employeeOrMode.work_mode
+}
+
+/** Удалённый режим — без графика, смен и присутствия в магазине */
+export function isOnlineWorkMode(employeeOrMode) {
+  return normalizeWorkMode(resolveWorkModeValue(employeeOrMode)) === WORK_MODE.ONLINE
+}
+
+export function isOfflineWorkMode(employeeOrMode) {
+  return !isOnlineWorkMode(employeeOrMode)
+}
+
+/**
+ * Участвует в графике / сменах / модулях физического присутствия.
+ * Не смешивать с типом расчёта зарплаты.
+ */
+export function participatesInStoreSchedule(employee) {
+  return isOfflineWorkMode(employee)
 }
 
 /** Нормализация статуса из базы / legacy-значений → Работает | Уволен */
@@ -198,6 +221,11 @@ export function getStaffEmployees(filter = 'active') {
   }
 
   return staff
+}
+
+/** Активные сотрудники, доступные для графика и назначения смен */
+export function getScheduleEligibleEmployees(filter = 'active') {
+  return getStaffEmployees(filter).filter(participatesInStoreSchedule)
 }
 
 /** Значение фильтра списка сотрудников по умолчанию */

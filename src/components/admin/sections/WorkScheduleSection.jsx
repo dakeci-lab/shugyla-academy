@@ -3,7 +3,10 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { isCloudMode } from '../../../lib/dataMode'
 import { canEditEmployeeSchedule, canViewTeamSchedule } from '../../../config/permissions'
-import { getStaffEmployees } from '../../../utils/employeeData'
+import {
+  getScheduleEligibleEmployees,
+  participatesInStoreSchedule,
+} from '../../../utils/employeeData'
 import {
   shiftsToMap,
   toDateKey,
@@ -63,8 +66,8 @@ export default function WorkScheduleSection() {
     const base =
       isCloudMode() && viewTeam && loadedEmployees != null
         ? loadedEmployees
-        : getStaffEmployees('active')
-    let list = base
+        : getScheduleEligibleEmployees('active')
+    let list = base.filter(participatesInStoreSchedule)
     if (!viewTeam && selfEmployeeId) {
       list = list.filter((emp) => Number(emp.id) === selfEmployeeId)
     }

@@ -61,6 +61,7 @@ function buildSessionUser(employee, phone = null) {
     roleName: role?.label || employee.role,
     position: employee.position || role?.label || employee.role,
     avatarUrl: employee.avatarUrl || null,
+    workMode: employee.workMode || employee.work_mode || 'offline',
     permissions: role?.permissions || [],
     assignedCourseIds: employee.assignedCourseIds || [],
   }
