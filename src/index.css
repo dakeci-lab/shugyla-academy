@@ -19,6 +19,8 @@
   --radius-md: 14px;
   --radius-lg: 20px;
   --header-height: 68px;
+  /* Desktop chrome: sidebar brand row + main topbar share one height */
+  --platform-topbar-height: 56px;
   --platform-modal-backdrop: rgba(0, 0, 0, 0.4);
 }
 

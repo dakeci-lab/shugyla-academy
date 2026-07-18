@@ -55,8 +55,18 @@ function stageLayoutAndHeader() {
   assert('mobile-head css removed', !layoutCss.includes('platform-layout__mobile-head'))
   assert('desktop topbar preserved', layoutCss.includes('.platform-layout__topbar'))
   assert('page descriptions removed from layout', !layout.includes('platform-layout__desc') && !layout.includes('section.description'))
-  assert('compact desktop topbar', layoutCss.includes('min-height: 56px'))
+  assert('compact desktop topbar', layoutCss.includes('--platform-topbar-height'))
   assert('desktop title uses pageTitle', layout.includes('platform-layout__title">{pageTitle}'))
+
+  const rootCss = read('src/index.css')
+  assert('shared platform topbar height token', rootCss.includes('--platform-topbar-height: 56px'))
+
+  const sidebarCss = read('src/components/platform/PlatformSidebar.css')
+  assert(
+    'desktop sidebar header matches topbar height',
+    sidebarCss.includes('height: var(--platform-topbar-height)') &&
+      sidebarCss.includes('@media (min-width: 901px)'),
+  )
 
   const header = read('src/components/platform/PlatformMobileHeader.jsx')
   assert('mobile header uses page title', header.includes('platform-mobile-header__title'))
