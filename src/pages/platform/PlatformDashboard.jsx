@@ -41,7 +41,7 @@ export default function PlatformDashboard() {
       icon: '👥',
       value: formatStatValue(employeesReady, stats.totalEmployees),
       label: 'Сотрудники',
-      hint: employeesReady ? 'Активные сотрудники магазина' : 'Загрузка…',
+      hint: employeesReady ? 'Работающие сотрудники магазина' : 'Загрузка…',
       to: '/platform/employees',
       variant: 'default',
     },

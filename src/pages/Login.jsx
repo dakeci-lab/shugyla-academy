@@ -6,7 +6,7 @@ import { isCloudMode } from '../lib/dataMode'
 import AuthLoadingScreen from '../components/AuthLoadingScreen'
 import './Login.css'
 
-const DEACTIVATED_MESSAGE = 'Аккаунт деактивирован. Обратитесь к администратору.'
+const DEACTIVATED_MESSAGE = 'Доступ закрыт: сотрудник уволен. Обратитесь к администратору.'
 const PROFILE_NOT_CONFIGURED_MESSAGE =
   'Учётная запись не настроена. Обратитесь к администратору.'
 const NETWORK_ERROR_MESSAGE = 'Нет соединения. Повторите попытку.'

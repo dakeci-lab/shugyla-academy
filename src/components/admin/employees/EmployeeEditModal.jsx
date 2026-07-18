@@ -218,7 +218,7 @@ export default function EmployeeEditModal({
                 disabled={submitting || deactivating || activating}
                 onClick={() => onRequestDeactivate(employee)}
               >
-                Деактивировать сотрудника
+                Уволить сотрудника
               </button>
             </Can>
           )}
@@ -230,7 +230,7 @@ export default function EmployeeEditModal({
                 disabled={submitting || deactivating || activating}
                 onClick={() => onRequestActivate(employee)}
               >
-                Активировать сотрудника
+                Восстановить сотрудника
               </button>
             </Can>
           )}

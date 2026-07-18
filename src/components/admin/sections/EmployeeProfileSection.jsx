@@ -321,10 +321,10 @@ export default function EmployeeProfileSection({ employeeId }) {
       await deactivateEmployee(deactivateTarget.id)
       setDeactivateTarget(null)
       setShowEdit(false)
-      showSuccess('Сотрудник деактивирован')
+      showSuccess('Сотрудник уволен')
       await handleEmployeeSaved()
     } catch (err) {
-      showError(err.message || 'Не удалось деактивировать сотрудника')
+      showError(err.message || 'Не удалось уволить сотрудника')
     } finally {
       setDeactivating(false)
     }
@@ -337,10 +337,10 @@ export default function EmployeeProfileSection({ employeeId }) {
       await restoreEmployee(activateTarget.id)
       setActivateTarget(null)
       setShowEdit(false)
-      showSuccess('Сотрудник активирован')
+      showSuccess('Сотрудник восстановлен')
       await handleEmployeeSaved()
     } catch (err) {
-      showError(err.message || 'Не удалось активировать сотрудника')
+      showError(err.message || 'Не удалось восстановить сотрудника')
     } finally {
       setActivating(false)
     }
@@ -451,9 +451,9 @@ export default function EmployeeProfileSection({ employeeId }) {
 
       {deactivateTarget && (
         <ConfirmDialog
-          title="Деактивировать сотрудника?"
-          message={`Сотрудник «${deactivateTarget.name}» потеряет доступ к работе в платформе согласно текущей логике. Исторические данные, график, рейтинг, посещаемость и обучение сохранятся.`}
-          confirmLabel="Деактивировать"
+          title="Уволить сотрудника?"
+          message={`Сотрудник «${deactivateTarget.name}» получит статус «Уволен» и потеряет доступ к платформе. Исторические данные, график, рейтинг, посещаемость и обучение сохранятся.`}
+          confirmLabel="Уволить"
           onCancel={() => setDeactivateTarget(null)}
           onConfirm={confirmDeactivate}
           loading={deactivating}
@@ -462,9 +462,9 @@ export default function EmployeeProfileSection({ employeeId }) {
 
       {activateTarget && (
         <ConfirmDialog
-          title="Активировать сотрудника?"
-          message={`Вернуть сотрудника «${activateTarget.name}» в активный статус? Прежние данные сохранятся.`}
-          confirmLabel="Активировать"
+          title="Восстановить сотрудника?"
+          message={`Вернуть сотрудника «${activateTarget.name}» в статус «Работает»? Прежние данные сохранятся.`}
+          confirmLabel="Восстановить сотрудника"
           confirmVariant="primary"
           onCancel={() => setActivateTarget(null)}
           onConfirm={confirmActivate}

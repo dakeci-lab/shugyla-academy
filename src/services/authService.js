@@ -29,7 +29,7 @@ export const ACADEMY_PROFILE_SAFE_FIELDS =
   'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, auth_user_id, contact_email'
 
 const DEACTIVATED_ACCOUNT_MESSAGE =
-  'Аккаунт деактивирован. Обратитесь к администратору.'
+  'Доступ закрыт: сотрудник уволен. Обратитесь к администратору.'
 
 export function usesSupabaseAuth() {
   return isSupabaseConfigured()
@@ -768,7 +768,7 @@ export async function signInWithEmail(email, password) {
   const legacy = authenticateEmployee(normalizedLogin, password)
   if (!legacy.ok) {
     if (legacy.reason === 'deactivated') {
-      return { ok: false, error: 'Аккаунт деактивирован. Обратитесь к администратору.' }
+      return { ok: false, error: DEACTIVATED_ACCOUNT_MESSAGE }
     }
     return { ok: false, error: 'Неверный логин или пароль' }
   }

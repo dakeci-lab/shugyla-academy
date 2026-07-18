@@ -447,7 +447,7 @@ async function updateUser(id, updates) {
 }
 
 export async function deactivateEmployee(id) {
-  await updateUser(id, { employmentStatus: 'inactive' })
+  await updateUser(id, { employmentStatus: 'terminated' })
 }
 
 export async function restoreEmployee(id) {

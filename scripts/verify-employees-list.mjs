@@ -95,14 +95,16 @@ function main() {
 
   console.log('Stage 5: Status actions in modal')
 
-  assert('deactivate in edit modal', editModal.includes('Деактивировать сотрудника'))
-  assert('activate in edit modal', editModal.includes('Активировать сотрудника'))
-  assert('deactivate uses ConfirmDialog', section.includes('ConfirmDialog'))
-  assert('deactivate uses deactivateEmployee', section.includes('deactivateEmployee'))
-  assert('activate uses restoreEmployee', section.includes('restoreEmployee'))
+  assert('dismiss in edit modal', editModal.includes('Уволить сотрудника'))
+  assert('restore in edit modal', editModal.includes('Восстановить сотрудника'))
+  assert('dismiss uses ConfirmDialog', section.includes('ConfirmDialog'))
+  assert('dismiss uses deactivateEmployee', section.includes('deactivateEmployee'))
+  assert('restore uses restoreEmployee', section.includes('restoreEmployee'))
   assert('no hard delete', !section.includes('deleteEmployee'))
-  assert('deactivate toast', section.includes("showSuccess('Сотрудник деактивирован')"))
-  assert('activate toast', section.includes("showSuccess('Сотрудник активирован')"))
+  assert('dismiss toast', section.includes("showSuccess('Сотрудник уволен')"))
+  assert('restore toast', section.includes("showSuccess('Сотрудник восстановлен')"))
+  assert('status labels working/fired', employeeData.includes("active: 'Работает'") && employeeData.includes("terminated: 'Уволен'"))
+  assert('no deactivated UI label', !employeeData.includes('Деактивирован'))
   assert('loading not over ready list', section.includes('showInitialLoading'))
   assert('inline AdminModal form removed from list', !section.includes('<AdminModal'))
 

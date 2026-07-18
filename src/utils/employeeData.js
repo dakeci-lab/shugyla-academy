@@ -11,6 +11,7 @@ export const STORAGE_KEYS = {
 
 export const EMPLOYMENT_STATUS = {
   ACTIVE: 'active',
+  /** @deprecated legacy — при чтении маппится в terminated (Уволен) */
   INACTIVE: 'inactive',
   /** @deprecated legacy — при чтении маппится в active */
   INTERNSHIP: 'internship',
@@ -18,47 +19,45 @@ export const EMPLOYMENT_STATUS = {
 }
 
 export const EMPLOYMENT_STATUS_LABELS = {
-  active: 'Активен',
-  inactive: 'Деактивирован',
-  deactivated: 'Деактивирован',
-  internship: 'Активен',
-  trainee: 'Активен',
+  active: 'Работает',
+  inactive: 'Уволен',
+  deactivated: 'Уволен',
+  internship: 'Работает',
+  trainee: 'Работает',
   terminated: 'Уволен',
   dismissed: 'Уволен',
 }
 
 export const EMPLOYMENT_STATUS_BADGE = {
   active: 'active',
-  inactive: 'warning',
-  deactivated: 'warning',
+  inactive: 'failed',
+  deactivated: 'failed',
   internship: 'active',
   trainee: 'active',
   terminated: 'failed',
   dismissed: 'failed',
 }
 
-/** Варианты статуса в формах сотрудников */
+/** Варианты статуса в формах сотрудников (только пользовательская модель) */
 export const EMPLOYEE_STATUS_OPTIONS = [
-  { value: EMPLOYMENT_STATUS.ACTIVE, label: 'Активен' },
-  { value: EMPLOYMENT_STATUS.INACTIVE, label: 'Деактивирован' },
+  { value: EMPLOYMENT_STATUS.ACTIVE, label: 'Работает' },
   { value: EMPLOYMENT_STATUS.TERMINATED, label: 'Уволен' },
 ]
 
-/** Нормализация статуса из базы / legacy-значений */
+/** Нормализация статуса из базы / legacy-значений → Работает | Уволен */
 export function normalizeEmploymentStatus(status) {
   if (!status) return EMPLOYMENT_STATUS.ACTIVE
-  if (status === 'deactivated') return EMPLOYMENT_STATUS.INACTIVE
+  if (status === 'deactivated' || status === 'inactive') return EMPLOYMENT_STATUS.TERMINATED
   if (status === 'dismissed') return EMPLOYMENT_STATUS.TERMINATED
   if (status === 'trainee' || status === 'internship') return EMPLOYMENT_STATUS.ACTIVE
   return status
 }
 
-/** Статус для select в форме (без стажировки) */
+/** Статус для select в форме */
 export function employmentStatusForForm(status) {
   const normalized = normalizeEmploymentStatus(status)
   if (
     normalized === EMPLOYMENT_STATUS.ACTIVE ||
-    normalized === EMPLOYMENT_STATUS.INACTIVE ||
     normalized === EMPLOYMENT_STATUS.TERMINATED
   ) {
     return normalized
@@ -71,12 +70,13 @@ export function canEmployeeLogin(status) {
   return normalized === EMPLOYMENT_STATUS.ACTIVE
 }
 
+/** Сотрудник не работает (уволен), включая legacy inactive/deactivated */
 export function isDeactivatedEmployeeStatus(status) {
-  const normalized = normalizeEmploymentStatus(status)
-  return (
-    normalized === EMPLOYMENT_STATUS.INACTIVE ||
-    normalized === EMPLOYMENT_STATUS.TERMINATED
-  )
+  return normalizeEmploymentStatus(status) === EMPLOYMENT_STATUS.TERMINATED
+}
+
+export function isTerminatedEmployeeStatus(status) {
+  return isDeactivatedEmployeeStatus(status)
 }
 
 export function isStaffEmployee(employee) {
@@ -97,7 +97,10 @@ export function isDeactivatedStaffEmployee(employee) {
   )
 }
 
-/** Фильтр списка сотрудников: active | deactivated | all */
+/**
+ * Фильтр списка сотрудников.
+ * id `deactivated` — legacy ключ API («уволенные»); в UI подпись «Уволен».
+ */
 export function getStaffEmployees(filter = 'active') {
   const staff = getAllEmployees().filter(isStaffEmployee)
 
@@ -117,17 +120,17 @@ export const EMPLOYEE_LIST_DEFAULT_STATUS = 'active'
 
 /** Варианты фильтра статуса на странице списка сотрудников */
 export const EMPLOYEE_LIST_STATUS_FILTER_OPTIONS = [
-  { id: 'active', label: 'Активные' },
-  { id: 'deactivated', label: 'Деактивированные' },
   { id: 'all', label: 'Все' },
+  { id: 'active', label: 'Работает' },
+  { id: 'deactivated', label: 'Уволен' },
 ]
 
 /** Компактная подпись количества в фильтре сотрудников */
 export function formatEmployeeFilterCount(status, count) {
   const total = Number(count) || 0
   if (status === 'all') return `Найдено: ${total}`
-  if (status === 'active') return `Активных сотрудников: ${total}`
-  if (status === 'deactivated') return `Деактивированных сотрудников: ${total}`
+  if (status === 'active') return `Работает: ${total}`
+  if (status === 'deactivated') return `Уволен: ${total}`
   return `Найдено: ${total}`
 }
 
@@ -208,6 +211,9 @@ export function normalizeEmployee(raw) {
     employmentStatus: normalizeEmploymentStatus(
       raw.employmentStatus || raw.status
     ),
+    /** Дата увольнения — поле под следующий этап payroll; пока опционально */
+    terminatedAt: raw.terminatedAt ?? raw.terminated_at ?? null,
+    hiredAt: raw.hiredAt ?? raw.hired_at ?? raw.createdAt ?? raw.created_at ?? null,
     assignedCourseIds: Array.isArray(raw.assignedCourseIds) ? raw.assignedCourseIds : [],
     avatarUrl: raw.avatarUrl ?? raw.avatar_url ?? null,
     contactEmail: raw.contactEmail ?? raw.contact_email ?? '',
@@ -248,12 +254,12 @@ export function getAllEmployees() {
   return getAllEmployeesLocal()
 }
 
-/** Активные сотрудники (без admin, без деактивированных и уволенных) */
+/** Работающие сотрудники (без admin, без уволенных) */
 export function getActiveEmployees() {
   return getStaffEmployees('active')
 }
 
-/** Деактивированные и уволенные сотрудники */
+/** Уволенные сотрудники (legacy id фильтра: deactivated) */
 export function getDeactivatedEmployees() {
   return getStaffEmployees('deactivated')
 }
@@ -323,14 +329,20 @@ export function updateEmployee(id, updates) {
   writeJson(STORAGE_KEYS.USER_EDITS, edits)
 }
 
-/** Деактивировать сотрудника (не удаляет из базы) */
+/** Уволить сотрудника (не удаляет из базы; дата — подготовка к payroll) */
 export function deactivateEmployee(id) {
-  updateEmployee(id, { employmentStatus: EMPLOYMENT_STATUS.INACTIVE })
+  updateEmployee(id, {
+    employmentStatus: EMPLOYMENT_STATUS.TERMINATED,
+    terminatedAt: new Date().toISOString().slice(0, 10),
+  })
 }
 
-/** Восстановить сотрудника */
+/** Восстановить сотрудника (статус снова «Работает») */
 export function restoreEmployee(id) {
-  updateEmployee(id, { employmentStatus: EMPLOYMENT_STATUS.ACTIVE })
+  updateEmployee(id, {
+    employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
+    terminatedAt: null,
+  })
 }
 
 /** Скрыть mock-сотрудника из списка / удалить extra-пользователя */

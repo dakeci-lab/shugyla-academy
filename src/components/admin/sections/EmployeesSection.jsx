@@ -231,8 +231,8 @@ export default function EmployeesSection() {
     if (filtersActive || debouncedSearch.trim()) {
       return 'По выбранным фильтрам сотрудники не найдены.'
     }
-    if (appliedStatus === 'active') return 'Активные сотрудники не найдены.'
-    if (appliedStatus === 'deactivated') return 'Деактивированные сотрудники не найдены.'
+    if (appliedStatus === 'active') return 'Работающие сотрудники не найдены.'
+    if (appliedStatus === 'deactivated') return 'Уволенные сотрудники не найдены.'
     return 'Сотрудники не найдены.'
   }
 
@@ -379,11 +379,11 @@ export default function EmployeesSection() {
       await deactivateEmployee(deactivateTarget.id)
       setDeactivateTarget(null)
       closeForm()
-      showSuccess('Сотрудник деактивирован')
+      showSuccess('Сотрудник уволен')
       await afterCloudMutation()
       refresh()
     } catch (err) {
-      showError(err.message || 'Не удалось деактивировать сотрудника')
+      showError(err.message || 'Не удалось уволить сотрудника')
     } finally {
       setDeactivating(false)
     }
@@ -398,11 +398,11 @@ export default function EmployeesSection() {
       setActivateTarget(null)
       closeForm()
       setAppliedStatus(EMPLOYEE_LIST_DEFAULT_STATUS)
-      showSuccess('Сотрудник активирован')
+      showSuccess('Сотрудник восстановлен')
       await afterCloudMutation()
       refresh()
     } catch (err) {
-      showError(err.message || 'Не удалось активировать сотрудника')
+      showError(err.message || 'Не удалось восстановить сотрудника')
     } finally {
       setActivating(false)
     }
@@ -504,9 +504,9 @@ export default function EmployeesSection() {
 
       {deactivateTarget && (
         <ConfirmDialog
-          title="Деактивировать сотрудника?"
-          message={`Сотрудник «${deactivateTarget.name}» потеряет доступ к работе в платформе согласно текущей логике. Исторические данные, график, рейтинг, посещаемость и обучение сохранятся.`}
-          confirmLabel="Деактивировать"
+          title="Уволить сотрудника?"
+          message={`Сотрудник «${deactivateTarget.name}» получит статус «Уволен» и потеряет доступ к платформе. Исторические данные, график, рейтинг, посещаемость и обучение сохранятся.`}
+          confirmLabel="Уволить"
           onCancel={() => setDeactivateTarget(null)}
           onConfirm={confirmDeactivate}
           loading={deactivating}
@@ -515,9 +515,9 @@ export default function EmployeesSection() {
 
       {activateTarget && (
         <ConfirmDialog
-          title="Активировать сотрудника?"
-          message={`Вернуть сотрудника «${activateTarget.name}» в активный статус? Прежние данные сохранятся.`}
-          confirmLabel="Активировать"
+          title="Восстановить сотрудника?"
+          message={`Вернуть сотрудника «${activateTarget.name}» в статус «Работает»? Прежние данные сохранятся.`}
+          confirmLabel="Восстановить сотрудника"
           confirmVariant="primary"
           onCancel={() => setActivateTarget(null)}
           onConfirm={confirmActivate}

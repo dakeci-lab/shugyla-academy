@@ -588,7 +588,7 @@ export async function updateEmployee(id, updates) {
 
 export async function deactivateEmployee(id) {
   if (isCloudMode()) {
-    await updateEmployeeAsAdmin(id, { employmentStatus: 'inactive' })
+    await updateEmployeeAsAdmin(id, { employmentStatus: 'terminated' })
     return
   }
   await getAdapter().deactivateEmployee(id)

@@ -42,7 +42,7 @@ export default function AcademyAssignmentContent() {
     (isCloudMode() && (getModuleError('employees') || getModuleError('courses'))) || null
   const employees = dataLoading || dataError
     ? []
-    : getAllEmployees().filter((e) => e.employmentStatus !== 'inactive')
+    : getAllEmployees().filter((e) => e.employmentStatus === 'active')
   const courses = dataLoading || dataError ? [] : getAssignableCourses()
 
   async function handleAssign(e) {
