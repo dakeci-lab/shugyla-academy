@@ -1,10 +1,7 @@
-import PayrollRecordSection from '../../components/admin/payroll/PayrollRecordSection'
-import '../../components/admin/admin-shared.css'
+import { Navigate } from 'react-router-dom'
+import { getPayrollListPath } from '../../utils/salaryPayroll'
 
+/** Карточка расчёта больше не используется — вся работа в ведомости */
 export default function PlatformPayrollRecord() {
-  return (
-    <div className="platform-payroll-record">
-      <PayrollRecordSection />
-    </div>
-  )
+  return <Navigate to={getPayrollListPath()} replace />
 }

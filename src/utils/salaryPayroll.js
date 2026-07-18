@@ -52,11 +52,11 @@ export function formatMoneyCompact(value) {
 }
 
 /**
- * Отображение строки ведомости из полей salary_records.
- * Аванс пока без отдельного поля в БД — «—».
- * Выплачено / остаток выводятся по статусу paid (без новых формул расчёта).
+ * Отображение строки ведомости.
+ * Удержания в колонке = все удержания минус аванс (аванс — отдельная колонка).
+ * Выплачено / остаток — по статусу paid.
  */
-export function getPayrollLedgerAmounts(record) {
+export function getPayrollLedgerAmounts(record, advanceAmount = 0) {
   if (!record) {
     return {
       baseSalary: null,
@@ -69,15 +69,18 @@ export function getPayrollLedgerAmounts(record) {
     }
   }
 
+  const advance = toMoneyNumber(advanceAmount)
+  const totalDeductions = toMoneyNumber(record.totalDeductions)
+  const otherDeductions = Math.max(0, toMoneyNumber(totalDeductions - advance))
   const payable = toMoneyNumber(record.totalPayable)
   const isPaid = record.status === 'paid'
 
   return {
     baseSalary: toMoneyNumber(record.baseSalary),
     allowances: toMoneyNumber(record.totalAllowances),
-    deductions: toMoneyNumber(record.totalDeductions),
+    deductions: otherDeductions,
     payable,
-    advance: null,
+    advance,
     remainder: isPaid ? 0 : payable,
     paid: isPaid ? payable : 0,
   }
@@ -95,14 +98,16 @@ export function sumPayrollLedgerRows(rows) {
     countWithRecord: 0,
   }
 
-  return (rows || []).reduce((acc, { record }) => {
-    const amounts = getPayrollLedgerAmounts(record)
+  return (rows || []).reduce((acc, row) => {
+    const { record, advanceAmount = 0 } = row
+    const amounts = getPayrollLedgerAmounts(record, advanceAmount)
     if (!record) return acc
     acc.countWithRecord += 1
     acc.baseSalary += amounts.baseSalary || 0
     acc.allowances += amounts.allowances || 0
     acc.deductions += amounts.deductions || 0
     acc.payable += amounts.payable || 0
+    acc.advance += amounts.advance || 0
     acc.remainder += amounts.remainder || 0
     acc.paid += amounts.paid || 0
     return acc

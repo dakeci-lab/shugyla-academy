@@ -82,8 +82,15 @@ function main() {
   assert('role under name', list.includes('payroll-table__role'))
   assert('totals row', list.includes('payroll-table__totals') && list.includes('payroll-summary'))
   assert('comment icon only', list.includes('PayrollCommentModal') && list.includes('CommentIcon'))
-  assert('manual blocks', detail.includes('Основной оклад') && detail.includes('Начисления') && detail.includes('Удержания'))
-  assert('no time-tracker import in payroll', !list.includes('timeTracker') && !detail.includes('timeTracker'))
+  assert('inline salary editing', list.includes('PayrollInlineMoneyCell'))
+  assert('lines popup', list.includes('PayrollLinesModal'))
+  assert('no open card button', !list.includes("Открыть'") && !list.includes('getPayrollRecordPath') && !list.includes('navigate(getPayroll'))
+  assert('advance upsert service', service.includes('upsertSalaryAdvance'))
+
+  const recordPage = read('src/pages/platform/PlatformPayrollRecord.jsx')
+  assert('record page redirects to ledger', recordPage.includes('Navigate') && recordPage.includes('getPayrollListPath'))
+
+  assert('no time-tracker import in payroll', !list.includes('timeTracker'))
   assert('verify script registered', pkg.includes('verify:salary-payroll-mvp'))
   assert(
     'employee pageSize within edge limit',

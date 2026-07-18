@@ -1,23 +1,33 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { isCloudMode } from '../../../lib/dataMode'
 import { getRoleLabel } from '../../../data/roles'
 import { getCurrentMonthState } from '../../../utils/attendanceData'
 import { formatMonthYearLabel } from '../../../utils/shiftData'
 import {
+  SALARY_ALLOWANCE_PRESETS,
+  SALARY_DEDUCTION_PRESETS,
   changePayrollMonth,
   formatMoneyCompact,
   formatMoneyKzt,
   getPayrollLedgerAmounts,
-  getPayrollRecordPath,
   sumPayrollLedgerRows,
+  toMoneyNumber,
 } from '../../../utils/salaryPayroll'
 import { listEmployeesForAdmin } from '../../../services/employeeAdminService'
 import {
+  addSalaryAllowance,
+  addSalaryDeduction,
+  deleteSalaryAllowance,
+  deleteSalaryDeduction,
   ensureSalaryPeriod,
   ensureSalaryRecord,
+  getSalaryRecordBundle,
+  listAdvanceLinesForRecords,
   listSalaryRecordsForPeriod,
+  updateSalaryAllowance,
+  updateSalaryDeduction,
   updateSalaryRecordFields,
+  upsertSalaryAdvance,
 } from '../../../services/salaryPayrollService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
@@ -29,12 +39,14 @@ import PlatformSearchToolbar, {
 } from '../../platform/PlatformSearchToolbar'
 import PayrollFilterPopover from './PayrollFilterPopover'
 import PayrollCommentModal from './PayrollCommentModal'
+import PayrollInlineMoneyCell from './PayrollInlineMoneyCell'
+import PayrollLinesModal from './PayrollLinesModal'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
 import './PayrollSection.css'
 
-/** admin-list-employees отклоняет page_size > 100 (invalid_pagination). */
 const EMPLOYEE_PAGE_SIZE = 100
+const DEDUCTION_PRESETS = SALARY_DEDUCTION_PRESETS.filter((item) => item.kind !== 'advance')
 
 async function listAllActiveEmployeesForPayroll() {
   const employees = []
@@ -61,13 +73,12 @@ function hasRecordNotes(record) {
   return Boolean(String(record?.notes || '').trim())
 }
 
-function MoneyCell({ value }) {
+function TotalsMoney({ value }) {
   return <td className="payroll-table__money">{formatMoneyCompact(value)}</td>
 }
 
-/** Список расчётов зарплаты за месяц — рабочая ведомость */
+/** Зарплатная ведомость с редактированием прямо в таблице */
 export default function PayrollSection() {
-  const navigate = useNavigate()
   const { warning: showWarning, success: showSuccess } = useToast()
   const filterButtonRef = useRef(null)
 
@@ -80,14 +91,16 @@ export default function PayrollSection() {
   const [filterOpen, setFilterOpen] = useState(false)
 
   const [loading, setLoading] = useState(true)
-  const [openingId, setOpeningId] = useState(null)
   const [error, setError] = useState('')
   const [employees, setEmployees] = useState([])
   const [recordsByEmployee, setRecordsByEmployee] = useState(new Map())
+  const [advancesByRecordId, setAdvancesByRecordId] = useState(new Map())
   const [period, setPeriod] = useState(null)
+  const [savingEmployeeId, setSavingEmployeeId] = useState(null)
 
   const [commentTarget, setCommentTarget] = useState(null)
   const [commentSaving, setCommentSaving] = useState(false)
+  const [linesTarget, setLinesTarget] = useState(null)
 
   const load = useCallback(
     async (options = {}) => {
@@ -98,6 +111,7 @@ export default function PayrollSection() {
         if (!isCloudMode()) {
           setEmployees([])
           setRecordsByEmployee(new Map())
+          setAdvancesByRecordId(new Map())
           setPeriod(null)
           setError('Подсчёт зарплаты доступен только в облачном режиме')
           return
@@ -110,6 +124,7 @@ export default function PayrollSection() {
           listAllActiveEmployeesForPayroll(),
           listSalaryRecordsForPeriod(nextPeriod.id),
         ])
+        const advances = await listAdvanceLinesForRecords(records.map((row) => row.id))
 
         setEmployees(employeeRows)
         const map = new Map()
@@ -117,10 +132,12 @@ export default function PayrollSection() {
           map.set(Number(record.employeeId), record)
         }
         setRecordsByEmployee(map)
+        setAdvancesByRecordId(advances)
       } catch (err) {
         setError(err?.message || 'Не удалось загрузить расчёты')
         setEmployees([])
         setRecordsByEmployee(new Map())
+        setAdvancesByRecordId(new Map())
       } finally {
         if (!quiet) setLoading(false)
       }
@@ -136,6 +153,37 @@ export default function PayrollSection() {
     useCallback(async () => {
       await load({ quiet: true })
     }, [load])
+  )
+
+  const patchEmployeeRecord = useCallback((employeeId, record, advanceMeta = undefined) => {
+    setRecordsByEmployee((prev) => {
+      const map = new Map(prev)
+      map.set(Number(employeeId), record)
+      return map
+    })
+    if (advanceMeta !== undefined) {
+      setAdvancesByRecordId((prev) => {
+        const map = new Map(prev)
+        if (!advanceMeta || toMoneyNumber(advanceMeta.amount) <= 0) {
+          map.delete(record.id)
+        } else {
+          map.set(record.id, advanceMeta)
+        }
+        return map
+      })
+    }
+  }, [])
+
+  const ensureRowRecord = useCallback(
+    async (employee) => {
+      if (!period) throw new Error('Период не загружен')
+      const existing = recordsByEmployee.get(Number(employee.id))
+      if (existing) return existing
+      const record = await ensureSalaryRecord(period.id, employee.id)
+      patchEmployeeRecord(employee.id, record)
+      return record
+    },
+    [period, recordsByEmployee, patchEmployeeRecord]
   )
 
   const rows = useMemo(() => {
@@ -154,9 +202,12 @@ export default function PayrollSection() {
       })
       .map((emp) => {
         const record = recordsByEmployee.get(Number(emp.id)) || null
-        return { employee: emp, record }
+        const advanceAmount = record
+          ? advancesByRecordId.get(record.id)?.amount || 0
+          : 0
+        return { employee: emp, record, advanceAmount }
       })
-  }, [employees, recordsByEmployee, search, appliedRoleId, appliedStatus])
+  }, [employees, recordsByEmployee, advancesByRecordId, search, appliedRoleId, appliedStatus])
 
   const totals = useMemo(() => sumPayrollLedgerRows(rows), [rows])
 
@@ -187,49 +238,90 @@ export default function PayrollSection() {
     setFilterOpen(true)
   }
 
-  function applyFilter() {
-    setAppliedRoleId(draftRoleId)
-    setAppliedStatus(draftStatus)
-    setFilterOpen(false)
-  }
-
-  function resetFilter() {
-    setDraftRoleId('')
-    setDraftStatus('all')
-    setAppliedRoleId('')
-    setAppliedStatus('all')
-    setFilterOpen(false)
-  }
-
-  function closeFilter() {
-    setFilterOpen(false)
-  }
-
-  async function handleOpen(employee) {
-    if (!period || openingId) return
-    setOpeningId(employee.id)
+  async function handleSaveBaseSalary(employee, amount) {
+    setSavingEmployeeId(employee.id)
     try {
-      const record = await ensureSalaryRecord(period.id, employee.id)
-      navigate(getPayrollRecordPath(record.id))
+      const record = await ensureRowRecord(employee)
+      const updated = await updateSalaryRecordFields(record.id, { baseSalary: amount })
+      patchEmployeeRecord(employee.id, updated)
     } catch (err) {
-      showWarning(err?.message || 'Не удалось открыть расчёт')
+      showWarning(err?.message || 'Не удалось сохранить оклад')
     } finally {
-      setOpeningId(null)
+      setSavingEmployeeId(null)
     }
   }
 
+  async function handleSaveAdvance(employee, amount) {
+    setSavingEmployeeId(employee.id)
+    try {
+      const record = await ensureRowRecord(employee)
+      const updated = await upsertSalaryAdvance(record.id, amount)
+      patchEmployeeRecord(employee.id, updated)
+      const advances = await listAdvanceLinesForRecords([updated.id])
+      setAdvancesByRecordId((prev) => {
+        const map = new Map(prev)
+        map.delete(updated.id)
+        const next = advances.get(updated.id)
+        if (next) map.set(updated.id, next)
+        return map
+      })
+    } catch (err) {
+      showWarning(err?.message || 'Не удалось сохранить аванс')
+    } finally {
+      setSavingEmployeeId(null)
+    }
+  }
+
+  async function handleOpenLines(employee, mode) {
+    try {
+      const record = await ensureRowRecord(employee)
+      const bundle = await getSalaryRecordBundle(record.id)
+      patchEmployeeRecord(employee.id, bundle.record)
+      const lines =
+        mode === 'allowances'
+          ? bundle.allowances
+          : bundle.deductions.filter((line) => line.kind !== 'advance')
+      setLinesTarget({
+        mode,
+        employee,
+        record: bundle.record,
+        lines,
+      })
+    } catch (err) {
+      showWarning(err?.message || 'Не удалось открыть строки')
+    }
+  }
+
+  async function refreshLinesTarget(recordId, employee, mode) {
+    const bundle = await getSalaryRecordBundle(recordId)
+    patchEmployeeRecord(employee.id, bundle.record)
+    if (mode === 'deductions' && period) {
+      const advances = await listAdvanceLinesForRecords([recordId])
+      setAdvancesByRecordId((prev) => {
+        const map = new Map(prev)
+        map.delete(recordId)
+        const next = advances.get(recordId)
+        if (next) map.set(recordId, next)
+        return map
+      })
+    }
+    const lines =
+      mode === 'allowances'
+        ? bundle.allowances
+        : bundle.deductions.filter((line) => line.kind !== 'advance')
+    setLinesTarget((prev) =>
+      prev && prev.record.id === recordId
+        ? { ...prev, record: bundle.record, lines }
+        : prev
+    )
+    return { bundle, lines }
+  }
+
   async function handleOpenComment(employee, record) {
-    if (!period || commentSaving) return
+    if (commentSaving) return
     try {
       let nextRecord = record
-      if (!nextRecord) {
-        nextRecord = await ensureSalaryRecord(period.id, employee.id)
-        setRecordsByEmployee((prev) => {
-          const map = new Map(prev)
-          map.set(Number(employee.id), nextRecord)
-          return map
-        })
-      }
+      if (!nextRecord) nextRecord = await ensureRowRecord(employee)
       setCommentTarget({ employee, record: nextRecord })
     } catch (err) {
       showWarning(err?.message || 'Не удалось открыть комментарий')
@@ -243,11 +335,7 @@ export default function PayrollSection() {
       const updated = await updateSalaryRecordFields(commentTarget.record.id, {
         notes: notes.trim() || '',
       })
-      setRecordsByEmployee((prev) => {
-        const map = new Map(prev)
-        map.set(Number(commentTarget.employee.id), updated)
-        return map
-      })
+      patchEmployeeRecord(commentTarget.employee.id, updated)
       setCommentTarget(null)
       showSuccess('Комментарий сохранён')
     } catch (err) {
@@ -289,9 +377,19 @@ export default function PayrollSection() {
               onRoleChange={setDraftRoleId}
               onStatusChange={setDraftStatus}
               resultCount={draftPreviewCount}
-              onApply={applyFilter}
-              onReset={resetFilter}
-              onClose={closeFilter}
+              onApply={() => {
+                setAppliedRoleId(draftRoleId)
+                setAppliedStatus(draftStatus)
+                setFilterOpen(false)
+              }}
+              onReset={() => {
+                setDraftRoleId('')
+                setDraftStatus('all')
+                setAppliedRoleId('')
+                setAppliedStatus('all')
+                setFilterOpen(false)
+              }}
+              onClose={() => setFilterOpen(false)}
               anchorRef={filterButtonRef}
             />
           </PlatformToolbarActionWrap>
@@ -324,12 +422,12 @@ export default function PayrollSection() {
               <span className="payroll-summary__value">{formatMoneyKzt(totals.deductions)}</span>
             </div>
             <div className="payroll-summary__item">
-              <span className="payroll-summary__label">К выдаче</span>
-              <span className="payroll-summary__value">{formatMoneyKzt(totals.payable)}</span>
+              <span className="payroll-summary__label">Авансы</span>
+              <span className="payroll-summary__value">{formatMoneyKzt(totals.advance)}</span>
             </div>
             <div className="payroll-summary__item">
-              <span className="payroll-summary__label">Остаток</span>
-              <span className="payroll-summary__value">{formatMoneyKzt(totals.remainder)}</span>
+              <span className="payroll-summary__label">К выдаче</span>
+              <span className="payroll-summary__value">{formatMoneyKzt(totals.payable)}</span>
             </div>
             <div className="payroll-summary__item">
               <span className="payroll-summary__label">Выплачено</span>
@@ -351,14 +449,14 @@ export default function PayrollSection() {
                   <th className="payroll-table__money">Остаток</th>
                   <th className="payroll-table__money">Выплачено</th>
                   <th className="payroll-table__comment">Ком.</th>
-                  <th className="payroll-table__actions">Открыть</th>
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ employee, record }, index) => {
+                {rows.map(({ employee, record, advanceAmount }, index) => {
                   const roleLabel = employee.position || getRoleLabel(employee.role)
-                  const amounts = getPayrollLedgerAmounts(record)
+                  const amounts = getPayrollLedgerAmounts(record, advanceAmount)
                   const notesPresent = hasRecordNotes(record)
+                  const rowSaving = savingEmployeeId === employee.id
                   return (
                     <tr key={employee.id}>
                       <td className="payroll-table__num">{index + 1}</td>
@@ -368,13 +466,43 @@ export default function PayrollSection() {
                           <span className="payroll-table__role">{roleLabel}</span>
                         </div>
                       </td>
-                      <MoneyCell value={amounts.baseSalary} />
-                      <MoneyCell value={amounts.allowances} />
-                      <MoneyCell value={amounts.deductions} />
-                      <MoneyCell value={amounts.payable} />
-                      <MoneyCell value={amounts.advance} />
-                      <MoneyCell value={amounts.remainder} />
-                      <MoneyCell value={amounts.paid} />
+                      <PayrollInlineMoneyCell
+                        value={amounts.baseSalary}
+                        saving={rowSaving}
+                        onCommit={(next) => handleSaveBaseSalary(employee, next)}
+                      />
+                      <td className="payroll-table__money">
+                        <button
+                          type="button"
+                          className="payroll-table__money-btn payroll-table__money-btn--link"
+                          onClick={() => void handleOpenLines(employee, 'allowances')}
+                        >
+                          {formatMoneyCompact(amounts.allowances)}
+                        </button>
+                      </td>
+                      <td className="payroll-table__money">
+                        <button
+                          type="button"
+                          className="payroll-table__money-btn payroll-table__money-btn--link"
+                          onClick={() => void handleOpenLines(employee, 'deductions')}
+                        >
+                          {formatMoneyCompact(amounts.deductions)}
+                        </button>
+                      </td>
+                      <td className="payroll-table__money payroll-table__money--readonly">
+                        {formatMoneyCompact(amounts.payable)}
+                      </td>
+                      <PayrollInlineMoneyCell
+                        value={amounts.advance}
+                        saving={rowSaving}
+                        onCommit={(next) => handleSaveAdvance(employee, next)}
+                      />
+                      <td className="payroll-table__money payroll-table__money--readonly">
+                        {formatMoneyCompact(amounts.remainder)}
+                      </td>
+                      <td className="payroll-table__money payroll-table__money--readonly">
+                        {formatMoneyCompact(amounts.paid)}
+                      </td>
                       <td className="payroll-table__comment">
                         <button
                           type="button"
@@ -390,16 +518,6 @@ export default function PayrollSection() {
                           <CommentIcon size={15} />
                         </button>
                       </td>
-                      <td className="payroll-table__actions">
-                        <button
-                          type="button"
-                          className="btn btn--outline btn--sm"
-                          disabled={openingId === employee.id}
-                          onClick={() => void handleOpen(employee)}
-                        >
-                          {openingId === employee.id ? '…' : 'Открыть'}
-                        </button>
-                      </td>
                     </tr>
                   )
                 })}
@@ -408,15 +526,14 @@ export default function PayrollSection() {
                 <tr className="payroll-table__totals">
                   <td className="payroll-table__num" />
                   <td className="payroll-table__totals-label">Итого</td>
-                  <td className="payroll-table__money">{formatMoneyCompact(totals.baseSalary)}</td>
-                  <td className="payroll-table__money">{formatMoneyCompact(totals.allowances)}</td>
-                  <td className="payroll-table__money">{formatMoneyCompact(totals.deductions)}</td>
-                  <td className="payroll-table__money">{formatMoneyCompact(totals.payable)}</td>
-                  <td className="payroll-table__money">—</td>
-                  <td className="payroll-table__money">{formatMoneyCompact(totals.remainder)}</td>
-                  <td className="payroll-table__money">{formatMoneyCompact(totals.paid)}</td>
+                  <TotalsMoney value={totals.baseSalary} />
+                  <TotalsMoney value={totals.allowances} />
+                  <TotalsMoney value={totals.deductions} />
+                  <TotalsMoney value={totals.payable} />
+                  <TotalsMoney value={totals.advance} />
+                  <TotalsMoney value={totals.remainder} />
+                  <TotalsMoney value={totals.paid} />
                   <td className="payroll-table__comment" />
-                  <td className="payroll-table__actions" />
                 </tr>
               </tfoot>
             </table>
@@ -433,6 +550,45 @@ export default function PayrollSection() {
             if (!commentSaving) setCommentTarget(null)
           }}
           onSave={(notes) => void handleSaveComment(notes)}
+        />
+      )}
+
+      {linesTarget && (
+        <PayrollLinesModal
+          title={linesTarget.mode === 'allowances' ? 'Начисления' : 'Удержания'}
+          employeeName={linesTarget.employee.name}
+          presets={
+            linesTarget.mode === 'allowances' ? SALARY_ALLOWANCE_PRESETS : DEDUCTION_PRESETS
+          }
+          lines={linesTarget.lines}
+          onClose={() => setLinesTarget(null)}
+          onAdd={async (payload) => {
+            const recordId = linesTarget.record.id
+            const created =
+              linesTarget.mode === 'allowances'
+                ? await addSalaryAllowance(recordId, payload)
+                : await addSalaryDeduction(recordId, payload)
+            await refreshLinesTarget(recordId, linesTarget.employee, linesTarget.mode)
+            return created
+          }}
+          onUpdate={async (lineId, patch) => {
+            const recordId = linesTarget.record.id
+            const updated =
+              linesTarget.mode === 'allowances'
+                ? await updateSalaryAllowance(lineId, recordId, patch)
+                : await updateSalaryDeduction(lineId, recordId, patch)
+            await refreshLinesTarget(recordId, linesTarget.employee, linesTarget.mode)
+            return updated
+          }}
+          onRemove={async (lineId) => {
+            const recordId = linesTarget.record.id
+            if (linesTarget.mode === 'allowances') {
+              await deleteSalaryAllowance(lineId, recordId)
+            } else {
+              await deleteSalaryDeduction(lineId, recordId)
+            }
+            await refreshLinesTarget(recordId, linesTarget.employee, linesTarget.mode)
+          }}
         />
       )}
     </div>

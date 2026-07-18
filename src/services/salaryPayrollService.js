@@ -112,6 +112,46 @@ export async function listSalaryRecordsForPeriod(periodId) {
   return (data ?? []).map(normalizeRecord).filter(Boolean)
 }
 
+/**
+ * Авансы по списку record id: Map<recordId, { lineId, amount }>
+ * Аванс хранится как salary_deductions.kind = 'advance'.
+ */
+export async function listAdvanceLinesForRecords(recordIds) {
+  assertCloudReady()
+  const byRecordId = new Map()
+  const ids = (recordIds || []).filter(Boolean)
+  if (ids.length === 0) return byRecordId
+
+  const { data, error } = await supabase
+    .from('salary_deductions')
+    .select(LINE_SELECT)
+    .in('record_id', ids)
+    .eq('kind', 'advance')
+
+  if (error) throw new Error(error.message || 'Не удалось загрузить авансы')
+
+  for (const row of data ?? []) {
+    const line = normalizeLine(row)
+    if (!line) continue
+    const prev = byRecordId.get(line.recordId)
+    if (!prev) {
+      byRecordId.set(line.recordId, { lineId: line.id, amount: line.amount })
+      continue
+    }
+    byRecordId.set(line.recordId, {
+      lineId: prev.lineId,
+      amount: toMoneyNumber(prev.amount + line.amount),
+    })
+  }
+
+  return byRecordId
+}
+
+export async function listAdvanceLinesByPeriod(periodId) {
+  const records = await listSalaryRecordsForPeriod(periodId)
+  return listAdvanceLinesForRecords(records.map((row) => row.id))
+}
+
 export async function ensureSalaryRecord(periodId, employeeId) {
   assertCloudReady()
   const empId = Number(employeeId)
@@ -383,6 +423,54 @@ export async function deleteSalaryDeduction(lineId, recordId) {
   const { error } = await supabase.from('salary_deductions').delete().eq('id', lineId)
   if (error) throw new Error(error.message || 'Не удалось удалить удержание')
   return recalculateAndPersistTotals(recordId)
+}
+
+/** Создать / обновить / удалить аванс и вернуть пересчитанный record */
+export async function upsertSalaryAdvance(recordId, amount) {
+  assertCloudReady()
+  const nextAmount = toMoneyNumber(amount)
+
+  const { data: existing, error: selectError } = await supabase
+    .from('salary_deductions')
+    .select(LINE_SELECT)
+    .eq('record_id', recordId)
+    .eq('kind', 'advance')
+    .order('sort_order', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (selectError) throw new Error(selectError.message || 'Не удалось загрузить аванс')
+
+  if (nextAmount <= 0) {
+    if (existing?.id) {
+      return deleteSalaryDeduction(existing.id, recordId)
+    }
+    return recalculateAndPersistTotals(recordId)
+  }
+
+  if (existing?.id) {
+    await updateSalaryDeduction(existing.id, recordId, {
+      kind: 'advance',
+      title: 'Аванс',
+      amount: nextAmount,
+    })
+  } else {
+    await addSalaryDeduction(recordId, {
+      kind: 'advance',
+      title: 'Аванс',
+      amount: nextAmount,
+      comment: '',
+    })
+  }
+
+  const { data, error } = await supabase
+    .from('salary_records')
+    .select(RECORD_SELECT)
+    .eq('id', recordId)
+    .single()
+
+  if (error) throw new Error(error.message || 'Не удалось загрузить расчёт')
+  return normalizeRecord(data)
 }
 
 export async function saveSalaryRecordFull(recordId, {
