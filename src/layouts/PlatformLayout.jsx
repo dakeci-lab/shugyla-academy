@@ -161,8 +161,7 @@ function PlatformLayoutShell({ onLogout }) {
 
           <header className="platform-layout__topbar">
             <div className="platform-layout__topbar-info">
-              <h1 className="platform-layout__title">{section.title}</h1>
-              <p className="platform-layout__desc">{section.description}</p>
+              <h1 className="platform-layout__title">{pageTitle}</h1>
             </div>
             <PlatformHeaderActions user={user} onLogout={onLogout} bellVariant="desktop" />
           </header>

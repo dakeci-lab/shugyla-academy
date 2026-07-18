@@ -47,8 +47,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  padding: 22px 32px;
+  gap: 16px;
+  min-height: 56px;
+  padding: 10px 28px;
   background: var(--color-white);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
@@ -56,20 +57,19 @@
 
 .platform-layout__topbar-info {
   min-width: 0;
+  display: flex;
+  align-items: center;
 }
 
 .platform-layout__title {
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
-  margin: 0 0 4px;
-  letter-spacing: -0.4px;
-}
-
-.platform-layout__desc {
-  color: var(--color-text-secondary);
-  font-size: 14px;
   margin: 0;
-  line-height: 1.4;
+  letter-spacing: -0.3px;
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .platform-layout__topbar-user {
@@ -87,7 +87,7 @@
 }
 
 .platform-layout__content {
-  padding: 28px 32px 56px;
+  padding: 20px 28px 48px;
   flex: 1;
   min-width: 0;
 }
