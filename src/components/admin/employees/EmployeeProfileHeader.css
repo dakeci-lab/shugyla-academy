@@ -56,10 +56,20 @@
   color: var(--color-text-secondary, #64748b);
 }
 
-.employee-profile-header__edit {
+.employee-profile-header__actions {
+  display: flex;
   flex-shrink: 0;
-  min-height: 44px;
-  padding-inline: 18px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.employee-profile-header__edit,
+.employee-profile-header__documents {
+  flex-shrink: 0;
+  min-height: 40px;
+  padding-inline: 14px;
 }
 
 @media (max-width: 640px) {
@@ -76,7 +86,13 @@
     font-size: 1.2rem;
   }
 
-  .employee-profile-header__edit {
+  .employee-profile-header__actions {
     width: 100%;
+  }
+
+  .employee-profile-header__edit,
+  .employee-profile-header__documents {
+    flex: 1;
+    min-width: 0;
   }
 }

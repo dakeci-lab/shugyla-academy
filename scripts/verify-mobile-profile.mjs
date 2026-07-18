@@ -56,11 +56,16 @@ function main() {
   assert('profile read-only role and phone', profile.includes('profile-page__role') && profile.includes('profile-page__phone'))
   assert('profile save button', profile.includes('profile-page__save'))
   assert('password modal', profile.includes('ProfilePasswordModal'))
-  assert('notifications modal', profile.includes('ProfileNotificationsModal'))
+  assert('documents action row', profile.includes('Документы') && profile.includes('getEmployeeDocumentsPath'))
+  assert('notifications removed from profile', !profile.includes('ProfileNotificationsModal'))
   assert('logout on profile page', profile.includes('profile-page__logout'))
   assert('toast on profile save', profile.includes('showSuccess'))
-  assert('compact notifications modal', read('src/components/profile/ProfileNotificationsModal.jsx').includes('Уведомления на этом устройстве'))
+  assert('push toggle lives in notifications UI', read('src/components/platform/notifications/PushNotificationToggle.jsx').includes('connectDeviceNotifications'))
   assert('no long push descriptions in profile page', !profile.includes('PushNotificationSettings'))
+  assert(
+    'mobile notifications nested under home',
+    sidebar.includes('nestMobileNotificationsUnderHome') && sidebar.includes("label: 'Главная'")
+  )
   assert('contact email migration', migration.includes('contact_email'))
   assert('self profile update policy', migration.includes('academy_users_update_own_profile'))
   assert('updateProfile service', read('src/services/academyDataService.js').includes('export async function updateProfile'))

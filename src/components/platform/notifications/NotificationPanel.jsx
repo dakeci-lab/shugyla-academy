@@ -6,6 +6,7 @@ import { CloseIcon, RefreshIcon } from '../../icons/PlatformIcons'
 import { useNotificationInbox } from '../../../context/NotificationInboxContext'
 import NotificationList from './NotificationList'
 import NotificationEmptyState from './NotificationEmptyState'
+import PushNotificationToggle from './PushNotificationToggle'
 import './notifications.css'
 
 const MOBILE_QUERY = '(max-width: 900px)'
@@ -107,6 +108,7 @@ function PanelHeader({ isMobile, onClose, onRefresh, refreshing, unreadCount }) 
       </div>
 
       <div className="notification-panel__actions">
+        <PushNotificationToggle />
         <button
           type="button"
           className="notification-panel__icon-btn"

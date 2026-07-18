@@ -10,8 +10,8 @@ import { validateContactEmail } from '../utils/profileValidation'
 import { LOGIN_PATH } from '../router/authRoutes'
 import ProfileAvatarEditor from '../components/ProfileAvatarEditor'
 import ProfilePasswordModal from '../components/profile/ProfilePasswordModal'
-import ProfileNotificationsModal from '../components/profile/ProfileNotificationsModal'
 import { ChevronRightIcon } from '../components/icons/PlatformIcons'
+import { getEmployeeDocumentsPath } from '../utils/employeeDocuments'
 import './Profile.css'
 
 function getInitialForm(user, employee) {
@@ -29,9 +29,7 @@ export default function Profile() {
   const { success: showSuccess, error: showError } = useToast()
   const [avatarVersion, setAvatarVersion] = useState(0)
   const [passwordOpen, setPasswordOpen] = useState(false)
-  const [notificationsOpen, setNotificationsOpen] = useState(false)
   const passwordTriggerRef = useRef(null)
-  const notificationsTriggerRef = useRef(null)
 
   const employee = useMemo(() => {
     void avatarVersion
@@ -153,12 +151,11 @@ export default function Profile() {
 
       <div className="profile-page__actions">
         <button
-          ref={notificationsTriggerRef}
           type="button"
           className="profile-page__action-row"
-          onClick={() => setNotificationsOpen(true)}
+          onClick={() => navigate(getEmployeeDocumentsPath(user.id))}
         >
-          <span>Уведомления</span>
+          <span>Документы</span>
           <ChevronRightIcon size={18} />
         </button>
 
@@ -182,12 +179,6 @@ export default function Profile() {
         onClose={() => setPasswordOpen(false)}
         userLogin={user.login}
         returnFocusRef={passwordTriggerRef}
-      />
-
-      <ProfileNotificationsModal
-        open={notificationsOpen}
-        onClose={() => setNotificationsOpen(false)}
-        returnFocusRef={notificationsTriggerRef}
       />
     </div>
   )

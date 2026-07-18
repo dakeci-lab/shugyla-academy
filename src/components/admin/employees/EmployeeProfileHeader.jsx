@@ -21,11 +21,15 @@ export default function EmployeeProfileHeader({
   showLogin = false,
   canEdit = false,
   onEdit,
+  showDocuments = false,
+  onDocuments,
 }) {
   if (!employee) return null
 
   const resolvedRole =
     roleLabel || employee.position || getRoleLabel(employee.role) || '—'
+
+  const hasActions = (canEdit && onEdit) || (showDocuments && onDocuments)
 
   return (
     <section className="employee-profile-header" aria-label="Карточка сотрудника">
@@ -53,16 +57,29 @@ export default function EmployeeProfileHeader({
         </div>
       </div>
 
-      {canEdit && onEdit && (
-        <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
-          <button
-            type="button"
-            className="btn btn--primary employee-profile-header__edit"
-            onClick={() => onEdit(employee)}
-          >
-            Редактировать
-          </button>
-        </Can>
+      {hasActions && (
+        <div className="employee-profile-header__actions">
+          {showDocuments && onDocuments && (
+            <button
+              type="button"
+              className="btn btn--outline employee-profile-header__documents"
+              onClick={onDocuments}
+            >
+              Документы
+            </button>
+          )}
+          {canEdit && onEdit && (
+            <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
+              <button
+                type="button"
+                className="btn btn--primary employee-profile-header__edit"
+                onClick={() => onEdit(employee)}
+              >
+                Редактировать
+              </button>
+            </Can>
+          )}
+        </div>
       )}
     </section>
   )

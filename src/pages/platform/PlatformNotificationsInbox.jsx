@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CheckCheckIcon } from '../../components/icons/PlatformIcons'
 import NotificationEmptyState from '../../components/platform/notifications/NotificationEmptyState'
 import NotificationList from '../../components/platform/notifications/NotificationList'
+import PushNotificationToggle from '../../components/platform/notifications/PushNotificationToggle'
 import '../../components/platform/notifications/notifications.css'
 import { useNotificationInbox } from '../../context/NotificationInboxContext'
 import { usePlatformPageTitle } from '../../context/PlatformPageTitleContext'
@@ -43,20 +44,23 @@ export default function PlatformNotificationsInbox() {
 
   const headerActions = useMemo(
     () => (
-      <button
-        type="button"
-        className="platform-mobile-header__icon-btn"
-        aria-label="Прочитать все"
-        title="Прочитать все"
-        disabled={markingAll || unreadCount <= 0}
-        onClick={() => {
-          if (markingAll || unreadCount <= 0) return
-          setMarkingAll(true)
-          void markAllAsRead().finally(() => setMarkingAll(false))
-        }}
-      >
-        <CheckCheckIcon size={18} />
-      </button>
+      <div className="notifications-inbox__header-actions">
+        <PushNotificationToggle />
+        <button
+          type="button"
+          className="platform-mobile-header__icon-btn"
+          aria-label="Прочитать все"
+          title="Прочитать все"
+          disabled={markingAll || unreadCount <= 0}
+          onClick={() => {
+            if (markingAll || unreadCount <= 0) return
+            setMarkingAll(true)
+            void markAllAsRead().finally(() => setMarkingAll(false))
+          }}
+        >
+          <CheckCheckIcon size={18} />
+        </button>
+      </div>
     ),
     [markAllAsRead, markingAll, unreadCount]
   )

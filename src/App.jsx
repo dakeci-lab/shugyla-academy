@@ -28,6 +28,7 @@ import PlatformSettingsGeneral from './pages/platform/PlatformSettingsGeneral'
 import PlatformSettingsRoles from './pages/platform/PlatformSettingsRoles'
 import PlatformSettingsNotifications from './pages/platform/PlatformSettingsNotifications'
 import PlatformNotificationsInbox from './pages/platform/PlatformNotificationsInbox'
+import PlatformEmployeeDocuments from './pages/platform/PlatformEmployeeDocuments'
 import PlatformEmployees from './pages/platform/PlatformEmployees'
 import PlatformEmployeesRedirect from './pages/platform/PlatformEmployeesRedirect'
 import PlatformWorkSchedule from './pages/platform/PlatformWorkSchedule'
@@ -155,6 +156,10 @@ export default function App() {
           <Route
             path="employees/:employeeId/schedule"
             element={<PlatformEmployeeSchedule />}
+          />
+          <Route
+            path="employees/:employeeId/documents"
+            element={<PlatformEmployeeDocuments />}
           />
           <Route
             path="employees/:employeeId"

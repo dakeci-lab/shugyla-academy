@@ -27,6 +27,7 @@ import {
   canViewTeamSchedule,
   PERMISSION_CODES,
 } from '../../../config/permissions'
+import { getEmployeeDocumentsPath } from '../../../utils/employeeDocuments'
 import Can from '../../auth/Can'
 import EmployeeProfileHeader from '../employees/EmployeeProfileHeader'
 import EmployeePeriodSummary from '../employees/EmployeePeriodSummary'
@@ -395,6 +396,8 @@ export default function EmployeeProfileSection({ employeeId }) {
         showLogin={showLogin}
         canEdit={canEdit}
         onEdit={() => setShowEdit(true)}
+        showDocuments={canSeeAdminFields || Number(user?.id) === Number(employeeId)}
+        onDocuments={() => navigate(getEmployeeDocumentsPath(employeeId))}
       />
 
       <EmployeePeriodSummary

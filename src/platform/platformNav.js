@@ -353,6 +353,13 @@ export function getPlatformSection(pathname) {
 }
 
 function getDynamicPlatformSection(pathname, flat) {
+  if (/^\/platform\/employees\/\d+\/documents\/?$/.test(pathname)) {
+    return {
+      title: 'Документы сотрудника',
+      description: 'Документы кадрового учёта сотрудника.',
+    }
+  }
+
   if (/^\/platform\/employees\/\d+(\/schedule)?\/?$/.test(pathname)) {
     return {
       title: 'Карточка сотрудника',

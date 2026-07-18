@@ -1,0 +1,54 @@
+.push-notification-toggle {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  cursor: pointer;
+}
+
+.push-notification-toggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.push-notification-toggle__ui {
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--color-border, #e5e7eb);
+  transition: background 0.2s;
+  position: relative;
+}
+
+.push-notification-toggle__ui::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-white, #fff);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+  transition: transform 0.2s;
+}
+
+.push-notification-toggle input:checked + .push-notification-toggle__ui {
+  background: var(--color-primary, #2a9d5c);
+}
+
+.push-notification-toggle input:checked + .push-notification-toggle__ui::after {
+  transform: translateX(18px);
+}
+
+.push-notification-toggle input:disabled + .push-notification-toggle__ui {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.push-notification-toggle input:focus-visible + .push-notification-toggle__ui {
+  outline: 2px solid var(--color-primary, #2a9d5c);
+  outline-offset: 2px;
+}

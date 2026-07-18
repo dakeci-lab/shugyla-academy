@@ -39,20 +39,48 @@ function useMediaQuery(query) {
   return matches
 }
 
-function insertMobileNotificationsItem(navItems) {
-  const items = []
-  let inserted = false
-
-  for (const item of navItems) {
-    items.push(item)
-    if (item.id === 'home') {
-      items.push(MOBILE_NOTIFICATIONS_ITEM)
-      inserted = true
+/** Mobile: Уведомления — подпункт группы «Главная», не отдельная группа */
+function nestMobileNotificationsUnderHome(navItems) {
+  let nested = false
+  const items = navItems.map((item) => {
+    if (item.id !== 'home' || item.children?.length) return item
+    nested = true
+    return {
+      id: 'home-group',
+      label: 'Главная',
+      children: [
+        {
+          id: 'home-index',
+          path: item.path || '/platform',
+          label: item.label || 'Главная',
+          end: item.end !== false,
+          routeKey: item.routeKey,
+          title: item.title || 'Главная',
+          description: item.description || '',
+        },
+        MOBILE_NOTIFICATIONS_ITEM,
+      ],
     }
-  }
+  })
 
-  if (!inserted) {
-    items.unshift(MOBILE_NOTIFICATIONS_ITEM)
+  if (!nested) {
+    return [
+      {
+        id: 'home-group',
+        label: 'Главная',
+        children: [
+          {
+            id: 'home-index',
+            path: '/platform',
+            label: 'Главная',
+            end: true,
+            title: 'Главная',
+          },
+          MOBILE_NOTIFICATIONS_ITEM,
+        ],
+      },
+      ...items,
+    ]
   }
 
   return items
@@ -72,7 +100,7 @@ export default function PlatformSidebar({ isOpen = false, onNavigate }) {
     [user]
   )
   const navItems = useMemo(
-    () => (isMobile ? insertMobileNotificationsItem(filteredNav) : filteredNav),
+    () => (isMobile ? nestMobileNotificationsUnderHome(filteredNav) : filteredNav),
     [filteredNav, isMobile]
   )
 
