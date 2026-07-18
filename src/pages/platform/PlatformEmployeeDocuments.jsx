@@ -178,15 +178,6 @@ export default function PlatformEmployeeDocuments() {
 
   return (
     <div className="employee-docs">
-      <header className="employee-docs__header">
-        <h1 className="employee-docs__title">Документы</h1>
-        <p className="employee-docs__hint">
-          {isOwn
-            ? 'Загрузите документы для кадрового учёта. После загрузки файл можно только просмотреть.'
-            : 'Просмотр документов сотрудника.'}
-        </p>
-      </header>
-
       <input
         ref={fileInputRef}
         type="file"

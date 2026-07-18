@@ -60,6 +60,7 @@ function main() {
   assert('extensible document types', catalog.includes('identity_card') && catalog.includes('EMPLOYEE_DOCUMENT_TYPES'))
   assert('documents route', app.includes('employees/:employeeId/documents'))
   assert('documents page', page.includes('PlatformEmployeeDocuments') || page.includes('Документы'))
+  assert('no duplicate page intro', !page.includes('employee-docs__header') && !page.includes('Загрузите документы'))
   assert('upload via storage', service.includes('EMPLOYEE_DOCUMENT_BUCKET') && service.includes('.upload('))
   assert('signed url view', service.includes('createSignedUrl'))
   assert('header documents button', header.includes('Документы') && header.includes('showDocuments'))
