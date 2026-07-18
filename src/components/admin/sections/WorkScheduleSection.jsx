@@ -172,8 +172,16 @@ export default function WorkScheduleSection() {
               const dateKey = toDateKey(date)
               const { weekday, day } = formatWeekDayHeader(date)
               const isToday = dateKey === todayKey
+              const isWeekend = date.getDay() === 0 || date.getDay() === 6
+              const dayClass = [
+                'team-schedule-table__day',
+                isWeekend ? 'team-schedule-table__day--weekend' : '',
+                isToday ? 'team-schedule-table__day--today' : '',
+              ]
+                .filter(Boolean)
+                .join(' ')
               return (
-                <th key={dateKey} scope="col" className="team-schedule-table__day">
+                <th key={dateKey} scope="col" className={dayClass}>
                   {isToday ? (
                     <span className="team-schedule-table__today-badge">
                       <span className="team-schedule-table__day-weekday">{weekday}</span>
@@ -218,9 +226,19 @@ export default function WorkScheduleSection() {
                 {weekDates.map((date) => {
                   const dateKey = toDateKey(date)
                   const shift = empShifts.get(dateKey)
+                  const isToday = dateKey === todayKey
+                  const isWeekend = date.getDay() === 0 || date.getDay() === 6
+                  const cellClass = [
+                    'team-schedule-table__day',
+                    'team-schedule-cell',
+                    isWeekend ? 'team-schedule-table__day--weekend' : '',
+                    isToday ? 'team-schedule-table__day--today' : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
 
                   return (
-                    <td key={dateKey} className="team-schedule-table__day team-schedule-cell">
+                    <td key={dateKey} className={cellClass}>
                       <TeamScheduleCell
                         shift={shift}
                         onCommentClick={(text) =>

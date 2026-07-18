@@ -807,9 +807,66 @@
 
 .team-schedule-wrap--desktop .team-schedule-table__today-badge {
   min-width: 2rem;
-  padding: 0.15rem 0.4rem;
+  padding: 0.2rem 0.45rem;
   border-radius: 6px;
   gap: 0;
+  background: var(--color-primary);
+  color: #fff;
+}
+
+/* Match period-header green chips: white text on primary green */
+.team-schedule-wrap--desktop .team-schedule-table__today-badge .team-schedule-table__day-weekday,
+.team-schedule-wrap--desktop .team-schedule-table__today-badge .team-schedule-table__day-number {
+  color: #fff;
+}
+
+/* Soft weekend columns — readable structure without loud color */
+.team-schedule-wrap--desktop .team-schedule-table thead th.team-schedule-table__day--weekend {
+  background: #e4ebe6;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table tbody td.team-schedule-table__day--weekend {
+  background: #f3f5f4;
+}
+
+.team-schedule-wrap--desktop
+  .team-schedule-table
+  tbody
+  tr:nth-child(even)
+  td.team-schedule-table__day--weekend {
+  background: #eef1ef;
+}
+
+.team-schedule-wrap--desktop
+  .team-schedule-table
+  tbody
+  tr:hover
+  td.team-schedule-table__day--weekend {
+  background: #e8f0ea;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table thead th.team-schedule-table__day--today {
+  background: #e6f5ec;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table tbody td.team-schedule-table__day--today {
+  background: rgba(42, 157, 92, 0.06);
+}
+
+.team-schedule-wrap--desktop
+  .team-schedule-table
+  tbody
+  tr:nth-child(even)
+  td.team-schedule-table__day--today {
+  background: rgba(42, 157, 92, 0.09);
+}
+
+.team-schedule-wrap--desktop
+  .team-schedule-table
+  tbody
+  tr:hover
+  td.team-schedule-table__day--today {
+  background: rgba(42, 157, 92, 0.12);
 }
 
 .team-schedule-wrap--desktop .team-schedule-cell {
