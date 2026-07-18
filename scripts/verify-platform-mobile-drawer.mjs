@@ -36,6 +36,7 @@ function main() {
 
   const layout = read('src/layouts/PlatformLayout.jsx')
   const layoutCss = read('src/layouts/PlatformLayout.css')
+  const sidebar = read('src/components/platform/PlatformSidebar.jsx')
   const sidebarCss = read('src/components/platform/PlatformSidebar.css')
   const scrollLock = read('src/utils/modalScrollLock.js')
   const edgeSwipe = read('src/hooks/useMobileDrawerEdgeSwipe.js')
@@ -60,6 +61,8 @@ function main() {
   assert('sidebar z-index above overlay', /z-index:\s*4010/.test(sidebarCss))
   assert('nav scrolls internally', sidebarCss.includes('.platform-sidebar__nav') && sidebarCss.includes('overflow-y: auto'))
   assert('overscroll contain', sidebarCss.includes('overscroll-behavior: contain'))
+  assert('full viewport height on mobile', sidebarCss.includes('100dvh') && sidebarCss.includes('bottom: 0'))
+  assert('no data mode footer in sidebar', !sidebar.includes('DataModeBadge') && !sidebar.includes('platform-sidebar__footer'))
 
   console.log('\nStage 4: Edge swipe gesture')
   assert('edge swipe hook wired', layout.includes('useMobileDrawerEdgeSwipe'))

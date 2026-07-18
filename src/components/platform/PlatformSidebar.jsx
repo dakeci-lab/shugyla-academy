@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import DataModeBadge from '../admin/DataModeBadge'
 import { useSession } from '../../context/SessionContext'
 import {
   PLATFORM_NAV,
@@ -274,10 +273,6 @@ export default function PlatformSidebar({ isOpen = false, onNavigate, panelRef =
           ? navItems.map((item) => renderMobileSection(item))
           : navItems.map((item) => renderDesktopItem(item))}
       </nav>
-
-      <div className="platform-sidebar__footer">
-        <DataModeBadge />
-      </div>
     </aside>
   )
 }
