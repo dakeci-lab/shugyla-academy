@@ -280,9 +280,10 @@ export default function OwnerDashboard() {
   const isTodaySelected = selectedDateKey === todayKey
   const isFutureSelected = selectedDateKey > todayKey
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (options = {}) => {
+    const quiet = options?.quiet === true
     setError('')
-    setLoading(true)
+    if (!quiet) setLoading(true)
     try {
       if (cloudMode) {
         // Compact home-summary: one day, only employees who have shifts that day.
@@ -311,7 +312,7 @@ export default function OwnerDashboard() {
     } catch (err) {
       setError(err.message || 'Не удалось загрузить данные дашборда')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [cloudMode, selectedDateKey, selectedMonthState.year, selectedMonthState.month, localEmployeeIdsKey])
 

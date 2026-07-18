@@ -1,0 +1,90 @@
+.page-refresh-indicator {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  pointer-events: none;
+  transition: height 0.32s cubic-bezier(0.25, 0.8, 0.25, 1),
+    opacity 0.28s ease;
+}
+
+.page-refresh-indicator--dragging,
+.page-refresh-indicator--refreshing {
+  transition: none;
+}
+
+.page-refresh-indicator--hiding {
+  opacity: 0;
+}
+
+.page-refresh-indicator__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  margin-bottom: 8px;
+  opacity: var(--refresh-opacity, 0);
+  transition: opacity 0.2s ease;
+}
+
+.page-refresh-indicator--refreshing .page-refresh-indicator__inner,
+.page-refresh-indicator--hiding .page-refresh-indicator__inner {
+  opacity: 1;
+}
+
+.page-refresh-indicator__spinner {
+  display: block;
+  width: 26px;
+  height: 26px;
+  box-sizing: border-box;
+  border: 2.5px solid rgba(45, 106, 79, 0.16);
+  border-top-color: var(--color-primary, #2d6a4f);
+  border-right-color: rgba(45, 106, 79, 0.55);
+  border-radius: 50%;
+  transform: rotate(calc(var(--refresh-rotation, 0) * 1deg));
+  will-change: transform;
+  backface-visibility: hidden;
+}
+
+.page-refresh-indicator__spinner--loading {
+  border-top-color: var(--color-primary, #2d6a4f);
+  border-right-color: var(--color-primary, #2d6a4f);
+  animation: page-refresh-spin 0.7s linear infinite;
+}
+
+.page-refresh-indicator__label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--color-text-secondary, #64748b);
+  line-height: 1;
+}
+
+@keyframes page-refresh-spin {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (min-width: 901px) {
+  .page-refresh-indicator {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-refresh-indicator__spinner--loading {
+    animation-duration: 1.4s;
+  }
+
+  .page-refresh-indicator {
+    transition-duration: 0.01ms;
+  }
+}

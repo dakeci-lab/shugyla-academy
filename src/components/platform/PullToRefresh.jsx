@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { usePullToRefresh } from '../../context/PullToRefreshContext'
+import PageRefreshIndicator from './PageRefreshIndicator'
 import './PullToRefresh.css'
 
 const THRESHOLD = 72
 const MAX_PULL = 120
 const RESISTANCE = 0.5
-const REFRESHING_HEIGHT = 52
+const REFRESHING_HEIGHT = 56
 const HIDE_DURATION_MS = 320
 const MOBILE_QUERY = '(max-width: 900px)'
 
@@ -17,7 +18,10 @@ function isMobileViewport() {
   return typeof window !== 'undefined' && window.matchMedia(MOBILE_QUERY).matches
 }
 
-/** Pull-to-refresh для мобильной PWA — только в верхней части страницы. */
+/**
+ * Pull-to-refresh для мобильной PWA.
+ * Важно: оборачивать только content area — Header должен оставаться снаружи.
+ */
 export default function PullToRefresh({ children, disabled = false, className = '' }) {
   const { performRefresh } = usePullToRefresh()
   const [pull, setPull] = useState(0)
@@ -138,39 +142,17 @@ export default function PullToRefresh({ children, disabled = false, className = 
   const pullProgress = Math.min(1, pull / THRESHOLD)
   const pullRotation = pullProgress * 240
 
-  const indicatorClassName = [
-    'pull-to-refresh__indicator',
-    showIndicator ? 'pull-to-refresh__indicator--visible' : '',
-    dragging ? 'pull-to-refresh__indicator--dragging' : '',
-    refreshing ? 'pull-to-refresh__indicator--refreshing' : '',
-    hiding ? 'pull-to-refresh__indicator--hiding' : '',
-  ]
-    .filter(Boolean)
-    .join(' ')
-
   return (
     <div className={`pull-to-refresh ${className}`.trim()}>
-      <div
-        className={indicatorClassName}
-        aria-hidden={!showIndicator}
-        style={{ height: showIndicator ? (refreshing ? REFRESHING_HEIGHT : offset) : 0 }}
-      >
-        <div
-          className="pull-to-refresh__spinner-wrap"
-          style={{ '--pull-opacity': refreshing || hiding ? 1 : pullProgress }}
-        >
-          <span
-            className={`pull-to-refresh__spinner${refreshing ? ' pull-to-refresh__spinner--loading' : ''}`}
-            style={refreshing ? undefined : { '--pull-rotation': pullRotation }}
-            aria-hidden="true"
-          />
-        </div>
-        {refreshing && (
-          <span className="pull-to-refresh__status" role="status" aria-live="polite">
-            Обновление…
-          </span>
-        )}
-      </div>
+      <PageRefreshIndicator
+        visible={showIndicator}
+        refreshing={refreshing}
+        dragging={dragging}
+        hiding={hiding}
+        height={refreshing ? REFRESHING_HEIGHT : offset}
+        pullProgress={pullProgress}
+        pullRotation={pullRotation}
+      />
 
       <div
         className={`pull-to-refresh__body${animating ? ' pull-to-refresh__body--animating' : ''}`}

@@ -16,6 +16,7 @@ import {
   getVacancyById,
 } from '../../../services/academyDataService'
 import { listEmployeesForAdmin } from '../../../services/employeeAdminService'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import {
   getVacancyEmployeeRole,
   canCreateEmployeeForCandidate,
@@ -103,9 +104,10 @@ export default function EmployeesSection() {
   const filtersActive =
     appliedStatus !== EMPLOYEE_LIST_DEFAULT_STATUS || Boolean(appliedRoleId)
 
-  const loadCloudEmployees = useCallback(async () => {
+  const loadCloudEmployees = useCallback(async (options = {}) => {
     if (!cloudMode) return
-    setListLoading(true)
+    const quiet = options?.quiet === true
+    if (!quiet) setListLoading(true)
     setListError('')
     try {
       const result = await listEmployeesForAdmin({
@@ -121,13 +123,17 @@ export default function EmployeesSection() {
       setCloudPagination(result.pagination)
       hasLoadedOnceRef.current = true
     } catch (err) {
-      setCloudEmployees([])
-      setCloudPagination(null)
+      if (!quiet) {
+        setCloudEmployees([])
+        setCloudPagination(null)
+      }
       setListError(err.message || 'Не удалось загрузить сотрудников')
     } finally {
-      setListLoading(false)
+      if (!quiet) setListLoading(false)
     }
   }, [cloudMode, page, debouncedSearch, appliedStatus, appliedRoleId])
+
+  usePlatformPageRefresh(loadCloudEmployees)
 
   useEffect(() => {
     if (cloudMode) {

@@ -102,8 +102,9 @@ export default function EmployeeRatingSection() {
     })
   }, [search, loadedEmployees])
 
-  const loadRating = useCallback(async () => {
-    setLoading(true)
+  const loadRating = useCallback(async (options = {}) => {
+    const quiet = options?.quiet === true
+    if (!quiet) setLoading(true)
     setError('')
     try {
       if (isCloudMode()) {
@@ -128,7 +129,7 @@ export default function EmployeeRatingSection() {
     } catch (err) {
       setError(err.message || 'Не удалось загрузить рейтинг')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [year, month])
 

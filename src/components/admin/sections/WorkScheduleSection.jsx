@@ -78,8 +78,9 @@ export default function WorkScheduleSection() {
   const employeeIds = useMemo(() => employees.map((emp) => emp.id), [employees])
   const employeeIdsKey = employeeIds.join(',')
 
-  const loadShifts = useCallback(async () => {
-    setLoading(true)
+  const loadShifts = useCallback(async (options = {}) => {
+    const quiet = options?.quiet === true
+    if (!quiet) setLoading(true)
     setError('')
     try {
       if (isCloudMode() && viewTeam) {
@@ -103,7 +104,7 @@ export default function WorkScheduleSection() {
     } catch (err) {
       setError(err.message || 'Не удалось загрузить график')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [weekStartKey, viewTeam, weekDates])
 

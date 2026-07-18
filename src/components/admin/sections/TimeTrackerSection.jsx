@@ -199,7 +199,7 @@ export default function TimeTrackerSection({ employeeId: employeeIdProp, variant
     }
   }, [employeeId])
 
-  usePlatformPageRefresh(loadShift)
+  usePlatformPageRefresh(() => loadShift({ quiet: true }))
 
   useEffect(() => {
     loadShift()

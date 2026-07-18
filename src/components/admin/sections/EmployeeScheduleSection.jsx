@@ -74,11 +74,12 @@ export default function EmployeeScheduleSection({
 
   const shiftMap = useMemo(() => shiftsToMap(shifts), [shifts])
 
-  const loadScheduleData = useCallback(async () => {
+  const loadScheduleData = useCallback(async (options = {}) => {
     if (!employeeId) return
-    setLoading(true)
+    const quiet = options?.quiet === true
+    if (!quiet) setLoading(true)
     setError('')
-    setEmployeeMissing(false)
+    if (!quiet) setEmployeeMissing(false)
     try {
       if (isCloudMode()) {
         const bundle = await fetchEmployeeWorkforceBundle(employeeId, year, month, 'schedule')
@@ -105,7 +106,7 @@ export default function EmployeeScheduleSection({
     } catch (err) {
       setError(err.message || 'Не удалось загрузить график')
     } finally {
-      setLoading(false)
+      if (!quiet) setLoading(false)
     }
   }, [employeeId, year, month])
 

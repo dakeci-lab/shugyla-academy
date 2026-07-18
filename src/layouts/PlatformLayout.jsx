@@ -87,9 +87,10 @@ function PlatformLayoutShell({ onLogout }) {
       />
 
       <PullToRefreshProvider onGlobalRefresh={reload}>
-        <PullToRefresh disabled={drawerOpen} className="platform-layout__main">
+        <div className="platform-layout__main">
           <AppInstallBanner />
 
+          {/* Header stays outside PullToRefresh so it never translates/unmounts. */}
           <PlatformMobileHeader
             title={pageTitle}
             onMenuOpen={() => setDrawerOpen(true)}
@@ -105,12 +106,14 @@ function PlatformLayoutShell({ onLogout }) {
             <PlatformHeaderActions user={user} onLogout={onLogout} bellVariant="desktop" />
           </header>
 
-          <div className="platform-layout__content">
-            <PlatformErrorBoundary onLogout={onLogout}>
-              <Outlet />
-            </PlatformErrorBoundary>
-          </div>
-        </PullToRefresh>
+          <PullToRefresh disabled={drawerOpen} className="platform-layout__refresh">
+            <div className="platform-layout__content">
+              <PlatformErrorBoundary onLogout={onLogout}>
+                <Outlet />
+              </PlatformErrorBoundary>
+            </div>
+          </PullToRefresh>
+        </div>
       </PullToRefreshProvider>
     </div>
   )

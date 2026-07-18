@@ -19,6 +19,7 @@ import {
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import {
   canEditEmployees,
   canManageEmployees,
@@ -112,11 +113,14 @@ export default function EmployeeProfileSection({ employeeId }) {
     return () => window.clearTimeout(timer)
   }, [employeeId, employeeLoading])
 
-  const loadEmployee = useCallback(async () => {
+  const loadEmployee = useCallback(async (options = {}) => {
     if (!employeeId) return
-    setEmployeeLoading(true)
+    const quiet = options?.quiet === true
+    if (!quiet) {
+      setEmployeeLoading(true)
+      setEmployeeMissing(false)
+    }
     setEmployeeError('')
-    setEmployeeMissing(false)
 
     try {
       let nextEmployee = null
@@ -181,9 +185,11 @@ export default function EmployeeProfileSection({ employeeId }) {
       if (!mountedRef.current) return
 
       if (!nextEmployee) {
-        setEmployee(null)
-        setEmployeeMissing(true)
-        setShowLogin(false)
+        if (!quiet) {
+          setEmployee(null)
+          setEmployeeMissing(true)
+          setShowLogin(false)
+        }
         return
       }
 
@@ -214,21 +220,25 @@ export default function EmployeeProfileSection({ employeeId }) {
       if (!mountedRef.current) return
 
       if (err instanceof EmployeeAdminError && err.code === 'employee_not_found') {
-        setEmployee(null)
-        setEmployeeMissing(true)
-        setShowLogin(false)
-        setEmployeeError('')
+        if (!quiet) {
+          setEmployee(null)
+          setEmployeeMissing(true)
+          setShowLogin(false)
+          setEmployeeError('')
+        }
         return
       }
 
       const message = err.message || 'Не удалось загрузить сотрудника'
       setEmployeeError(message)
-      setEmployee(null)
+      if (!quiet) setEmployee(null)
       showError(message)
     } finally {
-      if (mountedRef.current) setEmployeeLoading(false)
+      if (mountedRef.current && !quiet) setEmployeeLoading(false)
     }
   }, [employeeId, cloudMode, canSeeAdminFields, showError])
+
+  usePlatformPageRefresh(loadEmployee)
 
   useEffect(() => {
     loadEmployee()
