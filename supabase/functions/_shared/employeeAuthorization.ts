@@ -362,26 +362,40 @@ export async function authorizeAuthenticatedEmployee(
   }
 }
 
+/**
+ * Request-scoped employee-admin authorization (Stage 9):
+ * token → verify once → ONE fused caller+permission PostgREST call → enforce code.
+ * Reuses the same relational fusion as authorizeWorkforceRequest; does not change
+ * workforce behavior. No cross-request cache.
+ */
+export async function authorizeEmployeeAdminRequest(
+  req: Request,
+  permissionCode: string
+): Promise<RequestAuthzContext | Response> {
+  if (!permissionCode) {
+    return adminErrorResponse('forbidden', 403)
+  }
+
+  const ctx = await authorizeWorkforceRequest(req, [permissionCode])
+  if (ctx instanceof Response) return ctx
+
+  if (ctx.permissions[permissionCode] !== true) {
+    return adminErrorResponse('forbidden', 403)
+  }
+
+  return ctx
+}
+
 export async function authorizeEmployeeAdmin(
   req: Request,
   permissionCode: string
 ): Promise<AuthorizedContext | Response> {
-  const authResult = await authorizeAuthenticatedEmployee(req)
-  if (authResult instanceof Response) return authResult
-
-  const { serviceClient, caller } = authResult
-  if (!caller.role_id) {
-    return adminErrorResponse('forbidden', 403)
-  }
-
-  const permitted = await roleHasPermission(serviceClient, caller.role_id, permissionCode)
-  if (!permitted) {
-    return adminErrorResponse('forbidden', 403)
-  }
+  const ctx = await authorizeEmployeeAdminRequest(req, permissionCode)
+  if (ctx instanceof Response) return ctx
 
   return {
-    serviceClient,
-    caller,
+    serviceClient: ctx.serviceClient,
+    caller: ctx.caller,
   }
 }
 

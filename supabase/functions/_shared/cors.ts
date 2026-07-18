@@ -4,7 +4,8 @@ export const CORS_HEADERS: Record<string, string> = {
     'authorization, x-client-info, apikey, content-type, x-shugyla-scheduler-timestamp, x-shugyla-scheduler-signature, x-shugyla-scheduler-test-run-at',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   // Expose Server-Timing + DB-call budget (counts only; no PII).
-  'Access-Control-Expose-Headers': 'server-timing, x-workforce-db-calls',
+  'Access-Control-Expose-Headers':
+    'server-timing, x-workforce-db-calls, x-employee-admin-db-calls',
   'Timing-Allow-Origin': '*',
 }
 

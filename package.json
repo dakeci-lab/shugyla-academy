@@ -58,6 +58,7 @@
     "verify:workforce-edge-performance": "node scripts/verify-workforce-edge-performance.mjs",
     "verify:workforce-edge-authorization-performance": "node scripts/verify-workforce-edge-authorization-performance.mjs",
     "verify:workforce-edge-round-trip-reduction": "node scripts/verify-workforce-edge-round-trip-reduction.mjs",
+    "verify:employee-admin-edge-performance": "node scripts/verify-employee-admin-edge-performance.mjs",
     "verify:home-workforce-summary": "node scripts/verify-home-workforce-summary.mjs",
     "verify:supplier-form-focus": "node scripts/verify-supplier-form-focus.mjs",
     "verify:home-dashboard": "node scripts/verify-home-dashboard.mjs",

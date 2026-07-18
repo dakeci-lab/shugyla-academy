@@ -138,9 +138,13 @@ function stageEmployeeAdmin() {
   const provisioning = read('src/services/employeeProvisioningService.js')
   const academy = read('src/services/academyDataService.js')
 
+  const modal = read('src/components/admin/employees/EmployeeEditModal.jsx')
+
   assert('EmployeesSection uses listEmployeesForAdmin', section.includes('listEmployeesForAdmin'))
-  assert('cloud create uses createEmployee service', section.includes('createEmployee(payload)'))
-  assert('cloud edit uses updateEmployee without password', /cloudMode[\s\S]*updateEmployee\(editId/.test(section))
+  // Create/update moved into EmployeeEditModal; section only hosts the modal + refresh.
+  assert('cloud create uses createEmployee in EmployeeEditModal', modal.includes('createEmployee('))
+  assert('cloud edit uses updateEmployee in EmployeeEditModal', modal.includes('updateEmployee('))
+  assert('EmployeesSection refreshes after modal save', section.includes('onSaved={handleEmployeeSaved}') || section.includes('handleEmployeeSaved'))
   assert('admin-list-employees via functions.invoke', adminService.includes("supabase.functions.invoke('admin-list-employees'"))
   assert('admin-update-employees via functions.invoke', adminService.includes("supabase.functions.invoke('admin-update-employee'"))
   assert('admin-create via functions.invoke', provisioning.includes("supabase.functions.invoke('admin-create-employee'"))

@@ -1,5 +1,10 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
-import { authorizeEmployeeAdmin, adminErrorResponse } from '../_shared/employeeAuthorization.ts'
+import {
+  authorizeEmployeeAdminRequest,
+  adminErrorResponse,
+  trackDbCall,
+  type DbCallCounter,
+} from '../_shared/employeeAuthorization.ts'
 import {
   ALLOWED_STATUSES,
   SAFE_EMPLOYEE_SELECT,
@@ -9,7 +14,11 @@ import {
   type DbEmployeeRow,
   type SortableField,
 } from '../_shared/employeeFields.ts'
-import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
+import {
+  buildServerTimingHeader,
+  corsPreflightResponse,
+  jsonResponse,
+} from '../_shared/cors.ts'
 
 const PERMISSION_VIEW = 'employees.view'
 const DEFAULT_PAGE = 1
@@ -43,8 +52,21 @@ function parseBodyNumbers(payload: Record<string, unknown>) {
   return { page, pageSize }
 }
 
+function timingResponse(
+  body: Record<string, unknown>,
+  phases: Record<string, number>,
+  dbCalls: DbCallCounter,
+  status = 200
+) {
+  return jsonResponse(body, status, {
+    'Server-Timing': buildServerTimingHeader(phases),
+    'X-Employee-Admin-DB-Calls': String(dbCalls.count),
+  })
+}
+
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID()
+  const totalStart = performance.now()
 
   if (req.method === 'OPTIONS') {
     return corsPreflightResponse()
@@ -125,10 +147,14 @@ Deno.serve(async (req) => {
     employeeIdFilter = rawId
   }
 
-  const authResult = await authorizeEmployeeAdmin(req, PERMISSION_VIEW)
+  // Permission code is server-fixed — never taken from request body.
+  const authResult = await authorizeEmployeeAdminRequest(req, PERMISSION_VIEW)
   if (authResult instanceof Response) return authResult
 
-  const { serviceClient } = authResult
+  const { serviceClient, dbCalls, timings: authTimings } = authResult
+
+  const employeesDbStart = performance.now()
+  trackDbCall(dbCalls)
 
   let query = serviceClient
     .from('academy_users')
@@ -172,6 +198,8 @@ Deno.serve(async (req) => {
     .order('id', { ascending: true })
     .range(from, to)
 
+  const employeesDbMs = Math.round(performance.now() - employeesDbStart)
+
   if (error) {
     console.error('admin_list_employees_failed', {
       requestId,
@@ -183,6 +211,7 @@ Deno.serve(async (req) => {
     return adminErrorResponse('internal_error', 500)
   }
 
+  const transformStart = performance.now()
   const total = count ?? 0
   const employees = []
   for (const row of data ?? []) {
@@ -196,13 +225,15 @@ Deno.serve(async (req) => {
       })
     }
   }
+  const transformMs = Math.round(performance.now() - transformStart)
 
   // Exact employee_id lookup: unknown id must be a not-found response, not an empty list.
   if (employeeIdFilter != null && employees.length === 0) {
     return adminErrorResponse('employee_not_found', 404)
   }
 
-  return jsonResponse({
+  const serializeStart = performance.now()
+  const body = {
     ok: true,
     employees,
     pagination: {
@@ -211,5 +242,22 @@ Deno.serve(async (req) => {
       total,
       total_pages: total === 0 ? 0 : Math.ceil(total / pageSize),
     },
-  })
+  }
+  const serializeMs = Math.round(performance.now() - serializeStart)
+  const totalMs = Math.round(performance.now() - totalStart)
+
+  return timingResponse(
+    body,
+    {
+      token: authTimings.tokenMs,
+      auth: authTimings.authMs,
+      authorization_db: authTimings.authorizationDbMs,
+      authorization: authTimings.authorizationMs,
+      employees_db: employeesDbMs,
+      transform: transformMs,
+      serialize: serializeMs,
+      total: totalMs,
+    },
+    dbCalls
+  )
 })
