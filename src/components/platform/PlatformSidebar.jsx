@@ -38,6 +38,22 @@ function useMediaQuery(query) {
   return matches
 }
 
+const MOBILE_HIDDEN_NAV_IDS = new Set(['employees-payroll'])
+
+/** Mobile/PWA: скрыть разделы, доступные только в WEB */
+function hideDesktopOnlyNavItems(navItems) {
+  return navItems
+    .map((item) => {
+      if (!item.children?.length) {
+        return MOBILE_HIDDEN_NAV_IDS.has(item.id) ? null : item
+      }
+      const children = item.children.filter((child) => !MOBILE_HIDDEN_NAV_IDS.has(child.id))
+      if (children.length === 0) return null
+      return { ...item, children }
+    })
+    .filter(Boolean)
+}
+
 /** Mobile: Уведомления — подпункт группы «Главная», не отдельная группа */
 function nestMobileNotificationsUnderHome(navItems) {
   let nested = false
@@ -98,10 +114,10 @@ export default function PlatformSidebar({ isOpen = false, onNavigate, panelRef =
     () => filterPlatformNav(PLATFORM_NAV, user),
     [user]
   )
-  const navItems = useMemo(
-    () => (isMobile ? nestMobileNotificationsUnderHome(filteredNav) : filteredNav),
-    [filteredNav, isMobile]
-  )
+  const navItems = useMemo(() => {
+    if (!isMobile) return filteredNav
+    return nestMobileNotificationsUnderHome(hideDesktopOnlyNavItems(filteredNav))
+  }, [filteredNav, isMobile])
 
   const pinnedGroupIds = useMemo(
     () => new Set(getAutoExpandedGroupIds(pathname, navItems)),

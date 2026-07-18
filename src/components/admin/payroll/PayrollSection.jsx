@@ -1,11 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { isCloudMode } from '../../../lib/dataMode'
-import { EMPLOYEE_FORM_ROLES, getRoleLabel } from '../../../data/roles'
+import { getRoleLabel } from '../../../data/roles'
 import { getCurrentMonthState } from '../../../utils/attendanceData'
 import { formatMonthYearLabel } from '../../../utils/shiftData'
 import {
-  SALARY_RECORD_STATUSES,
   changePayrollMonth,
   formatMoneyKzt,
   getPayrollRecordPath,
@@ -16,14 +15,18 @@ import {
   ensureSalaryPeriod,
   ensureSalaryRecord,
   listSalaryRecordsForPeriod,
+  updateSalaryRecordFields,
 } from '../../../services/salaryPayrollService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
 import SchedulePeriodBar from '../SchedulePeriodBar'
-import EmployeeSearchToolbar from '../EmployeeSearchToolbar'
 import StatusBadge from '../StatusBadge'
+import { CommentIcon, FilterIcon, SearchIcon } from '../../icons/PlatformIcons'
+import PayrollFilterPopover from './PayrollFilterPopover'
+import PayrollCommentModal from './PayrollCommentModal'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
+import '../sections/EmployeesSection.css'
 import './PayrollSection.css'
 
 /** admin-list-employees отклоняет page_size > 100 (invalid_pagination). */
@@ -50,20 +53,33 @@ async function listAllActiveEmployeesForPayroll() {
   return employees
 }
 
+function hasRecordNotes(record) {
+  return Boolean(String(record?.notes || '').trim())
+}
+
 /** Список расчётов зарплаты за месяц */
 export default function PayrollSection() {
   const navigate = useNavigate()
-  const { warning: showWarning } = useToast()
+  const { warning: showWarning, success: showSuccess } = useToast()
+  const filterButtonRef = useRef(null)
+
   const [{ year, month }, setMonthState] = useState(getCurrentMonthState)
   const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('all')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [appliedRoleId, setAppliedRoleId] = useState('')
+  const [appliedStatus, setAppliedStatus] = useState('all')
+  const [draftRoleId, setDraftRoleId] = useState('')
+  const [draftStatus, setDraftStatus] = useState('all')
+  const [filterOpen, setFilterOpen] = useState(false)
+
   const [loading, setLoading] = useState(true)
   const [openingId, setOpeningId] = useState(null)
   const [error, setError] = useState('')
   const [employees, setEmployees] = useState([])
   const [recordsByEmployee, setRecordsByEmployee] = useState(new Map())
   const [period, setPeriod] = useState(null)
+
+  const [commentTarget, setCommentTarget] = useState(null)
+  const [commentSaving, setCommentSaving] = useState(false)
 
   const load = useCallback(
     async (options = {}) => {
@@ -82,8 +98,6 @@ export default function PayrollSection() {
         const nextPeriod = await ensureSalaryPeriod(year, month)
         setPeriod(nextPeriod)
 
-        // Список строится из academy_users (через admin-list-employees),
-        // а не из salary_records — иначе пустой месяц выглядел бы как «нет сотрудников».
         const [employeeRows, records] = await Promise.all([
           listAllActiveEmployeesForPayroll(),
           listSalaryRecordsForPeriod(nextPeriod.id),
@@ -120,12 +134,12 @@ export default function PayrollSection() {
     const q = search.trim().toLowerCase()
     return employees
       .filter((emp) => {
-        if (roleFilter !== 'all' && emp.role !== roleFilter) return false
+        if (appliedRoleId && emp.role !== appliedRoleId) return false
         const record = recordsByEmployee.get(Number(emp.id))
-        if (statusFilter === 'none') {
+        if (appliedStatus === 'none') {
           if (record) return false
-        } else if (statusFilter !== 'all') {
-          if (!record || record.status !== statusFilter) return false
+        } else if (appliedStatus !== 'all') {
+          if (!record || record.status !== appliedStatus) return false
         }
         if (!q) return true
         return String(emp.name || '').toLowerCase().includes(q)
@@ -134,7 +148,52 @@ export default function PayrollSection() {
         const record = recordsByEmployee.get(Number(emp.id)) || null
         return { employee: emp, record }
       })
-  }, [employees, recordsByEmployee, search, roleFilter, statusFilter])
+  }, [employees, recordsByEmployee, search, appliedRoleId, appliedStatus])
+
+  const draftPreviewCount = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return employees.filter((emp) => {
+      if (draftRoleId && emp.role !== draftRoleId) return false
+      const record = recordsByEmployee.get(Number(emp.id))
+      if (draftStatus === 'none') {
+        if (record) return false
+      } else if (draftStatus !== 'all') {
+        if (!record || record.status !== draftStatus) return false
+      }
+      if (!q) return true
+      return String(emp.name || '').toLowerCase().includes(q)
+    }).length
+  }, [employees, recordsByEmployee, search, draftRoleId, draftStatus])
+
+  const filtersActive = Boolean(appliedRoleId) || appliedStatus !== 'all'
+
+  function toggleFilter() {
+    if (filterOpen) {
+      setFilterOpen(false)
+      return
+    }
+    setDraftRoleId(appliedRoleId)
+    setDraftStatus(appliedStatus)
+    setFilterOpen(true)
+  }
+
+  function applyFilter() {
+    setAppliedRoleId(draftRoleId)
+    setAppliedStatus(draftStatus)
+    setFilterOpen(false)
+  }
+
+  function resetFilter() {
+    setDraftRoleId('')
+    setDraftStatus('all')
+    setAppliedRoleId('')
+    setAppliedStatus('all')
+    setFilterOpen(false)
+  }
+
+  function closeFilter() {
+    setFilterOpen(false)
+  }
 
   async function handleOpen(employee) {
     if (!period || openingId) return
@@ -149,6 +208,45 @@ export default function PayrollSection() {
     }
   }
 
+  async function handleOpenComment(employee, record) {
+    if (!period || commentSaving) return
+    try {
+      let nextRecord = record
+      if (!nextRecord) {
+        nextRecord = await ensureSalaryRecord(period.id, employee.id)
+        setRecordsByEmployee((prev) => {
+          const map = new Map(prev)
+          map.set(Number(employee.id), nextRecord)
+          return map
+        })
+      }
+      setCommentTarget({ employee, record: nextRecord })
+    } catch (err) {
+      showWarning(err?.message || 'Не удалось открыть комментарий')
+    }
+  }
+
+  async function handleSaveComment(notes) {
+    if (!commentTarget?.record) return
+    setCommentSaving(true)
+    try {
+      const updated = await updateSalaryRecordFields(commentTarget.record.id, {
+        notes: notes.trim() || '',
+      })
+      setRecordsByEmployee((prev) => {
+        const map = new Map(prev)
+        map.set(Number(commentTarget.employee.id), updated)
+        return map
+      })
+      setCommentTarget(null)
+      showSuccess('Комментарий сохранён')
+    } catch (err) {
+      showWarning(err?.message || 'Не удалось сохранить комментарий')
+    } finally {
+      setCommentSaving(false)
+    }
+  }
+
   return (
     <div className="payroll-section">
       <SchedulePeriodBar
@@ -160,39 +258,52 @@ export default function PayrollSection() {
         nextLabel="Следующий месяц"
       />
 
-      <div className="payroll-section__filters">
-        <EmployeeSearchToolbar
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-          placeholder="Поиск по ФИО"
-        />
-        <select
-          className="payroll-section__select"
-          value={roleFilter}
-          onChange={(event) => setRoleFilter(event.target.value)}
-          aria-label="Фильтр по роли"
-        >
-          <option value="all">Все роли</option>
-          {EMPLOYEE_FORM_ROLES.map((roleId) => (
-            <option key={roleId} value={roleId}>
-              {getRoleLabel(roleId)}
-            </option>
-          ))}
-        </select>
-        <select
-          className="payroll-section__select"
-          value={statusFilter}
-          onChange={(event) => setStatusFilter(event.target.value)}
-          aria-label="Фильтр по статусу"
-        >
-          <option value="all">Все статусы</option>
-          <option value="none">Без расчёта</option>
-          {SALARY_RECORD_STATUSES.map((status) => (
-            <option key={status.id} value={status.id}>
-              {status.label}
-            </option>
-          ))}
-        </select>
+      <div className="employees-section__toolbar payroll-section__toolbar">
+        <label className="employees-section__search-wrap">
+          <span className="employees-section__search-icon" aria-hidden="true">
+            <SearchIcon size={18} />
+          </span>
+          <input
+            type="search"
+            className="employees-section__search"
+            placeholder="Поиск по ФИО"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            aria-label="Поиск по ФИО"
+            autoComplete="off"
+          />
+        </label>
+
+        <div className="employees-section__filter-wrap">
+          <button
+            ref={filterButtonRef}
+            type="button"
+            className={`employees-section__icon-btn${
+              filtersActive ? ' employees-section__icon-btn--active' : ''
+            }`}
+            onClick={toggleFilter}
+            aria-expanded={filterOpen}
+            aria-label="Фильтр"
+            title="Фильтр"
+          >
+            <FilterIcon size={20} />
+            {filtersActive && (
+              <span className="employees-section__filter-indicator" aria-hidden="true" />
+            )}
+          </button>
+          <PayrollFilterPopover
+            open={filterOpen}
+            draftRoleId={draftRoleId}
+            draftStatus={draftStatus}
+            onRoleChange={setDraftRoleId}
+            onStatusChange={setDraftStatus}
+            resultCount={draftPreviewCount}
+            onApply={applyFilter}
+            onReset={resetFilter}
+            onClose={closeFilter}
+            anchorRef={filterButtonRef}
+          />
+        </div>
       </div>
 
       {error && <p className="payroll-section__error">{error}</p>}
@@ -201,7 +312,7 @@ export default function PayrollSection() {
         <p className="payroll-section__empty">Загрузка…</p>
       ) : error ? null : rows.length === 0 ? (
         <p className="payroll-section__empty">
-          {search || roleFilter !== 'all' || statusFilter !== 'all'
+          {search || filtersActive
             ? 'Сотрудники не найдены по текущим фильтрам'
             : 'Нет активных сотрудников для расчёта'}
         </p>
@@ -214,6 +325,7 @@ export default function PayrollSection() {
                 <th>Роль</th>
                 <th>Статус расчёта</th>
                 <th>К выдаче</th>
+                <th className="payroll-table__th-comment">Комментарий</th>
                 <th>Действия</th>
               </tr>
             </thead>
@@ -223,21 +335,37 @@ export default function PayrollSection() {
                   ? getSalaryStatusMeta(record.status)
                   : { label: 'Нет расчёта', badge: 'idle' }
                 const roleLabel = employee.position || getRoleLabel(employee.role)
+                const notesPresent = hasRecordNotes(record)
                 return (
                   <tr key={employee.id}>
-                    <td data-label="ФИО">
+                    <td>
                       <div className="payroll-table__name">{employee.name}</div>
                     </td>
-                    <td data-label="Роль">
+                    <td>
                       <span className="payroll-table__role">{roleLabel}</span>
                     </td>
-                    <td data-label="Статус">
+                    <td>
                       <StatusBadge label={statusMeta.label} type={statusMeta.badge} />
                     </td>
-                    <td data-label="К выдаче" className="payroll-table__payable">
+                    <td className="payroll-table__payable">
                       {record ? formatMoneyKzt(record.totalPayable) : '—'}
                     </td>
-                    <td data-label="Действия" className="payroll-table__actions">
+                    <td className="payroll-table__comment">
+                      <button
+                        type="button"
+                        className={`payroll-table__comment-btn${
+                          notesPresent ? ' payroll-table__comment-btn--filled' : ''
+                        }`}
+                        onClick={() => void handleOpenComment(employee, record)}
+                        aria-label={
+                          notesPresent ? 'Открыть комментарий' : 'Добавить комментарий'
+                        }
+                        title={notesPresent ? 'Есть комментарий' : 'Комментарий'}
+                      >
+                        <CommentIcon size={16} />
+                      </button>
+                    </td>
+                    <td className="payroll-table__actions">
                       <button
                         type="button"
                         className="btn btn--outline btn--sm"
@@ -253,6 +381,18 @@ export default function PayrollSection() {
             </tbody>
           </table>
         </div>
+      )}
+
+      {commentTarget && (
+        <PayrollCommentModal
+          employeeName={commentTarget.employee.name}
+          initialNotes={commentTarget.record?.notes || ''}
+          saving={commentSaving}
+          onClose={() => {
+            if (!commentSaving) setCommentTarget(null)
+          }}
+          onSave={(notes) => void handleSaveComment(notes)}
+        />
       )}
     </div>
   )

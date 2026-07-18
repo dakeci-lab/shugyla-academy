@@ -61,7 +61,10 @@ function main() {
   assert('list page wired', app.includes('PlatformPayroll') && app.includes('employees/payroll'))
   assert('detail route', app.includes('employees/payroll/records/:recordId'))
   assert('month bar', list.includes('SchedulePeriodBar'))
-  assert('filters', list.includes('roleFilter') && list.includes('statusFilter'))
+  assert('filter popover', list.includes('PayrollFilterPopover'))
+  assert('search without label toolbar', list.includes('Поиск по ФИО') && !list.includes('EmployeeSearchToolbar'))
+  assert('comment modal', list.includes('PayrollCommentModal'))
+  assert('table list', list.includes('payroll-table') && list.includes('Комментарий'))
   assert('manual blocks', detail.includes('Основной оклад') && detail.includes('Начисления') && detail.includes('Удержания'))
   assert('no time-tracker import in payroll', !list.includes('timeTracker') && !detail.includes('timeTracker'))
   assert('verify script registered', pkg.includes('verify:salary-payroll-mvp'))
@@ -70,6 +73,9 @@ function main() {
     list.includes('EMPLOYEE_PAGE_SIZE = 100') && !list.includes('pageSize: 200')
   )
   assert('list built from employees not only records', list.includes('listAllActiveEmployeesForPayroll'))
+
+  const sidebar = read('src/components/platform/PlatformSidebar.jsx')
+  assert('payroll hidden on mobile nav', sidebar.includes('hideDesktopOnlyNavItems') && sidebar.includes('employees-payroll'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }
