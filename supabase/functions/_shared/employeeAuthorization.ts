@@ -14,6 +14,19 @@ export type AuthorizedContext = {
   caller: CallerProfile
 }
 
+/** Request-local PostgREST round-trip counter — never module-level. */
+export type DbCallCounter = {
+  count: number
+}
+
+export function createDbCallCounter(): DbCallCounter {
+  return { count: 0 }
+}
+
+export function trackDbCall(counter: DbCallCounter | undefined): void {
+  if (counter) counter.count += 1
+}
+
 /** Request-scoped authz context — never store at module level. */
 export type RequestAuthzContext = {
   serviceClient: SupabaseClient
@@ -21,11 +34,11 @@ export type RequestAuthzContext = {
   authUserId: string
   authMethod: 'getClaims' | 'getUser'
   permissions: Record<string, boolean>
+  dbCalls: DbCallCounter
   timings: {
     tokenMs: number
     authMs: number
-    employeeMs: number
-    permissionsMs: number
+    authorizationDbMs: number
     authorizationMs: number
   }
 }
@@ -105,7 +118,6 @@ export async function verifyBearerAuthUserId(
     const sub = data?.claims?.sub
     if (!error && typeof sub === 'string' && sub.length > 0) {
       const alg = data?.header?.alg ?? ''
-      // SDK may have used getUser internally for HS* keys; surface that for timing logs.
       const authMethod: 'getClaims' | 'getUser' =
         typeof alg === 'string' && alg.startsWith('HS') ? 'getUser' : 'getClaims'
       return { authUserId: sub, authMethod }
@@ -121,10 +133,53 @@ export async function verifyBearerAuthUserId(
 
 const CALLER_SELECT = 'id, status, role, role_id, auth_user_id'
 
+/**
+ * Proven PostgREST path (Stage 8):
+ * academy_users.role_id → roles!academy_users_role_id_fkey
+ *   → role_permissions → permissions!inner(code)
+ * Nested permission codes are filtered server-side; empty nested list means no grant.
+ */
+const CALLER_AUTHZ_SELECT = [
+  'id',
+  'status',
+  'role',
+  'role_id',
+  'auth_user_id',
+  'roles!academy_users_role_id_fkey(role_permissions(permissions!inner(code)))',
+].join(', ')
+
+type NestedPermissionRow = {
+  permissions?: { code?: string | null } | null
+}
+
+type FusedCallerRow = CallerProfile & {
+  roles?: {
+    role_permissions?: NestedPermissionRow[] | null
+  } | null
+}
+
+function permissionsFromFusedCaller(
+  row: FusedCallerRow,
+  permissionCodes: string[]
+): Record<string, boolean> {
+  const result: Record<string, boolean> = {}
+  for (const code of permissionCodes) result[code] = false
+  const links = row.roles?.role_permissions ?? []
+  for (const link of links) {
+    const code = link?.permissions?.code
+    if (typeof code === 'string' && code in result) {
+      result[code] = true
+    }
+  }
+  return result
+}
+
 export async function loadCallerProfile(
   serviceClient: SupabaseClient,
-  authUserId: string
+  authUserId: string,
+  dbCounter?: DbCallCounter
 ): Promise<CallerProfile | Response> {
+  trackDbCall(dbCounter)
   const { data: callerProfile, error: callerProfileError } = await serviceClient
     .from('academy_users')
     .select(CALLER_SELECT)
@@ -149,80 +204,64 @@ export async function loadCallerProfile(
 async function roleHasPermission(
   serviceClient: SupabaseClient,
   roleId: string | null,
-  permissionCode: string
+  permissionCode: string,
+  dbCounter?: DbCallCounter
 ): Promise<boolean> {
   if (!roleId) return false
-  const map = await roleHasPermissionCodes(serviceClient, roleId, [permissionCode])
+  const map = await roleHasPermissionCodes(serviceClient, roleId, [permissionCode], dbCounter)
   return map[permissionCode] === true
 }
 
 /**
- * Batch permission checks for one role.
- * Prefer a single relational PostgREST query; fall back to 2-query path if embed fails.
+ * Batch permission checks for one role (non-workforce helpers).
+ * Single relational query; on embed failure returns all-false (deny).
  */
 export async function roleHasPermissionCodes(
   serviceClient: SupabaseClient,
   roleId: string | null,
-  permissionCodes: string[]
+  permissionCodes: string[],
+  dbCounter?: DbCallCounter
 ): Promise<Record<string, boolean>> {
   const result: Record<string, boolean> = {}
   for (const code of permissionCodes) result[code] = false
   if (!roleId || permissionCodes.length === 0) return result
 
   const uniqueCodes = [...new Set(permissionCodes)]
-
-  // One round-trip: only the requested codes that are linked to this role.
+  trackDbCall(dbCounter)
   const { data: linked, error: linkedError } = await serviceClient
     .from('permissions')
     .select('code, role_permissions!inner(role_id)')
     .in('code', uniqueCodes)
     .eq('role_permissions.role_id', roleId)
 
-  if (!linkedError && linked) {
-    for (const row of linked) {
-      const code = (row as { code?: string }).code
-      if (code && code in result) result[code] = true
+  if (linkedError || !linked) {
+    if (linkedError) {
+      console.error('role_permission_lookup_failed', {
+        code: linkedError.code,
+        message: linkedError.message,
+      })
     }
     return result
   }
 
-  // Fallback: 2 sequential queries (Stage 4 path) if relational select is unavailable.
-  const { data: permissions, error: permError } = await serviceClient
-    .from('permissions')
-    .select('id, code')
-    .in('code', uniqueCodes)
-
-  if (permError || !permissions?.length) return result
-
-  const permissionIds = permissions.map((row) => row.id).filter(Boolean)
-  if (!permissionIds.length) return result
-
-  const { data: links, error: linkError } = await serviceClient
-    .from('role_permissions')
-    .select('permission_id')
-    .eq('role_id', roleId)
-    .in('permission_id', permissionIds)
-
-  if (linkError) return result
-
-  const linkedIds = new Set((links ?? []).map((row) => row.permission_id))
-  for (const row of permissions) {
-    if (row.code && linkedIds.has(row.id)) {
-      result[row.code] = true
-    }
+  for (const row of linked) {
+    const code = (row as { code?: string }).code
+    if (code && code in result) result[code] = true
   }
   return result
 }
 
 /**
  * Full request-scoped authorization for workforce Edge:
- * token → verify once → employee once → permissions once.
- * Context is returned to the caller; never cached across invocations.
+ * token → verify once → ONE fused caller+permissions PostgREST call.
  */
 export async function authorizeWorkforceRequest(
   req: Request,
   permissionCodes: string[]
 ): Promise<RequestAuthzContext | Response> {
+  const dbCalls = createDbCallCounter()
+  const uniqueCodes = [...new Set(permissionCodes)]
+
   const tokenStart = performance.now()
   const bearer = getBearerToken(req)
   const tokenMs = Math.round(performance.now() - tokenStart)
@@ -239,18 +278,49 @@ export async function authorizeWorkforceRequest(
   const authMs = Math.round(performance.now() - authStart)
   if (verified instanceof Response) return verified
 
-  const employeeStart = performance.now()
-  const caller = await loadCallerProfile(serviceClient, verified.authUserId)
-  const employeeMs = Math.round(performance.now() - employeeStart)
-  if (caller instanceof Response) return caller
+  if (uniqueCodes.length === 0) {
+    return adminErrorResponse('forbidden', 403)
+  }
 
-  const permissionsStart = performance.now()
-  const permissions = await roleHasPermissionCodes(
-    serviceClient,
-    caller.role_id,
-    permissionCodes
-  )
-  const permissionsMs = Math.round(performance.now() - permissionsStart)
+  const authorizationDbStart = performance.now()
+  trackDbCall(dbCalls)
+  const { data, error } = await serviceClient
+    .from('academy_users')
+    .select(CALLER_AUTHZ_SELECT)
+    .eq('auth_user_id', verified.authUserId)
+    .in('roles.role_permissions.permissions.code', uniqueCodes)
+    .maybeSingle()
+  const authorizationDbMs = Math.round(performance.now() - authorizationDbStart)
+
+  if (error) {
+    console.error('workforce_authz_fusion_failed', {
+      code: error.code,
+      message: error.message,
+    })
+    return adminErrorResponse('internal_error', 500)
+  }
+
+  if (!data) {
+    return adminErrorResponse('forbidden', 403)
+  }
+
+  const fused = data as FusedCallerRow
+  if (!canEmployeeLogin(fused.status)) {
+    return adminErrorResponse('inactive_caller', 403)
+  }
+  if (!fused.auth_user_id) {
+    return adminErrorResponse('forbidden', 403)
+  }
+
+  const caller: CallerProfile = {
+    id: fused.id,
+    status: fused.status,
+    role: fused.role,
+    role_id: fused.role_id,
+    auth_user_id: fused.auth_user_id,
+  }
+
+  const permissions = permissionsFromFusedCaller(fused, uniqueCodes)
 
   return {
     serviceClient,
@@ -258,12 +328,12 @@ export async function authorizeWorkforceRequest(
     authUserId: verified.authUserId,
     authMethod: verified.authMethod,
     permissions,
+    dbCalls,
     timings: {
       tokenMs,
       authMs,
-      employeeMs,
-      permissionsMs,
-      authorizationMs: employeeMs + permissionsMs,
+      authorizationDbMs,
+      authorizationMs: authorizationDbMs,
     },
   }
 }

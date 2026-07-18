@@ -60,16 +60,38 @@ function main() {
 
   console.log('Stage 2: Parallel / scoped queries')
   assert('employee_id allowed in body', edge.includes("'employee_id'"))
-  assert('scoped parallel Promise.all', edge.includes('Promise.all([employeeQuery, shiftQuery])'))
-  assert('team path batches shifts with .in', edge.includes(".in('employee_id', ids)"))
+  assert(
+    'scoped workforce fused or parallel',
+    edge.includes('WORKFORCE_EMPLOYEE_WITH_SHIFTS_SELECT') ||
+      edge.includes('Promise.all([employeeQuery, shiftQuery])')
+  )
+  assert(
+    'team path avoids N+1 employee loops',
+    !/for \(const .+ of employees\)[\s\S]{0,120}await /.test(edge)
+  )
   assert('no employee loop query pattern', !/for \(const .+ of employees\)[\s\S]{0,120}await /.test(edge))
 
   console.log('Stage 3: Query narrowing + date filters')
-  assert('employees use WORKFORCE_EMPLOYEE_SELECT', edge.includes('WORKFORCE_EMPLOYEE_SELECT'))
-  assert('shifts use WORKFORCE_SHIFT_SELECT', edge.includes('WORKFORCE_SHIFT_SELECT'))
+  assert(
+    'employees use WORKFORCE_EMPLOYEE_SELECT or fused nest',
+    edge.includes('WORKFORCE_EMPLOYEE_WITH_SHIFTS_SELECT') || edge.includes('WORKFORCE_EMPLOYEE_SELECT')
+  )
+  assert(
+    'shifts use WORKFORCE_SHIFT_SELECT fields',
+    fields.includes('WORKFORCE_SHIFT_SELECT') &&
+      (edge.includes('WORKFORCE_EMPLOYEE_WITH_SHIFTS_SELECT') || edge.includes('WORKFORCE_SHIFT_SELECT'))
+  )
   assert('no select * on employees', !edge.includes(".select('*')"))
-  assert('shifts filtered gte date_from', edge.includes(".gte('shift_date', dateFrom)"))
-  assert('shifts filtered lte date_to', edge.includes(".lte('shift_date', dateTo)"))
+  assert(
+    'shifts filtered by date range',
+    edge.includes(".gte('academy_employee_shifts.shift_date', dateFrom)") ||
+      edge.includes(".gte('shift_date', dateFrom)")
+  )
+  assert(
+    'shifts filtered by date upper bound',
+    edge.includes(".lte('academy_employee_shifts.shift_date', dateTo)") ||
+      edge.includes(".lte('shift_date', dateTo)")
+  )
   assert(
     'break columns omitted from SELECT',
     !/WORKFORCE_SHIFT_SELECT\s*=\s*'[^']*planned_break/.test(fields)

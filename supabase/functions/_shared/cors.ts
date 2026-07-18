@@ -3,8 +3,8 @@ export const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Headers':
     'authorization, x-client-info, apikey, content-type, x-shugyla-scheduler-timestamp, x-shugyla-scheduler-signature, x-shugyla-scheduler-test-run-at',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  // Expose Server-Timing so browsers can read Edge phase durations (no PII in values).
-  'Access-Control-Expose-Headers': 'server-timing',
+  // Expose Server-Timing + DB-call budget (counts only; no PII).
+  'Access-Control-Expose-Headers': 'server-timing, x-workforce-db-calls',
   'Timing-Allow-Origin': '*',
 }
 

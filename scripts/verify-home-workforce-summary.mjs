@@ -50,12 +50,19 @@ function main() {
   assert('HOME_SUMMARY_EMPLOYEE_SELECT lean', fields.includes('HOME_SUMMARY_EMPLOYEE_SELECT'))
   assert('HOME_SUMMARY_SHIFT_SELECT lean', fields.includes('HOME_SUMMARY_SHIFT_SELECT'))
   assert(
-    'home loads shifts before employees',
-    /view === 'home-summary'[\s\S]*?HOME_SUMMARY_SHIFT_SELECT[\s\S]*?HOME_SUMMARY_EMPLOYEE_SELECT/.test(
-      edge
-    )
+    'home uses nested shift→employee select or sequential lean selects',
+    edge.includes('HOME_SUMMARY_SHIFT_WITH_EMPLOYEE_SELECT') ||
+      (/view === 'home-summary'[\s\S]*?HOME_SUMMARY_SHIFT_SELECT[\s\S]*?HOME_SUMMARY_EMPLOYEE_SELECT/.test(
+        edge
+      ) &&
+        edge.includes(".in('id', [...shiftIds])"))
   )
-  assert('home employees filtered by shift ids .in', edge.includes(".in('id', [...shiftIds])"))
+  assert(
+    'home does not rely on full-staff second query when fused',
+    edge.includes('HOME_SUMMARY_SHIFT_WITH_EMPLOYEE_SELECT')
+      ? !edge.includes(".in('id', [...shiftIds])")
+      : edge.includes(".in('id', [...shiftIds])")
+  )
 
   console.log('Stage 2: Frontend Home wiring')
   assert('fetchHomeWorkforceSummary exported', service.includes('export async function fetchHomeWorkforceSummary'))

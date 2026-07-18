@@ -86,23 +86,26 @@ function main() {
   assert('no select * in auth helper', !auth.includes(".select('*')"))
   assert('inactive caller rejected', auth.includes("'inactive_caller'"))
   assert(
-    'authorizeWorkforceRequest loads caller once',
+    'authorizeWorkforceRequest maps caller once via fusion',
     (() => {
       const start = auth.indexOf('export async function authorizeWorkforceRequest')
       const end = auth.indexOf('export async function authorizeAuthenticatedEmployee', start)
       const body = auth.slice(start, end === -1 ? undefined : end)
-      return countOccurrences(body, 'loadCallerProfile(') === 1
+      return (
+        body.includes('CALLER_AUTHZ_SELECT') &&
+        countOccurrences(body, 'loadCallerProfile(') === 0 &&
+        countOccurrences(body, '.maybeSingle()') === 1
+      )
     })()
   )
 
   console.log('Stage 3: Minimal permission lookup')
   assert('roleHasPermissionCodes exported', auth.includes('export async function roleHasPermissionCodes'))
   assert(
-    'relational permission select preferred',
-    auth.includes("role_permissions!inner(role_id)") && auth.includes(".in('code', uniqueCodes)")
+    'workforce authz uses roles→role_permissions→permissions fusion',
+    auth.includes('roles!academy_users_role_id_fkey') &&
+      auth.includes(".in('roles.role_permissions.permissions.code'")
   )
-  assert('permission codes filtered with .in', auth.includes(".in('code', uniqueCodes)"))
-  assert('fallback 2-query path retained', auth.includes(".from('role_permissions')"))
   assert('permissionCodesForView server-fixed', edge.includes('function permissionCodesForView'))
   assert(
     'home-summary only team permission',
@@ -114,15 +117,18 @@ function main() {
   console.log('Stage 4: Request-scoped context')
   assert('RequestAuthzContext type', auth.includes('export type RequestAuthzContext'))
   assert('no module-level current user', !/let\s+current(User|Caller|Authz)/.test(auth))
-  assert('no global permissions cache', !/Map\(\).*permission|permissionCache|authzCache/.test(auth))
-  assert('context includes timings', auth.includes('permissionsMs') && auth.includes('authorizationMs'))
+  assert('no global permissions cache', !/permissionCache|authzCache/.test(auth))
+  assert(
+    'context includes authorization timings',
+    auth.includes('authorizationDbMs') && auth.includes('authorizationMs')
+  )
 
   console.log('Stage 5: Server-Timing phases')
-  assert('token phase emitted', edge.includes('token: timings.tokenMs') || edge.includes('token:'))
-  assert('auth phase emitted', edge.includes('auth: timings.authMs') || edge.includes('...authzTimingPhases'))
-  assert('employee phase emitted', edge.includes('employee: timings.employeeMs') || edge.includes('authzTimingPhases'))
-  assert('permissions phase emitted', edge.includes('permissions: timings.permissionsMs') || edge.includes('authzTimingPhases'))
-  assert('authorization aggregate emitted', edge.includes('authorization: timings.authorizationMs') || edge.includes('authzTimingPhases'))
+  assert('token phase emitted', edge.includes('token:'))
+  assert('auth phase emitted', edge.includes('auth:'))
+  assert('authorization_db phase emitted', edge.includes('authorization_db:'))
+  assert('authorization aggregate emitted', edge.includes('authorization:'))
+  assert('workforce_db phase emitted', edge.includes('workforce_db:'))
   assert('CORS exposes server-timing', cors.includes('Access-Control-Expose-Headers'))
   assert('buildServerTimingHeader has no PII fields', !/buildServerTimingHeader[\s\S]{0,200}email/.test(cors))
 
@@ -136,7 +142,12 @@ function main() {
   assert('authz error is not empty success', !/if \(authzResult instanceof Response\)[\s\S]{0,80}employees:\s*\[\]/.test(edge))
 
   console.log('Stage 7: Contracts preserved')
-  assert('home-summary contract', edge.includes("'home-summary'") && edge.includes('HOME_SUMMARY_SHIFT_SELECT'))
+  assert(
+    'home-summary contract',
+    edge.includes("'home-summary'") &&
+      (edge.includes('HOME_SUMMARY_SHIFT_WITH_EMPLOYEE_SELECT') ||
+        edge.includes('HOME_SUMMARY_SHIFT_SELECT'))
+  )
   assert('response still employees+shifts', edge.includes('employees,') && edge.includes('shifts,'))
   assert('OwnerDashboard uses home summary', owner.includes('fetchHomeWorkforceSummary'))
   assert('Schedule uses schedule view', schedule.includes("view: 'schedule'"))

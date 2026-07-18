@@ -13,6 +13,21 @@ export const HOME_SUMMARY_EMPLOYEE_SELECT =
 export const HOME_SUMMARY_SHIFT_SELECT =
   'id, employee_id, shift_date, status, planned_start_time, planned_end_time, actual_start_time'
 
+/** Disambiguate employee_id FK (created_by also points at academy_users). */
+export const SHIFT_EMPLOYEE_FK = 'academy_employee_shifts_employee_id_fkey'
+
+/** Home: shifts → nested employee (!inner keeps only active non-admin matches). */
+export const HOME_SUMMARY_SHIFT_WITH_EMPLOYEE_SELECT = [
+  HOME_SUMMARY_SHIFT_SELECT,
+  `academy_users!${SHIFT_EMPLOYEE_FK}!inner(${HOME_SUMMARY_EMPLOYEE_SELECT})`,
+].join(', ')
+
+/** Profile/Schedule: employees → nested shifts (outer; empty nest kept). */
+export const WORKFORCE_EMPLOYEE_WITH_SHIFTS_SELECT = [
+  WORKFORCE_EMPLOYEE_SELECT,
+  `academy_employee_shifts!${SHIFT_EMPLOYEE_FK}(${WORKFORCE_SHIFT_SELECT})`,
+].join(', ')
+
 export type DbWorkforceEmployeeRow = {
   id: number
   first_name: string

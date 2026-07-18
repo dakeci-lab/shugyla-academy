@@ -2,6 +2,8 @@ import '@supabase/functions-js/edge-runtime.d.ts'
 import {
   authorizeWorkforceRequest,
   adminErrorResponse,
+  trackDbCall,
+  type DbCallCounter,
 } from '../_shared/employeeAuthorization.ts'
 import {
   buildServerTimingHeader,
@@ -9,10 +11,8 @@ import {
   jsonResponse,
 } from '../_shared/cors.ts'
 import {
-  HOME_SUMMARY_EMPLOYEE_SELECT,
-  HOME_SUMMARY_SHIFT_SELECT,
-  WORKFORCE_EMPLOYEE_SELECT,
-  WORKFORCE_SHIFT_SELECT,
+  HOME_SUMMARY_SHIFT_WITH_EMPLOYEE_SELECT,
+  WORKFORCE_EMPLOYEE_WITH_SHIFTS_SELECT,
   mapHomeSummaryEmployee,
   mapSafeWorkforceEmployee,
   mapSafeWorkforceShift,
@@ -72,10 +72,12 @@ function parseOptionalEmployeeId(value: unknown): number | null | Response {
 function timingResponse(
   body: Record<string, unknown>,
   phases: Record<string, number>,
+  dbCalls: DbCallCounter,
   status = 200
 ) {
   return jsonResponse(body, status, {
     'Server-Timing': buildServerTimingHeader(phases),
+    'X-Workforce-DB-Calls': String(dbCalls.count),
   })
 }
 
@@ -105,20 +107,19 @@ function resolveWorkforceScope(
   }
 }
 
-function authzTimingPhases(timings: {
-  tokenMs: number
-  authMs: number
-  employeeMs: number
-  permissionsMs: number
-  authorizationMs: number
-}) {
-  return {
-    token: timings.tokenMs,
-    auth: timings.authMs,
-    employee: timings.employeeMs,
-    permissions: timings.permissionsMs,
-    authorization: timings.authorizationMs,
-  }
+type HomeShiftEmbedRow = Record<string, unknown> & {
+  academy_users?: {
+    id: number
+    first_name: string
+    last_name: string
+    full_name: string
+    role: string
+    position: string
+  } | null
+}
+
+type EmployeeWithShiftsRow = DbWorkforceEmployeeRow & {
+  academy_employee_shifts?: Record<string, unknown>[] | null
 }
 
 Deno.serve(async (req) => {
@@ -185,11 +186,18 @@ Deno.serve(async (req) => {
   const authzResult = await authorizeWorkforceRequest(req, requiredCodes)
   if (authzResult instanceof Response) return authzResult
 
-  const { serviceClient, caller, permissions, timings: authzTimings, authMethod } = authzResult
+  const {
+    serviceClient,
+    caller,
+    permissions,
+    timings: authzTimings,
+    authMethod,
+    dbCalls,
+  } = authzResult
   const scopeResult = resolveWorkforceScope(view, permissions)
   if (scopeResult instanceof Response) return scopeResult
 
-  // --- Home summary: day shifts first, then only employees who appear that day ---
+  // --- Home summary: one nested shifts→employees query ---
   if (view === 'home-summary') {
     if (rangeDays !== 1 || dateFrom !== dateTo) {
       return adminErrorResponse('invalid_date_range', 422)
@@ -198,90 +206,53 @@ Deno.serve(async (req) => {
       return adminErrorResponse('forbidden_field', 422)
     }
 
-    const shiftStart = performance.now()
-    const shiftRes = await serviceClient
+    const workforceDbStart = performance.now()
+    trackDbCall(dbCalls)
+    const workforceRes = await serviceClient
       .from('academy_employee_shifts')
-      .select(HOME_SUMMARY_SHIFT_SELECT)
+      .select(HOME_SUMMARY_SHIFT_WITH_EMPLOYEE_SELECT)
       .eq('shift_date', dateFrom)
+      .eq('academy_users.status', 'active')
+      .neq('academy_users.role', 'admin')
       .order('employee_id', { ascending: true })
-    const shiftsQueryMs = Math.round(performance.now() - shiftStart)
+    const workforceDbMs = Math.round(performance.now() - workforceDbStart)
 
-    if (shiftRes.error) {
-      console.error('admin_team_workforce_shifts_failed', {
+    if (workforceRes.error) {
+      console.error('admin_team_workforce_home_fusion_failed', {
         requestId,
-        code: shiftRes.error.code,
-        message: shiftRes.error.message,
+        code: workforceRes.error.code,
+        message: workforceRes.error.message,
       })
       return adminErrorResponse('internal_error', 500)
     }
 
-    const shiftIds = new Set<number>()
-    for (const row of shiftRes.data ?? []) {
-      const id = Number((row as { employee_id?: number }).employee_id)
-      if (Number.isFinite(id)) shiftIds.add(id)
-    }
-
-    let employeesQueryMs = 0
-    let employeeRows: unknown[] = []
-    if (shiftIds.size > 0) {
-      const empStart = performance.now()
-      const empRes = await serviceClient
-        .from('academy_users')
-        .select(HOME_SUMMARY_EMPLOYEE_SELECT)
-        .in('id', [...shiftIds])
-        .neq('role', 'admin')
-        .eq('status', 'active')
-        .order('full_name', { ascending: true })
-        .order('id', { ascending: true })
-      employeesQueryMs = Math.round(performance.now() - empStart)
-      if (empRes.error) {
-        console.error('admin_team_workforce_employees_failed', {
-          requestId,
-          code: empRes.error.code,
-          message: empRes.error.message,
-        })
-        return adminErrorResponse('internal_error', 500)
-      }
-      employeeRows = empRes.data ?? []
-    }
-
     const transformStart = performance.now()
-    const employees = []
-    for (const row of employeeRows) {
-      try {
-        employees.push(
-          mapHomeSummaryEmployee(
-            row as {
-              id: number
-              first_name: string
-              last_name: string
-              full_name: string
-              role: string
-              position: string
-            }
-          )
-        )
-      } catch (mapError) {
-        console.error('admin_team_workforce_map_failed', {
-          requestId,
-          category: mapError instanceof Error ? mapError.message : 'unknown',
-        })
-      }
-    }
-    const allowedIds = new Set(employees.map((employee) => employee.id))
+    const employeeById = new Map<number, ReturnType<typeof mapHomeSummaryEmployee>>()
     const shifts = []
-    for (const row of shiftRes.data ?? []) {
+    for (const row of (workforceRes.data ?? []) as HomeShiftEmbedRow[]) {
+      const nested = row.academy_users
+      if (!nested?.id) {
+        console.error('admin_team_workforce_home_missing_employee', { requestId })
+        continue
+      }
       try {
-        const mapped = mapSafeWorkforceShift(row as Record<string, unknown>)
-        if (!allowedIds.has(mapped.employee_id)) continue
+        if (!employeeById.has(nested.id)) {
+          employeeById.set(nested.id, mapHomeSummaryEmployee(nested))
+        }
+        const mapped = mapSafeWorkforceShift(row)
+        if (mapped.employee_id !== nested.id) continue
         shifts.push(mapped)
       } catch (mapError) {
-        console.error('admin_team_workforce_shift_map_failed', {
+        console.error('admin_team_workforce_home_map_failed', {
           requestId,
           category: mapError instanceof Error ? mapError.message : 'unknown',
         })
       }
     }
+    const employees = [...employeeById.values()].sort((a, b) => {
+      const byName = a.full_name.localeCompare(b.full_name, 'ru')
+      return byName !== 0 ? byName : a.id - b.id
+    })
     const transformMs = Math.round(performance.now() - transformStart)
     const totalMs = Math.round(performance.now() - t0)
 
@@ -294,13 +265,12 @@ Deno.serve(async (req) => {
       authMethod,
       tokenMs: authzTimings.tokenMs,
       authMs: authzTimings.authMs,
-      employeeMs: authzTimings.employeeMs,
-      permissionsMs: authzTimings.permissionsMs,
+      authorizationDbMs: authzTimings.authorizationDbMs,
       authorizationMs: authzTimings.authorizationMs,
-      employeesQueryMs,
-      shiftsQueryMs,
+      workforceDbMs,
       transformMs,
       totalMs,
+      dbCalls: dbCalls.count,
       employeeCount: employees.length,
       shiftCount: shifts.length,
     })
@@ -317,16 +287,19 @@ Deno.serve(async (req) => {
         shifts,
       },
       {
-        ...authzTimingPhases(authzTimings),
-        employees: employeesQueryMs,
-        shifts: shiftsQueryMs,
+        token: authzTimings.tokenMs,
+        auth: authzTimings.authMs,
+        authorization_db: authzTimings.authorizationDbMs,
+        authorization: authzTimings.authorizationMs,
+        workforce_db: workforceDbMs,
         transform: transformMs,
         total: totalMs,
-      }
+      },
+      dbCalls
     )
   }
 
-  // Resolve effective employee scope before queries so employees + shifts can run in parallel.
+  // Profile / Schedule / dashboard / rating: employees with outer nested shifts.
   let scopedEmployeeId: number | null = null
   if (requestedEmployeeId != null) {
     if (!scopeResult.teamScope && requestedEmployeeId !== caller.id) {
@@ -337,137 +310,90 @@ Deno.serve(async (req) => {
     scopedEmployeeId = caller.id
   }
 
+  const workforceDbStart = performance.now()
+  trackDbCall(dbCalls)
   let employeeQuery = serviceClient
     .from('academy_users')
-    .select(WORKFORCE_EMPLOYEE_SELECT)
+    .select(WORKFORCE_EMPLOYEE_WITH_SHIFTS_SELECT)
     .neq('role', 'admin')
     .eq('status', 'active')
+    .gte('academy_employee_shifts.shift_date', dateFrom)
+    .lte('academy_employee_shifts.shift_date', dateTo)
     .order('full_name', { ascending: true })
     .order('id', { ascending: true })
+    .order('shift_date', {
+      ascending: true,
+      referencedTable: 'academy_employee_shifts',
+    })
+    .order('employee_id', {
+      ascending: true,
+      referencedTable: 'academy_employee_shifts',
+    })
 
   if (scopedEmployeeId != null) {
     employeeQuery = employeeQuery.eq('id', scopedEmployeeId)
   }
 
-  let shiftQuery = serviceClient
-    .from('academy_employee_shifts')
-    .select(WORKFORCE_SHIFT_SELECT)
-    .gte('shift_date', dateFrom)
-    .lte('shift_date', dateTo)
-    .order('shift_date', { ascending: true })
-    .order('employee_id', { ascending: true })
+  const workforceRes = await employeeQuery
+  const workforceDbMs = Math.round(performance.now() - workforceDbStart)
 
-  if (scopedEmployeeId != null) {
-    shiftQuery = shiftQuery.eq('employee_id', scopedEmployeeId)
-  }
-
-  const queriesStart = performance.now()
-  let employeeRows: unknown[] | null = null
-  let shiftRows: unknown[] | null = null
-  let employeeError: { code?: string; message?: string; details?: string; hint?: string } | null =
-    null
-  let shiftError: { code?: string; message?: string; details?: string; hint?: string } | null = null
-  let employeesQueryMs = 0
-  let shiftsQueryMs = 0
-
-  if (scopedEmployeeId != null) {
-    const empStart = performance.now()
-    const shiftStart = performance.now()
-    const [empRes, shiftRes] = await Promise.all([employeeQuery, shiftQuery])
-    employeesQueryMs = Math.round(performance.now() - empStart)
-    shiftsQueryMs = Math.round(performance.now() - shiftStart)
-    employeeRows = empRes.data
-    employeeError = empRes.error
-    shiftRows = shiftRes.data
-    shiftError = shiftRes.error
-  } else {
-    const empStart = performance.now()
-    const empRes = await employeeQuery
-    employeesQueryMs = Math.round(performance.now() - empStart)
-    employeeRows = empRes.data
-    employeeError = empRes.error
-
-    if (!employeeError) {
-      const ids: number[] = []
-      for (const row of employeeRows ?? []) {
-        const id = Number((row as DbWorkforceEmployeeRow)?.id)
-        if (Number.isFinite(id)) ids.push(id)
-      }
-      if (ids.length === 0) {
-        const totalMs = Math.round(performance.now() - t0)
-        return timingResponse(
-          {
-            ok: true,
-            view,
-            timezone,
-            date_from: dateFrom,
-            date_to: dateTo,
-            team_scope: scopeResult.teamScope,
-            employees: [],
-            shifts: [],
-          },
-          {
-            ...authzTimingPhases(authzTimings),
-            employees: employeesQueryMs,
-            shifts: 0,
-            transform: 0,
-            total: totalMs,
-          }
-        )
-      }
-      const shiftStart = performance.now()
-      const shiftRes = await shiftQuery.in('employee_id', ids)
-      shiftsQueryMs = Math.round(performance.now() - shiftStart)
-      shiftRows = shiftRes.data
-      shiftError = shiftRes.error
-    }
-  }
-  const queriesMs = Math.round(performance.now() - queriesStart)
-
-  if (employeeError) {
-    console.error('admin_team_workforce_employees_failed', {
+  if (workforceRes.error) {
+    console.error('admin_team_workforce_employees_fusion_failed', {
       requestId,
-      code: employeeError.code,
-      message: employeeError.message,
-      details: employeeError.details,
-      hint: employeeError.hint,
+      code: workforceRes.error.code,
+      message: workforceRes.error.message,
     })
     return adminErrorResponse('internal_error', 500)
   }
 
-  if (shiftError) {
-    console.error('admin_team_workforce_shifts_failed', {
-      requestId,
-      code: shiftError.code,
-      message: shiftError.message,
-      details: shiftError.details,
-      hint: shiftError.hint,
-    })
-    return adminErrorResponse('internal_error', 500)
+  // Scoped profile/own: missing employee → controlled empty (same as prior empty scope).
+  if (scopedEmployeeId != null && (!workforceRes.data || workforceRes.data.length === 0)) {
+    const totalMs = Math.round(performance.now() - t0)
+    return timingResponse(
+      {
+        ok: true,
+        view,
+        timezone,
+        date_from: dateFrom,
+        date_to: dateTo,
+        team_scope: scopeResult.teamScope,
+        employees: [],
+        shifts: [],
+      },
+      {
+        token: authzTimings.tokenMs,
+        auth: authzTimings.authMs,
+        authorization_db: authzTimings.authorizationDbMs,
+        authorization: authzTimings.authorizationMs,
+        workforce_db: workforceDbMs,
+        transform: 0,
+        total: totalMs,
+      },
+      dbCalls
+    )
   }
 
   const transformStart = performance.now()
   const employees = []
-  for (const row of employeeRows ?? []) {
+  const shifts = []
+  for (const row of (workforceRes.data ?? []) as EmployeeWithShiftsRow[]) {
     try {
-      employees.push(mapSafeWorkforceEmployee(row as DbWorkforceEmployeeRow))
+      const { academy_employee_shifts: nestedShifts, ...employeeRow } = row
+      employees.push(mapSafeWorkforceEmployee(employeeRow as DbWorkforceEmployeeRow))
+      for (const shiftRow of nestedShifts ?? []) {
+        try {
+          const mapped = mapSafeWorkforceShift(shiftRow)
+          if (mapped.employee_id !== employeeRow.id) continue
+          shifts.push(mapped)
+        } catch (mapError) {
+          console.error('admin_team_workforce_shift_map_failed', {
+            requestId,
+            category: mapError instanceof Error ? mapError.message : 'unknown',
+          })
+        }
+      }
     } catch (mapError) {
       console.error('admin_team_workforce_map_failed', {
-        requestId,
-        category: mapError instanceof Error ? mapError.message : 'unknown',
-      })
-    }
-  }
-
-  const allowedIds = new Set(employees.map((employee) => employee.id))
-  const shifts = []
-  for (const row of shiftRows ?? []) {
-    try {
-      const mapped = mapSafeWorkforceShift(row as Record<string, unknown>)
-      if (!allowedIds.has(mapped.employee_id)) continue
-      shifts.push(mapped)
-    } catch (mapError) {
-      console.error('admin_team_workforce_shift_map_failed', {
         requestId,
         category: mapError instanceof Error ? mapError.message : 'unknown',
       })
@@ -485,14 +411,12 @@ Deno.serve(async (req) => {
     authMethod,
     tokenMs: authzTimings.tokenMs,
     authMs: authzTimings.authMs,
-    employeeMs: authzTimings.employeeMs,
-    permissionsMs: authzTimings.permissionsMs,
+    authorizationDbMs: authzTimings.authorizationDbMs,
     authorizationMs: authzTimings.authorizationMs,
-    employeesQueryMs,
-    shiftsQueryMs,
-    queriesMs,
+    workforceDbMs,
     transformMs,
     totalMs,
+    dbCalls: dbCalls.count,
     employeeCount: employees.length,
     shiftCount: shifts.length,
   })
@@ -509,11 +433,14 @@ Deno.serve(async (req) => {
       shifts,
     },
     {
-      ...authzTimingPhases(authzTimings),
-      employees: employeesQueryMs,
-      shifts: shiftsQueryMs,
+      token: authzTimings.tokenMs,
+      auth: authzTimings.authMs,
+      authorization_db: authzTimings.authorizationDbMs,
+      authorization: authzTimings.authorizationMs,
+      workforce_db: workforceDbMs,
       transform: transformMs,
       total: totalMs,
-    }
+    },
+    dbCalls
   )
 })
