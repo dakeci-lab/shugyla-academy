@@ -101,6 +101,13 @@
   .platform-layout__overlay--visible {
     opacity: 1;
     pointer-events: auto;
+    /* Пока меню открыто — не отдаём горизонтальный жест браузеру */
+    touch-action: none;
+  }
+
+  .platform-layout--drawer-open .platform-sidebar {
+    /* Вертикальный scroll меню ок; горизонтальный Back — нет */
+    touch-action: pan-y;
   }
 
   .platform-layout__edge-swipe {

@@ -28,13 +28,11 @@ function currentPath() {
 /**
  * Edge-swipe для мобильного navigation drawer.
  *
- * Первопричина конфликта с системным «Назад»:
- * браузер начинает history-navigation с левого края ДО preventDefault
- * (мы ждали AXIS_LOCK). Исправление:
- * 1) edge-зона с touch-action: none забирает жест у браузера сразу;
- * 2) preventDefault на первом же движении вправо с края;
- * 3) короткий popstate-guard восстанавливает маршрут через React Router,
- *    если OS всё же успела сделать Back (без сырого history.pushState).
+ * Блокировка системного «Назад»:
+ * 1) edge-зона touch-action: none + early preventDefault при открытии;
+ * 2) пока Drawer открыт — persistent popstate-guard и preventDefault на
+ *    горизонтальных свайпах вправо (раньше mode=ignore отдавал жест браузеру);
+ * 3) свайп влево по-прежнему закрывает Drawer.
  */
 export default function useMobileDrawerEdgeSwipe({
   enabled = true,
@@ -59,6 +57,7 @@ export default function useMobileDrawerEdgeSwipe({
     armed: false,
     lockedPath: null,
     timer: 0,
+    persistent: false,
   })
 
   isOpenRef.current = isOpen
@@ -116,21 +115,31 @@ export default function useMobileDrawerEdgeSwipe({
       }
     }
 
-    function disarmHistoryGuard() {
+    function disarmHistoryGuard({ force = false } = {}) {
       const guard = historyGuardRef.current
+      if (!force && (isOpenRef.current || guard.persistent)) {
+        guard.armed = true
+        guard.lockedPath = guard.lockedPath || currentPath()
+        window.clearTimeout(guard.timer)
+        return
+      }
       window.clearTimeout(guard.timer)
       guard.armed = false
       guard.lockedPath = null
+      guard.persistent = false
     }
 
-    function armHistoryGuard() {
+    function armHistoryGuard({ persistent = false } = {}) {
       const guard = historyGuardRef.current
       guard.armed = true
+      guard.persistent = persistent || isOpenRef.current
       guard.lockedPath = currentPath()
       window.clearTimeout(guard.timer)
-      guard.timer = window.setTimeout(() => {
-        disarmHistoryGuard()
-      }, HISTORY_GUARD_MS)
+      if (!guard.persistent) {
+        guard.timer = window.setTimeout(() => {
+          disarmHistoryGuard({ force: true })
+        }, HISTORY_GUARD_MS)
+      }
     }
 
     function onPopState() {
@@ -138,14 +147,10 @@ export default function useMobileDrawerEdgeSwipe({
       if (!guard.armed || !guard.lockedPath) return
 
       const restoreTo = guard.lockedPath
-      // Системный Back сработал вместе со свайпом — возвращаем маршрут и открываем меню.
       onRestorePathRef.current?.(restoreTo)
       onOpenChangeRef.current?.(true)
-
-      window.clearTimeout(guard.timer)
-      guard.timer = window.setTimeout(() => {
-        disarmHistoryGuard()
-      }, HISTORY_GUARD_MS)
+      isOpenRef.current = true
+      armHistoryGuard({ persistent: true })
     }
 
     function settle(shouldOpen) {
@@ -170,6 +175,7 @@ export default function useMobileDrawerEdgeSwipe({
         overlay.style.pointerEvents = shouldOpen ? 'auto' : 'none'
       }
 
+      isOpenRef.current = shouldOpen
       onOpenChangeRef.current?.(shouldOpen)
 
       window.clearTimeout(settleTimerRef.current)
@@ -179,12 +185,9 @@ export default function useMobileDrawerEdgeSwipe({
       }, SETTLE_MS)
 
       if (shouldOpen) {
-        window.clearTimeout(historyGuardRef.current.timer)
-        historyGuardRef.current.timer = window.setTimeout(() => {
-          disarmHistoryGuard()
-        }, 450)
+        armHistoryGuard({ persistent: true })
       } else {
-        disarmHistoryGuard()
+        disarmHistoryGuard({ force: true })
       }
     }
 
@@ -192,8 +195,16 @@ export default function useMobileDrawerEdgeSwipe({
       const session = sessionRef.current
       sessionRef.current = null
       if (!session) return
+
+      if (session.mode === 'block-back') {
+        // Жест поглощён, drawer остаётся открытым
+        return
+      }
+
       if (session.mode !== 'drawer') {
-        if (session.fromEdge) disarmHistoryGuard()
+        if (session.fromEdge && !isOpenRef.current) {
+          disarmHistoryGuard({ force: true })
+        }
         return
       }
 
@@ -224,7 +235,9 @@ export default function useMobileDrawerEdgeSwipe({
 
       window.clearTimeout(settleTimerRef.current)
 
-      if (!open && fromEdge) {
+      if (open) {
+        armHistoryGuard({ persistent: true })
+      } else if (fromEdge) {
         armHistoryGuard()
       }
 
@@ -253,7 +266,8 @@ export default function useMobileDrawerEdgeSwipe({
       const edgeEl = edgeRef?.current
       const fromEdge =
         Boolean(edgeEl && (event.target === edgeEl || edgeEl.contains(event.target))) ||
-        (!isOpenRef.current && touch.clientX <= EDGE_ZONE_PX)
+        (!isOpenRef.current && touch.clientX <= EDGE_ZONE_PX) ||
+        (isOpenRef.current && touch.clientX <= EDGE_ZONE_PX)
 
       beginSession(touch, { fromEdge })
     }
@@ -269,37 +283,56 @@ export default function useMobileDrawerEdgeSwipe({
       const dx = touch.clientX - session.startX
       const dy = touch.clientY - session.startY
 
+      // Пока drawer открыт — любой свайп вправо блокируем у браузера.
+      if (session.fromOpen && session.mode === 'block-back') {
+        if (dx > 0 && event.cancelable) event.preventDefault()
+        return
+      }
+
       if (session.mode === 'undecided') {
-        // С края: preventDefault сразу при движении вправо — до AXIS_LOCK.
+        // С края при закрытом: preventDefault сразу при движении вправо.
         if (session.fromEdge && !session.fromOpen && dx > 0) {
           if (event.cancelable) event.preventDefault()
           if (!historyGuardRef.current.armed) armHistoryGuard()
+        }
+
+        // При открытом drawer: сразу глушим движение вправо (системный Back).
+        if (session.fromOpen && dx > 0) {
+          if (event.cancelable) event.preventDefault()
+          armHistoryGuard({ persistent: true })
         }
 
         if (Math.abs(dx) < AXIS_LOCK_PX && Math.abs(dy) < AXIS_LOCK_PX) return
 
         if (Math.abs(dy) > Math.abs(dx)) {
           session.mode = 'ignore'
-          if (session.fromEdge) disarmHistoryGuard()
+          if (session.fromEdge && !isOpenRef.current) {
+            disarmHistoryGuard({ force: true })
+          }
           return
         }
 
         if (!session.fromOpen && dx <= 0) {
           session.mode = 'ignore'
-          if (session.fromEdge) disarmHistoryGuard()
+          if (session.fromEdge) disarmHistoryGuard({ force: true })
           return
         }
 
         if (session.fromOpen && dx >= 0) {
-          session.mode = 'ignore'
+          // Не отдаём жест браузеру — поглощаем до конца касания.
+          if (event.cancelable) event.preventDefault()
+          session.mode = 'block-back'
+          armHistoryGuard({ persistent: true })
           return
         }
 
         session.mode = 'drawer'
         session.width = getDrawerWidth()
         session.velocity = 0
-        if (session.fromEdge && !session.fromOpen && !historyGuardRef.current.armed) {
+        if (!session.fromOpen && session.fromEdge) {
           armHistoryGuard()
+        } else if (session.fromOpen) {
+          armHistoryGuard({ persistent: true })
         }
         setDraggingClass(true)
       }
@@ -360,12 +393,32 @@ export default function useMobileDrawerEdgeSwipe({
         edgeEl.removeEventListener('touchcancel', onTouchCancel, passiveCapture)
       }
       window.clearTimeout(settleTimerRef.current)
-      disarmHistoryGuard()
+      disarmHistoryGuard({ force: true })
       setDraggingClass(false)
       clearInlineStyles()
       sessionRef.current = null
     }
   }, [enabled, layoutRef, sidebarRef, overlayRef, edgeRef])
+
+  // Пока drawer открыт (бургер / свайп) — history-guard всегда активен.
+  useEffect(() => {
+    if (!enabled) return undefined
+    const guard = historyGuardRef.current
+    if (isOpen) {
+      guard.armed = true
+      guard.persistent = true
+      guard.lockedPath = currentPath()
+      window.clearTimeout(guard.timer)
+      return undefined
+    }
+    if (!draggingRef.current) {
+      window.clearTimeout(guard.timer)
+      guard.armed = false
+      guard.lockedPath = null
+      guard.persistent = false
+    }
+    return undefined
+  }, [isOpen, enabled])
 
   useEffect(() => {
     if (draggingRef.current) return

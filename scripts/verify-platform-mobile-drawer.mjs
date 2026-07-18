@@ -73,6 +73,8 @@ function main() {
   assert('early preventDefault from edge', edgeSwipe.includes('fromEdge') && edgeSwipe.includes('preventDefault'))
   assert('popstate guard restores path', edgeSwipe.includes('onRestorePath') && layout.includes('restorePathAfterEdgeBack'))
   assert('unified under PlatformLayout', layout.includes('edgeRef') && !layout.includes('insertMobileNotificationsItem'))
+  assert('blocks back while drawer open', edgeSwipe.includes('block-back') && edgeSwipe.includes('persistent'))
+  assert('overlay blocks touch while open', layoutCss.includes('touch-action: none'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }
