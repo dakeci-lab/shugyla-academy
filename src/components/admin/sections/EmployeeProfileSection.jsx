@@ -250,15 +250,20 @@ export default function EmployeeProfileSection({ employeeId }) {
     // admin-list-employees / workforce. Mutations call loadEmployee + refresh.
   }, [loadEmployee])
 
+  // Clear schedule-derived state once when the employee is outside store presence.
+  // Must not depend on periodShifts: setPeriodShifts([]) would recreate the array
+  // every pass and re-trigger this effect (infinite render loop → frozen navigation).
   useEffect(() => {
-    if (!showStoreSchedule) {
-      setRating(null)
-      setRatingLoading(false)
-      setPeriodShifts([])
-      setScheduleLoading(false)
-      setScheduleError('')
-      return undefined
-    }
+    if (showStoreSchedule) return
+    setRating(null)
+    setRatingLoading(false)
+    setPeriodShifts((current) => (current.length === 0 ? current : []))
+    setScheduleLoading(false)
+    setScheduleError('')
+  }, [showStoreSchedule])
+
+  useEffect(() => {
+    if (!showStoreSchedule) return undefined
 
     if (!showRating || scheduleLoading) {
       if (!showRating) {
