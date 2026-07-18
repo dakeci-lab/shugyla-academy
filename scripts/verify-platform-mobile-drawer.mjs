@@ -38,6 +38,7 @@ function main() {
   const layoutCss = read('src/layouts/PlatformLayout.css')
   const sidebarCss = read('src/components/platform/PlatformSidebar.css')
   const scrollLock = read('src/utils/modalScrollLock.js')
+  const edgeSwipe = read('src/hooks/useMobileDrawerEdgeSwipe.js')
 
   console.log('Stage 1: Scroll lock')
   assert('uses lockModalScroll', layout.includes('lockModalScroll'))
@@ -59,6 +60,15 @@ function main() {
   assert('sidebar z-index above overlay', /z-index:\s*4010/.test(sidebarCss))
   assert('nav scrolls internally', sidebarCss.includes('.platform-sidebar__nav') && sidebarCss.includes('overflow-y: auto'))
   assert('overscroll contain', sidebarCss.includes('overscroll-behavior: contain'))
+
+  console.log('\nStage 4: Edge swipe gesture')
+  assert('edge swipe hook wired', layout.includes('useMobileDrawerEdgeSwipe'))
+  assert('edge zone constant', edgeSwipe.includes('EDGE_ZONE_PX'))
+  assert('follow-finger drag', edgeSwipe.includes('applyDragVisual') || edgeSwipe.includes('translateX'))
+  assert('axis lock ignores vertical', edgeSwipe.includes('AXIS_LOCK') || edgeSwipe.includes('ignore'))
+  assert('edge capture strip', layout.includes('platform-layout__edge-swipe'))
+  assert('desktop overlay forced off', layoutCss.includes('min-width: 901px') && layoutCss.includes('display: none !important'))
+  assert('pull-to-refresh disabled while dragging', layout.includes('drawerDragging'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

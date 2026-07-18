@@ -283,6 +283,10 @@
     box-shadow: 8px 0 32px rgba(20, 40, 28, 0.15);
   }
 
+  .platform-layout--drawer-dragging .platform-sidebar {
+    transition: none;
+  }
+
   .platform-sidebar__header {
     padding: 14px 16px;
     align-items: center;

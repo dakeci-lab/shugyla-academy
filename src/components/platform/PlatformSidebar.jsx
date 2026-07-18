@@ -91,7 +91,7 @@ function nestMobileNotificationsUnderHome(navItems) {
  * Desktop: hover-раскрытие + активный раздел всегда открыт
  * Mobile: иерархия Umag-style (серые группы + пункты без иконок/аккордеона)
  */
-export default function PlatformSidebar({ isOpen = false, onNavigate }) {
+export default function PlatformSidebar({ isOpen = false, onNavigate, panelRef = null }) {
   const { user } = useSession()
   const { pathname } = useLocation()
   const isMobile = useMediaQuery(MOBILE_QUERY)
@@ -248,7 +248,10 @@ export default function PlatformSidebar({ isOpen = false, onNavigate }) {
   }
 
   return (
-    <aside className={`platform-sidebar ${isOpen ? 'platform-sidebar--open' : ''}`}>
+    <aside
+      ref={panelRef}
+      className={`platform-sidebar ${isOpen ? 'platform-sidebar--open' : ''}`}
+    >
       <div className="platform-sidebar__header">
         {isMobile ? (
           <PlatformSidebarMobileProfile user={user} onNavigate={handleNavClick} />

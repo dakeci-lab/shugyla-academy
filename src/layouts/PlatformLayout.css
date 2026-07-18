@@ -3,6 +3,7 @@
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--color-bg);
+  overscroll-behavior-x: none;
 }
 
 .platform-layout__overlay {
@@ -25,6 +26,14 @@
   background: rgba(20, 30, 24, 0.55);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+/* Узкая зона у левого края — помогает перехватить жест до системного «Назад» */
+.platform-layout__edge-swipe {
+  display: none;
 }
 
 .platform-layout__main {
@@ -88,8 +97,27 @@
     display: block;
   }
 
-  .platform-layout--drawer-open .platform-layout__overlay {
+  .platform-layout--drawer-open .platform-layout__overlay,
+  .platform-layout__overlay--visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .platform-layout__edge-swipe {
     display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 28px;
+    z-index: 3990;
+    touch-action: pan-y;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .platform-layout--drawer-dragging .platform-layout__overlay {
+    transition: none;
   }
 
   .platform-layout__topbar {
@@ -103,6 +131,10 @@
 
 @media (min-width: 901px) {
   .platform-layout__overlay {
+    display: none !important;
+  }
+
+  .platform-layout__edge-swipe {
     display: none !important;
   }
 }

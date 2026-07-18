@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import PlatformHeaderActions from '../components/platform/PlatformHeaderActions'
 import PlatformMobileHeader from '../components/platform/PlatformMobileHeader'
@@ -11,11 +11,15 @@ import { PullToRefreshProvider } from '../context/PullToRefreshContext'
 import { PlatformPageTitleProvider, usePlatformPageTitleContext } from '../context/PlatformPageTitleContext'
 import { useAcademyData } from '../context/AcademyDataContext'
 import { useProcurementRealtime } from '../hooks/useProcurementRealtime'
+import useMediaQuery from '../hooks/useMediaQuery'
+import useMobileDrawerEdgeSwipe from '../hooks/useMobileDrawerEdgeSwipe'
 import { getPlatformSection } from '../platform/platformNav'
 import { useSession } from '../context/SessionContext'
 import { LOGIN_PATH } from '../router/authRoutes'
 import { lockModalScroll, unlockModalScroll } from '../utils/modalScrollLock'
 import './PlatformLayout.css'
+
+const MOBILE_LAYOUT_QUERY = '(max-width: 900px)'
 
 function PlatformLayoutShell({ onLogout }) {
   const { user } = useSession()
@@ -36,6 +40,19 @@ function PlatformLayoutShell({ onLogout }) {
   const showMobileBack = titleContext?.override?.showBack === true
   const mobileBackFallback = titleContext?.override?.backFallback || '/platform'
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const isMobile = useMediaQuery(MOBILE_LAYOUT_QUERY)
+  const layoutRef = useRef(null)
+  const sidebarRef = useRef(null)
+  const overlayRef = useRef(null)
+
+  const { isDragging: drawerDragging } = useMobileDrawerEdgeSwipe({
+    enabled: isMobile,
+    isOpen: drawerOpen,
+    onOpenChange: setDrawerOpen,
+    layoutRef,
+    sidebarRef,
+    overlayRef,
+  })
 
   const handleMobileBack = useCallback(() => {
     const historyIdx = window.history.state?.idx
@@ -70,20 +87,35 @@ function PlatformLayoutShell({ onLogout }) {
     setDrawerOpen(false)
   }
 
+  const layoutClassName = [
+    'platform-layout',
+    drawerOpen ? 'platform-layout--drawer-open' : '',
+    drawerDragging ? 'platform-layout--drawer-dragging' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
-    <div className={`platform-layout ${drawerOpen ? 'platform-layout--drawer-open' : ''}`}>
-      {drawerOpen && (
+    <div ref={layoutRef} className={layoutClassName}>
+      {(drawerOpen || isMobile) && (
         <button
+          ref={overlayRef}
           type="button"
-          className="platform-layout__overlay"
+          className={`platform-layout__overlay${drawerOpen ? ' platform-layout__overlay--visible' : ''}`}
           onClick={closeDrawer}
           aria-label="Закрыть меню"
+          tabIndex={drawerOpen ? 0 : -1}
         />
+      )}
+
+      {isMobile && !drawerOpen && (
+        <div className="platform-layout__edge-swipe" aria-hidden="true" />
       )}
 
       <PlatformSidebar
         isOpen={drawerOpen}
         onNavigate={closeDrawer}
+        panelRef={sidebarRef}
       />
 
       <PullToRefreshProvider onGlobalRefresh={reload}>
@@ -107,7 +139,7 @@ function PlatformLayoutShell({ onLogout }) {
             <PlatformHeaderActions user={user} onLogout={onLogout} bellVariant="desktop" />
           </header>
 
-          <PullToRefresh disabled={drawerOpen} className="platform-layout__refresh">
+          <PullToRefresh disabled={drawerOpen || drawerDragging} className="platform-layout__refresh">
             <div className="platform-layout__content">
               <PlatformErrorBoundary onLogout={onLogout}>
                 <Outlet />
