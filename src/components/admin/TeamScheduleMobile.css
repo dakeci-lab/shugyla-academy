@@ -449,33 +449,6 @@
   .team-schedule-wrap--desktop {
     display: none !important;
   }
-
-  .schedule-week-bar {
-    padding: 0.55rem 0.65rem;
-    margin-bottom: 0.65rem;
-    gap: 0.45rem;
-  }
-
-  .schedule-week-bar__nav {
-    width: 2rem;
-    height: 2rem;
-  }
-
-  .schedule-week-bar__main {
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 0.35rem;
-  }
-
-  .schedule-week-bar__title {
-    font-size: 0.82rem;
-    line-height: 1.25;
-  }
-
-  .schedule-week-bar__today {
-    font-size: 0.72rem;
-    padding: 0.22rem 0.65rem;
-  }
 }
 
 @media (min-width: 769px) {

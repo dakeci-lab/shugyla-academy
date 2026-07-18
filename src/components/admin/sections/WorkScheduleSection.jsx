@@ -23,7 +23,7 @@ import TeamScheduleCell from '../TeamScheduleCell'
 import TeamScheduleMobileCard from '../TeamScheduleMobileCard'
 import TeamScheduleDaySheet from '../TeamScheduleDaySheet'
 import TeamScheduleMobileLegend from '../TeamScheduleMobileLegend'
-import SchedulePeriodBar from '../SchedulePeriodBar'
+import PlatformPeriodHeader from '../../platform/PlatformPeriodHeader'
 import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
 import useMediaQuery, { MOBILE_SCHEDULE_QUERY } from '../../../hooks/useMediaQuery'
 import { buildTeamScheduleDaySheetModel } from '../../../utils/teamScheduleMobileUtils'
@@ -252,7 +252,7 @@ export default function WorkScheduleSection() {
 
   return (
     <>
-      <SchedulePeriodBar
+      <PlatformPeriodHeader
         title={weekTitle}
         onPrev={() => changeWeek(-1)}
         onNext={() => changeWeek(1)}

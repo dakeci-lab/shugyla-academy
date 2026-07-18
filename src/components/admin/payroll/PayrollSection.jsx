@@ -31,7 +31,7 @@ import {
 } from '../../../services/salaryPayrollService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
-import SchedulePeriodBar from '../SchedulePeriodBar'
+import PlatformPeriodHeader from '../../platform/PlatformPeriodHeader'
 import { CommentIcon } from '../../icons/PlatformIcons'
 import PlatformSearchToolbar, {
   PlatformFilterButton,
@@ -347,7 +347,7 @@ export default function PayrollSection() {
 
   return (
     <div className="payroll-section">
-      <SchedulePeriodBar
+      <PlatformPeriodHeader
         title={formatMonthYearLabel(year, month)}
         onPrev={() => setMonthState((prev) => changePayrollMonth(prev.year, prev.month, -1))}
         onNext={() => setMonthState((prev) => changePayrollMonth(prev.year, prev.month, 1))}

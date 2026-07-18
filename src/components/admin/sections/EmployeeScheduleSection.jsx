@@ -19,7 +19,7 @@ import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeScheduleCalendar from '../EmployeeScheduleCalendar'
 import ShiftDayEditModal from '../ShiftDayEditModal'
 import BulkScheduleModal from '../BulkScheduleModal'
-import { ChevronLeftIcon, ChevronRightIcon } from '../../icons/PlatformIcons'
+import PlatformPeriodHeader from '../../platform/PlatformPeriodHeader'
 import '../../EmployeeAvatar.css'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
@@ -214,40 +214,27 @@ export default function EmployeeScheduleSection({
         </div>
       )}
 
-      <div className={`schedule-month-nav${embedded ? ' schedule-month-nav--embedded' : ''}`}>
-        <h2 className="schedule-month-nav__title">{formatMonthYearLabel(year, month)}</h2>
-        <div className="schedule-month-nav__controls">
+      <PlatformPeriodHeader
+        title={formatMonthYearLabel(year, month)}
+        onPrev={() => changeMonth(-1)}
+        onNext={() => changeMonth(1)}
+        onToday={goToday}
+        prevLabel="Предыдущий месяц"
+        nextLabel="Следующий месяц"
+      />
+
+      {canEdit && (
+        <div className="schedule-employee-actions">
           <button
             type="button"
-            className="btn btn--outline btn--sm"
-            onClick={() => changeMonth(-1)}
-            aria-label="Предыдущий месяц"
+            className="btn btn--primary btn--sm"
+            onClick={() => setShowBulkModal(true)}
+            disabled={bulkSaving}
           >
-            <ChevronLeftIcon />
+            Настроить график
           </button>
-          <button type="button" className="btn btn--outline btn--sm" onClick={goToday}>
-            Сегодня
-          </button>
-          <button
-            type="button"
-            className="btn btn--outline btn--sm"
-            onClick={() => changeMonth(1)}
-            aria-label="Следующий месяц"
-          >
-            <ChevronRightIcon />
-          </button>
-          {canEdit && (
-            <button
-              type="button"
-              className="btn btn--primary btn--sm"
-              onClick={() => setShowBulkModal(true)}
-              disabled={bulkSaving}
-            >
-              Настроить график
-            </button>
-          )}
         </div>
-      </div>
+      )}
 
       {bulkSaving && (
         <p className="schedule-bulk-status" role="status">

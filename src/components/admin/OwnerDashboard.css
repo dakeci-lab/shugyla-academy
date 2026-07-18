@@ -5,87 +5,6 @@
   gap: 1rem;
 }
 
-.owner-dashboard__day-panel {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 40px 84px;
-  align-items: center;
-  gap: 0.625rem;
-  padding: 0.75rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md, 14px);
-  background: var(--color-white);
-}
-
-.owner-dashboard__day-arrow,
-.owner-dashboard__today-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 40px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-white);
-  color: var(--color-text, #141414);
-  font-family: inherit;
-  font-weight: 700;
-  cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
-}
-
-.owner-dashboard__day-arrow {
-  width: 40px;
-  padding: 0;
-}
-
-.owner-dashboard__today-btn {
-  padding: 0 0.875rem;
-  color: var(--color-primary-dark, #047857);
-}
-
-.owner-dashboard__today-btn--hidden {
-  visibility: hidden;
-  pointer-events: none;
-}
-
-.owner-dashboard__day-arrow:hover:not(:disabled),
-.owner-dashboard__today-btn:hover {
-  border-color: rgba(42, 157, 92, 0.35);
-  background: var(--color-primary-light, #ecfdf5);
-  color: var(--color-primary-dark, #047857);
-}
-
-.owner-dashboard__day-arrow:disabled {
-  cursor: not-allowed;
-  opacity: 0.42;
-}
-
-.owner-dashboard__day-current {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  align-items: center;
-  text-align: center;
-}
-
-.owner-dashboard__day-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 1rem;
-  font-weight: 800;
-  color: var(--color-text, #141414);
-}
-
-.owner-dashboard__day-hint {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.78rem;
-  font-weight: 500;
-  color: var(--color-text-muted, #6b7280);
-}
-
 .owner-dashboard__hero {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -309,36 +228,6 @@
 }
 
 @media (max-width: 560px) {
-  .owner-dashboard__day-panel {
-    grid-template-columns: 36px minmax(0, 1fr) 36px 64px;
-    gap: 0.375rem;
-    padding: 0.625rem;
-  }
-
-  .owner-dashboard__day-arrow,
-  .owner-dashboard__today-btn {
-    height: 36px;
-    border-radius: 9px;
-  }
-
-  .owner-dashboard__day-arrow {
-    width: 36px;
-  }
-
-  .owner-dashboard__today-btn {
-    width: 64px;
-    padding: 0;
-    font-size: 0.75rem;
-  }
-
-  .owner-dashboard__day-label {
-    font-size: 0.86rem;
-  }
-
-  .owner-dashboard__day-hint {
-    display: none;
-  }
-
   .owner-dashboard__hero {
     padding: 1rem;
   }

@@ -1,7 +1,6 @@
-import SchedulePeriodBar from '../admin/SchedulePeriodBar'
+import PlatformPeriodHeader from '../platform/PlatformPeriodHeader'
 import { formatWeekDayHeader, toDateKey } from '../../utils/shiftData'
 import './SimpleDeliveryCard.css'
-import '../admin/EmployeeSchedule.css'
 
 /** Единая навигация: неделя + выбор дня (Закуп / Приёмка) */
 export default function WeekScheduleNav({
@@ -17,7 +16,7 @@ export default function WeekScheduleNav({
 }) {
   return (
     <div className="week-schedule-nav">
-      <SchedulePeriodBar
+      <PlatformPeriodHeader
         title={weekTitle}
         onPrev={onPrevWeek}
         onNext={onNextWeek}

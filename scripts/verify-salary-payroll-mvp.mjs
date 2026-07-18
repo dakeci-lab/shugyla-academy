@@ -60,7 +60,7 @@ function main() {
   console.log('\nStage 3: UI / routes')
   assert('list page wired', app.includes('PlatformPayroll') && app.includes('employees/payroll'))
   assert('detail route', app.includes('employees/payroll/records/:recordId'))
-  assert('month bar', list.includes('SchedulePeriodBar'))
+  assert('month bar', list.includes('PlatformPeriodHeader'))
   assert('filter popover', list.includes('PayrollFilterPopover'))
   assert(
     'unified search toolbar',

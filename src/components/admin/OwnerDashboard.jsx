@@ -14,7 +14,7 @@ import {
 } from '../../services/academyDataService'
 import { fetchHomeWorkforceSummary } from '../../services/workforceAdminService'
 import { usePlatformPageRefresh } from '../../context/PullToRefreshContext'
-import { ChevronLeftIcon, ChevronRightIcon } from '../icons/PlatformIcons'
+import PlatformPeriodHeader from '../platform/PlatformPeriodHeader'
 import AdminModal from './AdminModal'
 import CompanyHealthGauge from './CompanyHealthGauge'
 import './admin-shared.css'
@@ -381,44 +381,17 @@ export default function OwnerDashboard() {
 
   return (
     <div className="owner-dashboard">
-      <section className="owner-dashboard__day-panel" aria-label="Выбор дня">
-        <button
-          type="button"
-          className="owner-dashboard__day-arrow"
-          onClick={() => shiftDay(-1)}
-          aria-label="Предыдущий день"
-        >
-          <ChevronLeftIcon size={18} />
-        </button>
-
-        <div className="owner-dashboard__day-current">
-          <span className="owner-dashboard__day-label">{selectedDateLabel}</span>
-          <span className="owner-dashboard__day-hint">Статистика за один календарный день</span>
-        </div>
-
-        <button
-          type="button"
-          className="owner-dashboard__day-arrow"
-          onClick={() => shiftDay(1)}
-          disabled={isTodaySelected || isFutureSelected}
-          aria-label="Следующий день"
-        >
-          <ChevronRightIcon size={18} />
-        </button>
-
-        <button
-          type="button"
-          className={`owner-dashboard__today-btn${
-            isTodaySelected ? ' owner-dashboard__today-btn--hidden' : ''
-          }`}
-          onClick={goToday}
-          disabled={isTodaySelected}
-          aria-hidden={isTodaySelected}
-          tabIndex={isTodaySelected ? -1 : 0}
-        >
-          Сегодня
-        </button>
-      </section>
+      <PlatformPeriodHeader
+        title={selectedDateLabel}
+        onPrev={() => shiftDay(-1)}
+        onNext={() => shiftDay(1)}
+        onToday={goToday}
+        prevLabel="Предыдущий день"
+        nextLabel="Следующий день"
+        nextDisabled={isTodaySelected || isFutureSelected}
+        todayDisabled={isTodaySelected}
+        aria-label="Выбор дня"
+      />
 
       {error && (
         <div className="owner-dashboard__error">

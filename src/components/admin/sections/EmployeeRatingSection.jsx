@@ -16,7 +16,7 @@ import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeRatingDetailModal from '../EmployeeRatingDetailModal'
 import RatingScoreBar from '../RatingScoreBar'
-import SchedulePeriodBar from '../SchedulePeriodBar'
+import PlatformPeriodHeader from '../../platform/PlatformPeriodHeader'
 import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
@@ -180,7 +180,7 @@ export default function EmployeeRatingSection() {
 
   return (
     <>
-      <SchedulePeriodBar
+      <PlatformPeriodHeader
         title={monthTitle}
         onPrev={() => changeMonth(-1)}
         onNext={() => changeMonth(1)}
