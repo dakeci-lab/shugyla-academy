@@ -42,9 +42,15 @@ function main() {
   const coalesce = read('src/lib/requestCoalesce.js')
 
   console.log('Stage 1: Auth / RBAC batching')
-  assert('authorizeAuthenticatedEmployee used once path', edge.includes('authorizeAuthenticatedEmployee(req)'))
+  assert(
+    'authorizeWorkforceRequest used once path',
+    edge.includes('authorizeWorkforceRequest(req,') || edge.includes('authorizeAuthenticatedEmployee(req)')
+  )
   assert('batch roleHasPermissionCodes exported', auth.includes('export async function roleHasPermissionCodes'))
-  assert('Edge uses roleHasPermissionCodes', edge.includes('roleHasPermissionCodes'))
+  assert(
+    'Edge resolves permissions via authorizeWorkforceRequest or roleHasPermissionCodes',
+    edge.includes('authorizeWorkforceRequest') || edge.includes('roleHasPermissionCodes')
+  )
   assert(
     'no triple sequential roleHasPermissionCode awaits',
     !/await roleHasPermissionCode[\s\S]*await roleHasPermissionCode[\s\S]*await roleHasPermissionCode/.test(
@@ -95,7 +101,10 @@ function main() {
   assert('response still returns employees and shifts', edge.includes('employees,') && edge.includes('shifts,'))
   assert('team_scope preserved', edge.includes('team_scope: scopeResult.teamScope'))
   assert('own-scope cannot request other employee', edge.includes('requestedEmployeeId !== caller.id'))
-  assert('401 unauthorized path via authorize', edge.includes('authorizeAuthenticatedEmployee'))
+  assert(
+    '401 unauthorized path via authorize',
+    edge.includes('authorizeWorkforceRequest') || edge.includes('authorizeAuthenticatedEmployee')
+  )
   assert('timing log has no email field', !/admin_team_workforce_timing[\s\S]{0,400}email/.test(edge))
   assert('MAX_RANGE_DAYS retained', edge.includes('MAX_RANGE_DAYS'))
 

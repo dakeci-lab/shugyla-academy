@@ -1,8 +1,7 @@
 import '@supabase/functions-js/edge-runtime.d.ts'
 import {
-  authorizeAuthenticatedEmployee,
+  authorizeWorkforceRequest,
   adminErrorResponse,
-  roleHasPermissionCodes,
 } from '../_shared/employeeAuthorization.ts'
 import {
   buildServerTimingHeader,
@@ -30,6 +29,21 @@ const PERMISSION_SCHEDULE_OWN = 'schedule.view_own'
 const PERMISSION_RATING_VIEW = 'rating.view'
 
 type WorkforceView = 'dashboard' | 'schedule' | 'rating' | 'home-summary'
+
+/** Server-fixed permission codes per view — never taken from request body. */
+function permissionCodesForView(view: WorkforceView): string[] {
+  switch (view) {
+    case 'dashboard':
+    case 'home-summary':
+      return [PERMISSION_SCHEDULE_TEAM]
+    case 'schedule':
+      return [PERMISSION_SCHEDULE_TEAM, PERMISSION_SCHEDULE_OWN]
+    case 'rating':
+      return [PERMISSION_RATING_VIEW, PERMISSION_SCHEDULE_TEAM]
+    default:
+      return []
+  }
+}
 
 function isDateKey(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -65,16 +79,10 @@ function timingResponse(
   })
 }
 
-async function resolveWorkforceScope(
-  serviceClient: Parameters<typeof roleHasPermissionCodes>[0],
-  caller: { id: number; role_id: string | null },
-  view: WorkforceView
-): Promise<{ teamScope: boolean } | Response> {
-  const perms = await roleHasPermissionCodes(serviceClient, caller.role_id, [
-    PERMISSION_SCHEDULE_TEAM,
-    PERMISSION_SCHEDULE_OWN,
-    PERMISSION_RATING_VIEW,
-  ])
+function resolveWorkforceScope(
+  view: WorkforceView,
+  perms: Record<string, boolean>
+): { teamScope: boolean } | Response {
   const hasTeam = perms[PERMISSION_SCHEDULE_TEAM] === true
   const hasOwn = perms[PERMISSION_SCHEDULE_OWN] === true
   const hasRating = perms[PERMISSION_RATING_VIEW] === true
@@ -94,6 +102,22 @@ async function resolveWorkforceScope(
       return { teamScope: false }
     default:
       return adminErrorResponse('validation_error', 422)
+  }
+}
+
+function authzTimingPhases(timings: {
+  tokenMs: number
+  authMs: number
+  employeeMs: number
+  permissionsMs: number
+  authorizationMs: number
+}) {
+  return {
+    token: timings.tokenMs,
+    auth: timings.authMs,
+    employee: timings.employeeMs,
+    permissions: timings.permissionsMs,
+    authorization: timings.authorizationMs,
   }
 }
 
@@ -153,16 +177,16 @@ Deno.serve(async (req) => {
   if (employeeIdResult instanceof Response) return employeeIdResult
   const requestedEmployeeId = employeeIdResult
 
-  const authStart = performance.now()
-  const authResult = await authorizeAuthenticatedEmployee(req)
-  const authMs = Math.round(performance.now() - authStart)
-  if (authResult instanceof Response) return authResult
+  const requiredCodes = permissionCodesForView(view)
+  if (requiredCodes.length === 0) {
+    return adminErrorResponse('invalid_view', 422)
+  }
 
-  const { serviceClient, caller } = authResult
+  const authzResult = await authorizeWorkforceRequest(req, requiredCodes)
+  if (authzResult instanceof Response) return authzResult
 
-  const authzStart = performance.now()
-  const scopeResult = await resolveWorkforceScope(serviceClient, caller, view)
-  const authzMs = Math.round(performance.now() - authzStart)
+  const { serviceClient, caller, permissions, timings: authzTimings, authMethod } = authzResult
+  const scopeResult = resolveWorkforceScope(view, permissions)
   if (scopeResult instanceof Response) return scopeResult
 
   // --- Home summary: day shifts first, then only employees who appear that day ---
@@ -267,8 +291,12 @@ Deno.serve(async (req) => {
       rangeDays,
       scoped: false,
       teamScope: true,
-      authMs,
-      authzMs,
+      authMethod,
+      tokenMs: authzTimings.tokenMs,
+      authMs: authzTimings.authMs,
+      employeeMs: authzTimings.employeeMs,
+      permissionsMs: authzTimings.permissionsMs,
+      authorizationMs: authzTimings.authorizationMs,
       employeesQueryMs,
       shiftsQueryMs,
       transformMs,
@@ -289,8 +317,7 @@ Deno.serve(async (req) => {
         shifts,
       },
       {
-        auth: authMs,
-        authorization: authzMs,
+        ...authzTimingPhases(authzTimings),
         employees: employeesQueryMs,
         shifts: shiftsQueryMs,
         transform: transformMs,
@@ -380,8 +407,7 @@ Deno.serve(async (req) => {
             shifts: [],
           },
           {
-            auth: authMs,
-            authorization: authzMs,
+            ...authzTimingPhases(authzTimings),
             employees: employeesQueryMs,
             shifts: 0,
             transform: 0,
@@ -456,8 +482,12 @@ Deno.serve(async (req) => {
     rangeDays,
     scoped: scopedEmployeeId != null,
     teamScope: scopeResult.teamScope,
-    authMs,
-    authzMs,
+    authMethod,
+    tokenMs: authzTimings.tokenMs,
+    authMs: authzTimings.authMs,
+    employeeMs: authzTimings.employeeMs,
+    permissionsMs: authzTimings.permissionsMs,
+    authorizationMs: authzTimings.authorizationMs,
     employeesQueryMs,
     shiftsQueryMs,
     queriesMs,
@@ -479,8 +509,7 @@ Deno.serve(async (req) => {
       shifts,
     },
     {
-      auth: authMs,
-      authorization: authzMs,
+      ...authzTimingPhases(authzTimings),
       employees: employeesQueryMs,
       shifts: shiftsQueryMs,
       transform: transformMs,

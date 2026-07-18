@@ -846,7 +846,10 @@ function stageSharedHelperStatic() {
     'utf8'
   )
 
-  assert('helper uses auth.getUser', helper.includes('auth.getUser'))
+  assert(
+    'helper verifies JWT via getClaims and/or getUser',
+    helper.includes('getClaims') || helper.includes('auth.getUser') || helper.includes('getUser(')
+  )
   assert('helper checks permissions table', helper.includes("from('permissions')"))
   assert('no user_metadata in helper', !/\buser_metadata\b/.test(helper))
   assert('list no select(*)', !listFn.includes("select('*')"))

@@ -56,6 +56,7 @@
     "verify:progressive-bootstrap": "node scripts/verify-progressive-bootstrap.mjs",
     "verify:request-deduplication": "node scripts/verify-request-deduplication.mjs",
     "verify:workforce-edge-performance": "node scripts/verify-workforce-edge-performance.mjs",
+    "verify:workforce-edge-authorization-performance": "node scripts/verify-workforce-edge-authorization-performance.mjs",
     "verify:home-workforce-summary": "node scripts/verify-home-workforce-summary.mjs",
     "verify:supplier-form-focus": "node scripts/verify-supplier-form-focus.mjs",
     "verify:home-dashboard": "node scripts/verify-home-dashboard.mjs",
