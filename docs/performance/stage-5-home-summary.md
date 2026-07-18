@@ -70,18 +70,47 @@ npm run verify:workforce-edge-performance
 
 ## 7. Production results
 
-**Authenticated Home timing after deploy:** blocked — browser session returned Edge `unauthorized` (`Сессия истекла`) during measurement attempt. No invented medians.
+**Environment:** `https://dakeci-lab.github.io/shugyla-academy/platform` · admin session · Resource Timing `duration` on `admin-team-workforce-data` · no HAR / no tokens / no PII.
 
-**Manual remeasure checklist (admin session):**
+| Run | Mode | duration (ms) | wf × | notes |
+|-----|------|---------------|------|-------|
+| 1 | cold (cache disabled) | 3029 | 1 | Server-Timing total 2389 |
+| 2 | warm reload | 5172 | 1 | auth/authorization variance |
+| 3 | SPA → Home | 3286 | 1 | body `view=home-summary` confirmed |
+| 4 | warm reload | 4877 | 1 | — |
+| 5 | SPA → Home | 2718 | 1 | body + counts confirmed |
 
-1. Hard reload `/platform` (cache enabled), 3×.
-2. Confirm Network: one `admin-team-workforce-data`, body `view=home-summary`, `date_from=date_to`.
-3. Record `duration` median/min/max; note Server-Timing if visible.
-4. Confirm health gauge + four metric cards match prior business rules for the same day.
-5. Spot-check Profile scoped workforce ×1 and Schedule team week ×1 unchanged.
-6. Compare employee/shift row counts vs Stage 4 full-staff payload.
+**Home workforce median / min / max:** **3286** / 2718 / 5172 ms (n=5).  
+**vs Stage 4 (4597 ms):** −28.5% (target was ≤3000 ms **or** ≥30%; narrowly under the % bar).  
+**Count:** ×1 on all Home loads; `admin-list-employees` / purchase / receiving = 0.
 
-Target: median ≤ 3000 ms or ≥ 30% below 4597 ms; count remains ×1.
+**Workload confirmed (fetch body + JSON counts, no IDs/names logged):**
+
+- `view=home-summary`, `date_from === date_to` (single day)
+- employees ≈ 9, shifts ≈ 9 for the measured day (not full active staff)
+- response `encodedBodySize` ≈ 1398 B (transfer ≈ 1698)
+
+**Representative Server-Timing (ms, durations only):**
+
+| Phase | Cold run | SPA run 5 |
+|-------|----------|-----------|
+| auth | 741 | 602 |
+| authorization | 544 | 555 |
+| employees | 821 | 280 |
+| shifts | 283 | 753 |
+| transform | 0 | 0 |
+| total | 2389 | 2191 |
+
+Dominant remaining cost: auth + authorization (+ occasional employees/shifts spikes). Transform ~0.
+
+**Correctness spot-checks (no mutations):**
+
+- Health gauge + metrics for today: 6 / 4 / 0 / 1 (scheduled / onTime / late / absent)
+- Day prev → different day metrics (7 / 5 / 2 / 0), still `home-summary` single-day
+- Day next → back to today metrics
+- Attendance “ОТКРЫТЬ” control present; no session error
+
+**Stage 5 status:** partially met — compact Home contract and ×1 request verified in production; median latency improved but did not clearly clear the ≤3000 ms / ≥30% gate.
 
 ## 8. Recommended Stage 6
 
