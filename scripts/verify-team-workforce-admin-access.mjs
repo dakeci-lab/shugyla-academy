@@ -232,7 +232,10 @@ function stageStaticFrontend() {
 
   assert('workforce service uses functions.invoke', workforce.includes("supabase.functions.invoke('admin-team-workforce-data'"))
   assert('workforce service has no service_role', !workforce.includes('SERVICE_ROLE'))
-  assert('OwnerDashboard uses fetchTeamWorkforceData', owner.includes('fetchTeamWorkforceData'))
+  assert(
+    'OwnerDashboard uses home workforce summary',
+    owner.includes('fetchHomeWorkforceSummary') || owner.includes('fetchTeamWorkforceData')
+  )
   assert('WorkScheduleSection uses fetchTeamWorkforceData', schedule.includes('fetchTeamWorkforceData'))
   assert('WorkScheduleSection passes week query to editor', schedule.includes('?week='))
   const editor = fs.readFileSync(

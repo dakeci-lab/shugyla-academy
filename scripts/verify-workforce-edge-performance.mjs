@@ -75,8 +75,9 @@ function main() {
 
   console.log('Stage 4: Frontend Home + profile scoping')
   assert(
-    'Home dashboard uses selected day range',
-    owner.includes('dateFrom: selectedDateKey') && owner.includes('dateTo: selectedDateKey')
+    'Home dashboard uses day summary or selected day range',
+    owner.includes('fetchHomeWorkforceSummary(selectedDateKey)') ||
+      (owner.includes('dateFrom: selectedDateKey') && owner.includes('dateTo: selectedDateKey'))
   )
   assert('service accepts employeeId', service.includes('employeeId = null'))
   assert('service sends employee_id', service.includes('body.employee_id = normalizedEmployeeId'))

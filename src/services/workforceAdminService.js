@@ -105,13 +105,28 @@ export function monthToDateRange(year, month) {
 }
 
 /**
+ * Cloud-only Home dashboard summary (view=home-summary).
+ * One selected day; employees limited to those with shifts that day.
+ */
+export async function fetchHomeWorkforceSummary(dateKey) {
+  if (typeof dateKey !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) {
+    throw new Error(ERROR_MESSAGES.validation)
+  }
+  return fetchTeamWorkforceData({
+    dateFrom: dateKey,
+    dateTo: dateKey,
+    view: 'home-summary',
+  })
+}
+
+/**
  * Cloud-only team workforce bundle via admin-team-workforce-data Edge Function.
  * Concurrent identical requests share one in-flight invoke.
  *
  * @param {{
  *   dateFrom: string,
  *   dateTo: string,
- *   view: 'dashboard'|'schedule'|'rating',
+ *   view: 'dashboard'|'schedule'|'rating'|'home-summary',
  *   employeeId?: number|null,
  * }} params
  */

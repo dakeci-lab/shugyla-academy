@@ -12,7 +12,7 @@ import {
   getAttendanceSettings,
   getTeamShiftsForMonth,
 } from '../../services/academyDataService'
-import { fetchTeamWorkforceData } from '../../services/workforceAdminService'
+import { fetchHomeWorkforceSummary } from '../../services/workforceAdminService'
 import { usePlatformPageRefresh } from '../../context/PullToRefreshContext'
 import { ChevronLeftIcon, ChevronRightIcon } from '../icons/PlatformIcons'
 import AdminModal from './AdminModal'
@@ -285,14 +285,10 @@ export default function OwnerDashboard() {
     setLoading(true)
     try {
       if (cloudMode) {
-        // Dashboard metrics need the selected day only — not the full month of shifts.
+        // Compact home-summary: one day, only employees who have shifts that day.
         const [attendanceSettings, bundle] = await Promise.all([
           getAttendanceSettings(),
-          fetchTeamWorkforceData({
-            dateFrom: selectedDateKey,
-            dateTo: selectedDateKey,
-            view: 'dashboard',
-          }),
+          fetchHomeWorkforceSummary(selectedDateKey),
         ])
         setSettings(attendanceSettings)
         setTeamEmployees(bundle.employees)

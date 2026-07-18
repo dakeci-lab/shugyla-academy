@@ -4,17 +4,24 @@ import {
   adminErrorResponse,
   roleHasPermissionCodes,
 } from '../_shared/employeeAuthorization.ts'
-import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
 import {
+  buildServerTimingHeader,
+  corsPreflightResponse,
+  jsonResponse,
+} from '../_shared/cors.ts'
+import {
+  HOME_SUMMARY_EMPLOYEE_SELECT,
+  HOME_SUMMARY_SHIFT_SELECT,
   WORKFORCE_EMPLOYEE_SELECT,
   WORKFORCE_SHIFT_SELECT,
+  mapHomeSummaryEmployee,
   mapSafeWorkforceEmployee,
   mapSafeWorkforceShift,
   type DbWorkforceEmployeeRow,
 } from '../_shared/workforceFields.ts'
 
 const ALLOWED_BODY_KEYS = new Set(['date_from', 'date_to', 'timezone', 'view', 'employee_id'])
-const ALLOWED_VIEWS = new Set(['dashboard', 'schedule', 'rating'])
+const ALLOWED_VIEWS = new Set(['dashboard', 'schedule', 'rating', 'home-summary'])
 const ALLOWED_TIMEZONE = 'Asia/Almaty'
 const MAX_RANGE_DAYS = 62
 
@@ -22,7 +29,7 @@ const PERMISSION_SCHEDULE_TEAM = 'schedule.view_team'
 const PERMISSION_SCHEDULE_OWN = 'schedule.view_own'
 const PERMISSION_RATING_VIEW = 'rating.view'
 
-type WorkforceView = 'dashboard' | 'schedule' | 'rating'
+type WorkforceView = 'dashboard' | 'schedule' | 'rating' | 'home-summary'
 
 function isDateKey(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
@@ -48,12 +55,21 @@ function parseOptionalEmployeeId(value: unknown): number | null | Response {
   return id
 }
 
+function timingResponse(
+  body: Record<string, unknown>,
+  phases: Record<string, number>,
+  status = 200
+) {
+  return jsonResponse(body, status, {
+    'Server-Timing': buildServerTimingHeader(phases),
+  })
+}
+
 async function resolveWorkforceScope(
   serviceClient: Parameters<typeof roleHasPermissionCodes>[0],
   caller: { id: number; role_id: string | null },
   view: WorkforceView
 ): Promise<{ teamScope: boolean } | Response> {
-  // One permissions lookup + one role_permissions lookup (was 6 sequential round-trips).
   const perms = await roleHasPermissionCodes(serviceClient, caller.role_id, [
     PERMISSION_SCHEDULE_TEAM,
     PERMISSION_SCHEDULE_OWN,
@@ -65,6 +81,7 @@ async function resolveWorkforceScope(
 
   switch (view) {
     case 'dashboard':
+    case 'home-summary':
       if (!hasTeam) return adminErrorResponse('forbidden', 403)
       return { teamScope: true }
     case 'schedule':
@@ -148,6 +165,140 @@ Deno.serve(async (req) => {
   const authzMs = Math.round(performance.now() - authzStart)
   if (scopeResult instanceof Response) return scopeResult
 
+  // --- Home summary: day shifts first, then only employees who appear that day ---
+  if (view === 'home-summary') {
+    if (rangeDays !== 1 || dateFrom !== dateTo) {
+      return adminErrorResponse('invalid_date_range', 422)
+    }
+    if (requestedEmployeeId != null) {
+      return adminErrorResponse('forbidden_field', 422)
+    }
+
+    const shiftStart = performance.now()
+    const shiftRes = await serviceClient
+      .from('academy_employee_shifts')
+      .select(HOME_SUMMARY_SHIFT_SELECT)
+      .eq('shift_date', dateFrom)
+      .order('employee_id', { ascending: true })
+    const shiftsQueryMs = Math.round(performance.now() - shiftStart)
+
+    if (shiftRes.error) {
+      console.error('admin_team_workforce_shifts_failed', {
+        requestId,
+        code: shiftRes.error.code,
+        message: shiftRes.error.message,
+      })
+      return adminErrorResponse('internal_error', 500)
+    }
+
+    const shiftIds = new Set<number>()
+    for (const row of shiftRes.data ?? []) {
+      const id = Number((row as { employee_id?: number }).employee_id)
+      if (Number.isFinite(id)) shiftIds.add(id)
+    }
+
+    let employeesQueryMs = 0
+    let employeeRows: unknown[] = []
+    if (shiftIds.size > 0) {
+      const empStart = performance.now()
+      const empRes = await serviceClient
+        .from('academy_users')
+        .select(HOME_SUMMARY_EMPLOYEE_SELECT)
+        .in('id', [...shiftIds])
+        .neq('role', 'admin')
+        .eq('status', 'active')
+        .order('full_name', { ascending: true })
+        .order('id', { ascending: true })
+      employeesQueryMs = Math.round(performance.now() - empStart)
+      if (empRes.error) {
+        console.error('admin_team_workforce_employees_failed', {
+          requestId,
+          code: empRes.error.code,
+          message: empRes.error.message,
+        })
+        return adminErrorResponse('internal_error', 500)
+      }
+      employeeRows = empRes.data ?? []
+    }
+
+    const transformStart = performance.now()
+    const employees = []
+    for (const row of employeeRows) {
+      try {
+        employees.push(
+          mapHomeSummaryEmployee(
+            row as {
+              id: number
+              first_name: string
+              last_name: string
+              full_name: string
+              role: string
+              position: string
+            }
+          )
+        )
+      } catch (mapError) {
+        console.error('admin_team_workforce_map_failed', {
+          requestId,
+          category: mapError instanceof Error ? mapError.message : 'unknown',
+        })
+      }
+    }
+    const allowedIds = new Set(employees.map((employee) => employee.id))
+    const shifts = []
+    for (const row of shiftRes.data ?? []) {
+      try {
+        const mapped = mapSafeWorkforceShift(row as Record<string, unknown>)
+        if (!allowedIds.has(mapped.employee_id)) continue
+        shifts.push(mapped)
+      } catch (mapError) {
+        console.error('admin_team_workforce_shift_map_failed', {
+          requestId,
+          category: mapError instanceof Error ? mapError.message : 'unknown',
+        })
+      }
+    }
+    const transformMs = Math.round(performance.now() - transformStart)
+    const totalMs = Math.round(performance.now() - t0)
+
+    console.log('admin_team_workforce_timing', {
+      requestId,
+      view,
+      rangeDays,
+      scoped: false,
+      teamScope: true,
+      authMs,
+      authzMs,
+      employeesQueryMs,
+      shiftsQueryMs,
+      transformMs,
+      totalMs,
+      employeeCount: employees.length,
+      shiftCount: shifts.length,
+    })
+
+    return timingResponse(
+      {
+        ok: true,
+        view,
+        timezone,
+        date_from: dateFrom,
+        date_to: dateTo,
+        team_scope: true,
+        employees,
+        shifts,
+      },
+      {
+        auth: authMs,
+        authorization: authzMs,
+        employees: employeesQueryMs,
+        shifts: shiftsQueryMs,
+        transform: transformMs,
+        total: totalMs,
+      }
+    )
+  }
+
   // Resolve effective employee scope before queries so employees + shifts can run in parallel.
   let scopedEmployeeId: number | null = null
   if (requestedEmployeeId != null) {
@@ -193,7 +344,6 @@ Deno.serve(async (req) => {
   let shiftsQueryMs = 0
 
   if (scopedEmployeeId != null) {
-    // Single-employee (profile / own-scope): independent queries in parallel.
     const empStart = performance.now()
     const shiftStart = performance.now()
     const [empRes, shiftRes] = await Promise.all([employeeQuery, shiftQuery])
@@ -204,7 +354,6 @@ Deno.serve(async (req) => {
     shiftRows = shiftRes.data
     shiftError = shiftRes.error
   } else {
-    // Team scope without employee_id: load active staff, then batch shifts by ids.
     const empStart = performance.now()
     const empRes = await employeeQuery
     employeesQueryMs = Math.round(performance.now() - empStart)
@@ -218,31 +367,27 @@ Deno.serve(async (req) => {
         if (Number.isFinite(id)) ids.push(id)
       }
       if (ids.length === 0) {
-        console.log('admin_team_workforce_timing', {
-          requestId,
-          view,
-          rangeDays,
-          scoped: Boolean(scopedEmployeeId),
-          teamScope: scopeResult.teamScope,
-          authMs,
-          authzMs,
-          employeesQueryMs,
-          shiftsQueryMs: 0,
-          transformMs: 0,
-          totalMs: Math.round(performance.now() - t0),
-          employeeCount: 0,
-          shiftCount: 0,
-        })
-        return jsonResponse({
-          ok: true,
-          view,
-          timezone,
-          date_from: dateFrom,
-          date_to: dateTo,
-          team_scope: scopeResult.teamScope,
-          employees: [],
-          shifts: [],
-        })
+        const totalMs = Math.round(performance.now() - t0)
+        return timingResponse(
+          {
+            ok: true,
+            view,
+            timezone,
+            date_from: dateFrom,
+            date_to: dateTo,
+            team_scope: scopeResult.teamScope,
+            employees: [],
+            shifts: [],
+          },
+          {
+            auth: authMs,
+            authorization: authzMs,
+            employees: employeesQueryMs,
+            shifts: 0,
+            transform: 0,
+            total: totalMs,
+          }
+        )
       }
       const shiftStart = performance.now()
       const shiftRes = await shiftQuery.in('employee_id', ids)
@@ -322,14 +467,24 @@ Deno.serve(async (req) => {
     shiftCount: shifts.length,
   })
 
-  return jsonResponse({
-    ok: true,
-    view,
-    timezone,
-    date_from: dateFrom,
-    date_to: dateTo,
-    team_scope: scopeResult.teamScope,
-    employees,
-    shifts,
-  })
+  return timingResponse(
+    {
+      ok: true,
+      view,
+      timezone,
+      date_from: dateFrom,
+      date_to: dateTo,
+      team_scope: scopeResult.teamScope,
+      employees,
+      shifts,
+    },
+    {
+      auth: authMs,
+      authorization: authzMs,
+      employees: employeesQueryMs,
+      shifts: shiftsQueryMs,
+      transform: transformMs,
+      total: totalMs,
+    }
+  )
 })

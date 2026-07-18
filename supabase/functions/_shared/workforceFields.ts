@@ -6,6 +6,13 @@ export const WORKFORCE_EMPLOYEE_SELECT =
 export const WORKFORCE_SHIFT_SELECT =
   'id, employee_id, shift_date, status, planned_start_time, planned_end_time, actual_start_time, actual_end_time, comment'
 
+/** Home summary: only fields used by OwnerDashboard metrics / detail rows. */
+export const HOME_SUMMARY_EMPLOYEE_SELECT =
+  'id, first_name, last_name, full_name, role, position'
+
+export const HOME_SUMMARY_SHIFT_SELECT =
+  'id, employee_id, shift_date, status, planned_start_time, planned_end_time, actual_start_time'
+
 export type DbWorkforceEmployeeRow = {
   id: number
   first_name: string
@@ -57,6 +64,27 @@ export function mapSafeWorkforceEmployee(row: DbWorkforceEmployeeRow): SafeWorkf
     status: row.status,
     position: row.position,
     avatar_url: row.avatar_url,
+  }
+}
+
+export function mapHomeSummaryEmployee(row: {
+  id: number
+  first_name: string
+  last_name: string
+  full_name: string
+  role: string
+  position: string
+}): SafeWorkforceEmployee {
+  return {
+    id: row.id,
+    first_name: row.first_name,
+    last_name: row.last_name,
+    full_name: row.full_name,
+    role: row.role,
+    role_id: null,
+    status: 'active',
+    position: row.position,
+    avatar_url: null,
   }
 }
 
