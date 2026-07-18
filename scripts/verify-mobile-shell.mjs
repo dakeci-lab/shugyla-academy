@@ -84,6 +84,20 @@ function main() {
   assert('drawer width not full screen', sidebarCss.includes('min(360px, 86vw)'))
   assert('desktop sidebar sticky preserved', sidebarCss.match(/min-width: 901px[\s\S]*position: sticky/))
 
+  const layoutCss = read('src/layouts/PlatformLayout.css')
+  assert(
+    'desktop shell locks layout height',
+    layoutCss.includes('height: 100dvh') && layoutCss.includes('.platform-layout__refresh'),
+  )
+  assert(
+    'desktop content area scrolls',
+    /@media \(min-width: 901px\)[\s\S]*\.platform-layout__refresh[\s\S]*overflow-y:\s*auto/.test(layoutCss),
+  )
+  assert(
+    'desktop topbar stays above content',
+    /@media \(min-width: 901px\)[\s\S]*\.platform-layout__topbar[\s\S]*position:\s*sticky/.test(layoutCss),
+  )
+
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }
 

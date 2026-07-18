@@ -349,7 +349,13 @@
   .platform-sidebar {
     position: sticky;
     top: 0;
+    align-self: stretch;
     height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
     transform: none !important;
     box-shadow: none !important;
   }
@@ -360,6 +366,13 @@
     min-height: var(--platform-topbar-height);
     padding: 0 18px;
     align-items: center;
+  }
+
+  .platform-sidebar__nav {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .platform-sidebar__group-toggle {

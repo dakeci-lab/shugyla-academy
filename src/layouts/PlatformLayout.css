@@ -145,6 +145,48 @@
 }
 
 @media (min-width: 901px) {
+  /* Desktop app shell: chrome fixed, only page content scrolls */
+  html:has(.platform-layout),
+  body:has(.platform-layout),
+  #root:has(.platform-layout) {
+    height: 100%;
+    max-height: 100%;
+    overflow: hidden;
+  }
+
+  .platform-layout {
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100vh;
+    max-height: 100dvh;
+    overflow: hidden;
+  }
+
+  .platform-layout__main {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .platform-layout__topbar {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    flex-shrink: 0;
+  }
+
+  .platform-layout__refresh {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .platform-layout__content {
+    min-height: min-content;
+  }
+
   .platform-layout__overlay {
     display: none !important;
   }
