@@ -67,7 +67,21 @@ function main() {
     list.includes('PlatformSearchToolbar') && list.includes('Поиск по ФИО'),
   )
   assert('comment modal', list.includes('PayrollCommentModal'))
-  assert('table list', list.includes('payroll-table') && list.includes('Комментарий'))
+  assert(
+    'ledger table columns',
+    list.includes('payroll-table') &&
+      list.includes('Оклад') &&
+      list.includes('Начисления') &&
+      list.includes('Удержания') &&
+      list.includes('К выдаче') &&
+      list.includes('Аванс') &&
+      list.includes('Остаток') &&
+      list.includes('Выплачено'),
+  )
+  assert('no status column in list', !list.includes('Статус расчёта'))
+  assert('role under name', list.includes('payroll-table__role'))
+  assert('totals row', list.includes('payroll-table__totals') && list.includes('payroll-summary'))
+  assert('comment icon only', list.includes('PayrollCommentModal') && list.includes('CommentIcon'))
   assert('manual blocks', detail.includes('Основной оклад') && detail.includes('Начисления') && detail.includes('Удержания'))
   assert('no time-tracker import in payroll', !list.includes('timeTracker') && !detail.includes('timeTracker'))
   assert('verify script registered', pkg.includes('verify:salary-payroll-mvp'))

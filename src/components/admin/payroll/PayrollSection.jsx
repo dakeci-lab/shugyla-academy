@@ -6,9 +6,11 @@ import { getCurrentMonthState } from '../../../utils/attendanceData'
 import { formatMonthYearLabel } from '../../../utils/shiftData'
 import {
   changePayrollMonth,
+  formatMoneyCompact,
   formatMoneyKzt,
+  getPayrollLedgerAmounts,
   getPayrollRecordPath,
-  getSalaryStatusMeta,
+  sumPayrollLedgerRows,
 } from '../../../utils/salaryPayroll'
 import { listEmployeesForAdmin } from '../../../services/employeeAdminService'
 import {
@@ -20,7 +22,6 @@ import {
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
 import SchedulePeriodBar from '../SchedulePeriodBar'
-import StatusBadge from '../StatusBadge'
 import { CommentIcon } from '../../icons/PlatformIcons'
 import PlatformSearchToolbar, {
   PlatformFilterButton,
@@ -60,7 +61,11 @@ function hasRecordNotes(record) {
   return Boolean(String(record?.notes || '').trim())
 }
 
-/** Список расчётов зарплаты за месяц */
+function MoneyCell({ value }) {
+  return <td className="payroll-table__money">{formatMoneyCompact(value)}</td>
+}
+
+/** Список расчётов зарплаты за месяц — рабочая ведомость */
 export default function PayrollSection() {
   const navigate = useNavigate()
   const { warning: showWarning, success: showSuccess } = useToast()
@@ -152,6 +157,8 @@ export default function PayrollSection() {
         return { employee: emp, record }
       })
   }, [employees, recordsByEmployee, search, appliedRoleId, appliedStatus])
+
+  const totals = useMemo(() => sumPayrollLedgerRows(rows), [rows])
 
   const draftPreviewCount = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -302,70 +309,119 @@ export default function PayrollSection() {
             : 'Нет активных сотрудников для расчёта'}
         </p>
       ) : (
-        <div className="payroll-table-wrap">
-          <table className="payroll-table">
-            <thead>
-              <tr>
-                <th>ФИО</th>
-                <th>Роль</th>
-                <th>Статус расчёта</th>
-                <th>К выдаче</th>
-                <th className="payroll-table__th-comment">Комментарий</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ employee, record }) => {
-                const statusMeta = record
-                  ? getSalaryStatusMeta(record.status)
-                  : { label: 'Нет расчёта', badge: 'idle' }
-                const roleLabel = employee.position || getRoleLabel(employee.role)
-                const notesPresent = hasRecordNotes(record)
-                return (
-                  <tr key={employee.id}>
-                    <td>
-                      <div className="payroll-table__name">{employee.name}</div>
-                    </td>
-                    <td>
-                      <span className="payroll-table__role">{roleLabel}</span>
-                    </td>
-                    <td>
-                      <StatusBadge label={statusMeta.label} type={statusMeta.badge} />
-                    </td>
-                    <td className="payroll-table__payable">
-                      {record ? formatMoneyKzt(record.totalPayable) : '—'}
-                    </td>
-                    <td className="payroll-table__comment">
-                      <button
-                        type="button"
-                        className={`payroll-table__comment-btn${
-                          notesPresent ? ' payroll-table__comment-btn--filled' : ''
-                        }`}
-                        onClick={() => void handleOpenComment(employee, record)}
-                        aria-label={
-                          notesPresent ? 'Открыть комментарий' : 'Добавить комментарий'
-                        }
-                        title={notesPresent ? 'Есть комментарий' : 'Комментарий'}
-                      >
-                        <CommentIcon size={16} />
-                      </button>
-                    </td>
-                    <td className="payroll-table__actions">
-                      <button
-                        type="button"
-                        className="btn btn--outline btn--sm"
-                        disabled={openingId === employee.id}
-                        onClick={() => void handleOpen(employee)}
-                      >
-                        {openingId === employee.id ? 'Открытие…' : 'Открыть'}
-                      </button>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="payroll-summary" aria-label="Итоги ведомости">
+            <div className="payroll-summary__item">
+              <span className="payroll-summary__label">Фонд оплаты</span>
+              <span className="payroll-summary__value">{formatMoneyKzt(totals.baseSalary)}</span>
+            </div>
+            <div className="payroll-summary__item">
+              <span className="payroll-summary__label">Начисления</span>
+              <span className="payroll-summary__value">{formatMoneyKzt(totals.allowances)}</span>
+            </div>
+            <div className="payroll-summary__item">
+              <span className="payroll-summary__label">Удержания</span>
+              <span className="payroll-summary__value">{formatMoneyKzt(totals.deductions)}</span>
+            </div>
+            <div className="payroll-summary__item">
+              <span className="payroll-summary__label">К выдаче</span>
+              <span className="payroll-summary__value">{formatMoneyKzt(totals.payable)}</span>
+            </div>
+            <div className="payroll-summary__item">
+              <span className="payroll-summary__label">Остаток</span>
+              <span className="payroll-summary__value">{formatMoneyKzt(totals.remainder)}</span>
+            </div>
+            <div className="payroll-summary__item">
+              <span className="payroll-summary__label">Выплачено</span>
+              <span className="payroll-summary__value">{formatMoneyKzt(totals.paid)}</span>
+            </div>
+          </div>
+
+          <div className="payroll-table-wrap">
+            <table className="payroll-table">
+              <thead>
+                <tr>
+                  <th className="payroll-table__num">№</th>
+                  <th className="payroll-table__employee">Сотрудник</th>
+                  <th className="payroll-table__money">Оклад</th>
+                  <th className="payroll-table__money">Начисления</th>
+                  <th className="payroll-table__money">Удержания</th>
+                  <th className="payroll-table__money">К выдаче</th>
+                  <th className="payroll-table__money">Аванс</th>
+                  <th className="payroll-table__money">Остаток</th>
+                  <th className="payroll-table__money">Выплачено</th>
+                  <th className="payroll-table__comment">Ком.</th>
+                  <th className="payroll-table__actions">Открыть</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(({ employee, record }, index) => {
+                  const roleLabel = employee.position || getRoleLabel(employee.role)
+                  const amounts = getPayrollLedgerAmounts(record)
+                  const notesPresent = hasRecordNotes(record)
+                  return (
+                    <tr key={employee.id}>
+                      <td className="payroll-table__num">{index + 1}</td>
+                      <td className="payroll-table__employee">
+                        <div className="payroll-table__person">
+                          <span className="payroll-table__name">{employee.name}</span>
+                          <span className="payroll-table__role">{roleLabel}</span>
+                        </div>
+                      </td>
+                      <MoneyCell value={amounts.baseSalary} />
+                      <MoneyCell value={amounts.allowances} />
+                      <MoneyCell value={amounts.deductions} />
+                      <MoneyCell value={amounts.payable} />
+                      <MoneyCell value={amounts.advance} />
+                      <MoneyCell value={amounts.remainder} />
+                      <MoneyCell value={amounts.paid} />
+                      <td className="payroll-table__comment">
+                        <button
+                          type="button"
+                          className={`payroll-table__comment-btn${
+                            notesPresent ? ' payroll-table__comment-btn--filled' : ''
+                          }`}
+                          onClick={() => void handleOpenComment(employee, record)}
+                          aria-label={
+                            notesPresent ? 'Открыть комментарий' : 'Добавить комментарий'
+                          }
+                          title={notesPresent ? 'Есть комментарий' : 'Комментарий'}
+                        >
+                          <CommentIcon size={15} />
+                        </button>
+                      </td>
+                      <td className="payroll-table__actions">
+                        <button
+                          type="button"
+                          className="btn btn--outline btn--sm"
+                          disabled={openingId === employee.id}
+                          onClick={() => void handleOpen(employee)}
+                        >
+                          {openingId === employee.id ? '…' : 'Открыть'}
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+              <tfoot>
+                <tr className="payroll-table__totals">
+                  <td className="payroll-table__num" />
+                  <td className="payroll-table__totals-label">Итого</td>
+                  <td className="payroll-table__money">{formatMoneyCompact(totals.baseSalary)}</td>
+                  <td className="payroll-table__money">{formatMoneyCompact(totals.allowances)}</td>
+                  <td className="payroll-table__money">{formatMoneyCompact(totals.deductions)}</td>
+                  <td className="payroll-table__money">{formatMoneyCompact(totals.payable)}</td>
+                  <td className="payroll-table__money">—</td>
+                  <td className="payroll-table__money">{formatMoneyCompact(totals.remainder)}</td>
+                  <td className="payroll-table__money">{formatMoneyCompact(totals.paid)}</td>
+                  <td className="payroll-table__comment" />
+                  <td className="payroll-table__actions" />
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </>
       )}
 
       {commentTarget && (

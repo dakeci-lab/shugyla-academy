@@ -41,6 +41,74 @@ export function formatMoneyKzt(value) {
   return `${formatted} ₸`
 }
 
+/** Компактный формат для колонок ведомости (без символа валюты в каждой ячейке). */
+export function formatMoneyCompact(value) {
+  if (value == null || value === '') return '—'
+  const amount = toMoneyNumber(value)
+  return amount.toLocaleString('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  })
+}
+
+/**
+ * Отображение строки ведомости из полей salary_records.
+ * Аванс пока без отдельного поля в БД — «—».
+ * Выплачено / остаток выводятся по статусу paid (без новых формул расчёта).
+ */
+export function getPayrollLedgerAmounts(record) {
+  if (!record) {
+    return {
+      baseSalary: null,
+      allowances: null,
+      deductions: null,
+      payable: null,
+      advance: null,
+      remainder: null,
+      paid: null,
+    }
+  }
+
+  const payable = toMoneyNumber(record.totalPayable)
+  const isPaid = record.status === 'paid'
+
+  return {
+    baseSalary: toMoneyNumber(record.baseSalary),
+    allowances: toMoneyNumber(record.totalAllowances),
+    deductions: toMoneyNumber(record.totalDeductions),
+    payable,
+    advance: null,
+    remainder: isPaid ? 0 : payable,
+    paid: isPaid ? payable : 0,
+  }
+}
+
+export function sumPayrollLedgerRows(rows) {
+  const empty = {
+    baseSalary: 0,
+    allowances: 0,
+    deductions: 0,
+    payable: 0,
+    advance: 0,
+    remainder: 0,
+    paid: 0,
+    countWithRecord: 0,
+  }
+
+  return (rows || []).reduce((acc, { record }) => {
+    const amounts = getPayrollLedgerAmounts(record)
+    if (!record) return acc
+    acc.countWithRecord += 1
+    acc.baseSalary += amounts.baseSalary || 0
+    acc.allowances += amounts.allowances || 0
+    acc.deductions += amounts.deductions || 0
+    acc.payable += amounts.payable || 0
+    acc.remainder += amounts.remainder || 0
+    acc.paid += amounts.paid || 0
+    return acc
+  }, empty)
+}
+
 /**
  * Excel-like MVP:
  * к выдаче = оклад + начисления − удержания
