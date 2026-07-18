@@ -8,21 +8,6 @@ import './PlatformDesktopNav.css'
 const CLOSE_DELAY_MS = 160
 const MORE_ID = '__more__'
 
-function CaretIcon() {
-  return (
-    <svg className="platform-desktop-nav__caret" width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-      <path
-        d="M2.2 3.6 L5 6.4 L7.8 3.6"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  )
-}
-
 function NavLeafLink({ item, onNavigate, className = '' }) {
   const { pathname } = useLocation()
   const active = isNavItemActive(pathname, item)
@@ -224,8 +209,7 @@ export default function PlatformDesktopNav() {
           onClick={() => (isOpen ? closeMenu() : openMenu(item.id))}
           onFocus={() => openMenu(item.id)}
         >
-          <span>{item.label}</span>
-          <CaretIcon />
+          {item.label}
         </button>
         {isOpen && (
           <DropdownPanel labelledBy={`platform-nav-trigger-${item.id}`}>
@@ -242,11 +226,10 @@ export default function PlatformDesktopNav() {
         {navItems.map((item) => (
           <span key={item.id} data-measure-item className="platform-desktop-nav__measure-item">
             {item.label}
-            {item.children?.length ? ' ▾' : ''}
           </span>
         ))}
         <span data-measure-more className="platform-desktop-nav__measure-item">
-          Ещё ▾
+          Ещё
         </span>
       </div>
 
@@ -272,8 +255,7 @@ export default function PlatformDesktopNav() {
               onClick={() => (openId === MORE_ID ? closeMenu() : openMenu(MORE_ID))}
               onFocus={() => openMenu(MORE_ID)}
             >
-              <span>Ещё</span>
-              <CaretIcon />
+              Ещё
             </button>
             {openId === MORE_ID && (
               <DropdownPanel labelledBy="platform-nav-trigger-more">
