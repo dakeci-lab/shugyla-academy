@@ -215,17 +215,17 @@ export const PLATFORM_NAV = [
     label: 'Настройки',
     routeKey: ROUTE_KEYS.SETTINGS,
     title: 'Настройки',
-    description: 'Параметры платформы, геозона и роли доступа.',
+    description: 'Тайм-трекер, роли доступа и уведомления.',
     pathPrefixes: ['/platform/settings'],
     children: [
       {
         id: 'settings-general',
         path: '/platform/settings/general',
-        label: 'Общие настройки',
+        label: 'Управление тайм-трекером',
         end: true,
         routeKey: ROUTE_KEYS.SETTINGS_GENERAL,
-        title: 'Общие настройки',
-        description: 'Рабочая точка, геозона и режим работы платформы.',
+        title: 'Управление тайм-трекером',
+        description: 'Рабочая территория и штрафные баллы тайм-трекера.',
       },
       {
         id: 'settings-roles',
