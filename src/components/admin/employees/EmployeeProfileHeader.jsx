@@ -5,6 +5,8 @@ import EmployeeAvatar from '../../EmployeeAvatar'
 import {
   getEmploymentStatusLabel,
   getEmploymentStatusBadgeType,
+  formatEmployeeDateRu,
+  isTerminatedEmployeeStatus,
 } from '../../../utils/employeeData'
 import { getRoleLabel } from '../../../data/roles'
 import './EmployeeProfileHeader.css'
@@ -47,6 +49,21 @@ export default function EmployeeProfileHeader({
               label={getEmploymentStatusLabel(employee.employmentStatus)}
               type={getEmploymentStatusBadgeType(employee.employmentStatus)}
             />
+          </div>
+          <div className="employee-profile-header__dates">
+            {formatEmployeeDateRu(employee.hiredAt) && (
+              <p className="employee-profile-header__date-row">
+                <span className="employee-profile-header__meta-label">Принят на работу</span>
+                <span>{formatEmployeeDateRu(employee.hiredAt)}</span>
+              </p>
+            )}
+            {isTerminatedEmployeeStatus(employee.employmentStatus) &&
+              formatEmployeeDateRu(employee.terminatedAt) && (
+                <p className="employee-profile-header__date-row">
+                  <span className="employee-profile-header__meta-label">Уволен</span>
+                  <span>{formatEmployeeDateRu(employee.terminatedAt)}</span>
+                </p>
+              )}
           </div>
           {showLogin && (
             <p className="employee-profile-header__login">

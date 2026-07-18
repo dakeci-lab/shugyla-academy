@@ -147,6 +147,7 @@ export default function EmployeeEditModal({
             roleId: selectedRole?.id || form.roleId || null,
             position: selectedRole?.name || getRoleLabel(roleCode),
             employmentStatus: form.employmentStatus,
+            hiredAt: form.hiredAt,
             avatarUrl: form.avatarUrl || null,
           })
         } else {
@@ -158,6 +159,7 @@ export default function EmployeeEditModal({
             login: form.login.trim(),
             position: selectedRole?.name || getRoleLabel(roleCode),
             employmentStatus: form.employmentStatus,
+            hiredAt: form.hiredAt,
             workLocationId: form.workLocationId || null,
             ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
             ...(form.password?.trim() ? { password: form.password } : {}),
@@ -477,6 +479,23 @@ export default function EmployeeEditModal({
             <span className="admin-form__hint">Нельзя изменить собственный статус.</span>
           )}
         </label>
+
+        {editId && (
+          <label className="admin-form__label">
+            Дата приёма на работу
+            <input
+              className="admin-form__input"
+              type="date"
+              value={form.hiredAt || ''}
+              onChange={(e) => patchForm({ hiredAt: e.target.value })}
+              disabled={submitting}
+              required
+            />
+            <span className="admin-form__hint">
+              Можно изменить при переносе сотрудников, уже работавших до создания аккаунта.
+            </span>
+          </label>
+        )}
 
         {formError && <p className="admin-form__error">{formError}</p>}
       </form>

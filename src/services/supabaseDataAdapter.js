@@ -1,6 +1,10 @@
 import { supabase } from '../lib/supabaseClient'
 import { ACADEMY_PROFILE_SAFE_FIELDS } from './authService'
-import { normalizeEmployee, canEmployeeLogin } from '../utils/employeeData'
+import {
+  normalizeEmployee,
+  canEmployeeLogin,
+  todayEmployeeDateKey,
+} from '../utils/employeeData'
 import { normalizeLesson } from '../utils/lessonData'
 import { fetchTestsData } from './testSupabaseAdapter'
 import { normalizeRoleId } from '../data/roles'
@@ -196,6 +200,9 @@ export async function fetchCoreAcademyData() {
       roleId: row.role_id,
       position: row.position,
       employmentStatus: row.status,
+      hiredAt: row.hired_at,
+      terminatedAt: row.terminated_at,
+      createdAt: row.created_at,
       assignedCourseIds: assignmentMap.get(row.id) || [],
       avatarUrl: row.avatar_url,
       contactEmail: row.contact_email || '',
@@ -386,6 +393,8 @@ async function createUser(data) {
     role_id: employee.roleId || null,
     position: employee.position || '',
     status: employee.employmentStatus,
+    hired_at: employee.hiredAt || null,
+    terminated_at: employee.terminatedAt || null,
     avatar_url: employee.avatarUrl || null,
     work_location_id: employee.workLocationId || null,
   }
@@ -431,6 +440,8 @@ async function updateUser(id, updates) {
   if (updates.position != null) patch.position = updates.position
   if (updates.employmentStatus != null) patch.status = updates.employmentStatus
   if (updates.status != null) patch.status = updates.status
+  if (updates.hiredAt !== undefined) patch.hired_at = updates.hiredAt
+  if (updates.terminatedAt !== undefined) patch.terminated_at = updates.terminatedAt
   if (updates.avatarUrl != null) patch.avatar_url = updates.avatarUrl
   if (updates.workLocationId != null) patch.work_location_id = updates.workLocationId
 
@@ -447,11 +458,18 @@ async function updateUser(id, updates) {
 }
 
 export async function deactivateEmployee(id) {
-  await updateUser(id, { employmentStatus: 'terminated' })
+  const { todayEmployeeDateKey } = await import('../utils/employeeData')
+  await updateUser(id, {
+    employmentStatus: 'terminated',
+    terminatedAt: todayEmployeeDateKey(),
+  })
 }
 
 export async function restoreEmployee(id) {
-  await updateUser(id, { employmentStatus: 'active' })
+  await updateUser(id, {
+    employmentStatus: 'active',
+    terminatedAt: null,
+  })
 }
 
 export async function permanentlyDeleteEmployee(id) {

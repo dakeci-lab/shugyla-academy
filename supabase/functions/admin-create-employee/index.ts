@@ -6,7 +6,11 @@ import {
   authorizeEmployeeAdmin,
   getBearerToken,
 } from '../_shared/employeeAuthorization.ts'
-import { buildFullName, MAX_NAME_LENGTH } from '../_shared/employeeFields.ts'
+import {
+  buildFullName,
+  MAX_NAME_LENGTH,
+  todayDateKeyAlmaty,
+} from '../_shared/employeeFields.ts'
 
 const PERMISSION_CREATE = 'employees.create'
 const ACTIVE_STATUS = 'active'
@@ -15,7 +19,7 @@ const MAX_PASSWORD_LENGTH = 128
 const MAX_LOGIN_LENGTH = 128
 
 const EMPLOYEE_RETURN_SELECT =
-  'id, login, full_name, first_name, last_name, role, role_id, status, position, avatar_url, created_at, auth_user_id'
+  'id, login, full_name, first_name, last_name, role, role_id, status, position, avatar_url, hired_at, terminated_at, created_at, auth_user_id'
 
 const FORBIDDEN_BODY_KEYS = new Set([
   'id',
@@ -289,6 +293,8 @@ Deno.serve(async (req) => {
         role_id: targetRole.id,
         position: position || '',
         status: ACTIVE_STATUS,
+        hired_at: todayDateKeyAlmaty(),
+        terminated_at: null,
         auth_user_id: createdAuthUserId,
         avatar_url: avatarUrl,
       }

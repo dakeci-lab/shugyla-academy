@@ -81,7 +81,11 @@ import {
   getVacancyRoleLabel,
   getVacancyEmployeeRole,
 } from '../utils/recruitmentData'
-import { EMPLOYMENT_STATUS, getEmployeeById } from '../utils/employeeData'
+import {
+  EMPLOYMENT_STATUS,
+  getEmployeeById,
+  todayEmployeeDateKey,
+} from '../utils/employeeData'
 import { prepareCandidatePhotoForSubmit } from './candidatePhotoService'
 import {
   getAllSuppliersSync,
@@ -566,6 +570,9 @@ export async function createEmployee(data) {
         position: row.position,
         employmentStatus: row.status,
         avatarUrl: row.avatar_url,
+        hiredAt: row.hired_at,
+        terminatedAt: row.terminated_at,
+        createdAt: row.created_at,
         assignedCourseIds: data.assignedCourseIds || [],
         workLocationId: data.workLocationId || null,
       })
@@ -588,7 +595,10 @@ export async function updateEmployee(id, updates) {
 
 export async function deactivateEmployee(id) {
   if (isCloudMode()) {
-    await updateEmployeeAsAdmin(id, { employmentStatus: 'terminated' })
+    await updateEmployeeAsAdmin(id, {
+      employmentStatus: 'terminated',
+      terminatedAt: todayEmployeeDateKey(),
+    })
     return
   }
   await getAdapter().deactivateEmployee(id)
@@ -596,7 +606,10 @@ export async function deactivateEmployee(id) {
 
 export async function restoreEmployee(id) {
   if (isCloudMode()) {
-    await updateEmployeeAsAdmin(id, { employmentStatus: 'active' })
+    await updateEmployeeAsAdmin(id, {
+      employmentStatus: 'active',
+      terminatedAt: null,
+    })
     return
   }
   await getAdapter().restoreEmployee(id)

@@ -26,7 +26,7 @@ import { getAppUrl } from '../router/basename'
 
 /** Safe academy_users columns for Auth-first cloud queries (never includes password). */
 export const ACADEMY_PROFILE_SAFE_FIELDS =
-  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, auth_user_id, contact_email'
+  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, hired_at, terminated_at, created_at, auth_user_id, contact_email'
 
 const DEACTIVATED_ACCOUNT_MESSAGE =
   'Доступ закрыт: сотрудник уволен. Обратитесь к администратору.'
@@ -69,6 +69,9 @@ function profileRowToEmployee(row, assignedCourseIds = []) {
     roleId: row.role_id,
     position: row.position,
     employmentStatus: row.status,
+    hiredAt: row.hired_at,
+    terminatedAt: row.terminated_at,
+    createdAt: row.created_at,
     assignedCourseIds,
     avatarUrl: row.avatar_url,
   })

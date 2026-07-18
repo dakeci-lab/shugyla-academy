@@ -2,6 +2,32 @@ import { USERS } from '../data/users'
 import { getRole, normalizeRoleId, ROLE_IDS } from '../data/roles'
 import { isCloudMode } from '../lib/dataMode'
 import { getCloudEmployees } from '../lib/cloudStore'
+import { toDateKeyInAppTimezone } from './timezone'
+
+/** YYYY-MM-DD from date / ISO / date-only string */
+export function toEmployeeDateKey(value) {
+  if (value == null || value === '') return null
+  if (typeof value === 'string') {
+    const match = value.trim().match(/^(\d{4}-\d{2}-\d{2})/)
+    return match ? match[1] : null
+  }
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return toDateKeyInAppTimezone(value)
+  }
+  return null
+}
+
+/** Display: 15.03.2026 */
+export function formatEmployeeDateRu(value) {
+  const key = toEmployeeDateKey(value)
+  if (!key) return null
+  const [year, month, day] = key.split('-')
+  return `${day}.${month}.${year}`
+}
+
+export function todayEmployeeDateKey() {
+  return toDateKeyInAppTimezone()
+}
 
 export const STORAGE_KEYS = {
   EXTRA_USERS: 'shugyla_extra_users',
@@ -211,9 +237,10 @@ export function normalizeEmployee(raw) {
     employmentStatus: normalizeEmploymentStatus(
       raw.employmentStatus || raw.status
     ),
-    /** Дата увольнения — поле под следующий этап payroll; пока опционально */
-    terminatedAt: raw.terminatedAt ?? raw.terminated_at ?? null,
-    hiredAt: raw.hiredAt ?? raw.hired_at ?? raw.createdAt ?? raw.created_at ?? null,
+    terminatedAt: toEmployeeDateKey(raw.terminatedAt ?? raw.terminated_at),
+    hiredAt: toEmployeeDateKey(
+      raw.hiredAt ?? raw.hired_at ?? raw.createdAt ?? raw.created_at
+    ),
     assignedCourseIds: Array.isArray(raw.assignedCourseIds) ? raw.assignedCourseIds : [],
     avatarUrl: raw.avatarUrl ?? raw.avatar_url ?? null,
     contactEmail: raw.contactEmail ?? raw.contact_email ?? '',
@@ -302,6 +329,8 @@ export function addEmployee(data) {
     ...data,
     id: getNextEmployeeId(),
     employmentStatus: data.employmentStatus || EMPLOYMENT_STATUS.ACTIVE,
+    hiredAt: data.hiredAt || todayEmployeeDateKey(),
+    terminatedAt: data.terminatedAt ?? null,
     assignedCourseIds: data.assignedCourseIds || [],
   })
 
@@ -329,15 +358,15 @@ export function updateEmployee(id, updates) {
   writeJson(STORAGE_KEYS.USER_EDITS, edits)
 }
 
-/** Уволить сотрудника (не удаляет из базы; дата — подготовка к payroll) */
+/** Уволить сотрудника (не удаляет из базы; дата увольнения = сегодня) */
 export function deactivateEmployee(id) {
   updateEmployee(id, {
     employmentStatus: EMPLOYMENT_STATUS.TERMINATED,
-    terminatedAt: new Date().toISOString().slice(0, 10),
+    terminatedAt: todayEmployeeDateKey(),
   })
 }
 
-/** Восстановить сотрудника (статус снова «Работает») */
+/** Восстановить сотрудника (статус снова «Работает»; дата приёма сохраняется) */
 export function restoreEmployee(id) {
   updateEmployee(id, {
     employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
@@ -417,6 +446,7 @@ export const EMPTY_EMPLOYEE_FORM = {
   password: '',
   avatarUrl: '',
   employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
+  hiredAt: '',
   workLocationId: '',
 }
 
@@ -430,6 +460,7 @@ export function employeeToForm(employee) {
     password: '',
     avatarUrl: employee.avatarUrl || '',
     employmentStatus: employmentStatusForForm(employee.employmentStatus),
+    hiredAt: toEmployeeDateKey(employee.hiredAt) || '',
     workLocationId: employee.workLocationId || '',
   }
 }
@@ -443,6 +474,9 @@ export function validateEmployeeForm(form, editId = null) {
   }
   if (!editId && !form.password?.trim()) {
     return 'Укажите пароль'
+  }
+  if (editId && !toEmployeeDateKey(form.hiredAt)) {
+    return 'Укажите дату приёма на работу'
   }
   if (isLoginTaken(form.login, editId)) {
     return 'Сотрудник с таким логином уже существует'

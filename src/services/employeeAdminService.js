@@ -93,6 +93,9 @@ function serverEmployeeToUi(row) {
     position: row.position,
     employmentStatus: row.status,
     avatarUrl: row.avatar_url,
+    hiredAt: row.hired_at,
+    terminatedAt: row.terminated_at,
+    createdAt: row.created_at,
     authLinked: row.auth_linked === true,
   })
 }
@@ -244,6 +247,8 @@ export async function updateEmployeeAsAdmin(employeeId, changes) {
   if (changes.roleId != null) payloadChanges.role_id = changes.roleId
   if (changes.employmentStatus != null) payloadChanges.status = changes.employmentStatus
   if (changes.status != null) payloadChanges.status = changes.status
+  if (changes.hiredAt !== undefined) payloadChanges.hired_at = changes.hiredAt
+  if (changes.terminatedAt !== undefined) payloadChanges.terminated_at = changes.terminatedAt
 
   const { data, error } = await supabase.functions.invoke('admin-update-employee', {
     body: {

@@ -13,6 +13,8 @@ create table if not exists academy_users (
   position text not null default '',
   status text not null default 'active',
   avatar_url text,
+  hired_at date,
+  terminated_at date,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

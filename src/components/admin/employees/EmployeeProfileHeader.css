@@ -43,6 +43,23 @@
   margin-top: 10px;
 }
 
+.employee-profile-header__dates {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+}
+
+.employee-profile-header__date-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text, #0f172a);
+}
+
 .employee-profile-header__login {
   display: flex;
   flex-wrap: wrap;

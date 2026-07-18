@@ -13,6 +13,8 @@ import {
   SAFE_EMPLOYEE_SELECT,
   buildFullName,
   mapSafeEmployee,
+  normalizeDateKey,
+  todayDateKeyAlmaty,
   type DbEmployeeRow,
 } from '../_shared/employeeFields.ts'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
@@ -26,6 +28,8 @@ const ALLOWED_CHANGE_KEYS = new Set([
   'avatar_url',
   'role_id',
   'status',
+  'hired_at',
+  'terminated_at',
 ])
 
 const FORBIDDEN_CHANGE_KEYS = new Set([
@@ -201,6 +205,35 @@ Deno.serve(async (req) => {
     }
     nextStatus = changes.status.trim()
     patch.status = nextStatus
+  }
+
+  if ('hired_at' in changes) {
+    const hiredAt = normalizeDateKey(changes.hired_at)
+    if (!hiredAt) {
+      return adminErrorResponse('invalid_hired_at', 422)
+    }
+    patch.hired_at = hiredAt
+  }
+
+  if ('terminated_at' in changes) {
+    if (changes.terminated_at === null || changes.terminated_at === '') {
+      patch.terminated_at = null
+    } else {
+      const terminatedAt = normalizeDateKey(changes.terminated_at)
+      if (!terminatedAt) {
+        return adminErrorResponse('invalid_terminated_at', 422)
+      }
+      patch.terminated_at = terminatedAt
+    }
+  }
+
+  // Status transitions drive termination date when client did not send it explicitly
+  if ('status' in changes && !('terminated_at' in changes)) {
+    if (canEmployeeLogin(nextStatus)) {
+      patch.terminated_at = null
+    } else if (nextStatus === 'terminated' || nextStatus === 'inactive' || nextStatus === 'deactivated') {
+      patch.terminated_at = todayDateKeyAlmaty()
+    }
   }
 
   const currentlyActiveEditor =

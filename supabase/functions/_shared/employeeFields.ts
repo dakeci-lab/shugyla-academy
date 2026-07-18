@@ -26,7 +26,7 @@ export const ALLOWED_STATUSES = new Set([
 ])
 
 export const SAFE_EMPLOYEE_SELECT =
-  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, created_at, updated_at, auth_user_id'
+  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, hired_at, terminated_at, created_at, updated_at, auth_user_id'
 
 export type DbEmployeeRow = {
   id: number
@@ -39,6 +39,8 @@ export type DbEmployeeRow = {
   status: string
   position: string
   avatar_url: string | null
+  hired_at?: string | null
+  terminated_at?: string | null
   created_at: string
   updated_at: string
   auth_user_id?: string | null
@@ -55,9 +57,23 @@ export type SafeEmployee = {
   status: string
   position: string
   avatar_url: string | null
+  hired_at: string | null
+  terminated_at: string | null
   created_at: string
   updated_at: string
   auth_linked: boolean
+}
+
+/** Calendar date YYYY-MM-DD in Asia/Almaty */
+export function todayDateKeyAlmaty(date = new Date()): string {
+  return date.toLocaleDateString('en-CA', { timeZone: 'Asia/Almaty' })
+}
+
+export function normalizeDateKey(value: unknown): string | null {
+  if (value == null || value === '') return null
+  if (typeof value !== 'string') return null
+  const match = value.trim().match(/^(\d{4}-\d{2}-\d{2})/)
+  return match ? match[1] : null
 }
 
 export function buildFullName(firstName: string, lastName: string): string {
@@ -76,6 +92,8 @@ export function mapSafeEmployee(row: DbEmployeeRow): SafeEmployee {
     status: row.status,
     position: row.position,
     avatar_url: row.avatar_url,
+    hired_at: normalizeDateKey(row.hired_at) ?? normalizeDateKey(row.created_at),
+    terminated_at: normalizeDateKey(row.terminated_at),
     created_at: row.created_at,
     updated_at: row.updated_at,
     auth_linked: Boolean(row.auth_user_id),
