@@ -133,7 +133,9 @@ export default function EmployeesSection() {
     if (cloudMode) {
       loadCloudEmployees()
     }
-  }, [cloudMode, loadCloudEmployees, version])
+    // Intentionally omit AcademyData `version`: progressive bootstrap bumps it and
+    // was replaying admin-list-employees. Mutations call loadCloudEmployees/refresh.
+  }, [cloudMode, loadCloudEmployees])
 
   useEffect(() => {
     setPage(1)
@@ -143,7 +145,8 @@ export default function EmployeesSection() {
     getRolesForEmployeeForm('', '')
       .then(setFilterRoles)
       .catch(() => setFilterRoles([]))
-  }, [version])
+    // Roles catalog is session-cached via ensureRbacLoaded; do not reload on version.
+  }, [])
 
   useEffect(() => {
     if (!cloudMode || !filterOpen) return undefined

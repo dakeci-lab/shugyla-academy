@@ -226,7 +226,9 @@ export default function EmployeeProfileSection({ employeeId }) {
 
   useEffect(() => {
     loadEmployee()
-  }, [loadEmployee, version])
+    // Intentionally omit AcademyData `version`: progressive bootstrap was replaying
+    // admin-list-employees / workforce. Mutations call loadEmployee + refresh.
+  }, [loadEmployee])
 
   useEffect(() => {
     if (!showRating || scheduleLoading) {

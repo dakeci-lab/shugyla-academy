@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
+import { coalesceInFlight } from '../lib/requestCoalesce'
 import { normalizeEmployee } from '../utils/employeeData'
 import {
   extractFunctionErrorBody,
@@ -105,13 +106,16 @@ async function ensureCloudSession() {
   if (sessionError || !sessionData?.session?.access_token) {
     throw new EmployeeAdminError(ERROR_MESSAGES.unauthorized, 'unauthorized')
   }
+
+  return sessionData.session.user?.id || 'session'
 }
 
 /**
  * Cloud-only: paginated employee list via admin-list-employees Edge Function.
+ * Concurrent identical requests share one in-flight invoke.
  */
 export async function listEmployeesForAdmin(options = {}) {
-  await ensureCloudSession()
+  const sessionUserId = await ensureCloudSession()
 
   const body = {
     page: options.page ?? 1,
@@ -124,29 +128,33 @@ export async function listEmployeesForAdmin(options = {}) {
     employee_id: options.employeeId != null ? Number(options.employeeId) : undefined,
   }
 
-  const { data, error } = await supabase.functions.invoke('admin-list-employees', { body })
+  const coalesceKey = `admin-list-employees:${sessionUserId}:${JSON.stringify(body)}`
 
-  if (error) {
-    const contextBody = await extractFunctionErrorBody(error)
-    const fallback = isGenericInvokeErrorMessage(error.message)
-      ? ERROR_MESSAGES.listDefault
-      : error.message
-    throwMappedAdminError(contextBody, fallback)
-  }
+  return coalesceInFlight(coalesceKey, async () => {
+    const { data, error } = await supabase.functions.invoke('admin-list-employees', { body })
 
-  if (!data?.ok || !Array.isArray(data.employees)) {
-    throwMappedAdminError(data, ERROR_MESSAGES.listDefault)
-  }
+    if (error) {
+      const contextBody = await extractFunctionErrorBody(error)
+      const fallback = isGenericInvokeErrorMessage(error.message)
+        ? ERROR_MESSAGES.listDefault
+        : error.message
+      throwMappedAdminError(contextBody, fallback)
+    }
 
-  return {
-    employees: data.employees.map(serverEmployeeToUi),
-    pagination: data.pagination ?? {
-      page: body.page,
-      page_size: body.page_size,
-      total: data.employees.length,
-      total_pages: 1,
-    },
-  }
+    if (!data?.ok || !Array.isArray(data.employees)) {
+      throwMappedAdminError(data, ERROR_MESSAGES.listDefault)
+    }
+
+    return {
+      employees: data.employees.map(serverEmployeeToUi),
+      pagination: data.pagination ?? {
+        page: body.page,
+        page_size: body.page_size,
+        total: data.employees.length,
+        total_pages: 1,
+      },
+    }
+  })
 }
 
 function isLegacyEmployeeIdRejection(error) {

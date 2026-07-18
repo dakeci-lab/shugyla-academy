@@ -143,6 +143,17 @@ export function SessionProvider({ children }) {
           setSupabaseAuthenticated(false)
           setAuthStatus(AUTH_STATUS.UNAUTHENTICATED)
           setRbacReady(false)
+          // Drop session-scoped caches so the next user never reuses in-flight/RBAC data.
+          try {
+            const { resetCloudBootstrapState } = await import('../services/academyDataService')
+            resetCloudBootstrapState()
+            const { invalidateRbacCache } = await import('../services/rbacService')
+            invalidateRbacCache()
+            const { clearInFlightRequests } = await import('../lib/requestCoalesce')
+            clearInFlightRequests()
+          } catch {
+            // Best-effort cleanup on remote sign-out.
+          }
           return
         }
 
@@ -289,6 +300,10 @@ export function SessionProvider({ children }) {
     if (isCloudMode()) {
       const { resetCloudBootstrapState } = await import('../services/academyDataService')
       resetCloudBootstrapState()
+      const { invalidateRbacCache } = await import('../services/rbacService')
+      invalidateRbacCache()
+      const { clearInFlightRequests } = await import('../lib/requestCoalesce')
+      clearInFlightRequests()
     }
   }, [])
 

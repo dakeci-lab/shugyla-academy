@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
+import { coalesceInFlight } from '../lib/requestCoalesce'
 import { normalizeEmployee } from '../utils/employeeData'
 import { normalizeShift } from '../utils/shiftData'
 import {
@@ -58,6 +59,8 @@ async function ensureCloudSession() {
   if (sessionError || !sessionData?.session?.access_token) {
     throw new Error(ERROR_MESSAGES.unauthorized)
   }
+
+  return sessionData.session.user?.id || 'session'
 }
 
 function workforceEmployeeToUi(row) {
@@ -103,34 +106,38 @@ export function monthToDateRange(year, month) {
 
 /**
  * Cloud-only team workforce bundle via admin-team-workforce-data Edge Function.
+ * Concurrent identical requests share one in-flight invoke.
  *
  * @param {{ dateFrom: string, dateTo: string, view: 'dashboard'|'schedule'|'rating' }} params
  */
 export async function fetchTeamWorkforceData({ dateFrom, dateTo, view }) {
-  await ensureCloudSession()
+  const sessionUserId = await ensureCloudSession()
+  const coalesceKey = `admin-team-workforce-data:${sessionUserId}:${dateFrom}:${dateTo}:${view}`
 
-  const { data, error } = await supabase.functions.invoke('admin-team-workforce-data', {
-    body: {
-      date_from: dateFrom,
-      date_to: dateTo,
-      view,
-      timezone: APP_TIMEZONE,
-    },
+  return coalesceInFlight(coalesceKey, async () => {
+    const { data, error } = await supabase.functions.invoke('admin-team-workforce-data', {
+      body: {
+        date_from: dateFrom,
+        date_to: dateTo,
+        view,
+        timezone: APP_TIMEZONE,
+      },
+    })
+
+    if (error) {
+      throw new Error(await resolveFunctionError(error, ERROR_MESSAGES.default))
+    }
+
+    if (!data?.ok || !Array.isArray(data.employees) || !Array.isArray(data.shifts)) {
+      throw new Error(mapWorkforceError(data, ERROR_MESSAGES.default))
+    }
+
+    return {
+      employees: data.employees.map(workforceEmployeeToUi),
+      shifts: data.shifts.map(workforceShiftToUi),
+      teamScope: data.team_scope === true,
+    }
   })
-
-  if (error) {
-    throw new Error(await resolveFunctionError(error, ERROR_MESSAGES.default))
-  }
-
-  if (!data?.ok || !Array.isArray(data.employees) || !Array.isArray(data.shifts)) {
-    throw new Error(mapWorkforceError(data, ERROR_MESSAGES.default))
-  }
-
-  return {
-    employees: data.employees.map(workforceEmployeeToUi),
-    shifts: data.shifts.map(workforceShiftToUi),
-    teamScope: data.team_scope === true,
-  }
 }
 
 export async function fetchTeamWorkforceForMonth(year, month, view) {

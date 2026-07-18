@@ -267,12 +267,14 @@ export default function OwnerDashboard() {
   const [activeMetric, setActiveMetric] = useState(null)
 
   const todayKey = toDateKeyInAppTimezone(now)
+  const cloudMode = isCloudMode()
   const employees = useMemo(
-    () => (isCloudMode() ? teamEmployees : getStaffEmployees('active')),
-    [teamEmployees]
+    () => (cloudMode ? teamEmployees : getStaffEmployees('active')),
+    [cloudMode, teamEmployees]
   )
   const employeeIds = useMemo(() => employees.map((emp) => emp.id), [employees])
-  const employeeIdsKey = employeeIds.join(',')
+  // Cloud workforce ignores employeeIds; including the key re-triggers load after setTeamEmployees.
+  const localEmployeeIdsKey = cloudMode ? '' : employeeIds.join(',')
   const selectedMonthState = useMemo(
     () => getMonthStateFromDateKey(selectedDateKey),
     [selectedDateKey]
@@ -285,7 +287,7 @@ export default function OwnerDashboard() {
     setError('')
     setLoading(true)
     try {
-      if (isCloudMode()) {
+      if (cloudMode) {
         const { dateFrom, dateTo } = monthToDateRange(
           selectedMonthState.year,
           selectedMonthState.month
@@ -300,12 +302,15 @@ export default function OwnerDashboard() {
           (bundle.shifts || []).filter((shift) => shift.shiftDate === selectedDateKey)
         )
       } else {
+        const ids = localEmployeeIdsKey
+          ? localEmployeeIdsKey.split(',').filter(Boolean)
+          : []
         const [attendanceSettings, shifts] = await Promise.all([
           getAttendanceSettings(),
           getTeamShiftsForMonth(
             selectedMonthState.year,
             selectedMonthState.month,
-            employeeIds.length ? employeeIds : null
+            ids.length ? ids : null
           ),
         ])
         setSettings(attendanceSettings)
@@ -316,7 +321,7 @@ export default function OwnerDashboard() {
     } finally {
       setLoading(false)
     }
-  }, [selectedDateKey, selectedMonthState.year, selectedMonthState.month, employeeIdsKey])
+  }, [cloudMode, selectedDateKey, selectedMonthState.year, selectedMonthState.month, localEmployeeIdsKey])
 
   usePlatformPageRefresh(loadData)
 

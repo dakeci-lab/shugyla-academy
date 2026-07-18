@@ -84,15 +84,28 @@ export async function getRoles() {
 }
 
 export async function getActiveRolesForAssignment() {
-  return getAdapter().getActiveRolesForAssignment()
+  const snapshot = await ensureRbacLoaded()
+  return snapshot.roles
+    .filter((role) => role.isActive)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
 }
 
 export async function getRolesForEmployeeForm(currentRoleCode, currentRoleId) {
-  if (getAdapter().getRolesForEmployeeForm) {
-    return getAdapter().getRolesForEmployeeForm(currentRoleCode, currentRoleId)
-  }
+  // Always use ensureRbacLoaded — adapter helpers bypass the session cache.
   const snapshot = await ensureRbacLoaded()
-  return snapshot.roles.filter((role) => role.isActive)
+  const active = snapshot.roles
+    .filter((role) => role.isActive)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+
+  const current =
+    snapshot.roles.find((role) => role.id === currentRoleId) ||
+    snapshot.roles.find((role) => role.code === currentRoleCode)
+
+  if (current && !current.isActive && !active.some((role) => role.id === current.id)) {
+    return [...active, current].sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+  }
+
+  return active
 }
 
 export async function getPermissions() {
