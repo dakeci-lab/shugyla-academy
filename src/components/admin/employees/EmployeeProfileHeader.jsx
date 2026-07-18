@@ -7,6 +7,8 @@ import {
   getEmploymentStatusBadgeType,
   formatEmployeeDateRu,
   isTerminatedEmployeeStatus,
+  getWorkModeLabel,
+  getSalaryCalculationTypeLabel,
 } from '../../../utils/employeeData'
 import { getRoleLabel } from '../../../data/roles'
 import './EmployeeProfileHeader.css'
@@ -64,6 +66,14 @@ export default function EmployeeProfileHeader({
                   <span>{formatEmployeeDateRu(employee.terminatedAt)}</span>
                 </p>
               )}
+            <p className="employee-profile-header__date-row">
+              <span className="employee-profile-header__meta-label">Режим работы</span>
+              <span>{getWorkModeLabel(employee.workMode)}</span>
+            </p>
+            <p className="employee-profile-header__date-row">
+              <span className="employee-profile-header__meta-label">Тип расчёта зарплаты</span>
+              <span>{getSalaryCalculationTypeLabel(employee.salaryCalculationType)}</span>
+            </p>
           </div>
           {showLogin && (
             <p className="employee-profile-header__login">

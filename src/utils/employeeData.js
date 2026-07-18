@@ -70,6 +70,65 @@ export const EMPLOYEE_STATUS_OPTIONS = [
   { value: EMPLOYMENT_STATUS.TERMINATED, label: 'Уволен' },
 ]
 
+/** Режим работы сотрудника (пока только хранение / отображение) */
+export const WORK_MODE = {
+  OFFLINE: 'offline',
+  ONLINE: 'online',
+}
+
+export const WORK_MODE_LABELS = {
+  offline: 'Офлайн',
+  online: 'Онлайн',
+}
+
+export const WORK_MODE_OPTIONS = [
+  { value: WORK_MODE.OFFLINE, label: WORK_MODE_LABELS.offline },
+  { value: WORK_MODE.ONLINE, label: WORK_MODE_LABELS.online },
+]
+
+/** Тип расчёта зарплаты (пока только хранение / отображение) */
+export const SALARY_CALCULATION_TYPE = {
+  SHIFT_BASED: 'shift_based',
+  FIXED_SALARY: 'fixed_salary',
+}
+
+export const SALARY_CALCULATION_TYPE_LABELS = {
+  shift_based: 'По сменам',
+  fixed_salary: 'Фиксированный оклад',
+}
+
+export const SALARY_CALCULATION_TYPE_OPTIONS = [
+  {
+    value: SALARY_CALCULATION_TYPE.SHIFT_BASED,
+    label: SALARY_CALCULATION_TYPE_LABELS.shift_based,
+  },
+  {
+    value: SALARY_CALCULATION_TYPE.FIXED_SALARY,
+    label: SALARY_CALCULATION_TYPE_LABELS.fixed_salary,
+  },
+]
+
+export function normalizeWorkMode(value) {
+  return value === WORK_MODE.ONLINE ? WORK_MODE.ONLINE : WORK_MODE.OFFLINE
+}
+
+export function normalizeSalaryCalculationType(value) {
+  return value === SALARY_CALCULATION_TYPE.FIXED_SALARY
+    ? SALARY_CALCULATION_TYPE.FIXED_SALARY
+    : SALARY_CALCULATION_TYPE.SHIFT_BASED
+}
+
+export function getWorkModeLabel(value) {
+  return WORK_MODE_LABELS[normalizeWorkMode(value)] || WORK_MODE_LABELS.offline
+}
+
+export function getSalaryCalculationTypeLabel(value) {
+  return (
+    SALARY_CALCULATION_TYPE_LABELS[normalizeSalaryCalculationType(value)] ||
+    SALARY_CALCULATION_TYPE_LABELS.shift_based
+  )
+}
+
 /** Нормализация статуса из базы / legacy-значений → Работает | Уволен */
 export function normalizeEmploymentStatus(status) {
   if (!status) return EMPLOYMENT_STATUS.ACTIVE
@@ -241,6 +300,10 @@ export function normalizeEmployee(raw) {
     hiredAt: toEmployeeDateKey(
       raw.hiredAt ?? raw.hired_at ?? raw.createdAt ?? raw.created_at
     ),
+    workMode: normalizeWorkMode(raw.workMode ?? raw.work_mode),
+    salaryCalculationType: normalizeSalaryCalculationType(
+      raw.salaryCalculationType ?? raw.salary_calculation_type
+    ),
     assignedCourseIds: Array.isArray(raw.assignedCourseIds) ? raw.assignedCourseIds : [],
     avatarUrl: raw.avatarUrl ?? raw.avatar_url ?? null,
     contactEmail: raw.contactEmail ?? raw.contact_email ?? '',
@@ -331,6 +394,9 @@ export function addEmployee(data) {
     employmentStatus: data.employmentStatus || EMPLOYMENT_STATUS.ACTIVE,
     hiredAt: data.hiredAt || todayEmployeeDateKey(),
     terminatedAt: data.terminatedAt ?? null,
+    workMode: data.workMode || WORK_MODE.OFFLINE,
+    salaryCalculationType:
+      data.salaryCalculationType || SALARY_CALCULATION_TYPE.SHIFT_BASED,
     assignedCourseIds: data.assignedCourseIds || [],
   })
 
@@ -447,6 +513,8 @@ export const EMPTY_EMPLOYEE_FORM = {
   avatarUrl: '',
   employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
   hiredAt: '',
+  workMode: WORK_MODE.OFFLINE,
+  salaryCalculationType: SALARY_CALCULATION_TYPE.SHIFT_BASED,
   workLocationId: '',
 }
 
@@ -461,6 +529,8 @@ export function employeeToForm(employee) {
     avatarUrl: employee.avatarUrl || '',
     employmentStatus: employmentStatusForForm(employee.employmentStatus),
     hiredAt: toEmployeeDateKey(employee.hiredAt) || '',
+    workMode: normalizeWorkMode(employee.workMode),
+    salaryCalculationType: normalizeSalaryCalculationType(employee.salaryCalculationType),
     workLocationId: employee.workLocationId || '',
   }
 }

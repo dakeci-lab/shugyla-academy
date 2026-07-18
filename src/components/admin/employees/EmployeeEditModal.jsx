@@ -4,6 +4,8 @@ import {
   employeeToForm,
   validateEmployeeForm,
   EMPLOYEE_STATUS_OPTIONS,
+  WORK_MODE_OPTIONS,
+  SALARY_CALCULATION_TYPE_OPTIONS,
   getStaffEmployees,
   isActiveStaffEmployee,
   isDeactivatedStaffEmployee,
@@ -148,6 +150,8 @@ export default function EmployeeEditModal({
             position: selectedRole?.name || getRoleLabel(roleCode),
             employmentStatus: form.employmentStatus,
             hiredAt: form.hiredAt,
+            workMode: form.workMode,
+            salaryCalculationType: form.salaryCalculationType,
             avatarUrl: form.avatarUrl || null,
           })
         } else {
@@ -160,6 +164,8 @@ export default function EmployeeEditModal({
             position: selectedRole?.name || getRoleLabel(roleCode),
             employmentStatus: form.employmentStatus,
             hiredAt: form.hiredAt,
+            workMode: form.workMode,
+            salaryCalculationType: form.salaryCalculationType,
             workLocationId: form.workLocationId || null,
             ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
             ...(form.password?.trim() ? { password: form.password } : {}),
@@ -177,6 +183,8 @@ export default function EmployeeEditModal({
           login: form.login.trim(),
           position: selectedRole?.name || getRoleLabel(roleCode),
           employmentStatus: form.employmentStatus,
+          workMode: form.workMode,
+          salaryCalculationType: form.salaryCalculationType,
           workLocationId: form.workLocationId || null,
           sourceCandidateId: sourceCandidateId || undefined,
           ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
@@ -496,6 +504,39 @@ export default function EmployeeEditModal({
             </span>
           </label>
         )}
+
+        <div className="admin-form__row">
+          <label className="admin-form__label">
+            Режим работы
+            <select
+              className="admin-form__select"
+              value={form.workMode}
+              onChange={(e) => patchForm({ workMode: e.target.value })}
+              disabled={submitting}
+            >
+              {WORK_MODE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="admin-form__label">
+            Тип расчёта зарплаты
+            <select
+              className="admin-form__select"
+              value={form.salaryCalculationType}
+              onChange={(e) => patchForm({ salaryCalculationType: e.target.value })}
+              disabled={submitting}
+            >
+              {SALARY_CALCULATION_TYPE_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
         {formError && <p className="admin-form__error">{formError}</p>}
       </form>

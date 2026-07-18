@@ -26,7 +26,10 @@ export const ALLOWED_STATUSES = new Set([
 ])
 
 export const SAFE_EMPLOYEE_SELECT =
-  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, hired_at, terminated_at, created_at, updated_at, auth_user_id'
+  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, hired_at, terminated_at, work_mode, salary_calculation_type, created_at, updated_at, auth_user_id'
+
+export const ALLOWED_WORK_MODES = new Set(['offline', 'online'])
+export const ALLOWED_SALARY_CALCULATION_TYPES = new Set(['shift_based', 'fixed_salary'])
 
 export type DbEmployeeRow = {
   id: number
@@ -41,6 +44,8 @@ export type DbEmployeeRow = {
   avatar_url: string | null
   hired_at?: string | null
   terminated_at?: string | null
+  work_mode?: string | null
+  salary_calculation_type?: string | null
   created_at: string
   updated_at: string
   auth_user_id?: string | null
@@ -59,6 +64,8 @@ export type SafeEmployee = {
   avatar_url: string | null
   hired_at: string | null
   terminated_at: string | null
+  work_mode: string
+  salary_calculation_type: string
   created_at: string
   updated_at: string
   auth_linked: boolean
@@ -80,6 +87,14 @@ export function buildFullName(firstName: string, lastName: string): string {
   return `${firstName} ${lastName}`.trim().slice(0, MAX_NAME_LENGTH)
 }
 
+export function normalizeWorkMode(value: unknown): string {
+  return value === 'online' ? 'online' : 'offline'
+}
+
+export function normalizeSalaryCalculationType(value: unknown): string {
+  return value === 'fixed_salary' ? 'fixed_salary' : 'shift_based'
+}
+
 export function mapSafeEmployee(row: DbEmployeeRow): SafeEmployee {
   return {
     id: row.id,
@@ -94,6 +109,8 @@ export function mapSafeEmployee(row: DbEmployeeRow): SafeEmployee {
     avatar_url: row.avatar_url,
     hired_at: normalizeDateKey(row.hired_at) ?? normalizeDateKey(row.created_at),
     terminated_at: normalizeDateKey(row.terminated_at),
+    work_mode: normalizeWorkMode(row.work_mode),
+    salary_calculation_type: normalizeSalaryCalculationType(row.salary_calculation_type),
     created_at: row.created_at,
     updated_at: row.updated_at,
     auth_linked: Boolean(row.auth_user_id),

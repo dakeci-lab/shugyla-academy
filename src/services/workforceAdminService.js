@@ -76,6 +76,8 @@ function workforceEmployeeToUi(row) {
     avatarUrl: row.avatar_url,
     hiredAt: row.hired_at,
     terminatedAt: row.terminated_at,
+    workMode: row.work_mode,
+    salaryCalculationType: row.salary_calculation_type,
     createdAt: row.created_at,
   })
 }

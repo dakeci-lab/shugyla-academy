@@ -95,6 +95,8 @@ function serverEmployeeToUi(row) {
     avatarUrl: row.avatar_url,
     hiredAt: row.hired_at,
     terminatedAt: row.terminated_at,
+    workMode: row.work_mode,
+    salaryCalculationType: row.salary_calculation_type,
     createdAt: row.created_at,
     authLinked: row.auth_linked === true,
   })
@@ -249,6 +251,10 @@ export async function updateEmployeeAsAdmin(employeeId, changes) {
   if (changes.status != null) payloadChanges.status = changes.status
   if (changes.hiredAt !== undefined) payloadChanges.hired_at = changes.hiredAt
   if (changes.terminatedAt !== undefined) payloadChanges.terminated_at = changes.terminatedAt
+  if (changes.workMode !== undefined) payloadChanges.work_mode = changes.workMode
+  if (changes.salaryCalculationType !== undefined) {
+    payloadChanges.salary_calculation_type = changes.salaryCalculationType
+  }
 
   const { data, error } = await supabase.functions.invoke('admin-update-employee', {
     body: {

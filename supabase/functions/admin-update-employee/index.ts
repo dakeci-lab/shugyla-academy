@@ -7,13 +7,17 @@ import {
   roleHasPermissionCode,
 } from '../_shared/employeeAuthorization.ts'
 import {
+  ALLOWED_SALARY_CALCULATION_TYPES,
   ALLOWED_STATUSES,
+  ALLOWED_WORK_MODES,
   MAX_AVATAR_URL_LENGTH,
   MAX_NAME_LENGTH,
   SAFE_EMPLOYEE_SELECT,
   buildFullName,
   mapSafeEmployee,
   normalizeDateKey,
+  normalizeSalaryCalculationType,
+  normalizeWorkMode,
   todayDateKeyAlmaty,
   type DbEmployeeRow,
 } from '../_shared/employeeFields.ts'
@@ -30,6 +34,8 @@ const ALLOWED_CHANGE_KEYS = new Set([
   'status',
   'hired_at',
   'terminated_at',
+  'work_mode',
+  'salary_calculation_type',
 ])
 
 const FORBIDDEN_CHANGE_KEYS = new Set([
@@ -225,6 +231,25 @@ Deno.serve(async (req) => {
       }
       patch.terminated_at = terminatedAt
     }
+  }
+
+  if ('work_mode' in changes) {
+    if (typeof changes.work_mode !== 'string' || !ALLOWED_WORK_MODES.has(changes.work_mode.trim())) {
+      return adminErrorResponse('invalid_work_mode', 422)
+    }
+    patch.work_mode = normalizeWorkMode(changes.work_mode.trim())
+  }
+
+  if ('salary_calculation_type' in changes) {
+    if (
+      typeof changes.salary_calculation_type !== 'string' ||
+      !ALLOWED_SALARY_CALCULATION_TYPES.has(changes.salary_calculation_type.trim())
+    ) {
+      return adminErrorResponse('invalid_salary_calculation_type', 422)
+    }
+    patch.salary_calculation_type = normalizeSalaryCalculationType(
+      changes.salary_calculation_type.trim()
+    )
   }
 
   // Status transitions drive termination date when client did not send it explicitly

@@ -1,5 +1,5 @@
 export const WORKFORCE_EMPLOYEE_SELECT =
-  'id, first_name, last_name, full_name, role, role_id, status, position, avatar_url, hired_at, terminated_at, created_at'
+  'id, first_name, last_name, full_name, role, role_id, status, position, avatar_url, hired_at, terminated_at, work_mode, salary_calculation_type, created_at'
 
 // Break columns omitted from SELECT (not used by Home/Schedule/Rating/Profile consumers).
 // mapSafeWorkforceShift still returns break keys as null for response-contract stability.
@@ -40,6 +40,8 @@ export type DbWorkforceEmployeeRow = {
   avatar_url: string | null
   hired_at?: string | null
   terminated_at?: string | null
+  work_mode?: string | null
+  salary_calculation_type?: string | null
   created_at?: string | null
 }
 
@@ -55,6 +57,8 @@ export type SafeWorkforceEmployee = {
   avatar_url: string | null
   hired_at: string | null
   terminated_at: string | null
+  work_mode: string
+  salary_calculation_type: string
   created_at: string | null
 }
 
@@ -80,6 +84,14 @@ function toDateKey(value: string | null | undefined): string | null {
   return match ? match[1] : null
 }
 
+function normalizeWorkMode(value: string | null | undefined): string {
+  return value === 'online' ? 'online' : 'offline'
+}
+
+function normalizeSalaryCalculationType(value: string | null | undefined): string {
+  return value === 'fixed_salary' ? 'fixed_salary' : 'shift_based'
+}
+
 export function mapSafeWorkforceEmployee(row: DbWorkforceEmployeeRow): SafeWorkforceEmployee {
   return {
     id: row.id,
@@ -93,6 +105,8 @@ export function mapSafeWorkforceEmployee(row: DbWorkforceEmployeeRow): SafeWorkf
     avatar_url: row.avatar_url,
     hired_at: toDateKey(row.hired_at) ?? toDateKey(row.created_at),
     terminated_at: toDateKey(row.terminated_at),
+    work_mode: normalizeWorkMode(row.work_mode),
+    salary_calculation_type: normalizeSalaryCalculationType(row.salary_calculation_type),
     created_at: row.created_at ?? null,
   }
 }
@@ -117,6 +131,8 @@ export function mapHomeSummaryEmployee(row: {
     avatar_url: null,
     hired_at: null,
     terminated_at: null,
+    work_mode: 'offline',
+    salary_calculation_type: 'shift_based',
     created_at: null,
   }
 }

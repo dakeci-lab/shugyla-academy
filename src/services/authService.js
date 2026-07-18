@@ -34,7 +34,7 @@ export const ACADEMY_AUTH_PROFILE_FIELDS =
 
 /** Safe academy_users columns for Auth-first cloud queries (never includes password). */
 export const ACADEMY_PROFILE_SAFE_FIELDS =
-  `${ACADEMY_AUTH_PROFILE_FIELDS}, hired_at, terminated_at`
+  `${ACADEMY_AUTH_PROFILE_FIELDS}, hired_at, terminated_at, work_mode, salary_calculation_type`
 
 const DEACTIVATED_ACCOUNT_MESSAGE =
   'Доступ закрыт: сотрудник уволен. Обратитесь к администратору.'
@@ -79,6 +79,8 @@ function profileRowToEmployee(row, assignedCourseIds = []) {
     employmentStatus: row.status,
     hiredAt: row.hired_at,
     terminatedAt: row.terminated_at,
+    workMode: row.work_mode,
+    salaryCalculationType: row.salary_calculation_type,
     createdAt: row.created_at,
     assignedCourseIds,
     avatarUrl: row.avatar_url,
@@ -118,6 +120,23 @@ async function loadAcademyUserRow(match) {
   const authResult = await match(ACADEMY_AUTH_PROFILE_FIELDS)
   if (authResult.error || !authResult.data) return authResult
 
+  const extendedResult = await match(
+    'id, hired_at, terminated_at, work_mode, salary_calculation_type'
+  )
+  if (!extendedResult.error && extendedResult.data) {
+    return {
+      ...authResult,
+      data: {
+        ...authResult.data,
+        hired_at: extendedResult.data.hired_at ?? null,
+        terminated_at: extendedResult.data.terminated_at ?? null,
+        work_mode: extendedResult.data.work_mode ?? null,
+        salary_calculation_type: extendedResult.data.salary_calculation_type ?? null,
+      },
+    }
+  }
+
+  // Fallback if PostgREST cache still lacks the newest columns
   const datesResult = await match('id, hired_at, terminated_at')
   if (!datesResult.error && datesResult.data) {
     return {
