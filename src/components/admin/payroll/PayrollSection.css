@@ -1,0 +1,152 @@
+.payroll-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.payroll-section__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.payroll-section__filters .employee-search-toolbar {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.payroll-section__select {
+  min-width: 160px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm, 8px);
+  background: var(--color-white);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.payroll-section__error {
+  margin: 0;
+  color: var(--color-danger, #b42318);
+  font-size: 14px;
+}
+
+.payroll-section__empty {
+  margin: 0;
+  padding: 24px 8px;
+  color: var(--color-text-secondary);
+  text-align: center;
+}
+
+.payroll-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-white);
+}
+
+.payroll-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+
+.payroll-table th,
+.payroll-table td {
+  padding: 12px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+
+.payroll-table th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: var(--color-bg);
+}
+
+.payroll-table tr:last-child td {
+  border-bottom: none;
+}
+
+.payroll-table__name {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.payroll-table__role {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.payroll-table__payable {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.payroll-table__actions {
+  white-space: nowrap;
+}
+
+@media (max-width: 700px) {
+  .payroll-section__filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .payroll-section__select {
+    width: 100%;
+  }
+
+  .payroll-table {
+    min-width: 0;
+  }
+
+  .payroll-table thead {
+    display: none;
+  }
+
+  .payroll-table,
+  .payroll-table tbody,
+  .payroll-table tr,
+  .payroll-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .payroll-table tr {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .payroll-table tr:last-child {
+    border-bottom: none;
+  }
+
+  .payroll-table td {
+    border: none;
+    padding: 4px 0;
+  }
+
+  .payroll-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    margin-bottom: 2px;
+  }
+
+  .payroll-table__actions {
+    padding-top: 8px;
+  }
+
+  .payroll-table__actions .btn {
+    width: 100%;
+  }
+}

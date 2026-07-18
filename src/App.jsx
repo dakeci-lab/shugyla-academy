@@ -35,6 +35,8 @@ import PlatformWorkSchedule from './pages/platform/PlatformWorkSchedule'
 import PlatformEmployeeSchedule from './pages/platform/PlatformEmployeeSchedule'
 import PlatformEmployeeProfile from './pages/platform/PlatformEmployeeProfile'
 import PlatformEmployeeRating from './pages/platform/PlatformEmployeeRating'
+import PlatformPayroll from './pages/platform/PlatformPayroll'
+import PlatformPayrollRecord from './pages/platform/PlatformPayrollRecord'
 import PlatformTimeTracker from './pages/platform/PlatformTimeTracker'
 import PlatformHrVacancies from './pages/platform/PlatformHrVacancies'
 import PlatformHrCandidates from './pages/platform/PlatformHrCandidates'
@@ -146,10 +148,15 @@ export default function App() {
             path="employees/payroll"
             element={
               <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_PAYROLL}>
-                <ModulePlaceholder
-                  title="Подсчёт зарплаты"
-                  description="Расчёт заработной платы сотрудников."
-                />
+                <PlatformPayroll />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="employees/payroll/records/:recordId"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_PAYROLL}>
+                <PlatformPayrollRecord />
               </PlatformRoute>
             }
           />

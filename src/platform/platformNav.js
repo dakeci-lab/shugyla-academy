@@ -353,6 +353,13 @@ export function getPlatformSection(pathname) {
 }
 
 function getDynamicPlatformSection(pathname, flat) {
+  if (/^\/platform\/employees\/payroll\/records\/[^/]+\/?$/.test(pathname)) {
+    return {
+      title: 'Расчёт зарплаты',
+      description: 'Карточка расчёта заработной платы сотрудника.',
+    }
+  }
+
   if (/^\/platform\/employees\/\d+\/documents\/?$/.test(pathname)) {
     return {
       title: 'Документы сотрудника',
