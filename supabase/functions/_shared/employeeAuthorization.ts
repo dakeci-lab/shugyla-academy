@@ -220,3 +220,44 @@ export async function roleHasPermissionCode(
 ): Promise<boolean> {
   return roleHasPermission(serviceClient, roleId, permissionCode)
 }
+
+/**
+ * Batch permission checks for one role: 2 queries total instead of 2×N.
+ * Returns a map of permissionCode → boolean.
+ */
+export async function roleHasPermissionCodes(
+  serviceClient: SupabaseClient,
+  roleId: string | null,
+  permissionCodes: string[]
+): Promise<Record<string, boolean>> {
+  const result: Record<string, boolean> = {}
+  for (const code of permissionCodes) result[code] = false
+  if (!roleId || permissionCodes.length === 0) return result
+
+  const uniqueCodes = [...new Set(permissionCodes)]
+  const { data: permissions, error: permError } = await serviceClient
+    .from('permissions')
+    .select('id, code')
+    .in('code', uniqueCodes)
+
+  if (permError || !permissions?.length) return result
+
+  const permissionIds = permissions.map((row) => row.id).filter(Boolean)
+  if (!permissionIds.length) return result
+
+  const { data: links, error: linkError } = await serviceClient
+    .from('role_permissions')
+    .select('permission_id')
+    .eq('role_id', roleId)
+    .in('permission_id', permissionIds)
+
+  if (linkError) return result
+
+  const linkedIds = new Set((links ?? []).map((row) => row.permission_id))
+  for (const row of permissions) {
+    if (row.code && linkedIds.has(row.id)) {
+      result[row.code] = true
+    }
+  }
+  return result
+}

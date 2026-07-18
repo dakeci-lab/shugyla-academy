@@ -108,20 +108,36 @@ export function monthToDateRange(year, month) {
  * Cloud-only team workforce bundle via admin-team-workforce-data Edge Function.
  * Concurrent identical requests share one in-flight invoke.
  *
- * @param {{ dateFrom: string, dateTo: string, view: 'dashboard'|'schedule'|'rating' }} params
+ * @param {{
+ *   dateFrom: string,
+ *   dateTo: string,
+ *   view: 'dashboard'|'schedule'|'rating',
+ *   employeeId?: number|null,
+ * }} params
  */
-export async function fetchTeamWorkforceData({ dateFrom, dateTo, view }) {
+export async function fetchTeamWorkforceData({ dateFrom, dateTo, view, employeeId = null } = {}) {
   const sessionUserId = await ensureCloudSession()
-  const coalesceKey = `admin-team-workforce-data:${sessionUserId}:${dateFrom}:${dateTo}:${view}`
+  const normalizedEmployeeId =
+    employeeId == null || employeeId === ''
+      ? null
+      : Number.isFinite(Number(employeeId))
+        ? Number(employeeId)
+        : null
+  const coalesceKey = `admin-team-workforce-data:${sessionUserId}:${dateFrom}:${dateTo}:${view}:${normalizedEmployeeId ?? 'team'}`
 
   return coalesceInFlight(coalesceKey, async () => {
+    const body = {
+      date_from: dateFrom,
+      date_to: dateTo,
+      view,
+      timezone: APP_TIMEZONE,
+    }
+    if (normalizedEmployeeId != null) {
+      body.employee_id = normalizedEmployeeId
+    }
+
     const { data, error } = await supabase.functions.invoke('admin-team-workforce-data', {
-      body: {
-        date_from: dateFrom,
-        date_to: dateTo,
-        view,
-        timezone: APP_TIMEZONE,
-      },
+      body,
     })
 
     if (error) {
@@ -140,9 +156,9 @@ export async function fetchTeamWorkforceData({ dateFrom, dateTo, view }) {
   })
 }
 
-export async function fetchTeamWorkforceForMonth(year, month, view) {
+export async function fetchTeamWorkforceForMonth(year, month, view, employeeId = null) {
   const { dateFrom, dateTo } = monthToDateRange(year, month)
-  return fetchTeamWorkforceData({ dateFrom, dateTo, view })
+  return fetchTeamWorkforceData({ dateFrom, dateTo, view, employeeId })
 }
 
 /** Canonical workforce employee id (`academy_users.id`). */
@@ -154,6 +170,7 @@ export function normalizeWorkforceEmployeeId(value) {
 /**
  * Resolve one employee and their shifts for a calendar month via workforce Edge Function.
  * Cloud-only; callers should fall back to local adapters when not in cloud mode.
+ * Passes employee_id so the Edge Function scopes DB queries (not a full-team fetch).
  */
 export async function fetchEmployeeWorkforceBundle(employeeId, year, month, view = 'schedule') {
   const normalizedId = normalizeWorkforceEmployeeId(employeeId)
@@ -161,7 +178,7 @@ export async function fetchEmployeeWorkforceBundle(employeeId, year, month, view
     return { employee: null, shifts: [], teamScope: false }
   }
 
-  const bundle = await fetchTeamWorkforceForMonth(year, month, view)
+  const bundle = await fetchTeamWorkforceForMonth(year, month, view, normalizedId)
   const employee = bundle.employees.find((row) => Number(row.id) === normalizedId) ?? null
   const shifts = bundle.shifts.filter((row) => Number(row.employeeId) === normalizedId)
 

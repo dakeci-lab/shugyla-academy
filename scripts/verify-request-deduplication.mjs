@@ -53,6 +53,11 @@ function main() {
   assert('list key includes session user', employeeAdmin.includes('admin-list-employees:'))
   assert('workforce uses coalesce', workforce.includes('coalesceInFlight'))
   assert('workforce key includes view/dates', workforce.includes('admin-team-workforce-data:'))
+  assert(
+    'workforce key includes employee scope segment',
+    workforce.includes("normalizedEmployeeId ?? 'team'") ||
+      workforce.includes(':${normalizedEmployeeId ??')
+  )
 
   console.log('Stage 3: Home feedback loop broken')
   assert('cloud uses localEmployeeIdsKey empty', ownerDash.includes("cloudMode ? '' : employeeIds.join(',')"))

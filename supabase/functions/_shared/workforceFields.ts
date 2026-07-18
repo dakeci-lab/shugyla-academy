@@ -1,8 +1,10 @@
 export const WORKFORCE_EMPLOYEE_SELECT =
   'id, first_name, last_name, full_name, role, role_id, status, position, avatar_url'
 
+// Break columns omitted from SELECT (not used by Home/Schedule/Rating/Profile consumers).
+// mapSafeWorkforceShift still returns break keys as null for response-contract stability.
 export const WORKFORCE_SHIFT_SELECT =
-  'id, employee_id, shift_date, status, planned_start_time, planned_end_time, planned_break_start, planned_break_end, actual_start_time, actual_end_time, actual_break_start, actual_break_end, comment'
+  'id, employee_id, shift_date, status, planned_start_time, planned_end_time, actual_start_time, actual_end_time, comment'
 
 export type DbWorkforceEmployeeRow = {
   id: number

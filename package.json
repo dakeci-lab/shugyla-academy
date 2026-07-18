@@ -55,6 +55,7 @@
     "verify:app-bootstrap": "node scripts/verify-app-bootstrap.mjs",
     "verify:progressive-bootstrap": "node scripts/verify-progressive-bootstrap.mjs",
     "verify:request-deduplication": "node scripts/verify-request-deduplication.mjs",
+    "verify:workforce-edge-performance": "node scripts/verify-workforce-edge-performance.mjs",
     "verify:supplier-form-focus": "node scripts/verify-supplier-form-focus.mjs",
     "verify:home-dashboard": "node scripts/verify-home-dashboard.mjs",
     "verify:hidden-scrollbars": "node scripts/verify-hidden-scrollbars.mjs",

@@ -12,10 +12,7 @@ import {
   getAttendanceSettings,
   getTeamShiftsForMonth,
 } from '../../services/academyDataService'
-import {
-  fetchTeamWorkforceData,
-  monthToDateRange,
-} from '../../services/workforceAdminService'
+import { fetchTeamWorkforceData } from '../../services/workforceAdminService'
 import { usePlatformPageRefresh } from '../../context/PullToRefreshContext'
 import { ChevronLeftIcon, ChevronRightIcon } from '../icons/PlatformIcons'
 import AdminModal from './AdminModal'
@@ -288,19 +285,18 @@ export default function OwnerDashboard() {
     setLoading(true)
     try {
       if (cloudMode) {
-        const { dateFrom, dateTo } = monthToDateRange(
-          selectedMonthState.year,
-          selectedMonthState.month
-        )
+        // Dashboard metrics need the selected day only — not the full month of shifts.
         const [attendanceSettings, bundle] = await Promise.all([
           getAttendanceSettings(),
-          fetchTeamWorkforceData({ dateFrom, dateTo, view: 'dashboard' }),
+          fetchTeamWorkforceData({
+            dateFrom: selectedDateKey,
+            dateTo: selectedDateKey,
+            view: 'dashboard',
+          }),
         ])
         setSettings(attendanceSettings)
         setTeamEmployees(bundle.employees)
-        setDayShifts(
-          (bundle.shifts || []).filter((shift) => shift.shiftDate === selectedDateKey)
-        )
+        setDayShifts(bundle.shifts || [])
       } else {
         const ids = localEmployeeIdsKey
           ? localEmployeeIdsKey.split(',').filter(Boolean)
