@@ -109,11 +109,18 @@
     top: 0;
     left: 0;
     bottom: 0;
-    width: 28px;
+    width: 32px;
     z-index: 3990;
-    touch-action: pan-y;
+    /* none — браузер не должен начинать swipe-back в этой зоне */
+    touch-action: none;
     -webkit-user-select: none;
     user-select: none;
+  }
+
+  .platform-layout,
+  .platform-layout__main,
+  .platform-layout__content {
+    overscroll-behavior-x: none;
   }
 
   .platform-layout--drawer-dragging .platform-layout__overlay {

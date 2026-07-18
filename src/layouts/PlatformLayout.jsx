@@ -44,14 +44,30 @@ function PlatformLayoutShell({ onLogout }) {
   const layoutRef = useRef(null)
   const sidebarRef = useRef(null)
   const overlayRef = useRef(null)
+  const edgeRef = useRef(null)
+  /** Пока активен перехват edge→Back, не закрываем drawer на смене pathname */
+  const edgeBackInterceptUntilRef = useRef(0)
+
+  const restorePathAfterEdgeBack = useCallback(
+    (path) => {
+      edgeBackInterceptUntilRef.current = Date.now() + 1200
+      if (!path) return
+      const current = `${window.location.pathname}${window.location.search}${window.location.hash}`
+      if (current === path) return
+      navigate(path, { replace: true })
+    },
+    [navigate]
+  )
 
   const { isDragging: drawerDragging } = useMobileDrawerEdgeSwipe({
     enabled: isMobile,
     isOpen: drawerOpen,
     onOpenChange: setDrawerOpen,
+    onRestorePath: restorePathAfterEdgeBack,
     layoutRef,
     sidebarRef,
     overlayRef,
+    edgeRef,
   })
 
   const handleMobileBack = useCallback(() => {
@@ -64,6 +80,10 @@ function PlatformLayoutShell({ onLogout }) {
   }, [navigate, mobileBackFallback])
 
   useEffect(() => {
+    if (Date.now() < edgeBackInterceptUntilRef.current) {
+      setDrawerOpen(true)
+      return
+    }
     setDrawerOpen(false)
   }, [pathname])
 
@@ -108,8 +128,15 @@ function PlatformLayoutShell({ onLogout }) {
         />
       )}
 
-      {isMobile && !drawerOpen && (
-        <div className="platform-layout__edge-swipe" aria-hidden="true" />
+      {isMobile && (
+        <div
+          ref={edgeRef}
+          className="platform-layout__edge-swipe"
+          aria-hidden="true"
+          style={{
+            pointerEvents: drawerOpen || drawerDragging ? 'none' : 'auto',
+          }}
+        />
       )}
 
       <PlatformSidebar

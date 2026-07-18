@@ -74,6 +74,7 @@ html.pwa-standalone body,
 html.pwa-standalone #root {
   touch-action: pan-x pan-y;
   overscroll-behavior: none;
+  overscroll-behavior-x: none;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }

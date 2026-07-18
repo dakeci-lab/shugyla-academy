@@ -69,6 +69,10 @@ function main() {
   assert('edge capture strip', layout.includes('platform-layout__edge-swipe'))
   assert('desktop overlay forced off', layoutCss.includes('min-width: 901px') && layoutCss.includes('display: none !important'))
   assert('pull-to-refresh disabled while dragging', layout.includes('drawerDragging'))
+  assert('edge strip touch-action none', layoutCss.includes('touch-action: none'))
+  assert('early preventDefault from edge', edgeSwipe.includes('fromEdge') && edgeSwipe.includes('preventDefault'))
+  assert('popstate guard restores path', edgeSwipe.includes('onRestorePath') && layout.includes('restorePathAfterEdgeBack'))
+  assert('unified under PlatformLayout', layout.includes('edgeRef') && !layout.includes('insertMobileNotificationsItem'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }
