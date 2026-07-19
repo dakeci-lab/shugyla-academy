@@ -222,7 +222,6 @@ Deno.serve(async (req) => {
       .select(HOME_SUMMARY_SHIFT_WITH_EMPLOYEE_SELECT)
       .eq('shift_date', dateFrom)
       .eq('academy_users.status', 'active')
-      .neq('academy_users.role', 'admin')
       .eq('academy_users.work_mode', 'offline')
       .order('employee_id', { ascending: true })
     const workforceDbMs = Math.round(performance.now() - workforceDbStart)
@@ -322,10 +321,10 @@ Deno.serve(async (req) => {
 
   const workforceDbStart = performance.now()
   trackDbCall(dbCalls)
+  // Role is RBAC only — do not exclude role=admin from schedule/payroll workforce.
   let employeeQuery = serviceClient
     .from('academy_users')
     .select(WORKFORCE_EMPLOYEE_WITH_SHIFTS_SELECT)
-    .neq('role', 'admin')
     .gte('academy_employee_shifts.shift_date', dateFrom)
     .lte('academy_employee_shifts.shift_date', dateTo)
     .order('full_name', { ascending: true })

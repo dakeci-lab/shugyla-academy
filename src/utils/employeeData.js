@@ -235,8 +235,12 @@ export function isTerminatedEmployeeStatus(status) {
   return isDeactivatedEmployeeStatus(status)
 }
 
+/**
+ * Кадровая сущность сотрудника — не зависит от RBAC-роли.
+ * Роль (`admin` и др.) задаёт права доступа, а не участие в списке/зарплате.
+ */
 export function isStaffEmployee(employee) {
-  return employee?.role !== 'admin'
+  return employee != null && employee.id != null
 }
 
 export function isActiveStaffEmployee(employee) {

@@ -156,10 +156,11 @@ Deno.serve(async (req) => {
   const employeesDbStart = performance.now()
   trackDbCall(dbCalls)
 
+  // Include all academy_users rows (including role=admin). Role is access control only;
+  // owners/directors are regular HR employees for list, profile, and payroll.
   let query = serviceClient
     .from('academy_users')
     .select(SAFE_EMPLOYEE_SELECT, { count: 'exact' })
-    .neq('role', 'admin')
 
   if (employeeIdFilter != null) {
     query = query.eq('id', employeeIdFilter)

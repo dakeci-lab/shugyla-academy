@@ -46,7 +46,8 @@ async function assertTargetInScope(
     .eq('id', targetEmployeeId)
     .maybeSingle()
 
-  if (error || !target || !canEmployeeLogin(target.status) || target.role === 'admin') {
+  // Admins are schedulable HR employees; role only affects permissions, not target eligibility.
+  if (error || !target || !canEmployeeLogin(target.status)) {
     return adminErrorResponse('forbidden', 403)
   }
 
