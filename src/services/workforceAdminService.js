@@ -78,6 +78,7 @@ function workforceEmployeeToUi(row) {
     terminatedAt: row.terminated_at,
     workMode: row.work_mode,
     salaryCalculationType: row.salary_calculation_type,
+    payrollParticipation: row.payroll_participation,
     createdAt: row.created_at,
   })
 }

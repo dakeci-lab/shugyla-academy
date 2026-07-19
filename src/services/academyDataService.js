@@ -574,6 +574,7 @@ export async function createEmployee(data) {
         terminatedAt: row.terminated_at,
         workMode: row.work_mode,
         salaryCalculationType: row.salary_calculation_type,
+        payrollParticipation: row.payroll_participation,
         createdAt: row.created_at,
         assignedCourseIds: data.assignedCourseIds || [],
         workLocationId: data.workLocationId || null,

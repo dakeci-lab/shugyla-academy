@@ -97,6 +97,7 @@ function serverEmployeeToUi(row) {
     terminatedAt: row.terminated_at,
     workMode: row.work_mode,
     salaryCalculationType: row.salary_calculation_type,
+    payrollParticipation: row.payroll_participation,
     createdAt: row.created_at,
     authLinked: row.auth_linked === true,
   })
@@ -254,6 +255,9 @@ export async function updateEmployeeAsAdmin(employeeId, changes) {
   if (changes.workMode !== undefined) payloadChanges.work_mode = changes.workMode
   if (changes.salaryCalculationType !== undefined) {
     payloadChanges.salary_calculation_type = changes.salaryCalculationType
+  }
+  if (changes.payrollParticipation !== undefined) {
+    payloadChanges.payroll_participation = changes.payrollParticipation
   }
 
   const { data, error } = await supabase.functions.invoke('admin-update-employee', {

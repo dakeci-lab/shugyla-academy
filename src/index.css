@@ -147,6 +147,21 @@ html.pwa-standalone textarea {
   background: var(--color-primary-light);
 }
 
+.btn--danger {
+  color: #fff;
+  background: var(--color-danger);
+  border: 1px solid var(--color-danger);
+}
+
+.btn--danger:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+
+.btn--danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .btn--sm {
   padding: 6px 14px;
   font-size: 13px;

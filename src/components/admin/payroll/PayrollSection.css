@@ -279,6 +279,24 @@
   color: #3f5a48;
 }
 
+.payroll-comment-modal__danger {
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.payroll-comment-modal__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.payroll-comment-modal__confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 @media (max-width: 1100px) {
   .payroll-summary {
     grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -19,7 +19,7 @@ const MAX_PASSWORD_LENGTH = 128
 const MAX_LOGIN_LENGTH = 128
 
 const EMPLOYEE_RETURN_SELECT =
-  'id, login, full_name, first_name, last_name, role, role_id, status, position, avatar_url, hired_at, terminated_at, work_mode, salary_calculation_type, created_at, auth_user_id'
+  'id, login, full_name, first_name, last_name, role, role_id, status, position, avatar_url, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation, created_at, auth_user_id'
 
 const FORBIDDEN_BODY_KEYS = new Set([
   'id',
@@ -297,6 +297,7 @@ Deno.serve(async (req) => {
         terminated_at: null,
         work_mode: 'offline',
         salary_calculation_type: 'shift_based',
+        payroll_participation: 'active',
         auth_user_id: createdAuthUserId,
         avatar_url: avatarUrl,
       }

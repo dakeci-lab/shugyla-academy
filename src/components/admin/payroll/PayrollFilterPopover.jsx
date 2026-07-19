@@ -2,12 +2,21 @@ import { useEffect, useRef } from 'react'
 import AdminModal from '../AdminModal'
 import useMediaQuery from '../../../hooks/useMediaQuery'
 import { EMPLOYEE_FORM_ROLES, getRoleLabel } from '../../../data/roles'
+import { PAYROLL_PARTICIPATION_FILTER_OPTIONS } from '../../../utils/employeeData'
 import { SALARY_RECORD_STATUSES } from '../../../utils/salaryPayroll'
 import '../employees/EmployeeFilterPopover.css'
 
 const MOBILE_QUERY = '(max-width: 900px)'
 
-function PayrollFilterFields({ draftRoleId, draftStatus, onRoleChange, onStatusChange, resultCount }) {
+function PayrollFilterFields({
+  draftRoleId,
+  draftStatus,
+  draftParticipation,
+  onRoleChange,
+  onStatusChange,
+  onParticipationChange,
+  resultCount,
+}) {
   return (
     <>
       <div className="employee-filter-popover__section">
@@ -33,6 +42,30 @@ function PayrollFilterFields({ draftRoleId, draftStatus, onRoleChange, onStatusC
           className="employee-filter-popover__options"
           role="radiogroup"
           aria-label="Статус расчёта"
+        >
+          {PAYROLL_PARTICIPATION_FILTER_OPTIONS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={draftParticipation === option.id}
+              className={`employee-filter-popover__option${
+                draftParticipation === option.id ? ' employee-filter-popover__option--active' : ''
+              }`}
+              onClick={() => onParticipationChange?.(option.id)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="employee-filter-popover__section">
+        <span className="employee-filter-popover__label">Этап расчёта</span>
+        <div
+          className="employee-filter-popover__options"
+          role="radiogroup"
+          aria-label="Этап расчёта"
         >
           <button
             type="button"
@@ -83,8 +116,10 @@ export default function PayrollFilterPopover({
   open,
   draftRoleId,
   draftStatus,
+  draftParticipation,
   onRoleChange,
   onStatusChange,
+  onParticipationChange,
   resultCount,
   onApply,
   onReset,
@@ -126,6 +161,7 @@ export default function PayrollFilterPopover({
   function handleReset() {
     onRoleChange?.('')
     onStatusChange?.('all')
+    onParticipationChange?.('active')
     onReset?.()
   }
 
@@ -144,8 +180,10 @@ export default function PayrollFilterPopover({
     <PayrollFilterFields
       draftRoleId={draftRoleId}
       draftStatus={draftStatus}
+      draftParticipation={draftParticipation}
       onRoleChange={onRoleChange}
       onStatusChange={onStatusChange}
+      onParticipationChange={onParticipationChange}
       resultCount={resultCount}
     />
   )

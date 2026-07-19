@@ -216,6 +216,7 @@ export async function fetchCoreAcademyData() {
       terminatedAt: row.terminated_at,
       workMode: row.work_mode,
       salaryCalculationType: row.salary_calculation_type,
+      payrollParticipation: row.payroll_participation,
       createdAt: row.created_at,
       assignedCourseIds: assignmentMap.get(row.id) || [],
       avatarUrl: row.avatar_url,
@@ -411,6 +412,7 @@ async function createUser(data) {
     terminated_at: employee.terminatedAt || null,
     work_mode: employee.workMode || 'offline',
     salary_calculation_type: employee.salaryCalculationType || 'shift_based',
+    payroll_participation: employee.payrollParticipation || 'active',
     avatar_url: employee.avatarUrl || null,
     work_location_id: employee.workLocationId || null,
   }
@@ -461,6 +463,9 @@ async function updateUser(id, updates) {
   if (updates.workMode !== undefined) patch.work_mode = updates.workMode
   if (updates.salaryCalculationType !== undefined) {
     patch.salary_calculation_type = updates.salaryCalculationType
+  }
+  if (updates.payrollParticipation !== undefined) {
+    patch.payroll_participation = updates.payrollParticipation
   }
   if (updates.avatarUrl != null) patch.avatar_url = updates.avatarUrl
   if (updates.workLocationId != null) patch.work_location_id = updates.workLocationId

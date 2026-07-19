@@ -6,6 +6,7 @@ import {
   EMPLOYEE_STATUS_OPTIONS,
   WORK_MODE_OPTIONS,
   SALARY_CALCULATION_TYPE_OPTIONS,
+  PAYROLL_PARTICIPATION_OPTIONS,
   getStaffEmployees,
   isActiveStaffEmployee,
   isDeactivatedStaffEmployee,
@@ -152,6 +153,7 @@ export default function EmployeeEditModal({
             hiredAt: form.hiredAt,
             workMode: form.workMode,
             salaryCalculationType: form.salaryCalculationType,
+            payrollParticipation: form.payrollParticipation,
             avatarUrl: form.avatarUrl || null,
           })
         } else {
@@ -166,6 +168,7 @@ export default function EmployeeEditModal({
             hiredAt: form.hiredAt,
             workMode: form.workMode,
             salaryCalculationType: form.salaryCalculationType,
+            payrollParticipation: form.payrollParticipation,
             workLocationId: form.workLocationId || null,
             ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
             ...(form.password?.trim() ? { password: form.password } : {}),
@@ -185,6 +188,7 @@ export default function EmployeeEditModal({
           employmentStatus: form.employmentStatus,
           workMode: form.workMode,
           salaryCalculationType: form.salaryCalculationType,
+          payrollParticipation: form.payrollParticipation,
           workLocationId: form.workLocationId || null,
           sourceCandidateId: sourceCandidateId || undefined,
           ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
@@ -537,6 +541,26 @@ export default function EmployeeEditModal({
             </select>
           </label>
         </div>
+
+        <label className="admin-form__label">
+          Статус расчёта
+          <select
+            className="admin-form__select"
+            value={form.payrollParticipation}
+            onChange={(e) => patchForm({ payrollParticipation: e.target.value })}
+            disabled={submitting}
+          >
+            {PAYROLL_PARTICIPATION_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+          <span className="admin-form__hint">
+            Исключённые сотрудники не участвуют в зарплатной ведомости. Карточка и доступ к
+            платформе не меняются.
+          </span>
+        </label>
 
         {formError && <p className="admin-form__error">{formError}</p>}
       </form>

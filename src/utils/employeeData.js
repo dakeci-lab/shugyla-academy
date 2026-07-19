@@ -92,6 +92,28 @@ export const SALARY_CALCULATION_TYPE = {
   FIXED_SALARY: 'fixed_salary',
 }
 
+/** Участие в зарплатной ведомости (независимо от статуса сотрудника) */
+export const PAYROLL_PARTICIPATION = {
+  ACTIVE: 'active',
+  EXCLUDED: 'excluded',
+}
+
+export const PAYROLL_PARTICIPATION_LABELS = {
+  active: 'Активный',
+  excluded: 'Исключён',
+}
+
+export const PAYROLL_PARTICIPATION_OPTIONS = [
+  { value: PAYROLL_PARTICIPATION.ACTIVE, label: PAYROLL_PARTICIPATION_LABELS.active },
+  { value: PAYROLL_PARTICIPATION.EXCLUDED, label: PAYROLL_PARTICIPATION_LABELS.excluded },
+]
+
+export const PAYROLL_PARTICIPATION_FILTER_OPTIONS = [
+  { id: 'all', label: 'Все' },
+  { id: 'active', label: 'Активные' },
+  { id: 'excluded', label: 'Исключённые' },
+]
+
 export const SALARY_CALCULATION_TYPE_LABELS = {
   shift_based: 'По сменам',
   fixed_salary: 'Фиксированный оклад',
@@ -116,6 +138,27 @@ export function normalizeSalaryCalculationType(value) {
   return value === SALARY_CALCULATION_TYPE.FIXED_SALARY
     ? SALARY_CALCULATION_TYPE.FIXED_SALARY
     : SALARY_CALCULATION_TYPE.SHIFT_BASED
+}
+
+export function normalizePayrollParticipation(value) {
+  return value === PAYROLL_PARTICIPATION.EXCLUDED
+    ? PAYROLL_PARTICIPATION.EXCLUDED
+    : PAYROLL_PARTICIPATION.ACTIVE
+}
+
+export function getPayrollParticipationLabel(value) {
+  return (
+    PAYROLL_PARTICIPATION_LABELS[normalizePayrollParticipation(value)] ||
+    PAYROLL_PARTICIPATION_LABELS.active
+  )
+}
+
+export function isPayrollExcluded(employeeOrValue) {
+  const value =
+    employeeOrValue && typeof employeeOrValue === 'object'
+      ? employeeOrValue.payrollParticipation ?? employeeOrValue.payroll_participation
+      : employeeOrValue
+  return normalizePayrollParticipation(value) === PAYROLL_PARTICIPATION.EXCLUDED
 }
 
 export function getWorkModeLabel(value) {
@@ -332,6 +375,9 @@ export function normalizeEmployee(raw) {
     salaryCalculationType: normalizeSalaryCalculationType(
       raw.salaryCalculationType ?? raw.salary_calculation_type
     ),
+    payrollParticipation: normalizePayrollParticipation(
+      raw.payrollParticipation ?? raw.payroll_participation
+    ),
     assignedCourseIds: Array.isArray(raw.assignedCourseIds) ? raw.assignedCourseIds : [],
     avatarUrl: raw.avatarUrl ?? raw.avatar_url ?? null,
     contactEmail: raw.contactEmail ?? raw.contact_email ?? '',
@@ -425,6 +471,8 @@ export function addEmployee(data) {
     workMode: data.workMode || WORK_MODE.OFFLINE,
     salaryCalculationType:
       data.salaryCalculationType || SALARY_CALCULATION_TYPE.SHIFT_BASED,
+    payrollParticipation:
+      data.payrollParticipation || PAYROLL_PARTICIPATION.ACTIVE,
     assignedCourseIds: data.assignedCourseIds || [],
   })
 
@@ -543,6 +591,7 @@ export const EMPTY_EMPLOYEE_FORM = {
   hiredAt: '',
   workMode: WORK_MODE.OFFLINE,
   salaryCalculationType: SALARY_CALCULATION_TYPE.SHIFT_BASED,
+  payrollParticipation: PAYROLL_PARTICIPATION.ACTIVE,
   workLocationId: '',
 }
 
@@ -559,6 +608,7 @@ export function employeeToForm(employee) {
     hiredAt: toEmployeeDateKey(employee.hiredAt) || '',
     workMode: normalizeWorkMode(employee.workMode),
     salaryCalculationType: normalizeSalaryCalculationType(employee.salaryCalculationType),
+    payrollParticipation: normalizePayrollParticipation(employee.payrollParticipation),
     workLocationId: employee.workLocationId || '',
   }
 }

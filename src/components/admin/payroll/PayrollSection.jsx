@@ -19,6 +19,11 @@ import {
   listEmployeesForAdmin,
 } from '../../../services/employeeAdminService'
 import {
+  PAYROLL_PARTICIPATION,
+  normalizePayrollParticipation,
+} from '../../../utils/employeeData'
+import { updateEmployee } from '../../../services/academyDataService'
+import {
   addSalaryAllowance,
   addSalaryDeduction,
   deleteSalaryAllowance,
@@ -125,8 +130,10 @@ export default function PayrollSection() {
   const [search, setSearch] = useState('')
   const [appliedRoleId, setAppliedRoleId] = useState('')
   const [appliedStatus, setAppliedStatus] = useState('all')
+  const [appliedParticipation, setAppliedParticipation] = useState('active')
   const [draftRoleId, setDraftRoleId] = useState('')
   const [draftStatus, setDraftStatus] = useState('all')
+  const [draftParticipation, setDraftParticipation] = useState('active')
   const [filterOpen, setFilterOpen] = useState(false)
 
   const [loading, setLoading] = useState(true)
@@ -139,6 +146,7 @@ export default function PayrollSection() {
 
   const [commentTarget, setCommentTarget] = useState(null)
   const [commentSaving, setCommentSaving] = useState(false)
+  const [commentExcluding, setCommentExcluding] = useState(false)
   const [linesTarget, setLinesTarget] = useState(null)
 
   const load = useCallback(
@@ -228,6 +236,10 @@ export default function PayrollSection() {
     return employees
       .filter((emp) => {
         if (appliedRoleId && emp.role !== appliedRoleId) return false
+        const participation = normalizePayrollParticipation(emp.payrollParticipation)
+        if (appliedParticipation !== 'all' && participation !== appliedParticipation) {
+          return false
+        }
         const record = recordsByEmployee.get(Number(emp.id))
         if (appliedStatus === 'none') {
           if (record) return false
@@ -244,7 +256,15 @@ export default function PayrollSection() {
           : 0
         return { employee: emp, record, advanceAmount }
       })
-  }, [employees, recordsByEmployee, advancesByRecordId, search, appliedRoleId, appliedStatus])
+  }, [
+    employees,
+    recordsByEmployee,
+    advancesByRecordId,
+    search,
+    appliedRoleId,
+    appliedStatus,
+    appliedParticipation,
+  ])
 
   const totals = useMemo(() => sumPayrollLedgerRows(rows), [rows])
 
@@ -252,6 +272,10 @@ export default function PayrollSection() {
     const q = search.trim().toLowerCase()
     return employees.filter((emp) => {
       if (draftRoleId && emp.role !== draftRoleId) return false
+      const participation = normalizePayrollParticipation(emp.payrollParticipation)
+      if (draftParticipation !== 'all' && participation !== draftParticipation) {
+        return false
+      }
       const record = recordsByEmployee.get(Number(emp.id))
       if (draftStatus === 'none') {
         if (record) return false
@@ -261,9 +285,17 @@ export default function PayrollSection() {
       if (!q) return true
       return String(emp.name || '').toLowerCase().includes(q)
     }).length
-  }, [employees, recordsByEmployee, search, draftRoleId, draftStatus])
+  }, [
+    employees,
+    recordsByEmployee,
+    search,
+    draftRoleId,
+    draftStatus,
+    draftParticipation,
+  ])
 
-  const filtersActive = Boolean(appliedRoleId) || appliedStatus !== 'all'
+  const filtersActive =
+    Boolean(appliedRoleId) || appliedStatus !== 'all' || appliedParticipation !== 'active'
 
   function toggleFilter() {
     if (filterOpen) {
@@ -272,7 +304,28 @@ export default function PayrollSection() {
     }
     setDraftRoleId(appliedRoleId)
     setDraftStatus(appliedStatus)
+    setDraftParticipation(appliedParticipation)
     setFilterOpen(true)
+  }
+
+  function patchEmployeeLocal(employeeId, patch) {
+    setEmployees((prev) =>
+      prev.map((emp) =>
+        Number(emp.id) === Number(employeeId) ? { ...emp, ...patch } : emp
+      )
+    )
+    setCommentTarget((prev) =>
+      prev && Number(prev.employee.id) === Number(employeeId)
+        ? { ...prev, employee: { ...prev.employee, ...patch } }
+        : prev
+    )
+  }
+
+  async function persistPayrollParticipation(employee, nextParticipation) {
+    const value = normalizePayrollParticipation(nextParticipation)
+    await updateEmployee(employee.id, { payrollParticipation: value })
+    patchEmployeeLocal(employee.id, { payrollParticipation: value })
+    return value
   }
 
   async function handleSaveBaseSalary(employee, amount) {
@@ -365,20 +418,44 @@ export default function PayrollSection() {
     }
   }
 
-  async function handleSaveComment(notes) {
+  async function handleSaveComment({ notes, payrollParticipation }) {
     if (!commentTarget?.record) return
     setCommentSaving(true)
     try {
+      const nextParticipation = normalizePayrollParticipation(payrollParticipation)
+      const currentParticipation = normalizePayrollParticipation(
+        commentTarget.employee.payrollParticipation
+      )
+      if (nextParticipation !== currentParticipation) {
+        await persistPayrollParticipation(commentTarget.employee, nextParticipation)
+      }
       const updated = await updateSalaryRecordFields(commentTarget.record.id, {
         notes: notes.trim() || '',
       })
       patchEmployeeRecord(commentTarget.employee.id, updated)
       setCommentTarget(null)
-      showSuccess('Комментарий сохранён')
+      showSuccess('Сохранено')
     } catch (err) {
-      showWarning(err?.message || 'Не удалось сохранить комментарий')
+      showWarning(err?.message || 'Не удалось сохранить')
     } finally {
       setCommentSaving(false)
+    }
+  }
+
+  async function handleExcludeFromPayroll() {
+    if (!commentTarget?.employee || commentExcluding) return
+    setCommentExcluding(true)
+    try {
+      await persistPayrollParticipation(
+        commentTarget.employee,
+        PAYROLL_PARTICIPATION.EXCLUDED
+      )
+      setCommentTarget(null)
+      showSuccess('Сотрудник исключён из расчёта')
+    } catch (err) {
+      showWarning(err?.message || 'Не удалось исключить сотрудника')
+    } finally {
+      setCommentExcluding(false)
     }
   }
 
@@ -411,19 +488,24 @@ export default function PayrollSection() {
               open={filterOpen}
               draftRoleId={draftRoleId}
               draftStatus={draftStatus}
+              draftParticipation={draftParticipation}
               onRoleChange={setDraftRoleId}
               onStatusChange={setDraftStatus}
+              onParticipationChange={setDraftParticipation}
               resultCount={draftPreviewCount}
               onApply={() => {
                 setAppliedRoleId(draftRoleId)
                 setAppliedStatus(draftStatus)
+                setAppliedParticipation(draftParticipation)
                 setFilterOpen(false)
               }}
               onReset={() => {
                 setDraftRoleId('')
                 setDraftStatus('all')
+                setDraftParticipation('active')
                 setAppliedRoleId('')
                 setAppliedStatus('all')
+                setAppliedParticipation('active')
                 setFilterOpen(false)
               }}
               onClose={() => setFilterOpen(false)}
@@ -582,11 +664,14 @@ export default function PayrollSection() {
         <PayrollCommentModal
           employeeName={commentTarget.employee.name}
           initialNotes={commentTarget.record?.notes || ''}
+          initialParticipation={commentTarget.employee.payrollParticipation}
           saving={commentSaving}
+          excluding={commentExcluding}
           onClose={() => {
-            if (!commentSaving) setCommentTarget(null)
+            if (!commentSaving && !commentExcluding) setCommentTarget(null)
           }}
-          onSave={(notes) => void handleSaveComment(notes)}
+          onSave={(payload) => void handleSaveComment(payload)}
+          onExclude={() => void handleExcludeFromPayroll()}
         />
       )}
 

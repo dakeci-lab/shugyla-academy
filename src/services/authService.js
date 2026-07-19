@@ -34,7 +34,7 @@ export const ACADEMY_AUTH_PROFILE_FIELDS =
 
 /** Safe academy_users columns for Auth-first cloud queries (never includes password). */
 export const ACADEMY_PROFILE_SAFE_FIELDS =
-  `${ACADEMY_AUTH_PROFILE_FIELDS}, hired_at, terminated_at, work_mode, salary_calculation_type`
+  `${ACADEMY_AUTH_PROFILE_FIELDS}, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation`
 
 const DEACTIVATED_ACCOUNT_MESSAGE =
   'Доступ закрыт: сотрудник уволен. Обратитесь к администратору.'
@@ -82,6 +82,7 @@ function profileRowToEmployee(row, assignedCourseIds = []) {
     terminatedAt: row.terminated_at,
     workMode: row.work_mode,
     salaryCalculationType: row.salary_calculation_type,
+    payrollParticipation: row.payroll_participation,
     createdAt: row.created_at,
     assignedCourseIds,
     avatarUrl: row.avatar_url,
@@ -122,7 +123,7 @@ async function loadAcademyUserRow(match) {
   if (authResult.error || !authResult.data) return authResult
 
   const extendedResult = await match(
-    'id, hired_at, terminated_at, work_mode, salary_calculation_type'
+    'id, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation'
   )
   if (!extendedResult.error && extendedResult.data) {
     return {
@@ -133,6 +134,7 @@ async function loadAcademyUserRow(match) {
         terminated_at: extendedResult.data.terminated_at ?? null,
         work_mode: extendedResult.data.work_mode ?? null,
         salary_calculation_type: extendedResult.data.salary_calculation_type ?? null,
+        payroll_participation: extendedResult.data.payroll_participation ?? null,
       },
     }
   }

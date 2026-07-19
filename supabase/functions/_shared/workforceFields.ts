@@ -1,5 +1,5 @@
 export const WORKFORCE_EMPLOYEE_SELECT =
-  'id, first_name, last_name, full_name, role, role_id, status, position, avatar_url, hired_at, terminated_at, work_mode, salary_calculation_type, created_at'
+  'id, first_name, last_name, full_name, role, role_id, status, position, avatar_url, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation, created_at'
 
 // Break columns omitted from SELECT (not used by Home/Schedule/Rating/Profile consumers).
 // mapSafeWorkforceShift still returns break keys as null for response-contract stability.
@@ -42,6 +42,7 @@ export type DbWorkforceEmployeeRow = {
   terminated_at?: string | null
   work_mode?: string | null
   salary_calculation_type?: string | null
+  payroll_participation?: string | null
   created_at?: string | null
 }
 
@@ -59,6 +60,7 @@ export type SafeWorkforceEmployee = {
   terminated_at: string | null
   work_mode: string
   salary_calculation_type: string
+  payroll_participation: string
   created_at: string | null
 }
 
@@ -92,6 +94,10 @@ function normalizeSalaryCalculationType(value: string | null | undefined): strin
   return value === 'fixed_salary' ? 'fixed_salary' : 'shift_based'
 }
 
+function normalizePayrollParticipation(value: string | null | undefined): string {
+  return value === 'excluded' ? 'excluded' : 'active'
+}
+
 export function mapSafeWorkforceEmployee(row: DbWorkforceEmployeeRow): SafeWorkforceEmployee {
   return {
     id: row.id,
@@ -107,6 +113,7 @@ export function mapSafeWorkforceEmployee(row: DbWorkforceEmployeeRow): SafeWorkf
     terminated_at: toDateKey(row.terminated_at),
     work_mode: normalizeWorkMode(row.work_mode),
     salary_calculation_type: normalizeSalaryCalculationType(row.salary_calculation_type),
+    payroll_participation: normalizePayrollParticipation(row.payroll_participation),
     created_at: row.created_at ?? null,
   }
 }
@@ -133,6 +140,7 @@ export function mapHomeSummaryEmployee(row: {
     terminated_at: null,
     work_mode: 'offline',
     salary_calculation_type: 'shift_based',
+    payroll_participation: 'active',
     created_at: null,
   }
 }

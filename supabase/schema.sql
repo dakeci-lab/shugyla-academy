@@ -17,6 +17,7 @@ create table if not exists academy_users (
   terminated_at date,
   work_mode text not null default 'offline',
   salary_calculation_type text not null default 'shift_based',
+  payroll_participation text not null default 'active',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );

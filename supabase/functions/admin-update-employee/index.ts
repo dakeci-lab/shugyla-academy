@@ -7,6 +7,7 @@ import {
   roleHasPermissionCode,
 } from '../_shared/employeeAuthorization.ts'
 import {
+  ALLOWED_PAYROLL_PARTICIPATIONS,
   ALLOWED_SALARY_CALCULATION_TYPES,
   ALLOWED_STATUSES,
   ALLOWED_WORK_MODES,
@@ -16,6 +17,7 @@ import {
   buildFullName,
   mapSafeEmployee,
   normalizeDateKey,
+  normalizePayrollParticipation,
   normalizeSalaryCalculationType,
   normalizeWorkMode,
   todayDateKeyAlmaty,
@@ -36,6 +38,7 @@ const ALLOWED_CHANGE_KEYS = new Set([
   'terminated_at',
   'work_mode',
   'salary_calculation_type',
+  'payroll_participation',
 ])
 
 const FORBIDDEN_CHANGE_KEYS = new Set([
@@ -249,6 +252,18 @@ Deno.serve(async (req) => {
     }
     patch.salary_calculation_type = normalizeSalaryCalculationType(
       changes.salary_calculation_type.trim()
+    )
+  }
+
+  if ('payroll_participation' in changes) {
+    if (
+      typeof changes.payroll_participation !== 'string' ||
+      !ALLOWED_PAYROLL_PARTICIPATIONS.has(changes.payroll_participation.trim())
+    ) {
+      return adminErrorResponse('invalid_payroll_participation', 422)
+    }
+    patch.payroll_participation = normalizePayrollParticipation(
+      changes.payroll_participation.trim()
     )
   }
 
