@@ -12,6 +12,7 @@ import {
   formatMoneyKzt,
   getPayrollBaseColumnMode,
   getPayrollLedgerAmounts,
+  getPayrollPaidCap,
   getPayrollShiftStatsForEmployee,
   isPayrollShiftBased,
   selectEmployeesForPayrollMonth,
@@ -416,7 +417,7 @@ export default function PayrollSection() {
       const advanceAmount = advancesByRecordId.get(record.id)?.amount || 0
       const stats = getPayrollShiftStatsForEmployee(shiftStatsByEmployee, employee.id)
       const amounts = getPayrollLedgerAmounts(record, advanceAmount, employee, stats)
-      const check = validatePaidAmount(amount, amounts.payable)
+      const check = validatePaidAmount(amount, getPayrollPaidCap(amounts, employee))
       if (!check.ok) {
         showWarning(check.message)
         return
@@ -666,6 +667,7 @@ export default function PayrollSection() {
                       <PayrollInlineMoneyCell
                         value={amounts.baseColumnValue}
                         hint={amounts.baseColumnLabel}
+                        detail={amounts.baseColumnDetail || ''}
                         ariaLabel={
                           amounts.baseColumnMode === SALARY_CALCULATION_TYPE.SHIFT_BASED
                             ? 'Редактировать ставку (за смену)'
@@ -693,7 +695,16 @@ export default function PayrollSection() {
                         </button>
                       </td>
                       <td className="payroll-table__money payroll-table__money--readonly">
-                        {formatMoneyCompact(amounts.payable)}
+                        <div className="payroll-table__money-stack">
+                          <span className="payroll-table__money-value">
+                            {formatMoneyCompact(amounts.payable)}
+                          </span>
+                          {amounts.payableDetail ? (
+                            <span className="payroll-table__money-detail">
+                              {amounts.payableDetail}
+                            </span>
+                          ) : null}
+                        </div>
                       </td>
                       <PayrollInlineMoneyCell
                         value={amounts.advance}

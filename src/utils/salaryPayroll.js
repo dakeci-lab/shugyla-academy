@@ -4,8 +4,8 @@ import {
   SALARY_CALCULATION_TYPE,
   normalizeSalaryCalculationType,
 } from './employeeData'
-import { summarizeEmployeePeriod } from './employeePeriodSummary'
 import { isWorkingShiftStatus } from './shiftData'
+import { deriveTrackerStatus } from './shiftWorkWindow'
 
 export const SALARY_RECORD_STATUSES = [
   { id: 'draft', label: 'Черновик', badge: 'draft' },
@@ -91,17 +91,32 @@ export function isPayrollShiftBased(employeeOrType) {
   return getPayrollBaseColumnMode(employeeOrType).mode === SALARY_CALCULATION_TYPE.SHIFT_BASED
 }
 
+/** Смена завершена в тайм-трекере (есть check-in и check-out). */
+export function isPayrollCompletedShift(shift) {
+  if (!isWorkingShiftStatus(shift?.status)) return false
+  return deriveTrackerStatus(shift) === 'completed'
+}
+
 /** Назначенные (график) и подтверждённые (тайм-трекер) смены за период. */
 export function countPayrollShiftStats(shifts = []) {
   let assigned = 0
+  let completed = 0
   for (const shift of shifts) {
-    if (isWorkingShiftStatus(shift?.status)) assigned += 1
+    if (!isWorkingShiftStatus(shift?.status)) continue
+    assigned += 1
+    if (isPayrollCompletedShift(shift)) completed += 1
   }
-  const { completedShifts } = summarizeEmployeePeriod(shifts)
-  return {
-    assigned,
-    completed: completedShifts,
-  }
+  return { assigned, completed }
+}
+
+/** Склонение: 1 смена / 2 смены / 5 смен */
+export function formatPayrollShiftsCountLabel(count) {
+  const n = Math.max(0, Math.floor(Number(count) || 0))
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return `${n} смена`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${n} смены`
+  return `${n} смен`
 }
 
 /** Map<employeeId, { assigned, completed }> from a month shift list. */
@@ -163,9 +178,15 @@ export function computePayrollEarnedBase(record, employee, shiftStats = null) {
 
 /**
  * Отображение строки ведомости.
- * Удержания в колонке = все удержания минус аванс (аванс — отдельная колонка).
- * Остаток = к выдаче − выплачено.
- * Колонка «Ставка»: оклад или ставка за смену — по salaryCalculationType.
+ *
+ * Сменщики (утверждённая архитектура):
+ *   К выдаче = ставка × подтверждённые смены (+ начисления)
+ *   Остаток  = К выдаче − удержания − аванс − выплачено
+ *   Фонд     = ставка × назначенные смены (график)
+ *
+ * Окладники (без изменений):
+ *   К выдаче = оклад + начисления − все удержания (вкл. аванс)
+ *   Остаток  = К выдаче − выплачено
  */
 export function getPayrollLedgerAmounts(
   record,
@@ -174,6 +195,8 @@ export function getPayrollLedgerAmounts(
   shiftStats = null
 ) {
   const column = getPayrollBaseColumnMode(employee)
+  const isShift = column.mode === SALARY_CALCULATION_TYPE.SHIFT_BASED
+  const stats = shiftStats || { assigned: 0, completed: 0 }
 
   if (!record) {
     return {
@@ -181,6 +204,8 @@ export function getPayrollLedgerAmounts(
       baseColumnValue: null,
       baseColumnLabel: column.label,
       baseColumnMode: column.mode,
+      baseColumnDetail: isShift ? `План: ${formatPayrollShiftsCountLabel(0)}` : '',
+      payableDetail: isShift ? 'Отработано: 0' : '',
       allowances: null,
       deductions: null,
       payable: null,
@@ -199,24 +224,57 @@ export function getPayrollLedgerAmounts(
   const rate = getPayrollRateAmount(record, employee)
   const fund = computePayrollFundAmount(record, employee, shiftStats)
   const earnedBase = computePayrollEarnedBase(record, employee, shiftStats)
-  const payable = toMoneyNumber(earnedBase + allowances - totalDeductions)
+  const assignedShifts = Number(stats.assigned) || 0
+  const completedShifts = Number(stats.completed) || 0
+
+  let payable
+  let remainder
+  const paidStored = resolvePaidAmount(record, null)
+
+  if (isShift) {
+    // Не вычитаем удержания/аванс из «К выдаче» — иначе при earned=0 получались отрицательные суммы.
+    payable = toMoneyNumber(earnedBase + allowances)
+    const paid = paidStored
+    remainder = toMoneyNumber(
+      Math.max(0, payable - otherDeductions - advance - paid)
+    )
+    return {
+      baseSalary: fund,
+      baseColumnValue: rate,
+      baseColumnLabel: column.label,
+      baseColumnMode: column.mode,
+      baseColumnDetail: `План: ${formatPayrollShiftsCountLabel(assignedShifts)}`,
+      payableDetail: `Отработано: ${completedShifts}`,
+      allowances,
+      deductions: otherDeductions,
+      payable,
+      advance,
+      remainder,
+      paid,
+      assignedShifts,
+      completedShifts,
+    }
+  }
+
+  payable = toMoneyNumber(earnedBase + allowances - totalDeductions)
   const paid = resolvePaidAmount(record, payable)
-  const stats = shiftStats || { assigned: 0, completed: 0 }
+  remainder = toMoneyNumber(Math.max(0, payable - paid))
 
   return {
-    // «Фонд оплаты» в итогах — прогноз (оклад или ставка × назначенные смены).
     baseSalary: fund,
     baseColumnValue: rate,
     baseColumnLabel: column.label,
     baseColumnMode: column.mode,
+    baseColumnDetail: '',
+    payableDetail: '',
     allowances,
     deductions: otherDeductions,
     payable,
     advance,
-    remainder: toMoneyNumber(Math.max(0, payable - paid)),
+    remainder,
     paid,
-    assignedShifts: Number(stats.assigned) || 0,
-    completedShifts: Number(stats.completed) || 0,
+    assignedShifts,
+    completedShifts,
   }
 }
 
@@ -231,20 +289,36 @@ export function resolvePaidAmount(record, payableOverride = null) {
   return record.status === 'paid' ? payable : 0
 }
 
-/** Проверка: выплачено не больше «К выдаче» и не отрицательное. */
-export function validatePaidAmount(paidAmount, payable) {
+/** Проверка: выплачено не больше допустимого потолка и не отрицательное. */
+export function validatePaidAmount(paidAmount, maxAllowed) {
   const paid = toMoneyNumber(paidAmount)
-  const maxPayable = toMoneyNumber(payable)
+  const maxPayable = toMoneyNumber(maxAllowed)
   if (paid < 0) {
     return { ok: false, message: 'Сумма «Выплачено» не может быть отрицательной' }
   }
   if (paid > maxPayable) {
     return {
       ok: false,
-      message: `Нельзя выплатить больше суммы «К выдаче» (${formatMoneyKzt(maxPayable)})`,
+      message: `Нельзя выплатить больше допустимой суммы (${formatMoneyKzt(maxPayable)})`,
     }
   }
   return { ok: true, paid }
+}
+
+/** Максимум для «Выплачено»: у сменщиков — после удержаний и аванса. */
+export function getPayrollPaidCap(amounts, employee) {
+  if (!amounts) return 0
+  if (isPayrollShiftBased(employee)) {
+    return toMoneyNumber(
+      Math.max(
+        0,
+        toMoneyNumber(amounts.payable) -
+          toMoneyNumber(amounts.deductions) -
+          toMoneyNumber(amounts.advance)
+      )
+    )
+  }
+  return toMoneyNumber(amounts.payable)
 }
 
 /** Empty aggregate for payroll ledger totals (summary cards + ИТОГО). */

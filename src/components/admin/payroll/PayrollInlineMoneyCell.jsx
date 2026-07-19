@@ -5,6 +5,7 @@ import { formatMoneyCompact, toMoneyNumber } from '../../../utils/salaryPayroll'
 export default function PayrollInlineMoneyCell({
   value,
   hint = '',
+  detail = '',
   disabled = false,
   saving = false,
   onCommit,
@@ -13,6 +14,7 @@ export default function PayrollInlineMoneyCell({
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
   const inputRef = useRef(null)
+  const hasMeta = Boolean(hint || detail)
 
   useEffect(() => {
     if (!editing) return
@@ -65,6 +67,7 @@ export default function PayrollInlineMoneyCell({
             onKeyDown={handleKeyDown}
             aria-label={ariaLabel}
           />
+          {detail ? <span className="payroll-table__money-detail">{detail}</span> : null}
         </div>
       </td>
     )
@@ -74,7 +77,7 @@ export default function PayrollInlineMoneyCell({
     <td className="payroll-table__money">
       <button
         type="button"
-        className={`payroll-table__money-btn${hint ? ' payroll-table__money-btn--hinted' : ''}`}
+        className={`payroll-table__money-btn${hasMeta ? ' payroll-table__money-btn--hinted' : ''}`}
         onClick={startEdit}
         disabled={disabled || saving}
         aria-label={ariaLabel}
@@ -83,6 +86,7 @@ export default function PayrollInlineMoneyCell({
         <span className="payroll-table__money-value">
           {saving ? '…' : formatMoneyCompact(value)}
         </span>
+        {detail ? <span className="payroll-table__money-detail">{detail}</span> : null}
       </button>
     </td>
   )
