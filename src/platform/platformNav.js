@@ -49,6 +49,7 @@ export const PLATFORM_NAV = [
         routeKey: ROUTE_KEYS.EMPLOYEES_PAYROLL,
         title: 'Подсчёт зарплаты',
         description: 'Расчёт заработной платы сотрудников.',
+        webOnly: true,
       },
     ],
   },
@@ -114,10 +115,11 @@ export const PLATFORM_NAV = [
   {
     id: 'price-tags',
     path: '/platform/price-tags',
-    label: 'Ценники',
+    label: 'Печать ценников',
     routeKey: ROUTE_KEYS.PRICE_TAGS,
-    title: 'Ценники',
-    description: 'Настройки печати ценников и виды ценников.',
+    title: 'Печать ценников',
+    description: 'Генератор и печать ценников (только WEB).',
+    webOnly: true,
   },
   {
     id: 'standards-group',

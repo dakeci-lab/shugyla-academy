@@ -7,6 +7,7 @@ import {
   isNavItemActive,
 } from '../../platform/platformNav'
 import { filterPlatformNav } from '../../platform/platformAccess'
+import { excludeWebOnlyNavItems } from '../../platform/webOnlyNav'
 import PlatformSidebarMobileProfile from './PlatformSidebarMobileProfile'
 import './PlatformSidebar.css'
 
@@ -36,22 +37,6 @@ function useMediaQuery(query) {
   }, [query])
 
   return matches
-}
-
-const MOBILE_HIDDEN_NAV_IDS = new Set(['employees-payroll'])
-
-/** Mobile/PWA: скрыть разделы, доступные только в WEB */
-function hideDesktopOnlyNavItems(navItems) {
-  return navItems
-    .map((item) => {
-      if (!item.children?.length) {
-        return MOBILE_HIDDEN_NAV_IDS.has(item.id) ? null : item
-      }
-      const children = item.children.filter((child) => !MOBILE_HIDDEN_NAV_IDS.has(child.id))
-      if (children.length === 0) return null
-      return { ...item, children }
-    })
-    .filter(Boolean)
 }
 
 /** Mobile: Уведомления — подпункт группы «Главная», не отдельная группа */
@@ -116,7 +101,7 @@ export default function PlatformSidebar({ isOpen = false, onNavigate, panelRef =
   )
   const navItems = useMemo(() => {
     if (!isMobile) return filteredNav
-    return nestMobileNotificationsUnderHome(hideDesktopOnlyNavItems(filteredNav))
+    return nestMobileNotificationsUnderHome(excludeWebOnlyNavItems(filteredNav))
   }, [filteredNav, isMobile])
 
   const pinnedGroupIds = useMemo(

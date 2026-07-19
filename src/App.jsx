@@ -50,6 +50,7 @@ import PurchaseDetailPage from './pages/platform/procurement/PurchaseDetailPage'
 import ReceivingPage from './pages/platform/receiving/ReceivingPage'
 import ReceivingDetailPage from './pages/platform/receiving/ReceivingDetailPage'
 import ModulePlaceholder from './pages/platform/ModulePlaceholder'
+import PriceTagsPage from './pages/platform/price-tags/PriceTagsPage'
 import AcademyCabinetContent from './components/academy/AcademyCabinetContent'
 import AcademyCatalogContent from './components/academy/AcademyCatalogContent'
 import AcademyAssignmentContent from './components/academy/AcademyAssignmentContent'
@@ -277,10 +278,7 @@ export default function App() {
             path="price-tags"
             element={
               <PlatformRoute routeKey={ROUTE_KEYS.PRICE_TAGS}>
-                <ModulePlaceholder
-                  title="Ценники"
-                  description="Настройки печати ценников и виды ценников."
-                />
+                <PriceTagsPage />
               </PlatformRoute>
             }
           />
