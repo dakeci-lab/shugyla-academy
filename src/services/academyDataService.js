@@ -1,3 +1,4 @@
+import { isAcademyModuleEnabled } from '../config/featureFlags'
 import { isCloudMode, getDataModeLabel, getDataModeVariant } from '../lib/dataMode'
 import {
   clearCloudStore,
@@ -167,6 +168,7 @@ export function resetCloudBootstrapState() {
 /** Map pathname → modules needed before page can show real empty/error states. */
 export function getRouteCriticalModules(pathname = '') {
   const path = String(pathname || '')
+  const academyOn = isAcademyModuleEnabled()
   if (path.includes('/platform/procurement') || path.includes('/platform/receiving')) {
     return ['suppliers', 'procurement', 'receiving']
   }
@@ -189,10 +191,12 @@ export function getRouteCriticalModules(pathname = '') {
     path.includes('/courses') ||
     path.includes('/course/')
   ) {
-    return ['employees', 'courses', 'academyLearning']
+    // Academy UI is gated; do not pull learning data when the module is off.
+    return academyOn ? ['employees', 'courses', 'academyLearning'] : []
   }
   if (path === '/platform' || path === '/platform/') {
-    return ['employees', 'courses', 'suppliers']
+    // Home no longer depends on academy core; suppliers stay in background prefetch.
+    return academyOn ? ['employees', 'courses', 'suppliers'] : []
   }
   return []
 }
@@ -364,12 +368,15 @@ function scheduleBackgroundPrefetch(priorityModules = []) {
     }
 
     // Core academy cache for sync getters / dashboard (does not block shell).
-    try {
-      await ensureModuleLoaded('employees')
-      await ensureModuleLoaded('courses')
-      await ensureModuleLoaded('academyLearning')
-    } catch {
-      // isolated
+    // Skip entirely while Academy product module is disabled — biggest bootstrap win.
+    if (isAcademyModuleEnabled()) {
+      try {
+        await ensureModuleLoaded('employees')
+        await ensureModuleLoaded('courses')
+        await ensureModuleLoaded('academyLearning')
+      } catch {
+        // isolated
+      }
     }
 
     const remaining = BACKGROUND_MODULES.filter(

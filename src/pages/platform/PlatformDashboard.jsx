@@ -6,6 +6,7 @@ import { getActiveSuppliersCount } from '../../utils/supplierData'
 import { isCloudMode, getDataModeLabel } from '../../lib/dataMode'
 import { isModuleReady } from '../../lib/cloudStore'
 import { useAcademyData } from '../../context/AcademyDataContext'
+import { isAcademyModuleEnabled } from '../../config/featureFlags'
 import '../../components/admin/admin-shared.css'
 import './PlatformDashboard.css'
 
@@ -19,10 +20,15 @@ export default function PlatformDashboard() {
   const { ensureModules, version } = useAcademyData()
   const cloudMode = isCloudMode()
 
+  const academyOn = isAcademyModuleEnabled()
+
   useEffect(() => {
     if (!cloudMode) return
-    void ensureModules(['employees', 'courses', 'suppliers'])
-  }, [cloudMode, ensureModules])
+    const modules = academyOn
+      ? ['employees', 'courses', 'suppliers']
+      : ['suppliers']
+    void ensureModules(modules)
+  }, [cloudMode, ensureModules, academyOn])
 
   void version
 
@@ -30,10 +36,13 @@ export default function PlatformDashboard() {
   const coursesReady = !cloudMode || isModuleReady('courses')
   const suppliersReady = !cloudMode || isModuleReady('suppliers')
 
-  const stats = employeesReady && coursesReady ? getOverviewStats() : {
-    totalEmployees: 0,
-    totalCourses: 0,
-  }
+  const stats =
+    employeesReady && (!academyOn || coursesReady)
+      ? getOverviewStats()
+      : {
+          totalEmployees: 0,
+          totalCourses: 0,
+        }
   const activeSuppliers = suppliersReady ? getActiveSuppliersCount() : 0
 
   const cards = [
@@ -45,14 +54,18 @@ export default function PlatformDashboard() {
       to: '/platform/employees',
       variant: 'default',
     },
-    {
-      icon: '📚',
-      value: formatStatValue(coursesReady, stats.totalCourses),
-      label: 'Курсы',
-      hint: coursesReady ? 'Курсы в модуле Academy' : 'Загрузка…',
-      to: '/platform/academy',
-      variant: 'info',
-    },
+    ...(academyOn
+      ? [
+          {
+            icon: '📚',
+            value: formatStatValue(coursesReady, stats.totalCourses),
+            label: 'Курсы',
+            hint: coursesReady ? 'Курсы в модуле Academy' : 'Загрузка…',
+            to: '/platform/academy',
+            variant: 'info',
+          },
+        ]
+      : []),
     {
       icon: '▦',
       value: '—',

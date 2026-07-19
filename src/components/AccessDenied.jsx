@@ -36,11 +36,8 @@ export default function AccessDenied({ course, userRole }) {
           )}
 
           <div className="access-denied__actions">
-            <Link to="/dashboard" className="btn btn--primary">
-              Мои курсы
-            </Link>
-            <Link to="/academy" className="btn btn--outline">
-              На главную
+            <Link to="/platform" className="btn btn--primary">
+              На платформу
             </Link>
           </div>
         </div>

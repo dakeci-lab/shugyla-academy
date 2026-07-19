@@ -14,7 +14,7 @@ export default function PlatformEmployeeProfile() {
   }
 
   if (!canViewEmployeeProfile(user, employeeId)) {
-    return <Navigate to="/platform/academy/cabinet" replace />
+    return <Navigate to="/platform" replace />
   }
 
   return (

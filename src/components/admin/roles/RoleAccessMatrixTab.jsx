@@ -4,7 +4,7 @@ import {
   getPermissionActionLabel,
   groupPermissionsForMatrix,
   parsePermissionAction,
-  RBAC_MATRIX_MODULES,
+  getRbacMatrixModules,
   getPermissionModuleLabel,
 } from '../../../config/permissionCatalog'
 import { getRolePermissionIds, reloadRbac, upsertRole } from '../../../services/rbacService'
@@ -36,7 +36,7 @@ export default function RoleAccessMatrixTab({
   const editor = useRoleEditor({ roles, permissions, onSaved: onReload })
 
   const [selectedRoleId, setSelectedRoleId] = useState('')
-  const [activeModule, setActiveModule] = useState(RBAC_MATRIX_MODULES[0])
+  const [activeModule, setActiveModule] = useState(() => getRbacMatrixModules()[0])
   const [selectedPermissionIds, setSelectedPermissionIds] = useState([])
   const [savedPermissionIds, setSavedPermissionIds] = useState([])
   const [loadingPermissions, setLoadingPermissions] = useState(false)

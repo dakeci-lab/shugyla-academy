@@ -51,7 +51,7 @@ export default function Header({ variant = 'default' }) {
                 Платформа
               </Link>
               {canManageAdmin(user.role) && (
-                <Link to="/admin" className="header__link">
+                <Link to="/platform/employees/list" className="header__link">
                   {t.adminPanel}
                 </Link>
               )}
@@ -61,7 +61,7 @@ export default function Header({ variant = 'default' }) {
               <Link to="/profile" className="header__link">
                 Профиль
               </Link>
-              <Link to="/dashboard" className="header__link header__user">
+              <Link to="/platform" className="header__link header__user">
                 {user.name}
               </Link>
               <button

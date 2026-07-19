@@ -46,8 +46,8 @@ export default function Sidebar({ activeTab, onTabChange }) {
         <NavLink to="/platform" className="sidebar__back">
           Панель платформы
         </NavLink>
-        <NavLink to="/dashboard" className="sidebar__back sidebar__back--muted">
-          Личный кабинет Academy
+        <NavLink to="/platform" className="sidebar__back sidebar__back--muted">
+          На платформу
         </NavLink>
       </div>
     </aside>

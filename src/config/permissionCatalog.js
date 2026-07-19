@@ -3,6 +3,8 @@
  * code — стабильный идентификатор для can('employees.view')
  */
 
+import { isAcademyModuleEnabled } from './featureFlags'
+
 export const PERMISSION_CODES = {
   DASHBOARD_VIEW: 'dashboard.view',
 
@@ -131,6 +133,13 @@ export const RBAC_MATRIX_MODULES = [
   'settings',
   'roles',
 ]
+
+/** Visible RBAC matrix modules — Academy hidden while feature toggle is off. */
+export function getRbacMatrixModules() {
+  return RBAC_MATRIX_MODULES.filter(
+    (module) => module !== 'academy' || isAcademyModuleEnabled()
+  )
+}
 
 export const PERMISSION_ACTION_LABELS = {
   view: 'Смотреть',
@@ -292,7 +301,7 @@ export function parsePermissionAction(code) {
 }
 
 export function groupPermissionsForMatrix(permissions, moduleFilter = null) {
-  const modules = moduleFilter ? [moduleFilter] : RBAC_MATRIX_MODULES
+  const modules = moduleFilter ? [moduleFilter] : getRbacMatrixModules()
   const byModule = groupPermissionsByModule(permissions)
   const map = new Map(byModule.map((g) => [g.module, g]))
 
