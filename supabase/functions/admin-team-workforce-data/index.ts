@@ -20,15 +20,16 @@ import {
 } from '../_shared/workforceFields.ts'
 
 const ALLOWED_BODY_KEYS = new Set(['date_from', 'date_to', 'timezone', 'view', 'employee_id'])
-const ALLOWED_VIEWS = new Set(['dashboard', 'schedule', 'rating', 'home-summary'])
+const ALLOWED_VIEWS = new Set(['dashboard', 'schedule', 'rating', 'home-summary', 'payroll'])
 const ALLOWED_TIMEZONE = 'Asia/Almaty'
 const MAX_RANGE_DAYS = 62
 
 const PERMISSION_SCHEDULE_TEAM = 'schedule.view_team'
 const PERMISSION_SCHEDULE_OWN = 'schedule.view_own'
 const PERMISSION_RATING_VIEW = 'rating.view'
+const PERMISSION_PAYROLL_VIEW = 'payroll.view'
 
-type WorkforceView = 'dashboard' | 'schedule' | 'rating' | 'home-summary'
+type WorkforceView = 'dashboard' | 'schedule' | 'rating' | 'home-summary' | 'payroll'
 
 /** Server-fixed permission codes per view — never taken from request body. */
 function permissionCodesForView(view: WorkforceView): string[] {
@@ -40,6 +41,9 @@ function permissionCodesForView(view: WorkforceView): string[] {
       return [PERMISSION_SCHEDULE_TEAM, PERMISSION_SCHEDULE_OWN]
     case 'rating':
       return [PERMISSION_RATING_VIEW, PERMISSION_SCHEDULE_TEAM]
+    case 'payroll':
+      // Payroll UI is team-scoped; schedule.view_team covers admins who already load team shifts.
+      return [PERMISSION_PAYROLL_VIEW, PERMISSION_SCHEDULE_TEAM]
     default:
       return []
   }
@@ -88,6 +92,7 @@ function resolveWorkforceScope(
   const hasTeam = perms[PERMISSION_SCHEDULE_TEAM] === true
   const hasOwn = perms[PERMISSION_SCHEDULE_OWN] === true
   const hasRating = perms[PERMISSION_RATING_VIEW] === true
+  const hasPayroll = perms[PERMISSION_PAYROLL_VIEW] === true
 
   switch (view) {
     case 'dashboard':
@@ -102,6 +107,10 @@ function resolveWorkforceScope(
       if (!hasRating) return adminErrorResponse('forbidden', 403)
       if (hasTeam) return { teamScope: true }
       return { teamScope: false }
+    case 'payroll':
+      // Mid-month terminations must still load shifts for the selected period.
+      if (hasPayroll || hasTeam) return { teamScope: true }
+      return adminErrorResponse('forbidden', 403)
     default:
       return adminErrorResponse('validation_error', 422)
   }
@@ -317,7 +326,6 @@ Deno.serve(async (req) => {
     .from('academy_users')
     .select(WORKFORCE_EMPLOYEE_WITH_SHIFTS_SELECT)
     .neq('role', 'admin')
-    .eq('status', 'active')
     .gte('academy_employee_shifts.shift_date', dateFrom)
     .lte('academy_employee_shifts.shift_date', dateTo)
     .order('full_name', { ascending: true })
@@ -331,11 +339,21 @@ Deno.serve(async (req) => {
       referencedTable: 'academy_employee_shifts',
     })
 
+  if (view === 'payroll') {
+    // Payroll is period-based: include terminated staff whose employment overlaps the range.
+    // Do NOT filter status=active — that zeros Plan/Worked for mid-month terminations.
+    employeeQuery = employeeQuery
+      .lte('hired_at', dateTo)
+      .or(`terminated_at.is.null,terminated_at.gte.${dateFrom}`)
+  } else {
+    employeeQuery = employeeQuery.eq('status', 'active')
+  }
+
   if (scopedEmployeeId != null) {
     // Single-employee profile/own lookup keeps online staff (card still loads).
     employeeQuery = employeeQuery.eq('id', scopedEmployeeId)
   } else {
-    // Team schedule / dashboard / rating: online (remote) staff are not in store presence.
+    // Team schedule / dashboard / rating / payroll: online (remote) staff are not in store presence.
     employeeQuery = employeeQuery.eq('work_mode', 'offline')
   }
 

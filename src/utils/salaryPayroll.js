@@ -119,12 +119,38 @@ export function formatPayrollShiftsCountLabel(count) {
   return `${n} смен`
 }
 
-/** Map<employeeId, { assigned, completed }> from a month shift list. */
-export function buildPayrollShiftStatsByEmployee(shifts = []) {
+/**
+ * Смена учитывается в зарплате только внутри периода работы сотрудника
+ * (от даты приёма до даты увольнения включительно).
+ */
+export function isShiftWithinEmploymentPeriod(shift, employee) {
+  const shiftDate = toPayrollDateKey(shift?.shiftDate ?? shift?.shift_date)
+  if (!shiftDate) return false
+  if (!employee) return true
+
+  const hiredAt = toPayrollDateKey(employee?.hiredAt ?? employee?.hired_at)
+  if (hiredAt && shiftDate < hiredAt) return false
+
+  const terminatedAt = toPayrollDateKey(employee?.terminatedAt ?? employee?.terminated_at)
+  if (terminatedAt && shiftDate > terminatedAt) return false
+
+  return true
+}
+
+/**
+ * Map<employeeId, { assigned, completed }> from a month shift list.
+ * Optional employeesById clips shifts outside hire/termination dates
+ * (mid-month terminations must not count post-termination schedule rows).
+ */
+export function buildPayrollShiftStatsByEmployee(shifts = [], employeesById = null) {
   const byEmployee = new Map()
   for (const shift of shifts || []) {
     const id = Number(shift?.employeeId ?? shift?.employee_id)
     if (!Number.isFinite(id)) continue
+    if (employeesById) {
+      const employee = employeesById.get(id) ?? employeesById.get(String(id))
+      if (employee && !isShiftWithinEmploymentPeriod(shift, employee)) continue
+    }
     if (!byEmployee.has(id)) byEmployee.set(id, [])
     byEmployee.get(id).push(shift)
   }

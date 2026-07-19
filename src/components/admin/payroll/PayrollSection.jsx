@@ -185,13 +185,14 @@ export default function PayrollSection() {
         // so payroll would see Plan/Worked = 0 for every other employee.
         const [advances, workforceBundle] = await Promise.all([
           listAdvanceLinesForRecords(records.map((row) => row.id)),
-          fetchTeamWorkforceForMonth(year, month, 'schedule'),
+          fetchTeamWorkforceForMonth(year, month, 'payroll'),
         ])
         const monthShifts = workforceBundle.shifts
-        const shiftStats = buildPayrollShiftStatsByEmployee(monthShifts)
         const employeesById = new Map(
           employeeRows.map((row) => [Number(row.id), row])
         )
+        // Period-based stats: include terminated staff; clip shifts after termination.
+        const shiftStats = buildPayrollShiftStatsByEmployee(monthShifts, employeesById)
 
         if (import.meta.env.DEV) {
           for (const employee of employeeRows) {
@@ -207,12 +208,14 @@ export default function PayrollSection() {
               scheduleRows: employeeShifts.length,
               assignedWorking: stats.assigned,
               completedTracker: stats.completed,
-              source: 'admin-team-workforce-data:schedule',
+              employmentStatus: employee.employmentStatus,
+              terminatedAt: employee.terminatedAt ?? null,
+              source: 'admin-team-workforce-data:payroll',
               zeroReason:
                 employeeShifts.length === 0
                   ? 'no_shifts_in_workforce_bundle'
                   : stats.assigned === 0
-                    ? 'no_working_status_rows'
+                    ? 'no_working_status_rows_in_employment_period'
                     : stats.completed === 0
                       ? 'no_check_in_check_out_pairs'
                       : null,

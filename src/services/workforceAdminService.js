@@ -132,7 +132,7 @@ export async function fetchHomeWorkforceSummary(dateKey) {
  * @param {{
  *   dateFrom: string,
  *   dateTo: string,
- *   view: 'dashboard'|'schedule'|'rating'|'home-summary',
+ *   view: 'dashboard'|'schedule'|'rating'|'home-summary'|'payroll',
  *   employeeId?: number|null,
  * }} params
  */
