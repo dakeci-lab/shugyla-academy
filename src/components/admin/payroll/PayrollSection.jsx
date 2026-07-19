@@ -13,6 +13,7 @@ import {
   selectEmployeesForPayrollMonth,
   sumPayrollLedgerRows,
   toMoneyNumber,
+  validatePaidAmount,
 } from '../../../utils/salaryPayroll'
 import {
   getEmployeeForAdmin,
@@ -362,6 +363,26 @@ export default function PayrollSection() {
     }
   }
 
+  async function handleSavePaid(employee, amount) {
+    setSavingEmployeeId(employee.id)
+    try {
+      const record = await ensureRowRecord(employee)
+      const check = validatePaidAmount(amount, record.totalPayable)
+      if (!check.ok) {
+        showWarning(check.message)
+        return
+      }
+      const updated = await updateSalaryRecordFields(record.id, {
+        paidAmount: check.paid,
+      })
+      patchEmployeeRecord(employee.id, updated)
+    } catch (err) {
+      showWarning(err?.message || 'Не удалось сохранить выплату')
+    } finally {
+      setSavingEmployeeId(null)
+    }
+  }
+
   async function handleOpenLines(employee, mode) {
     try {
       const record = await ensureRowRecord(employee)
@@ -619,9 +640,11 @@ export default function PayrollSection() {
                       <td className="payroll-table__money payroll-table__money--readonly">
                         {formatMoneyCompact(amounts.remainder)}
                       </td>
-                      <td className="payroll-table__money payroll-table__money--readonly">
-                        {formatMoneyCompact(amounts.paid)}
-                      </td>
+                      <PayrollInlineMoneyCell
+                        value={amounts.paid}
+                        saving={rowSaving}
+                        onCommit={(next) => handleSavePaid(employee, next)}
+                      />
                       <td className="payroll-table__comment">
                         <button
                           type="button"

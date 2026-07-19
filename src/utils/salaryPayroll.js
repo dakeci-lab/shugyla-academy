@@ -54,7 +54,7 @@ export function formatMoneyCompact(value) {
 /**
  * Отображение строки ведомости.
  * Удержания в колонке = все удержания минус аванс (аванс — отдельная колонка).
- * Выплачено / остаток — по статусу paid.
+ * Остаток = к выдаче − выплачено (частичная выплата через paid_amount).
  */
 export function getPayrollLedgerAmounts(record, advanceAmount = 0) {
   if (!record) {
@@ -73,7 +73,7 @@ export function getPayrollLedgerAmounts(record, advanceAmount = 0) {
   const totalDeductions = toMoneyNumber(record.totalDeductions)
   const otherDeductions = Math.max(0, toMoneyNumber(totalDeductions - advance))
   const payable = toMoneyNumber(record.totalPayable)
-  const isPaid = record.status === 'paid'
+  const paid = resolvePaidAmount(record, payable)
 
   return {
     baseSalary: toMoneyNumber(record.baseSalary),
@@ -81,9 +81,36 @@ export function getPayrollLedgerAmounts(record, advanceAmount = 0) {
     deductions: otherDeductions,
     payable,
     advance,
-    remainder: isPaid ? 0 : payable,
-    paid: isPaid ? payable : 0,
+    remainder: toMoneyNumber(Math.max(0, payable - paid)),
+    paid,
   }
+}
+
+/** Итоговая выплаченная сумма; legacy status=paid → полная сумма к выдаче. */
+export function resolvePaidAmount(record, payableOverride = null) {
+  if (!record) return 0
+  if (record.paidAmount != null && record.paidAmount !== '') {
+    return toMoneyNumber(record.paidAmount)
+  }
+  const payable =
+    payableOverride != null ? toMoneyNumber(payableOverride) : toMoneyNumber(record.totalPayable)
+  return record.status === 'paid' ? payable : 0
+}
+
+/** Проверка: выплачено не больше «К выдаче» и не отрицательное. */
+export function validatePaidAmount(paidAmount, payable) {
+  const paid = toMoneyNumber(paidAmount)
+  const maxPayable = toMoneyNumber(payable)
+  if (paid < 0) {
+    return { ok: false, message: 'Сумма «Выплачено» не может быть отрицательной' }
+  }
+  if (paid > maxPayable) {
+    return {
+      ok: false,
+      message: `Нельзя выплатить больше суммы «К выдаче» (${formatMoneyKzt(maxPayable)})`,
+    }
+  }
+  return { ok: true, paid }
 }
 
 export function sumPayrollLedgerRows(rows) {

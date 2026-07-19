@@ -7,7 +7,7 @@ import {
 
 const PERIOD_SELECT = 'id, year, month, status, created_at, updated_at'
 const RECORD_SELECT =
-  'id, period_id, employee_id, status, base_salary, work_hours, work_shifts, total_allowances, total_deductions, total_payable, notes, created_at, updated_at'
+  'id, period_id, employee_id, status, base_salary, work_hours, work_shifts, total_allowances, total_deductions, total_payable, paid_amount, notes, created_at, updated_at'
 const LINE_SELECT = 'id, record_id, kind, title, amount, comment, sort_order, created_at, updated_at'
 
 function assertCloudReady() {
@@ -56,6 +56,7 @@ function normalizeRecord(row) {
     totalAllowances: toMoneyNumber(row.total_allowances),
     totalDeductions: toMoneyNumber(row.total_deductions),
     totalPayable: toMoneyNumber(row.total_payable),
+    paidAmount: toMoneyNumber(row.paid_amount),
     notes: row.notes ?? '',
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -178,6 +179,7 @@ export async function ensureSalaryRecord(periodId, employeeId) {
       total_allowances: 0,
       total_deductions: 0,
       total_payable: 0,
+      paid_amount: 0,
     })
     .select(RECORD_SELECT)
     .single()
@@ -283,6 +285,7 @@ export async function updateSalaryRecordFields(recordId, patch) {
   if (patch.baseSalary != null) payload.base_salary = toMoneyNumber(patch.baseSalary)
   if (patch.workHours != null) payload.work_hours = toMoneyNumber(patch.workHours)
   if (patch.workShifts != null) payload.work_shifts = toMoneyNumber(patch.workShifts)
+  if (patch.paidAmount != null) payload.paid_amount = toMoneyNumber(patch.paidAmount)
   if (patch.notes != null) payload.notes = patch.notes
 
   if (Object.keys(payload).length === 0) {
@@ -296,13 +299,8 @@ export async function updateSalaryRecordFields(recordId, patch) {
 
   if (error) throw new Error(error.message || 'Не удалось сохранить расчёт')
 
-  if (
-    patch.baseSalary != null ||
-    patch.status != null // status-only still ok; totals refresh if base changed
-  ) {
-    if (patch.baseSalary != null) {
-      return recalculateAndPersistTotals(recordId)
-    }
+  if (patch.baseSalary != null) {
+    return recalculateAndPersistTotals(recordId)
   }
 
   const { data, error: selectError } = await supabase
