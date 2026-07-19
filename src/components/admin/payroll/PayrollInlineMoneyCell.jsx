@@ -4,9 +4,11 @@ import { formatMoneyCompact, toMoneyNumber } from '../../../utils/salaryPayroll'
 /** Редактируемая денежная ячейка ведомости (клик → ввод → Enter/blur) */
 export default function PayrollInlineMoneyCell({
   value,
+  hint = '',
   disabled = false,
   saving = false,
   onCommit,
+  ariaLabel = 'Редактировать сумму',
 }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState('')
@@ -48,18 +50,22 @@ export default function PayrollInlineMoneyCell({
   if (editing) {
     return (
       <td className="payroll-table__money payroll-table__money--editing">
-        <input
-          ref={inputRef}
-          type="number"
-          min="0"
-          step="1"
-          className="payroll-table__money-input"
-          value={draft}
-          disabled={saving}
-          onChange={(event) => setDraft(event.target.value)}
-          onBlur={() => void commit()}
-          onKeyDown={handleKeyDown}
-        />
+        <div className="payroll-table__money-edit">
+          {hint ? <span className="payroll-table__money-hint">{hint}</span> : null}
+          <input
+            ref={inputRef}
+            type="number"
+            min="0"
+            step="1"
+            className="payroll-table__money-input"
+            value={draft}
+            disabled={saving}
+            onChange={(event) => setDraft(event.target.value)}
+            onBlur={() => void commit()}
+            onKeyDown={handleKeyDown}
+            aria-label={ariaLabel}
+          />
+        </div>
       </td>
     )
   }
@@ -68,12 +74,15 @@ export default function PayrollInlineMoneyCell({
     <td className="payroll-table__money">
       <button
         type="button"
-        className="payroll-table__money-btn"
+        className={`payroll-table__money-btn${hint ? ' payroll-table__money-btn--hinted' : ''}`}
         onClick={startEdit}
         disabled={disabled || saving}
-        aria-label="Редактировать сумму"
+        aria-label={ariaLabel}
       >
-        {saving ? '…' : formatMoneyCompact(value)}
+        {hint ? <span className="payroll-table__money-hint">{hint}</span> : null}
+        <span className="payroll-table__money-value">
+          {saving ? '…' : formatMoneyCompact(value)}
+        </span>
       </button>
     </td>
   )

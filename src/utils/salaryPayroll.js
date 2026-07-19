@@ -1,5 +1,10 @@
 /** Domain helpers for payroll MVP (Excel-like manual calculation). */
 
+import {
+  SALARY_CALCULATION_TYPE,
+  normalizeSalaryCalculationType,
+} from './employeeData'
+
 export const SALARY_RECORD_STATUSES = [
   { id: 'draft', label: 'Черновик', badge: 'draft' },
   { id: 'review', label: 'На проверке', badge: 'progress' },
@@ -52,14 +57,48 @@ export function formatMoneyCompact(value) {
 }
 
 /**
+ * Режим общей колонки «Оклад / Смена» по типу расчёта сотрудника.
+ * fixed_salary → месячный оклад (base_salary);
+ * shift_based → стоимость одной смены (shift_rate). Авторасчёт смен — следующий этап.
+ */
+export function getPayrollBaseColumnMode(employeeOrType) {
+  const type =
+    employeeOrType && typeof employeeOrType === 'object'
+      ? normalizeSalaryCalculationType(
+          employeeOrType.salaryCalculationType ?? employeeOrType.salary_calculation_type
+        )
+      : normalizeSalaryCalculationType(employeeOrType)
+
+  if (type === SALARY_CALCULATION_TYPE.FIXED_SALARY) {
+    return {
+      mode: SALARY_CALCULATION_TYPE.FIXED_SALARY,
+      label: 'Оклад',
+      ariaLabel: 'Редактировать оклад',
+    }
+  }
+
+  return {
+    mode: SALARY_CALCULATION_TYPE.SHIFT_BASED,
+    label: 'За смену',
+    ariaLabel: 'Редактировать стоимость смены',
+  }
+}
+
+/**
  * Отображение строки ведомости.
  * Удержания в колонке = все удержания минус аванс (аванс — отдельная колонка).
  * Остаток = к выдаче − выплачено (частичная выплата через paid_amount).
+ * Колонка «Оклад / Смена»: оклад или ставка за смену — по salaryCalculationType.
  */
-export function getPayrollLedgerAmounts(record, advanceAmount = 0) {
+export function getPayrollLedgerAmounts(record, advanceAmount = 0, employee = null) {
+  const column = getPayrollBaseColumnMode(employee)
+
   if (!record) {
     return {
       baseSalary: null,
+      baseColumnValue: null,
+      baseColumnLabel: column.label,
+      baseColumnMode: column.mode,
       allowances: null,
       deductions: null,
       payable: null,
@@ -74,9 +113,16 @@ export function getPayrollLedgerAmounts(record, advanceAmount = 0) {
   const otherDeductions = Math.max(0, toMoneyNumber(totalDeductions - advance))
   const payable = toMoneyNumber(record.totalPayable)
   const paid = resolvePaidAmount(record, payable)
+  const baseSalary = toMoneyNumber(record.baseSalary)
+  const shiftRate = toMoneyNumber(record.shiftRate)
+  const isShift = column.mode === SALARY_CALCULATION_TYPE.SHIFT_BASED
 
   return {
-    baseSalary: toMoneyNumber(record.baseSalary),
+    // Фонд оплаты / итоги — только месячный оклад (для сменщиков пока 0, пока нет авторасчёта).
+    baseSalary,
+    baseColumnValue: isShift ? shiftRate : baseSalary,
+    baseColumnLabel: column.label,
+    baseColumnMode: column.mode,
     allowances: toMoneyNumber(record.totalAllowances),
     deductions: otherDeductions,
     payable,

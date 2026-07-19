@@ -9,12 +9,14 @@ import {
   changePayrollMonth,
   formatMoneyCompact,
   formatMoneyKzt,
+  getPayrollBaseColumnMode,
   getPayrollLedgerAmounts,
   selectEmployeesForPayrollMonth,
   sumPayrollLedgerRows,
   toMoneyNumber,
   validatePaidAmount,
 } from '../../../utils/salaryPayroll'
+import { SALARY_CALCULATION_TYPE } from '../../../utils/employeeData'
 import {
   getEmployeeForAdmin,
   listEmployeesForAdmin,
@@ -255,7 +257,7 @@ export default function PayrollSection() {
         const advanceAmount = record
           ? advancesByRecordId.get(record.id)?.amount || 0
           : 0
-        const amounts = getPayrollLedgerAmounts(record, advanceAmount)
+        const amounts = getPayrollLedgerAmounts(record, advanceAmount, emp)
         return { employee: emp, record, advanceAmount, amounts }
       })
   }, [
@@ -331,14 +333,18 @@ export default function PayrollSection() {
     return value
   }
 
-  async function handleSaveBaseSalary(employee, amount) {
+  async function handleSaveBaseColumn(employee, amount) {
     setSavingEmployeeId(employee.id)
     try {
       const record = await ensureRowRecord(employee)
-      const updated = await updateSalaryRecordFields(record.id, { baseSalary: amount })
+      const { mode } = getPayrollBaseColumnMode(employee)
+      const updated =
+        mode === SALARY_CALCULATION_TYPE.SHIFT_BASED
+          ? await updateSalaryRecordFields(record.id, { shiftRate: amount })
+          : await updateSalaryRecordFields(record.id, { baseSalary: amount })
       patchEmployeeRecord(employee.id, updated)
     } catch (err) {
-      showWarning(err?.message || 'Не удалось сохранить оклад')
+      showWarning(err?.message || 'Не удалось сохранить сумму')
     } finally {
       setSavingEmployeeId(null)
     }
@@ -587,7 +593,9 @@ export default function PayrollSection() {
                 <tr>
                   <th className="payroll-table__num">№</th>
                   <th className="payroll-table__employee">Сотрудник</th>
-                  <th className="payroll-table__money">Оклад</th>
+                  <th className="payroll-table__money" title="Оклад или стоимость смены — по типу расчёта сотрудника">
+                    Оклад / Смена
+                  </th>
                   <th className="payroll-table__money">Начисления</th>
                   <th className="payroll-table__money">Удержания</th>
                   <th className="payroll-table__money">К выдаче</th>
@@ -612,9 +620,15 @@ export default function PayrollSection() {
                         </div>
                       </td>
                       <PayrollInlineMoneyCell
-                        value={amounts.baseSalary}
+                        value={amounts.baseColumnValue}
+                        hint={amounts.baseColumnLabel}
+                        ariaLabel={
+                          amounts.baseColumnMode === SALARY_CALCULATION_TYPE.SHIFT_BASED
+                            ? 'Редактировать стоимость смены'
+                            : 'Редактировать оклад'
+                        }
                         saving={rowSaving}
-                        onCommit={(next) => handleSaveBaseSalary(employee, next)}
+                        onCommit={(next) => handleSaveBaseColumn(employee, next)}
                       />
                       <td className="payroll-table__money">
                         <button

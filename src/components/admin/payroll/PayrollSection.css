@@ -121,6 +121,16 @@
 
 .payroll-table__money--editing {
   padding: 2px 4px;
+  vertical-align: middle;
+}
+
+.payroll-table__money-edit {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
 }
 
 .payroll-table__money-input {
@@ -154,6 +164,30 @@
   font-variant-numeric: tabular-nums;
   text-align: right;
   cursor: pointer;
+}
+
+.payroll-table__money-btn--hinted {
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 1px;
+  min-height: 30px;
+}
+
+.payroll-table__money-hint {
+  display: block;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.payroll-table__money-value {
+  display: block;
+  line-height: 1.2;
 }
 
 .payroll-table__money-btn:hover:not(:disabled) {

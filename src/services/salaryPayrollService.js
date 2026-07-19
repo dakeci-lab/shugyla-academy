@@ -7,7 +7,7 @@ import {
 
 const PERIOD_SELECT = 'id, year, month, status, created_at, updated_at'
 const RECORD_SELECT =
-  'id, period_id, employee_id, status, base_salary, work_hours, work_shifts, total_allowances, total_deductions, total_payable, paid_amount, notes, created_at, updated_at'
+  'id, period_id, employee_id, status, base_salary, shift_rate, work_hours, work_shifts, total_allowances, total_deductions, total_payable, paid_amount, notes, created_at, updated_at'
 const LINE_SELECT = 'id, record_id, kind, title, amount, comment, sort_order, created_at, updated_at'
 
 function assertCloudReady() {
@@ -51,6 +51,7 @@ function normalizeRecord(row) {
     employeeId: Number(row.employee_id),
     status: row.status,
     baseSalary: toMoneyNumber(row.base_salary),
+    shiftRate: toMoneyNumber(row.shift_rate),
     workHours: toMoneyNumber(row.work_hours),
     workShifts: toMoneyNumber(row.work_shifts),
     totalAllowances: toMoneyNumber(row.total_allowances),
@@ -174,6 +175,7 @@ export async function ensureSalaryRecord(periodId, employeeId) {
       employee_id: empId,
       status: 'draft',
       base_salary: 0,
+      shift_rate: 0,
       work_hours: 0,
       work_shifts: 0,
       total_allowances: 0,
@@ -283,6 +285,7 @@ export async function updateSalaryRecordFields(recordId, patch) {
   const payload = {}
   if (patch.status != null) payload.status = patch.status
   if (patch.baseSalary != null) payload.base_salary = toMoneyNumber(patch.baseSalary)
+  if (patch.shiftRate != null) payload.shift_rate = toMoneyNumber(patch.shiftRate)
   if (patch.workHours != null) payload.work_hours = toMoneyNumber(patch.workHours)
   if (patch.workShifts != null) payload.work_shifts = toMoneyNumber(patch.workShifts)
   if (patch.paidAmount != null) payload.paid_amount = toMoneyNumber(patch.paidAmount)
@@ -299,6 +302,7 @@ export async function updateSalaryRecordFields(recordId, patch) {
 
   if (error) throw new Error(error.message || 'Не удалось сохранить расчёт')
 
+  // shift_rate does not affect totals until auto shift×rate calculation is enabled.
   if (patch.baseSalary != null) {
     return recalculateAndPersistTotals(recordId)
   }

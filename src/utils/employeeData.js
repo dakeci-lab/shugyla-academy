@@ -86,7 +86,11 @@ export const WORK_MODE_OPTIONS = [
   { value: WORK_MODE.ONLINE, label: WORK_MODE_LABELS.online },
 ]
 
-/** Тип расчёта зарплаты (пока только хранение / отображение) */
+/**
+ * Тип расчёта зарплаты.
+ * В ведомости: fixed_salary → колонка «Оклад» (base_salary);
+ * shift_based → «За смену» (shift_rate). Авто: rate × смены — следующий этап.
+ */
 export const SALARY_CALCULATION_TYPE = {
   SHIFT_BASED: 'shift_based',
   FIXED_SALARY: 'fixed_salary',
