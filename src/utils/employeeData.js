@@ -88,8 +88,9 @@ export const WORK_MODE_OPTIONS = [
 
 /**
  * Тип расчёта зарплаты.
- * В ведомости: fixed_salary → колонка «Оклад» (base_salary);
- * shift_based → «За смену» (shift_rate). Авто: rate × смены — следующий этап.
+ * В ведомости колонка «Ставка»:
+ * fixed_salary → месячный оклад (base_salary); фонд и к выдаче = полный оклад (временно);
+ * shift_based → стоимость смены (shift_rate); фонд = rate×назначенные, к выдаче = rate×подтверждённые.
  */
 export const SALARY_CALCULATION_TYPE = {
   SHIFT_BASED: 'shift_based',

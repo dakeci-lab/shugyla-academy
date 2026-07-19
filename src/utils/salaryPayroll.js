@@ -4,6 +4,8 @@ import {
   SALARY_CALCULATION_TYPE,
   normalizeSalaryCalculationType,
 } from './employeeData'
+import { summarizeEmployeePeriod } from './employeePeriodSummary'
+import { isWorkingShiftStatus } from './shiftData'
 
 export const SALARY_RECORD_STATUSES = [
   { id: 'draft', label: 'Черновик', badge: 'draft' },
@@ -57,9 +59,10 @@ export function formatMoneyCompact(value) {
 }
 
 /**
- * Режим общей колонки «Оклад / Смена» по типу расчёта сотрудника.
+ * Режим колонки «Ставка» по типу расчёта сотрудника.
  * fixed_salary → месячный оклад (base_salary);
- * shift_based → стоимость одной смены (shift_rate). Авторасчёт смен — следующий этап.
+ * shift_based → стоимость одной смены (shift_rate).
+ * Подсказка в ячейке: «Оклад» / «За смену».
  */
 export function getPayrollBaseColumnMode(employeeOrType) {
   const type =
@@ -73,24 +76,103 @@ export function getPayrollBaseColumnMode(employeeOrType) {
     return {
       mode: SALARY_CALCULATION_TYPE.FIXED_SALARY,
       label: 'Оклад',
-      ariaLabel: 'Редактировать оклад',
+      ariaLabel: 'Редактировать ставку (оклад)',
     }
   }
 
   return {
     mode: SALARY_CALCULATION_TYPE.SHIFT_BASED,
     label: 'За смену',
-    ariaLabel: 'Редактировать стоимость смены',
+    ariaLabel: 'Редактировать ставку (за смену)',
   }
+}
+
+export function isPayrollShiftBased(employeeOrType) {
+  return getPayrollBaseColumnMode(employeeOrType).mode === SALARY_CALCULATION_TYPE.SHIFT_BASED
+}
+
+/** Назначенные (график) и подтверждённые (тайм-трекер) смены за период. */
+export function countPayrollShiftStats(shifts = []) {
+  let assigned = 0
+  for (const shift of shifts) {
+    if (isWorkingShiftStatus(shift?.status)) assigned += 1
+  }
+  const { completedShifts } = summarizeEmployeePeriod(shifts)
+  return {
+    assigned,
+    completed: completedShifts,
+  }
+}
+
+/** Map<employeeId, { assigned, completed }> from a month shift list. */
+export function buildPayrollShiftStatsByEmployee(shifts = []) {
+  const byEmployee = new Map()
+  for (const shift of shifts || []) {
+    const id = Number(shift?.employeeId ?? shift?.employee_id)
+    if (!Number.isFinite(id)) continue
+    if (!byEmployee.has(id)) byEmployee.set(id, [])
+    byEmployee.get(id).push(shift)
+  }
+
+  const stats = new Map()
+  for (const [id, list] of byEmployee) {
+    stats.set(id, countPayrollShiftStats(list))
+  }
+  return stats
+}
+
+export function getPayrollShiftStatsForEmployee(shiftStatsByEmployee, employeeId) {
+  return (
+    shiftStatsByEmployee?.get(Number(employeeId)) || {
+      assigned: 0,
+      completed: 0,
+    }
+  )
+}
+
+/** Ставка: оклад или стоимость смены (не путать с заработанной базой в base_salary у сменщиков). */
+export function getPayrollRateAmount(record, employee) {
+  if (!record) return 0
+  if (isPayrollShiftBased(employee)) return toMoneyNumber(record.shiftRate)
+  return toMoneyNumber(record.baseSalary)
+}
+
+/**
+ * Фонд оплаты — прогноз обязательств:
+ * fixed → полный оклад; shift → ставка × назначенные смены в графике.
+ */
+export function computePayrollFundAmount(record, employee, shiftStats = null) {
+  const rate = getPayrollRateAmount(record, employee)
+  if (!isPayrollShiftBased(employee)) return rate
+  const assigned = Number(shiftStats?.assigned) || 0
+  return toMoneyNumber(rate * assigned)
+}
+
+/**
+ * Заработанная база до начислений/удержаний:
+ * fixed → полный оклад (временно без посещаемости);
+ * shift → ставка × подтверждённые смены (check-in/out).
+ * Дальше сюда можно подключить KPI, отпуска, дисциплину без смены UI «Ставка».
+ */
+export function computePayrollEarnedBase(record, employee, shiftStats = null) {
+  const rate = getPayrollRateAmount(record, employee)
+  if (!isPayrollShiftBased(employee)) return rate
+  const completed = Number(shiftStats?.completed) || 0
+  return toMoneyNumber(rate * completed)
 }
 
 /**
  * Отображение строки ведомости.
  * Удержания в колонке = все удержания минус аванс (аванс — отдельная колонка).
- * Остаток = к выдаче − выплачено (частичная выплата через paid_amount).
- * Колонка «Оклад / Смена»: оклад или ставка за смену — по salaryCalculationType.
+ * Остаток = к выдаче − выплачено.
+ * Колонка «Ставка»: оклад или ставка за смену — по salaryCalculationType.
  */
-export function getPayrollLedgerAmounts(record, advanceAmount = 0, employee = null) {
+export function getPayrollLedgerAmounts(
+  record,
+  advanceAmount = 0,
+  employee = null,
+  shiftStats = null
+) {
   const column = getPayrollBaseColumnMode(employee)
 
   if (!record) {
@@ -105,30 +187,36 @@ export function getPayrollLedgerAmounts(record, advanceAmount = 0, employee = nu
       advance: null,
       remainder: null,
       paid: null,
+      assignedShifts: null,
+      completedShifts: null,
     }
   }
 
   const advance = toMoneyNumber(advanceAmount)
   const totalDeductions = toMoneyNumber(record.totalDeductions)
   const otherDeductions = Math.max(0, toMoneyNumber(totalDeductions - advance))
-  const payable = toMoneyNumber(record.totalPayable)
+  const allowances = toMoneyNumber(record.totalAllowances)
+  const rate = getPayrollRateAmount(record, employee)
+  const fund = computePayrollFundAmount(record, employee, shiftStats)
+  const earnedBase = computePayrollEarnedBase(record, employee, shiftStats)
+  const payable = toMoneyNumber(earnedBase + allowances - totalDeductions)
   const paid = resolvePaidAmount(record, payable)
-  const baseSalary = toMoneyNumber(record.baseSalary)
-  const shiftRate = toMoneyNumber(record.shiftRate)
-  const isShift = column.mode === SALARY_CALCULATION_TYPE.SHIFT_BASED
+  const stats = shiftStats || { assigned: 0, completed: 0 }
 
   return {
-    // Фонд оплаты / итоги — только месячный оклад (для сменщиков пока 0, пока нет авторасчёта).
-    baseSalary,
-    baseColumnValue: isShift ? shiftRate : baseSalary,
+    // «Фонд оплаты» в итогах — прогноз (оклад или ставка × назначенные смены).
+    baseSalary: fund,
+    baseColumnValue: rate,
     baseColumnLabel: column.label,
     baseColumnMode: column.mode,
-    allowances: toMoneyNumber(record.totalAllowances),
+    allowances,
     deductions: otherDeductions,
     payable,
     advance,
     remainder: toMoneyNumber(Math.max(0, payable - paid)),
     paid,
+    assignedShifts: Number(stats.assigned) || 0,
+    completedShifts: Number(stats.completed) || 0,
   }
 }
 
@@ -182,7 +270,14 @@ export function sumPayrollLedgerRows(rows) {
   return (rows || []).reduce((acc, row) => {
     const amounts =
       row?.amounts ||
-      (row?.record ? getPayrollLedgerAmounts(row.record, row.advanceAmount || 0) : null)
+      (row?.record
+        ? getPayrollLedgerAmounts(
+            row.record,
+            row.advanceAmount || 0,
+            row.employee,
+            row.shiftStats
+          )
+        : null)
     if (!amounts || row?.record == null) return acc
     acc.countWithRecord += 1
     acc.baseSalary += amounts.baseSalary || 0
@@ -197,9 +292,9 @@ export function sumPayrollLedgerRows(rows) {
 }
 
 /**
- * Excel-like MVP:
- * к выдаче = оклад + начисления − удержания
- * work_hours / work_shifts пока не влияют на сумму (ручной учёт).
+ * К выдаче = заработанная база + начисления − удержания.
+ * Для сменщиков база = ставка × подтверждённые смены (пишется в base_salary при sync).
+ * Для окладников база = полный оклад (позже — посещаемость / KPI / отпуска).
  */
 export function computeSalaryTotals({
   baseSalary = 0,

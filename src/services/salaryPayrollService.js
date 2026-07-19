@@ -1,7 +1,9 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
 import {
+  computePayrollEarnedBase,
   computeSalaryTotals,
+  isPayrollShiftBased,
   toMoneyNumber,
 } from '../utils/salaryPayroll'
 
@@ -302,7 +304,6 @@ export async function updateSalaryRecordFields(recordId, patch) {
 
   if (error) throw new Error(error.message || 'Не удалось сохранить расчёт')
 
-  // shift_rate does not affect totals until auto shift×rate calculation is enabled.
   if (patch.baseSalary != null) {
     return recalculateAndPersistTotals(recordId)
   }
@@ -315,6 +316,26 @@ export async function updateSalaryRecordFields(recordId, patch) {
 
   if (selectError) throw new Error(selectError.message || 'Не удалось загрузить расчёт')
   return normalizeRecord(data)
+}
+
+/**
+ * Для сменщиков: base_salary = ставка × подтверждённые смены, work_shifts = completed.
+ * Окладники не трогаем (полный оклад уже в base_salary).
+ */
+export async function syncShiftBasedEarnedBase(record, employee, shiftStats) {
+  assertCloudReady()
+  if (!record?.id || !isPayrollShiftBased(employee)) return record
+
+  const earnedBase = computePayrollEarnedBase(record, employee, shiftStats)
+  const completed = Number(shiftStats?.completed) || 0
+  const sameBase = toMoneyNumber(record.baseSalary) === earnedBase
+  const sameShifts = toMoneyNumber(record.workShifts) === completed
+  if (sameBase && sameShifts) return record
+
+  return updateSalaryRecordFields(record.id, {
+    baseSalary: earnedBase,
+    workShifts: completed,
+  })
 }
 
 export async function addSalaryAllowance(recordId, { kind, title, amount, comment }) {

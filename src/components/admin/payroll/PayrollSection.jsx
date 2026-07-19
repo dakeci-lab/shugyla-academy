@@ -6,11 +6,14 @@ import { formatMonthYearLabel } from '../../../utils/shiftData'
 import {
   SALARY_ALLOWANCE_PRESETS,
   SALARY_DEDUCTION_PRESETS,
+  buildPayrollShiftStatsByEmployee,
   changePayrollMonth,
   formatMoneyCompact,
   formatMoneyKzt,
   getPayrollBaseColumnMode,
   getPayrollLedgerAmounts,
+  getPayrollShiftStatsForEmployee,
+  isPayrollShiftBased,
   selectEmployeesForPayrollMonth,
   sumPayrollLedgerRows,
   toMoneyNumber,
@@ -25,7 +28,10 @@ import {
   PAYROLL_PARTICIPATION,
   normalizePayrollParticipation,
 } from '../../../utils/employeeData'
-import { updateEmployee } from '../../../services/academyDataService'
+import {
+  getTeamShiftsForMonth,
+  updateEmployee,
+} from '../../../services/academyDataService'
 import {
   addSalaryAllowance,
   addSalaryDeduction,
@@ -36,6 +42,7 @@ import {
   getSalaryRecordBundle,
   listAdvanceLinesForRecords,
   listSalaryRecordsForPeriod,
+  syncShiftBasedEarnedBase,
   updateSalaryAllowance,
   updateSalaryDeduction,
   updateSalaryRecordFields,
@@ -144,6 +151,7 @@ export default function PayrollSection() {
   const [employees, setEmployees] = useState([])
   const [recordsByEmployee, setRecordsByEmployee] = useState(new Map())
   const [advancesByRecordId, setAdvancesByRecordId] = useState(new Map())
+  const [shiftStatsByEmployee, setShiftStatsByEmployee] = useState(new Map())
   const [period, setPeriod] = useState(null)
   const [savingEmployeeId, setSavingEmployeeId] = useState(null)
 
@@ -162,6 +170,7 @@ export default function PayrollSection() {
           setEmployees([])
           setRecordsByEmployee(new Map())
           setAdvancesByRecordId(new Map())
+          setShiftStatsByEmployee(new Map())
           setPeriod(null)
           setError('Подсчёт зарплаты доступен только в облачном режиме')
           return
@@ -172,20 +181,39 @@ export default function PayrollSection() {
 
         const records = await listSalaryRecordsForPeriod(nextPeriod.id)
         const employeeRows = await listEmployeesForPayrollMonth(year, month, records)
-        const advances = await listAdvanceLinesForRecords(records.map((row) => row.id))
+        const employeeIds = employeeRows.map((row) => row.id)
+        const [advances, monthShifts] = await Promise.all([
+          listAdvanceLinesForRecords(records.map((row) => row.id)),
+          getTeamShiftsForMonth(year, month, employeeIds),
+        ])
+        const shiftStats = buildPayrollShiftStatsByEmployee(monthShifts)
+        const employeesById = new Map(
+          employeeRows.map((row) => [Number(row.id), row])
+        )
+
+        const syncedRecords = await Promise.all(
+          records.map(async (record) => {
+            const employee = employeesById.get(Number(record.employeeId))
+            if (!employee || !isPayrollShiftBased(employee)) return record
+            const stats = getPayrollShiftStatsForEmployee(shiftStats, record.employeeId)
+            return syncShiftBasedEarnedBase(record, employee, stats)
+          })
+        )
 
         setEmployees(employeeRows)
         const map = new Map()
-        for (const record of records) {
+        for (const record of syncedRecords) {
           map.set(Number(record.employeeId), record)
         }
         setRecordsByEmployee(map)
         setAdvancesByRecordId(advances)
+        setShiftStatsByEmployee(shiftStats)
       } catch (err) {
         setError(err?.message || 'Не удалось загрузить расчёты')
         setEmployees([])
         setRecordsByEmployee(new Map())
         setAdvancesByRecordId(new Map())
+        setShiftStatsByEmployee(new Map())
       } finally {
         if (!quiet) setLoading(false)
       }
@@ -227,11 +255,15 @@ export default function PayrollSection() {
       if (!period) throw new Error('Период не загружен')
       const existing = recordsByEmployee.get(Number(employee.id))
       if (existing) return existing
-      const record = await ensureSalaryRecord(period.id, employee.id)
+      let record = await ensureSalaryRecord(period.id, employee.id)
+      if (isPayrollShiftBased(employee)) {
+        const stats = getPayrollShiftStatsForEmployee(shiftStatsByEmployee, employee.id)
+        record = await syncShiftBasedEarnedBase(record, employee, stats)
+      }
       patchEmployeeRecord(employee.id, record)
       return record
     },
-    [period, recordsByEmployee, patchEmployeeRecord]
+    [period, recordsByEmployee, patchEmployeeRecord, shiftStatsByEmployee]
   )
 
   const rows = useMemo(() => {
@@ -257,13 +289,15 @@ export default function PayrollSection() {
         const advanceAmount = record
           ? advancesByRecordId.get(record.id)?.amount || 0
           : 0
-        const amounts = getPayrollLedgerAmounts(record, advanceAmount, emp)
-        return { employee: emp, record, advanceAmount, amounts }
+        const shiftStats = getPayrollShiftStatsForEmployee(shiftStatsByEmployee, emp.id)
+        const amounts = getPayrollLedgerAmounts(record, advanceAmount, emp, shiftStats)
+        return { employee: emp, record, advanceAmount, shiftStats, amounts }
       })
   }, [
     employees,
     recordsByEmployee,
     advancesByRecordId,
+    shiftStatsByEmployee,
     search,
     appliedRoleId,
     appliedStatus,
@@ -338,13 +372,17 @@ export default function PayrollSection() {
     try {
       const record = await ensureRowRecord(employee)
       const { mode } = getPayrollBaseColumnMode(employee)
-      const updated =
-        mode === SALARY_CALCULATION_TYPE.SHIFT_BASED
-          ? await updateSalaryRecordFields(record.id, { shiftRate: amount })
-          : await updateSalaryRecordFields(record.id, { baseSalary: amount })
+      let updated
+      if (mode === SALARY_CALCULATION_TYPE.SHIFT_BASED) {
+        const withRate = await updateSalaryRecordFields(record.id, { shiftRate: amount })
+        const stats = getPayrollShiftStatsForEmployee(shiftStatsByEmployee, employee.id)
+        updated = await syncShiftBasedEarnedBase(withRate, employee, stats)
+      } else {
+        updated = await updateSalaryRecordFields(record.id, { baseSalary: amount })
+      }
       patchEmployeeRecord(employee.id, updated)
     } catch (err) {
-      showWarning(err?.message || 'Не удалось сохранить сумму')
+      showWarning(err?.message || 'Не удалось сохранить ставку')
     } finally {
       setSavingEmployeeId(null)
     }
@@ -375,7 +413,10 @@ export default function PayrollSection() {
     setSavingEmployeeId(employee.id)
     try {
       const record = await ensureRowRecord(employee)
-      const check = validatePaidAmount(amount, record.totalPayable)
+      const advanceAmount = advancesByRecordId.get(record.id)?.amount || 0
+      const stats = getPayrollShiftStatsForEmployee(shiftStatsByEmployee, employee.id)
+      const amounts = getPayrollLedgerAmounts(record, advanceAmount, employee, stats)
+      const check = validatePaidAmount(amount, amounts.payable)
       if (!check.ok) {
         showWarning(check.message)
         return
@@ -593,8 +634,11 @@ export default function PayrollSection() {
                 <tr>
                   <th className="payroll-table__num">№</th>
                   <th className="payroll-table__employee">Сотрудник</th>
-                  <th className="payroll-table__money" title="Оклад или стоимость смены — по типу расчёта сотрудника">
-                    Оклад / Смена
+                  <th
+                    className="payroll-table__money"
+                    title="Ставка: месячный оклад или стоимость смены — по типу расчёта сотрудника"
+                  >
+                    Ставка
                   </th>
                   <th className="payroll-table__money">Начисления</th>
                   <th className="payroll-table__money">Удержания</th>
@@ -624,8 +668,8 @@ export default function PayrollSection() {
                         hint={amounts.baseColumnLabel}
                         ariaLabel={
                           amounts.baseColumnMode === SALARY_CALCULATION_TYPE.SHIFT_BASED
-                            ? 'Редактировать стоимость смены'
-                            : 'Редактировать оклад'
+                            ? 'Редактировать ставку (за смену)'
+                            : 'Редактировать ставку (оклад)'
                         }
                         saving={rowSaving}
                         onCommit={(next) => handleSaveBaseColumn(employee, next)}
