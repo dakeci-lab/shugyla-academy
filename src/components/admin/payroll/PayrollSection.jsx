@@ -29,10 +29,8 @@ import {
   PAYROLL_PARTICIPATION,
   normalizePayrollParticipation,
 } from '../../../utils/employeeData'
-import {
-  getTeamShiftsForMonth,
-  updateEmployee,
-} from '../../../services/academyDataService'
+import { updateEmployee } from '../../../services/academyDataService'
+import { fetchTeamWorkforceForMonth } from '../../../services/workforceAdminService'
 import {
   addSalaryAllowance,
   addSalaryDeduction,
@@ -182,15 +180,45 @@ export default function PayrollSection() {
 
         const records = await listSalaryRecordsForPeriod(nextPeriod.id)
         const employeeRows = await listEmployeesForPayrollMonth(year, month, records)
-        const employeeIds = employeeRows.map((row) => row.id)
-        const [advances, monthShifts] = await Promise.all([
+        // Team shifts must go through admin-team-workforce-data (service role).
+        // Direct academy_employee_shifts select is RLS-scoped to the caller's own rows,
+        // so payroll would see Plan/Worked = 0 for every other employee.
+        const [advances, workforceBundle] = await Promise.all([
           listAdvanceLinesForRecords(records.map((row) => row.id)),
-          getTeamShiftsForMonth(year, month, employeeIds),
+          fetchTeamWorkforceForMonth(year, month, 'schedule'),
         ])
+        const monthShifts = workforceBundle.shifts
         const shiftStats = buildPayrollShiftStatsByEmployee(monthShifts)
         const employeesById = new Map(
           employeeRows.map((row) => [Number(row.id), row])
         )
+
+        if (import.meta.env.DEV) {
+          for (const employee of employeeRows) {
+            if (!isPayrollShiftBased(employee)) continue
+            const employeeShifts = monthShifts.filter(
+              (shift) => Number(shift.employeeId) === Number(employee.id)
+            )
+            const stats = getPayrollShiftStatsForEmployee(shiftStats, employee.id)
+            console.info('[payroll-shift-diagnostics]', {
+              employeeId: employee.id,
+              name: employee.name,
+              period: `${year}-${String(month).padStart(2, '0')}`,
+              scheduleRows: employeeShifts.length,
+              assignedWorking: stats.assigned,
+              completedTracker: stats.completed,
+              source: 'admin-team-workforce-data:schedule',
+              zeroReason:
+                employeeShifts.length === 0
+                  ? 'no_shifts_in_workforce_bundle'
+                  : stats.assigned === 0
+                    ? 'no_working_status_rows'
+                    : stats.completed === 0
+                      ? 'no_check_in_check_out_pairs'
+                      : null,
+            })
+          }
+        }
 
         const syncedRecords = await Promise.all(
           records.map(async (record) => {
