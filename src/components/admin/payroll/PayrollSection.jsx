@@ -255,7 +255,8 @@ export default function PayrollSection() {
         const advanceAmount = record
           ? advancesByRecordId.get(record.id)?.amount || 0
           : 0
-        return { employee: emp, record, advanceAmount }
+        const amounts = getPayrollLedgerAmounts(record, advanceAmount)
+        return { employee: emp, record, advanceAmount, amounts }
       })
   }, [
     employees,
@@ -267,6 +268,7 @@ export default function PayrollSection() {
     appliedParticipation,
   ])
 
+  // Single source for summary cards and table ИТОГО — summed from the same row.amounts.
   const totals = useMemo(() => sumPayrollLedgerRows(rows), [rows])
 
   const draftPreviewCount = useMemo(() => {
@@ -562,12 +564,16 @@ export default function PayrollSection() {
               <span className="payroll-summary__value">{formatMoneyKzt(totals.deductions)}</span>
             </div>
             <div className="payroll-summary__item">
+              <span className="payroll-summary__label">К выдаче</span>
+              <span className="payroll-summary__value">{formatMoneyKzt(totals.payable)}</span>
+            </div>
+            <div className="payroll-summary__item">
               <span className="payroll-summary__label">Авансы</span>
               <span className="payroll-summary__value">{formatMoneyKzt(totals.advance)}</span>
             </div>
             <div className="payroll-summary__item">
-              <span className="payroll-summary__label">К выдаче</span>
-              <span className="payroll-summary__value">{formatMoneyKzt(totals.payable)}</span>
+              <span className="payroll-summary__label">Остаток</span>
+              <span className="payroll-summary__value">{formatMoneyKzt(totals.remainder)}</span>
             </div>
             <div className="payroll-summary__item">
               <span className="payroll-summary__label">Выплачено</span>
@@ -592,9 +598,8 @@ export default function PayrollSection() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map(({ employee, record, advanceAmount }, index) => {
+                {rows.map(({ employee, record, amounts }, index) => {
                   const roleLabel = employee.position || getRoleLabel(employee.role)
-                  const amounts = getPayrollLedgerAmounts(record, advanceAmount)
                   const notesPresent = hasRecordNotes(record)
                   const rowSaving = savingEmployeeId === employee.id
                   return (

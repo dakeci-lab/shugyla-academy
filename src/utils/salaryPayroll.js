@@ -113,8 +113,9 @@ export function validatePaidAmount(paidAmount, payable) {
   return { ok: true, paid }
 }
 
-export function sumPayrollLedgerRows(rows) {
-  const empty = {
+/** Empty aggregate for payroll ledger totals (summary cards + ИТОГО). */
+export function createEmptyPayrollLedgerTotals() {
+  return {
     baseSalary: 0,
     allowances: 0,
     deductions: 0,
@@ -124,11 +125,19 @@ export function sumPayrollLedgerRows(rows) {
     paid: 0,
     countWithRecord: 0,
   }
+}
 
+/**
+ * Single aggregation used by both the top summary panel and the table ИТОГО row.
+ * Prefer rows that already carry `amounts` from getPayrollLedgerAmounts — same objects
+ * as table cells — so panel and footer cannot diverge.
+ */
+export function sumPayrollLedgerRows(rows) {
   return (rows || []).reduce((acc, row) => {
-    const { record, advanceAmount = 0 } = row
-    const amounts = getPayrollLedgerAmounts(record, advanceAmount)
-    if (!record) return acc
+    const amounts =
+      row?.amounts ||
+      (row?.record ? getPayrollLedgerAmounts(row.record, row.advanceAmount || 0) : null)
+    if (!amounts || row?.record == null) return acc
     acc.countWithRecord += 1
     acc.baseSalary += amounts.baseSalary || 0
     acc.allowances += amounts.allowances || 0
@@ -138,7 +147,7 @@ export function sumPayrollLedgerRows(rows) {
     acc.remainder += amounts.remainder || 0
     acc.paid += amounts.paid || 0
     return acc
-  }, empty)
+  }, createEmptyPayrollLedgerTotals())
 }
 
 /**
