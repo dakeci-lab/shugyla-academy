@@ -3,7 +3,11 @@
  * hidden from mobile drawer and PWA standalone shells.
  */
 
-export const WEB_ONLY_NAV_IDS = new Set(['employees-payroll', 'price-tags'])
+export const WEB_ONLY_NAV_IDS = new Set([
+  'employees-payroll',
+  'price-tags',
+  'price-checker',
+])
 
 /** Strip web-only entries from a filtered platform nav tree. */
 export function excludeWebOnlyNavItems(navItems) {

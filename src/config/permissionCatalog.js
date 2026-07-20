@@ -62,6 +62,8 @@ export const PERMISSION_CODES = {
   PRICE_TAGS_VIEW: 'price_tags.view',
   PRICE_TAGS_MANAGE: 'price_tags.manage',
 
+  PRICE_CHECKER_VIEW: 'products.price_checker.view',
+
   PAYROLL_VIEW: 'payroll.view',
   PAYROLL_CALCULATE: 'payroll.calculate',
   PAYROLL_MANAGE_SETTINGS: 'payroll.manage_settings',
@@ -111,6 +113,7 @@ export const PERMISSION_MODULES = {
   receiving: 'Приёмка',
   suppliers: 'Поставщики',
   price_tags: 'Ценники',
+  products: 'Товары',
   payroll: 'Зарплата',
   finance: 'Финансы',
   settings: 'Настройки',
@@ -128,6 +131,7 @@ export const RBAC_MATRIX_MODULES = [
   'receiving',
   'suppliers',
   'price_tags',
+  'products',
   'standards',
   'academy',
   'settings',
@@ -213,6 +217,7 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.SUPPLIERS_DELETE, name: 'Удаление поставщиков', module: 'suppliers', sortOrder: 123 },
   { code: PERMISSION_CODES.PRICE_TAGS_VIEW, name: 'Просмотр ценников', module: 'price_tags', sortOrder: 130 },
   { code: PERMISSION_CODES.PRICE_TAGS_MANAGE, name: 'Управление ценниками', module: 'price_tags', sortOrder: 131 },
+  { code: PERMISSION_CODES.PRICE_CHECKER_VIEW, name: 'Прайс-чекер', module: 'products', sortOrder: 135 },
   { code: PERMISSION_CODES.PAYROLL_VIEW, name: 'Просмотр зарплат', module: 'payroll', sortOrder: 140 },
   { code: PERMISSION_CODES.PAYROLL_CALCULATE, name: 'Расчёт зарплаты', module: 'payroll', sortOrder: 141 },
   { code: PERMISSION_CODES.PAYROLL_MANAGE_SETTINGS, name: 'Настройки зарплаты', module: 'payroll', sortOrder: 142 },

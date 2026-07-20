@@ -51,6 +51,7 @@ import ReceivingPage from './pages/platform/receiving/ReceivingPage'
 import ReceivingDetailPage from './pages/platform/receiving/ReceivingDetailPage'
 import ModulePlaceholder from './pages/platform/ModulePlaceholder'
 import PriceTagsPage from './pages/platform/price-tags/PriceTagsPage'
+import PriceCheckerPage from './pages/platform/products/PriceCheckerPage'
 import AcademyCabinetContent from './components/academy/AcademyCabinetContent'
 import AcademyCatalogContent from './components/academy/AcademyCatalogContent'
 import AcademyAssignmentContent from './components/academy/AcademyAssignmentContent'
@@ -279,6 +280,14 @@ export default function App() {
             element={
               <PlatformRoute routeKey={ROUTE_KEYS.PRICE_TAGS}>
                 <PriceTagsPage />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="products/price-checker"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.PRICE_CHECKER}>
+                <PriceCheckerPage />
               </PlatformRoute>
             }
           />

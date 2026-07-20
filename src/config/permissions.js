@@ -37,7 +37,9 @@ export const ROUTE_KEYS = {
   PROCUREMENT: 'procurement',
   RECEIVING: 'receiving',
   SUPPLIERS: 'suppliers',
+  PRODUCTS_GROUP: 'products_group',
   PRICE_TAGS: 'price_tags',
+  PRICE_CHECKER: 'price_checker',
   ACADEMY: 'academy',
   ACADEMY_GROUP: 'academy_group',
   ACADEMY_MANAGE: 'academy_manage',
@@ -89,12 +91,19 @@ const ROUTE_ACCESS = {
     ROLE_IDS.RECEIVER,
   ],
   [ROUTE_KEYS.SUPPLIERS]: [ROLE_IDS.ADMIN, ROLE_IDS.PURCHASER],
+  [ROUTE_KEYS.PRODUCTS_GROUP]: [
+    ROLE_IDS.ADMIN,
+    ROLE_IDS.PURCHASER,
+    ROLE_IDS.RECEIVER,
+    ROLE_IDS.FLOOR_ADMIN,
+  ],
   [ROUTE_KEYS.PRICE_TAGS]: [
     ROLE_IDS.ADMIN,
     ROLE_IDS.PURCHASER,
     ROLE_IDS.RECEIVER,
     ROLE_IDS.FLOOR_ADMIN,
   ],
+  [ROUTE_KEYS.PRICE_CHECKER]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.ACADEMY]: ALL_PLATFORM_ROLES,
   [ROUTE_KEYS.ACADEMY_GROUP]: ALL_PLATFORM_ROLES,
   [ROUTE_KEYS.ACADEMY_MANAGE]: [ROLE_IDS.ADMIN],
@@ -227,6 +236,7 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.RECEIVING]: [P.RECEIVING_VIEW],
     [ROUTE_KEYS.SUPPLIERS]: [P.SUPPLIERS_VIEW],
     [ROUTE_KEYS.PRICE_TAGS]: [P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE],
+    [ROUTE_KEYS.PRICE_CHECKER]: [P.PRICE_CHECKER_VIEW],
     [ROUTE_KEYS.ACADEMY]: [P.ACADEMY_VIEW],
     [ROUTE_KEYS.ACADEMY_MANAGE]: [P.ACADEMY_MANAGE_COURSES, P.ACADEMY_ASSIGN_COURSES],
     [ROUTE_KEYS.STANDARDS]: [P.STANDARDS_VIEW],
@@ -413,6 +423,10 @@ export function canViewEmployeeProfile(user, employeeId) {
 
 export function canViewEmployeeRating(user) {
   return can(user, PERMISSION_CODES.RATING_VIEW)
+}
+
+export function canViewPriceChecker(user) {
+  return canAccessRoute(user, ROUTE_KEYS.PRICE_CHECKER)
 }
 
 export function canCreateEmployees(user) {
