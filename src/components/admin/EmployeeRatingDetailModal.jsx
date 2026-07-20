@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import AdminModal from './AdminModal'
+import { isCloudMode } from '../../lib/dataMode'
 import {
   SCORE_EVENT_LABELS,
   RATING_UPDATED_EVENT,
@@ -9,7 +10,21 @@ import {
   getEmployeeShiftsForMonth,
   getAttendanceSettings,
 } from '../../services/academyDataService'
+import { fetchEmployeeWorkforceBundle } from '../../services/workforceAdminService'
 import './admin-shared.css'
+
+/**
+ * Load one employee's month shifts for rating detail.
+ * Cloud: workforce Edge (service role) — direct academy_employee_shifts is RLS own-only.
+ * Local: adapter as before.
+ */
+async function loadEmployeeShiftsForRatingDetail(employeeId, year, month) {
+  if (isCloudMode()) {
+    const bundle = await fetchEmployeeWorkforceBundle(employeeId, year, month, 'rating')
+    return bundle.shifts
+  }
+  return getEmployeeShiftsForMonth(employeeId, year, month)
+}
 
 /** Детализация рейтинга сотрудника (расчёт на лету) */
 export default function EmployeeRatingDetailModal({ employee, year, month, onClose }) {
@@ -25,7 +40,7 @@ export default function EmployeeRatingDetailModal({ employee, year, month, onClo
     try {
       const [settings, shifts] = await Promise.all([
         getAttendanceSettings(),
-        getEmployeeShiftsForMonth(employee.id, year, month),
+        loadEmployeeShiftsForRatingDetail(employee.id, year, month),
       ])
       const { entries: computedEntries, stats, ratingStatus: status } = calculateEmployeeRatingFromShifts(
         shifts,
