@@ -789,6 +789,12 @@
 .team-schedule-wrap--desktop .team-schedule-table__day {
   min-width: 5rem;
   width: calc((100% - 236px) / 7);
+  /* All non-today day columns share the same white background (no weekend/past tint). */
+  background: #fff;
+}
+
+.team-schedule-wrap--desktop .team-schedule-table thead th.team-schedule-table__day {
+  background: #fff;
 }
 
 .team-schedule-wrap--desktop .team-schedule-table__day-weekday {
@@ -818,31 +824,6 @@
 .team-schedule-wrap--desktop .team-schedule-table__today-badge .team-schedule-table__day-weekday,
 .team-schedule-wrap--desktop .team-schedule-table__today-badge .team-schedule-table__day-number {
   color: #fff;
-}
-
-/* Soft weekend columns — readable structure without loud color */
-.team-schedule-wrap--desktop .team-schedule-table thead th.team-schedule-table__day--weekend {
-  background: #e4ebe6;
-}
-
-.team-schedule-wrap--desktop .team-schedule-table tbody td.team-schedule-table__day--weekend {
-  background: #f3f5f4;
-}
-
-.team-schedule-wrap--desktop
-  .team-schedule-table
-  tbody
-  tr:nth-child(even)
-  td.team-schedule-table__day--weekend {
-  background: #eef1ef;
-}
-
-.team-schedule-wrap--desktop
-  .team-schedule-table
-  tbody
-  tr:hover
-  td.team-schedule-table__day--weekend {
-  background: #e8f0ea;
 }
 
 .team-schedule-wrap--desktop .team-schedule-table thead th.team-schedule-table__day--today {

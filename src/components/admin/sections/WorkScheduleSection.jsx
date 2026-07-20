@@ -172,10 +172,8 @@ export default function WorkScheduleSection() {
               const dateKey = toDateKey(date)
               const { weekday, day } = formatWeekDayHeader(date)
               const isToday = dateKey === todayKey
-              const isWeekend = date.getDay() === 0 || date.getDay() === 6
               const dayClass = [
                 'team-schedule-table__day',
-                isWeekend ? 'team-schedule-table__day--weekend' : '',
                 isToday ? 'team-schedule-table__day--today' : '',
               ]
                 .filter(Boolean)
@@ -227,11 +225,9 @@ export default function WorkScheduleSection() {
                   const dateKey = toDateKey(date)
                   const shift = empShifts.get(dateKey)
                   const isToday = dateKey === todayKey
-                  const isWeekend = date.getDay() === 0 || date.getDay() === 6
                   const cellClass = [
                     'team-schedule-table__day',
                     'team-schedule-cell',
-                    isWeekend ? 'team-schedule-table__day--weekend' : '',
                     isToday ? 'team-schedule-table__day--today' : '',
                   ]
                     .filter(Boolean)
