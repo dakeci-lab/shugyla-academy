@@ -3,6 +3,13 @@
  *
  * Frontend → this Edge Function → api.umag.kz (server-side secrets only).
  * Never returns UMAG tokens, cookies, or raw upstream payloads to the client.
+ *
+ * HAR contract (web.umag.kz, findProductByBarcode):
+ * - GET /rest/cabinet/nom/product/findProductByBarcode
+ * - query: showServices, showPackages, showDeleted, barcode, create, storeId
+ * - Authorization: raw token (NO "Bearer " prefix)
+ * - Browser also sent Cookie / Origin / Referer / api-ver / client-ver;
+ *   Edge uses Authorization + Accept + fixed api-ver/client-ver only (no cookies).
  */
 
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
@@ -17,6 +24,10 @@ const MAX_BARCODE_LENGTH = 64
 const MIN_BARCODE_LENGTH = 4
 const UMAG_TIMEOUT_MS = 12_000
 const DEFAULT_UMAG_BASE = 'https://api.umag.kz'
+
+/** Non-secret version headers observed in UMAG cabinet HAR. */
+const UMAG_API_VER = '1.4'
+const UMAG_CLIENT_VER = 'angular_cabinet_20.0.11'
 
 /** UMAG measure codes observed in cabinet — extend carefully. */
 const MEASURE_LABELS: Record<number, string> = {
@@ -46,6 +57,10 @@ type UmagProductPayload = {
   productUnitList?: Array<{ name?: string | null; shortName?: string | null }> | null
 }
 
+/**
+ * TEMP fallback until RBAC migration is confirmed on remote.
+ * Remove after products.price_checker.view is granted to admin in production.
+ */
 function isAdminCaller(role: string | null | undefined): boolean {
   const normalized = String(role || '')
     .trim()
@@ -64,10 +79,10 @@ function normalizeBarcode(value: unknown): string | null {
   return barcode
 }
 
-function maskSecret(value: string | undefined | null): string {
+function maskStoreId(value: string | undefined | null): string {
   if (!value) return '(empty)'
-  if (value.length <= 8) return '***'
-  return `${value.slice(0, 3)}…${value.slice(-3)} (len=${value.length})`
+  if (value.length <= 2) return '**'
+  return `${value.slice(0, 1)}…${value.slice(-1)} (len=${value.length})`
 }
 
 function safeDisplayName(name: string, barcode: string): string {
@@ -96,29 +111,26 @@ function resolveCategoryName(payload: UmagProductPayload): string | null {
   return leaf?.name ? String(leaf.name) : null
 }
 
+function notFoundResponse() {
+  return jsonResponse(
+    {
+      success: false,
+      code: 'PRODUCT_NOT_FOUND',
+      message: 'Товар не найден',
+    },
+    404
+  )
+}
+
 function productResponse(payload: UmagProductPayload, barcode: string) {
   const product = payload.product
   if (!product || product.id == null) {
-    return jsonResponse(
-      {
-        success: false,
-        code: 'PRODUCT_NOT_FOUND',
-        message: 'Товар не найден',
-      },
-      404
-    )
+    return notFoundResponse()
   }
 
   const sellingPrice = payload.productStorePrice?.sellingPrice
   if (sellingPrice == null || !Number.isFinite(Number(sellingPrice))) {
-    return jsonResponse(
-      {
-        success: false,
-        code: 'PRODUCT_NOT_FOUND',
-        message: 'Товар не найден',
-      },
-      404
-    )
+    return notFoundResponse()
   }
 
   const rawName = String(product.fullName || product.name || '').trim()
@@ -144,10 +156,10 @@ async function fetchUmagProduct(barcode: string): Promise<Response> {
   const storeId = Deno.env.get('UMAG_STORE_ID')?.trim()
 
   if (!authToken || !storeId) {
-    console.error('umag_not_configured', {
+    console.error('UMAG not configured', {
       hasToken: Boolean(authToken),
-      token: maskSecret(authToken),
       hasStoreId: Boolean(storeId),
+      storeIdMasked: maskStoreId(storeId),
     })
     return jsonResponse(
       {
@@ -159,7 +171,7 @@ async function fetchUmagProduct(barcode: string): Promise<Response> {
     )
   }
 
-  // Fixed path + fixed query keys from web.umag.kz HAR — barcode is the only user input.
+  // Fixed path + fixed query keys from HAR — barcode is the only user-controlled value.
   const url = new URL(`${baseUrl}/rest/cabinet/nom/product/findProductByBarcode`)
   url.searchParams.set('showServices', 'true')
   url.searchParams.set('showPackages', 'true')
@@ -170,19 +182,34 @@ async function fetchUmagProduct(barcode: string): Promise<Response> {
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), UMAG_TIMEOUT_MS)
+  const started = performance.now()
+
+  console.log('UMAG request started', {
+    path: '/rest/cabinet/nom/product/findProductByBarcode',
+    barcodeLength: barcode.length,
+    storeIdMasked: maskStoreId(storeId),
+    hasAuthToken: true,
+  })
 
   try {
+    // Authorization value is the raw token from HAR — do NOT prefix with "Bearer ".
     const upstream = await fetch(url.toString(), {
       method: 'GET',
       headers: {
         Accept: 'application/json, text/plain, */*',
         Authorization: authToken,
+        'api-ver': UMAG_API_VER,
+        'client-ver': UMAG_CLIENT_VER,
       },
       signal: controller.signal,
     })
 
+    const elapsedMs = Math.round(performance.now() - started)
+    console.log('UMAG response status:', upstream.status)
+    console.log('UMAG response time:', `${elapsedMs}ms`)
+
     if (upstream.status === 401 || upstream.status === 403) {
-      console.error('umag_auth_failed', { status: upstream.status })
+      console.error('UMAG auth failed', { status: upstream.status, elapsedMs })
       return jsonResponse(
         {
           success: false,
@@ -194,14 +221,7 @@ async function fetchUmagProduct(barcode: string): Promise<Response> {
     }
 
     if (upstream.status === 404) {
-      return jsonResponse(
-        {
-          success: false,
-          code: 'PRODUCT_NOT_FOUND',
-          message: 'Товар не найден',
-        },
-        404
-      )
+      return notFoundResponse()
     }
 
     if (upstream.status === 429) {
@@ -215,8 +235,20 @@ async function fetchUmagProduct(barcode: string): Promise<Response> {
       )
     }
 
+    if (upstream.status >= 500) {
+      console.error('UMAG upstream 5xx', { status: upstream.status, elapsedMs })
+      return jsonResponse(
+        {
+          success: false,
+          code: 'UMAG_NETWORK_ERROR',
+          message: 'Не удалось получить данные из UMAG. Повторите попытку.',
+        },
+        502
+      )
+    }
+
     if (!upstream.ok) {
-      console.error('umag_upstream_error', { status: upstream.status })
+      console.error('UMAG upstream error', { status: upstream.status, elapsedMs })
       return jsonResponse(
         {
           success: false,
@@ -231,7 +263,7 @@ async function fetchUmagProduct(barcode: string): Promise<Response> {
     try {
       payload = (await upstream.json()) as UmagProductPayload
     } catch {
-      console.error('umag_invalid_json')
+      console.error('UMAG invalid JSON', { elapsedMs })
       return jsonResponse(
         {
           success: false,
@@ -242,11 +274,14 @@ async function fetchUmagProduct(barcode: string): Promise<Response> {
       )
     }
 
+    // Never forward raw payload — only mapped safe fields.
     return productResponse(payload, barcode)
   } catch (error) {
     const aborted = error instanceof DOMException && error.name === 'AbortError'
-    console.error(aborted ? 'umag_timeout' : 'umag_fetch_failed', {
+    const elapsedMs = Math.round(performance.now() - started)
+    console.error(aborted ? 'UMAG timeout' : 'UMAG fetch failed', {
       aborted,
+      elapsedMs,
     })
     return jsonResponse(
       {
@@ -303,7 +338,6 @@ Deno.serve(async (req) => {
 
   const authz = await authorizeWorkforceRequest(req, [PERMISSION_PRICE_CHECKER_VIEW])
   if (authz instanceof Response) {
-    // Map generic admin errors to price-checker contract where helpful.
     try {
       const clone = authz.clone()
       const parsed = (await clone.json()) as { ok?: boolean; code?: string }
@@ -326,6 +360,7 @@ Deno.serve(async (req) => {
   }
 
   const hasPermission = authz.permissions[PERMISSION_PRICE_CHECKER_VIEW] === true
+  // TEMP: role===admin fallback — remove after remote RBAC migration is confirmed.
   if (!hasPermission && !isAdminCaller(authz.caller.role)) {
     return jsonResponse(
       { success: false, code: 'FORBIDDEN', message: 'Недостаточно прав для прайс-чекера' },

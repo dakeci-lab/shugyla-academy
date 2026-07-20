@@ -67,6 +67,7 @@ export default function PriceCheckerPage() {
       inFlightRef.current = false
 
       if (result.success) {
+        setErrorMessage('')
         setStatus('found')
         setProduct(result.product)
         setFetchedAt(result.fetchedAt)
@@ -79,9 +80,12 @@ export default function PriceCheckerPage() {
         return
       }
 
+      setProduct(null)
+      setFetchedAt(null)
+
       if (result.code === PRICE_CHECKER_ERROR_CODES.NOT_FOUND) {
         setStatus('not_found')
-        setErrorMessage(result.message)
+        setErrorMessage('')
         pushHistory({
           barcode: normalized,
           name: '',
