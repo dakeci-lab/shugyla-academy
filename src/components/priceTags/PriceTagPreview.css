@@ -50,17 +50,16 @@
   color: #111;
 }
 
-.price-tag-card__volume,
-.price-tag-card__desc,
-.price-tag-card__sku {
+.price-tag-card__unit,
+.price-tag-card__desc {
   margin: 4px 0 0;
   font-size: 11px;
   line-height: 1.3;
   color: #555;
 }
 
-.price-tag-card__sku {
-  color: #777;
+.price-tag-card__unit {
+  color: #666;
 }
 
 .price-tag-card__bottom {

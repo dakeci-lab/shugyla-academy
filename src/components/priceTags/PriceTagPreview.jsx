@@ -3,7 +3,7 @@ import './PriceTagPreview.css'
 
 /** Live on-screen preview — same view-model as print. */
 export default function PriceTagPreview({ draft, type, sizeId }) {
-  const view = buildPriceTagViewModel(draft, { type, sizeId })
+  const view = buildPriceTagViewModel(draft || {}, { type, sizeId })
   const { size } = view
   const scale = Math.min(1, 280 / size.widthMm, 360 / size.heightMm)
   const widthPx = size.widthMm * 3.2 * scale
@@ -23,11 +23,10 @@ export default function PriceTagPreview({ draft, type, sizeId }) {
         >
           <div className="price-tag-card__top">
             <h3 className="price-tag-card__name">{view.name}</h3>
-            {view.volume ? <p className="price-tag-card__volume">{view.volume}</p> : null}
+            {view.unitLabel ? <p className="price-tag-card__unit">{view.unitLabel}</p> : null}
             {view.description ? (
               <p className="price-tag-card__desc">{view.description}</p>
             ) : null}
-            {view.sku ? <p className="price-tag-card__sku">арт. {view.sku}</p> : null}
           </div>
           <div className="price-tag-card__bottom">
             {view.showOldPrice ? (
