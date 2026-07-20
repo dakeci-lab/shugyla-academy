@@ -57,17 +57,6 @@ type UmagProductPayload = {
   productUnitList?: Array<{ name?: string | null; shortName?: string | null }> | null
 }
 
-/**
- * TEMP fallback until RBAC migration is confirmed on remote.
- * Remove after products.price_checker.view is granted to admin in production.
- */
-function isAdminCaller(role: string | null | undefined): boolean {
-  const normalized = String(role || '')
-    .trim()
-    .toLowerCase()
-  return normalized === 'admin' || normalized === 'administrator'
-}
-
 function normalizeBarcode(value: unknown): string | null {
   if (typeof value !== 'string' && typeof value !== 'number') return null
   const barcode = String(value)
@@ -359,9 +348,7 @@ Deno.serve(async (req) => {
     return authz
   }
 
-  const hasPermission = authz.permissions[PERMISSION_PRICE_CHECKER_VIEW] === true
-  // TEMP: role===admin fallback — remove after remote RBAC migration is confirmed.
-  if (!hasPermission && !isAdminCaller(authz.caller.role)) {
+  if (authz.permissions[PERMISSION_PRICE_CHECKER_VIEW] !== true) {
     return jsonResponse(
       { success: false, code: 'FORBIDDEN', message: 'Недостаточно прав для прайс-чекера' },
       403
