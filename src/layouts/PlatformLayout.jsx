@@ -15,7 +15,9 @@ import { PlatformPageTitleProvider, usePlatformPageTitleContext } from '../conte
 import { useAcademyData } from '../context/AcademyDataContext'
 import { useProcurementRealtime } from '../hooks/useProcurementRealtime'
 import useMediaQuery from '../hooks/useMediaQuery'
-import useBlockMobileBrowserBack from '../hooks/useBlockMobileBrowserBack'
+import useBlockMobileBrowserBack, {
+  MOBILE_BACK_BLOCK_KEY,
+} from '../hooks/useBlockMobileBrowserBack'
 import useMobileDrawerEdgeSwipe from '../hooks/useMobileDrawerEdgeSwipe'
 import { getPlatformSection } from '../platform/platformNav'
 import { useSession } from '../context/SessionContext'
@@ -77,14 +79,29 @@ function PlatformLayoutShell({ onLogout }) {
   })
 
   const handleMobileBack = useCallback(() => {
-    const historyIdx = window.history.state?.idx
-    if (typeof historyIdx === 'number' && historyIdx > 0) {
-      allowNextBack()
-      navigate(-1)
+    const fallback = mobileBackFallback || '/platform'
+    const explicitFallback = Boolean(titleContext?.override?.backFallback)
+    // Pages with showBack always set a logical parent — prefer it.
+    // History -1 is unreliable under the same-URL back-block sentinel.
+    if (explicitFallback) {
+      navigate(fallback)
       return
     }
-    navigate(mobileBackFallback)
-  }, [allowNextBack, navigate, mobileBackFallback])
+
+    const state = window.history.state
+    const onSentinel = Boolean(state?.[MOBILE_BACK_BLOCK_KEY])
+    const historyIdx = typeof state?.idx === 'number' ? state.idx : null
+    const minIdx = onSentinel ? 2 : 1
+
+    if (historyIdx == null || historyIdx < minIdx) {
+      navigate(fallback)
+      return
+    }
+
+    const steps = onSentinel ? 2 : 1
+    allowNextBack(steps)
+    navigate(-steps)
+  }, [allowNextBack, navigate, mobileBackFallback, titleContext?.override?.backFallback])
 
   useEffect(() => {
     if (suppressPathCloseRef.current) return

@@ -3,11 +3,17 @@ import { useLocation, useNavigate } from 'react-router-dom'
 
 export const MOBILE_BACK_BLOCK_KEY = '__shugylaBlockBrowserBack'
 
-/** Разрешить один следующий browser/history back (кнопка «Назад» в UI). */
-let allowNextBrowserBack = false
+/** How many upcoming popstate events the UI Back button is allowed to consume. */
+let allowNextBrowserBackCount = 0
 
 export function allowMobileBrowserBackOnce() {
-  allowNextBrowserBack = true
+  allowNextBrowserBackCount = Math.max(allowNextBrowserBackCount, 1)
+}
+
+/** Allow N history pops (e.g. 2 to skip the same-URL back-block sentinel). */
+export function allowMobileBrowserBackSteps(steps = 1) {
+  const n = Math.max(1, Math.floor(Number(steps) || 1))
+  allowNextBrowserBackCount = Math.max(allowNextBrowserBackCount, n)
 }
 
 function currentPathname() {
@@ -44,8 +50,8 @@ export default function useBlockMobileBrowserBack({
   onBlockedBackRef.current = onBlockedBack
   lockedPathRef.current = `${location.pathname}${location.search}${location.hash}`
 
-  const allowNextBack = useCallback(() => {
-    allowMobileBrowserBackOnce()
+  const allowNextBack = useCallback((steps = 1) => {
+    allowMobileBrowserBackSteps(steps)
   }, [])
 
   useEffect(() => {
@@ -86,11 +92,13 @@ export default function useBlockMobileBrowserBack({
     function onPopState() {
       if (!enabledRef.current) return
 
-      if (allowNextBrowserBack) {
-        allowNextBrowserBack = false
+      if (allowNextBrowserBackCount > 0) {
+        allowNextBrowserBackCount -= 1
         window.setTimeout(() => {
           lockedPathRef.current = currentPathname()
-          seedSentinel()
+          if (allowNextBrowserBackCount === 0) {
+            seedSentinel()
+          }
         }, 0)
         return
       }
@@ -108,7 +116,7 @@ export default function useBlockMobileBrowserBack({
 
   useEffect(() => {
     if (!enabled) return undefined
-    if (allowNextBrowserBack || restoringRef.current) return undefined
+    if (allowNextBrowserBackCount > 0 || restoringRef.current) return undefined
 
     const id = window.setTimeout(() => {
       try {

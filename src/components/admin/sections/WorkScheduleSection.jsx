@@ -64,8 +64,9 @@ export default function WorkScheduleSection() {
     : formatWeekRangeLabel(weekStartKey)
 
   const employees = useMemo(() => {
+    // Cloud: always prefer workforce bundle (team or own scope). Local list is empty for staff.
     const base =
-      isCloudMode() && viewTeam && loadedEmployees != null
+      isCloudMode() && loadedEmployees != null
         ? loadedEmployees
         : getScheduleEligibleEmployees('active')
     let list = base.filter(participatesInStoreSchedule)
@@ -79,38 +80,46 @@ export default function WorkScheduleSection() {
     })
   }, [search, viewTeam, selfEmployeeId, loadedEmployees])
 
-  const employeeIds = useMemo(() => employees.map((emp) => emp.id), [employees])
-  const employeeIdsKey = employeeIds.join(',')
-
   const loadShifts = useCallback(async (options = {}) => {
     const quiet = options?.quiet === true
     if (!quiet) setLoading(true)
     setError('')
     try {
-      if (isCloudMode() && viewTeam) {
+      if (isCloudMode()) {
+        // Team: full offline staff. Own-only: Edge scopes to caller (schedule.view_own).
+        // Direct academy_employee_shifts select cannot populate the employee row list in cloud.
         const dateFrom = toDateKey(weekDates[0])
         const dateTo = toDateKey(weekDates[weekDates.length - 1])
         const bundle = await fetchTeamWorkforceData({
           dateFrom,
           dateTo,
           view: 'schedule',
+          employeeId: viewTeam ? null : selfEmployeeId,
         })
         setLoadedEmployees(bundle.employees)
         setShifts(bundle.shifts)
       } else {
         const months = getMonthsForWeek(weekStartKey)
-        const ids = employeeIds.length ? employeeIds : null
+        const ids = !viewTeam && selfEmployeeId
+          ? [selfEmployeeId]
+          : getScheduleEligibleEmployees('active')
+              .filter(participatesInStoreSchedule)
+              .map((emp) => emp.id)
         const monthResults = await Promise.all(
-          months.map(({ year, month }) => getTeamShiftsForMonth(year, month, ids))
+          months.map(({ year, month }) =>
+            getTeamShiftsForMonth(year, month, ids.length ? ids : null)
+          )
         )
         setShifts(monthResults.flat())
       }
     } catch (err) {
       setError(err.message || 'Не удалось загрузить график')
+      setLoadedEmployees(null)
+      setShifts([])
     } finally {
       if (!quiet) setLoading(false)
     }
-  }, [weekStartKey, viewTeam, weekDates])
+  }, [weekStartKey, viewTeam, weekDates, selfEmployeeId])
 
   usePlatformPageRefresh(loadShifts)
 
