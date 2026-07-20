@@ -40,7 +40,8 @@ function permissionCodesForView(view: WorkforceView): string[] {
     case 'schedule':
       return [PERMISSION_SCHEDULE_TEAM, PERMISSION_SCHEDULE_OWN]
     case 'rating':
-      return [PERMISSION_RATING_VIEW, PERMISSION_SCHEDULE_TEAM]
+      // Team leaderboard is visible to anyone with rating.view (not tied to schedule.view_team).
+      return [PERMISSION_RATING_VIEW]
     case 'payroll':
       // Payroll UI is team-scoped; schedule.view_team covers admins who already load team shifts.
       return [PERMISSION_PAYROLL_VIEW, PERMISSION_SCHEDULE_TEAM]
@@ -104,9 +105,9 @@ function resolveWorkforceScope(
       if (hasOwn) return { teamScope: false }
       return adminErrorResponse('forbidden', 403)
     case 'rating':
+      // Product rule: every role with rating.view sees the full store leaderboard.
       if (!hasRating) return adminErrorResponse('forbidden', 403)
-      if (hasTeam) return { teamScope: true }
-      return { teamScope: false }
+      return { teamScope: true }
     case 'payroll':
       // Mid-month terminations must still load shifts for the selected period.
       if (hasPayroll || hasTeam) return { teamScope: true }
