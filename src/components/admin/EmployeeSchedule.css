@@ -853,7 +853,10 @@
 .team-schedule-wrap--desktop .team-schedule-cell {
   padding: 2px 4px;
   vertical-align: middle;
-  background: transparent;
+}
+
+.team-schedule-wrap--desktop td.team-schedule-table__day.team-schedule-cell {
+  background: #fff;
 }
 
 .team-schedule-wrap--desktop .team-schedule-cell__inner {
