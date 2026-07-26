@@ -1458,6 +1458,14 @@ export async function getEmployeeShiftsForMonth(employeeId, year, month) {
   return getShiftAdapter().getShiftsForEmployeeMonth(Number(employeeId), year, month)
 }
 
+export async function getEmployeeShiftsForDateRange(employeeId, dateFrom, dateTo) {
+  return getShiftAdapter().getShiftsForEmployeeDateRange(
+    Number(employeeId),
+    dateFrom,
+    dateTo
+  )
+}
+
 export async function getTeamShiftsForMonth(year, month, employeeIds = null) {
   return getShiftAdapter().getShiftsForMonth(year, month, employeeIds)
 }

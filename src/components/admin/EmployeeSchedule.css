@@ -156,6 +156,12 @@
   letter-spacing: -0.02em;
 }
 
+/* Adjacent-month days: mute only the day number, keep full card chrome. */
+.shift-day__number--outside {
+  color: var(--color-text-muted, #94a3b8);
+  font-weight: 600;
+}
+
 .shift-day__time {
   font-size: 0.74rem;
   font-weight: 600;

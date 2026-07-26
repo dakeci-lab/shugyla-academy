@@ -21,8 +21,12 @@ function inDateRange(shiftDate, start, end) {
 
 export function getShiftsForEmployeeMonth(employeeId, year, month) {
   const { start, end } = getMonthRange(year, month)
+  return getShiftsForEmployeeDateRange(employeeId, start, end)
+}
+
+export function getShiftsForEmployeeDateRange(employeeId, dateFrom, dateTo) {
   return readShifts()
-    .filter((row) => row.employee_id === employeeId && inDateRange(row.shift_date, start, end))
+    .filter((row) => row.employee_id === employeeId && inDateRange(row.shift_date, dateFrom, dateTo))
     .map(normalizeShift)
 }
 

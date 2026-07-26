@@ -7,6 +7,7 @@ import {
   formatMonthYearLabel,
   parseDateKey,
   isDateKey,
+  getMonthCalendarRange,
 } from '../../../utils/shiftData'
 import { fetchEmployeeWorkforceBundle } from '../../../services/workforceAdminService'
 import { isCloudMode } from '../../../lib/dataMode'
@@ -96,8 +97,11 @@ export default function EmployeeScheduleSection({
         setEmployee(localEmployee)
         setEmployeeMissing(!localEmployee)
         if (localEmployee) {
-          const { getEmployeeShiftsForMonth } = await import('../../../services/academyDataService')
-          const rows = await getEmployeeShiftsForMonth(employeeId, year, month)
+          const { getEmployeeShiftsForDateRange } = await import(
+            '../../../services/academyDataService'
+          )
+          const { dateFrom, dateTo } = getMonthCalendarRange(year, month)
+          const rows = await getEmployeeShiftsForDateRange(employeeId, dateFrom, dateTo)
           setShifts(rows)
           onEmployeeSyncRef.current?.(localEmployee)
         } else {

@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
 import { coalesceInFlight } from '../lib/requestCoalesce'
 import { normalizeEmployee } from '../utils/employeeData'
-import { normalizeShift } from '../utils/shiftData'
+import { getMonthCalendarRange, normalizeShift } from '../utils/shiftData'
 import {
   extractFunctionErrorBody,
   isGenericInvokeErrorMessage,
@@ -110,6 +110,11 @@ export function monthToDateRange(year, month) {
   }
 }
 
+/** Personal schedule calendar: load the full Mon–Sun grid including adjacent months. */
+export function scheduleCalendarDateRange(year, month) {
+  return getMonthCalendarRange(year, month)
+}
+
 /**
  * Cloud-only Home dashboard summary (view=home-summary).
  * One selected day; employees limited to those with shifts that day.
@@ -199,7 +204,17 @@ export async function fetchEmployeeWorkforceBundle(employeeId, year, month, view
     return { employee: null, shifts: [], teamScope: false }
   }
 
-  const bundle = await fetchTeamWorkforceForMonth(year, month, view, normalizedId)
+  // Schedule calendar shows adjacent-month days in the grid — load that full range once.
+  // Rating/other views stay on strict calendar-month bounds.
+  const { dateFrom, dateTo } =
+    view === 'schedule' ? getMonthCalendarRange(year, month) : monthToDateRange(year, month)
+
+  const bundle = await fetchTeamWorkforceData({
+    dateFrom,
+    dateTo,
+    view,
+    employeeId: normalizedId,
+  })
   const employee = bundle.employees.find((row) => Number(row.id) === normalizedId) ?? null
   const shifts = bundle.shifts.filter((row) => Number(row.employeeId) === normalizedId)
 

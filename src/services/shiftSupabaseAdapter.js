@@ -118,13 +118,17 @@ function getMonthRange(year, month) {
 
 export async function getShiftsForEmployeeMonth(employeeId, year, month) {
   const { start, end } = getMonthRange(year, month)
+  return getShiftsForEmployeeDateRange(employeeId, start, end)
+}
+
+export async function getShiftsForEmployeeDateRange(employeeId, dateFrom, dateTo) {
   const rows = await throwIfError(
     await supabase
       .from('academy_employee_shifts')
       .select('*')
       .eq('employee_id', employeeId)
-      .gte('shift_date', start)
-      .lte('shift_date', end)
+      .gte('shift_date', dateFrom)
+      .lte('shift_date', dateTo)
       .order('shift_date'),
     'Загрузка графика сотрудника'
   )

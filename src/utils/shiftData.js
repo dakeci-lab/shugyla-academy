@@ -525,24 +525,40 @@ export function getMonthBounds(year, month) {
   return { start, end, daysInMonth: lastDay }
 }
 
+/**
+ * Full Mon–Sun calendar grid for a viewed month, including real adjacent-month dates.
+ * Uses local calendar components (not UTC) to avoid dateKey off-by-one.
+ */
 export function buildMonthCalendar(year, month) {
   const { daysInMonth } = getMonthBounds(year, month)
-  const firstDay = new Date(year, month - 1, 1)
-  let startOffset = firstDay.getDay() - 1
+  const firstOfMonth = new Date(year, month - 1, 1)
+  let startOffset = firstOfMonth.getDay() - 1
   if (startOffset < 0) startOffset = 6
 
-  const cells = []
-  for (let i = 0; i < startOffset; i += 1) {
-    cells.push(null)
-  }
-  for (let day = 1; day <= daysInMonth; day += 1) {
-    cells.push(new Date(year, month - 1, day))
-  }
-  while (cells.length % 7 !== 0) {
-    cells.push(null)
-  }
+  const lastOfMonth = new Date(year, month - 1, daysInMonth)
+  const daysToSunday = lastOfMonth.getDay() === 0 ? 0 : 7 - lastOfMonth.getDay()
 
+  const cells = []
+  const totalDays = startOffset + daysInMonth + daysToSunday
+  for (let i = 0; i < totalDays; i += 1) {
+    // Day index relative to the 1st: negative = previous month, > daysInMonth = next.
+    cells.push(new Date(year, month - 1, 1 - startOffset + i))
+  }
   return cells
+}
+
+/** Inclusive date_from/date_to covering the full displayed calendar grid. */
+export function getMonthCalendarRange(year, month) {
+  const cells = buildMonthCalendar(year, month)
+  return {
+    dateFrom: toDateKey(cells[0]),
+    dateTo: toDateKey(cells[cells.length - 1]),
+  }
+}
+
+export function isOutsideViewMonth(date, year, month) {
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) return false
+  return date.getFullYear() !== year || date.getMonth() + 1 !== month
 }
 
 export function shiftsToMap(shifts) {

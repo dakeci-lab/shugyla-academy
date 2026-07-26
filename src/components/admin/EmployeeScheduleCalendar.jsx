@@ -1,6 +1,7 @@
 import {
   WEEKDAY_LABELS,
   buildMonthCalendar,
+  isOutsideViewMonth,
   toDateKey,
   formatTimeRange,
   formatTimeValue,
@@ -12,11 +13,7 @@ import { SYNC_STATUS } from '../../hooks/useScheduleBackgroundSync'
 import { PencilIcon } from '../icons/PlatformIcons'
 import './EmployeeSchedule.css'
 
-function ShiftDayCell({ date, shift, syncMeta, editable, onEdit, onRetrySync }) {
-  if (!date) {
-    return <div className="schedule-calendar__cell schedule-calendar__cell--empty" />
-  }
-
+function ShiftDayCell({ date, shift, syncMeta, editable, onEdit, onRetrySync, outsideMonth = false }) {
   const dateKey = toDateKey(date)
   const status = shift?.status
   const statusClass = status ? SHIFT_STATUS_CSS[status] : 'shift-day--empty'
@@ -56,7 +53,16 @@ function ShiftDayCell({ date, shift, syncMeta, editable, onEdit, onRetrySync }) 
         }}
       >
         <div className="shift-day__top">
-          <span className="shift-day__number">{date.getDate()}</span>
+          <span
+            className={[
+              'shift-day__number',
+              outsideMonth ? 'shift-day__number--outside' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            {date.getDate()}
+          </span>
           {editable && (
             <button
               type="button"
@@ -123,17 +129,21 @@ export default function EmployeeScheduleCalendar({
           {label}
         </div>
       ))}
-      {cells.map((date, index) => (
-        <ShiftDayCell
-          key={date ? toDateKey(date) : `empty-${index}`}
-          date={date}
-          shift={date ? shiftMap.get(toDateKey(date)) : null}
-          syncMeta={date ? syncMetaByDate[toDateKey(date)] : null}
-          editable={editable}
-          onEdit={onEditDay}
-          onRetrySync={onRetrySync}
-        />
-      ))}
+      {cells.map((date) => {
+        const dateKey = toDateKey(date)
+        return (
+          <ShiftDayCell
+            key={dateKey}
+            date={date}
+            shift={shiftMap.get(dateKey) || null}
+            syncMeta={syncMetaByDate[dateKey]}
+            editable={editable}
+            onEdit={onEditDay}
+            onRetrySync={onRetrySync}
+            outsideMonth={isOutsideViewMonth(date, year, month)}
+          />
+        )
+      })}
     </div>
   )
 }

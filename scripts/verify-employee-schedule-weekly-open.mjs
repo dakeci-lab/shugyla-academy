@@ -61,6 +61,7 @@ function main() {
   assert('editor uses workforce bundle in cloud mode', editor.includes('fetchEmployeeWorkforceBundle'))
   assert('editor does not rely on sync getEmployeeById in cloud path', !editor.match(/const employee = getEmployeeById/))
   assert('local mode still uses getEmployeeById', editor.includes('getEmployeeById(Number(employeeId))'))
+  assert('local mode loads full calendar date range', editor.includes('getMonthCalendarRange'))
   assert('weekStartKey initializes month', editor.includes('getInitialMonth(weekStartKey)'))
   assert('back navigation preserves week', editor.includes('/platform/employees/schedule?week='))
   assert('not found only after load', editor.includes('employeeMissing'))
@@ -69,6 +70,12 @@ function main() {
   assert('existing bulk modal reused', editor.includes('BulkScheduleModal'))
   assert('profile embeds schedule section', profile.includes('<EmployeeScheduleSection'))
   assert('profile embeds with schedule anchor', profile.includes('id="schedule"'))
+
+  const shiftData = read('src/utils/shiftData.js')
+  const calendar = read('src/components/admin/EmployeeScheduleCalendar.jsx')
+  assert('month calendar builds real adjacent dates', shiftData.includes('getMonthCalendarRange'))
+  assert('calendar marks outside-month day numbers', calendar.includes('shift-day__number--outside'))
+  assert('calendar does not render empty null pads', !calendar.includes('schedule-calendar__cell--empty'))
   console.log('')
 
   console.log('Stage 3: ID contract')
