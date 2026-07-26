@@ -361,6 +361,22 @@ export function canSyncUmagSettlements(user) {
   return can(user, PERMISSION_CODES.UMAG_SETTLEMENTS_SYNC)
 }
 
+export function canViewUmagReconciliations(user) {
+  return can(user, PERMISSION_CODES.UMAG_RECONCILIATIONS_VIEW)
+}
+
+export function canCreateUmagReconciliations(user) {
+  return can(user, PERMISSION_CODES.UMAG_RECONCILIATIONS_CREATE)
+}
+
+export function canEditUmagReconciliations(user) {
+  return can(user, PERMISSION_CODES.UMAG_RECONCILIATIONS_EDIT)
+}
+
+export function canResolveUmagReconciliations(user) {
+  return can(user, PERMISSION_CODES.UMAG_RECONCILIATIONS_RESOLVE)
+}
+
 // --- Действия: закуп ---
 
 export function canViewPurchases(user) {

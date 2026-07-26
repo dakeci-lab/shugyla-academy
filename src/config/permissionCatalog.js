@@ -61,6 +61,10 @@ export const PERMISSION_CODES = {
 
   UMAG_SETTLEMENTS_VIEW: 'umag.settlements.view',
   UMAG_SETTLEMENTS_SYNC: 'umag.settlements.sync',
+  UMAG_RECONCILIATIONS_VIEW: 'umag.reconciliations.view',
+  UMAG_RECONCILIATIONS_CREATE: 'umag.reconciliations.create',
+  UMAG_RECONCILIATIONS_EDIT: 'umag.reconciliations.edit',
+  UMAG_RECONCILIATIONS_RESOLVE: 'umag.reconciliations.resolve',
 
   PRICE_TAGS_VIEW: 'price_tags.view',
   PRICE_TAGS_MANAGE: 'price_tags.manage',
@@ -224,6 +228,10 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.SUPPLIERS_DELETE, name: 'Удаление поставщиков', module: 'suppliers', sortOrder: 123 },
   { code: PERMISSION_CODES.UMAG_SETTLEMENTS_VIEW, name: 'Просмотр взаиморасчётов UMAG', module: 'umag', sortOrder: 170 },
   { code: PERMISSION_CODES.UMAG_SETTLEMENTS_SYNC, name: 'Синхронизация UMAG', module: 'umag', sortOrder: 171 },
+  { code: PERMISSION_CODES.UMAG_RECONCILIATIONS_VIEW, name: 'Просмотр актов сверки', module: 'umag', sortOrder: 180 },
+  { code: PERMISSION_CODES.UMAG_RECONCILIATIONS_CREATE, name: 'Создание актов сверки', module: 'umag', sortOrder: 181 },
+  { code: PERMISSION_CODES.UMAG_RECONCILIATIONS_EDIT, name: 'Редактирование актов сверки', module: 'umag', sortOrder: 182 },
+  { code: PERMISSION_CODES.UMAG_RECONCILIATIONS_RESOLVE, name: 'Закрытие расхождений сверки', module: 'umag', sortOrder: 183 },
   { code: PERMISSION_CODES.PRICE_TAGS_VIEW, name: 'Просмотр ценников', module: 'price_tags', sortOrder: 130 },
   { code: PERMISSION_CODES.PRICE_TAGS_MANAGE, name: 'Управление ценниками', module: 'price_tags', sortOrder: 131 },
   { code: PERMISSION_CODES.PRICE_CHECKER_VIEW, name: 'Прайс-чекер', module: 'products', sortOrder: 135 },

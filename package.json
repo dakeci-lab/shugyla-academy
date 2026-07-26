@@ -52,6 +52,7 @@
     "verify:mobile-shell": "node scripts/verify-mobile-shell.mjs",
     "verify:suppliers-simplify": "node scripts/verify-suppliers-simplify.mjs",
     "verify:suppliers-toolbar": "node scripts/verify-suppliers-toolbar.mjs",
+    "verify:supplier-reconciliations": "node scripts/verify-supplier-reconciliations.mjs",
     "verify:employees-list": "node scripts/verify-employees-list.mjs",
     "verify:employee-create-fix": "node scripts/verify-employee-create-fix.mjs",
     "verify:app-bootstrap": "node scripts/verify-app-bootstrap.mjs",

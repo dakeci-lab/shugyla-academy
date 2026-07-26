@@ -2,7 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
 import {
+  canCreateUmagReconciliations,
+  canEditUmagReconciliations,
+  canResolveUmagReconciliations,
   canSyncUmagSettlements,
+  canViewUmagReconciliations,
   canViewUmagSettlements,
 } from '../../../config/permissions'
 import {
@@ -16,7 +20,16 @@ import {
   syncUmagSettlements,
   toAqtobeDateKey,
 } from '../../../services/umagSettlementsService'
+import {
+  describeDifference,
+  fetchLatestReconciliationStatuses,
+  formatReconciliationPeriod,
+  listSupplierReconciliations,
+  reconciliationStatusLabel,
+} from '../../../services/supplierReconciliationService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
+import CreateReconciliationModal from './CreateReconciliationModal'
+import ReconciliationDetailView from './ReconciliationDetailView'
 import './UmagSettlementsPanel.css'
 
 function periodPresets() {
@@ -60,8 +73,63 @@ function SummaryCard({ label, value, loading, emphasize, isCount }) {
   )
 }
 
-function UmagSupplierDetail({ supplier, onBack }) {
+function LatestReconBadge({ status }) {
+  if (!status) {
+    return <span className="umag-settlements__recon-badge umag-settlements__recon-badge--none">Нет сверки</span>
+  }
+  return (
+    <span className={`umag-settlements__recon-badge umag-settlements__recon-badge--${status}`}>
+      {reconciliationStatusLabel(status)}
+    </span>
+  )
+}
+
+function UmagSupplierDetail({
+  supplier,
+  periodDateFrom,
+  periodDateTo,
+  lastRun,
+  canSync,
+  canViewRecon,
+  canCreateRecon,
+  userId,
+  onBack,
+  onOpenReconciliation,
+  onSyncComplete,
+  showError,
+  showSuccess,
+  showWarning,
+}) {
   const supplies = supplier.supplies || []
+  const [createOpen, setCreateOpen] = useState(false)
+  const [history, setHistory] = useState([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState('')
+
+  const loadHistory = useCallback(async () => {
+    if (!canViewRecon) {
+      setHistory([])
+      return
+    }
+    setHistoryLoading(true)
+    setHistoryError('')
+    try {
+      const rows = await listSupplierReconciliations({
+        supplierId: supplier.supplierId,
+        umagSupplierId: supplier.umagSupplierId,
+      })
+      setHistory(rows)
+    } catch (err) {
+      setHistory([])
+      setHistoryError(err.message || 'Не удалось загрузить историю сверок')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }, [canViewRecon, supplier.supplierId, supplier.umagSupplierId])
+
+  useEffect(() => {
+    void loadHistory()
+  }, [loadHistory])
 
   return (
     <div className="umag-settlements umag-settlements--detail">
@@ -69,9 +137,22 @@ function UmagSupplierDetail({ supplier, onBack }) {
         ← К списку взаиморасчётов
       </button>
 
-      <h2 className="umag-settlements__detail-title">{supplier.name}</h2>
-      <div className="umag-settlements__source-badge" role="status">
-        По данным UMAG
+      <div className="umag-settlements__detail-head">
+        <div>
+          <h2 className="umag-settlements__detail-title">{supplier.name}</h2>
+          <div className="umag-settlements__source-badge" role="status">
+            По данным UMAG за выбранный период
+          </div>
+        </div>
+        {canCreateRecon ? (
+          <button
+            type="button"
+            className="btn btn-primary umag-settlements__create-recon"
+            onClick={() => setCreateOpen(true)}
+          >
+            Создать сверку
+          </button>
+        ) : null}
       </div>
 
       <div className="umag-settlements__totals">
@@ -80,6 +161,101 @@ function UmagSupplierDetail({ supplier, onBack }) {
         <SummaryCard label="Задолженность" value={supplier.debt} emphasize />
         <SummaryCard label="Количество приёмок" value={supplier.supplyCount} isCount />
       </div>
+
+      {canViewRecon ? (
+        <section className="umag-settlements__recon-history" aria-label="История сверок">
+          <h3 className="umag-settlements__section-title">История сверок</h3>
+          {historyLoading ? (
+            <div className="umag-settlements__empty">Загрузка истории…</div>
+          ) : historyError ? (
+            <div className="umag-settlements__error" role="alert">
+              {historyError}
+            </div>
+          ) : history.length === 0 ? (
+            <div className="umag-settlements__empty">Сверок по этому поставщику ещё нет</div>
+          ) : (
+            <>
+              <div className="umag-settlements__table-wrap">
+                <table className="umag-settlements__table">
+                  <thead>
+                    <tr>
+                      <th>Период</th>
+                      <th>Дата сверки</th>
+                      <th>UMAG</th>
+                      <th>Поставщик</th>
+                      <th>Расхождение</th>
+                      <th>Статус</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {history.map((row) => {
+                      const diff = describeDifference(row.difference)
+                      return (
+                        <tr key={row.id}>
+                          <td>
+                            <button
+                              type="button"
+                              className="umag-settlements__link"
+                              onClick={() => onOpenReconciliation(row.id)}
+                            >
+                              {formatReconciliationPeriod(row.dateFrom, row.dateTo)}
+                            </button>
+                          </td>
+                          <td>{formatUmagDate(row.createdAt)}</td>
+                          <td>{formatUmagMoney(row.umagDebt)}</td>
+                          <td>
+                            {row.supplierReportedBalance == null
+                              ? '—'
+                              : formatUmagMoney(row.supplierReportedBalance)}
+                          </td>
+                          <td>{diff.amountLabel}</td>
+                          <td>{reconciliationStatusLabel(row.status)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="umag-settlements__cards" aria-label="История сверок">
+                {history.map((row) => {
+                  const diff = describeDifference(row.difference)
+                  return (
+                    <button
+                      key={row.id}
+                      type="button"
+                      className="umag-settlements__card"
+                      onClick={() => onOpenReconciliation(row.id)}
+                    >
+                      <div className="umag-settlements__card-title">
+                        {formatReconciliationPeriod(row.dateFrom, row.dateTo)}
+                      </div>
+                      <div className="umag-settlements__card-grid">
+                        <span>Дата сверки</span>
+                        <strong>{formatUmagDate(row.createdAt)}</strong>
+                        <span>UMAG</span>
+                        <strong>{formatUmagMoney(row.umagDebt)}</strong>
+                        <span>Поставщик</span>
+                        <strong>
+                          {row.supplierReportedBalance == null
+                            ? '—'
+                            : formatUmagMoney(row.supplierReportedBalance)}
+                        </strong>
+                        <span>Расхождение</span>
+                        <strong>{diff.amountLabel}</strong>
+                        <span>Статус</span>
+                        <strong>{reconciliationStatusLabel(row.status)}</strong>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </section>
+      ) : null}
+
+      <h3 className="umag-settlements__section-title">Приёмки UMAG</h3>
 
       {supplies.length === 0 ? (
         <div className="umag-settlements__empty">
@@ -146,6 +322,27 @@ function UmagSupplierDetail({ supplier, onBack }) {
           </div>
         </>
       )}
+
+      {createOpen ? (
+        <CreateReconciliationModal
+          supplier={supplier}
+          defaultDateFrom={periodDateFrom}
+          defaultDateTo={periodDateTo}
+          lastRun={lastRun}
+          canSync={canSync}
+          createdBy={userId}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(created) => {
+            setCreateOpen(false)
+            void loadHistory()
+            onOpenReconciliation(created.id)
+          }}
+          onSyncComplete={onSyncComplete}
+          showError={showError}
+          showSuccess={showSuccess}
+          showWarning={showWarning}
+        />
+      ) : null}
     </div>
   )
 }
@@ -159,6 +356,11 @@ export default function UmagSettlementsPanel() {
 
   const canView = canViewUmagSettlements(user)
   const canSync = canSyncUmagSettlements(user)
+  const canViewRecon = canViewUmagReconciliations(user)
+  const canCreateRecon = canCreateUmagReconciliations(user)
+  const canEditRecon = canEditUmagReconciliations(user)
+  const canResolveRecon = canResolveUmagReconciliations(user)
+  const userId = Number.isFinite(Number(user?.id)) ? Number(user.id) : null
 
   const currentMonth = useMemo(() => getMonthPeriodKeys(), [])
   const [dateFrom, setDateFrom] = useState(currentMonth.dateFrom)
@@ -171,15 +373,19 @@ export default function UmagSettlementsPanel() {
   const [loadError, setLoadError] = useState('')
   const [lastRun, setLastRun] = useState(null)
   const [selected, setSelected] = useState(null)
+  const [selectedReconciliationId, setSelectedReconciliationId] = useState(null)
+  const [latestReconByKey, setLatestReconByKey] = useState(() => new Map())
 
   const loadData = useCallback(async () => {
     setLoading(true)
     setLoadError('')
-    const [settlements, run] = await Promise.all([
+    const [settlements, run, latestStatuses] = await Promise.all([
       fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search }),
       fetchLastUmagSyncRun(),
+      canViewRecon ? fetchLatestReconciliationStatuses() : Promise.resolve(new Map()),
     ])
     setLastRun(run)
+    setLatestReconByKey(latestStatuses)
     if (settlements.error) {
       setLoadError(settlements.error)
       setRows([])
@@ -189,7 +395,7 @@ export default function UmagSettlementsPanel() {
       setTotals(settlements.totals)
     }
     setLoading(false)
-  }, [dateFrom, dateTo, search])
+  }, [dateFrom, dateTo, search, canViewRecon])
 
   useEffect(() => {
     if (!canView) return
@@ -213,6 +419,7 @@ export default function UmagSettlementsPanel() {
       showSuccess(result.message)
     }
     setSelected(null)
+    setSelectedReconciliationId(null)
     await loadData()
   }
 
@@ -220,14 +427,50 @@ export default function UmagSettlementsPanel() {
     setDateFrom(preset.dateFrom)
     setDateTo(preset.dateTo)
     setSelected(null)
+    setSelectedReconciliationId(null)
   }
 
   if (!canView) {
     return <PlatformAccessDenied title="Нет доступа к взаиморасчётам UMAG" />
   }
 
+  if (selectedReconciliationId) {
+    return (
+      <div className="umag-settlements umag-settlements--detail">
+        <ReconciliationDetailView
+          reconciliationId={selectedReconciliationId}
+          canEdit={canEditRecon}
+          canResolve={canResolveRecon}
+          userId={userId}
+          onBack={() => setSelectedReconciliationId(null)}
+          showError={showError}
+          showSuccess={showSuccess}
+        />
+      </div>
+    )
+  }
+
   if (selected) {
-    return <UmagSupplierDetail supplier={selected} onBack={() => setSelected(null)} />
+    return (
+      <UmagSupplierDetail
+        supplier={selected}
+        periodDateFrom={dateFrom}
+        periodDateTo={dateTo}
+        lastRun={lastRun}
+        canSync={canSync}
+        canViewRecon={canViewRecon}
+        canCreateRecon={canCreateRecon}
+        userId={userId}
+        onBack={() => setSelected(null)}
+        onOpenReconciliation={(id) => setSelectedReconciliationId(id)}
+        onSyncComplete={() => {
+          void loadData()
+        }}
+        showError={showError}
+        showSuccess={showSuccess}
+        showWarning={showWarning}
+      />
+    )
   }
 
   return (
@@ -343,6 +586,7 @@ export default function UmagSettlementsPanel() {
                   <th>Оплачено</th>
                   <th>Возвраты</th>
                   <th>Задолженность</th>
+                  {canViewRecon ? <th>Последняя сверка</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -364,6 +608,11 @@ export default function UmagSettlementsPanel() {
                     <td className={row.debt > 0 ? 'umag-settlements__debt' : undefined}>
                       {formatUmagMoney(row.debt)}
                     </td>
+                    {canViewRecon ? (
+                      <td>
+                        <LatestReconBadge status={latestReconByKey.get(row.key)} />
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -379,6 +628,11 @@ export default function UmagSettlementsPanel() {
                 onClick={() => setSelected(row)}
               >
                 <div className="umag-settlements__card-title">{row.name}</div>
+                {canViewRecon ? (
+                  <div className="umag-settlements__card-recon">
+                    <LatestReconBadge status={latestReconByKey.get(row.key)} />
+                  </div>
+                ) : null}
                 <div className="umag-settlements__card-grid">
                   <span>Приёмок</span>
                   <strong>{row.supplyCount}</strong>

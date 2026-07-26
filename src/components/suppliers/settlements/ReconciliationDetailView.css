@@ -1,0 +1,240 @@
+.recon-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.recon-detail__header {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recon-detail__title {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--color-text, #0f172a);
+}
+
+.recon-detail__badge {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.recon-detail__badge--matched {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.recon-detail__badge--discrepancy {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.recon-detail__badge--resolved {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.recon-detail__badge--draft {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.recon-detail__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.recon-detail__section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.recon-detail__section h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.recon-detail__subtitle {
+  margin: 8px 0 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.recon-detail__hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.recon-detail__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.recon-detail__metric {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.recon-detail__metric span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.recon-detail__metric strong {
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.recon-detail__metric--debt {
+  grid-column: 1 / -1;
+  background: #ecfdf5;
+}
+
+.recon-detail__section--diff {
+  background: #fff7ed;
+  border-color: #fed7aa;
+}
+
+.recon-detail__diff-value {
+  font-size: 24px;
+  font-weight: 800;
+  color: #9a3412;
+}
+
+.recon-detail__diff-hint {
+  font-size: 13px;
+  font-weight: 600;
+  color: #c2410c;
+}
+
+.recon-detail__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.recon-detail__field input,
+.recon-detail__field textarea,
+.recon-detail__section textarea {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 10px;
+  font: inherit;
+  font-weight: 500;
+  color: var(--color-text, #0f172a);
+}
+
+.recon-detail__section textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.recon-detail__value,
+.recon-detail__text {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+}
+
+.recon-detail__docs {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.recon-detail__doc-link {
+  appearance: none;
+  border: none;
+  background: none;
+  padding: 0;
+  color: #047857;
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.recon-detail__file {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.recon-detail__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.recon-detail__resolve-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  width: 100%;
+}
+
+.recon-detail__loading,
+.recon-detail__error {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.recon-detail__error {
+  color: #b91c1c;
+}
+
+@media (max-width: 640px) {
+  .recon-detail__metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .recon-detail__actions,
+  .recon-detail__resolve-footer {
+    flex-direction: column;
+  }
+
+  .recon-detail__actions .btn,
+  .recon-detail__resolve-footer .btn {
+    width: 100%;
+  }
+}

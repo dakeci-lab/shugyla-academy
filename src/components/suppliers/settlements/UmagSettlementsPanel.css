@@ -300,6 +300,73 @@
   letter-spacing: -0.02em;
 }
 
+.umag-settlements__detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.umag-settlements__create-recon {
+  min-height: 40px;
+  white-space: nowrap;
+}
+
+.umag-settlements__section-title {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--color-text, #0f172a);
+}
+
+.umag-settlements__recon-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.umag-settlements__recon-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.umag-settlements__recon-badge--none {
+  background: #f8fafc;
+  color: #94a3b8;
+}
+
+.umag-settlements__recon-badge--matched {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.umag-settlements__recon-badge--discrepancy {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.umag-settlements__recon-badge--resolved {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.umag-settlements__recon-badge--draft {
+  background: #f8fafc;
+  color: #64748b;
+}
+
+.umag-settlements__card-recon {
+  margin-bottom: 8px;
+}
+
 @media (max-width: 900px) {
   .umag-settlements__totals {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -321,7 +388,8 @@
     grid-template-columns: 1fr;
   }
 
-  .umag-settlements__sync-btn {
+  .umag-settlements__sync-btn,
+  .umag-settlements__create-recon {
     width: 100%;
   }
 }
