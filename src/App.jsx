@@ -44,6 +44,7 @@ import PlatformHrCandidates from './pages/platform/PlatformHrCandidates'
 import HrPlatformRoute from './components/platform/HrPlatformRoute'
 import PlatformStandardsManage from './pages/platform/PlatformStandardsManage'
 import SuppliersPage, { SupplierDetailPage } from './pages/platform/suppliers/SuppliersPage'
+import SettlementsPage from './pages/platform/settlements/SettlementsPage'
 import ProcurementPage from './pages/platform/procurement/ProcurementPage'
 import AnalyticsProcurementPage from './pages/platform/procurement/AnalyticsProcurementPage'
 import PurchaseDetailPage from './pages/platform/procurement/PurchaseDetailPage'
@@ -272,6 +273,14 @@ export default function App() {
             element={
               <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIERS}>
                 <SupplierDetailPage />
+              </PlatformRoute>
+            }
+          />
+          <Route
+            path="settlements"
+            element={
+              <PlatformRoute routeKey={ROUTE_KEYS.SETTLEMENTS}>
+                <SettlementsPage />
               </PlatformRoute>
             }
           />

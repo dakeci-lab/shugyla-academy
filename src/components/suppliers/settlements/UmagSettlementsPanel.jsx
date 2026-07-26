@@ -66,7 +66,7 @@ function UmagSupplierDetail({ supplier, onBack }) {
   return (
     <div className="umag-settlements umag-settlements--detail">
       <button type="button" className="umag-settlements__back" onClick={onBack}>
-        ← К списку поставщиков
+        ← К списку взаиморасчётов
       </button>
 
       <h2 className="umag-settlements__detail-title">{supplier.name}</h2>

@@ -37,6 +37,7 @@ export const ROUTE_KEYS = {
   PROCUREMENT: 'procurement',
   RECEIVING: 'receiving',
   SUPPLIERS: 'suppliers',
+  SETTLEMENTS: 'settlements',
   PRODUCTS_GROUP: 'products_group',
   PRICE_TAGS: 'price_tags',
   PRICE_CHECKER: 'price_checker',
@@ -91,6 +92,8 @@ const ROUTE_ACCESS = {
     ROLE_IDS.RECEIVER,
   ],
   [ROUTE_KEYS.SUPPLIERS]: [ROLE_IDS.ADMIN, ROLE_IDS.PURCHASER],
+  // Settlements: permission-first (umag.settlements.view); role fallback admin-only.
+  [ROUTE_KEYS.SETTLEMENTS]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.PRODUCTS_GROUP]: [
     ROLE_IDS.ADMIN,
     ROLE_IDS.PURCHASER,
@@ -235,6 +238,7 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.PROCUREMENT]: [P.PROCUREMENT_VIEW],
     [ROUTE_KEYS.RECEIVING]: [P.RECEIVING_VIEW],
     [ROUTE_KEYS.SUPPLIERS]: [P.SUPPLIERS_VIEW],
+    [ROUTE_KEYS.SETTLEMENTS]: [P.UMAG_SETTLEMENTS_VIEW],
     [ROUTE_KEYS.PRICE_TAGS]: [P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE],
     [ROUTE_KEYS.PRICE_CHECKER]: [P.PRICE_CHECKER_VIEW],
     [ROUTE_KEYS.ACADEMY]: [P.ACADEMY_VIEW],
@@ -350,10 +354,7 @@ export function canDeleteSuppliers(user) {
 }
 
 export function canViewUmagSettlements(user) {
-  return canAny(user, [
-    PERMISSION_CODES.UMAG_SETTLEMENTS_VIEW,
-    PERMISSION_CODES.SUPPLIERS_VIEW,
-  ])
+  return can(user, PERMISSION_CODES.UMAG_SETTLEMENTS_VIEW)
 }
 
 export function canSyncUmagSettlements(user) {
