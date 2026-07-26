@@ -349,6 +349,17 @@ export function canDeleteSuppliers(user) {
   return canEditSuppliers(user)
 }
 
+export function canViewUmagSettlements(user) {
+  return canAny(user, [
+    PERMISSION_CODES.UMAG_SETTLEMENTS_VIEW,
+    PERMISSION_CODES.SUPPLIERS_VIEW,
+  ])
+}
+
+export function canSyncUmagSettlements(user) {
+  return can(user, PERMISSION_CODES.UMAG_SETTLEMENTS_SYNC)
+}
+
 // --- Действия: закуп ---
 
 export function canViewPurchases(user) {

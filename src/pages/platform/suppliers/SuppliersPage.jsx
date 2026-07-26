@@ -17,7 +17,9 @@ import {
   canViewSuppliers,
   canEditSuppliers,
   canDeleteSuppliers,
+  canViewUmagSettlements,
 } from '../../../config/permissions'
+import UmagSettlementsPanel from '../../../components/suppliers/settlements/UmagSettlementsPanel'
 import useMediaQuery from '../../../hooks/useMediaQuery'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../../../components/admin/AdminModal'
@@ -224,7 +226,7 @@ export function SuppliersListPage() {
   }
 
   return (
-    <div className="suppliers-page">
+    <div className="suppliers-page__list">
       <PlatformSearchToolbar
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -315,5 +317,51 @@ export function SupplierDetailPage() {
 }
 
 export default function SuppliersPage() {
-  return <SuppliersListPage />
+  const { user } = useSession()
+  const canViewDirectory = canViewSuppliers(user)
+  const canViewSettlements = canViewUmagSettlements(user)
+  const [tab, setTab] = useState(
+    canViewDirectory ? 'directory' : canViewSettlements ? 'settlements' : 'directory'
+  )
+
+  if (!canViewDirectory && !canViewSettlements) {
+    return <PlatformAccessDenied title="Нет доступа к поставщикам" />
+  }
+
+  return (
+    <div className="suppliers-page">
+      <div className="suppliers-page__tabs" role="tablist" aria-label="Разделы поставщиков">
+        {canViewDirectory && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'directory'}
+            className={`suppliers-page__tab${tab === 'directory' ? ' suppliers-page__tab--active' : ''}`}
+            onClick={() => setTab('directory')}
+          >
+            Справочник
+          </button>
+        )}
+        {canViewSettlements && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'settlements'}
+            className={`suppliers-page__tab${tab === 'settlements' ? ' suppliers-page__tab--active' : ''}`}
+            onClick={() => setTab('settlements')}
+          >
+            Взаиморасчёты
+          </button>
+        )}
+      </div>
+
+      <div className="suppliers-page__tab-panel" role="tabpanel">
+        {tab === 'directory' && canViewDirectory ? (
+          <SuppliersListPage />
+        ) : tab === 'settlements' && canViewSettlements ? (
+          <UmagSettlementsPanel />
+        ) : null}
+      </div>
+    </div>
+  )
 }

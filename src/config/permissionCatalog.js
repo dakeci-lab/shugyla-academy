@@ -59,6 +59,9 @@ export const PERMISSION_CODES = {
   SUPPLIERS_EDIT: 'suppliers.edit',
   SUPPLIERS_DELETE: 'suppliers.delete',
 
+  UMAG_SETTLEMENTS_VIEW: 'umag.settlements.view',
+  UMAG_SETTLEMENTS_SYNC: 'umag.settlements.sync',
+
   PRICE_TAGS_VIEW: 'price_tags.view',
   PRICE_TAGS_MANAGE: 'price_tags.manage',
 
@@ -112,6 +115,7 @@ export const PERMISSION_MODULES = {
   procurement: 'Закупки',
   receiving: 'Приёмка',
   suppliers: 'Поставщики',
+  umag: 'UMAG',
   price_tags: 'Ценники',
   products: 'Товары',
   payroll: 'Зарплата',
@@ -130,6 +134,7 @@ export const RBAC_MATRIX_MODULES = [
   'procurement',
   'receiving',
   'suppliers',
+  'umag',
   'price_tags',
   'products',
   'standards',
@@ -168,6 +173,8 @@ export const PERMISSION_ACTION_LABELS = {
   transfer: 'Передача в приёмку',
   calculate: 'Расчёт',
   manage_settings: 'Настройки модуля',
+  sync: 'Синхронизация',
+  settlements: 'Взаиморасчёты',
 }
 
 /** @deprecated */
@@ -215,6 +222,8 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.SUPPLIERS_CREATE, name: 'Создание поставщиков', module: 'suppliers', sortOrder: 121 },
   { code: PERMISSION_CODES.SUPPLIERS_EDIT, name: 'Редактирование поставщиков', module: 'suppliers', sortOrder: 122 },
   { code: PERMISSION_CODES.SUPPLIERS_DELETE, name: 'Удаление поставщиков', module: 'suppliers', sortOrder: 123 },
+  { code: PERMISSION_CODES.UMAG_SETTLEMENTS_VIEW, name: 'Просмотр взаиморасчётов UMAG', module: 'umag', sortOrder: 170 },
+  { code: PERMISSION_CODES.UMAG_SETTLEMENTS_SYNC, name: 'Синхронизация UMAG', module: 'umag', sortOrder: 171 },
   { code: PERMISSION_CODES.PRICE_TAGS_VIEW, name: 'Просмотр ценников', module: 'price_tags', sortOrder: 130 },
   { code: PERMISSION_CODES.PRICE_TAGS_MANAGE, name: 'Управление ценниками', module: 'price_tags', sortOrder: 131 },
   { code: PERMISSION_CODES.PRICE_CHECKER_VIEW, name: 'Прайс-чекер', module: 'products', sortOrder: 135 },

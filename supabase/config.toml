@@ -490,3 +490,9 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/employee-time-tracker-action/deno.json"
 entrypoint = "./functions/employee-time-tracker-action/index.ts"
+
+[functions.umag-sync]
+enabled = true
+verify_jwt = true
+import_map = "./functions/umag-sync/deno.json"
+entrypoint = "./functions/umag-sync/index.ts"
