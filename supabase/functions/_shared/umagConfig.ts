@@ -1,6 +1,8 @@
 /**
- * Shared UMAG secrets + request helpers for Edge Functions.
- * Never log Authorization or cookies.
+ * Shared UMAG connection helpers for Edge Functions.
+ * Never log Authorization, cookies, passwords, or full session tokens.
+ *
+ * Session acquisition / re-auth lives in umagAuth.ts.
  */
 
 export const UMAG_TIMEOUT_MS = 30_000
@@ -15,6 +17,7 @@ export type UmagConfig = {
   clientVer: string
 }
 
+/** @deprecated Prefer acquireUmagSession / umagFetchAuthed from umagAuth.ts */
 export function resolveUmagConfig(): UmagConfig | { error: 'UMAG_NOT_CONFIGURED' } {
   const baseUrl = (
     Deno.env.get('UMAG_BASE_URL') ||
@@ -31,12 +34,22 @@ export function resolveUmagConfig(): UmagConfig | { error: 'UMAG_NOT_CONFIGURED'
   const storeId = (Deno.env.get('UMAG_STORE_ID') || '').trim()
   const apiVer = (Deno.env.get('UMAG_API_VER') || '1.4').trim()
   const clientVer = (Deno.env.get('UMAG_CLIENT_VER') || 'angular_cabinet_20.0.15').trim()
+  const hasCredentials = Boolean(
+    ((Deno.env.get('UMAG_LOGIN') || Deno.env.get('UMAG_USERNAME') || '').trim()) &&
+      (Deno.env.get('UMAG_PASSWORD') || '').trim()
+  )
 
-  if (!authorization || !storeId) {
+  if (!storeId || (!authorization && !hasCredentials)) {
     return { error: 'UMAG_NOT_CONFIGURED' }
   }
 
-  return { baseUrl, authorization, storeId, apiVer, clientVer }
+  return {
+    baseUrl,
+    authorization: authorization || '',
+    storeId,
+    apiVer,
+    clientVer,
+  }
 }
 
 export function maskStoreId(value: string): string {
@@ -73,6 +86,7 @@ export function umagHeaders(config: UmagConfig): HeadersInit {
   }
 }
 
+/** Low-level fetch with a provided config (no re-auth). Prefer umagFetchAuthed. */
 export async function umagFetch(
   config: UmagConfig,
   path: string,

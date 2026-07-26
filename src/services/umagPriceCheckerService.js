@@ -22,7 +22,7 @@ const USER_MESSAGES = {
   [PRICE_CHECKER_ERROR_CODES.VALIDATION]: 'Введите корректный штрих-код',
   [PRICE_CHECKER_ERROR_CODES.NOT_FOUND]: 'Товар с таким штрих-кодом не найден',
   [PRICE_CHECKER_ERROR_CODES.UMAG_AUTH]:
-    'Не удалось авторизоваться в UMAG. Требуется обновление подключения.',
+    'Не удалось войти в UMAG. Проверьте логин и пароль интеграции.',
   [PRICE_CHECKER_ERROR_CODES.UMAG_NETWORK]:
     'Не удалось получить данные из UMAG. Повторите попытку.',
   [PRICE_CHECKER_ERROR_CODES.UMAG_NOT_CONFIGURED]: 'Подключение к UMAG ещё не настроено',

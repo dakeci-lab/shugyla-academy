@@ -21,12 +21,14 @@ import {
   maskStoreId,
   nearlyEqual,
   parseUmagEditTime,
-  resolveUmagConfig,
   sumNumbers,
-  umagFetch,
   UMAG_PAGE_SIZE,
-  type UmagConfig,
 } from '../_shared/umagConfig.ts'
+import {
+  acquireUmagSession,
+  umagFetchAuthed,
+  type UmagSession,
+} from '../_shared/umagAuth.ts'
 
 const PERMISSION_SYNC = 'umag.settlements.sync'
 const ALLOWED_BODY_KEYS = new Set(['action', 'dateFrom', 'dateTo', 'syncSuppliers'])
@@ -100,13 +102,45 @@ function umagErrorResponse(
   )
 }
 
-function mapUmagHttpError(status: number): Response {
-  if (status === 401 || status === 403) {
+function mapUmagAuthError(
+  code:
+    | 'UMAG_NOT_CONFIGURED'
+    | 'UMAG_AUTH_FAILED'
+    | 'UMAG_LOGIN_FAILED'
+    | 'UMAG_TIMEOUT'
+    | 'UMAG_NETWORK_ERROR'
+): Response {
+  if (code === 'UMAG_NOT_CONFIGURED') {
+    return umagErrorResponse(
+      'UMAG_NOT_CONFIGURED',
+      'Подключение к UMAG ещё не настроено. Установите UMAG_LOGIN (или UMAG_USERNAME), UMAG_PASSWORD и UMAG_STORE_ID.',
+      503
+    )
+  }
+  if (code === 'UMAG_AUTH_FAILED' || code === 'UMAG_LOGIN_FAILED') {
     return umagErrorResponse(
       'UMAG_AUTH_FAILED',
-      'Не удалось авторизоваться в UMAG. Требуется обновление подключения.',
+      'Не удалось войти в UMAG. Проверьте логин и пароль или доступ учётной записи.',
       502
     )
+  }
+  if (code === 'UMAG_TIMEOUT') {
+    return umagErrorResponse(
+      'UMAG_TIMEOUT',
+      'Превышено время ожидания ответа UMAG. Повторите попытку.',
+      504
+    )
+  }
+  return umagErrorResponse(
+    'UMAG_NETWORK_ERROR',
+    'Не удалось связаться с UMAG. Повторите попытку.',
+    502
+  )
+}
+
+function mapUmagHttpError(status: number): Response {
+  if (status === 401 || status === 403) {
+    return mapUmagAuthError('UMAG_AUTH_FAILED')
   }
   if (status >= 500) {
     return umagErrorResponse(
@@ -220,7 +254,7 @@ async function finishSyncRun(
   }
 }
 
-async function fetchAllSuppliers(config: UmagConfig): Promise<
+async function fetchAllSuppliers(session: UmagSession): Promise<
   | { ok: true; agents: UmagAgent[]; pages: number }
   | { ok: false; response: Response }
 > {
@@ -231,36 +265,17 @@ async function fetchAllSuppliers(config: UmagConfig): Promise<
 
   while (true) {
     pages += 1
-    let result: Awaited<ReturnType<typeof umagFetch>>
-    try {
-      result = await umagFetch(config, '/rest/cabinet/org/agent/list', {
-        agentType: 'SUPPLIER',
-        first,
-        pageSize: UMAG_PAGE_SIZE,
-        deleted: false,
-        searchString: '',
-        storeId: config.storeId,
-      })
-    } catch (err) {
-      const name = err instanceof Error ? err.name : ''
-      if (name === 'AbortError') {
-        return {
-          ok: false,
-          response: umagErrorResponse(
-            'UMAG_TIMEOUT',
-            'Превышено время ожидания ответа UMAG при загрузке поставщиков.',
-            504
-          ),
-        }
-      }
-      return {
-        ok: false,
-        response: umagErrorResponse(
-          'UMAG_NETWORK_ERROR',
-          'Не удалось связаться с UMAG при загрузке поставщиков.',
-          502
-        ),
-      }
+    const result = await umagFetchAuthed('/rest/cabinet/org/agent/list', {
+      agentType: 'SUPPLIER',
+      first,
+      pageSize: UMAG_PAGE_SIZE,
+      deleted: false,
+      searchString: '',
+      storeId: session.storeId,
+    })
+
+    if ('error' in result) {
+      return { ok: false, response: mapUmagAuthError(result.error) }
     }
 
     if (result.status !== 200) {
@@ -290,7 +305,8 @@ async function fetchAllSuppliers(config: UmagConfig): Promise<
       totalSoFar: agents.length,
       reportedCount,
       elapsedMs: result.elapsedMs,
-      storeId: maskStoreId(config.storeId),
+      retriedAfterSignIn: result.retriedAfterSignIn,
+      storeId: maskStoreId(session.storeId),
     })
 
     if (batch.length === 0) break
@@ -313,7 +329,7 @@ async function fetchAllSuppliers(config: UmagConfig): Promise<
 }
 
 async function fetchAllSupplies(
-  config: UmagConfig,
+  session: UmagSession,
   fromTime: number,
   toTime: number
 ): Promise<
@@ -344,35 +360,16 @@ async function fetchAllSupplies(
 
   while (true) {
     pages += 1
-    let result: Awaited<ReturnType<typeof umagFetch>>
-    try {
-      result = await umagFetch(config, '/rest/cabinet/opr/supplies/all', {
-        first,
-        pageSize: UMAG_PAGE_SIZE,
-        fromTime,
-        toTime,
-        storeId: config.storeId,
-      })
-    } catch (err) {
-      const name = err instanceof Error ? err.name : ''
-      if (name === 'AbortError') {
-        return {
-          ok: false,
-          response: umagErrorResponse(
-            'UMAG_TIMEOUT',
-            'Превышено время ожидания ответа UMAG при загрузке приёмок.',
-            504
-          ),
-        }
-      }
-      return {
-        ok: false,
-        response: umagErrorResponse(
-          'UMAG_NETWORK_ERROR',
-          'Не удалось связаться с UMAG при загрузке приёмок.',
-          502
-        ),
-      }
+    const result = await umagFetchAuthed('/rest/cabinet/opr/supplies/all', {
+      first,
+      pageSize: UMAG_PAGE_SIZE,
+      fromTime,
+      toTime,
+      storeId: session.storeId,
+    })
+
+    if ('error' in result) {
+      return { ok: false, response: mapUmagAuthError(result.error) }
     }
 
     if (result.status !== 200) {
@@ -412,7 +409,8 @@ async function fetchAllSupplies(
       totalSoFar: supplies.length,
       totalCount: source.totalCount,
       elapsedMs: result.elapsedMs,
-      storeId: maskStoreId(config.storeId),
+      retriedAfterSignIn: result.retriedAfterSignIn,
+      storeId: maskStoreId(session.storeId),
     })
 
     const totalCount = source.totalCount
@@ -652,13 +650,10 @@ Deno.serve(async (req) => {
     return umagErrorResponse('VALIDATION_ERROR', 'Некорректный период синхронизации.', 400)
   }
 
-  const config = resolveUmagConfig()
-  if ('error' in config) {
-    return umagErrorResponse(
-      'UMAG_NOT_CONFIGURED',
-      'Подключение к UMAG ещё не настроено. Установите секреты Edge Function.',
-      503
-    )
+  // Fresh signin when credentials exist (or warm cache). umagFetchAuthed retries once on 401/403.
+  const session = await acquireUmagSession()
+  if ('error' in session) {
+    return mapUmagAuthError(session.error)
   }
 
   const runId = await createSyncRun(authz.serviceClient, {
@@ -673,7 +668,7 @@ Deno.serve(async (req) => {
     let supplierMap = await loadSupplierMap(authz.serviceClient)
 
     if (syncSuppliers) {
-      const suppliersResult = await fetchAllSuppliers(config)
+      const suppliersResult = await fetchAllSuppliers(session)
       if (!suppliersResult.ok) {
         await finishSyncRun(authz.serviceClient, runId, {
           status: 'failed' satisfies SyncStatus,
@@ -698,7 +693,7 @@ Deno.serve(async (req) => {
       supplierMap = await loadSupplierMap(authz.serviceClient)
     }
 
-    const suppliesResult = await fetchAllSupplies(config, bounds.fromTime, bounds.toTime)
+    const suppliesResult = await fetchAllSupplies(session, bounds.fromTime, bounds.toTime)
     if (!suppliesResult.ok) {
       await finishSyncRun(authz.serviceClient, runId, {
         status: 'failed',

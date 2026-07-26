@@ -21,7 +21,7 @@ export const UMAG_SETTLEMENTS_ERROR_CODES = {
 const USER_MESSAGES = {
   [UMAG_SETTLEMENTS_ERROR_CODES.VALIDATION]: 'Укажите корректный период синхронизации.',
   [UMAG_SETTLEMENTS_ERROR_CODES.UMAG_AUTH]:
-    'Не удалось авторизоваться в UMAG. Требуется обновление подключения.',
+    'Не удалось войти в UMAG. Проверьте логин и пароль интеграции.',
   [UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NETWORK]:
     'Не удалось получить данные из UMAG. Повторите попытку.',
   [UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NOT_CONFIGURED]:

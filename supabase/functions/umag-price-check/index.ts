@@ -7,9 +7,8 @@
  * HAR contract (web.umag.kz, findProductByBarcode):
  * - GET /rest/cabinet/nom/product/findProductByBarcode
  * - query: showServices, showPackages, showDeleted, barcode, create, storeId
- * - Authorization: raw token (NO "Bearer " prefix)
- * - Browser also sent Cookie / Origin / Referer / api-ver / client-ver;
- *   Edge uses Authorization + Accept + fixed api-ver/client-ver only (no cookies).
+ * - Auth via shared umagAuth (signin → sessionToken, one retry on 401/403)
+ * - Authorization: raw sessionToken (NO "Bearer " prefix)
  */
 
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
@@ -17,17 +16,14 @@ import {
   adminErrorResponse,
   authorizeWorkforceRequest,
 } from '../_shared/employeeAuthorization.ts'
+import { umagFetchAuthed } from '../_shared/umagAuth.ts'
+import { maskStoreId } from '../_shared/umagConfig.ts'
 
 const PERMISSION_PRICE_CHECKER_VIEW = 'products.price_checker.view'
 const ALLOWED_BODY_KEYS = new Set(['barcode'])
 const MAX_BARCODE_LENGTH = 64
 const MIN_BARCODE_LENGTH = 4
 const UMAG_TIMEOUT_MS = 12_000
-const DEFAULT_UMAG_BASE = 'https://api.umag.kz'
-
-/** Non-secret version headers observed in UMAG cabinet HAR. */
-const UMAG_API_VER = '1.4'
-const UMAG_CLIENT_VER = 'angular_cabinet_20.0.11'
 
 /** UMAG measure codes observed in cabinet — extend carefully. */
 const MEASURE_LABELS: Record<number, string> = {
@@ -66,12 +62,6 @@ function normalizeBarcode(value: unknown): string | null {
     return null
   }
   return barcode
-}
-
-function maskStoreId(value: string | undefined | null): string {
-  if (!value) return '(empty)'
-  if (value.length <= 2) return '**'
-  return `${value.slice(0, 1)}…${value.slice(-1)} (len=${value.length})`
 }
 
 function safeDisplayName(name: string, barcode: string): string {
@@ -140,149 +130,130 @@ function productResponse(payload: UmagProductPayload, barcode: string) {
 }
 
 async function fetchUmagProduct(barcode: string): Promise<Response> {
-  const baseUrl = (Deno.env.get('UMAG_API_BASE_URL') || DEFAULT_UMAG_BASE).replace(/\/+$/, '')
-  const authToken = Deno.env.get('UMAG_AUTH_TOKEN')?.trim()
-  const storeId = Deno.env.get('UMAG_STORE_ID')?.trim()
-
-  if (!authToken || !storeId) {
-    console.error('UMAG not configured', {
-      hasToken: Boolean(authToken),
-      hasStoreId: Boolean(storeId),
-      storeIdMasked: maskStoreId(storeId),
-    })
-    return jsonResponse(
-      {
-        success: false,
-        code: 'UMAG_NOT_CONFIGURED',
-        message: 'Подключение к UMAG ещё не настроено',
-      },
-      503
-    )
-  }
-
-  // Fixed path + fixed query keys from HAR — barcode is the only user-controlled value.
-  const url = new URL(`${baseUrl}/rest/cabinet/nom/product/findProductByBarcode`)
-  url.searchParams.set('showServices', 'true')
-  url.searchParams.set('showPackages', 'true')
-  url.searchParams.set('showDeleted', 'false')
-  url.searchParams.set('barcode', barcode)
-  url.searchParams.set('create', 'false')
-  url.searchParams.set('storeId', storeId)
-
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), UMAG_TIMEOUT_MS)
-  const started = performance.now()
+  const storeId = (Deno.env.get('UMAG_STORE_ID') || '').trim()
 
   console.log('UMAG request started', {
     path: '/rest/cabinet/nom/product/findProductByBarcode',
     barcodeLength: barcode.length,
     storeIdMasked: maskStoreId(storeId),
-    hasAuthToken: true,
   })
 
-  try {
-    // Authorization value is the raw token from HAR — do NOT prefix with "Bearer ".
-    const upstream = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        Accept: 'application/json, text/plain, */*',
-        Authorization: authToken,
-        'api-ver': UMAG_API_VER,
-        'client-ver': UMAG_CLIENT_VER,
-      },
-      signal: controller.signal,
-    })
+  const result = await umagFetchAuthed(
+    '/rest/cabinet/nom/product/findProductByBarcode',
+    {
+      showServices: true,
+      showPackages: true,
+      showDeleted: false,
+      barcode,
+      create: false,
+      storeId,
+    },
+    { timeoutMs: UMAG_TIMEOUT_MS }
+  )
 
-    const elapsedMs = Math.round(performance.now() - started)
-    console.log('UMAG response status:', upstream.status)
-    console.log('UMAG response time:', `${elapsedMs}ms`)
-
-    if (upstream.status === 401 || upstream.status === 403) {
-      console.error('UMAG auth failed', { status: upstream.status, elapsedMs })
+  if ('error' in result) {
+    if (result.error === 'UMAG_NOT_CONFIGURED') {
+      console.error('UMAG not configured', { storeIdMasked: maskStoreId(storeId) })
+      return jsonResponse(
+        {
+          success: false,
+          code: 'UMAG_NOT_CONFIGURED',
+          message: 'Подключение к UMAG ещё не настроено',
+        },
+        503
+      )
+    }
+    if (result.error === 'UMAG_AUTH_FAILED' || result.error === 'UMAG_LOGIN_FAILED') {
       return jsonResponse(
         {
           success: false,
           code: 'UMAG_AUTH_FAILED',
-          message: 'Не удалось авторизоваться в UMAG. Требуется обновление подключения.',
+          message:
+            'Не удалось войти в UMAG. Проверьте логин и пароль или доступ учётной записи.',
         },
         502
       )
     }
-
-    if (upstream.status === 404) {
-      return notFoundResponse()
-    }
-
-    if (upstream.status === 429) {
+    if (result.error === 'UMAG_TIMEOUT') {
       return jsonResponse(
         {
           success: false,
-          code: 'RATE_LIMITED',
-          message: 'Слишком много запросов. Подождите немного и повторите.',
-        },
-        429
-      )
-    }
-
-    if (upstream.status >= 500) {
-      console.error('UMAG upstream 5xx', { status: upstream.status, elapsedMs })
-      return jsonResponse(
-        {
-          success: false,
-          code: 'UMAG_NETWORK_ERROR',
+          code: 'UMAG_TIMEOUT',
           message: 'Не удалось получить данные из UMAG. Повторите попытку.',
         },
         502
       )
     }
-
-    if (!upstream.ok) {
-      console.error('UMAG upstream error', { status: upstream.status, elapsedMs })
-      return jsonResponse(
-        {
-          success: false,
-          code: 'UMAG_NETWORK_ERROR',
-          message: 'Не удалось получить данные из UMAG. Повторите попытку.',
-        },
-        502
-      )
-    }
-
-    let payload: UmagProductPayload
-    try {
-      payload = (await upstream.json()) as UmagProductPayload
-    } catch {
-      console.error('UMAG invalid JSON', { elapsedMs })
-      return jsonResponse(
-        {
-          success: false,
-          code: 'UMAG_NETWORK_ERROR',
-          message: 'Не удалось получить данные из UMAG. Повторите попытку.',
-        },
-        502
-      )
-    }
-
-    // Never forward raw payload — only mapped safe fields.
-    return productResponse(payload, barcode)
-  } catch (error) {
-    const aborted = error instanceof DOMException && error.name === 'AbortError'
-    const elapsedMs = Math.round(performance.now() - started)
-    console.error(aborted ? 'UMAG timeout' : 'UMAG fetch failed', {
-      aborted,
-      elapsedMs,
-    })
     return jsonResponse(
       {
         success: false,
-        code: aborted ? 'UMAG_TIMEOUT' : 'UMAG_NETWORK_ERROR',
+        code: 'UMAG_NETWORK_ERROR',
         message: 'Не удалось получить данные из UMAG. Повторите попытку.',
       },
       502
     )
-  } finally {
-    clearTimeout(timer)
   }
+
+  console.log('UMAG response status:', result.status)
+  console.log('UMAG response time:', `${result.elapsedMs}ms`)
+  if (result.retriedAfterSignIn) {
+    console.info('UMAG re-authenticated before successful product lookup')
+  }
+
+  if (result.status === 401 || result.status === 403) {
+    return jsonResponse(
+      {
+        success: false,
+        code: 'UMAG_AUTH_FAILED',
+        message:
+          'Не удалось войти в UMAG. Проверьте логин и пароль или доступ учётной записи.',
+      },
+      502
+    )
+  }
+
+  if (result.status === 404 || result.status === 422) {
+    // UMAG often returns 422 plain text for invalid/unknown barcodes.
+    return notFoundResponse()
+  }
+
+  if (result.status === 429) {
+    return jsonResponse(
+      {
+        success: false,
+        code: 'RATE_LIMITED',
+        message: 'Слишком много запросов. Подождите немного и повторите.',
+      },
+      429
+    )
+  }
+
+  if (result.status >= 500) {
+    console.error('UMAG upstream 5xx', { status: result.status, elapsedMs: result.elapsedMs })
+    return jsonResponse(
+      {
+        success: false,
+        code: 'UMAG_NETWORK_ERROR',
+        message: 'Не удалось получить данные из UMAG. Повторите попытку.',
+      },
+      502
+    )
+  }
+
+  if (result.status !== 200 || result.json == null || typeof result.json !== 'object') {
+    console.error('UMAG upstream error', { status: result.status, elapsedMs: result.elapsedMs })
+    return jsonResponse(
+      {
+        success: false,
+        code: 'UMAG_NETWORK_ERROR',
+        message: 'Не удалось получить данные из UMAG. Повторите попытку.',
+      },
+      502
+    )
+  }
+
+  // Never forward raw payload — only mapped safe fields.
+  return productResponse(result.json as UmagProductPayload, barcode)
 }
 
 Deno.serve(async (req) => {
