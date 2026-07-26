@@ -84,7 +84,7 @@ export const PLATFORM_NAV = [
     label: 'Закупки',
     routeKey: ROUTE_KEYS.PROCUREMENT_GROUP,
     title: 'Закупки',
-    description: 'Закуп, приёмка, поставщики и взаиморасчёты.',
+    description: 'Закуп, приёмка, поставщики, взаиморасчёты и оплаты.',
     children: [
       {
         id: 'procurement',
@@ -117,6 +117,14 @@ export const PLATFORM_NAV = [
         routeKey: ROUTE_KEYS.SETTLEMENTS,
         title: 'Взаиморасчёты',
         description: 'Приёмки, оплаты и задолженность по данным UMAG.',
+      },
+      {
+        id: 'supplier-payments',
+        path: '/platform/supplier-payments',
+        label: 'Оплаты поставщикам',
+        routeKey: ROUTE_KEYS.SUPPLIER_PAYMENTS,
+        title: 'Оплаты поставщикам',
+        description: 'Сроки оплаты задолженности с учётом отсрочки поставщика.',
       },
     ],
   },

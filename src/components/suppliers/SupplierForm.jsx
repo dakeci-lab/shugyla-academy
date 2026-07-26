@@ -1,14 +1,83 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   PAYMENT_TYPE,
   PAYMENT_TYPE_LABELS,
   SUPPLIER_STATUS,
   SUPPLIER_STATUS_LABELS,
+  formatSupplierPaymentTerms,
   parseSupplierWeekdays,
   serializeSupplierWeekdays,
 } from '../../utils/supplierData'
+import {
+  buildSupplierPaymentSummary,
+  formatUmagMoney,
+  listPaymentObligationsForSupplier,
+} from '../../services/supplierPaymentObligationsService'
 import SupplierWeekdaySelector from './SupplierWeekdaySelector'
 import '../../components/admin/admin-shared.css'
 import './SupplierForm.css'
+
+export function validateSupplierDeferralDays(form) {
+  if (
+    form.paymentType !== PAYMENT_TYPE.DEFERRAL &&
+    form.paymentType !== PAYMENT_TYPE.MIXED
+  ) {
+    return null
+  }
+  // Empty is allowed → obligation stays in «Требует настройки».
+  if (form.deferralDays === '' || form.deferralDays == null) return null
+  const days = Number(form.deferralDays)
+  if (!Number.isInteger(days) || days < 0 || days > 365) {
+    return 'Срок отсрочки должен быть целым числом от 0 до 365'
+  }
+  return null
+}
+
+function SupplierPaymentsSummary({ supplierId, form }) {
+  const [summary, setSummary] = useState(null)
+
+  useEffect(() => {
+    if (!supplierId) {
+      setSummary(null)
+      return
+    }
+    let cancelled = false
+    void listPaymentObligationsForSupplier(supplierId)
+      .then((rows) => {
+        if (!cancelled) setSummary(buildSupplierPaymentSummary(rows))
+      })
+      .catch(() => {
+        if (!cancelled) setSummary(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [supplierId])
+
+  if (!supplierId) return null
+
+  return (
+    <section className="supplier-form__payments" aria-label="Оплаты">
+      <h3 className="supplier-form__payments-title">Оплаты</h3>
+      <div className="supplier-form__payments-grid">
+        <span>Тип</span>
+        <strong>{formatSupplierPaymentTerms(form)}</strong>
+        <span>Текущая задолженность</span>
+        <strong>{summary ? formatUmagMoney(summary.totalDebt) : '…'}</strong>
+        <span>Сегодня к оплате</span>
+        <strong>{summary ? formatUmagMoney(summary.dueToday) : '…'}</strong>
+        <span>Ближайшие 7 дней</span>
+        <strong>{summary ? formatUmagMoney(summary.next7Days) : '…'}</strong>
+        <span>Просрочено</span>
+        <strong>{summary ? formatUmagMoney(summary.overdue) : '…'}</strong>
+      </div>
+      <Link className="supplier-form__payments-link" to="/platform/supplier-payments">
+        Открыть календарь оплат
+      </Link>
+    </section>
+  )
+}
 
 export const EMPTY_SUPPLIER_FORM = {
   name: '',
@@ -96,7 +165,13 @@ function displayOrUnset(value) {
   return text || 'Не настроено'
 }
 
-export default function SupplierForm({ form, onChange, error, isCreate = false }) {
+export default function SupplierForm({
+  form,
+  onChange,
+  error,
+  isCreate = false,
+  supplierId = null,
+}) {
   const showDeferral =
     form.paymentType === PAYMENT_TYPE.DEFERRAL || form.paymentType === PAYMENT_TYPE.MIXED
   const umagLocked = Boolean(form.linkedToUmag)
@@ -261,11 +336,15 @@ export default function SupplierForm({ form, onChange, error, isCreate = false }
             className="admin-form__input"
             type="number"
             min="0"
+            max="365"
+            step="1"
             value={form.deferralDays}
             onChange={(e) => setField('deferralDays', e.target.value)}
           />
         </label>
       )}
+
+      {!isCreate ? <SupplierPaymentsSummary supplierId={supplierId} form={form} /> : null}
 
       {error && <p className="admin-form__error">{error}</p>}
     </div>

@@ -30,7 +30,9 @@ import SupplierForm, {
   supplierToForm,
   formToSupplierCreatePayload,
   formToSupplierUpdatePayload,
+  validateSupplierDeferralDays,
 } from '../../../components/suppliers/SupplierForm'
+import { applyMissingObligationSnapshotsForSupplier } from '../../../services/supplierPaymentObligationsService'
 import SupplierFilterPopover from '../../../components/suppliers/SupplierFilterPopover'
 import SupplierTable from '../../../components/suppliers/SupplierTable'
 import { PlusIcon } from '../../../components/icons/PlatformIcons'
@@ -166,13 +168,26 @@ export function SuppliersListPage() {
       setFormError('Укажите название поставщика')
       return
     }
+    const deferralError = validateSupplierDeferralDays(form)
+    if (deferralError) {
+      setFormError(deferralError)
+      return
+    }
 
     setSaving(true)
     try {
+      const payload = editId
+        ? formToSupplierUpdatePayload(form)
+        : formToSupplierCreatePayload(form)
       if (editId) {
-        await updateSupplier(editId, formToSupplierUpdatePayload(form))
+        await updateSupplier(editId, payload)
+        try {
+          await applyMissingObligationSnapshotsForSupplier(editId, payload)
+        } catch {
+          // Calendar first-fill is best-effort; supplier save already succeeded.
+        }
       } else {
-        await createSupplier(formToSupplierCreatePayload(form))
+        await createSupplier(payload)
       }
       await refresh()
       closeForm()
@@ -340,6 +355,7 @@ export function SuppliersListPage() {
             onChange={setForm}
             error={formError}
             isCreate={!editId}
+            supplierId={editId}
           />
         </AdminModal>
       )}

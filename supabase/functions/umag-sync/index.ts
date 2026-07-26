@@ -1391,6 +1391,262 @@ async function reconcileMissingSupplyReturns(
   return { sourceDeleted }
 }
 
+function aqtobeDateKeyFromIso(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Aqtobe',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(d)
+  const y = parts.find((p) => p.type === 'year')?.value
+  const m = parts.find((p) => p.type === 'month')?.value
+  const day = parts.find((p) => p.type === 'day')?.value
+  if (!y || !m || !day) return null
+  return `${y}-${m}-${day}`
+}
+
+function addCalendarDays(dateKey: string, days: number): string {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  const utc = Date.UTC(y, m - 1, d) + days * 86_400_000
+  const dt = new Date(utc)
+  const yy = dt.getUTCFullYear()
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getUTCDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
+}
+
+function resolveTermsSnapshot(supplier: {
+  payment_type?: string | null
+  deferral_days?: number | null
+} | null): {
+  type: string | null
+  days: number | null
+  configured: boolean
+} {
+  const type = supplier?.payment_type ? String(supplier.payment_type) : null
+  if (type === 'cash' || type === 'transfer') {
+    return { type, days: 0, configured: true }
+  }
+  if (type === 'deferral' || type === 'mixed') {
+    const days = supplier?.deferral_days == null ? null : Number(supplier.deferral_days)
+    if (days != null && Number.isInteger(days) && days >= 0 && days <= 365) {
+      return { type, days, configured: true }
+    }
+    return { type, days: null, configured: false }
+  }
+  return { type: null, days: null, configured: false }
+}
+
+/**
+ * Refresh payment obligations from already-imported umag_supplies for the period.
+ * Does not call UMAG. Snapshot terms are immutable after first fill.
+ */
+async function refreshPaymentObligations(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  dateFrom: string,
+  dateTo: string
+): Promise<
+  | { created: number; updated: number; paid: number; sourceDeleted: number; reactivated: number }
+  | Response
+> {
+  const fromIso = `${dateFrom}T00:00:00+05:00`
+  const toIso = `${dateTo}T23:59:59.999+05:00`
+
+  const { data: supplies, error: suppliesError } = await serviceClient
+    .from('umag_supplies')
+    .select(
+      'id, umag_supply_id, platform_supplier_id, doc_time, amount, payment_amount, debt, is_source_deleted'
+    )
+    .gte('doc_time', fromIso)
+    .lte('doc_time', toIso)
+
+  if (suppliesError) {
+    console.error('spo_supplies_select_failed', { message: suppliesError.message })
+    return umagErrorResponse(
+      'SUPABASE_UPSERT_FAILED',
+      'Не удалось обновить обязательства оплаты поставщикам.',
+      500
+    )
+  }
+
+  const supplyRows = supplies || []
+  if (supplyRows.length === 0) {
+    return { created: 0, updated: 0, paid: 0, sourceDeleted: 0, reactivated: 0 }
+  }
+
+  const supplierIds = [
+    ...new Set(
+      supplyRows
+        .map((s: { platform_supplier_id: string | null }) => s.platform_supplier_id)
+        .filter(Boolean)
+    ),
+  ]
+
+  const termsBySupplier = new Map<
+    string,
+    { payment_type: string | null; deferral_days: number | null }
+  >()
+  if (supplierIds.length > 0) {
+    const { data: suppliers, error: suppliersError } = await serviceClient
+      .from('platform_suppliers')
+      .select('id, payment_type, deferral_days')
+      .in('id', supplierIds)
+    if (suppliersError) {
+      console.error('spo_suppliers_select_failed', { message: suppliersError.message })
+      return umagErrorResponse(
+        'SUPABASE_UPSERT_FAILED',
+        'Не удалось прочитать условия оплаты поставщиков.',
+        500
+      )
+    }
+    for (const row of suppliers || []) {
+      termsBySupplier.set(row.id, {
+        payment_type: row.payment_type ?? null,
+        deferral_days: row.deferral_days ?? null,
+      })
+    }
+  }
+
+  const umagIds = supplyRows.map((s: { umag_supply_id: number }) => Number(s.umag_supply_id))
+  const { data: existingRows, error: existingError } = await serviceClient
+    .from('supplier_payment_obligations')
+    .select(
+      'id, umag_supply_id, payment_terms_type_snapshot, deferment_days_snapshot, due_date, terms_snapshot_created_at, paid_at, is_source_deleted, current_debt'
+    )
+    .in('umag_supply_id', umagIds)
+
+  if (existingError) {
+    console.error('spo_existing_select_failed', { message: existingError.message })
+    return umagErrorResponse(
+      'SUPABASE_UPSERT_FAILED',
+      'Не удалось прочитать обязательства оплаты.',
+      500
+    )
+  }
+
+  const existingByUmagId = new Map<number, Record<string, unknown>>()
+  for (const row of existingRows || []) {
+    existingByUmagId.set(Number(row.umag_supply_id), row)
+  }
+
+  const now = new Date().toISOString()
+  let created = 0
+  let updated = 0
+  let paid = 0
+  let sourceDeleted = 0
+  let reactivated = 0
+  const upsertRows: Record<string, unknown>[] = []
+
+  for (const supply of supplyRows) {
+    const umagSupplyId = Number(supply.umag_supply_id)
+    const debt = asNumber(supply.debt)
+    const existing = existingByUmagId.get(umagSupplyId) || null
+    const isDeleted = Boolean(supply.is_source_deleted)
+
+    // Never create obligations for supplies that never carried open debt.
+    if (!existing && (isDeleted || debt <= 0)) continue
+
+    const docDate = aqtobeDateKeyFromIso(supply.doc_time)
+    const terms = resolveTermsSnapshot(
+      supply.platform_supplier_id
+        ? termsBySupplier.get(supply.platform_supplier_id) || null
+        : null
+    )
+
+    const hasSnapshot = existing?.due_date != null || existing?.terms_snapshot_created_at != null
+    let paymentTermsType = (existing?.payment_terms_type_snapshot as string | null) ?? null
+    let defermentDays = (existing?.deferment_days_snapshot as number | null) ?? null
+    let dueDate = (existing?.due_date as string | null) ?? null
+    let termsSnapshotCreatedAt =
+      (existing?.terms_snapshot_created_at as string | null) ?? null
+
+    // First snapshot only when missing; later supplier term changes do not rewrite.
+    if (!hasSnapshot && terms.configured && docDate) {
+      paymentTermsType = terms.type
+      defermentDays = terms.days
+      dueDate = addCalendarDays(docDate, terms.days ?? 0)
+      termsSnapshotCreatedAt = now
+    } else if (!hasSnapshot && terms.type && !terms.configured) {
+      paymentTermsType = terms.type
+      defermentDays = null
+      dueDate = null
+      termsSnapshotCreatedAt = null
+    }
+
+    let paidAt = (existing?.paid_at as string | null) ?? null
+    if (debt <= 0) {
+      if (!paidAt) {
+        paidAt = now
+        paid += 1
+      }
+    } else if (paidAt) {
+      // UMAG debt returned after correction — reopen obligation.
+      paidAt = null
+    }
+
+    if (isDeleted) {
+      if (!existing?.is_source_deleted) sourceDeleted += 1
+    } else if (existing?.is_source_deleted) {
+      reactivated += 1
+    }
+
+    if (existing) updated += 1
+    else created += 1
+
+    upsertRows.push({
+      platform_supplier_id: supply.platform_supplier_id,
+      umag_supply_id: umagSupplyId,
+      umag_supply_row_id: supply.id,
+      supply_document_date: docDate,
+      source_doc_time: supply.doc_time,
+      original_supply_amount: asNumber(supply.amount),
+      current_payment_amount: asNumber(supply.payment_amount),
+      current_debt: debt,
+      payment_terms_type_snapshot: paymentTermsType,
+      deferment_days_snapshot: defermentDays,
+      due_date: dueDate,
+      terms_snapshot_created_at: termsSnapshotCreatedAt,
+      is_source_deleted: isDeleted,
+      source_deleted_at: isDeleted ? now : null,
+      last_synced_at: now,
+      paid_at: paidAt,
+      ...(existing ? {} : { first_seen_at: now }),
+    })
+  }
+
+  const chunkSize = 200
+  for (let i = 0; i < upsertRows.length; i += chunkSize) {
+    const chunk = upsertRows.slice(i, i + chunkSize)
+    const { error } = await serviceClient
+      .from('supplier_payment_obligations')
+      .upsert(chunk, { onConflict: 'umag_supply_id' })
+    if (error) {
+      console.error('spo_upsert_failed', { message: error.message, offset: i })
+      return umagErrorResponse(
+        'SUPABASE_UPSERT_FAILED',
+        'Не удалось сохранить обязательства оплаты поставщикам.',
+        500
+      )
+    }
+  }
+
+  console.info('umag_sync_payment_obligations_refreshed', {
+    dateFrom,
+    dateTo,
+    created,
+    updated,
+    paid,
+    sourceDeleted,
+    reactivated,
+  })
+
+  return { created, updated, paid, sourceDeleted, reactivated }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return corsPreflightResponse()
   if (req.method !== 'POST') {
@@ -1676,6 +1932,26 @@ Deno.serve(async (req) => {
       sourceDeleted = reconcile.sourceDeleted
     }
 
+    const obligationsRefresh = await refreshPaymentObligations(
+      authz.serviceClient,
+      dateFrom,
+      dateTo
+    )
+    if (obligationsRefresh instanceof Response) {
+      await finishSyncRun(authz.serviceClient, runId, {
+        status: 'failed',
+        error_message: 'Ошибка обновления обязательств оплаты поставщикам',
+        records_received: suppliesResult.supplies.length,
+        records_created: suppliesUpsert.created + suppliersCreated + canonicalStats.created,
+        records_updated: suppliesUpsert.updated + suppliersUpdated + canonicalStats.updated,
+        records_source_deleted: sourceDeleted,
+        records_reactivated: suppliesUpsert.reactivated,
+        aggregates_match: aggregatesMatch,
+        warning_message: warningMessage,
+      })
+      return obligationsRefresh
+    }
+
     // Refresh platform map so returns map agentId → canonical even if suppliers were skipped
     if (!syncSuppliers || platformMap.size === 0) {
       platformMap = await loadPlatformSupplierMap(authz.serviceClient)
@@ -1868,6 +2144,7 @@ Deno.serve(async (req) => {
         sourceDeleted,
         pages: suppliesResult.pages,
       },
+      paymentObligations: obligationsRefresh,
       returns: {
         received: returnsResult.returns.length,
         created: returnsUpsert.created,

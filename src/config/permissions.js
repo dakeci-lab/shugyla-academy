@@ -38,6 +38,7 @@ export const ROUTE_KEYS = {
   RECEIVING: 'receiving',
   SUPPLIERS: 'suppliers',
   SETTLEMENTS: 'settlements',
+  SUPPLIER_PAYMENTS: 'supplier_payments',
   PRODUCTS_GROUP: 'products_group',
   PRICE_TAGS: 'price_tags',
   PRICE_CHECKER: 'price_checker',
@@ -94,6 +95,7 @@ const ROUTE_ACCESS = {
   [ROUTE_KEYS.SUPPLIERS]: [ROLE_IDS.ADMIN, ROLE_IDS.PURCHASER],
   // Settlements: permission-first (umag.settlements.view); role fallback admin-only.
   [ROUTE_KEYS.SETTLEMENTS]: [ROLE_IDS.ADMIN],
+  [ROUTE_KEYS.SUPPLIER_PAYMENTS]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.PRODUCTS_GROUP]: [
     ROLE_IDS.ADMIN,
     ROLE_IDS.PURCHASER,
@@ -239,6 +241,7 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.RECEIVING]: [P.RECEIVING_VIEW],
     [ROUTE_KEYS.SUPPLIERS]: [P.SUPPLIERS_VIEW],
     [ROUTE_KEYS.SETTLEMENTS]: [P.UMAG_SETTLEMENTS_VIEW],
+    [ROUTE_KEYS.SUPPLIER_PAYMENTS]: [P.SUPPLIER_PAYMENTS_VIEW],
     [ROUTE_KEYS.PRICE_TAGS]: [P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE],
     [ROUTE_KEYS.PRICE_CHECKER]: [P.PRICE_CHECKER_VIEW],
     [ROUTE_KEYS.ACADEMY]: [P.ACADEMY_VIEW],
@@ -375,6 +378,14 @@ export function canEditUmagReconciliations(user) {
 
 export function canResolveUmagReconciliations(user) {
   return can(user, PERMISSION_CODES.UMAG_RECONCILIATIONS_RESOLVE)
+}
+
+export function canViewSupplierPayments(user) {
+  return can(user, PERMISSION_CODES.SUPPLIER_PAYMENTS_VIEW)
+}
+
+export function canManageSupplierPayments(user) {
+  return can(user, PERMISSION_CODES.SUPPLIER_PAYMENTS_MANAGE)
 }
 
 // --- Действия: закуп ---

@@ -36,6 +36,40 @@
   gap: 16px;
 }
 
+.supplier-form__payments {
+  margin-top: 8px;
+  padding: 12px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.supplier-form__payments-title {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.supplier-form__payments-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  font-size: 13px;
+}
+
+.supplier-form__payments-grid span {
+  color: var(--color-text-secondary, #64748b);
+}
+
+.supplier-form__payments-link {
+  display: inline-block;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #047857;
+  text-decoration: none;
+}
+
 .supplier-form input[readonly] {
   background: #f8fafc;
   color: #334155;

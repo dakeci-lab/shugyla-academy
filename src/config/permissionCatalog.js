@@ -66,6 +66,9 @@ export const PERMISSION_CODES = {
   UMAG_RECONCILIATIONS_EDIT: 'umag.reconciliations.edit',
   UMAG_RECONCILIATIONS_RESOLVE: 'umag.reconciliations.resolve',
 
+  SUPPLIER_PAYMENTS_VIEW: 'supplier_payments.view',
+  SUPPLIER_PAYMENTS_MANAGE: 'supplier_payments.manage',
+
   PRICE_TAGS_VIEW: 'price_tags.view',
   PRICE_TAGS_MANAGE: 'price_tags.manage',
 
@@ -120,6 +123,7 @@ export const PERMISSION_MODULES = {
   receiving: 'Приёмка',
   suppliers: 'Поставщики',
   umag: 'UMAG',
+  supplier_payments: 'Оплаты поставщикам',
   price_tags: 'Ценники',
   products: 'Товары',
   payroll: 'Зарплата',
@@ -139,6 +143,7 @@ export const RBAC_MATRIX_MODULES = [
   'receiving',
   'suppliers',
   'umag',
+  'supplier_payments',
   'price_tags',
   'products',
   'standards',
@@ -232,6 +237,8 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.UMAG_RECONCILIATIONS_CREATE, name: 'Создание актов сверки', module: 'umag', sortOrder: 181 },
   { code: PERMISSION_CODES.UMAG_RECONCILIATIONS_EDIT, name: 'Редактирование актов сверки', module: 'umag', sortOrder: 182 },
   { code: PERMISSION_CODES.UMAG_RECONCILIATIONS_RESOLVE, name: 'Закрытие расхождений сверки', module: 'umag', sortOrder: 183 },
+  { code: PERMISSION_CODES.SUPPLIER_PAYMENTS_VIEW, name: 'Просмотр оплат поставщикам', module: 'supplier_payments', sortOrder: 190 },
+  { code: PERMISSION_CODES.SUPPLIER_PAYMENTS_MANAGE, name: 'Управление календарём оплат поставщикам', module: 'supplier_payments', sortOrder: 191 },
   { code: PERMISSION_CODES.PRICE_TAGS_VIEW, name: 'Просмотр ценников', module: 'price_tags', sortOrder: 130 },
   { code: PERMISSION_CODES.PRICE_TAGS_MANAGE, name: 'Управление ценниками', module: 'price_tags', sortOrder: 131 },
   { code: PERMISSION_CODES.PRICE_CHECKER_VIEW, name: 'Прайс-чекер', module: 'products', sortOrder: 135 },
