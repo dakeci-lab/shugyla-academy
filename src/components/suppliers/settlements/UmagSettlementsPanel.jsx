@@ -12,6 +12,8 @@ import {
 import {
   fetchLastUmagSyncRun,
   fetchUmagSettlementsBySupplier,
+  filterSupplierOperations,
+  formatSignedUmagMoney,
   formatUmagDate,
   formatUmagDateTime,
   formatUmagMoney,
@@ -84,6 +86,54 @@ function LatestReconBadge({ status }) {
   )
 }
 
+function formatAccountNames(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).filter(Boolean).join(', ') || '—'
+  }
+  if (value == null || value === '') return '—'
+  return String(value)
+}
+
+function ReturnDetailModal({ item, onClose }) {
+  if (!item) return null
+  const ret = item.source || {}
+  return (
+    <div className="umag-settlements__modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="umag-settlements__modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Возврат поставщику"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="umag-settlements__modal-head">
+          <h3>Возврат поставщику</h3>
+          <button type="button" className="umag-settlements__modal-close" onClick={onClose}>
+            ×
+          </button>
+        </div>
+        <div className="umag-settlements__card-grid">
+          <span>Дата</span>
+          <strong>{formatUmagDate(ret.document_time)}</strong>
+          <span>Сумма</span>
+          <strong>{formatSignedUmagMoney(-Math.abs(Number(ret.amount) || 0))}</strong>
+          <span>Сотрудник</span>
+          <strong>{ret.user_name || '—'}</strong>
+          <span>Счета</span>
+          <strong>{formatAccountNames(ret.account_names)}</strong>
+          <span>Статус</span>
+          <strong>
+            {ret.is_provided == null ? '—' : ret.is_provided ? 'Проведён' : 'Не проведён'}
+          </strong>
+          <span>Источник</span>
+          <strong>UMAG</strong>
+        </div>
+        {ret.note ? <p className="umag-settlements__comment">{ret.note}</p> : null}
+      </div>
+    </div>
+  )
+}
+
 function UmagSupplierDetail({
   supplier,
   periodDateFrom,
@@ -100,11 +150,17 @@ function UmagSupplierDetail({
   showSuccess,
   showWarning,
 }) {
-  const supplies = supplier.supplies || []
+  const operations = supplier.operations || []
+  const [opsFilter, setOpsFilter] = useState('all')
+  const [selectedReturn, setSelectedReturn] = useState(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [history, setHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState('')
+  const visibleOps = useMemo(
+    () => filterSupplierOperations(operations, opsFilter),
+    [operations, opsFilter]
+  )
 
   const loadHistory = useCallback(async () => {
     if (!canViewRecon) {
@@ -162,6 +218,7 @@ function UmagSupplierDetail({
 
       <div className="umag-settlements__totals">
         <SummaryCard label="Сумма приёмок" value={supplier.amount} />
+        <SummaryCard label="Возвраты поставщикам" value={supplier.returnAmount} />
         <SummaryCard label="Оплачено" value={supplier.paymentAmount} />
         <SummaryCard label="Задолженность" value={supplier.debt} emphasize />
         <SummaryCard label="Количество приёмок" value={supplier.supplyCount} isCount />
@@ -260,73 +317,128 @@ function UmagSupplierDetail({
         </section>
       ) : null}
 
-      <h3 className="umag-settlements__section-title">Приёмки UMAG</h3>
-
-      {supplies.length === 0 ? (
-        <div className="umag-settlements__empty">
-          За выбранный период приёмок UMAG не найдено
-        </div>
-      ) : (
-        <>
-          <div className="umag-settlements__table-wrap">
-            <table className="umag-settlements__table">
-              <thead>
-                <tr>
-                  <th>Дата</th>
-                  <th>ID</th>
-                  <th>Сумма</th>
-                  <th>Оплачено</th>
-                  <th>Возврат</th>
-                  <th>Задолженность</th>
-                  <th>Счёт</th>
-                  <th>Кто провёл</th>
-                </tr>
-              </thead>
-              <tbody>
-                {supplies.map((supply) => (
-                  <tr key={supply.id}>
-                    <td>{formatUmagDate(supply.doc_time)}</td>
-                    <td>{supply.umag_supply_id}</td>
-                    <td>{formatUmagMoney(supply.amount)}</td>
-                    <td>{formatUmagMoney(supply.payment_amount)}</td>
-                    <td>{formatUmagMoney(supply.payment_refund_amount)}</td>
-                    <td>{formatUmagMoney(supply.debt)}</td>
-                    <td>{supply.account || '—'}</td>
-                    <td>{supply.umag_user_name || '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="umag-settlements__cards">
-            {supplies.map((supply) => (
-              <div key={supply.id} className="umag-settlements__card umag-settlements__card--static">
-                <div className="umag-settlements__card-title">
-                  {formatUmagDate(supply.doc_time)} · #{supply.umag_supply_id}
-                </div>
-                <div className="umag-settlements__card-grid">
-                  <span>Сумма</span>
-                  <strong>{formatUmagMoney(supply.amount)}</strong>
-                  <span>Оплачено</span>
-                  <strong>{formatUmagMoney(supply.payment_amount)}</strong>
-                  <span>Возврат</span>
-                  <strong>{formatUmagMoney(supply.payment_refund_amount)}</strong>
-                  <span>Задолженность</span>
-                  <strong>{formatUmagMoney(supply.debt)}</strong>
-                  <span>Счёт</span>
-                  <strong>{supply.account || '—'}</strong>
-                  <span>Кто провёл</span>
-                  <strong>{supply.umag_user_name || '—'}</strong>
-                </div>
-                {supply.comment ? (
-                  <p className="umag-settlements__comment">{supply.comment}</p>
-                ) : null}
-              </div>
+      <section className="umag-settlements__ops" aria-label="История операций">
+        <div className="umag-settlements__ops-head">
+          <h3 className="umag-settlements__section-title">История операций</h3>
+          <div className="umag-settlements__ops-filters" role="tablist" aria-label="Фильтр операций">
+            {[
+              { id: 'all', label: 'Все' },
+              { id: 'supplies', label: 'Приёмки' },
+              { id: 'returns', label: 'Возвраты' },
+            ].map((opt) => (
+              <button
+                key={opt.id}
+                type="button"
+                role="tab"
+                aria-selected={opsFilter === opt.id}
+                className={`umag-settlements__ops-filter${
+                  opsFilter === opt.id ? ' umag-settlements__ops-filter--active' : ''
+                }`}
+                onClick={() => setOpsFilter(opt.id)}
+              >
+                {opt.label}
+              </button>
             ))}
           </div>
-        </>
-      )}
+        </div>
+
+        {visibleOps.length === 0 ? (
+          <div className="umag-settlements__empty">
+            За выбранный период операций UMAG не найдено
+          </div>
+        ) : (
+          <>
+            <div className="umag-settlements__table-wrap">
+              <table className="umag-settlements__table">
+                <thead>
+                  <tr>
+                    <th>Дата</th>
+                    <th>Тип</th>
+                    <th>Сумма</th>
+                    <th>Детали</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleOps.map((op) => (
+                    <tr key={op.id}>
+                      <td>{formatUmagDate(op.sortAt)}</td>
+                      <td>
+                        <span
+                          className={`umag-settlements__op-badge umag-settlements__op-badge--${op.kind}`}
+                        >
+                          {op.label}
+                        </span>
+                      </td>
+                      <td
+                        className={
+                          op.kind === 'return'
+                            ? 'umag-settlements__amount-neg'
+                            : 'umag-settlements__amount-pos'
+                        }
+                      >
+                        {formatSignedUmagMoney(op.signedAmount)}
+                      </td>
+                      <td>
+                        {op.kind === 'return' ? (
+                          <button
+                            type="button"
+                            className="umag-settlements__link"
+                            onClick={() => setSelectedReturn(op)}
+                          >
+                            Открыть
+                          </button>
+                        ) : (
+                          [
+                            op.source?.umag_user_name,
+                            op.source?.account,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ') || '—'
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="umag-settlements__cards" aria-label="История операций">
+              {visibleOps.map((op) => (
+                <button
+                  key={op.id}
+                  type="button"
+                  className="umag-settlements__card"
+                  onClick={() => {
+                    if (op.kind === 'return') setSelectedReturn(op)
+                  }}
+                >
+                  <div className="umag-settlements__card-title">
+                    {formatUmagDate(op.sortAt)}
+                    <span
+                      className={`umag-settlements__op-badge umag-settlements__op-badge--${op.kind}`}
+                    >
+                      {op.label}
+                    </span>
+                  </div>
+                  <div
+                    className={`umag-settlements__ops-amount${
+                      op.kind === 'return'
+                        ? ' umag-settlements__amount-neg'
+                        : ' umag-settlements__amount-pos'
+                    }`}
+                  >
+                    {formatSignedUmagMoney(op.signedAmount)}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </section>
+
+      {selectedReturn ? (
+        <ReturnDetailModal item={selectedReturn} onClose={() => setSelectedReturn(null)} />
+      ) : null}
 
       {createOpen ? (
         <CreateReconciliationModal
@@ -549,6 +661,11 @@ export default function UmagSettlementsPanel() {
 
       <div className="umag-settlements__totals" aria-label="Итоги по данным UMAG">
         <SummaryCard label="Сумма приёмок" value={totals?.amount} loading={loading} />
+        <SummaryCard
+          label="Возвраты поставщикам"
+          value={totals?.returnAmount}
+          loading={loading}
+        />
         <SummaryCard label="Оплачено" value={totals?.paymentAmount} loading={loading} />
         <SummaryCard label="Возвраты оплаты" value={totals?.paymentRefundAmount} loading={loading} />
         <SummaryCard label="Задолженность" value={totals?.debt} loading={loading} emphasize />
@@ -577,7 +694,7 @@ export default function UmagSettlementsPanel() {
         </div>
       ) : rows.length === 0 ? (
         <div className="umag-settlements__empty">
-          За выбранный период приёмок UMAG не найдено
+          За выбранный период операций UMAG не найдено
         </div>
       ) : (
         <>
@@ -587,9 +704,9 @@ export default function UmagSettlementsPanel() {
                 <tr>
                   <th>Поставщик</th>
                   <th>Приёмок</th>
-                  <th>Сумма</th>
+                  <th>Сумма приёмок</th>
+                  <th>Возвраты поставщикам</th>
                   <th>Оплачено</th>
-                  <th>Возвраты</th>
                   <th>Задолженность</th>
                   {canViewRecon ? <th>Последняя сверка</th> : null}
                 </tr>
@@ -608,8 +725,8 @@ export default function UmagSettlementsPanel() {
                     </td>
                     <td>{row.supplyCount}</td>
                     <td>{formatUmagMoney(row.amount)}</td>
+                    <td>{formatUmagMoney(row.returnAmount)}</td>
                     <td>{formatUmagMoney(row.paymentAmount)}</td>
-                    <td>{formatUmagMoney(row.paymentRefundAmount)}</td>
                     <td className={row.debt > 0 ? 'umag-settlements__debt' : undefined}>
                       {formatUmagMoney(row.debt)}
                     </td>
@@ -641,8 +758,10 @@ export default function UmagSettlementsPanel() {
                 <div className="umag-settlements__card-grid">
                   <span>Приёмок</span>
                   <strong>{row.supplyCount}</strong>
-                  <span>Сумма</span>
+                  <span>Сумма приёмок</span>
                   <strong>{formatUmagMoney(row.amount)}</strong>
+                  <span>Возвраты поставщику</span>
+                  <strong>{formatUmagMoney(row.returnAmount)}</strong>
                   <span>Оплачено</span>
                   <strong>{formatUmagMoney(row.paymentAmount)}</strong>
                   <span>Задолженность</span>

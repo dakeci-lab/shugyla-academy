@@ -1,5 +1,5 @@
 /**
- * umag-sync — stage-1 UMAG suppliers + supplies mirror for settlements.
+ * umag-sync — UMAG suppliers + supplies + supply returns for settlements.
  *
  * Frontend → this Edge Function → api.umag.kz → Supabase tables.
  * Never returns UMAG Authorization or raw credentials to the client.
@@ -7,8 +7,9 @@
  * Primary endpoints:
  * - GET /rest/cabinet/org/agent/list (agentType=SUPPLIER)
  * - GET /rest/cabinet/opr/supplies/all
+ * - GET /rest/cabinet/opr/supply-returns/list
  *
- * Does NOT call supply product lines or N+1 detail endpoints.
+ * Does NOT call supply/return product lines or N+1 detail endpoints.
  */
 
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
@@ -83,6 +84,42 @@ type SuppliesPage = {
 type AgentsPage = {
   agents?: UmagAgent[]
   count?: number
+}
+
+type UmagSupplyReturnDoc = {
+  id?: number | string
+  storeId?: number | string | null
+  userId?: number | string | null
+  agentId?: number | string | null
+  amount?: number | string | null
+  documentTime?: number | string | null
+  note?: string | null
+  isProvided?: boolean | null
+  createTime?: number | string | null
+  updateTime?: number | string | null
+  operationTime?: number | string | null
+  operationType?: string | null
+}
+
+type UmagSupplyReturnAdditional = {
+  supplierName?: string | null
+  payedAmount?: number | string | null
+  userName?: string | null
+  accountNames?: unknown
+}
+
+type UmagSupplyReturnItem = {
+  supplyReturn?: UmagSupplyReturnDoc | null
+  additionalData?: UmagSupplyReturnAdditional | null
+} & UmagSupplyReturnDoc &
+  UmagSupplyReturnAdditional
+
+type SupplyReturnsPage = {
+  fetchedCount?: number
+  totalCount?: number
+  amount?: number | string
+  list?: UmagSupplyReturnItem[]
+  supplyReturns?: UmagSupplyReturnItem[]
 }
 
 function umagErrorResponse(
@@ -1015,6 +1052,345 @@ async function reconcileMissingSupplies(
   return { sourceDeleted }
 }
 
+function normalizeAccountNames(value: unknown): unknown[] {
+  if (Array.isArray(value)) return value
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed) return []
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed)) return parsed
+    } catch {
+      return [trimmed]
+    }
+    return [trimmed]
+  }
+  if (value == null) return []
+  return [value]
+}
+
+function unwrapSupplyReturn(item: UmagSupplyReturnItem): {
+  doc: UmagSupplyReturnDoc
+  additional: UmagSupplyReturnAdditional
+  raw: UmagSupplyReturnItem
+} {
+  const doc = (item.supplyReturn && typeof item.supplyReturn === 'object'
+    ? item.supplyReturn
+    : item) as UmagSupplyReturnDoc
+  const additional = (item.additionalData && typeof item.additionalData === 'object'
+    ? item.additionalData
+    : item) as UmagSupplyReturnAdditional
+  return { doc, additional, raw: item }
+}
+
+async function fetchAllSupplyReturns(
+  session: UmagSession,
+  fromTime: number,
+  toTime: number
+): Promise<
+  | {
+      ok: true
+      returns: UmagSupplyReturnItem[]
+      pages: number
+      paginationComplete: boolean
+      source: {
+        totalCount: number | null
+        amount: number | null
+      }
+    }
+  | { ok: false; response: Response }
+> {
+  const returns: UmagSupplyReturnItem[] = []
+  let first = 0
+  let pages = 0
+  let paginationComplete = false
+  let source = {
+    totalCount: null as number | null,
+    amount: null as number | null,
+  }
+
+  while (true) {
+    pages += 1
+    const result = await umagFetchAuthed('/rest/cabinet/opr/supply-returns/list', {
+      first,
+      pageSize: UMAG_PAGE_SIZE,
+      fromTime,
+      toTime,
+      storeId: session.storeId,
+    })
+
+    if ('error' in result) {
+      return { ok: false, response: mapUmagAuthError(result.error) }
+    }
+
+    if (result.status !== 200) {
+      return { ok: false, response: mapUmagHttpError(result.status) }
+    }
+
+    // HAR: endpoint returns a root JSON array of { supplyReturn, additionalData }.
+    // Some environments may wrap it as an object with list/totalCount.
+    const payload = result.json
+    if (payload == null || typeof payload !== 'object') {
+      return {
+        ok: false,
+        response: umagErrorResponse(
+          'UMAG_INVALID_JSON',
+          'UMAG вернул некорректный ответ при загрузке возвратов поставщикам.',
+          502
+        ),
+      }
+    }
+
+    let batch: UmagSupplyReturnItem[] = []
+    if (Array.isArray(payload)) {
+      batch = payload as UmagSupplyReturnItem[]
+    } else {
+      const page = payload as SupplyReturnsPage
+      if (pages === 1) {
+        source = {
+          totalCount: page.totalCount == null ? null : asNumber(page.totalCount, 0),
+          amount: page.amount == null ? null : asNumber(page.amount),
+        }
+      }
+      batch = Array.isArray(page.list)
+        ? page.list
+        : Array.isArray(page.supplyReturns)
+          ? page.supplyReturns
+          : []
+    }
+
+    returns.push(...batch)
+
+    console.info('umag_sync_returns_page', {
+      first,
+      pageSize: UMAG_PAGE_SIZE,
+      batch: batch.length,
+      totalSoFar: returns.length,
+      totalCount: source.totalCount,
+      rootArray: Array.isArray(payload),
+      elapsedMs: result.elapsedMs,
+      retriedAfterSignIn: result.retriedAfterSignIn,
+      storeId: maskStoreId(session.storeId),
+    })
+
+    const totalCount = source.totalCount
+    if (batch.length === 0) {
+      paginationComplete = true
+      break
+    }
+    if (totalCount != null && returns.length >= totalCount) {
+      paginationComplete = true
+      break
+    }
+    if (batch.length < UMAG_PAGE_SIZE) {
+      paginationComplete = true
+      break
+    }
+    first += UMAG_PAGE_SIZE
+    if (pages > 500) {
+      return {
+        ok: false,
+        response: umagErrorResponse(
+          'UMAG_PAGINATION_FAILED',
+          'Превышен лимит страниц при загрузке возвратов UMAG.',
+          502
+        ),
+      }
+    }
+  }
+
+  return { ok: true, returns, pages, paginationComplete, source }
+}
+
+async function upsertSupplyReturns(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  items: UmagSupplyReturnItem[],
+  platformMap: Map<number, string>
+): Promise<{ created: number; updated: number; reactivated: number } | Response> {
+  if (items.length === 0) return { created: 0, updated: 0, reactivated: 0 }
+
+  const umagIds: number[] = []
+  for (const item of items) {
+    const { doc } = unwrapSupplyReturn(item)
+    const id = asBigIntId(doc.id)
+    if (id != null) umagIds.push(id)
+  }
+
+  const { data: existingRows, error: existingError } = await serviceClient
+    .from('umag_supply_returns')
+    .select('id, umag_return_id, is_source_deleted')
+    .in('umag_return_id', umagIds)
+
+  if (existingError) {
+    console.error('umag_supply_returns_select_failed', { message: existingError.message })
+    return umagErrorResponse(
+      'SUPABASE_UPSERT_FAILED',
+      'Не удалось прочитать существующие возвраты UMAG.',
+      500
+    )
+  }
+
+  const existing = new Map<number, boolean>()
+  for (const row of existingRows || []) {
+    existing.set(Number(row.umag_return_id), Boolean(row.is_source_deleted))
+  }
+
+  const now = new Date().toISOString()
+  const rows = []
+
+  for (const item of items) {
+    const { doc, additional, raw } = unwrapSupplyReturn(item)
+    const umagReturnId = asBigIntId(doc.id)
+    if (umagReturnId == null) continue
+    const umagSupplierId = asBigIntId(doc.agentId)
+    const documentTime = parseUmagEditTime(doc.documentTime ?? doc.operationTime ?? doc.createTime)
+    if (!documentTime) continue
+
+    const supplierName =
+      additional.supplierName != null
+        ? String(additional.supplierName).trim()
+        : doc && 'supplierName' in doc && (doc as { supplierName?: unknown }).supplierName != null
+          ? String((doc as { supplierName?: unknown }).supplierName).trim()
+          : null
+
+    rows.push({
+      umag_return_id: umagReturnId,
+      platform_supplier_id:
+        umagSupplierId != null ? platformMap.get(umagSupplierId) ?? null : null,
+      umag_supplier_id: umagSupplierId,
+      store_id: asBigIntId(doc.storeId),
+      umag_user_id: asBigIntId(doc.userId),
+      supplier_name: supplierName || null,
+      user_name:
+        additional.userName != null
+          ? String(additional.userName)
+          : null,
+      amount: Math.abs(asNumber(doc.amount)),
+      payed_amount:
+        additional.payedAmount == null ? null : Math.abs(asNumber(additional.payedAmount)),
+      document_time: documentTime,
+      operation_time: parseUmagEditTime(doc.operationTime),
+      create_time: parseUmagEditTime(doc.createTime),
+      umag_update_time: parseUmagEditTime(doc.updateTime),
+      operation_type: doc.operationType != null ? String(doc.operationType) : null,
+      note: doc.note != null ? String(doc.note) : null,
+      is_provided: typeof doc.isProvided === 'boolean' ? doc.isProvided : null,
+      account_names: normalizeAccountNames(additional.accountNames),
+      raw_payload: raw,
+      last_synced_at: now,
+      last_seen_at: now,
+      is_source_deleted: false,
+      source_deleted_at: null,
+    })
+  }
+
+  const chunkSize = 200
+  let created = 0
+  let updated = 0
+  let reactivated = 0
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const chunk = rows.slice(i, i + chunkSize)
+    const { error } = await serviceClient
+      .from('umag_supply_returns')
+      .upsert(chunk, { onConflict: 'umag_return_id' })
+    if (error) {
+      console.error('umag_supply_returns_upsert_failed', { message: error.message, offset: i })
+      return umagErrorResponse(
+        'SUPABASE_UPSERT_FAILED',
+        'Не удалось сохранить возвраты UMAG.',
+        500
+      )
+    }
+    for (const row of chunk) {
+      const umagId = Number(row.umag_return_id)
+      if (existing.has(umagId)) {
+        updated += 1
+        if (existing.get(umagId) === true) reactivated += 1
+      } else {
+        created += 1
+      }
+    }
+  }
+
+  return { created, updated, reactivated }
+}
+
+async function reconcileMissingSupplyReturns(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  dateFrom: string,
+  dateTo: string,
+  receivedUmagIds: Set<number>
+): Promise<{ sourceDeleted: number } | Response> {
+  const fromIso = `${dateFrom}T00:00:00+05:00`
+  const toIso = `${dateTo}T23:59:59.999+05:00`
+
+  const { data: activeRows, error } = await serviceClient
+    .from('umag_supply_returns')
+    .select('id, umag_return_id')
+    .eq('is_source_deleted', false)
+    .gte('document_time', fromIso)
+    .lte('document_time', toIso)
+
+  if (error) {
+    console.error('umag_supply_returns_reconcile_select_failed', { message: error.message })
+    return umagErrorResponse(
+      'SUPABASE_RECONCILE_FAILED',
+      'Не удалось выполнить сверку удалённых возвратов UMAG.',
+      500
+    )
+  }
+
+  const missingIds = (activeRows || [])
+    .filter((row: { umag_return_id: number }) => !receivedUmagIds.has(Number(row.umag_return_id)))
+    .map((row: { id: string }) => row.id)
+
+  if (missingIds.length === 0) {
+    return { sourceDeleted: 0 }
+  }
+
+  const now = new Date().toISOString()
+  const chunkSize = 200
+  let sourceDeleted = 0
+  for (let i = 0; i < missingIds.length; i += chunkSize) {
+    const chunk = missingIds.slice(i, i + chunkSize)
+    const { error: updateError, count } = await serviceClient
+      .from('umag_supply_returns')
+      .update(
+        {
+          is_source_deleted: true,
+          source_deleted_at: now,
+        },
+        { count: 'exact' }
+      )
+      .in('id', chunk)
+      .eq('is_source_deleted', false)
+
+    if (updateError) {
+      console.error('umag_supply_returns_reconcile_update_failed', {
+        message: updateError.message,
+        offset: i,
+      })
+      return umagErrorResponse(
+        'SUPABASE_RECONCILE_FAILED',
+        'Не удалось пометить отсутствующие возвраты UMAG.',
+        500
+      )
+    }
+    sourceDeleted += typeof count === 'number' ? count : chunk.length
+  }
+
+  console.info('umag_sync_returns_reconcile_source_deleted', {
+    dateFrom,
+    dateTo,
+    received: receivedUmagIds.size,
+    sourceDeleted,
+  })
+
+  return { sourceDeleted }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return corsPreflightResponse()
   if (req.method !== 'POST') {
@@ -1300,7 +1676,135 @@ Deno.serve(async (req) => {
       sourceDeleted = reconcile.sourceDeleted
     }
 
-    const status: SyncStatus = aggregatesMatch ? 'success' : 'partial'
+    // Refresh platform map so returns map agentId → canonical even if suppliers were skipped
+    if (!syncSuppliers || platformMap.size === 0) {
+      platformMap = await loadPlatformSupplierMap(authz.serviceClient)
+    }
+
+    const returnsResult = await fetchAllSupplyReturns(session, bounds.fromTime, bounds.toTime)
+    if (!returnsResult.ok) {
+      await finishSyncRun(authz.serviceClient, runId, {
+        status: 'failed',
+        error_message: 'Ошибка загрузки возвратов поставщикам UMAG',
+        records_received: suppliesResult.supplies.length,
+        records_created: suppliesUpsert.created + suppliersCreated + canonicalStats.created,
+        records_updated: suppliesUpsert.updated + suppliersUpdated + canonicalStats.updated,
+        records_source_deleted: sourceDeleted,
+        records_reactivated: suppliesUpsert.reactivated,
+        source_total_count: source.totalCount,
+        source_amount: source.amount,
+        aggregates_match: aggregatesMatch,
+        warning_message: warningMessage,
+      })
+      return returnsResult.response
+    }
+
+    const calculatedReturnAmount = sumNumbers(
+      returnsResult.returns.map((item) => {
+        const { doc } = unwrapSupplyReturn(item)
+        return Math.abs(asNumber(doc.amount))
+      })
+    )
+    const returnSource = returnsResult.source
+    const returnMismatches: string[] = []
+    if (
+      returnSource.amount != null &&
+      !nearlyEqual(
+        calculatedReturnAmount,
+        Math.abs(asNumber(returnSource.amount)),
+        AGGREGATE_EPSILON
+      )
+    ) {
+      returnMismatches.push(
+        `returnAmount: rows=${calculatedReturnAmount} source=${returnSource.amount}`
+      )
+    }
+    if (
+      returnSource.totalCount != null &&
+      returnsResult.returns.length !== returnSource.totalCount
+    ) {
+      returnMismatches.push(
+        `returnTotalCount: rows=${returnsResult.returns.length} source=${returnSource.totalCount}`
+      )
+    }
+    const returnsAggregatesMatch = returnMismatches.length === 0
+    const returnsWarning = returnsAggregatesMatch
+      ? null
+      : `Расхождение агрегатов возвратов UMAG: ${returnMismatches.join('; ')}`
+    if (returnsWarning) {
+      console.warn('umag_sync_returns_aggregate_mismatch', {
+        mismatches: returnMismatches,
+        dateFrom,
+        dateTo,
+      })
+    }
+
+    const returnsUpsert = await upsertSupplyReturns(
+      authz.serviceClient,
+      returnsResult.returns,
+      platformMap
+    )
+    if (returnsUpsert instanceof Response) {
+      await finishSyncRun(authz.serviceClient, runId, {
+        status: 'failed',
+        error_message: 'Ошибка сохранения возвратов поставщикам',
+        records_received: suppliesResult.supplies.length,
+        returns_received: returnsResult.returns.length,
+        source_return_count: returnSource.totalCount,
+        source_return_amount: returnSource.amount,
+        calculated_return_amount: calculatedReturnAmount,
+        aggregates_match: aggregatesMatch && returnsAggregatesMatch,
+        warning_message: [warningMessage, returnsWarning].filter(Boolean).join(' | ') || null,
+      })
+      return returnsUpsert
+    }
+
+    let returnsSourceDeleted = 0
+    // Soft-delete only after a complete validated snapshot.
+    // Root-array responses have no totalCount — require clean pagination instead.
+    const returnsSnapshotComplete =
+      returnsAggregatesMatch &&
+      returnsResult.paginationComplete &&
+      (returnSource.totalCount == null ||
+        returnSource.totalCount === returnsResult.returns.length)
+
+    if (returnsSnapshotComplete) {
+      const receivedReturnIds = new Set<number>()
+      for (const item of returnsResult.returns) {
+        const { doc } = unwrapSupplyReturn(item)
+        const id = asBigIntId(doc.id)
+        if (id != null) receivedReturnIds.add(id)
+      }
+
+      if (receivedReturnIds.size === returnsResult.returns.length) {
+        const reconcileReturns = await reconcileMissingSupplyReturns(
+          authz.serviceClient,
+          dateFrom,
+          dateTo,
+          receivedReturnIds
+        )
+        if (reconcileReturns instanceof Response) {
+          await finishSyncRun(authz.serviceClient, runId, {
+            status: 'failed',
+            error_message: 'Ошибка сверки удалённых возвратов после импорта',
+            returns_received: returnsResult.returns.length,
+            returns_created: returnsUpsert.created,
+            returns_updated: returnsUpsert.updated,
+            returns_reactivated: returnsUpsert.reactivated,
+            source_return_count: returnSource.totalCount,
+            source_return_amount: returnSource.amount,
+            calculated_return_amount: calculatedReturnAmount,
+          })
+          return reconcileReturns
+        }
+        returnsSourceDeleted = reconcileReturns.sourceDeleted
+      }
+    }
+
+    const combinedWarning =
+      [warningMessage, returnsWarning].filter(Boolean).join(' | ') || null
+    const status: SyncStatus =
+      aggregatesMatch && returnsAggregatesMatch ? 'success' : 'partial'
     await finishSyncRun(authz.serviceClient, runId, {
       status,
       records_received: suppliesResult.supplies.length,
@@ -1308,6 +1812,14 @@ Deno.serve(async (req) => {
       records_updated: suppliesUpsert.updated + suppliersUpdated + canonicalStats.updated,
       records_source_deleted: sourceDeleted,
       records_reactivated: suppliesUpsert.reactivated,
+      returns_received: returnsResult.returns.length,
+      returns_created: returnsUpsert.created,
+      returns_updated: returnsUpsert.updated,
+      returns_source_deleted: returnsSourceDeleted,
+      returns_reactivated: returnsUpsert.reactivated,
+      source_return_count: returnSource.totalCount,
+      source_return_amount: returnSource.amount,
+      calculated_return_amount: calculatedReturnAmount,
       source_suppliers_received: canonicalStats.sourceReceived || null,
       canonical_created: canonicalStats.created,
       canonical_updated: canonicalStats.updated,
@@ -1324,15 +1836,15 @@ Deno.serve(async (req) => {
       calculated_payment_amount: calculated.paymentAmount,
       calculated_payment_refund_amount: calculated.paymentRefundAmount,
       calculated_debt: calculated.debt,
-      aggregates_match: aggregatesMatch,
-      warning_message: warningMessage,
+      aggregates_match: aggregatesMatch && returnsAggregatesMatch,
+      warning_message: combinedWarning,
       error_message: null,
     })
 
     return jsonResponse({
       success: true,
       status,
-      warning: warningMessage,
+      warning: combinedWarning,
       period: { dateFrom, dateTo, fromTime: bounds.fromTime, toTime: bounds.toTime },
       suppliers: {
         created: suppliersCreated,
@@ -1355,6 +1867,19 @@ Deno.serve(async (req) => {
         reactivated: suppliesUpsert.reactivated,
         sourceDeleted,
         pages: suppliesResult.pages,
+      },
+      returns: {
+        received: returnsResult.returns.length,
+        created: returnsUpsert.created,
+        updated: returnsUpsert.updated,
+        reactivated: returnsUpsert.reactivated,
+        sourceDeleted: returnsSourceDeleted,
+        pages: returnsResult.pages,
+        aggregates: {
+          match: returnsAggregatesMatch,
+          source: returnSource,
+          calculatedAmount: calculatedReturnAmount,
+        },
       },
       aggregates: {
         match: aggregatesMatch,

@@ -190,6 +190,7 @@ export async function syncUmagSettlements({ dateFrom, dateTo, syncSuppliers = tr
         period: data.period,
         suppliers: data.suppliers,
         supplies: data.supplies,
+        returns: data.returns,
         aggregates: data.aggregates,
         syncRunId: data.syncRunId,
         message:
@@ -228,8 +229,106 @@ export async function fetchLastUmagSyncRun() {
   return data
 }
 
+function supplierSettlementKey({ platformSupplierId, supplierId, umagSupplierId, name }) {
+  return (
+    platformSupplierId ||
+    supplierId ||
+    (umagSupplierId != null ? `umag:${umagSupplierId}` : `name:${name || 'Без названия'}`)
+  )
+}
+
+function ensureSettlementRow(byKey, seed) {
+  const key = supplierSettlementKey(seed)
+  let row = byKey.get(key)
+  if (!row) {
+    row = {
+      key,
+      platformSupplierId: seed.platformSupplierId || null,
+      supplierId: seed.platformSupplierId || seed.supplierId || null,
+      umagSupplierUuid: seed.supplierId || null,
+      umagSupplierId: seed.umagSupplierId ?? null,
+      name: seed.name || 'Без названия',
+      legalName: seed.legalName || null,
+      supplyCount: 0,
+      amount: 0,
+      paymentAmount: 0,
+      paymentRefundAmount: 0,
+      debt: 0,
+      returnCount: 0,
+      returnAmount: 0,
+      supplies: [],
+      returns: [],
+    }
+    byKey.set(key, row)
+  } else {
+    if (!row.platformSupplierId && seed.platformSupplierId) {
+      row.platformSupplierId = seed.platformSupplierId
+      row.supplierId = seed.platformSupplierId
+    }
+    if (!row.name && seed.name) row.name = seed.name
+    if (!row.legalName && seed.legalName) row.legalName = seed.legalName
+    if (row.umagSupplierId == null && seed.umagSupplierId != null) {
+      row.umagSupplierId = seed.umagSupplierId
+    }
+  }
+  return row
+}
+
 /**
- * Load supplies for period and aggregate by supplier.
+ * Build unified chronological operations for one supplier (newest first).
+ * Supply amounts are shown as +, return amounts as − (presentation only).
+ */
+export function buildSupplierOperationHistory(supplies = [], returns = []) {
+  const ops = []
+  for (const supply of supplies) {
+    ops.push({
+      id: `supply:${supply.id}`,
+      kind: 'supply',
+      label: 'Приёмка',
+      sortAt: supply.doc_time,
+      amount: toNumber(supply.amount),
+      signedAmount: toNumber(supply.amount),
+      source: supply,
+    })
+  }
+  for (const ret of returns) {
+    const abs = Math.abs(toNumber(ret.amount))
+    ops.push({
+      id: `return:${ret.id}`,
+      kind: 'return',
+      label: 'Возврат поставщику',
+      sortAt: ret.document_time,
+      amount: abs,
+      signedAmount: -abs,
+      source: ret,
+    })
+  }
+  ops.sort((a, b) => {
+    const ta = new Date(a.sortAt || 0).getTime()
+    const tb = new Date(b.sortAt || 0).getTime()
+    if (tb !== ta) return tb - ta
+    return String(a.id).localeCompare(String(b.id))
+  })
+  return ops
+}
+
+export function filterSupplierOperations(operations, filter = 'all') {
+  if (filter === 'supplies') return operations.filter((op) => op.kind === 'supply')
+  if (filter === 'returns') return operations.filter((op) => op.kind === 'return')
+  return operations
+}
+
+export function formatSignedUmagMoney(value) {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return '—'
+  const absLabel = formatUmagMoney(Math.abs(n)).replace(' ₸', '')
+  if (n > 0) return `+${absLabel} ₸`
+  if (n < 0) return `−${absLabel} ₸`
+  return `${absLabel} ₸`
+}
+
+/**
+ * Load supplies + returns for period and aggregate by canonical supplier.
  * @param {{ dateFrom: string, dateTo: string, search?: string }} params
  */
 export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search = '' }) {
@@ -240,48 +339,54 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
   const fromIso = `${dateFrom}T00:00:00+05:00`
   const toIso = `${dateTo}T23:59:59.999+05:00`
 
-  const { data, error } = await supabase
-    .from('umag_supplies')
-    .select(
-      'id, umag_supply_id, supplier_id, platform_supplier_id, umag_supplier_id, supplier_name, supplier_legal_name, doc_time, amount, payment_amount, payment_refund_amount, debt, account, comment, umag_user_name'
-    )
-    .eq('is_source_deleted', false)
-    .gte('doc_time', fromIso)
-    .lte('doc_time', toIso)
-    .order('doc_time', { ascending: false })
+  const [suppliesRes, returnsRes] = await Promise.all([
+    supabase
+      .from('umag_supplies')
+      .select(
+        'id, umag_supply_id, supplier_id, platform_supplier_id, umag_supplier_id, supplier_name, supplier_legal_name, doc_time, amount, payment_amount, payment_refund_amount, debt, account, comment, umag_user_name'
+      )
+      .eq('is_source_deleted', false)
+      .gte('doc_time', fromIso)
+      .lte('doc_time', toIso)
+      .order('doc_time', { ascending: false }),
+    supabase
+      .from('umag_supply_returns')
+      .select(
+        'id, umag_return_id, platform_supplier_id, umag_supplier_id, supplier_name, user_name, amount, payed_amount, document_time, operation_time, note, is_provided, account_names, operation_type'
+      )
+      .eq('is_source_deleted', false)
+      .gte('document_time', fromIso)
+      .lte('document_time', toIso)
+      .order('document_time', { ascending: false }),
+  ])
 
-  if (error) {
-    return { rows: [], totals: emptyTotals(), error: error.message || 'Не удалось загрузить приёмки UMAG.' }
+  if (suppliesRes.error) {
+    return {
+      rows: [],
+      totals: emptyTotals(),
+      error: suppliesRes.error.message || 'Не удалось загрузить приёмки UMAG.',
+    }
+  }
+  if (returnsRes.error) {
+    return {
+      rows: [],
+      totals: emptyTotals(),
+      error: returnsRes.error.message || 'Не удалось загрузить возвраты поставщикам UMAG.',
+    }
   }
 
-  const supplies = data || []
+  const supplies = suppliesRes.data || []
+  const returns = returnsRes.data || []
   const byKey = new Map()
 
   for (const supply of supplies) {
-    // Prefer canonical platform supplier identity for settlements UI.
-    const key =
-      supply.platform_supplier_id ||
-      supply.supplier_id ||
-      (supply.umag_supplier_id != null ? `umag:${supply.umag_supplier_id}` : `name:${supply.supplier_name}`)
-    let row = byKey.get(key)
-    if (!row) {
-      row = {
-        key,
-        platformSupplierId: supply.platform_supplier_id,
-        supplierId: supply.platform_supplier_id || supply.supplier_id,
-        umagSupplierUuid: supply.supplier_id,
-        umagSupplierId: supply.umag_supplier_id,
-        name: supply.supplier_name || 'Без названия',
-        legalName: supply.supplier_legal_name || null,
-        supplyCount: 0,
-        amount: 0,
-        paymentAmount: 0,
-        paymentRefundAmount: 0,
-        debt: 0,
-        supplies: [],
-      }
-      byKey.set(key, row)
-    }
+    const row = ensureSettlementRow(byKey, {
+      platformSupplierId: supply.platform_supplier_id,
+      supplierId: supply.supplier_id,
+      umagSupplierId: supply.umag_supplier_id,
+      name: supply.supplier_name,
+      legalName: supply.supplier_legal_name,
+    })
     row.supplyCount += 1
     row.amount += toNumber(supply.amount)
     row.paymentAmount += toNumber(supply.payment_amount)
@@ -290,7 +395,22 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
     row.supplies.push(supply)
   }
 
-  let rows = [...byKey.values()]
+  for (const ret of returns) {
+    const row = ensureSettlementRow(byKey, {
+      platformSupplierId: ret.platform_supplier_id,
+      umagSupplierId: ret.umag_supplier_id,
+      name: ret.supplier_name,
+    })
+    row.returnCount += 1
+    row.returnAmount += Math.abs(toNumber(ret.amount))
+    row.returns.push(ret)
+  }
+
+  let rows = [...byKey.values()].map((row) => ({
+    ...row,
+    operations: buildSupplierOperationHistory(row.supplies, row.returns),
+  }))
+
   const q = search.trim().toLowerCase()
   if (q) {
     rows = rows.filter(
@@ -312,12 +432,20 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
       acc.paymentAmount += row.paymentAmount
       acc.paymentRefundAmount += row.paymentRefundAmount
       acc.debt += row.debt
+      acc.returnCount += row.returnCount
+      acc.returnAmount += row.returnAmount
       return acc
     },
     emptyTotals()
   )
 
-  return { rows, totals, error: null, suppliesCount: supplies.length }
+  return {
+    rows,
+    totals,
+    error: null,
+    suppliesCount: supplies.length,
+    returnsCount: returns.length,
+  }
 }
 
 function emptyTotals() {
@@ -327,5 +455,7 @@ function emptyTotals() {
     paymentAmount: 0,
     paymentRefundAmount: 0,
     debt: 0,
+    returnCount: 0,
+    returnAmount: 0,
   }
 }

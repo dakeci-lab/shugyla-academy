@@ -55,6 +55,7 @@
     "verify:supplier-reconciliations": "node scripts/verify-supplier-reconciliations.mjs",
     "verify:supplier-centralization": "node scripts/verify-supplier-centralization.mjs",
     "verify:umag-first-suppliers": "node scripts/verify-umag-first-suppliers.mjs",
+    "verify:umag-supply-returns": "node scripts/verify-umag-supply-returns.mjs",
     "verify:employees-list": "node scripts/verify-employees-list.mjs",
     "verify:employee-create-fix": "node scripts/verify-employee-create-fix.mjs",
     "verify:app-bootstrap": "node scripts/verify-app-bootstrap.mjs",

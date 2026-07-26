@@ -247,11 +247,15 @@ export default function CreateReconciliationModal({
                 <strong>{formatUmagMoney(snapshot.umagSupplyAmount)}</strong>
               </div>
               <div>
+                <span>Возвраты поставщикам</span>
+                <strong>{formatUmagMoney(snapshot.umagSupplyReturnAmount)}</strong>
+              </div>
+              <div>
                 <span>Оплачено</span>
                 <strong>{formatUmagMoney(snapshot.umagPaymentAmount)}</strong>
               </div>
               <div>
-                <span>Возвраты</span>
+                <span>Возвраты оплаты</span>
                 <strong>{formatUmagMoney(snapshot.umagPaymentRefundAmount)}</strong>
               </div>
               <div className="recon-create__metrics--debt">

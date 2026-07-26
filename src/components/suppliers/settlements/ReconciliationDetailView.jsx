@@ -211,8 +211,15 @@ export default function ReconciliationDetailView({
         <div className="recon-detail__metrics">
           <Metric label="Приёмки" value={item.umagSupplyCount} />
           <Metric label="Сумма приёмок" value={formatUmagMoney(item.umagSupplyAmount)} />
+          <Metric
+            label="Возвраты поставщикам"
+            value={formatUmagMoney(item.umagSupplyReturnAmount)}
+          />
           <Metric label="Оплачено" value={formatUmagMoney(item.umagPaymentAmount)} />
-          <Metric label="Возвраты" value={formatUmagMoney(item.umagPaymentRefundAmount)} />
+          <Metric
+            label="Возвраты оплаты"
+            value={formatUmagMoney(item.umagPaymentRefundAmount)}
+          />
           <Metric label="Задолженность" value={formatUmagMoney(item.umagDebt)} emphasize />
         </div>
       </section>

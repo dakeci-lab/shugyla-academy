@@ -35,6 +35,8 @@ const RECON_SELECT = `
   status,
   umag_supply_count,
   umag_supply_amount,
+  umag_supply_return_count,
+  umag_supply_return_amount,
   umag_payment_amount,
   umag_payment_refund_amount,
   umag_debt,
@@ -72,6 +74,8 @@ function emptySnapshot() {
   return {
     umagSupplyCount: 0,
     umagSupplyAmount: 0,
+    umagSupplyReturnCount: 0,
+    umagSupplyReturnAmount: 0,
     umagPaymentAmount: 0,
     umagPaymentRefundAmount: 0,
     umagDebt: 0,
@@ -195,6 +199,8 @@ export function normalizeReconciliation(row) {
     status: row.status,
     umagSupplyCount: toNumber(row.umag_supply_count),
     umagSupplyAmount: toNumber(row.umag_supply_amount),
+    umagSupplyReturnCount: toNumber(row.umag_supply_return_count),
+    umagSupplyReturnAmount: toNumber(row.umag_supply_return_amount),
     umagPaymentAmount: toNumber(row.umag_payment_amount),
     umagPaymentRefundAmount: toNumber(row.umag_payment_refund_amount),
     umagDebt: toNumber(row.umag_debt),
@@ -231,8 +237,8 @@ export function normalizeReconciliationDocument(row) {
 }
 
 /**
- * Period snapshot from active (non-deleted) umag_supplies for one supplier.
- * This is SUM(debt) over the period — not a full accounting balance claim.
+ * Period snapshot from active (non-deleted) umag_supplies + umag_supply_returns.
+ * umagDebt remains SUM(debt) from supplies — not recalculated via returns.
  */
 export async function computeUmagSnapshotForSupplier({
   supplierId,
@@ -253,32 +259,47 @@ export async function computeUmagSnapshotForSupplier({
   const fromIso = `${dateFrom}T00:00:00+05:00`
   const toIso = `${dateTo}T23:59:59.999+05:00`
 
-  let query = supabase
+  let suppliesQuery = supabase
     .from('umag_supplies')
     .select('amount, payment_amount, payment_refund_amount, debt')
     .eq('is_source_deleted', false)
     .gte('doc_time', fromIso)
     .lte('doc_time', toIso)
 
+  let returnsQuery = supabase
+    .from('umag_supply_returns')
+    .select('amount')
+    .eq('is_source_deleted', false)
+    .gte('document_time', fromIso)
+    .lte('document_time', toIso)
+
   if (canonicalId) {
-    query = query.eq('platform_supplier_id', canonicalId)
+    suppliesQuery = suppliesQuery.eq('platform_supplier_id', canonicalId)
+    returnsQuery = returnsQuery.eq('platform_supplier_id', canonicalId)
   } else {
-    query = query.eq('umag_supplier_id', umagSupplierId)
+    suppliesQuery = suppliesQuery.eq('umag_supplier_id', umagSupplierId)
+    returnsQuery = returnsQuery.eq('umag_supplier_id', umagSupplierId)
   }
 
-  const { data, error } = await query
-  if (error) {
-    throw new Error(error.message || 'Не удалось рассчитать показатели UMAG')
+  const [suppliesRes, returnsRes] = await Promise.all([suppliesQuery, returnsQuery])
+  if (suppliesRes.error) {
+    throw new Error(suppliesRes.error.message || 'Не удалось рассчитать показатели UMAG')
+  }
+  if (returnsRes.error) {
+    throw new Error(returnsRes.error.message || 'Не удалось рассчитать возвраты поставщикам UMAG')
   }
 
-  const rows = data || []
   const snapshot = emptySnapshot()
-  for (const row of rows) {
+  for (const row of suppliesRes.data || []) {
     snapshot.umagSupplyCount += 1
     snapshot.umagSupplyAmount += toNumber(row.amount)
     snapshot.umagPaymentAmount += toNumber(row.payment_amount)
     snapshot.umagPaymentRefundAmount += toNumber(row.payment_refund_amount)
     snapshot.umagDebt += toNumber(row.debt)
+  }
+  for (const row of returnsRes.data || []) {
+    snapshot.umagSupplyReturnCount += 1
+    snapshot.umagSupplyReturnAmount += Math.abs(toNumber(row.amount))
   }
   return snapshot
 }
@@ -448,6 +469,8 @@ export async function createSupplierReconciliation(input) {
     status,
     umag_supply_count: snapshot.umagSupplyCount,
     umag_supply_amount: snapshot.umagSupplyAmount,
+    umag_supply_return_count: snapshot.umagSupplyReturnCount,
+    umag_supply_return_amount: snapshot.umagSupplyReturnAmount,
     umag_payment_amount: snapshot.umagPaymentAmount,
     umag_payment_refund_amount: snapshot.umagPaymentRefundAmount,
     umag_debt: snapshot.umagDebt,

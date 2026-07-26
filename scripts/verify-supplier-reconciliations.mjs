@@ -63,11 +63,13 @@ function main() {
 
   const umagService = read('src/services/umagSettlementsService.js')
   assert.match(umagService, /\.eq\('is_source_deleted', false\)/)
-  ok('UMAG settlements still exclude source-deleted supplies')
+  assert.match(umagService, /umag_supply_returns/)
+  ok('UMAG settlements still exclude source-deleted supplies and load returns')
 
   const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
   assert.match(panel, /Создать сверку/)
   assert.match(panel, /История сверок/)
+  assert.match(panel, /История операций/)
   assert.match(panel, /CreateReconciliationModal/)
   assert.match(panel, /ReconciliationDetailView/)
   ok('settlements panel wires create + history + detail')
@@ -75,6 +77,8 @@ function main() {
   const createModal = read('src/components/suppliers/settlements/CreateReconciliationModal.jsx')
   assert.match(createModal, /По данным UMAG за выбранный период/)
   assert.match(createModal, /Задолженность по акту поставщика/)
+  assert.match(createModal, /Возвраты поставщикам/)
+  assert.match(createModal, /Возвраты оплаты/)
   assert.match(createModal, /Синхронизировать/)
   ok('create modal shows period UMAG snapshot disclaimer')
 
