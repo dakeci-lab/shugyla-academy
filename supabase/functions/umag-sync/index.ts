@@ -539,8 +539,8 @@ async function upsertSupplies(
   serviceClient: any,
   supplies: UmagSupply[],
   supplierMap: Map<number, string>
-): Promise<{ created: number; updated: number } | Response> {
-  if (supplies.length === 0) return { created: 0, updated: 0 }
+): Promise<{ created: number; updated: number; reactivated: number } | Response> {
+  if (supplies.length === 0) return { created: 0, updated: 0, reactivated: 0 }
 
   const umagIds = supplies
     .map((s) => asBigIntId(s.id))
@@ -548,7 +548,7 @@ async function upsertSupplies(
 
   const { data: existingRows, error: existingError } = await serviceClient
     .from('umag_supplies')
-    .select('id, umag_supply_id')
+    .select('id, umag_supply_id, is_source_deleted')
     .in('umag_supply_id', umagIds)
 
   if (existingError) {
@@ -560,7 +560,10 @@ async function upsertSupplies(
     )
   }
 
-  const existing = new Set((existingRows || []).map((r: { umag_supply_id: number }) => Number(r.umag_supply_id)))
+  const existing = new Map<number, boolean>()
+  for (const row of existingRows || []) {
+    existing.set(Number(row.umag_supply_id), Boolean(row.is_source_deleted))
+  }
   const now = new Date().toISOString()
   const rows = []
 
@@ -593,6 +596,9 @@ async function upsertSupplies(
       umag_user_name: supply.userFirstName != null ? String(supply.userFirstName) : null,
       raw_payload: supply,
       last_synced_at: now,
+      last_seen_at: now,
+      is_source_deleted: false,
+      source_deleted_at: null,
     })
   }
 
@@ -600,6 +606,7 @@ async function upsertSupplies(
   const chunkSize = 200
   let created = 0
   let updated = 0
+  let reactivated = 0
   for (let i = 0; i < rows.length; i += chunkSize) {
     const chunk = rows.slice(i, i + chunkSize)
     const { error } = await serviceClient
@@ -614,12 +621,100 @@ async function upsertSupplies(
       )
     }
     for (const row of chunk) {
-      if (existing.has(Number(row.umag_supply_id))) updated += 1
-      else created += 1
+      const umagId = Number(row.umag_supply_id)
+      if (existing.has(umagId)) {
+        updated += 1
+        if (existing.get(umagId) === true) reactivated += 1
+      } else {
+        created += 1
+      }
     }
   }
 
-  return { created, updated }
+  return { created, updated, reactivated }
+}
+
+/**
+ * Soft-delete active DB supplies in the synced period that are absent from a
+ * complete UMAG snapshot. Never hard-delete. Caller must only invoke after
+ * full pagination + aggregate validation succeeded.
+ *
+ * docTime moves across periods: a supply missing from period A is marked
+ * source-deleted for A; a later sync of period B re-upserts and reactivates it.
+ */
+async function reconcileMissingSupplies(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  dateFrom: string,
+  dateTo: string,
+  receivedUmagIds: Set<number>
+): Promise<{ sourceDeleted: number } | Response> {
+  const fromIso = `${dateFrom}T00:00:00+05:00`
+  const toIso = `${dateTo}T23:59:59.999+05:00`
+
+  const { data: activeRows, error } = await serviceClient
+    .from('umag_supplies')
+    .select('id, umag_supply_id')
+    .eq('is_source_deleted', false)
+    .gte('doc_time', fromIso)
+    .lte('doc_time', toIso)
+
+  if (error) {
+    console.error('umag_supplies_reconcile_select_failed', { message: error.message })
+    return umagErrorResponse(
+      'SUPABASE_RECONCILE_FAILED',
+      'Не удалось выполнить сверку удалённых приёмок UMAG.',
+      500
+    )
+  }
+
+  const missingIds = (activeRows || [])
+    .filter((row: { umag_supply_id: number }) => !receivedUmagIds.has(Number(row.umag_supply_id)))
+    .map((row: { id: string }) => row.id)
+
+  if (missingIds.length === 0) {
+    return { sourceDeleted: 0 }
+  }
+
+  const now = new Date().toISOString()
+  const chunkSize = 200
+  let sourceDeleted = 0
+  for (let i = 0; i < missingIds.length; i += chunkSize) {
+    const chunk = missingIds.slice(i, i + chunkSize)
+    const { error: updateError, count } = await serviceClient
+      .from('umag_supplies')
+      .update(
+        {
+          is_source_deleted: true,
+          source_deleted_at: now,
+        },
+        { count: 'exact' }
+      )
+      .in('id', chunk)
+      .eq('is_source_deleted', false)
+
+    if (updateError) {
+      console.error('umag_supplies_reconcile_update_failed', {
+        message: updateError.message,
+        offset: i,
+      })
+      return umagErrorResponse(
+        'SUPABASE_RECONCILE_FAILED',
+        'Не удалось пометить отсутствующие приёмки UMAG.',
+        500
+      )
+    }
+    sourceDeleted += typeof count === 'number' ? count : chunk.length
+  }
+
+  console.info('umag_sync_reconcile_source_deleted', {
+    dateFrom,
+    dateTo,
+    received: receivedUmagIds.size,
+    sourceDeleted,
+  })
+
+  return { sourceDeleted }
 }
 
 Deno.serve(async (req) => {
@@ -784,12 +879,98 @@ Deno.serve(async (req) => {
       return suppliesUpsert
     }
 
+    let sourceDeleted = 0
+    // Snapshot reconciliation ONLY after a fully validated period snapshot.
+    // Prefer keeping a stale row over false mass soft-deletes.
+    if (aggregatesMatch && source.totalCount != null) {
+      const receivedIds = new Set<number>()
+      for (const supply of suppliesResult.supplies) {
+        const id = asBigIntId(supply.id)
+        if (id != null) receivedIds.add(id)
+      }
+
+      if (receivedIds.size !== suppliesResult.supplies.length) {
+        await finishSyncRun(authz.serviceClient, runId, {
+          status: 'partial',
+          error_message: 'Неполные ID приёмок — сверка удалений пропущена',
+          records_received: suppliesResult.supplies.length,
+          records_created: suppliesUpsert.created + suppliersCreated,
+          records_updated: suppliesUpsert.updated + suppliersUpdated,
+          records_reactivated: suppliesUpsert.reactivated,
+          source_total_count: source.totalCount,
+          source_amount: source.amount,
+          source_payment_amount: source.paymentAmount,
+          source_payment_refund_amount: source.paymentRefundAmount,
+          source_debt: source.debt,
+          calculated_amount: calculated.amount,
+          calculated_payment_amount: calculated.paymentAmount,
+          calculated_payment_refund_amount: calculated.paymentRefundAmount,
+          calculated_debt: calculated.debt,
+          aggregates_match: false,
+          warning_message: 'Сверка удалённых приёмок пропущена: дубли/пустые ID в ответе UMAG',
+        })
+        return jsonResponse({
+          success: true,
+          status: 'partial',
+          warning: 'Сверка удалённых приёмок пропущена: дубли/пустые ID в ответе UMAG',
+          period: { dateFrom, dateTo, fromTime: bounds.fromTime, toTime: bounds.toTime },
+          suppliers: {
+            created: suppliersCreated,
+            updated: suppliersUpdated,
+            totalKnown: supplierMap.size,
+          },
+          supplies: {
+            received: suppliesResult.supplies.length,
+            created: suppliesUpsert.created,
+            updated: suppliesUpsert.updated,
+            reactivated: suppliesUpsert.reactivated,
+            sourceDeleted: 0,
+            pages: suppliesResult.pages,
+          },
+          aggregates: { match: false, source, calculated },
+          syncRunId: runId,
+        })
+      }
+
+      const reconcile = await reconcileMissingSupplies(
+        authz.serviceClient,
+        dateFrom,
+        dateTo,
+        receivedIds
+      )
+      if (reconcile instanceof Response) {
+        await finishSyncRun(authz.serviceClient, runId, {
+          status: 'failed',
+          error_message: 'Ошибка сверки удалённых приёмок после импорта',
+          records_received: suppliesResult.supplies.length,
+          records_created: suppliesUpsert.created + suppliersCreated,
+          records_updated: suppliesUpsert.updated + suppliersUpdated,
+          records_reactivated: suppliesUpsert.reactivated,
+          source_total_count: source.totalCount,
+          source_amount: source.amount,
+          source_payment_amount: source.paymentAmount,
+          source_payment_refund_amount: source.paymentRefundAmount,
+          source_debt: source.debt,
+          calculated_amount: calculated.amount,
+          calculated_payment_amount: calculated.paymentAmount,
+          calculated_payment_refund_amount: calculated.paymentRefundAmount,
+          calculated_debt: calculated.debt,
+          aggregates_match: aggregatesMatch,
+          warning_message: warningMessage,
+        })
+        return reconcile
+      }
+      sourceDeleted = reconcile.sourceDeleted
+    }
+
     const status: SyncStatus = aggregatesMatch ? 'success' : 'partial'
     await finishSyncRun(authz.serviceClient, runId, {
       status,
       records_received: suppliesResult.supplies.length,
       records_created: suppliesUpsert.created + suppliersCreated,
       records_updated: suppliesUpsert.updated + suppliersUpdated,
+      records_source_deleted: sourceDeleted,
+      records_reactivated: suppliesUpsert.reactivated,
       source_total_count: source.totalCount,
       source_amount: source.amount,
       source_payment_amount: source.paymentAmount,
@@ -818,6 +999,8 @@ Deno.serve(async (req) => {
         received: suppliesResult.supplies.length,
         created: suppliesUpsert.created,
         updated: suppliesUpsert.updated,
+        reactivated: suppliesUpsert.reactivated,
+        sourceDeleted,
         pages: suppliesResult.pages,
       },
       aggregates: {

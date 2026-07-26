@@ -245,6 +245,7 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
     .select(
       'id, umag_supply_id, supplier_id, umag_supplier_id, supplier_name, supplier_legal_name, doc_time, amount, payment_amount, payment_refund_amount, debt, account, comment, umag_user_name'
     )
+    .eq('is_source_deleted', false)
     .gte('doc_time', fromIso)
     .lte('doc_time', toIso)
     .order('doc_time', { ascending: false })
