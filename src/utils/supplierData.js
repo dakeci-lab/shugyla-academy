@@ -210,6 +210,7 @@ export function normalizeSupplier(raw) {
   const umagSupplierId =
     raw.umagSupplierId ?? raw.umag_supplier_id ?? null
   const linkedToUmag = umagSupplierId != null && umagSupplierId !== ''
+  const isMerged = Boolean(raw.isMerged ?? raw.is_merged)
 
   return {
     id: raw.id,
@@ -225,6 +226,8 @@ export function normalizeSupplier(raw) {
       raw.is_umag_active ??
       (linkedToUmag ? true : null),
     umagLastSyncedAt: raw.umagLastSyncedAt ?? raw.umag_last_synced_at ?? null,
+    isMerged,
+    mergedIntoSupplierId: raw.mergedIntoSupplierId ?? raw.merged_into_supplier_id ?? null,
     linkedToUmag,
     productCategories: categories,
     managerName: raw.managerName ?? raw.manager_name ?? '',

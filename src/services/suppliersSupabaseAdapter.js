@@ -25,6 +25,8 @@ function rowToSupplier(row) {
     umag_supplier_id: row.umag_supplier_id,
     is_umag_active: row.is_umag_active,
     umag_last_synced_at: row.umag_last_synced_at,
+    is_merged: row.is_merged,
+    merged_into_supplier_id: row.merged_into_supplier_id,
     product_categories: row.product_categories,
     manager_name: row.manager_name,
     manager_phone: row.manager_phone,
@@ -93,6 +95,7 @@ export async function fetchSuppliersData() {
   const result = await supabase
     .from('platform_suppliers')
     .select('*')
+    .eq('is_merged', false)
     .order('name')
 
   const suppliers = (await throwIfError(result, 'Загрузка поставщиков')).map(rowToSupplier)

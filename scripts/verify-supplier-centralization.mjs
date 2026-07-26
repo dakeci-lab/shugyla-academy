@@ -51,7 +51,17 @@ function main() {
   const adapter = read('src/services/suppliersSupabaseAdapter.js')
   assert.match(adapter, /supplierToOperationalRow/)
   assert.match(adapter, /linkedToUmag/)
-  ok('adapter protects UMAG-owned fields on update')
+  assert.match(adapter, /\.eq\('is_merged', false\)/)
+  ok('adapter protects UMAG-owned fields and hides merged duplicates')
+
+  const mergeMigration = read(
+    'supabase/migrations/20260727020000_merge_safe_umag_supplier_duplicates.sql'
+  )
+  assert.match(mergeMigration, /is_merged/)
+  assert.match(mergeMigration, /merged_into_supplier_id/)
+  assert.match(mergeMigration, /pending_manual_review/)
+  assert.match(mergeMigration, /ambiguous_umag_created_used_in_procurement/)
+  ok('safe duplicate merge migration present')
 
   const form = read('src/components/suppliers/SupplierForm.jsx')
   assert.match(form, /Синхронизировано с UMAG/)

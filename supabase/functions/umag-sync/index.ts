@@ -587,7 +587,7 @@ async function reconcileCanonicalSuppliers(
 
   const { data: platformRows, error: platformError } = await serviceClient
     .from('platform_suppliers')
-    .select('id, name, umag_supplier_id, bin')
+    .select('id, name, umag_supplier_id, bin, is_merged')
   if (platformError) {
     console.error('canonical_platform_select_failed', { message: platformError.message })
     return umagErrorResponse(
@@ -603,6 +603,9 @@ async function reconcileCanonicalSuppliers(
   const platformByName = new Map<string, string[]>()
 
   for (const row of platformRows || []) {
+    // Soft-merged bootstrap duplicates must never receive sync updates or recreate links.
+    if (row.is_merged === true) continue
+
     const nameKey = String(row.name || '')
       .trim()
       .toLowerCase()
@@ -815,6 +818,7 @@ async function loadPlatformSupplierMap(
     .from('platform_suppliers')
     .select('id, umag_supplier_id')
     .not('umag_supplier_id', 'is', null)
+    .eq('is_merged', false)
   if (error) {
     console.error('platform_supplier_map_failed', { message: error.message })
     return map
