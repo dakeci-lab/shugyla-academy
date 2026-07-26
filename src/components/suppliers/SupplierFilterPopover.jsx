@@ -14,8 +14,8 @@ function SupplierFilterFields({ draftStatus, onChange, resultCount }) {
   return (
     <>
       <div className="supplier-filter-popover__section">
-        <span className="supplier-filter-popover__label">Статус</span>
-        <div className="supplier-filter-popover__options" role="radiogroup" aria-label="Статус поставщика">
+        <span className="supplier-filter-popover__label">Каталог</span>
+        <div className="supplier-filter-popover__options" role="radiogroup" aria-label="Каталог поставщиков">
           {SUPPLIER_LIST_STATUS_FILTER_OPTIONS.map((option) => (
             <button
               key={option.id}

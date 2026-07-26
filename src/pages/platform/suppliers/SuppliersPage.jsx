@@ -9,8 +9,10 @@ import {
 } from '../../../services/academyDataService'
 import {
   filterSuppliers,
+  SUPPLIER_CATALOG_FILTER,
   SUPPLIER_LIST_DEFAULT_STATUS,
 } from '../../../utils/supplierData'
+import { countPendingSupplierMatchCandidates } from '../../../services/suppliersSupabaseAdapter'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
 import {
@@ -62,6 +64,7 @@ export function SuppliersListPage() {
   const [saving, setSaving] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [pendingMatchCount, setPendingMatchCount] = useState(0)
 
   const canView = canViewSuppliers(user)
   const canEdit = canEditSuppliers(user)
@@ -79,6 +82,24 @@ export function SuppliersListPage() {
     [suppliers, search, draftStatus, version]
   )
   const filtersActive = appliedStatus !== SUPPLIER_LIST_DEFAULT_STATUS
+
+  useEffect(() => {
+    if (!canView || !canEdit) {
+      setPendingMatchCount(0)
+      return undefined
+    }
+    let cancelled = false
+    void countPendingSupplierMatchCandidates()
+      .then((count) => {
+        if (!cancelled) setPendingMatchCount(count)
+      })
+      .catch(() => {
+        if (!cancelled) setPendingMatchCount(0)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [canView, canEdit, version])
 
   useEffect(() => {
     const openEditId = location.state?.openEditId
@@ -223,6 +244,22 @@ export function SuppliersListPage() {
     return <PlatformAccessDenied title="Нет доступа к поставщикам" />
   }
 
+  const emptyMessage = (() => {
+    if (search.trim()) return 'По вашему запросу ничего не найдено.'
+    if (appliedStatus === SUPPLIER_CATALOG_FILTER.UMAG_ACTIVE) {
+      return 'Нет действующих поставщиков UMAG. Создайте контрагента в UMAG и выполните синхронизацию.'
+    }
+    if (appliedStatus === SUPPLIER_CATALOG_FILTER.LOCAL_ONLY) {
+      return 'Нет поставщиков без связи с UMAG.'
+    }
+    if (appliedStatus === SUPPLIER_CATALOG_FILTER.ARCHIVED) {
+      return 'Архивных поставщиков нет.'
+    }
+    return suppliers.length === 0
+      ? 'Поставщики ещё не добавлены.'
+      : 'По вашему запросу ничего не найдено.'
+  })()
+
   return (
     <div className="suppliers-page">
       <PlatformSearchToolbar
@@ -266,12 +303,15 @@ export function SuppliersListPage() {
         }
       />
 
-      {filtered.length === 0 ? (
-        <div className="suppliers-page__empty">
-          {suppliers.length === 0
-            ? 'Поставщики ещё не добавлены.'
-            : 'По вашему запросу ничего не найдено.'}
+      {pendingMatchCount > 0 ? (
+        <div className="suppliers-page__review-banner" role="status">
+          Требует сопоставления: {pendingMatchCount}
+          {pendingMatchCount === 1 ? ' поставщик' : ' поставщика'} с неоднозначным UMAG-совпадением.
         </div>
+      ) : null}
+
+      {filtered.length === 0 ? (
+        <div className="suppliers-page__empty">{emptyMessage}</div>
       ) : (
         <SupplierTable suppliers={filtered} canEdit={canEdit} onEdit={openEdit} />
       )}
@@ -295,7 +335,12 @@ export function SuppliersListPage() {
           autoFocusClose={false}
           footer={modalFooter}
         >
-          <SupplierForm form={form} onChange={setForm} error={formError} />
+          <SupplierForm
+            form={form}
+            onChange={setForm}
+            error={formError}
+            isCreate={!editId}
+          />
         </AdminModal>
       )}
     </div>

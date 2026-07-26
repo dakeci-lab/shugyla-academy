@@ -102,6 +102,20 @@ export async function fetchSuppliersData() {
   return { suppliers }
 }
 
+export async function countPendingSupplierMatchCandidates() {
+  if (!supabase) return 0
+  const { count, error } = await supabase
+    .from('supplier_umag_match_candidates')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'pending_manual_review')
+
+  if (error) {
+    console.warn('supplier_match_candidates_count_failed', error.message)
+    return 0
+  }
+  return Number(count) || 0
+}
+
 export async function createSupplier(data) {
   const name = data.name?.trim()
   if (!name) throw new Error('Укажите название поставщика')

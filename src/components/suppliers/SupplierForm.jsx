@@ -96,7 +96,7 @@ function displayOrUnset(value) {
   return text || 'Не настроено'
 }
 
-export default function SupplierForm({ form, onChange, error }) {
+export default function SupplierForm({ form, onChange, error, isCreate = false }) {
   const showDeferral =
     form.paymentType === PAYMENT_TYPE.DEFERRAL || form.paymentType === PAYMENT_TYPE.MIXED
   const umagLocked = Boolean(form.linkedToUmag)
@@ -113,7 +113,23 @@ export default function SupplierForm({ form, onChange, error }) {
           {form.isUmagActive === false ? ' · неактивен в UMAG' : ''}
           {form.umagSupplierId != null ? ` · ID ${form.umagSupplierId}` : ''}
         </div>
-      ) : null}
+      ) : (
+        <div className="supplier-form__local-hint" role="note">
+          {isCreate ? (
+            <>
+              Рекомендуемый процесс: создайте контрагента в UMAG и синхронизируйте — он появится в
+              основном списке. Ручное создание будет без связи с UMAG.
+            </>
+          ) : (
+            <>
+              Не связан с UMAG. Для участия в синхронизации поставщик должен быть создан или связан в
+              UMAG.
+            </>
+          )}
+        </div>
+      )}
+
+      {umagLocked ? <h3 className="supplier-form__section-title">Данные UMAG</h3> : null}
 
       <div className="admin-form__row">
         <label className="admin-form__label">

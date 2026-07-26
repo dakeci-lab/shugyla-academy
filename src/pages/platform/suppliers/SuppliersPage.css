@@ -121,6 +121,18 @@
   line-height: 1.45;
 }
 
+.suppliers-page__review-banner {
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .suppliers-modal-footer {
   display: flex;
   align-items: center;

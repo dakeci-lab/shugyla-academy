@@ -53,25 +53,67 @@ export const SUPPLIER_STATUS_FILTER_OPTIONS = [
   { id: SUPPLIER_STATUS.ARCHIVED, label: SUPPLIER_STATUS_LABELS.archived },
 ]
 
-/** Значение фильтра списка поставщиков по умолчанию */
-export const SUPPLIER_LIST_DEFAULT_STATUS = SUPPLIER_STATUS.ACTIVE
+/** Каталог списка поставщиков (UMAG-first) */
+export const SUPPLIER_CATALOG_FILTER = {
+  UMAG_ACTIVE: 'umag_active',
+  LOCAL_ONLY: 'local_only',
+  ARCHIVED: 'archived',
+  ALL: 'all',
+}
 
-/** Варианты фильтра статуса на странице поставщиков */
+/** Значение фильтра списка поставщиков по умолчанию — действующие UMAG-linked */
+export const SUPPLIER_LIST_DEFAULT_STATUS = SUPPLIER_CATALOG_FILTER.UMAG_ACTIVE
+
+/** Варианты фильтра каталога на странице поставщиков */
 export const SUPPLIER_LIST_STATUS_FILTER_OPTIONS = [
-  { id: 'all', label: 'Все' },
-  { id: SUPPLIER_STATUS.ACTIVE, label: 'Активные' },
-  { id: SUPPLIER_STATUS.INACTIVE, label: 'Деактивированные' },
-  { id: SUPPLIER_STATUS.ARCHIVED, label: 'Архивные' },
+  { id: SUPPLIER_CATALOG_FILTER.UMAG_ACTIVE, label: 'UMAG' },
+  { id: SUPPLIER_CATALOG_FILTER.LOCAL_ONLY, label: 'Не связаны с UMAG' },
+  { id: SUPPLIER_CATALOG_FILTER.ARCHIVED, label: 'Архивные' },
+  { id: SUPPLIER_CATALOG_FILTER.ALL, label: 'Все' },
 ]
 
 /** Компактная подпись количества в фильтре поставщиков */
 export function formatSupplierFilterCount(status, count) {
   const total = Number(count) || 0
-  if (status === 'all') return `Найдено: ${total}`
+  if (status === SUPPLIER_CATALOG_FILTER.UMAG_ACTIVE) {
+    return `UMAG-поставщиков: ${total}`
+  }
+  if (status === SUPPLIER_CATALOG_FILTER.LOCAL_ONLY) {
+    return `Не связаны с UMAG: ${total}`
+  }
+  if (status === SUPPLIER_CATALOG_FILTER.ARCHIVED) return `Архивных поставщиков: ${total}`
+  if (status === SUPPLIER_CATALOG_FILTER.ALL || status === 'all') return `Найдено: ${total}`
+  // legacy status filters
   if (status === SUPPLIER_STATUS.ACTIVE) return `Активных поставщиков: ${total}`
   if (status === SUPPLIER_STATUS.INACTIVE) return `Деактивированных поставщиков: ${total}`
-  if (status === SUPPLIER_STATUS.ARCHIVED) return `Архивных поставщиков: ${total}`
   return `Найдено: ${total}`
+}
+
+export function matchesSupplierCatalogFilter(supplier, catalog = SUPPLIER_CATALOG_FILTER.ALL) {
+  if (!supplier || supplier.isMerged) return false
+
+  if (catalog === SUPPLIER_CATALOG_FILTER.UMAG_ACTIVE) {
+    return (
+      Boolean(supplier.linkedToUmag) &&
+      supplier.isUmagActive !== false &&
+      supplier.status !== SUPPLIER_STATUS.ARCHIVED
+    )
+  }
+
+  if (catalog === SUPPLIER_CATALOG_FILTER.LOCAL_ONLY) {
+    return !supplier.linkedToUmag && supplier.status !== SUPPLIER_STATUS.ARCHIVED
+  }
+
+  if (catalog === SUPPLIER_CATALOG_FILTER.ARCHIVED) {
+    return supplier.status === SUPPLIER_STATUS.ARCHIVED
+  }
+
+  if (catalog === SUPPLIER_CATALOG_FILTER.ALL || catalog === 'all') {
+    return true
+  }
+
+  // Backward-compatible status filter
+  return supplier.status === catalog
 }
 
 /** Дни недели для расписания поставщика (ISO: пн → вс) */
@@ -331,13 +373,14 @@ export function filterSuppliers(suppliers, { search = '', status = 'all' } = {})
   const q = search.trim().toLowerCase()
 
   return suppliers.filter((supplier) => {
-    if (status !== 'all' && supplier.status !== status) return false
+    if (!matchesSupplierCatalogFilter(supplier, status)) return false
 
     if (!q) return true
 
     const haystack = [
       supplier.name,
       supplier.legalName,
+      supplier.bin,
       supplier.managerName,
       supplier.managerPhone,
       supplier.whatsapp,
@@ -349,6 +392,18 @@ export function filterSuppliers(suppliers, { search = '', status = 'all' } = {})
 
     return haystack.includes(q)
   })
+}
+
+/** Priority for new procurement/receiving picker: UMAG-active → local-only → rest */
+export function compareSuppliersForSelection(a, b) {
+  const rank = (supplier) => {
+    if (supplier?.linkedToUmag && supplier.isUmagActive !== false) return 0
+    if (!supplier?.linkedToUmag) return 1
+    return 2
+  }
+  const byRank = rank(a) - rank(b)
+  if (byRank !== 0) return byRank
+  return String(a?.name || '').localeCompare(String(b?.name || ''), 'ru')
 }
 
 export function categoriesToInputValue(categories) {

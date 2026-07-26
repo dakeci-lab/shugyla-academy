@@ -62,15 +62,19 @@ function main() {
   console.log('Stage 3: Status filter')
 
   assert('filter popover component', page.includes('SupplierFilterPopover'))
-  assert('filter only status field', filter.includes('Статус') && !filter.includes('SearchableSupplierSelect'))
-  assert('default active status', page.includes('SUPPLIER_LIST_DEFAULT_STATUS'))
-  assert('default status is active', supplierData.includes("SUPPLIER_LIST_DEFAULT_STATUS = SUPPLIER_STATUS.ACTIVE"))
-  assert('inactive option', supplierData.includes("label: 'Деактивированные'"))
+  assert('filter catalog field', filter.includes('Каталог') && !filter.includes('SearchableSupplierSelect'))
+  assert('default catalog status', page.includes('SUPPLIER_LIST_DEFAULT_STATUS'))
+  assert(
+    'default catalog is UMAG-active',
+    supplierData.includes('SUPPLIER_LIST_DEFAULT_STATUS = SUPPLIER_CATALOG_FILTER.UMAG_ACTIVE')
+  )
+  assert('local-only option', supplierData.includes("label: 'Не связаны с UMAG'"))
   assert('archived option', supplierData.includes("label: 'Архивные'"))
-  assert('reset returns active', page.includes('setAppliedStatus(SUPPLIER_LIST_DEFAULT_STATUS)'))
+  assert('reset returns default catalog', page.includes('setAppliedStatus(SUPPLIER_LIST_DEFAULT_STATUS)'))
   assert('shared applied and draft state', page.includes('appliedStatus') && page.includes('draftStatus'))
   assert('search plus status filtering', page.match(/filterSuppliers\(suppliers,\s*\{\s*search,\s*status:\s*appliedStatus/))
   assert('count uses search and draft status', page.includes('filterPreviewCount'))
+  assert('umag-first catalog helper', supplierData.includes('matchesSupplierCatalogFilter'))
 
   console.log('Stage 4: Filter UX')
 

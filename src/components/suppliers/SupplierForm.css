@@ -12,6 +12,17 @@
   font-weight: 700;
 }
 
+.supplier-form__local-hint {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  color: #9a3412;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .supplier-form__section-title {
   margin: 4px 0 0;
   font-size: 14px;

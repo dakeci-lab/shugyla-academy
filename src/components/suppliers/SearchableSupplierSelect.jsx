@@ -2,6 +2,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { getSuppliers } from '../../services/academyDataService'
 import {
   SUPPLIER_STATUS,
+  compareSuppliersForSelection,
   filterSuppliers,
 } from '../../utils/supplierData'
 import { ChevronDownIcon, SearchIcon } from '../icons/PlatformIcons'
@@ -39,12 +40,15 @@ export default function SearchableSupplierSelect({
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
 
   const allSuppliers = useMemo(() => {
-    const list = suppliersProp ?? getSuppliers()
-    if (!activeOnly) return list
-    return list.filter(
-      (supplier) =>
-        supplier.status === SUPPLIER_STATUS.ACTIVE || supplier.id === value
-    )
+    const list = (suppliersProp ?? getSuppliers()).filter((supplier) => !supplier.isMerged)
+    const visible = activeOnly
+      ? list.filter(
+          (supplier) =>
+            supplier.status === SUPPLIER_STATUS.ACTIVE || supplier.id === value
+        )
+      : list
+    // UMAG-linked active first; keep local-only available for current workflows.
+    return [...visible].sort(compareSuppliersForSelection)
   }, [suppliersProp, activeOnly, value])
 
   const filteredSuppliers = useMemo(
