@@ -207,10 +207,25 @@ export function normalizeSupplier(raw) {
     raw.deliveryWeekdays ?? raw.delivery_weekdays ?? raw.delivery_days ?? raw.deliveryDays
   )
 
+  const umagSupplierId =
+    raw.umagSupplierId ?? raw.umag_supplier_id ?? null
+  const linkedToUmag = umagSupplierId != null && umagSupplierId !== ''
+
   return {
     id: raw.id,
     name: raw.name?.trim() || '',
     legalName: raw.legalName ?? raw.legal_name ?? '',
+    bin: raw.bin ?? '',
+    umagPhone: raw.umagPhone ?? raw.umag_phone ?? '',
+    actualAddress: raw.actualAddress ?? raw.actual_address ?? '',
+    legalAddress: raw.legalAddress ?? raw.legal_address ?? '',
+    umagSupplierId: umagSupplierId == null ? null : Number(umagSupplierId),
+    isUmagActive:
+      raw.isUmagActive ??
+      raw.is_umag_active ??
+      (linkedToUmag ? true : null),
+    umagLastSyncedAt: raw.umagLastSyncedAt ?? raw.umag_last_synced_at ?? null,
+    linkedToUmag,
     productCategories: categories,
     managerName: raw.managerName ?? raw.manager_name ?? '',
     managerPhone: raw.managerPhone ?? raw.manager_phone ?? '',

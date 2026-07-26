@@ -67,7 +67,31 @@
 .supplier-table__name {
   font-weight: 700;
   color: var(--color-text);
-  max-width: 240px;
+  max-width: 280px;
+}
+
+.supplier-table__name-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.supplier-table__umag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+}
+
+.supplier-table__umag--inactive {
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .supplier-name-link {

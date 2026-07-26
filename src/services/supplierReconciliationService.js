@@ -236,6 +236,7 @@ export function normalizeReconciliationDocument(row) {
  */
 export async function computeUmagSnapshotForSupplier({
   supplierId,
+  platformSupplierId,
   umagSupplierId,
   dateFrom,
   dateTo,
@@ -244,8 +245,9 @@ export async function computeUmagSnapshotForSupplier({
   if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
     throw new Error('Укажите корректный период сверки')
   }
-  if (!supplierId && umagSupplierId == null) {
-    throw new Error('Не выбран поставщик UMAG')
+  const canonicalId = platformSupplierId || supplierId
+  if (!canonicalId && umagSupplierId == null) {
+    throw new Error('Не выбран поставщик')
   }
 
   const fromIso = `${dateFrom}T00:00:00+05:00`
@@ -258,8 +260,8 @@ export async function computeUmagSnapshotForSupplier({
     .gte('doc_time', fromIso)
     .lte('doc_time', toIso)
 
-  if (supplierId) {
-    query = query.eq('supplier_id', supplierId)
+  if (canonicalId) {
+    query = query.eq('platform_supplier_id', canonicalId)
   } else {
     query = query.eq('umag_supplier_id', umagSupplierId)
   }
@@ -281,7 +283,11 @@ export async function computeUmagSnapshotForSupplier({
   return snapshot
 }
 
-export async function listSupplierReconciliations({ supplierId, umagSupplierId } = {}) {
+export async function listSupplierReconciliations({
+  supplierId,
+  platformSupplierId,
+  umagSupplierId,
+} = {}) {
   assertCloudReady()
 
   let query = supabase
@@ -289,8 +295,9 @@ export async function listSupplierReconciliations({ supplierId, umagSupplierId }
     .select(RECON_SELECT)
     .order('created_at', { ascending: false })
 
-  if (supplierId) {
-    query = query.eq('supplier_id', supplierId)
+  const canonicalId = platformSupplierId || supplierId
+  if (canonicalId) {
+    query = query.eq('supplier_id', canonicalId)
   } else if (umagSupplierId != null) {
     query = query.eq('umag_supplier_id', umagSupplierId)
   }
@@ -407,6 +414,7 @@ export async function createSupplierReconciliation(input) {
 
   const {
     supplierId = null,
+    platformSupplierId = null,
     umagSupplierId = null,
     supplierName,
     dateFrom,
@@ -420,8 +428,9 @@ export async function createSupplierReconciliation(input) {
   if (!supplierName?.trim()) throw new Error('Не указан поставщик')
   if (dateFrom > dateTo) throw new Error('Дата начала не может быть позже даты окончания')
 
+  const canonicalId = platformSupplierId || supplierId
   const snapshot = await computeUmagSnapshotForSupplier({
-    supplierId,
+    platformSupplierId: canonicalId,
     umagSupplierId,
     dateFrom,
     dateTo,
@@ -431,7 +440,7 @@ export async function createSupplierReconciliation(input) {
   const status = deriveReconciliationStatus(supplierReportedBalance, difference)
 
   const payload = {
-    supplier_id: supplierId || null,
+    supplier_id: canonicalId || null,
     umag_supplier_id: umagSupplierId ?? null,
     supplier_name: supplierName.trim(),
     date_from: dateFrom,
@@ -565,6 +574,11 @@ export async function fetchLatestReconciliationStatuses() {
       (row.umag_supplier_id != null ? `umag:${row.umag_supplier_id}` : null)
     if (!key || map.has(key)) continue
     map.set(key, row.status)
+    // Also index by umag external id for settlements rows that still key by umag:*
+    if (row.supplier_id && row.umag_supplier_id != null) {
+      const umagKey = `umag:${row.umag_supplier_id}`
+      if (!map.has(umagKey)) map.set(umagKey, row.status)
+    }
   }
   return map
 }

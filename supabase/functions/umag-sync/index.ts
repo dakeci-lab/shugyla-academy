@@ -534,11 +534,303 @@ async function loadSupplierMap(
   return map
 }
 
+type CanonicalReconcileStats = {
+  sourceReceived: number
+  created: number
+  updated: number
+  linkedByExternalId: number
+  linkedByBin: number
+  potentialDuplicates: number
+  mappingErrors: number
+  platformMap: Map<number, string>
+}
+
+function normalizeBin(value: unknown): string | null {
+  const bin = String(value ?? '').trim()
+  return bin ? bin : null
+}
+
+/**
+ * Keep platform_suppliers as canonical.
+ * Link by umag_supplier_id or unique BIN only — never by fuzzy/name merge.
+ * UMAG-owned fields update; Shugyla operational fields are never written here.
+ */
+async function reconcileCanonicalSuppliers(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  activeUmagIds: Set<number>
+): Promise<CanonicalReconcileStats | Response> {
+  const emptyStats: CanonicalReconcileStats = {
+    sourceReceived: 0,
+    created: 0,
+    updated: 0,
+    linkedByExternalId: 0,
+    linkedByBin: 0,
+    potentialDuplicates: 0,
+    mappingErrors: 0,
+    platformMap: new Map(),
+  }
+
+  const { data: umagRows, error: umagError } = await serviceClient
+    .from('umag_suppliers')
+    .select(
+      'umag_supplier_id, name, legal_name, bin, phone, actual_address, legal_address, is_deleted, last_synced_at'
+    )
+  if (umagError) {
+    console.error('canonical_umag_select_failed', { message: umagError.message })
+    return umagErrorResponse(
+      'SUPABASE_UPSERT_FAILED',
+      'Не удалось прочитать зеркало поставщиков UMAG для сверки.',
+      500
+    )
+  }
+
+  const { data: platformRows, error: platformError } = await serviceClient
+    .from('platform_suppliers')
+    .select('id, name, umag_supplier_id, bin')
+  if (platformError) {
+    console.error('canonical_platform_select_failed', { message: platformError.message })
+    return umagErrorResponse(
+      'SUPABASE_UPSERT_FAILED',
+      'Не удалось прочитать канонических поставщиков для сверки.',
+      500
+    )
+  }
+
+  const byUmagId = new Map<number, { id: string; name: string; bin: string | null }>()
+  const unlinkedByBin = new Map<string, string[]>()
+  const nameCountsPlatform = new Map<string, number>()
+  const platformByName = new Map<string, string[]>()
+
+  for (const row of platformRows || []) {
+    const nameKey = String(row.name || '')
+      .trim()
+      .toLowerCase()
+    if (nameKey) {
+      nameCountsPlatform.set(nameKey, (nameCountsPlatform.get(nameKey) || 0) + 1)
+      const list = platformByName.get(nameKey) || []
+      list.push(row.id)
+      platformByName.set(nameKey, list)
+    }
+    if (row.umag_supplier_id != null) {
+      byUmagId.set(Number(row.umag_supplier_id), {
+        id: row.id,
+        name: row.name,
+        bin: normalizeBin(row.bin),
+      })
+    } else {
+      const bin = normalizeBin(row.bin)
+      if (bin) {
+        const list = unlinkedByBin.get(bin) || []
+        list.push(row.id)
+        unlinkedByBin.set(bin, list)
+      }
+    }
+  }
+
+  const umagBinCounts = new Map<string, number>()
+  const nameCountsUmag = new Map<string, number>()
+  for (const row of umagRows || []) {
+    const bin = normalizeBin(row.bin)
+    if (bin) umagBinCounts.set(bin, (umagBinCounts.get(bin) || 0) + 1)
+    const nameKey = String(row.name || '')
+      .trim()
+      .toLowerCase()
+    if (nameKey) nameCountsUmag.set(nameKey, (nameCountsUmag.get(nameKey) || 0) + 1)
+  }
+
+  const stats = { ...emptyStats, sourceReceived: (umagRows || []).length, platformMap: new Map<number, string>() }
+  const now = new Date().toISOString()
+  const candidateRows: Array<{
+    umag_supplier_id: number
+    platform_supplier_id: string
+    match_reason: string
+    status: string
+  }> = []
+
+  for (const umag of umagRows || []) {
+    const umagId = Number(umag.umag_supplier_id)
+    if (!Number.isFinite(umagId)) {
+      stats.mappingErrors += 1
+      continue
+    }
+
+    const umagOwned = {
+      name: String(umag.name || '').trim() || `Поставщик ${umagId}`,
+      legal_name: umag.legal_name ? String(umag.legal_name) : null,
+      bin: normalizeBin(umag.bin),
+      umag_phone: umag.phone ? String(umag.phone) : null,
+      actual_address: umag.actual_address ? String(umag.actual_address) : null,
+      legal_address: umag.legal_address ? String(umag.legal_address) : null,
+      is_umag_active: activeUmagIds.has(umagId) && !Boolean(umag.is_deleted),
+      umag_last_synced_at: umag.last_synced_at || now,
+      umag_supplier_id: umagId,
+    }
+
+    let platformId = byUmagId.get(umagId)?.id || null
+    let linkMethod: 'external' | 'bin' | 'create' | null = platformId ? 'external' : null
+
+    if (!platformId && umagOwned.bin && umagBinCounts.get(umagOwned.bin) === 1) {
+      const candidates = unlinkedByBin.get(umagOwned.bin) || []
+      if (candidates.length === 1) {
+        platformId = candidates[0]
+        linkMethod = 'bin'
+      }
+    }
+
+    if (platformId) {
+      const { error } = await serviceClient
+        .from('platform_suppliers')
+        .update(umagOwned)
+        .eq('id', platformId)
+      if (error) {
+        console.error('canonical_update_failed', { umagId, message: error.message })
+        stats.mappingErrors += 1
+        continue
+      }
+      stats.updated += 1
+      if (linkMethod === 'external') stats.linkedByExternalId += 1
+      if (linkMethod === 'bin') {
+        stats.linkedByBin += 1
+        byUmagId.set(umagId, { id: platformId, name: umagOwned.name, bin: umagOwned.bin })
+        // prevent reuse of this BIN for another create
+        unlinkedByBin.delete(umagOwned.bin || '')
+      }
+      stats.platformMap.set(umagId, platformId)
+    } else {
+      const insertRow = {
+        ...umagOwned,
+        manager_name: '',
+        manager_phone: '',
+        order_days: '',
+        delivery_days: '',
+        product_categories: [],
+        payment_type: 'cash',
+        return_policy: 'no',
+        status: umagOwned.is_umag_active ? 'active' : 'inactive',
+        comment: null,
+      }
+      const { data: created, error } = await serviceClient
+        .from('platform_suppliers')
+        .insert(insertRow)
+        .select('id')
+        .single()
+      if (error || !created?.id) {
+        console.error('canonical_create_failed', { umagId, message: error?.message })
+        stats.mappingErrors += 1
+        continue
+      }
+      stats.created += 1
+      stats.platformMap.set(umagId, created.id)
+      byUmagId.set(umagId, { id: created.id, name: umagOwned.name, bin: umagOwned.bin })
+
+      const nameKey = umagOwned.name.trim().toLowerCase()
+      if (
+        nameKey &&
+        nameCountsPlatform.get(nameKey) === 1 &&
+        nameCountsUmag.get(nameKey) === 1
+      ) {
+        const existingIds = platformByName.get(nameKey) || []
+        for (const existingId of existingIds) {
+          if (existingId === created.id) continue
+          candidateRows.push({
+            umag_supplier_id: umagId,
+            platform_supplier_id: existingId,
+            match_reason: 'exact_name',
+            status: 'open',
+          })
+        }
+      }
+    }
+  }
+
+  // Soft-deactivate canonical rows linked to UMAG agents missing from this active sync set
+  const linkedPlatformIds: string[] = []
+  for (const [umagId, meta] of byUmagId) {
+    if (!activeUmagIds.has(umagId)) linkedPlatformIds.push(meta.id)
+  }
+  if (linkedPlatformIds.length > 0) {
+    const chunkSize = 100
+    for (let i = 0; i < linkedPlatformIds.length; i += chunkSize) {
+      const chunk = linkedPlatformIds.slice(i, i + chunkSize)
+      const { error } = await serviceClient
+        .from('platform_suppliers')
+        .update({ is_umag_active: false, umag_last_synced_at: now })
+        .in('id', chunk)
+      if (error) {
+        console.error('canonical_deactivate_failed', { message: error.message })
+        stats.mappingErrors += 1
+      }
+    }
+  }
+
+  if (candidateRows.length > 0) {
+    const { error } = await serviceClient
+      .from('supplier_umag_match_candidates')
+      .upsert(candidateRows, {
+        onConflict: 'umag_supplier_id,platform_supplier_id,match_reason',
+        ignoreDuplicates: true,
+      })
+    if (error) {
+      console.error('canonical_candidates_failed', { message: error.message })
+      stats.mappingErrors += 1
+    } else {
+      stats.potentialDuplicates = candidateRows.length
+    }
+  }
+
+  // Ensure map includes every already-linked platform supplier
+  for (const [umagId, meta] of byUmagId) {
+    if (!stats.platformMap.has(umagId)) stats.platformMap.set(umagId, meta.id)
+  }
+
+  console.info('umag_sync_canonical_reconcile', {
+    sourceReceived: stats.sourceReceived,
+    created: stats.created,
+    updated: stats.updated,
+    linkedByExternalId: stats.linkedByExternalId,
+    linkedByBin: stats.linkedByBin,
+    potentialDuplicates: stats.potentialDuplicates,
+    mappingErrors: stats.mappingErrors,
+  })
+
+  if (stats.mappingErrors > 0) {
+    return umagErrorResponse(
+      'CANONICAL_SUPPLIER_RECONCILE_FAILED',
+      'Сверка канонических поставщиков завершилась с ошибками. Sync не помечен как успешный.',
+      500,
+      { mappingErrors: stats.mappingErrors, stats }
+    )
+  }
+
+  return stats
+}
+
+async function loadPlatformSupplierMap(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any
+): Promise<Map<number, string>> {
+  const map = new Map<number, string>()
+  const { data, error } = await serviceClient
+    .from('platform_suppliers')
+    .select('id, umag_supplier_id')
+    .not('umag_supplier_id', 'is', null)
+  if (error) {
+    console.error('platform_supplier_map_failed', { message: error.message })
+    return map
+  }
+  for (const row of data || []) {
+    map.set(Number(row.umag_supplier_id), row.id)
+  }
+  return map
+}
+
 async function upsertSupplies(
   // deno-lint-ignore no-explicit-any
   serviceClient: any,
   supplies: UmagSupply[],
-  supplierMap: Map<number, string>
+  supplierMap: Map<number, string>,
+  platformMap: Map<number, string>
 ): Promise<{ created: number; updated: number; reactivated: number } | Response> {
   if (supplies.length === 0) return { created: 0, updated: 0, reactivated: 0 }
 
@@ -577,6 +869,8 @@ async function upsertSupplies(
     rows.push({
       umag_supply_id: umagSupplyId,
       supplier_id: umagSupplierId != null ? supplierMap.get(umagSupplierId) ?? null : null,
+      platform_supplier_id:
+        umagSupplierId != null ? platformMap.get(umagSupplierId) ?? null : null,
       umag_supplier_id: umagSupplierId,
       supplier_name: String(supply.supplierName || '').trim() || 'Без названия',
       supplier_legal_name: supply.supplierLegalName ? String(supply.supplierLegalName) : null,
@@ -760,7 +1054,18 @@ Deno.serve(async (req) => {
   try {
     let suppliersCreated = 0
     let suppliersUpdated = 0
+    let canonicalStats: CanonicalReconcileStats = {
+      sourceReceived: 0,
+      created: 0,
+      updated: 0,
+      linkedByExternalId: 0,
+      linkedByBin: 0,
+      potentialDuplicates: 0,
+      mappingErrors: 0,
+      platformMap: new Map(),
+    }
     let supplierMap = await loadSupplierMap(authz.serviceClient)
+    let platformMap = await loadPlatformSupplierMap(authz.serviceClient)
 
     if (syncSuppliers) {
       const suppliersResult = await fetchAllSuppliers(session)
@@ -778,6 +1083,7 @@ Deno.serve(async (req) => {
           status: 'failed',
           error_message: 'Ошибка сохранения поставщиков',
           records_received: suppliersResult.agents.length,
+          source_suppliers_received: suppliersResult.agents.length,
         })
         return upsertResult
       }
@@ -786,6 +1092,32 @@ Deno.serve(async (req) => {
       supplierMap = upsertResult.map.size > 0 ? upsertResult.map : supplierMap
       // Refresh full map so supplies can link even if some agents were already present
       supplierMap = await loadSupplierMap(authz.serviceClient)
+
+      const activeUmagIds = new Set<number>()
+      for (const agent of suppliersResult.agents) {
+        const id = asBigIntId(agent.id)
+        if (id != null) activeUmagIds.add(id)
+      }
+
+      const reconcileResult = await reconcileCanonicalSuppliers(
+        authz.serviceClient,
+        activeUmagIds
+      )
+      if (reconcileResult instanceof Response) {
+        await finishSyncRun(authz.serviceClient, runId, {
+          status: 'failed',
+          error_message: 'Ошибка сверки канонических поставщиков',
+          records_received: suppliersResult.agents.length,
+          source_suppliers_received: suppliersResult.agents.length,
+          records_created: suppliersCreated,
+          records_updated: suppliersUpdated,
+        })
+        return reconcileResult
+      }
+      canonicalStats = reconcileResult
+      platformMap = reconcileResult.platformMap.size
+        ? reconcileResult.platformMap
+        : await loadPlatformSupplierMap(authz.serviceClient)
     }
 
     const suppliesResult = await fetchAllSupplies(session, bounds.fromTime, bounds.toTime)
@@ -857,7 +1189,8 @@ Deno.serve(async (req) => {
     const suppliesUpsert = await upsertSupplies(
       authz.serviceClient,
       suppliesResult.supplies,
-      supplierMap
+      supplierMap,
+      platformMap
     )
     if (suppliesUpsert instanceof Response) {
       await finishSyncRun(authz.serviceClient, runId, {
@@ -967,10 +1300,17 @@ Deno.serve(async (req) => {
     await finishSyncRun(authz.serviceClient, runId, {
       status,
       records_received: suppliesResult.supplies.length,
-      records_created: suppliesUpsert.created + suppliersCreated,
-      records_updated: suppliesUpsert.updated + suppliersUpdated,
+      records_created: suppliesUpsert.created + suppliersCreated + canonicalStats.created,
+      records_updated: suppliesUpsert.updated + suppliersUpdated + canonicalStats.updated,
       records_source_deleted: sourceDeleted,
       records_reactivated: suppliesUpsert.reactivated,
+      source_suppliers_received: canonicalStats.sourceReceived || null,
+      canonical_created: canonicalStats.created,
+      canonical_updated: canonicalStats.updated,
+      linked_by_external_id: canonicalStats.linkedByExternalId,
+      linked_by_bin: canonicalStats.linkedByBin,
+      potential_duplicates: canonicalStats.potentialDuplicates,
+      mapping_errors: canonicalStats.mappingErrors,
       source_total_count: source.totalCount,
       source_amount: source.amount,
       source_payment_amount: source.paymentAmount,
@@ -994,6 +1334,15 @@ Deno.serve(async (req) => {
         created: suppliersCreated,
         updated: suppliersUpdated,
         totalKnown: supplierMap.size,
+        canonical: {
+          created: canonicalStats.created,
+          updated: canonicalStats.updated,
+          linkedByExternalId: canonicalStats.linkedByExternalId,
+          linkedByBin: canonicalStats.linkedByBin,
+          potentialDuplicates: canonicalStats.potentialDuplicates,
+          mappingErrors: canonicalStats.mappingErrors,
+          totalLinked: platformMap.size,
+        },
       },
       supplies: {
         received: suppliesResult.supplies.length,

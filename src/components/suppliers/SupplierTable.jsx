@@ -38,6 +38,22 @@ function SupplierStatusBadge({ status }) {
   )
 }
 
+function UmagLinkBadge({ supplier }) {
+  if (!supplier?.linkedToUmag) return null
+  return (
+    <span
+      className={`supplier-table__umag${supplier.isUmagActive === false ? ' supplier-table__umag--inactive' : ''}`}
+      title={
+        supplier.isUmagActive === false
+          ? 'Связан с UMAG, сейчас неактивен в UMAG'
+          : 'Синхронизировано с UMAG'
+      }
+    >
+      UMAG
+    </span>
+  )
+}
+
 function handleCardKeyDown(event, onEdit, supplier) {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
@@ -78,17 +94,20 @@ export default function SupplierTable({
                 <tr key={supplier.id} className="supplier-table__row">
                   <td className="supplier-table__num">{index + 1}</td>
                   <td className="supplier-table__name">
-                    {canEdit && onEdit ? (
-                      <button
-                        type="button"
-                        className="supplier-name-link"
-                        onClick={(event) => openEdit(supplier, event)}
-                      >
-                        {supplier.name}
-                      </button>
-                    ) : (
-                      supplier.name
-                    )}
+                    <div className="supplier-table__name-wrap">
+                      {canEdit && onEdit ? (
+                        <button
+                          type="button"
+                          className="supplier-name-link"
+                          onClick={(event) => openEdit(supplier, event)}
+                        >
+                          {supplier.name}
+                        </button>
+                      ) : (
+                        <span>{supplier.name}</span>
+                      )}
+                      <UmagLinkBadge supplier={supplier} />
+                    </div>
                   </td>
                   <td>{displayValue(supplier.managerName)}</td>
                   <td>{displayValue(supplier.managerPhone)}</td>
@@ -130,7 +149,9 @@ export default function SupplierTable({
                 : {})}
             >
               <div className="supplier-card-item__head">
-                <h3 className="supplier-card-item__title">{supplier.name}</h3>
+                <h3 className="supplier-card-item__title">
+                  {supplier.name} <UmagLinkBadge supplier={supplier} />
+                </h3>
                 <SupplierStatusBadge status={supplier.status} />
               </div>
 

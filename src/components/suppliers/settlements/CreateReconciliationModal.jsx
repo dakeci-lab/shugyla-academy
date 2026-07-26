@@ -58,7 +58,7 @@ export default function CreateReconciliationModal({
       setSnapshotError('')
       try {
         const next = await computeUmagSnapshotForSupplier({
-          supplierId: supplier.supplierId,
+          platformSupplierId: supplier.platformSupplierId || supplier.supplierId,
           umagSupplierId: supplier.umagSupplierId,
           dateFrom,
           dateTo,
@@ -77,7 +77,13 @@ export default function CreateReconciliationModal({
     return () => {
       cancelled = true
     }
-  }, [supplier.supplierId, supplier.umagSupplierId, dateFrom, dateTo])
+  }, [
+    supplier.platformSupplierId,
+    supplier.supplierId,
+    supplier.umagSupplierId,
+    dateFrom,
+    dateTo,
+  ])
 
   const reportedBalance = useMemo(() => parseMoneyInput(reportedRaw), [reportedRaw])
   const difference = useMemo(() => {
@@ -111,7 +117,7 @@ export default function CreateReconciliationModal({
     onSyncComplete?.()
     try {
       const next = await computeUmagSnapshotForSupplier({
-        supplierId: supplier.supplierId,
+        platformSupplierId: supplier.platformSupplierId || supplier.supplierId,
         umagSupplierId: supplier.umagSupplierId,
         dateFrom,
         dateTo,
@@ -144,7 +150,7 @@ export default function CreateReconciliationModal({
     setSaving(true)
     try {
       const created = await createSupplierReconciliation({
-        supplierId: supplier.supplierId,
+        platformSupplierId: supplier.platformSupplierId || supplier.supplierId,
         umagSupplierId: supplier.umagSupplierId,
         supplierName: supplier.name,
         dateFrom,

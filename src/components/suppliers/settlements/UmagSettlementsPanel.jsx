@@ -115,7 +115,7 @@ function UmagSupplierDetail({
     setHistoryError('')
     try {
       const rows = await listSupplierReconciliations({
-        supplierId: supplier.supplierId,
+        platformSupplierId: supplier.platformSupplierId || supplier.supplierId,
         umagSupplierId: supplier.umagSupplierId,
       })
       setHistory(rows)
@@ -125,7 +125,12 @@ function UmagSupplierDetail({
     } finally {
       setHistoryLoading(false)
     }
-  }, [canViewRecon, supplier.supplierId, supplier.umagSupplierId])
+  }, [
+    canViewRecon,
+    supplier.platformSupplierId,
+    supplier.supplierId,
+    supplier.umagSupplierId,
+  ])
 
   useEffect(() => {
     void loadHistory()

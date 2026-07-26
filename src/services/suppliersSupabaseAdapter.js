@@ -18,6 +18,13 @@ function rowToSupplier(row) {
     id: row.id,
     name: row.name,
     legal_name: row.legal_name,
+    bin: row.bin,
+    umag_phone: row.umag_phone,
+    actual_address: row.actual_address,
+    legal_address: row.legal_address,
+    umag_supplier_id: row.umag_supplier_id,
+    is_umag_active: row.is_umag_active,
+    umag_last_synced_at: row.umag_last_synced_at,
     product_categories: row.product_categories,
     manager_name: row.manager_name,
     manager_phone: row.manager_phone,
@@ -38,6 +45,7 @@ function rowToSupplier(row) {
   })
 }
 
+/** Full row for local-only create. Never used to overwrite UMAG-owned fields on linked suppliers. */
 function supplierToRow(data) {
   return {
     name: data.name?.trim(),
@@ -57,6 +65,27 @@ function supplierToRow(data) {
     responsible_employee_name: data.responsibleEmployeeName?.trim() || null,
     status: data.status || SUPPLIER_STATUS.ACTIVE,
     comment: data.comment?.trim() || null,
+  }
+}
+
+/** Shugyla-owned operational fields only — safe for UMAG-linked suppliers. */
+function supplierToOperationalRow(data) {
+  return {
+    manager_name: data.managerName?.trim() || '',
+    manager_phone: data.managerPhone?.trim() || '',
+    whatsapp: data.whatsapp?.trim() || null,
+    order_days: serializeSupplierWeekdays(data.orderWeekdays ?? data.orderDays),
+    delivery_days: serializeSupplierWeekdays(data.deliveryWeekdays ?? data.deliveryDays),
+    min_order_amount: data.minOrderAmount ?? null,
+    payment_type: data.paymentType || PAYMENT_TYPE.CASH,
+    deferral_days: data.deferralDays ?? null,
+    return_policy: data.returnPolicy || RETURN_POLICY.NO,
+    return_comment: data.returnComment?.trim() || null,
+    responsible_employee_id: data.responsibleEmployeeId ?? null,
+    responsible_employee_name: data.responsibleEmployeeName?.trim() || null,
+    status: data.status || SUPPLIER_STATUS.ACTIVE,
+    comment: data.comment?.trim() || null,
+    product_categories: data.productCategories || [],
   }
 }
 
@@ -92,7 +121,8 @@ export async function updateSupplier(supplierId, updates) {
   if (!current) throw new Error('Поставщик не найден')
 
   const merged = normalizeSupplier({ ...current, ...updates })
-  const patch = supplierToRow(merged)
+  // Linked suppliers: never let the client overwrite UMAG-owned identity fields.
+  const patch = current.linkedToUmag ? supplierToOperationalRow(merged) : supplierToRow(merged)
 
   await throwIfError(
     await supabase.from('platform_suppliers').update(patch).eq('id', supplierId),

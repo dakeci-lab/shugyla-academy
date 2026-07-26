@@ -243,7 +243,7 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
   const { data, error } = await supabase
     .from('umag_supplies')
     .select(
-      'id, umag_supply_id, supplier_id, umag_supplier_id, supplier_name, supplier_legal_name, doc_time, amount, payment_amount, payment_refund_amount, debt, account, comment, umag_user_name'
+      'id, umag_supply_id, supplier_id, platform_supplier_id, umag_supplier_id, supplier_name, supplier_legal_name, doc_time, amount, payment_amount, payment_refund_amount, debt, account, comment, umag_user_name'
     )
     .eq('is_source_deleted', false)
     .gte('doc_time', fromIso)
@@ -258,14 +258,18 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
   const byKey = new Map()
 
   for (const supply of supplies) {
+    // Prefer canonical platform supplier identity for settlements UI.
     const key =
+      supply.platform_supplier_id ||
       supply.supplier_id ||
       (supply.umag_supplier_id != null ? `umag:${supply.umag_supplier_id}` : `name:${supply.supplier_name}`)
     let row = byKey.get(key)
     if (!row) {
       row = {
         key,
-        supplierId: supply.supplier_id,
+        platformSupplierId: supply.platform_supplier_id,
+        supplierId: supply.platform_supplier_id || supply.supplier_id,
+        umagSupplierUuid: supply.supplier_id,
         umagSupplierId: supply.umag_supplier_id,
         name: supply.supplier_name || 'Без названия',
         legalName: supply.supplier_legal_name || null,

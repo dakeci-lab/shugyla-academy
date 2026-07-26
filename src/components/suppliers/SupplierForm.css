@@ -2,10 +2,32 @@
   margin-top: 4px;
 }
 
+.supplier-form__umag-badge {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  color: #047857;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.supplier-form__section-title {
+  margin: 4px 0 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text, #0f172a);
+}
+
 .supplier-form__schedule {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+}
+
+.supplier-form input[readonly] {
+  background: #f8fafc;
+  color: #334155;
 }
 
 @media (max-width: 720px) {

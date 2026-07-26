@@ -13,6 +13,13 @@ import './SupplierForm.css'
 export const EMPTY_SUPPLIER_FORM = {
   name: '',
   legalName: '',
+  bin: '',
+  umagPhone: '',
+  actualAddress: '',
+  legalAddress: '',
+  linkedToUmag: false,
+  isUmagActive: null,
+  umagSupplierId: null,
   managerName: '',
   managerPhone: '',
   orderWeekdays: [],
@@ -27,6 +34,13 @@ export function supplierToForm(supplier) {
   return {
     name: supplier.name || '',
     legalName: supplier.legalName || '',
+    bin: supplier.bin || '',
+    umagPhone: supplier.umagPhone || '',
+    actualAddress: supplier.actualAddress || '',
+    legalAddress: supplier.legalAddress || '',
+    linkedToUmag: Boolean(supplier.linkedToUmag),
+    isUmagActive: supplier.isUmagActive,
+    umagSupplierId: supplier.umagSupplierId ?? null,
     managerName: supplier.managerName || '',
     managerPhone: supplier.managerPhone || '',
     orderWeekdays: parseSupplierWeekdays(supplier.orderWeekdays ?? supplier.orderDays),
@@ -77,9 +91,15 @@ export function formToSupplierPayload(form) {
 }
 
 /** Форма добавления / редактирования поставщика */
+function displayOrUnset(value) {
+  const text = String(value ?? '').trim()
+  return text || 'Не настроено'
+}
+
 export default function SupplierForm({ form, onChange, error }) {
   const showDeferral =
     form.paymentType === PAYMENT_TYPE.DEFERRAL || form.paymentType === PAYMENT_TYPE.MIXED
+  const umagLocked = Boolean(form.linkedToUmag)
 
   function setField(field, value) {
     onChange({ ...form, [field]: value })
@@ -87,6 +107,14 @@ export default function SupplierForm({ form, onChange, error }) {
 
   return (
     <div className="supplier-form admin-form">
+      {umagLocked ? (
+        <div className="supplier-form__umag-badge" role="status">
+          Синхронизировано с UMAG
+          {form.isUmagActive === false ? ' · неактивен в UMAG' : ''}
+          {form.umagSupplierId != null ? ` · ID ${form.umagSupplierId}` : ''}
+        </div>
+      ) : null}
+
       <div className="admin-form__row">
         <label className="admin-form__label">
           Название поставщика *
@@ -95,6 +123,7 @@ export default function SupplierForm({ form, onChange, error }) {
             value={form.name}
             onChange={(e) => setField('name', e.target.value)}
             required
+            readOnly={umagLocked}
           />
         </label>
         <label className="admin-form__label">
@@ -103,9 +132,45 @@ export default function SupplierForm({ form, onChange, error }) {
             className="admin-form__input"
             value={form.legalName}
             onChange={(e) => setField('legalName', e.target.value)}
+            readOnly={umagLocked}
           />
         </label>
       </div>
+
+      {umagLocked ? (
+        <>
+          <div className="admin-form__row">
+            <label className="admin-form__label">
+              БИН
+              <input className="admin-form__input" value={displayOrUnset(form.bin)} readOnly />
+            </label>
+            <label className="admin-form__label">
+              Телефон (UMAG)
+              <input className="admin-form__input" value={displayOrUnset(form.umagPhone)} readOnly />
+            </label>
+          </div>
+          <div className="admin-form__row">
+            <label className="admin-form__label">
+              Фактический адрес
+              <input
+                className="admin-form__input"
+                value={displayOrUnset(form.actualAddress)}
+                readOnly
+              />
+            </label>
+            <label className="admin-form__label">
+              Юридический адрес
+              <input
+                className="admin-form__input"
+                value={displayOrUnset(form.legalAddress)}
+                readOnly
+              />
+            </label>
+          </div>
+        </>
+      ) : null}
+
+      <h3 className="supplier-form__section-title">Наши настройки</h3>
 
       <div className="admin-form__row">
         <label className="admin-form__label">
@@ -114,6 +179,7 @@ export default function SupplierForm({ form, onChange, error }) {
             className="admin-form__input"
             value={form.managerName}
             onChange={(e) => setField('managerName', e.target.value)}
+            placeholder={umagLocked ? 'Не настроено' : undefined}
           />
         </label>
         <label className="admin-form__label">
@@ -123,6 +189,7 @@ export default function SupplierForm({ form, onChange, error }) {
             type="tel"
             value={form.managerPhone}
             onChange={(e) => setField('managerPhone', e.target.value)}
+            placeholder={umagLocked ? 'Не настроено' : undefined}
           />
         </label>
       </div>
