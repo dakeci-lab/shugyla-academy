@@ -73,8 +73,11 @@ function main() {
   const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
   assert.match(panel, /Возвраты поставщикам/)
   assert.match(panel, /История операций/)
-  assert.match(panel, /Возврат поставщику/)
   assert.match(panel, /filterSupplierOperations/)
+  assert.match(panel, /OperationDetailSheet/)
+  const sheet = read('src/components/suppliers/settlements/OperationDetailSheet.jsx')
+  assert.match(sheet, /Возврат поставщику/)
+  assert.match(sheet, /Приёмка/)
   ok('settlements UI shows returns summary + unified history')
 
   console.log(`\n${passed} checks passed`)

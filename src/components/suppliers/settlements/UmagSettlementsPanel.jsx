@@ -32,6 +32,7 @@ import {
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import CreateReconciliationModal from './CreateReconciliationModal'
 import ReconciliationDetailView from './ReconciliationDetailView'
+import OperationDetailSheet from './OperationDetailSheet'
 import './UmagSettlementsPanel.css'
 
 function periodPresets() {
@@ -86,54 +87,6 @@ function LatestReconBadge({ status }) {
   )
 }
 
-function formatAccountNames(value) {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item)).filter(Boolean).join(', ') || '—'
-  }
-  if (value == null || value === '') return '—'
-  return String(value)
-}
-
-function ReturnDetailModal({ item, onClose }) {
-  if (!item) return null
-  const ret = item.source || {}
-  return (
-    <div className="umag-settlements__modal-backdrop" role="presentation" onClick={onClose}>
-      <div
-        className="umag-settlements__modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="Возврат поставщику"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="umag-settlements__modal-head">
-          <h3>Возврат поставщику</h3>
-          <button type="button" className="umag-settlements__modal-close" onClick={onClose}>
-            ×
-          </button>
-        </div>
-        <div className="umag-settlements__card-grid">
-          <span>Дата</span>
-          <strong>{formatUmagDate(ret.document_time)}</strong>
-          <span>Сумма</span>
-          <strong>{formatSignedUmagMoney(-Math.abs(Number(ret.amount) || 0))}</strong>
-          <span>Сотрудник</span>
-          <strong>{ret.user_name || '—'}</strong>
-          <span>Счета</span>
-          <strong>{formatAccountNames(ret.account_names)}</strong>
-          <span>Статус</span>
-          <strong>
-            {ret.is_provided == null ? '—' : ret.is_provided ? 'Проведён' : 'Не проведён'}
-          </strong>
-          <span>Источник</span>
-          <strong>UMAG</strong>
-        </div>
-        {ret.note ? <p className="umag-settlements__comment">{ret.note}</p> : null}
-      </div>
-    </div>
-  )
-}
-
 function UmagSupplierDetail({
   supplier,
   periodDateFrom,
@@ -152,7 +105,7 @@ function UmagSupplierDetail({
 }) {
   const operations = supplier.operations || []
   const [opsFilter, setOpsFilter] = useState('all')
-  const [selectedReturn, setSelectedReturn] = useState(null)
+  const [selectedOperation, setSelectedOperation] = useState(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [history, setHistory] = useState([])
   const [historyLoading, setHistoryLoading] = useState(false)
@@ -376,22 +329,13 @@ function UmagSupplierDetail({
                         {formatSignedUmagMoney(op.signedAmount)}
                       </td>
                       <td>
-                        {op.kind === 'return' ? (
-                          <button
-                            type="button"
-                            className="umag-settlements__link"
-                            onClick={() => setSelectedReturn(op)}
-                          >
-                            Открыть
-                          </button>
-                        ) : (
-                          [
-                            op.source?.umag_user_name,
-                            op.source?.account,
-                          ]
-                            .filter(Boolean)
-                            .join(' · ') || '—'
-                        )}
+                        <button
+                          type="button"
+                          className="umag-settlements__link"
+                          onClick={() => setSelectedOperation(op)}
+                        >
+                          Открыть
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -405,9 +349,7 @@ function UmagSupplierDetail({
                   key={op.id}
                   type="button"
                   className="umag-settlements__card"
-                  onClick={() => {
-                    if (op.kind === 'return') setSelectedReturn(op)
-                  }}
+                  onClick={() => setSelectedOperation(op)}
                 >
                   <div className="umag-settlements__card-title">
                     {formatUmagDate(op.sortAt)}
@@ -433,8 +375,12 @@ function UmagSupplierDetail({
         )}
       </section>
 
-      {selectedReturn ? (
-        <ReturnDetailModal item={selectedReturn} onClose={() => setSelectedReturn(null)} />
+      {selectedOperation ? (
+        <OperationDetailSheet
+          operation={selectedOperation}
+          supplierName={supplier.name}
+          onClose={() => setSelectedOperation(null)}
+        />
       ) : null}
 
       {createOpen ? (
