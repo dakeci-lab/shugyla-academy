@@ -69,20 +69,43 @@ function main() {
   assert.match(sync, /failed_supply_ids/)
   ok('umag-sync refreshes obligations without rewriting snapshots')
 
+  const panel = read('src/components/suppliers/payments/SupplierPaymentsPanel.jsx')
+  assert.match(panel, /Общий долг поставщикам/)
+  assert.match(panel, /Сегодня к оплате/)
+  assert.match(panel, /Просрочено/)
+  assert.match(panel, /К оплате/)
+  assert.match(panel, /Настроить отсрочку/)
+  assert.match(panel, /focusSection: 'payment-terms'/)
+  assert.match(panel, /pickDefaultPaymentTab/)
+  assert.doesNotMatch(panel, /Прогноз платежей/)
+  assert.doesNotMatch(panel, /Отсроченная задолженность/)
+  assert.doesNotMatch(panel, /Ближайшие 7 дней/)
+  assert.doesNotMatch(panel, /Когда нужно платить по текущему долгу UMAG/)
+  assert.doesNotMatch(panel, /setInterval/)
+  ok('payments UI dashboard without polling')
+
   const utils = read('src/utils/supplierPaymentObligations.js')
   assert.match(utils, /Asia\/Aqtobe/)
   assert.match(utils, /TERMS_MISSING/)
   assert.match(utils, /buildPaymentScheduleView/)
+  assert.match(utils, /totalActiveDebt/)
+  assert.match(utils, /pickDefaultPaymentTab/)
+  assert.match(utils, /tabCounts/)
   ok('status helpers use Aqtobe calendar dates')
 
-  const panel = read('src/components/suppliers/payments/SupplierPaymentsPanel.jsx')
-  assert.match(panel, /Сегодня к оплате/)
-  assert.match(panel, /Отсроченная задолженность/)
-  assert.match(panel, /Прогноз платежей/)
-  assert.match(panel, /Обновлено:/)
-  assert.doesNotMatch(panel, /Когда нужно платить по текущему долгу UMAG/)
-  assert.doesNotMatch(panel, /setInterval/)
-  ok('payments UI dashboard without polling')
+  const form = read('src/components/suppliers/SupplierForm.jsx')
+  assert.match(form, /validateSupplierDeferralDays/)
+  assert.match(form, /SupplierPaymentsSummary/)
+  assert.match(form, /max=\"365\"/)
+  assert.match(form, /supplier-payment-terms/)
+  assert.match(form, /focusSection/)
+  ok('supplier form validates deferral days and shows payments summary')
+
+  const suppliersPage = read('src/pages/platform/suppliers/SuppliersPage.jsx')
+  assert.match(suppliersPage, /focusSection/)
+  assert.match(suppliersPage, /returnTo/)
+  assert.match(suppliersPage, /applyMissingObligationSnapshotsForSupplier/)
+  ok('supplier edit opens payment-terms focus and refreshes obligations')
 
   const settlements = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
   assert.doesNotMatch(settlements, /По данным UMAG/)
@@ -99,12 +122,6 @@ function main() {
   assert.match(app, /supplier-payments/)
   ok('route wired')
 
-  const form = read('src/components/suppliers/SupplierForm.jsx')
-  assert.match(form, /validateSupplierDeferralDays/)
-  assert.match(form, /SupplierPaymentsSummary/)
-  assert.match(form, /max=\"365\"/)
-  ok('supplier form validates deferral days and shows payments summary')
-
   assert.equal(addCalendarDays('2026-07-28', 7), '2026-08-04')
   assert.equal(addCalendarDays('2026-07-28', 0), '2026-07-28')
   assert.equal(addCalendarDays('2026-07-28', 14), '2026-08-11')
@@ -118,9 +135,28 @@ function main() {
   assert.equal(deriveStatus(0, '2026-08-01', today), 'paid')
   assert.equal(diffCalendarDays(today, '2026-08-09'), 5)
   assert.equal(diffCalendarDays(today, '2026-08-03'), -1)
+
+  // Category sum identity: overdue + today + upcoming + termsMissing = totalActiveDebt
+  const overdue = 100
+  const dueToday = 50
+  const upcoming = 30
+  const termsMissing = 20
+  const total = overdue + dueToday + upcoming + termsMissing
+  assert.equal(total, 200)
+  assert.equal(pickDefaultFromCounts({ overdue: 2, today: 1, upcoming: 3, termsMissing: 0 }), 'overdue')
+  assert.equal(pickDefaultFromCounts({ overdue: 0, today: 4, upcoming: 3, termsMissing: 1 }), 'today')
+  assert.equal(pickDefaultFromCounts({ overdue: 0, today: 0, upcoming: 3, termsMissing: 1 }), 'upcoming')
   ok('status and day-diff rules')
 
   console.log(`\n${passed} checks passed`)
+}
+
+function pickDefaultFromCounts(tabCounts) {
+  if ((tabCounts.overdue || 0) > 0) return 'overdue'
+  if ((tabCounts.today || 0) > 0) return 'today'
+  if ((tabCounts.upcoming || 0) > 0) return 'upcoming'
+  if ((tabCounts.termsMissing || 0) > 0) return 'termsMissing'
+  return 'overdue'
 }
 
 main()

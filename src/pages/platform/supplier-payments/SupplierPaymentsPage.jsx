@@ -8,7 +8,7 @@ import './SupplierPaymentsPage.css'
 /**
  * Оплаты поставщикам — /platform/supplier-payments
  *
- * Календарь обязательств по umag_supplies.debt и условиям отсрочки.
+ * Контроль сроков оплаты по umag_supplies.debt и условиям отсрочки.
  * Не проводит платежи и не пересчитывает UMAG debt.
  */
 export default function SupplierPaymentsPage() {

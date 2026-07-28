@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   PAYMENT_TYPE,
@@ -171,10 +171,30 @@ export default function SupplierForm({
   error,
   isCreate = false,
   supplierId = null,
+  focusSection = null,
 }) {
   const showDeferral =
     form.paymentType === PAYMENT_TYPE.DEFERRAL || form.paymentType === PAYMENT_TYPE.MIXED
   const umagLocked = Boolean(form.linkedToUmag)
+  const paymentTermsRef = useRef(null)
+
+  useEffect(() => {
+    if (focusSection !== 'payment-terms') return
+    const el = paymentTermsRef.current
+    if (!el) return
+    const scrollTimer = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      el.classList.add('supplier-form__focus-target')
+    }, 80)
+    const clearTimer = window.setTimeout(() => {
+      el.classList.remove('supplier-form__focus-target')
+    }, 2600)
+    return () => {
+      window.clearTimeout(scrollTimer)
+      window.clearTimeout(clearTimer)
+      el.classList.remove('supplier-form__focus-target')
+    }
+  }, [focusSection])
 
   function setField(field, value) {
     onChange({ ...form, [field]: value })
@@ -298,51 +318,57 @@ export default function SupplierForm({
         />
       </div>
 
-      <div className="admin-form__row">
-        <label className="admin-form__label">
-          Условия оплаты
-          <select
-            className="admin-form__input"
-            value={form.paymentType}
-            onChange={(e) => setField('paymentType', e.target.value)}
-          >
-            {Object.entries(PAYMENT_TYPE_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="admin-form__label">
-          Статус
-          <select
-            className="admin-form__input"
-            value={form.status}
-            onChange={(e) => setField('status', e.target.value)}
-          >
-            {Object.entries(SUPPLIER_STATUS_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <div
+        ref={paymentTermsRef}
+        id="supplier-payment-terms"
+        className="supplier-form__payment-terms"
+      >
+        <div className="admin-form__row">
+          <label className="admin-form__label">
+            Условия оплаты
+            <select
+              className="admin-form__input"
+              value={form.paymentType}
+              onChange={(e) => setField('paymentType', e.target.value)}
+            >
+              {Object.entries(PAYMENT_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="admin-form__label">
+            Статус
+            <select
+              className="admin-form__input"
+              value={form.status}
+              onChange={(e) => setField('status', e.target.value)}
+            >
+              {Object.entries(SUPPLIER_STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
 
-      {showDeferral && (
-        <label className="admin-form__label">
-          Срок отсрочки (дней)
-          <input
-            className="admin-form__input"
-            type="number"
-            min="0"
-            max="365"
-            step="1"
-            value={form.deferralDays}
-            onChange={(e) => setField('deferralDays', e.target.value)}
-          />
-        </label>
-      )}
+        {showDeferral && (
+          <label className="admin-form__label">
+            Срок отсрочки (дней)
+            <input
+              className="admin-form__input"
+              type="number"
+              min="0"
+              max="365"
+              step="1"
+              value={form.deferralDays}
+              onChange={(e) => setField('deferralDays', e.target.value)}
+            />
+          </label>
+        )}
+      </div>
 
       {!isCreate ? <SupplierPaymentsSummary supplierId={supplierId} form={form} /> : null}
 

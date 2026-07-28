@@ -67,6 +67,8 @@ export function SuppliersListPage() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [pendingMatchCount, setPendingMatchCount] = useState(0)
+  const [focusSection, setFocusSection] = useState(null)
+  const returnToRef = useRef(null)
 
   const canView = canViewSuppliers(user)
   const canEdit = canEditSuppliers(user)
@@ -112,6 +114,8 @@ export function SuppliersListPage() {
       setEditId(supplier.id)
       setForm(supplierToForm(supplier))
       setFormError('')
+      setFocusSection(location.state?.focusSection || null)
+      returnToRef.current = location.state?.returnTo || null
       setShowForm(true)
     }
 
@@ -122,6 +126,8 @@ export function SuppliersListPage() {
     setEditId(null)
     setForm(EMPTY_SUPPLIER_FORM)
     setFormError('')
+    setFocusSection(null)
+    returnToRef.current = null
     setShowForm(true)
   }
 
@@ -129,6 +135,8 @@ export function SuppliersListPage() {
     setEditId(supplier.id)
     setForm(supplierToForm(supplier))
     setFormError('')
+    setFocusSection(null)
+    returnToRef.current = null
     setShowForm(true)
   }
 
@@ -136,6 +144,8 @@ export function SuppliersListPage() {
     setShowForm(false)
     setEditId(null)
     setFormError('')
+    setFocusSection(null)
+    returnToRef.current = null
   }, [])
 
   function toggleFilter() {
@@ -190,13 +200,21 @@ export function SuppliersListPage() {
         await createSupplier(payload)
       }
       await refresh()
+      const returnTo = returnToRef.current
+      const cameFromPayments = Boolean(returnTo)
       closeForm()
+      if (cameFromPayments) {
+        showSuccess('Условия оплаты сохранены. Сроки обязательств обновлены.')
+        navigate(returnTo)
+      } else {
+        showSuccess('Поставщик сохранён')
+      }
     } catch (err) {
       setFormError(err.message || 'Не удалось сохранить поставщика')
     } finally {
       setSaving(false)
     }
-  }, [closeForm, editId, form, refresh])
+  }, [closeForm, editId, form, navigate, refresh, showSuccess])
 
   const requestDelete = useCallback(() => {
     if (!editId) return
@@ -356,6 +374,7 @@ export function SuppliersListPage() {
             error={formError}
             isCreate={!editId}
             supplierId={editId}
+            focusSection={focusSection}
           />
         </AdminModal>
       )}

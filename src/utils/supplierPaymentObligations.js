@@ -250,12 +250,49 @@ export function buildPaymentScheduleView(obligations, todayKey = toAqtobeDateKey
   overdueDates.sort((a, b) => a.dueDate.localeCompare(b.dueDate))
   futureDates.sort((a, b) => a.dueDate.localeCompare(b.dueDate))
 
+  const termsMissing = [...termsMissingGroups.values()].sort((a, b) => b.amount - a.amount)
+  const overdueList = overdueDates.flatMap((entry) => entry.suppliers)
+  const todayList = todayDates.flatMap((entry) => entry.suppliers)
+  const upcomingList = futureDates.flatMap((entry) => entry.suppliers)
+
+  const obligationCount = (groups) => groups.reduce((sum, g) => sum + (g.count || 0), 0)
+
   return {
     summaries,
     dateGroups: [...overdueDates, ...todayDates, ...futureDates],
-    termsMissing: [...termsMissingGroups.values()].sort((a, b) => b.amount - a.amount),
+    termsMissing,
+    lists: {
+      overdue: overdueList,
+      today: todayList,
+      upcoming: upcomingList,
+      termsMissing,
+    },
+    tabCounts: {
+      overdue: obligationCount(overdueList),
+      today: obligationCount(todayList),
+      upcoming: obligationCount(upcomingList),
+      termsMissing: obligationCount(termsMissing),
+    },
     activeCount: active.length,
   }
+}
+
+/** Default tab: overdue → today → upcoming → termsMissing. */
+export function pickDefaultPaymentTab(tabCounts = {}) {
+  if ((tabCounts.overdue || 0) > 0) return 'overdue'
+  if ((tabCounts.today || 0) > 0) return 'today'
+  if ((tabCounts.upcoming || 0) > 0) return 'upcoming'
+  if ((tabCounts.termsMissing || 0) > 0) return 'termsMissing'
+  return 'overdue'
+}
+
+export function formatReceptionCount(count) {
+  const n = Number(count) || 0
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return `${n} приёмка`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${n} приёмки`
+  return `${n} приёмок`
 }
 
 export function buildSupplierPaymentSummary(obligations, todayKey = toAqtobeDateKey()) {

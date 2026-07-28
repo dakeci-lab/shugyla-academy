@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
 import {
@@ -12,6 +12,8 @@ import {
   OBLIGATION_STATUS_LABELS,
   formatDaysUntilDue,
   formatPaymentTermsSnapshot,
+  formatReceptionCount,
+  pickDefaultPaymentTab,
 } from '../../../utils/supplierPaymentObligations'
 import {
   fetchSupplierPaymentsDashboard,
@@ -25,11 +27,26 @@ import { getMonthPeriodKeys } from '../../../services/umagSettlementsService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import './SupplierPaymentsPanel.css'
 
-function SummaryCard({ label, value, tone, loading }) {
+const TABS = [
+  { id: 'overdue', label: 'Просрочено', empty: 'Просроченных оплат нет' },
+  { id: 'today', label: 'Сегодня', empty: 'На сегодня оплат нет' },
+  { id: 'upcoming', label: 'Предстоящие', empty: 'Предстоящих обязательств нет' },
+  {
+    id: 'termsMissing',
+    label: 'Без срока',
+    empty: 'У всех обязательств настроен срок оплаты',
+  },
+]
+
+function KpiCard({ label, value, tone, loading, primary }) {
   return (
-    <div className={`spo-panel__summary spo-panel__summary--${tone || 'default'}`}>
-      <div className="spo-panel__summary-label">{label}</div>
-      <div className="spo-panel__summary-value">{loading ? '…' : formatUmagMoney(value)}</div>
+    <div
+      className={`spo-panel__kpi spo-panel__kpi--${tone || 'default'}${
+        primary ? ' spo-panel__kpi--primary' : ''
+      }`}
+    >
+      <div className="spo-panel__kpi-label">{label}</div>
+      <div className="spo-panel__kpi-value">{loading ? '…' : formatUmagMoney(value)}</div>
     </div>
   )
 }
@@ -49,15 +66,72 @@ function statusTone(status) {
   }
 }
 
-function formatDateHeading(dueDate, todayKey) {
-  const label = formatUmagDate(`${dueDate}T12:00:00+05:00`)
-  if (dueDate < todayKey) return `Просрочено · ${label}`
-  if (dueDate === todayKey) return `Сегодня · ${label}`
-  return label
+function ObligationCard({ group, todayKey, canEditTerms, onOpen, onConfigure }) {
+  const isMissing = group.status === OBLIGATION_STATUS.TERMS_MISSING
+  const dueLabel = group.dueDate
+    ? formatUmagDate(`${group.dueDate}T12:00:00+05:00`)
+    : null
+  const daysText = formatDaysUntilDue(group.dueDate, todayKey)
+  const mapped = Boolean(group.platformSupplierId)
+
+  return (
+    <div className={`spo-panel__card spo-panel__card--${statusTone(group.status)}`}>
+      <button type="button" className="spo-panel__card-main" onClick={() => onOpen(group)}>
+        <div className="spo-panel__card-title">{group.name || 'Без названия'}</div>
+        <div className="spo-panel__card-amount">{formatUmagMoney(group.amount)}</div>
+        {isMissing ? (
+          <div className="spo-panel__card-meta">Срок оплаты не настроен</div>
+        ) : (
+          <>
+            <div className="spo-panel__card-meta">
+              Срок оплаты:{' '}
+              {group.status === OBLIGATION_STATUS.DUE_TODAY ? 'сегодня' : dueLabel}
+            </div>
+            {group.status !== OBLIGATION_STATUS.DUE_TODAY ? (
+              <div
+                className={`spo-panel__card-days spo-panel__card-days--${statusTone(
+                  group.status
+                )}`}
+              >
+                {daysText}
+              </div>
+            ) : null}
+          </>
+        )}
+        <div className="spo-panel__card-meta">{formatReceptionCount(group.count)}</div>
+      </button>
+
+      {isMissing ? (
+        <div className="spo-panel__card-actions">
+          {canEditTerms && mapped ? (
+            <button
+              type="button"
+              className="btn btn-primary spo-panel__configure-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                onConfigure(group)
+              }}
+            >
+              Настроить отсрочку
+            </button>
+          ) : (
+            <p className="spo-panel__card-hint" role="status">
+              {mapped
+                ? 'Нет прав на изменение условий поставщика'
+                : 'Поставщик не сопоставлен. Сначала необходимо связать его с карточкой поставщика.'}
+            </p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
 }
 
-function GroupDetail({ group, todayKey, canEditTerms, onClose }) {
+function GroupDetail({ group, todayKey, canEditTerms, onClose, onConfigure }) {
   if (!group) return null
+  const isMissing = group.status === OBLIGATION_STATUS.TERMS_MISSING
+  const mapped = Boolean(group.platformSupplierId)
+
   return (
     <div className="spo-panel__sheet-backdrop" role="presentation" onClick={onClose}>
       <div
@@ -69,11 +143,11 @@ function GroupDetail({ group, todayKey, canEditTerms, onClose }) {
       >
         <div className="spo-panel__sheet-head">
           <div>
-            <h3>{group.name}</h3>
+            <h3>{group.name || 'Без названия'}</h3>
             <p className="spo-panel__muted">
               {group.dueDate
                 ? formatDaysUntilDue(group.dueDate, todayKey)
-                : 'Срок оплаты поставщика не настроен'}
+                : 'Срок оплаты не настроен'}
             </p>
           </div>
           <button type="button" className="spo-panel__sheet-close" onClick={onClose}>
@@ -82,15 +156,24 @@ function GroupDetail({ group, todayKey, canEditTerms, onClose }) {
         </div>
 
         <div className="spo-panel__sheet-total">{formatUmagMoney(group.amount)}</div>
-        <div className="spo-panel__muted">{group.count} приёмки</div>
+        <div className="spo-panel__muted">{formatReceptionCount(group.count)}</div>
 
-        {group.status === OBLIGATION_STATUS.TERMS_MISSING && canEditTerms ? (
-          <Link
-            className="btn btn-primary spo-panel__configure-btn"
-            to={`/platform/suppliers/${group.platformSupplierId}`}
-          >
-            Настроить условия
-          </Link>
+        {isMissing ? (
+          mapped && canEditTerms ? (
+            <button
+              type="button"
+              className="btn btn-primary spo-panel__configure-btn"
+              onClick={() => onConfigure(group)}
+            >
+              Настроить отсрочку
+            </button>
+          ) : (
+            <p className="spo-panel__card-hint" role="status">
+              {mapped
+                ? 'Нет прав на изменение условий поставщика'
+                : 'Поставщик не сопоставлен. Сначала необходимо связать его с карточкой поставщика.'}
+            </p>
+          )
         ) : null}
 
         <ul className="spo-panel__ob-list">
@@ -128,6 +211,7 @@ function GroupDetail({ group, todayKey, canEditTerms, onClose }) {
 export default function SupplierPaymentsPanel() {
   const { user } = useSession()
   const toast = useToast()
+  const navigate = useNavigate()
   const canView = canViewSupplierPayments(user)
   const canSync = canSyncUmagSettlements(user)
   const canEditTerms = canEditSuppliers(user)
@@ -139,6 +223,8 @@ export default function SupplierPaymentsPanel() {
   const [todayKey, setTodayKey] = useState(() => toAqtobeDateKey())
   const [lastRun, setLastRun] = useState(null)
   const [selectedGroup, setSelectedGroup] = useState(null)
+  const [activeTab, setActiveTab] = useState('overdue')
+  const [tabTouched, setTabTouched] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -149,7 +235,7 @@ export default function SupplierPaymentsPanel() {
       setTodayKey(data.todayKey)
       setLastRun(data.lastRun)
     } catch (err) {
-      setError(err.message || 'Не удалось загрузить календарь оплат')
+      setError(err.message || 'Не удалось загрузить оплаты поставщикам')
       setView(null)
     } finally {
       setLoading(false)
@@ -160,6 +246,11 @@ export default function SupplierPaymentsPanel() {
     if (!canView) return
     void load()
   }, [canView, load])
+
+  useEffect(() => {
+    if (!view || tabTouched) return
+    setActiveTab(pickDefaultPaymentTab(view.tabCounts))
+  }, [view, tabTouched])
 
   useEffect(() => {
     function onVisibility() {
@@ -194,16 +285,38 @@ export default function SupplierPaymentsPanel() {
     } else {
       toast.success?.(result.message || 'Синхронизация выполнена.')
     }
+    setTabTouched(false)
     await load()
   }
 
+  function openConfigure(group) {
+    if (!group?.platformSupplierId) {
+      toast.error?.(
+        'Поставщик не сопоставлен. Сначала необходимо связать его с карточкой поставщика.'
+      )
+      return
+    }
+    setSelectedGroup(null)
+    navigate('/platform/suppliers', {
+      state: {
+        openEditId: group.platformSupplierId,
+        focusSection: 'payment-terms',
+        returnTo: '/platform/supplier-payments',
+      },
+    })
+  }
+
   const summaries = view?.summaries
+  const tabCounts = view?.tabCounts || {}
+  const visibleGroups = view?.lists?.[activeTab] || []
+  const activeTabMeta = TABS.find((tab) => tab.id === activeTab) || TABS[0]
+
   const staleWarning = useMemo(() => {
     const finished = lastRun?.finished_at || lastRun?.started_at
     if (!finished) return 'Данные ещё не синхронизировались.'
     const ageMs = Date.now() - new Date(finished).getTime()
     if (ageMs > 24 * 60 * 60 * 1000) {
-      return 'Последняя синхронизация была больше суток назад. Обновите данные перед планированием оплат.'
+      return 'Последняя синхронизация была больше суток назад.'
     }
     return null
   }, [lastRun])
@@ -216,7 +329,8 @@ export default function SupplierPaymentsPanel() {
     <div className="spo-panel">
       <div className="spo-panel__toolbar">
         <div>
-          <h2 className="spo-panel__title">Календарь оплат</h2>
+          <h2 className="spo-panel__title">Оплаты поставщикам</h2>
+          <p className="spo-panel__subtitle">Контроль сроков оплаты поставщикам</p>
           <div className="spo-panel__meta">
             <span className="spo-panel__source-chip" title="Источник данных">
               UMAG
@@ -229,7 +343,13 @@ export default function SupplierPaymentsPanel() {
             </span>
             {lastRun?.status && lastRun.status !== 'success' ? (
               <span className="spo-panel__meta-status">
-                ({lastRun.status === 'partial' ? 'частично' : lastRun.status === 'failed' ? 'ошибка' : lastRun.status})
+                (
+                {lastRun.status === 'partial'
+                  ? 'частично'
+                  : lastRun.status === 'failed'
+                    ? 'ошибка'
+                    : lastRun.status}
+                )
               </span>
             ) : null}
           </div>
@@ -258,115 +378,81 @@ export default function SupplierPaymentsPanel() {
         </div>
       ) : null}
 
-      <div className="spo-panel__totals" aria-label="Сводка оплат">
-        <SummaryCard label="Сегодня к оплате" value={summaries?.dueToday} tone="today" loading={loading} />
-        <SummaryCard label="Ближайшие 7 дней" value={summaries?.next7Days} tone="upcoming" loading={loading} />
-        <SummaryCard label="Просрочено" value={summaries?.overdue} tone="overdue" loading={loading} />
-        <SummaryCard
-          label="Отсроченная задолженность"
-          value={summaries?.deferredNotYetDue}
-          tone="deferred"
+      <div className="spo-panel__kpis" aria-label="Сводка оплат">
+        <KpiCard
+          label="Общий долг поставщикам"
+          value={summaries?.totalActiveDebt}
+          tone="total"
+          primary
           loading={loading}
         />
-        {(summaries?.termsMissing || 0) > 0 ? (
-          <SummaryCard
-            label="Требует настройки"
-            value={summaries?.termsMissing}
-            tone="missing"
-            loading={loading}
-          />
-        ) : null}
+        <KpiCard
+          label="Просрочено"
+          value={summaries?.overdue}
+          tone="overdue"
+          loading={loading}
+        />
+        <KpiCard
+          label="Сегодня к оплате"
+          value={summaries?.dueToday}
+          tone="today"
+          loading={loading}
+        />
       </div>
 
-      <section className="spo-panel__forecast" aria-label="Прогноз платежей">
-        <h3 className="spo-panel__section-title">Прогноз платежей</h3>
-        <div className="spo-panel__forecast-grid">
-          <div>
-            <span>3 дня</span>
-            <strong>{loading ? '…' : formatUmagMoney(summaries?.forecast3)}</strong>
-          </div>
-          <div>
-            <span>7 дней</span>
-            <strong>{loading ? '…' : formatUmagMoney(summaries?.forecast7)}</strong>
-          </div>
-          <div>
-            <span>14 дней</span>
-            <strong>{loading ? '…' : formatUmagMoney(summaries?.forecast14)}</strong>
-          </div>
-          <div>
-            <span>30 дней</span>
-            <strong>{loading ? '…' : formatUmagMoney(summaries?.forecast30)}</strong>
-          </div>
+      <section className="spo-panel__plan" aria-label="К оплате">
+        <div className="spo-panel__plan-head">
+          <h3 className="spo-panel__section-title">К оплате</h3>
         </div>
+
+        <div className="spo-panel__tabs" role="tablist" aria-label="Приоритет оплат">
+          {TABS.map((tab) => {
+            const count = tabCounts[tab.id] || 0
+            const selected = activeTab === tab.id
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={selected}
+                className={`spo-panel__tab spo-panel__tab--${tab.id}${
+                  selected ? ' spo-panel__tab--active' : ''
+                }`}
+                onClick={() => {
+                  setTabTouched(true)
+                  setActiveTab(tab.id)
+                }}
+              >
+                <span>{tab.label}</span>
+                <span className="spo-panel__tab-count">{count}</span>
+              </button>
+            )
+          })}
+        </div>
+
+        {loading ? (
+          <div className="spo-panel__empty spo-panel__empty--compact">Загрузка…</div>
+        ) : error ? (
+          <div className="spo-panel__error" role="alert">
+            {error}
+          </div>
+        ) : visibleGroups.length === 0 ? (
+          <div className="spo-panel__empty spo-panel__empty--compact">{activeTabMeta.empty}</div>
+        ) : (
+          <div className="spo-panel__cards">
+            {visibleGroups.map((group) => (
+              <ObligationCard
+                key={group.key}
+                group={group}
+                todayKey={todayKey}
+                canEditTerms={canEditTerms}
+                onOpen={setSelectedGroup}
+                onConfigure={openConfigure}
+              />
+            ))}
+          </div>
+        )}
       </section>
-
-      {loading ? (
-        <div className="spo-panel__empty">Загрузка календаря…</div>
-      ) : error ? (
-        <div className="spo-panel__error" role="alert">
-          {error}
-        </div>
-      ) : (
-        <>
-          {view?.termsMissing?.length ? (
-            <section className="spo-panel__section" aria-label="Требует настройки">
-              <h3 className="spo-panel__section-title">Требует настройки</h3>
-              <div className="spo-panel__cards">
-                {view.termsMissing.map((group) => (
-                  <button
-                    key={group.key}
-                    type="button"
-                    className="spo-panel__card spo-panel__card--missing"
-                    onClick={() => setSelectedGroup(group)}
-                  >
-                    <div className="spo-panel__card-title">{group.name}</div>
-                    <div className="spo-panel__card-amount">{formatUmagMoney(group.amount)}</div>
-                    <div className="spo-panel__card-meta">
-                      Срок оплаты поставщика не настроен · {group.count} приёмки
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </section>
-          ) : null}
-
-          <section className="spo-panel__section" aria-label="План оплат">
-            <h3 className="spo-panel__section-title">План оплат</h3>
-            {!view?.dateGroups?.length ? (
-              <div className="spo-panel__empty">
-                Нет открытых обязательств с назначенным сроком оплаты
-              </div>
-            ) : (
-              view.dateGroups.map((dateGroup) => (
-                <div key={dateGroup.dueDate} className="spo-panel__date-block">
-                  <h4 className={`spo-panel__date-title spo-panel__date-title--${dateGroup.kind}`}>
-                    {formatDateHeading(dateGroup.dueDate, todayKey)}
-                  </h4>
-                  <div className="spo-panel__cards">
-                    {dateGroup.suppliers.map((group) => (
-                      <button
-                        key={group.key}
-                        type="button"
-                        className={`spo-panel__card spo-panel__card--${statusTone(group.status)}`}
-                        onClick={() => setSelectedGroup(group)}
-                      >
-                        <div className="spo-panel__card-title">{group.name}</div>
-                        <div className="spo-panel__card-amount">
-                          {formatUmagMoney(group.amount)}
-                        </div>
-                        <div className="spo-panel__card-meta">
-                          {formatDaysUntilDue(group.dueDate, todayKey)} · {group.count}{' '}
-                          {group.count === 1 ? 'приёмка' : 'приёмки'}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </section>
-        </>
-      )}
 
       {selectedGroup ? (
         <GroupDetail
@@ -374,6 +460,7 @@ export default function SupplierPaymentsPanel() {
           todayKey={todayKey}
           canEditTerms={canEditTerms}
           onClose={() => setSelectedGroup(null)}
+          onConfigure={openConfigure}
         />
       ) : null}
     </div>
