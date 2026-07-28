@@ -1,4 +1,5 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import AdminModal from '../../admin/AdminModal'
 import useMediaQuery from '../../../hooks/useMediaQuery'
 import {
@@ -6,9 +7,12 @@ import {
   getPreviousMonthPeriodKeys,
   toAqtobeDateKey,
 } from '../../../services/umagSettlementsService'
-import '../../procurement/PurchaseFilterPopover.css'
+import './SettlementsFilterPopover.css'
 
 const MOBILE_QUERY = '(max-width: 900px)'
+const POPOVER_WIDTH = 360
+const VIEWPORT_PAD = 16
+const SIDE_OFFSET = 8
 
 export const SETTLEMENTS_PERIOD_PRESET = {
   TODAY: 'today',
@@ -77,16 +81,16 @@ function SettlementsFilterFields({ draft, onChange }) {
   }
 
   return (
-    <div className="purchase-filter-popover__section">
-      <span className="purchase-filter-popover__label">Период</span>
-      <div className="purchase-filter-popover__presets">
+    <div className="settlements-filter-popover__section">
+      <span className="settlements-filter-popover__label">Период</span>
+      <div className="settlements-filter-popover__presets" role="group" aria-label="Быстрый период">
         {PRESETS.map((preset) => (
           <button
             key={preset.id}
             type="button"
-            className={`purchase-filter-popover__preset${
+            className={`settlements-filter-popover__preset${
               draft.periodPreset === preset.id
-                ? ' purchase-filter-popover__preset--active'
+                ? ' settlements-filter-popover__preset--active'
                 : ''
             }`}
             onClick={() => selectPreset(preset.id)}
@@ -95,28 +99,60 @@ function SettlementsFilterFields({ draft, onChange }) {
           </button>
         ))}
       </div>
-      <div className="purchase-filter-popover__dates">
-        <input
-          type="date"
-          className="admin-form__input purchase-filter-popover__date"
-          value={draft.dateFrom}
-          onChange={(e) => updateDate('dateFrom', e.target.value)}
-          aria-label="Дата с"
-        />
-        <span className="purchase-filter-popover__dates-sep">—</span>
-        <input
-          type="date"
-          className="admin-form__input purchase-filter-popover__date"
-          value={draft.dateTo}
-          onChange={(e) => updateDate('dateTo', e.target.value)}
-          aria-label="Дата по"
-        />
+
+      <span className="settlements-filter-popover__label">Произвольный период</span>
+      <div className="settlements-filter-popover__dates">
+        <label className="settlements-filter-popover__date-field">
+          <span>С</span>
+          <span className="settlements-filter-popover__date-wrap">
+            <input
+              type="date"
+              className="settlements-filter-popover__date"
+              value={draft.dateFrom}
+              onChange={(e) => updateDate('dateFrom', e.target.value)}
+            />
+          </span>
+        </label>
+        <label className="settlements-filter-popover__date-field">
+          <span>По</span>
+          <span className="settlements-filter-popover__date-wrap">
+            <input
+              type="date"
+              className="settlements-filter-popover__date"
+              value={draft.dateTo}
+              onChange={(e) => updateDate('dateTo', e.target.value)}
+            />
+          </span>
+        </label>
       </div>
     </div>
   )
 }
 
-/** Period filter for Взаиморасчёты — desktop popover / mobile AdminModal. */
+function computePopoverStyle(anchorEl, popoverEl) {
+  if (!anchorEl) return { top: VIEWPORT_PAD, left: VIEWPORT_PAD, width: POPOVER_WIDTH }
+
+  const rect = anchorEl.getBoundingClientRect()
+  const width = Math.min(POPOVER_WIDTH, window.innerWidth - VIEWPORT_PAD * 2)
+  const height = popoverEl?.offsetHeight || 320
+
+  let left = rect.right - width
+  left = Math.max(VIEWPORT_PAD, Math.min(left, window.innerWidth - width - VIEWPORT_PAD))
+
+  let top = rect.bottom + SIDE_OFFSET
+  const spaceBelow = window.innerHeight - rect.bottom - VIEWPORT_PAD
+  const spaceAbove = rect.top - VIEWPORT_PAD
+  if (spaceBelow < height && spaceAbove > spaceBelow) {
+    top = Math.max(VIEWPORT_PAD, rect.top - height - SIDE_OFFSET)
+  } else {
+    top = Math.min(top, window.innerHeight - Math.min(height, spaceBelow) - VIEWPORT_PAD)
+    top = Math.max(VIEWPORT_PAD, top)
+  }
+
+  return { top, left, width }
+}
+
+/** Period filter for Взаиморасчёты — desktop portal popover / mobile AdminModal. */
 export default function SettlementsFilterPopover({
   open,
   draft,
@@ -128,6 +164,26 @@ export default function SettlementsFilterPopover({
 }) {
   const popoverRef = useRef(null)
   const isMobile = useMediaQuery(MOBILE_QUERY)
+  const [style, setStyle] = useState(null)
+
+  useLayoutEffect(() => {
+    if (!open || isMobile) return undefined
+
+    function updatePosition() {
+      setStyle(computePopoverStyle(anchorRef?.current, popoverRef.current))
+    }
+
+    updatePosition()
+    // Re-measure after paint so height-based flip is accurate.
+    const raf = window.requestAnimationFrame(updatePosition)
+    window.addEventListener('resize', updatePosition)
+    window.addEventListener('scroll', updatePosition, true)
+    return () => {
+      window.cancelAnimationFrame(raf)
+      window.removeEventListener('resize', updatePosition)
+      window.removeEventListener('scroll', updatePosition, true)
+    }
+  }, [open, isMobile, anchorRef, draft])
 
   useEffect(() => {
     if (!open) return undefined
@@ -178,19 +234,29 @@ export default function SettlementsFilterPopover({
     )
   }
 
-  return (
+  return createPortal(
     <div
       ref={popoverRef}
-      className="purchase-filter-popover"
+      className="settlements-filter-popover"
       role="dialog"
       aria-modal="false"
       aria-labelledby="settlements-filter-popover-title"
+      style={
+        style
+          ? {
+              top: `${style.top}px`,
+              left: `${style.left}px`,
+              width: `${style.width}px`,
+            }
+          : undefined
+      }
     >
-      <h2 id="settlements-filter-popover-title" className="purchase-filter-popover__sr-title">
+      <h2 id="settlements-filter-popover-title" className="settlements-filter-popover__sr-title">
         Фильтр
       </h2>
       <SettlementsFilterFields draft={draft} onChange={onChange} />
-      <div className="purchase-filter-popover__actions">{actions}</div>
-    </div>
+      <div className="settlements-filter-popover__actions">{actions}</div>
+    </div>,
+    document.body
   )
 }

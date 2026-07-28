@@ -1,9 +1,14 @@
 .purchase-filter-popover {
   position: absolute;
   top: calc(100% + 8px);
-  left: 0;
+  right: 0;
+  left: auto;
   z-index: 40;
-  width: min(360px, 100%);
+  /* Do NOT use width: 100% — parent action-wrap is only ~44px (filter icon). */
+  box-sizing: border-box;
+  width: 360px;
+  min-width: 320px;
+  max-width: 420px;
   padding: 16px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
