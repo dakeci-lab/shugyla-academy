@@ -75,7 +75,8 @@ function main() {
   ok('settlements panel wires create + history + detail')
 
   const createModal = read('src/components/suppliers/settlements/CreateReconciliationModal.jsx')
-  assert.match(createModal, /По данным UMAG за выбранный период/)
+  assert.match(createModal, /Показатели за выбранный период/)
+  assert.doesNotMatch(createModal, /По данным UMAG за выбранный период/)
   assert.match(createModal, /Задолженность по акту поставщика/)
   assert.match(createModal, /Возвраты поставщикам/)
   assert.match(createModal, /Возвраты оплаты/)

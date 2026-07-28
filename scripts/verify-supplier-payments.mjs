@@ -62,6 +62,11 @@ function main() {
   assert.match(sync, /refreshPaymentObligations/)
   assert.match(sync, /terms_snapshot_created_at/)
   assert.match(sync, /First snapshot only when missing/)
+  assert.match(sync, /Homogeneous keys required for PostgREST bulk upsert/)
+  assert.match(sync, /first_seen_at: \(existing\?\.first_seen_at/)
+  assert.doesNotMatch(sync, /\.\.\.\(existing \? \{\} : \{ first_seen_at/)
+  assert.match(sync, /obligations_failed/)
+  assert.match(sync, /failed_supply_ids/)
   ok('umag-sync refreshes obligations without rewriting snapshots')
 
   const utils = read('src/utils/supplierPaymentObligations.js')
@@ -74,8 +79,15 @@ function main() {
   assert.match(panel, /Сегодня к оплате/)
   assert.match(panel, /Отсроченная задолженность/)
   assert.match(panel, /Прогноз платежей/)
+  assert.match(panel, /Обновлено:/)
+  assert.doesNotMatch(panel, /Когда нужно платить по текущему долгу UMAG/)
   assert.doesNotMatch(panel, /setInterval/)
   ok('payments UI dashboard without polling')
+
+  const settlements = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
+  assert.doesNotMatch(settlements, /По данным UMAG/)
+  assert.match(settlements, /Обновлено:/)
+  ok('settlements UI without large UMAG source banners')
 
   const nav = read('src/platform/platformNav.js')
   assert.match(nav, /Оплаты поставщикам/)

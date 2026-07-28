@@ -203,9 +203,9 @@ export default function ReconciliationDetailView({
       </div>
 
       <section className="recon-detail__section">
-        <h3>По данным UMAG за выбранный период</h3>
+        <h3>Показатели за выбранный период</h3>
         <p className="recon-detail__hint">
-          Snapshot на момент создания сверки. Последующие синхронизации UMAG эти значения не меняют.
+          Snapshot на момент создания сверки. Последующие синхронизации эти значения не меняют.
           Для сравнения с актом используется задолженность (SUM debt).
         </p>
         <div className="recon-detail__metrics">

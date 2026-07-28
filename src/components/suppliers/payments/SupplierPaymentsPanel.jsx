@@ -192,7 +192,7 @@ export default function SupplierPaymentsPanel() {
     if (result.status === 'partial' || result.warning) {
       toast.warning?.(result.warning || result.message)
     } else {
-      toast.success?.(result.message || 'Синхронизация с UMAG выполнена.')
+      toast.success?.(result.message || 'Синхронизация выполнена.')
     }
     await load()
   }
@@ -200,10 +200,10 @@ export default function SupplierPaymentsPanel() {
   const summaries = view?.summaries
   const staleWarning = useMemo(() => {
     const finished = lastRun?.finished_at || lastRun?.started_at
-    if (!finished) return 'Данные UMAG ещё не синхронизировались.'
+    if (!finished) return 'Данные ещё не синхронизировались.'
     const ageMs = Date.now() - new Date(finished).getTime()
     if (ageMs > 24 * 60 * 60 * 1000) {
-      return 'Последняя синхронизация UMAG была больше суток назад. Обновите данные перед планированием оплат.'
+      return 'Последняя синхронизация была больше суток назад. Обновите данные перед планированием оплат.'
     }
     return null
   }, [lastRun])
@@ -216,10 +216,23 @@ export default function SupplierPaymentsPanel() {
     <div className="spo-panel">
       <div className="spo-panel__toolbar">
         <div>
-          <div className="spo-panel__eyebrow">Календарь оплат</div>
-          <p className="spo-panel__lead">
-            Когда нужно платить по текущему долгу UMAG с учётом отсрочки поставщика.
-          </p>
+          <h2 className="spo-panel__title">Календарь оплат</h2>
+          <div className="spo-panel__meta">
+            <span className="spo-panel__source-chip" title="Источник данных">
+              UMAG
+            </span>
+            <span>
+              Обновлено:{' '}
+              {lastRun?.finished_at || lastRun?.started_at
+                ? formatUmagDateTime(lastRun.finished_at || lastRun.started_at)
+                : 'ещё не выполнялась'}
+            </span>
+            {lastRun?.status && lastRun.status !== 'success' ? (
+              <span className="spo-panel__meta-status">
+                ({lastRun.status === 'partial' ? 'частично' : lastRun.status === 'failed' ? 'ошибка' : lastRun.status})
+              </span>
+            ) : null}
+          </div>
         </div>
         {canSync ? (
           <button
@@ -228,17 +241,16 @@ export default function SupplierPaymentsPanel() {
             onClick={handleSync}
             disabled={syncing}
           >
-            {syncing ? 'Синхронизация…' : 'Синхронизировать с UMAG'}
+            {syncing ? 'Синхронизация…' : 'Синхронизировать'}
           </button>
         ) : null}
       </div>
 
-      <div className="spo-panel__meta">
-        Данные UMAG обновлены:{' '}
-        {lastRun?.finished_at || lastRun?.started_at
-          ? formatUmagDateTime(lastRun.finished_at || lastRun.started_at)
-          : 'ещё не выполнялась'}
-      </div>
+      {lastRun?.warning_message ? (
+        <div className="spo-panel__warning" role="status">
+          {lastRun.warning_message}
+        </div>
+      ) : null}
 
       {staleWarning ? (
         <div className="spo-panel__warning" role="status">

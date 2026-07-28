@@ -207,7 +207,7 @@ export default function CreateReconciliationModal({
 
         <div className="recon-create__sync-meta">
           <span>
-            Последняя синхронизация UMAG:{' '}
+            Обновлено:{' '}
             {lastRun?.finished_at || lastRun?.started_at
               ? formatUmagDateTime(lastRun.finished_at || lastRun.started_at)
               : 'ещё не выполнялась'}
@@ -224,8 +224,8 @@ export default function CreateReconciliationModal({
           ) : null}
         </div>
 
-        <section className="recon-create__block" aria-label="По данным UMAG">
-          <h3 className="recon-create__block-title">По данным UMAG за выбранный период</h3>
+        <section className="recon-create__block" aria-label="Показатели за период">
+          <h3 className="recon-create__block-title">Показатели за выбранный период</h3>
           <p className="recon-create__hint">
             Сумма задолженности — SUM(debt) активных приёмок за период. Это не полный бухгалтерский
             баланс поставщика.

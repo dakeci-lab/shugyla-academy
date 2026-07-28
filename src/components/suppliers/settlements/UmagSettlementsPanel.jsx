@@ -201,9 +201,6 @@ function UmagSupplierDetail({
       <div className="umag-settlements__detail-head">
         <div>
           <h2 className="umag-settlements__detail-title">{supplier.name}</h2>
-          <div className="umag-settlements__source-badge" role="status">
-            По данным UMAG за выбранный период
-          </div>
         </div>
         {canCreateRecon ? (
           <button
@@ -592,10 +589,6 @@ export default function UmagSettlementsPanel() {
 
   return (
     <div className="umag-settlements">
-      <div className="umag-settlements__source-badge" role="status">
-        По данным UMAG
-      </div>
-
       <div className="umag-settlements__toolbar">
         <div className="umag-settlements__period">
           <label className="umag-settlements__field">
@@ -635,21 +628,26 @@ export default function UmagSettlementsPanel() {
             onClick={handleSync}
             disabled={syncing}
           >
-            {syncing ? 'Синхронизация…' : 'Синхронизировать с UMAG'}
+            {syncing ? 'Синхронизация…' : 'Синхронизировать'}
           </button>
         )}
       </div>
 
       <div className="umag-settlements__meta">
+        <span className="umag-settlements__source-chip" title="Источник данных">
+          UMAG
+        </span>
         <span>
           Период: {dateFrom} — {dateTo}
         </span>
         <span>
-          Последняя синхронизация:{' '}
+          Обновлено:{' '}
           {lastRun?.finished_at || lastRun?.started_at
             ? formatUmagDateTime(lastRun.finished_at || lastRun.started_at)
             : 'ещё не выполнялась'}
-          {lastRun?.status ? ` (${statusLabel(lastRun.status)})` : ''}
+          {lastRun?.status && lastRun.status !== 'success'
+            ? ` (${statusLabel(lastRun.status)})`
+            : ''}
         </span>
       </div>
 

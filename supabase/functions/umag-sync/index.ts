@@ -1425,111 +1425,266 @@ function resolveTermsSnapshot(supplier: {
   type: string | null
   days: number | null
   configured: boolean
+  legacy: boolean
 } {
-  const type = supplier?.payment_type ? String(supplier.payment_type) : null
+  const raw = supplier?.payment_type == null ? '' : String(supplier.payment_type).trim()
+  const type = raw || null
   if (type === 'cash' || type === 'transfer') {
-    return { type, days: 0, configured: true }
+    return { type, days: 0, configured: true, legacy: false }
   }
   if (type === 'deferral' || type === 'mixed') {
     const days = supplier?.deferral_days == null ? null : Number(supplier.deferral_days)
     if (days != null && Number.isInteger(days) && days >= 0 && days <= 365) {
-      return { type, days, configured: true }
+      return { type, days, configured: true, legacy: false }
     }
-    return { type, days: null, configured: false }
+    return { type, days: null, configured: false, legacy: false }
   }
-  return { type: null, days: null, configured: false }
+  if (type) {
+    // Legacy / unknown payment type — keep obligation, mark terms missing.
+    return { type: null, days: null, configured: false, legacy: true }
+  }
+  return { type: null, days: null, configured: false, legacy: false }
+}
+
+type SupplierTermsRow = {
+  id: string
+  payment_type: string | null
+  deferral_days: number | null
+  is_merged: boolean | null
+  merged_into_supplier_id: string | null
+}
+
+type ObligationsRefreshResult = {
+  status: 'success' | 'partial' | 'failed'
+  supplies_with_open_debt: number
+  obligations_created: number
+  obligations_updated: number
+  obligations_paid: number
+  obligations_terms_missing: number
+  obligations_failed: number
+  obligations_source_deleted: number
+  obligations_reactivated: number
+  failed_supply_ids: number[]
+  error_code: string | null
+  error_message: string | null
+}
+
+function emptyObligationsResult(
+  patch: Partial<ObligationsRefreshResult> = {}
+): ObligationsRefreshResult {
+  return {
+    status: 'success',
+    supplies_with_open_debt: 0,
+    obligations_created: 0,
+    obligations_updated: 0,
+    obligations_paid: 0,
+    obligations_terms_missing: 0,
+    obligations_failed: 0,
+    obligations_source_deleted: 0,
+    obligations_reactivated: 0,
+    failed_supply_ids: [],
+    error_code: null,
+    error_message: null,
+    ...patch,
+  }
+}
+
+function resolveCanonicalSupplierId(
+  startId: string | null,
+  byId: Map<string, SupplierTermsRow>
+): string | null {
+  if (!startId) return null
+  let current = startId
+  const seen = new Set<string>()
+  while (current) {
+    if (seen.has(current)) return current
+    seen.add(current)
+    const row = byId.get(current)
+    if (!row) return current
+    if (row.is_merged && row.merged_into_supplier_id) {
+      current = row.merged_into_supplier_id
+      continue
+    }
+    return current
+  }
+  return null
+}
+
+async function fetchRowsByIdsInChunks(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  table: string,
+  select: string,
+  idColumn: string,
+  ids: Array<string | number>,
+  chunkSize = 100
+  // deno-lint-ignore no-explicit-any
+): Promise<{ rows: any[]; error: { message: string; code?: string } | null }> {
+  const rows: unknown[] = []
+  for (let i = 0; i < ids.length; i += chunkSize) {
+    const chunk = ids.slice(i, i + chunkSize)
+    const { data, error } = await serviceClient.from(table).select(select).in(idColumn, chunk)
+    if (error) return { rows: [], error }
+    for (const row of data || []) rows.push(row)
+  }
+  return { rows, error: null }
+}
+
+async function fetchPaginatedSupplies(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  buildQuery: (q: any) => any
+  // deno-lint-ignore no-explicit-any
+): Promise<{ rows: any[]; error: { message: string; code?: string } | null }> {
+  const pageSize = 1000
+  const rows: unknown[] = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await buildQuery(
+      serviceClient
+        .from('umag_supplies')
+        .select(
+          'id, umag_supply_id, platform_supplier_id, doc_time, amount, payment_amount, debt, is_source_deleted'
+        )
+    ).range(from, from + pageSize - 1)
+    if (error) return { rows: [], error }
+    const page = data || []
+    rows.push(...page)
+    if (page.length < pageSize) break
+    from += pageSize
+  }
+  return { rows, error: null }
 }
 
 /**
- * Refresh payment obligations from already-imported umag_supplies for the period.
+ * Refresh payment obligations from already-imported umag_supplies.
  * Does not call UMAG. Snapshot terms are immutable after first fill.
+ *
+ * Critical: every upsert row must include the same object keys. PostgREST
+ * rejects heterogeneous bulk payloads (e.g. first_seen_at only on inserts),
+ * which previously aborted the whole batch after the first obligation existed.
  */
 async function refreshPaymentObligations(
   // deno-lint-ignore no-explicit-any
   serviceClient: any,
   dateFrom: string,
   dateTo: string
-): Promise<
-  | { created: number; updated: number; paid: number; sourceDeleted: number; reactivated: number }
-  | Response
-> {
+): Promise<ObligationsRefreshResult> {
   const fromIso = `${dateFrom}T00:00:00+05:00`
   const toIso = `${dateTo}T23:59:59.999+05:00`
 
-  const { data: supplies, error: suppliesError } = await serviceClient
-    .from('umag_supplies')
-    .select(
-      'id, umag_supply_id, platform_supplier_id, doc_time, amount, payment_amount, debt, is_source_deleted'
-    )
-    .gte('doc_time', fromIso)
-    .lte('doc_time', toIso)
-
-  if (suppliesError) {
-    console.error('spo_supplies_select_failed', { message: suppliesError.message })
-    return umagErrorResponse(
-      'SUPABASE_UPSERT_FAILED',
-      'Не удалось обновить обязательства оплаты поставщикам.',
-      500
-    )
+  const periodResult = await fetchPaginatedSupplies(serviceClient, (q) =>
+    q.gte('doc_time', fromIso).lte('doc_time', toIso)
+  )
+  if (periodResult.error) {
+    console.error('spo_supplies_select_failed', {
+      message: periodResult.error.message,
+      code: periodResult.error.code,
+    })
+    return emptyObligationsResult({
+      status: 'failed',
+      error_code: 'SUPABASE_SELECT_FAILED',
+      error_message: `Не удалось прочитать приёмки для обязательств: ${periodResult.error.message}`,
+    })
   }
 
-  const supplyRows = supplies || []
-  if (supplyRows.length === 0) {
-    return { created: 0, updated: 0, paid: 0, sourceDeleted: 0, reactivated: 0 }
+  const openDebtResult = await fetchPaginatedSupplies(serviceClient, (q) =>
+    q.eq('is_source_deleted', false).gt('debt', 0)
+  )
+  if (openDebtResult.error) {
+    console.error('spo_open_debt_select_failed', {
+      message: openDebtResult.error.message,
+      code: openDebtResult.error.code,
+    })
+    return emptyObligationsResult({
+      status: 'failed',
+      error_code: 'SUPABASE_SELECT_FAILED',
+      error_message: `Не удалось прочитать открытые долги UMAG: ${openDebtResult.error.message}`,
+    })
   }
 
-  const supplierIds = [
+  const supplyByUmagId = new Map<number, Record<string, unknown>>()
+  for (const row of periodResult.rows) {
+    supplyByUmagId.set(Number(row.umag_supply_id), row)
+  }
+  for (const row of openDebtResult.rows) {
+    const id = Number(row.umag_supply_id)
+    if (!supplyByUmagId.has(id)) supplyByUmagId.set(id, row)
+  }
+
+  const supplyRows = [...supplyByUmagId.values()]
+  if (supplyRows.length === 0) return emptyObligationsResult()
+
+  const seedSupplierIds = [
     ...new Set(
       supplyRows
-        .map((s: { platform_supplier_id: string | null }) => s.platform_supplier_id)
-        .filter(Boolean)
+        .map((s) => s.platform_supplier_id as string | null)
+        .filter((id): id is string => Boolean(id))
     ),
   ]
 
-  const termsBySupplier = new Map<
-    string,
-    { payment_type: string | null; deferral_days: number | null }
-  >()
-  if (supplierIds.length > 0) {
-    const { data: suppliers, error: suppliersError } = await serviceClient
-      .from('platform_suppliers')
-      .select('id, payment_type, deferral_days')
-      .in('id', supplierIds)
-    if (suppliersError) {
-      console.error('spo_suppliers_select_failed', { message: suppliersError.message })
-      return umagErrorResponse(
-        'SUPABASE_UPSERT_FAILED',
-        'Не удалось прочитать условия оплаты поставщиков.',
-        500
-      )
+  const suppliersById = new Map<string, SupplierTermsRow>()
+  let pendingIds = [...seedSupplierIds]
+  while (pendingIds.length > 0) {
+    const fetched = await fetchRowsByIdsInChunks(
+      serviceClient,
+      'platform_suppliers',
+      'id, payment_type, deferral_days, is_merged, merged_into_supplier_id',
+      'id',
+      pendingIds
+    )
+    if (fetched.error) {
+      console.error('spo_suppliers_select_failed', {
+        message: fetched.error.message,
+        code: fetched.error.code,
+      })
+      return emptyObligationsResult({
+        status: 'failed',
+        error_code: 'SUPABASE_SELECT_FAILED',
+        error_message: `Не удалось прочитать условия оплаты поставщиков: ${fetched.error.message}`,
+      })
     }
-    for (const row of suppliers || []) {
-      termsBySupplier.set(row.id, {
+    pendingIds = []
+    for (const row of fetched.rows as SupplierTermsRow[]) {
+      suppliersById.set(row.id, {
+        id: row.id,
         payment_type: row.payment_type ?? null,
         deferral_days: row.deferral_days ?? null,
+        is_merged: row.is_merged ?? false,
+        merged_into_supplier_id: row.merged_into_supplier_id ?? null,
       })
+      if (
+        row.is_merged &&
+        row.merged_into_supplier_id &&
+        !suppliersById.has(row.merged_into_supplier_id)
+      ) {
+        pendingIds.push(row.merged_into_supplier_id)
+      }
     }
   }
 
-  const umagIds = supplyRows.map((s: { umag_supply_id: number }) => Number(s.umag_supply_id))
-  const { data: existingRows, error: existingError } = await serviceClient
-    .from('supplier_payment_obligations')
-    .select(
-      'id, umag_supply_id, payment_terms_type_snapshot, deferment_days_snapshot, due_date, terms_snapshot_created_at, paid_at, is_source_deleted, current_debt'
-    )
-    .in('umag_supply_id', umagIds)
-
-  if (existingError) {
-    console.error('spo_existing_select_failed', { message: existingError.message })
-    return umagErrorResponse(
-      'SUPABASE_UPSERT_FAILED',
-      'Не удалось прочитать обязательства оплаты.',
-      500
-    )
+  const umagIds = supplyRows.map((s) => Number(s.umag_supply_id))
+  const existingFetched = await fetchRowsByIdsInChunks(
+    serviceClient,
+    'supplier_payment_obligations',
+    'id, umag_supply_id, payment_terms_type_snapshot, deferment_days_snapshot, due_date, terms_snapshot_created_at, paid_at, is_source_deleted, current_debt, first_seen_at, platform_supplier_id',
+    'umag_supply_id',
+    umagIds
+  )
+  if (existingFetched.error) {
+    console.error('spo_existing_select_failed', {
+      message: existingFetched.error.message,
+      code: existingFetched.error.code,
+    })
+    return emptyObligationsResult({
+      status: 'failed',
+      error_code: 'SUPABASE_SELECT_FAILED',
+      error_message: `Не удалось прочитать обязательства оплаты: ${existingFetched.error.message}`,
+    })
   }
 
   const existingByUmagId = new Map<number, Record<string, unknown>>()
-  for (const row of existingRows || []) {
+  for (const row of existingFetched.rows) {
     existingByUmagId.set(Number(row.umag_supply_id), row)
   }
 
@@ -1539,7 +1694,11 @@ async function refreshPaymentObligations(
   let paid = 0
   let sourceDeleted = 0
   let reactivated = 0
+  let termsMissing = 0
+  let suppliesWithOpenDebt = 0
   const upsertRows: Record<string, unknown>[] = []
+  const failedSupplyIds: number[] = []
+  const failedDetails: Array<{ umag_supply_id: number; message: string; code?: string }> = []
 
   for (const supply of supplyRows) {
     const umagSupplyId = Number(supply.umag_supply_id)
@@ -1550,13 +1709,23 @@ async function refreshPaymentObligations(
     // Never create obligations for supplies that never carried open debt.
     if (!existing && (isDeleted || debt <= 0)) continue
 
-    const docDate = aqtobeDateKeyFromIso(supply.doc_time)
-    const terms = resolveTermsSnapshot(
-      supply.platform_supplier_id
-        ? termsBySupplier.get(supply.platform_supplier_id) || null
-        : null
-    )
+    if (!isDeleted && debt > 0) suppliesWithOpenDebt += 1
 
+    const canonicalSupplierId = resolveCanonicalSupplierId(
+      (supply.platform_supplier_id as string | null) || null,
+      suppliersById
+    )
+    const terms = resolveTermsSnapshot(
+      canonicalSupplierId ? suppliersById.get(canonicalSupplierId) || null : null
+    )
+    if (terms.legacy) {
+      console.warn('spo_legacy_payment_type', {
+        umag_supply_id: umagSupplyId,
+        platform_supplier_id: canonicalSupplierId,
+      })
+    }
+
+    const docDate = aqtobeDateKeyFromIso(supply.doc_time as string | null)
     const hasSnapshot = existing?.due_date != null || existing?.terms_snapshot_created_at != null
     let paymentTermsType = (existing?.payment_terms_type_snapshot as string | null) ?? null
     let defermentDays = (existing?.deferment_days_snapshot as number | null) ?? null
@@ -1570,12 +1739,14 @@ async function refreshPaymentObligations(
       defermentDays = terms.days
       dueDate = addCalendarDays(docDate, terms.days ?? 0)
       termsSnapshotCreatedAt = now
-    } else if (!hasSnapshot && terms.type && !terms.configured) {
+    } else if (!hasSnapshot && !terms.configured) {
       paymentTermsType = terms.type
       defermentDays = null
       dueDate = null
       termsSnapshotCreatedAt = null
     }
+
+    if (!isDeleted && debt > 0 && dueDate == null) termsMissing += 1
 
     let paidAt = (existing?.paid_at as string | null) ?? null
     if (debt <= 0) {
@@ -1597,12 +1768,13 @@ async function refreshPaymentObligations(
     if (existing) updated += 1
     else created += 1
 
+    // Homogeneous keys required for PostgREST bulk upsert.
     upsertRows.push({
-      platform_supplier_id: supply.platform_supplier_id,
+      platform_supplier_id: canonicalSupplierId,
       umag_supply_id: umagSupplyId,
       umag_supply_row_id: supply.id,
       supply_document_date: docDate,
-      source_doc_time: supply.doc_time,
+      source_doc_time: supply.doc_time ?? null,
       original_supply_amount: asNumber(supply.amount),
       current_payment_amount: asNumber(supply.payment_amount),
       current_debt: debt,
@@ -1614,37 +1786,81 @@ async function refreshPaymentObligations(
       source_deleted_at: isDeleted ? now : null,
       last_synced_at: now,
       paid_at: paidAt,
-      ...(existing ? {} : { first_seen_at: now }),
+      first_seen_at: (existing?.first_seen_at as string | null) || now,
     })
   }
 
-  const chunkSize = 200
+  const chunkSize = 100
   for (let i = 0; i < upsertRows.length; i += chunkSize) {
     const chunk = upsertRows.slice(i, i + chunkSize)
     const { error } = await serviceClient
       .from('supplier_payment_obligations')
       .upsert(chunk, { onConflict: 'umag_supply_id' })
-    if (error) {
-      console.error('spo_upsert_failed', { message: error.message, offset: i })
-      return umagErrorResponse(
-        'SUPABASE_UPSERT_FAILED',
-        'Не удалось сохранить обязательства оплаты поставщикам.',
-        500
-      )
+    if (!error) continue
+
+    console.error('spo_upsert_chunk_failed', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint,
+      offset: i,
+      chunkSize: chunk.length,
+    })
+
+    for (const row of chunk) {
+      const umagSupplyId = Number(row.umag_supply_id)
+      const { error: rowError } = await serviceClient
+        .from('supplier_payment_obligations')
+        .upsert([row], { onConflict: 'umag_supply_id' })
+      if (!rowError) continue
+      failedSupplyIds.push(umagSupplyId)
+      failedDetails.push({
+        umag_supply_id: umagSupplyId,
+        message: rowError.message,
+        code: rowError.code,
+      })
+      console.error('spo_upsert_row_failed', {
+        umag_supply_id: umagSupplyId,
+        platform_supplier_id: row.platform_supplier_id,
+        message: rowError.message,
+        code: rowError.code,
+        details: rowError.details,
+        hint: rowError.hint,
+      })
     }
   }
+
+  const failed = failedSupplyIds.length
+  const status: ObligationsRefreshResult['status'] =
+    failed === 0 ? 'success' : failed >= upsertRows.length ? 'failed' : 'partial'
+
+  const result = emptyObligationsResult({
+    status,
+    supplies_with_open_debt: suppliesWithOpenDebt,
+    obligations_created: Math.max(0, created - failed),
+    obligations_updated: updated,
+    obligations_paid: paid,
+    obligations_terms_missing: termsMissing,
+    obligations_failed: failed,
+    obligations_source_deleted: sourceDeleted,
+    obligations_reactivated: reactivated,
+    failed_supply_ids: failedSupplyIds,
+    error_code: failed
+      ? failedDetails[0]?.code || 'SUPABASE_UPSERT_FAILED'
+      : null,
+    error_message: failed
+      ? `Не удалось сохранить ${failed} обязательств: ${failedDetails[0]?.message || 'unknown'}`
+      : null,
+  })
 
   console.info('umag_sync_payment_obligations_refreshed', {
     dateFrom,
     dateTo,
-    created,
-    updated,
-    paid,
-    sourceDeleted,
-    reactivated,
+    ...result,
+    failed_details: failedDetails.slice(0, 20),
   })
 
-  return { created, updated, paid, sourceDeleted, reactivated }
+  return result
 }
 
 Deno.serve(async (req) => {
@@ -1937,20 +2153,13 @@ Deno.serve(async (req) => {
       dateFrom,
       dateTo
     )
-    if (obligationsRefresh instanceof Response) {
-      await finishSyncRun(authz.serviceClient, runId, {
-        status: 'failed',
-        error_message: 'Ошибка обновления обязательств оплаты поставщикам',
-        records_received: suppliesResult.supplies.length,
-        records_created: suppliesUpsert.created + suppliersCreated + canonicalStats.created,
-        records_updated: suppliesUpsert.updated + suppliersUpdated + canonicalStats.updated,
-        records_source_deleted: sourceDeleted,
-        records_reactivated: suppliesUpsert.reactivated,
-        aggregates_match: aggregatesMatch,
-        warning_message: warningMessage,
-      })
-      return obligationsRefresh
-    }
+    const obligationsWarning =
+      obligationsRefresh.status === 'success'
+        ? null
+        : obligationsRefresh.status === 'partial'
+          ? `Данные UMAG обновлены, календарь оплат обновлён не полностью (${obligationsRefresh.obligations_failed} обязательств).`
+          : obligationsRefresh.error_message ||
+            'Данные UMAG обновлены, календарь оплат обновить не удалось.'
 
     // Refresh platform map so returns map agentId → canonical even if suppliers were skipped
     if (!syncSuppliers || platformMap.size === 0) {
@@ -2078,9 +2287,11 @@ Deno.serve(async (req) => {
     }
 
     const combinedWarning =
-      [warningMessage, returnsWarning].filter(Boolean).join(' | ') || null
+      [warningMessage, returnsWarning, obligationsWarning].filter(Boolean).join(' | ') || null
     const status: SyncStatus =
-      aggregatesMatch && returnsAggregatesMatch ? 'success' : 'partial'
+      aggregatesMatch && returnsAggregatesMatch && obligationsRefresh.status === 'success'
+        ? 'success'
+        : 'partial'
     await finishSyncRun(authz.serviceClient, runId, {
       status,
       records_received: suppliesResult.supplies.length,

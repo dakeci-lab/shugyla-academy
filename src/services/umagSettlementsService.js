@@ -183,6 +183,18 @@ export async function syncUmagSettlements({ dateFrom, dateTo, syncSuppliers = tr
     }
 
     if (data?.success === true) {
+      const paymentObligations = data.paymentObligations || null
+      const failedObligations = Number(paymentObligations?.obligations_failed || 0)
+      let message = 'Синхронизация с UMAG выполнена.'
+      if (data.status === 'partial') {
+        if (failedObligations > 0) {
+          message = `Данные UMAG обновлены, календарь оплат обновлён не полностью: ${failedObligations}`
+        } else {
+          message = USER_MESSAGES[UMAG_SETTLEMENTS_ERROR_CODES.PARTIAL]
+        }
+      } else if (paymentObligations?.status === 'success') {
+        message = 'Синхронизация с UMAG выполнена. Календарь оплат обновлён.'
+      }
       return {
         success: true,
         status: data.status || 'success',
@@ -191,12 +203,10 @@ export async function syncUmagSettlements({ dateFrom, dateTo, syncSuppliers = tr
         suppliers: data.suppliers,
         supplies: data.supplies,
         returns: data.returns,
+        paymentObligations,
         aggregates: data.aggregates,
         syncRunId: data.syncRunId,
-        message:
-          data.status === 'partial'
-            ? USER_MESSAGES[UMAG_SETTLEMENTS_ERROR_CODES.PARTIAL]
-            : 'Синхронизация с UMAG выполнена.',
+        message,
       }
     }
 
