@@ -62,6 +62,10 @@ function main() {
   assert.match(settlements, /buildSupplierOperationHistory/)
   assert.match(settlements, /formatSignedUmagMoney/)
   assert.match(settlements, /returnAmount/)
+  assert.match(settlements, /deriveSupplyPaymentStatus/)
+  assert.match(settlements, /SUPPLY_PAYMENT_EPSILON/)
+  assert.match(settlements, /paymentStatus/)
+  assert.match(settlements, /debt/)
   ok('settlements service aggregates returns and builds history')
 
   const recon = read('src/services/supplierReconciliationService.js')
@@ -75,10 +79,41 @@ function main() {
   assert.match(panel, /История операций/)
   assert.match(panel, /filterSupplierOperations/)
   assert.match(panel, /OperationDetailSheet/)
+  assert.match(panel, /Оплачено/)
+  assert.match(panel, /Осталось/)
+  assert.match(panel, /PaymentStatusBadge/)
+  assert.match(panel, /supplyPaymentStatusLabel/)
   const sheet = read('src/components/suppliers/settlements/OperationDetailSheet.jsx')
   assert.match(sheet, /Возврат поставщику/)
   assert.match(sheet, /Приёмка/)
+  assert.match(sheet, /Статус оплаты/)
+  assert.match(sheet, /Осталось/)
+  assert.match(sheet, /deriveSupplyPaymentStatus/)
   ok('settlements UI shows returns summary + unified history')
+
+  // Mirror service status logic (cannot import Vite path aliases / extensionless modules here).
+  const EPSILON = 0.01
+  function deriveStatus(paymentAmount, debt) {
+    const paid = Number(paymentAmount) || 0
+    const remaining = Number(debt) || 0
+    if (remaining <= EPSILON) return 'paid'
+    if (paid > EPSILON) return 'partial'
+    return 'unpaid'
+  }
+  assert.equal(deriveStatus(0, 311010), 'unpaid')
+  assert.equal(deriveStatus(200000, 300000), 'partial')
+  assert.equal(deriveStatus(500000, 0), 'paid')
+  assert.equal(deriveStatus(500000, 0.005), 'paid')
+  assert.equal(deriveStatus(100.5, 81.7932), 'partial')
+  assert.match(settlements, /remaining <= SUPPLY_PAYMENT_EPSILON/)
+  assert.match(settlements, /paid > SUPPLY_PAYMENT_EPSILON/)
+  assert.match(settlements, /paymentStatus: null/)
+  const money = (81793.199999).toLocaleString('ru-KZ', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  })
+  assert.equal(money, '81\u00a0793,2')
+  ok('payment status derivation + money formatting')
 
   console.log(`\n${passed} checks passed`)
 }

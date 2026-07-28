@@ -284,6 +284,46 @@ function ensureSettlementRow(byKey, seed) {
   return row
 }
 
+export function formatSignedUmagMoney(value) {
+  const n = typeof value === 'number' ? value : Number(value)
+  if (!Number.isFinite(n)) return '—'
+  const absLabel = formatUmagMoney(Math.abs(n)).replace(' ₸', '')
+  if (n > 0) return `+${absLabel} ₸`
+  if (n < 0) return `−${absLabel} ₸`
+  return `${absLabel} ₸`
+}
+
+/** Money comparison epsilon (₸) for payment status derivation. */
+export const SUPPLY_PAYMENT_EPSILON = 0.01
+
+export const SUPPLY_PAYMENT_STATUS = {
+  PAID: 'paid',
+  PARTIAL: 'partial',
+  UNPAID: 'unpaid',
+}
+
+export const SUPPLY_PAYMENT_STATUS_LABELS = {
+  [SUPPLY_PAYMENT_STATUS.PAID]: 'Оплачено',
+  [SUPPLY_PAYMENT_STATUS.PARTIAL]: 'Частично оплачено',
+  [SUPPLY_PAYMENT_STATUS.UNPAID]: 'Не оплачено',
+}
+
+/**
+ * Derive supply payment status from UMAG mirrored fields.
+ * debt is the source of truth for remaining balance.
+ */
+export function deriveSupplyPaymentStatus(paymentAmount, debt) {
+  const paid = toNumber(paymentAmount)
+  const remaining = toNumber(debt)
+  if (remaining <= SUPPLY_PAYMENT_EPSILON) return SUPPLY_PAYMENT_STATUS.PAID
+  if (paid > SUPPLY_PAYMENT_EPSILON) return SUPPLY_PAYMENT_STATUS.PARTIAL
+  return SUPPLY_PAYMENT_STATUS.UNPAID
+}
+
+export function supplyPaymentStatusLabel(status) {
+  return SUPPLY_PAYMENT_STATUS_LABELS[status] || '—'
+}
+
 /**
  * Build unified chronological operations for one supplier (newest first).
  * Supply amounts are shown as +, return amounts as − (presentation only).
@@ -291,13 +331,19 @@ function ensureSettlementRow(byKey, seed) {
 export function buildSupplierOperationHistory(supplies = [], returns = []) {
   const ops = []
   for (const supply of supplies) {
+    const amount = toNumber(supply.amount)
+    const paymentAmount = toNumber(supply.payment_amount)
+    const debt = toNumber(supply.debt)
     ops.push({
       id: `supply:${supply.id}`,
       kind: 'supply',
       label: 'Приёмка',
       sortAt: supply.doc_time,
-      amount: toNumber(supply.amount),
-      signedAmount: toNumber(supply.amount),
+      amount,
+      paymentAmount,
+      debt,
+      paymentStatus: deriveSupplyPaymentStatus(paymentAmount, debt),
+      signedAmount: amount,
       source: supply,
     })
   }
@@ -309,6 +355,9 @@ export function buildSupplierOperationHistory(supplies = [], returns = []) {
       label: 'Возврат поставщику',
       sortAt: ret.document_time,
       amount: abs,
+      paymentAmount: null,
+      debt: null,
+      paymentStatus: null,
       signedAmount: -abs,
       source: ret,
     })
@@ -326,15 +375,6 @@ export function filterSupplierOperations(operations, filter = 'all') {
   if (filter === 'supplies') return operations.filter((op) => op.kind === 'supply')
   if (filter === 'returns') return operations.filter((op) => op.kind === 'return')
   return operations
-}
-
-export function formatSignedUmagMoney(value) {
-  const n = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(n)) return '—'
-  const absLabel = formatUmagMoney(Math.abs(n)).replace(' ₸', '')
-  if (n > 0) return `+${absLabel} ₸`
-  if (n < 0) return `−${absLabel} ₸`
-  return `${absLabel} ₸`
 }
 
 /**

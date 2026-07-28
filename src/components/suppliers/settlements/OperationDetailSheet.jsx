@@ -8,6 +8,10 @@ import {
   formatUmagMoney,
   OPERATION_DETAIL_ERROR_CODES,
 } from '../../../services/umagOperationDetailsService'
+import {
+  deriveSupplyPaymentStatus,
+  supplyPaymentStatusLabel,
+} from '../../../services/umagSettlementsService'
 import './OperationDetailSheet.css'
 
 function formatQtyPrice(item) {
@@ -46,6 +50,15 @@ function mapErrorMessage(error) {
   return error?.message || 'Не удалось загрузить состав документа'
 }
 
+function PaymentStatusBadge({ status }) {
+  if (!status) return null
+  return (
+    <span className={`umag-op-detail__pay-status umag-op-detail__pay-status--${status}`}>
+      {supplyPaymentStatusLabel(status)}
+    </span>
+  )
+}
+
 export default function OperationDetailSheet({ operation, supplierName, onClose }) {
   const kind = operation?.kind
   const operationType = kind === 'return' ? 'supply_return' : 'supply'
@@ -67,16 +80,25 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
         note: source.note,
         accountNames: source.account_names,
         isProvided: source.is_provided,
+        paymentStatus: null,
       }
     }
+    const paymentAmount =
+      operation?.paymentAmount != null
+        ? Number(operation.paymentAmount)
+        : Number(source.payment_amount) || 0
+    const debt =
+      operation?.debt != null ? Number(operation.debt) : Number(source.debt) || 0
     return {
       title: 'Приёмка',
       supplierName: supplierName || source.supplier_name || '—',
       when: source.doc_time,
       amount: Number(source.amount) || 0,
       signedAmount: Number(source.amount) || 0,
-      paymentAmount: Number(source.payment_amount) || 0,
-      debt: Number(source.debt) || 0,
+      paymentAmount,
+      debt,
+      paymentStatus:
+        operation?.paymentStatus || deriveSupplyPaymentStatus(paymentAmount, debt),
       userName: source.umag_user_name,
       comment: source.comment,
       account: source.account,
@@ -162,7 +184,11 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
             <span>Сумма</span>
             <strong
               className={
-                kind === 'return' ? 'umag-op-detail__amount-neg' : 'umag-op-detail__amount-pos'
+                kind === 'return'
+                  ? 'umag-op-detail__amount-neg'
+                  : headerFromHistory.paymentStatus === 'unpaid'
+                    ? 'umag-op-detail__money--unpaid'
+                    : 'umag-op-detail__amount-pos'
               }
             >
               {formatSignedUmagMoney(headerFromHistory.signedAmount)}
@@ -172,11 +198,33 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
             <>
               <div>
                 <span>Оплачено</span>
-                <strong>{formatUmagMoney(headerFromHistory.paymentAmount)}</strong>
+                <strong
+                  className={
+                    headerFromHistory.paymentStatus === 'paid'
+                      ? 'umag-op-detail__money--paid'
+                      : undefined
+                  }
+                >
+                  {formatUmagMoney(headerFromHistory.paymentAmount)}
+                </strong>
               </div>
               <div>
-                <span>Задолженность</span>
-                <strong>{formatUmagMoney(headerFromHistory.debt)}</strong>
+                <span>Осталось</span>
+                <strong
+                  className={
+                    headerFromHistory.paymentStatus === 'paid'
+                      ? 'umag-op-detail__money--paid'
+                      : headerFromHistory.paymentStatus === 'partial'
+                        ? 'umag-op-detail__money--partial'
+                        : 'umag-op-detail__money--unpaid'
+                  }
+                >
+                  {formatUmagMoney(headerFromHistory.debt)}
+                </strong>
+              </div>
+              <div>
+                <span>Статус оплаты</span>
+                <PaymentStatusBadge status={headerFromHistory.paymentStatus} />
               </div>
             </>
           ) : null}

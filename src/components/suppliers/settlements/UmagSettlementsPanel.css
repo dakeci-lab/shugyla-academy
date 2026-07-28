@@ -259,6 +259,10 @@
 }
 
 .umag-settlements__card-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   font-size: 15px;
   font-weight: 700;
   margin-bottom: 10px;
@@ -467,10 +471,119 @@
   font-weight: 700;
 }
 
+.umag-settlements__amount-unpaid {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.umag-settlements__money-col {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.umag-settlements__table--ops th.umag-settlements__money-col,
+.umag-settlements__table--ops td.umag-settlements__money-col {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.umag-settlements__table--ops .umag-settlements__ops-meta {
+  max-width: 160px;
+  white-space: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.umag-settlements__money--paid {
+  color: #047857;
+  font-weight: 600;
+}
+
+.umag-settlements__money--partial {
+  color: #c2410c;
+  font-weight: 700;
+}
+
+.umag-settlements__money--unpaid {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.umag-settlements__pay-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+
+.umag-settlements__pay-status--paid {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.umag-settlements__pay-status--partial {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.umag-settlements__pay-status--unpaid {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.umag-settlements__pay-status--na {
+  background: transparent;
+  color: #94a3b8;
+  font-weight: 600;
+  padding: 0;
+}
+
 .umag-settlements__ops-amount {
   margin-top: 8px;
   font-size: 18px;
   letter-spacing: -0.02em;
+}
+
+.umag-settlements__card-date {
+  color: var(--color-text-secondary, #64748b);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.umag-settlements__card-finance {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+.umag-settlements__card-finance span {
+  display: block;
+  color: var(--color-text-secondary, #64748b);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.umag-settlements__card-finance strong {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.umag-settlements__card-status {
+  margin-top: 10px;
+}
+
+.umag-settlements__card-meta {
+  margin-top: 8px;
+  color: var(--color-text-secondary, #64748b);
+  font-size: 12px;
 }
 
 .umag-settlements__modal-backdrop {
