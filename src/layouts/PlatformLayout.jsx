@@ -38,7 +38,7 @@ function PlatformLayoutShell({ onLogout }) {
       pathname.includes('/platform/receiving')
     )
   }, [user, pathname])
-  useProcurementRealtime(procurementRealtimeEnabled)
+  const { connectionStatus } = useProcurementRealtime(procurementRealtimeEnabled)
   const navigate = useNavigate()
   const titleContext = usePlatformPageTitleContext()
   const section = useMemo(() => getPlatformSection(pathname), [pathname])
@@ -191,6 +191,17 @@ function PlatformLayoutShell({ onLogout }) {
 
           <PullToRefresh disabled={drawerOpen || drawerDragging} className="platform-layout__refresh">
             <div className="platform-layout__content">
+              {procurementRealtimeEnabled &&
+              (connectionStatus === 'offline' || connectionStatus === 'reconnecting') ? (
+                <div
+                  className={`platform-layout__sync-banner platform-layout__sync-banner--${connectionStatus}`}
+                  role="status"
+                >
+                  {connectionStatus === 'offline'
+                    ? 'Нет соединения'
+                    : 'Восстанавливаем соединение…'}
+                </div>
+              ) : null}
               <PlatformErrorBoundary onLogout={onLogout}>
                 <Outlet />
               </PlatformErrorBoundary>

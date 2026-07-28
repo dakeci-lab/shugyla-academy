@@ -40,7 +40,7 @@ import './SimpleDeliveryCard.css'
 export default function SimpleReceivingWeekView() {
   const { user } = useSession()
   const { version, notifyChange } = useAdminRefresh()
-  const { ensureModules } = useAcademyData()
+  const { ensureModules, reloadProcurement } = useAcademyData()
   const {
     weekStartKey,
     selectedDateKey,
@@ -53,6 +53,7 @@ export default function SimpleReceivingWeekView() {
   } = useWeekScheduleState()
   const [checkedOverrides, setCheckedOverrides] = useState({})
   const [togglingId, setTogglingId] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     if (!isCloudMode()) return
@@ -64,6 +65,17 @@ export default function SimpleReceivingWeekView() {
     setTogglingId(null)
   }, [version])
 
+  async function handleManualRefresh() {
+    if (refreshing || !isCloudMode()) return
+    setRefreshing(true)
+    try {
+      await reloadProcurement()
+    } catch (error) {
+      console.error('[Receiving] refresh failed', error)
+    } finally {
+      setRefreshing(false)
+    }
+  }
   const canAccept = canAcceptSimpleDelivery(user)
   const moduleError = getPurchasesDataError() || getReceivingDataError()
   const modulesLoading =
@@ -163,18 +175,29 @@ export default function SimpleReceivingWeekView() {
 
   return (
     <>
-      <WeekScheduleNav
-        weekTitle={weekTitle}
-        weekDates={weekDates}
-        selectedDateKey={selectedDateKey}
-        todayKey={todayKey}
-        countsByDate={countsByDate}
-        onPrevWeek={() => changeWeek(-1)}
-        onNextWeek={() => changeWeek(1)}
-        onToday={goToday}
-        onSelectDate={setSelectedDateKey}
-      />
-
+      <div className="simple-receiving-week__toolbar">
+        <WeekScheduleNav
+          weekTitle={weekTitle}
+          weekDates={weekDates}
+          selectedDateKey={selectedDateKey}
+          todayKey={todayKey}
+          countsByDate={countsByDate}
+          onPrevWeek={() => changeWeek(-1)}
+          onNextWeek={() => changeWeek(1)}
+          onToday={goToday}
+          onSelectDate={setSelectedDateKey}
+        />
+        {isCloudMode() ? (
+          <button
+            type="button"
+            className="btn btn-secondary simple-receiving-week__refresh"
+            onClick={() => void handleManualRefresh()}
+            disabled={refreshing}
+          >
+            {refreshing ? 'Обновление…' : 'Обновить'}
+          </button>
+        ) : null}
+      </div>
       {moduleError ? (
         <p className="simple-receiving-week__empty">
           {toUserErrorMessage(moduleError, 'Не удалось загрузить данные приёмки.')}

@@ -421,6 +421,33 @@ export default function ProcurementPage() {
           )}
 
           <PlatformToolbarActionWrap>
+            <button
+              type="button"
+              className="btn btn-secondary procurement-page__refresh"
+              onClick={() => {
+                void (async () => {
+                  setProcurementRefreshing(true)
+                  try {
+                    await reloadProcurement()
+                    setProcurementLoadError(null)
+                  } catch (error) {
+                    const message = toUserErrorMessage(
+                      error,
+                      'Не удалось обновить закупы.'
+                    )
+                    setProcurementLoadError(message)
+                    showError(message)
+                  } finally {
+                    setProcurementRefreshing(false)
+                  }
+                })()
+              }}
+              disabled={procurementRefreshing}
+              aria-label="Обновить"
+              title="Обновить"
+            >
+              {procurementRefreshing ? 'Обновление…' : 'Обновить'}
+            </button>
             <PlatformFilterButton
               buttonRef={filterButtonRef}
               active={filtersActive}

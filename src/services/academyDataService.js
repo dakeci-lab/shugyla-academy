@@ -473,7 +473,7 @@ function applyFullFetchResult(data) {
   else markModuleReady('receiving')
 }
 
-/** Обновить только закуп и приёмку (Realtime / polling) */
+/** Обновить только закуп и приёмку (Realtime / foreground refresh) */
 export async function refreshProcurementData() {
   if (!isCloudMode()) return null
 
