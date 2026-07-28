@@ -46,15 +46,6 @@
   white-space: nowrap;
 }
 
-.umag-settlements__meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  align-items: center;
-  font-size: 13px;
-  color: var(--color-text-secondary, #64748b);
-}
-
 .umag-settlements__warning,
 .umag-settlements__error {
   padding: 10px 12px;
@@ -81,68 +72,95 @@
   gap: 10px;
 }
 
-.umag-settlements__footer-totals {
+.umag-settlements__empty-cell {
+  text-align: center;
+  color: var(--color-text-secondary, #64748b);
+  padding: 28px 16px !important;
+  white-space: normal;
+}
+
+.umag-settlements__empty--mobile {
+  display: none;
+}
+
+.umag-settlements__tfoot {
   position: sticky;
   bottom: 0;
-  z-index: 12;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px 12px;
-  margin-top: auto;
-  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.96);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.06);
+  z-index: 3;
 }
 
-.umag-settlements__footer-metric {
+.umag-settlements__tfoot td {
+  padding: 10px 12px;
+  vertical-align: top;
+  background: #fff;
+  border-top: 2px solid #cbd5e1;
+  border-bottom: none;
+  white-space: normal;
+  box-shadow: 0 -1px 0 #e2e8f0;
+}
+
+.umag-settlements__tfoot-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
   min-width: 0;
-  padding-left: 8px;
-  border-left: 3px solid #cbd5e1;
 }
 
-.umag-settlements__footer-metric--neutral {
-  border-left-color: #64748b;
+.umag-settlements__tfoot-meta-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
 }
 
-.umag-settlements__footer-metric--paid {
-  border-left-color: #10b981;
+.umag-settlements__tfoot-period {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
 }
 
-.umag-settlements__footer-metric--returns {
-  border-left-color: #f59e0b;
+.umag-settlements__tfoot-updated {
+  font-size: 12px;
+  color: var(--color-text-secondary, #64748b);
 }
 
-.umag-settlements__footer-metric--debt {
-  border-left-color: #ef4444;
+.umag-settlements__tfoot-hint {
+  margin-top: 2px;
+  font-size: 11px;
+  color: #94a3b8;
 }
 
-.umag-settlements__footer-label {
+.umag-settlements__tfoot-label {
   display: block;
   font-size: 11px;
   font-weight: 600;
   color: var(--color-text-secondary, #64748b);
+  margin-bottom: 2px;
 }
 
-.umag-settlements__footer-value {
+.umag-settlements__tfoot-value {
   display: block;
-  margin-top: 2px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
   color: var(--color-text, #0f172a);
-  word-break: break-word;
 }
 
-.umag-settlements__footer-metric--paid .umag-settlements__footer-value {
+.umag-settlements__tfoot-value--paid {
   color: #047857;
 }
 
-.umag-settlements__footer-metric--debt .umag-settlements__footer-value {
+.umag-settlements__tfoot-value--returns {
+  color: #c2410c;
+}
+
+.umag-settlements__tfoot-value--debt {
   color: #b91c1c;
+}
+
+.umag-settlements__mobile-totals {
+  display: none;
 }
 
 .umag-settlements__summary {
@@ -662,10 +680,6 @@
     justify-content: flex-start;
   }
 
-  .umag-settlements__footer-totals {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .umag-settlements__totals {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -674,10 +688,41 @@
     display: none;
   }
 
+  .umag-settlements__empty--mobile {
+    display: block;
+  }
+
   .umag-settlements__cards {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    padding-bottom: 8px;
+  }
+
+  .umag-settlements__list-body {
+    padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .umag-settlements__mobile-totals {
+    display: block;
+    position: sticky;
+    bottom: 0;
+    z-index: 12;
+    margin-top: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    border-top: 2px solid #cbd5e1;
+    background: #fff;
+  }
+
+  .umag-settlements__mobile-totals-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 12px;
+    margin-top: 10px;
+  }
+
+  .umag-settlements__mobile-totals-cell {
+    min-width: 0;
   }
 }
 
@@ -686,7 +731,8 @@
     grid-template-columns: 1fr;
   }
 
-  .umag-settlements__footer-value {
+  .umag-settlements__tfoot-value,
+  .umag-settlements__mobile-totals .umag-settlements__tfoot-value {
     font-size: 13px;
   }
 

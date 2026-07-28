@@ -112,8 +112,12 @@ function main() {
   assert.match(settlements, /Обновлено:/)
   assert.match(settlements, /PlatformSearchToolbar/)
   assert.match(settlements, /SettlementsFilterPopover/)
-  assert.match(settlements, /footer-totals/)
+  assert.match(settlements, /SettlementsTableFoot/)
+  assert.match(settlements, /umag-settlements__tfoot/)
+  assert.match(settlements, /SettlementsMobileTotals/)
   assert.doesNotMatch(settlements, /umag-settlements__presets/)
+  assert.doesNotMatch(settlements, /umag-settlements__meta/)
+  assert.doesNotMatch(settlements, /footer-totals/)
   ok('settlements UI without large UMAG source banners')
 
   const nav = read('src/platform/platformNav.js')

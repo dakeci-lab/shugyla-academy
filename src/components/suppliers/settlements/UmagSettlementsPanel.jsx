@@ -70,27 +70,159 @@ function describeSettlementsPeriod(dateFrom, dateTo) {
   return `${formatPeriodDateKey(dateFrom)} — ${formatPeriodDateKey(dateTo)}`
 }
 
-function FooterTotals({ totals, loading }) {
-  const items = [
-    { id: 'amount', label: 'Приёмки', value: totals?.amount, tone: 'neutral' },
-    { id: 'paid', label: 'Оплачено', value: totals?.paymentAmount, tone: 'paid' },
-    { id: 'returns', label: 'Возвраты', value: totals?.returnAmount, tone: 'returns' },
-    { id: 'debt', label: 'Задолженность', value: totals?.debt, tone: 'debt' },
-  ]
+function formatLastUpdated(lastRun) {
+  const at = lastRun?.finished_at || lastRun?.started_at
+  if (!at) return 'ещё не выполнялась'
+  const base = formatUmagDateTime(at)
+  if (lastRun?.status && lastRun.status !== 'success') {
+    return `${base} (${statusLabel(lastRun.status)})`
+  }
+  return base
+}
+
+function TotalsMetaBlock({ periodLabel, lastRun }) {
+  return (
+    <div className="umag-settlements__tfoot-meta">
+      <div className="umag-settlements__tfoot-meta-line">
+        <span className="umag-settlements__source-chip" title="Источник данных">
+          UMAG
+        </span>
+        <span className="umag-settlements__tfoot-period">{periodLabel}</span>
+      </div>
+      <div className="umag-settlements__tfoot-updated">
+        Обновлено: {formatLastUpdated(lastRun)}
+      </div>
+      <div className="umag-settlements__tfoot-hint">Итого за выбранный период</div>
+    </div>
+  )
+}
+
+function TotalsMetricContent({ label, value, loading, isCount, tone }) {
+  const debtPositive = tone === 'debt' && Number(value) > 0
+  const display = loading
+    ? '…'
+    : isCount
+      ? String(value ?? 0)
+      : formatUmagMoney(value)
 
   return (
-    <div className="umag-settlements__footer-totals" aria-label="Итоги периода">
-      {items.map((item) => (
-        <div
-          key={item.id}
-          className={`umag-settlements__footer-metric umag-settlements__footer-metric--${item.tone}`}
-        >
-          <span className="umag-settlements__footer-label">{item.label}</span>
-          <strong className="umag-settlements__footer-value">
-            {loading ? '…' : formatUmagMoney(item.value)}
-          </strong>
+    <>
+      <span className="umag-settlements__tfoot-label">{label}</span>
+      <strong
+        className={`umag-settlements__tfoot-value${
+          tone === 'paid'
+            ? ' umag-settlements__tfoot-value--paid'
+            : tone === 'returns'
+              ? ' umag-settlements__tfoot-value--returns'
+              : debtPositive
+                ? ' umag-settlements__tfoot-value--debt'
+                : ''
+        }`}
+      >
+        {display}
+      </strong>
+    </>
+  )
+}
+
+/** Desktop: true table footer aligned to column grid. */
+function SettlementsTableFoot({
+  totals,
+  loading,
+  periodLabel,
+  lastRun,
+  canViewRecon,
+}) {
+  return (
+    <tfoot className="umag-settlements__tfoot">
+      <tr>
+        <td className="umag-settlements__tfoot-meta-cell">
+          <TotalsMetaBlock periodLabel={periodLabel} lastRun={lastRun} />
+        </td>
+        <td className="umag-settlements__tfoot-metric-cell">
+          <TotalsMetricContent
+            label="Приёмок"
+            value={totals?.supplyCount}
+            loading={loading}
+            isCount
+          />
+        </td>
+        <td className="umag-settlements__tfoot-metric-cell">
+          <TotalsMetricContent
+            label="Сумма приёмок"
+            value={totals?.amount}
+            loading={loading}
+            tone="neutral"
+          />
+        </td>
+        <td className="umag-settlements__tfoot-metric-cell">
+          <TotalsMetricContent
+            label="Возвраты поставщикам"
+            value={totals?.returnAmount}
+            loading={loading}
+            tone="returns"
+          />
+        </td>
+        <td className="umag-settlements__tfoot-metric-cell">
+          <TotalsMetricContent
+            label="Оплачено"
+            value={totals?.paymentAmount}
+            loading={loading}
+            tone="paid"
+          />
+        </td>
+        <td className="umag-settlements__tfoot-metric-cell">
+          <TotalsMetricContent
+            label="Задолженность"
+            value={totals?.debt}
+            loading={loading}
+            tone="debt"
+          />
+        </td>
+        {canViewRecon ? <td className="umag-settlements__tfoot-empty-cell" /> : null}
+      </tr>
+    </tfoot>
+  )
+}
+
+/** Mobile: compact sticky strip under card list (same aggregates). */
+function SettlementsMobileTotals({ totals, loading, periodLabel, lastRun }) {
+  return (
+    <div className="umag-settlements__mobile-totals" aria-label="Итоги периода">
+      <TotalsMetaBlock periodLabel={periodLabel} lastRun={lastRun} />
+      <div className="umag-settlements__mobile-totals-grid">
+        <div className="umag-settlements__mobile-totals-cell">
+          <TotalsMetricContent
+            label="Сумма приёмок"
+            value={totals?.amount}
+            loading={loading}
+          />
         </div>
-      ))}
+        <div className="umag-settlements__mobile-totals-cell">
+          <TotalsMetricContent
+            label="Возвраты"
+            value={totals?.returnAmount}
+            loading={loading}
+            tone="returns"
+          />
+        </div>
+        <div className="umag-settlements__mobile-totals-cell">
+          <TotalsMetricContent
+            label="Оплачено"
+            value={totals?.paymentAmount}
+            loading={loading}
+            tone="paid"
+          />
+        </div>
+        <div className="umag-settlements__mobile-totals-cell">
+          <TotalsMetricContent
+            label="Задолженность"
+            value={totals?.debt}
+            loading={loading}
+            tone="debt"
+          />
+        </div>
+      </div>
     </div>
   )
 }
@@ -783,24 +915,6 @@ export default function UmagSettlementsPanel() {
         }
       />
 
-      <div className="umag-settlements__meta">
-        <span className="umag-settlements__source-chip" title="Источник данных">
-          UMAG
-        </span>
-        <span className="umag-settlements__period-chip" title="Активный период">
-          {periodLabel}
-        </span>
-        <span>
-          Обновлено:{' '}
-          {lastRun?.finished_at || lastRun?.started_at
-            ? formatUmagDateTime(lastRun.finished_at || lastRun.started_at)
-            : 'ещё не выполнялась'}
-          {lastRun?.status && lastRun.status !== 'success'
-            ? ` (${statusLabel(lastRun.status)})`
-            : ''}
-        </span>
-      </div>
-
       {lastRun?.warning_message && (
         <div className="umag-settlements__warning" role="alert">
           {lastRun.warning_message}
@@ -817,14 +931,10 @@ export default function UmagSettlementsPanel() {
         <div className="umag-settlements__error" role="alert">
           {loadError}
         </div>
-      ) : rows.length === 0 ? (
-        <div className="umag-settlements__empty">
-          За выбранный период операций UMAG не найдено
-        </div>
       ) : (
         <div className="umag-settlements__list-body">
           <div className="umag-settlements__table-wrap">
-            <table className="umag-settlements__table">
+            <table className="umag-settlements__table umag-settlements__table--with-totals">
               <thead>
                 <tr>
                   <th>Поставщик</th>
@@ -837,70 +947,96 @@ export default function UmagSettlementsPanel() {
                 </tr>
               </thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.key}>
-                    <td>
-                      <button
-                        type="button"
-                        className="umag-settlements__link"
-                        onClick={() => setSelected(row)}
-                      >
-                        {row.name}
-                      </button>
+                {rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={canViewRecon ? 7 : 6} className="umag-settlements__empty-cell">
+                      За выбранный период операций UMAG не найдено
                     </td>
-                    <td>{row.supplyCount}</td>
-                    <td>{formatUmagMoney(row.amount)}</td>
-                    <td>{formatUmagMoney(row.returnAmount)}</td>
-                    <td>{formatUmagMoney(row.paymentAmount)}</td>
-                    <td className={row.debt > 0 ? 'umag-settlements__debt' : undefined}>
-                      {formatUmagMoney(row.debt)}
-                    </td>
-                    {canViewRecon ? (
-                      <td>
-                        <LatestReconBadge status={latestReconByKey.get(row.key)} />
-                      </td>
-                    ) : null}
                   </tr>
-                ))}
+                ) : (
+                  rows.map((row) => (
+                    <tr key={row.key}>
+                      <td>
+                        <button
+                          type="button"
+                          className="umag-settlements__link"
+                          onClick={() => setSelected(row)}
+                        >
+                          {row.name}
+                        </button>
+                      </td>
+                      <td>{row.supplyCount}</td>
+                      <td>{formatUmagMoney(row.amount)}</td>
+                      <td>{formatUmagMoney(row.returnAmount)}</td>
+                      <td>{formatUmagMoney(row.paymentAmount)}</td>
+                      <td className={row.debt > 0 ? 'umag-settlements__debt' : undefined}>
+                        {formatUmagMoney(row.debt)}
+                      </td>
+                      {canViewRecon ? (
+                        <td>
+                          <LatestReconBadge status={latestReconByKey.get(row.key)} />
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))
+                )}
               </tbody>
+              <SettlementsTableFoot
+                totals={totals}
+                loading={false}
+                periodLabel={periodLabel}
+                lastRun={lastRun}
+                canViewRecon={canViewRecon}
+              />
             </table>
           </div>
 
-          <div className="umag-settlements__cards" aria-label="Поставщики">
-            {rows.map((row) => (
-              <button
-                key={row.key}
-                type="button"
-                className="umag-settlements__card"
-                onClick={() => setSelected(row)}
-              >
-                <div className="umag-settlements__card-title">{row.name}</div>
-                {canViewRecon ? (
-                  <div className="umag-settlements__card-recon">
-                    <LatestReconBadge status={latestReconByKey.get(row.key)} />
+          {rows.length === 0 ? (
+            <div className="umag-settlements__empty umag-settlements__empty--mobile">
+              За выбранный период операций UMAG не найдено
+            </div>
+          ) : (
+            <div className="umag-settlements__cards" aria-label="Поставщики">
+              {rows.map((row) => (
+                <button
+                  key={row.key}
+                  type="button"
+                  className="umag-settlements__card"
+                  onClick={() => setSelected(row)}
+                >
+                  <div className="umag-settlements__card-title">{row.name}</div>
+                  {canViewRecon ? (
+                    <div className="umag-settlements__card-recon">
+                      <LatestReconBadge status={latestReconByKey.get(row.key)} />
+                    </div>
+                  ) : null}
+                  <div className="umag-settlements__card-grid">
+                    <span>Приёмок</span>
+                    <strong>{row.supplyCount}</strong>
+                    <span>Сумма приёмок</span>
+                    <strong>{formatUmagMoney(row.amount)}</strong>
+                    <span>Возвраты поставщику</span>
+                    <strong>{formatUmagMoney(row.returnAmount)}</strong>
+                    <span>Оплачено</span>
+                    <strong>{formatUmagMoney(row.paymentAmount)}</strong>
+                    <span>Задолженность</span>
+                    <strong className={row.debt > 0 ? 'umag-settlements__debt' : undefined}>
+                      {formatUmagMoney(row.debt)}
+                    </strong>
                   </div>
-                ) : null}
-                <div className="umag-settlements__card-grid">
-                  <span>Приёмок</span>
-                  <strong>{row.supplyCount}</strong>
-                  <span>Сумма приёмок</span>
-                  <strong>{formatUmagMoney(row.amount)}</strong>
-                  <span>Возвраты поставщику</span>
-                  <strong>{formatUmagMoney(row.returnAmount)}</strong>
-                  <span>Оплачено</span>
-                  <strong>{formatUmagMoney(row.paymentAmount)}</strong>
-                  <span>Задолженность</span>
-                  <strong className={row.debt > 0 ? 'umag-settlements__debt' : undefined}>
-                    {formatUmagMoney(row.debt)}
-                  </strong>
-                </div>
-              </button>
-            ))}
-          </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          <SettlementsMobileTotals
+            totals={totals}
+            loading={false}
+            periodLabel={periodLabel}
+            lastRun={lastRun}
+          />
         </div>
       )}
-
-      <FooterTotals totals={totals} loading={loading} />
     </div>
   )
 }
