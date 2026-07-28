@@ -87,6 +87,25 @@ function LatestReconBadge({ status }) {
   )
 }
 
+function formatAccountNames(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item)).filter(Boolean).join(', ') || '—'
+  }
+  if (value == null || value === '') return '—'
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value)
+      if (Array.isArray(parsed)) {
+        return parsed.map((item) => String(item)).filter(Boolean).join(', ') || '—'
+      }
+    } catch {
+      /* plain string */
+    }
+    return value
+  }
+  return String(value)
+}
+
 function UmagSupplierDetail({
   supplier,
   periodDateFrom,
@@ -310,14 +329,23 @@ function UmagSupplierDetail({
                 </thead>
                 <tbody>
                   {visibleOps.map((op) => (
-                    <tr key={op.id}>
+                    <tr
+                      key={op.id}
+                      className="umag-settlements__ops-row"
+                      onClick={() => setSelectedOperation(op)}
+                    >
                       <td>{formatUmagDate(op.sortAt)}</td>
                       <td>
-                        <span
-                          className={`umag-settlements__op-badge umag-settlements__op-badge--${op.kind}`}
+                        <button
+                          type="button"
+                          className={`umag-settlements__op-badge umag-settlements__op-badge--button umag-settlements__op-badge--${op.kind}`}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedOperation(op)
+                          }}
                         >
                           {op.label}
-                        </span>
+                        </button>
                       </td>
                       <td
                         className={
@@ -328,14 +356,17 @@ function UmagSupplierDetail({
                       >
                         {formatSignedUmagMoney(op.signedAmount)}
                       </td>
-                      <td>
-                        <button
-                          type="button"
-                          className="umag-settlements__link"
-                          onClick={() => setSelectedOperation(op)}
-                        >
-                          Открыть
-                        </button>
+                      <td className="umag-settlements__ops-meta">
+                        {op.kind === 'return'
+                          ? [
+                              op.source?.user_name,
+                              formatAccountNames(op.source?.account_names),
+                            ]
+                              .filter((part) => part && part !== '—')
+                              .join(' · ') || 'Состав товаров'
+                          : [op.source?.umag_user_name, op.source?.account]
+                              .filter(Boolean)
+                              .join(' · ') || 'Состав товаров'}
                       </td>
                     </tr>
                   ))}
