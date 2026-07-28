@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
 import {
@@ -18,10 +18,8 @@ import {
   formatUmagDateTime,
   formatUmagMoney,
   getMonthPeriodKeys,
-  getPreviousMonthPeriodKeys,
   supplyPaymentStatusLabel,
   syncUmagSettlements,
-  toAqtobeDateKey,
 } from '../../../services/umagSettlementsService'
 import {
   describeDifference,
@@ -31,21 +29,19 @@ import {
   reconciliationStatusLabel,
 } from '../../../services/supplierReconciliationService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
+import PlatformSearchToolbar, {
+  PlatformFilterButton,
+  PlatformToolbarActionWrap,
+} from '../../platform/PlatformSearchToolbar'
 import CreateReconciliationModal from './CreateReconciliationModal'
 import ReconciliationDetailView from './ReconciliationDetailView'
 import OperationDetailSheet from './OperationDetailSheet'
+import SettlementsFilterPopover, {
+  SETTLEMENTS_PERIOD_PRESET,
+  getSettlementsPeriodDefaults,
+  resolveSettlementsPeriodPreset,
+} from './SettlementsFilterPopover'
 import './UmagSettlementsPanel.css'
-
-function periodPresets() {
-  const today = toAqtobeDateKey()
-  const current = getMonthPeriodKeys()
-  const previous = getPreviousMonthPeriodKeys()
-  return [
-    { id: 'current_month', label: 'Текущий месяц', ...current },
-    { id: 'previous_month', label: 'Прошлый месяц', ...previous },
-    { id: 'today', label: 'Сегодня', dateFrom: today, dateTo: today },
-  ]
-}
 
 function statusLabel(status) {
   switch (status) {
@@ -60,6 +56,43 @@ function statusLabel(status) {
     default:
       return status
   }
+}
+
+function formatPeriodDateKey(dateKey) {
+  return formatUmagDate(`${dateKey}T12:00:00+05:00`)
+}
+
+function describeSettlementsPeriod(dateFrom, dateTo) {
+  const preset = resolveSettlementsPeriodPreset(dateFrom, dateTo)
+  if (preset === SETTLEMENTS_PERIOD_PRESET.TODAY) return 'Сегодня'
+  if (preset === SETTLEMENTS_PERIOD_PRESET.CURRENT_MONTH) return 'Текущий месяц'
+  if (preset === SETTLEMENTS_PERIOD_PRESET.PREVIOUS_MONTH) return 'Прошлый месяц'
+  return `${formatPeriodDateKey(dateFrom)} — ${formatPeriodDateKey(dateTo)}`
+}
+
+function FooterTotals({ totals, loading }) {
+  const items = [
+    { id: 'amount', label: 'Приёмки', value: totals?.amount, tone: 'neutral' },
+    { id: 'paid', label: 'Оплачено', value: totals?.paymentAmount, tone: 'paid' },
+    { id: 'returns', label: 'Возвраты', value: totals?.returnAmount, tone: 'returns' },
+    { id: 'debt', label: 'Задолженность', value: totals?.debt, tone: 'debt' },
+  ]
+
+  return (
+    <div className="umag-settlements__footer-totals" aria-label="Итоги периода">
+      {items.map((item) => (
+        <div
+          key={item.id}
+          className={`umag-settlements__footer-metric umag-settlements__footer-metric--${item.tone}`}
+        >
+          <span className="umag-settlements__footer-label">{item.label}</span>
+          <strong className="umag-settlements__footer-value">
+            {loading ? '…' : formatUmagMoney(item.value)}
+          </strong>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function SummaryCard({ label, value, loading, emphasize, isCount }) {
@@ -563,6 +596,17 @@ export default function UmagSettlementsPanel() {
   const [selected, setSelected] = useState(null)
   const [selectedReconciliationId, setSelectedReconciliationId] = useState(null)
   const [latestReconByKey, setLatestReconByKey] = useState(() => new Map())
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [draftFilter, setDraftFilter] = useState(() => getSettlementsPeriodDefaults())
+  const filterButtonRef = useRef(null)
+
+  const periodLabel = useMemo(
+    () => describeSettlementsPeriod(dateFrom, dateTo),
+    [dateFrom, dateTo]
+  )
+  const filterActive =
+    resolveSettlementsPeriodPreset(dateFrom, dateTo) !==
+    SETTLEMENTS_PERIOD_PRESET.CURRENT_MONTH
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -611,11 +655,41 @@ export default function UmagSettlementsPanel() {
     await loadData()
   }
 
-  function applyPreset(preset) {
-    setDateFrom(preset.dateFrom)
-    setDateTo(preset.dateTo)
+  function openFilter() {
+    setDraftFilter({
+      periodPreset: resolveSettlementsPeriodPreset(dateFrom, dateTo),
+      dateFrom,
+      dateTo,
+    })
+    setFilterOpen((open) => !open)
+  }
+
+  function applyFilter() {
+    const nextFrom = draftFilter.dateFrom
+    const nextTo = draftFilter.dateTo
+    if (!nextFrom || !nextTo) {
+      showError('Укажите даты периода')
+      return
+    }
+    if (nextFrom > nextTo) {
+      showError('Дата «С» не может быть позже даты «По»')
+      return
+    }
+    setDateFrom(nextFrom)
+    setDateTo(nextTo)
     setSelected(null)
     setSelectedReconciliationId(null)
+    setFilterOpen(false)
+  }
+
+  function resetFilter() {
+    const defaults = getSettlementsPeriodDefaults()
+    setDraftFilter(defaults)
+    setDateFrom(defaults.dateFrom)
+    setDateTo(defaults.dateTo)
+    setSelected(null)
+    setSelectedReconciliationId(null)
+    setFilterOpen(false)
   }
 
   if (!canView) {
@@ -662,57 +736,59 @@ export default function UmagSettlementsPanel() {
   }
 
   return (
-    <div className="umag-settlements">
-      <div className="umag-settlements__toolbar">
-        <div className="umag-settlements__period">
-          <label className="umag-settlements__field">
-            <span>С</span>
-            <input
-              type="date"
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-          </label>
-          <label className="umag-settlements__field">
-            <span>По</span>
-            <input
-              type="date"
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
-          </label>
-          <div className="umag-settlements__presets">
-            {periodPresets().map((preset) => (
+    <div className="umag-settlements umag-settlements--list">
+      <PlatformSearchToolbar
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        onClear={() => setSearch('')}
+        showClear
+        placeholder="Поиск по поставщику"
+        ariaLabel="Поиск по поставщику"
+        flush
+        className="umag-settlements__search-toolbar"
+        actions={
+          <>
+            <PlatformToolbarActionWrap>
+              <PlatformFilterButton
+                buttonRef={filterButtonRef}
+                active={filterActive || filterOpen}
+                onClick={openFilter}
+                ariaExpanded={filterOpen}
+                ariaLabel={
+                  filterActive ? `Фильтр, ${periodLabel}` : 'Фильтр периода'
+                }
+                title={filterActive ? `Фильтр · ${periodLabel}` : 'Фильтр'}
+              />
+              <SettlementsFilterPopover
+                open={filterOpen}
+                draft={draftFilter}
+                onChange={setDraftFilter}
+                onApply={applyFilter}
+                onReset={resetFilter}
+                onClose={() => setFilterOpen(false)}
+                anchorRef={filterButtonRef}
+              />
+            </PlatformToolbarActionWrap>
+            {canSync ? (
               <button
-                key={preset.id}
                 type="button"
-                className="umag-settlements__preset"
-                onClick={() => applyPreset(preset)}
+                className="btn btn-primary umag-settlements__sync-btn"
+                onClick={handleSync}
+                disabled={syncing}
               >
-                {preset.label}
+                {syncing ? 'Синхронизация…' : 'Синхронизировать'}
               </button>
-            ))}
-          </div>
-        </div>
-
-        {canSync && (
-          <button
-            type="button"
-            className="btn btn-primary umag-settlements__sync-btn"
-            onClick={handleSync}
-            disabled={syncing}
-          >
-            {syncing ? 'Синхронизация…' : 'Синхронизировать'}
-          </button>
-        )}
-      </div>
+            ) : null}
+          </>
+        }
+      />
 
       <div className="umag-settlements__meta">
         <span className="umag-settlements__source-chip" title="Источник данных">
           UMAG
         </span>
-        <span>
-          Период: {dateFrom} — {dateTo}
+        <span className="umag-settlements__period-chip" title="Активный период">
+          {periodLabel}
         </span>
         <span>
           Обновлено:{' '}
@@ -731,29 +807,6 @@ export default function UmagSettlementsPanel() {
         </div>
       )}
 
-      <div className="umag-settlements__totals" aria-label="Итоги по данным UMAG">
-        <SummaryCard label="Сумма приёмок" value={totals?.amount} loading={loading} />
-        <SummaryCard
-          label="Возвраты поставщикам"
-          value={totals?.returnAmount}
-          loading={loading}
-        />
-        <SummaryCard label="Оплачено" value={totals?.paymentAmount} loading={loading} />
-        <SummaryCard label="Возвраты оплаты" value={totals?.paymentRefundAmount} loading={loading} />
-        <SummaryCard label="Задолженность" value={totals?.debt} loading={loading} emphasize />
-      </div>
-
-      <div className="umag-settlements__search-row">
-        <input
-          type="search"
-          className="umag-settlements__search"
-          placeholder="Поиск по поставщику…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          aria-label="Поиск по поставщику"
-        />
-      </div>
-
       {loading ? (
         <div className="umag-settlements__skeleton" aria-busy="true">
           <div className="umag-settlements__skeleton-row" />
@@ -769,7 +822,7 @@ export default function UmagSettlementsPanel() {
           За выбранный период операций UMAG не найдено
         </div>
       ) : (
-        <>
+        <div className="umag-settlements__list-body">
           <div className="umag-settlements__table-wrap">
             <table className="umag-settlements__table">
               <thead>
@@ -844,8 +897,10 @@ export default function UmagSettlementsPanel() {
               </button>
             ))}
           </div>
-        </>
+        </div>
       )}
+
+      <FooterTotals totals={totals} loading={loading} />
     </div>
   )
 }

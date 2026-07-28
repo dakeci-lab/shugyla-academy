@@ -110,6 +110,10 @@ function main() {
   const settlements = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
   assert.doesNotMatch(settlements, /По данным UMAG/)
   assert.match(settlements, /Обновлено:/)
+  assert.match(settlements, /PlatformSearchToolbar/)
+  assert.match(settlements, /SettlementsFilterPopover/)
+  assert.match(settlements, /footer-totals/)
+  assert.doesNotMatch(settlements, /umag-settlements__presets/)
   ok('settlements UI without large UMAG source banners')
 
   const nav = read('src/platform/platformNav.js')
