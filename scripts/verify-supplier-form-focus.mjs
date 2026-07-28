@@ -52,7 +52,11 @@ function main() {
   assert('onChange uses setForm', page.includes('onChange={setForm}'))
   assert('SupplierForm setField spreads form', form.includes('onChange({ ...form, [field]: value })'))
   assert('inputs are controlled strings', form.includes('value={form.name}'))
-  assert('no supplier sync effect in SupplierForm', !form.includes('useEffect'))
+  assert(
+    'no write-back sync effect in SupplierForm',
+    !form.includes('updateSupplier') && !form.includes('createSupplier') && !form.includes('refresh()')
+  )
+  assert('payment-terms focus section supported', form.includes("focusSection !== 'payment-terms'"))
 
   console.log('Stage 3: Modal stability')
 
