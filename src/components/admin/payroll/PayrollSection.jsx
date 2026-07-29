@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { isCloudMode } from '../../../lib/dataMode'
+import { getEmployeeProfilePath } from '../../../config/permissions'
 import { getRoleLabel } from '../../../data/roles'
 import { getCurrentMonthState } from '../../../utils/attendanceData'
 import { formatMonthYearLabel } from '../../../utils/shiftData'
@@ -65,6 +67,40 @@ import './PayrollSection.css'
 
 const EMPLOYEE_PAGE_SIZE = 100
 const DEDUCTION_PRESETS = SALARY_DEDUCTION_PRESETS.filter((item) => item.kind !== 'advance')
+const PAYROLL_UI_STORAGE_KEY = 'platform-payroll-ledger-ui'
+
+function readPayrollUiState() {
+  try {
+    const raw = sessionStorage.getItem(PAYROLL_UI_STORAGE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
+  }
+}
+
+function writePayrollUiState(state) {
+  try {
+    sessionStorage.setItem(PAYROLL_UI_STORAGE_KEY, JSON.stringify(state))
+  } catch {
+    /* ignore quota / private mode */
+  }
+}
+
+/** Stable academy_users.id → existing employee card route. Never resolve by name. */
+function getPayrollEmployeeLink(employee) {
+  const id = Number(employee?.id)
+  if (!Number.isFinite(id) || id <= 0) {
+    if (import.meta.env.DEV) {
+      console.warn('[payroll] employee row missing stable id; name left non-clickable', {
+        name: employee?.name ?? null,
+      })
+    }
+    return null
+  }
+  return getEmployeeProfilePath(id)
+}
 
 /** Все сотрудники (без фильтра по статусу) — состав ведомости режется по датам. */
 async function listAllStaffEmployeesForPayroll() {
@@ -134,15 +170,55 @@ function TotalsMoney({ value }) {
 export default function PayrollSection() {
   const { warning: showWarning, success: showSuccess } = useToast()
   const filterButtonRef = useRef(null)
+  const restoredUiRef = useRef(readPayrollUiState())
+  const scrollRestoredRef = useRef(false)
 
-  const [{ year, month }, setMonthState] = useState(getCurrentMonthState)
-  const [search, setSearch] = useState('')
-  const [appliedRoleId, setAppliedRoleId] = useState('')
-  const [appliedStatus, setAppliedStatus] = useState('all')
-  const [appliedParticipation, setAppliedParticipation] = useState('active')
-  const [draftRoleId, setDraftRoleId] = useState('')
-  const [draftStatus, setDraftStatus] = useState('all')
-  const [draftParticipation, setDraftParticipation] = useState('active')
+  const [{ year, month }, setMonthState] = useState(() => {
+    const saved = restoredUiRef.current
+    if (
+      saved &&
+      Number.isFinite(Number(saved.year)) &&
+      Number.isFinite(Number(saved.month)) &&
+      saved.month >= 1 &&
+      saved.month <= 12
+    ) {
+      return { year: Number(saved.year), month: Number(saved.month) }
+    }
+    return getCurrentMonthState()
+  })
+  const [search, setSearch] = useState(() =>
+    typeof restoredUiRef.current?.search === 'string' ? restoredUiRef.current.search : '',
+  )
+  const [appliedRoleId, setAppliedRoleId] = useState(() =>
+    typeof restoredUiRef.current?.appliedRoleId === 'string'
+      ? restoredUiRef.current.appliedRoleId
+      : '',
+  )
+  const [appliedStatus, setAppliedStatus] = useState(() =>
+    typeof restoredUiRef.current?.appliedStatus === 'string'
+      ? restoredUiRef.current.appliedStatus
+      : 'all',
+  )
+  const [appliedParticipation, setAppliedParticipation] = useState(() =>
+    typeof restoredUiRef.current?.appliedParticipation === 'string'
+      ? restoredUiRef.current.appliedParticipation
+      : 'active',
+  )
+  const [draftRoleId, setDraftRoleId] = useState(() =>
+    typeof restoredUiRef.current?.appliedRoleId === 'string'
+      ? restoredUiRef.current.appliedRoleId
+      : '',
+  )
+  const [draftStatus, setDraftStatus] = useState(() =>
+    typeof restoredUiRef.current?.appliedStatus === 'string'
+      ? restoredUiRef.current.appliedStatus
+      : 'all',
+  )
+  const [draftParticipation, setDraftParticipation] = useState(() =>
+    typeof restoredUiRef.current?.appliedParticipation === 'string'
+      ? restoredUiRef.current.appliedParticipation
+      : 'active',
+  )
   const [filterOpen, setFilterOpen] = useState(false)
 
   const [loading, setLoading] = useState(true)
@@ -262,6 +338,40 @@ export default function PayrollSection() {
       await load({ quiet: true })
     }, [load])
   )
+
+  const persistPayrollUiState = useCallback(
+    (overrides = {}) => {
+      writePayrollUiState({
+        year,
+        month,
+        search,
+        appliedRoleId,
+        appliedStatus,
+        appliedParticipation,
+        scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
+        ...overrides,
+      })
+    },
+    [year, month, search, appliedRoleId, appliedStatus, appliedParticipation],
+  )
+
+  useEffect(() => {
+    persistPayrollUiState()
+  }, [persistPayrollUiState])
+
+  useEffect(() => {
+    if (loading || scrollRestoredRef.current) return undefined
+    const savedY = Number(restoredUiRef.current?.scrollY)
+    if (!Number.isFinite(savedY) || savedY <= 0) {
+      scrollRestoredRef.current = true
+      return undefined
+    }
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo(0, savedY)
+      scrollRestoredRef.current = true
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [loading])
 
   const patchEmployeeRecord = useCallback((employeeId, record, advanceMeta = undefined) => {
     setRecordsByEmployee((prev) => {
@@ -686,14 +796,28 @@ export default function PayrollSection() {
                   const roleLabel = employee.position || getRoleLabel(employee.role)
                   const notesPresent = hasRecordNotes(record)
                   const rowSaving = savingEmployeeId === employee.id
+                  const profilePath = getPayrollEmployeeLink(employee)
+                  const personBlock = (
+                    <span className="payroll-table__person">
+                      <span className="payroll-table__name">{employee.name}</span>
+                      <span className="payroll-table__role">{roleLabel}</span>
+                    </span>
+                  )
                   return (
                     <tr key={employee.id}>
                       <td className="payroll-table__num">{index + 1}</td>
                       <td className="payroll-table__employee">
-                        <div className="payroll-table__person">
-                          <span className="payroll-table__name">{employee.name}</span>
-                          <span className="payroll-table__role">{roleLabel}</span>
-                        </div>
+                        {profilePath ? (
+                          <Link
+                            to={profilePath}
+                            className="payroll-table__person-link"
+                            onClick={() => persistPayrollUiState()}
+                          >
+                            {personBlock}
+                          </Link>
+                        ) : (
+                          personBlock
+                        )}
                       </td>
                       <PayrollInlineMoneyCell
                         value={amounts.baseColumnValue}

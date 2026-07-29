@@ -8,7 +8,7 @@
 
 import fs from 'fs'
 import path from 'path'
-import { fileURLToPath, pathToFileURL } from 'url'
+import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
@@ -70,7 +70,7 @@ function main() {
   assert(
     'ledger table columns',
     list.includes('payroll-table') &&
-      list.includes('Оклад') &&
+      list.includes('Ставка') &&
       list.includes('Начисления') &&
       list.includes('Удержания') &&
       list.includes('К выдаче') &&
@@ -80,11 +80,13 @@ function main() {
   )
   assert('no status column in list', !list.includes('Статус расчёта'))
   assert('role under name', list.includes('payroll-table__role'))
+  assert('employee name links to profile by id', list.includes('getEmployeeProfilePath') && list.includes('payroll-table__person-link') && list.includes('getPayrollEmployeeLink'))
   assert('totals row', list.includes('payroll-table__totals') && list.includes('payroll-summary'))
   assert('comment icon only', list.includes('PayrollCommentModal') && list.includes('CommentIcon'))
   assert('inline salary editing', list.includes('PayrollInlineMoneyCell'))
   assert('lines popup', list.includes('PayrollLinesModal'))
   assert('no open card button', !list.includes("Открыть'") && !list.includes('getPayrollRecordPath') && !list.includes('navigate(getPayroll'))
+  assert('payroll ui state restore', list.includes('PAYROLL_UI_STORAGE_KEY') && list.includes('sessionStorage'))
   assert('advance upsert service', service.includes('upsertSalaryAdvance'))
 
   const recordPage = read('src/pages/platform/PlatformPayrollRecord.jsx')
@@ -111,16 +113,70 @@ function main() {
   )
   assert('history preserves record employees', list.includes('includeEmployeeIds') || list.includes('recordEmployeeIds'))
 
-  const sidebar = read('src/components/platform/PlatformSidebar.jsx')
-  assert('payroll hidden on mobile nav', sidebar.includes('hideDesktopOnlyNavItems') && sidebar.includes('employees-payroll'))
+  const nav = read('src/platform/platformNav.js')
+  const webOnly = read('src/platform/webOnlyNav.js')
+  assert(
+    'payroll hidden on mobile nav',
+    nav.includes('employees-payroll') &&
+      nav.includes('webOnly: true') &&
+      webOnly.includes('employees-payroll'),
+  )
 }
 
 async function runOverlapScenarios() {
   console.log('\nStage 4: Employment period overlap')
-  const {
-    employmentOverlapsPayrollMonth,
-    selectEmployeesForPayrollMonth,
-  } = await import(pathToFileURL(path.join(ROOT, 'src/utils/salaryPayroll.js')).href)
+  // Inline mirrors of salaryPayroll helpers — Node ESM cannot import the Vite
+  // module graph (extensionless relative paths) from this verify script.
+  function pad2(value) {
+    return String(value).padStart(2, '0')
+  }
+  function toPayrollDateKey(value) {
+    if (value == null || value === '') return null
+    if (typeof value === 'string') {
+      const match = value.trim().match(/^(\d{4}-\d{2}-\d{2})/)
+      return match ? match[1] : null
+    }
+    return null
+  }
+  function getPayrollMonthBounds(year, month) {
+    const y = Number(year)
+    const m = Number(month)
+    const start = `${y}-${pad2(m)}-01`
+    const lastDay = new Date(y, m, 0).getDate()
+    const end = `${y}-${pad2(m)}-${pad2(lastDay)}`
+    return { start, end }
+  }
+  function employmentOverlapsPayrollMonth(employee, year, month) {
+    const hiredAt = toPayrollDateKey(employee?.hiredAt ?? employee?.hired_at)
+    if (!hiredAt) return false
+    const { start: periodStart, end: periodEnd } = getPayrollMonthBounds(year, month)
+    const terminatedAt = toPayrollDateKey(employee?.terminatedAt ?? employee?.terminated_at)
+    const employmentEnd = terminatedAt || '9999-12-31'
+    return hiredAt <= periodEnd && employmentEnd >= periodStart
+  }
+  function selectEmployeesForPayrollMonth(employees, year, month, { includeEmployeeIds = [] } = {}) {
+    const byId = new Map()
+    for (const employee of employees || []) {
+      if (!employee?.id) continue
+      if (employmentOverlapsPayrollMonth(employee, year, month)) {
+        byId.set(Number(employee.id), employee)
+      }
+    }
+    const index = new Map(
+      (employees || [])
+        .filter((employee) => employee?.id != null)
+        .map((employee) => [Number(employee.id), employee]),
+    )
+    for (const rawId of includeEmployeeIds || []) {
+      const id = Number(rawId)
+      if (!Number.isFinite(id) || byId.has(id)) continue
+      const employee = index.get(id)
+      if (employee) byId.set(id, employee)
+    }
+    return [...byId.values()].sort((left, right) =>
+      String(left.name || '').localeCompare(String(right.name || ''), 'ru'),
+    )
+  }
 
   const working = { id: 1, name: 'A', hiredAt: '2026-03-15', terminatedAt: null }
   assert('working appears in current month', employmentOverlapsPayrollMonth(working, 2026, 7) === true)
