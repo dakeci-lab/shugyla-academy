@@ -5,7 +5,11 @@ import {
   normalizeSalaryCalculationType,
 } from './employeeData'
 import { isWorkingShiftStatus } from './shiftData'
-import { deriveTrackerStatus } from './shiftWorkWindow'
+import {
+  buildMonthlyWorkSummaryByEmployee,
+  isMonthlyWorkCompletedShift,
+  isShiftEligibleForMonthlyWork,
+} from './employeeMonthlyWorkSummary'
 
 export const SALARY_RECORD_STATUSES = [
   { id: 'draft', label: 'Черновик', badge: 'draft' },
@@ -93,8 +97,7 @@ export function isPayrollShiftBased(employeeOrType) {
 
 /** Смена завершена в тайм-трекере (есть check-in и check-out). */
 export function isPayrollCompletedShift(shift) {
-  if (!isWorkingShiftStatus(shift?.status)) return false
-  return deriveTrackerStatus(shift) === 'completed'
+  return isMonthlyWorkCompletedShift(shift)
 }
 
 /** Назначенные (график) и подтверждённые (тайм-трекер) смены за период. */
@@ -120,29 +123,28 @@ export function formatPayrollShiftsCountLabel(count) {
 }
 
 /**
- * Смена учитывается в зарплате только внутри периода работы сотрудника
- * (от даты приёма до даты увольнения включительно).
+ * Post-termination rows are excluded. Pre-hire rows are kept so payroll matches
+ * the live schedule (hiredAt previously fell back to created_at and under-counted).
  */
 export function isShiftWithinEmploymentPeriod(shift, employee) {
-  const shiftDate = toPayrollDateKey(shift?.shiftDate ?? shift?.shift_date)
-  if (!shiftDate) return false
-  if (!employee) return true
-
-  const hiredAt = toPayrollDateKey(employee?.hiredAt ?? employee?.hired_at)
-  if (hiredAt && shiftDate < hiredAt) return false
-
-  const terminatedAt = toPayrollDateKey(employee?.terminatedAt ?? employee?.terminated_at)
-  if (terminatedAt && shiftDate > terminatedAt) return false
-
-  return true
+  return isShiftEligibleForMonthlyWork(shift, employee)
 }
 
 /**
  * Map<employeeId, { assigned, completed }> from a month shift list.
- * Optional employeesById clips shifts outside hire/termination dates
- * (mid-month terminations must not count post-termination schedule rows).
+ * Prefer passing year/month so the shared monthly aggregator is used.
+ * When omitted, input is treated as already month-scoped (payroll fetch).
  */
-export function buildPayrollShiftStatsByEmployee(shifts = [], employeesById = null) {
+export function buildPayrollShiftStatsByEmployee(
+  shifts = [],
+  employeesById = null,
+  year = null,
+  month = null,
+) {
+  if (year != null && month != null) {
+    return buildMonthlyWorkSummaryByEmployee(shifts, { year, month, employeesById })
+  }
+
   const byEmployee = new Map()
   for (const shift of shifts || []) {
     const id = Number(shift?.employeeId ?? shift?.employee_id)
@@ -163,12 +165,12 @@ export function buildPayrollShiftStatsByEmployee(shifts = [], employeesById = nu
 }
 
 export function getPayrollShiftStatsForEmployee(shiftStatsByEmployee, employeeId) {
-  return (
-    shiftStatsByEmployee?.get(Number(employeeId)) || {
-      assigned: 0,
-      completed: 0,
-    }
-  )
+  const summary = shiftStatsByEmployee?.get(Number(employeeId))
+  if (!summary) return { assigned: 0, completed: 0 }
+  return {
+    assigned: Number(summary.assigned ?? summary.plannedShifts) || 0,
+    completed: Number(summary.completed ?? summary.workedShifts) || 0,
+  }
 }
 
 /** Ставка: оклад или стоимость смены (не путать с заработанной базой в base_salary у сменщиков). */

@@ -267,7 +267,12 @@ export default function PayrollSection() {
           employeeRows.map((row) => [Number(row.id), row])
         )
         // Period-based stats: include terminated staff; clip shifts after termination.
-        const shiftStats = buildPayrollShiftStatsByEmployee(monthShifts, employeesById)
+        const shiftStats = buildPayrollShiftStatsByEmployee(
+          monthShifts,
+          employeesById,
+          year,
+          month,
+        )
 
         if (import.meta.env.DEV) {
           for (const employee of employeeRows) {
@@ -816,6 +821,11 @@ export default function PayrollSection() {
                         value={amounts.baseColumnValue}
                         hint={amounts.baseColumnLabel}
                         detail={amounts.baseColumnDetail || ''}
+                        detailTitle={
+                          amounts.baseColumnDetail
+                            ? 'План — рабочие смены по графику за выбранный месяц.'
+                            : ''
+                        }
                         ariaLabel={
                           amounts.baseColumnMode === SALARY_CALCULATION_TYPE.SHIFT_BASED
                             ? 'Редактировать ставку (за смену)'
@@ -848,7 +858,10 @@ export default function PayrollSection() {
                             {formatMoneyCompact(amounts.payable)}
                           </span>
                           {amounts.payableDetail ? (
-                            <span className="payroll-table__money-detail">
+                            <span
+                              className="payroll-table__money-detail"
+                              title="Отработано — фактически завершённые смены по тайм-трекеру."
+                            >
                               {amounts.payableDetail}
                             </span>
                           ) : null}

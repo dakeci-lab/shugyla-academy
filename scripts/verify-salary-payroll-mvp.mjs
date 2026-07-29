@@ -99,6 +99,8 @@ function main() {
   assert('no open card button', !list.includes("Открыть'") && !list.includes('getPayrollRecordPath') && !list.includes('navigate(getPayroll'))
   assert('payroll ui state restore', list.includes('PAYROLL_UI_STORAGE_KEY') && list.includes('sessionStorage'))
   assert('advance upsert service', service.includes('upsertSalaryAdvance'))
+  assert('shared monthly work aggregator', utils.includes('buildMonthlyWorkSummaryByEmployee') || read('src/utils/employeeMonthlyWorkSummary.js').includes('summarizeEmployeeMonthlyWork'))
+  assert('no hiredAt shift clip', !utils.includes('shiftDate < hiredAt'))
 
   const recordPage = read('src/pages/platform/PlatformPayrollRecord.jsx')
   assert('record page redirects to ledger', recordPage.includes('Navigate') && recordPage.includes('getPayrollListPath'))

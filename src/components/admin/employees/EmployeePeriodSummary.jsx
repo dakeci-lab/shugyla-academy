@@ -30,7 +30,7 @@ export default function EmployeePeriodSummary({
   ratingLoading = false,
   showRating = false,
 }) {
-  const stats = summarizeEmployeePeriod(shifts)
+  const stats = summarizeEmployeePeriod(shifts, { year, month })
   const periodLabel =
     year && month ? formatMonthYearLabel(year, month) : 'выбранный период'
 

@@ -1,43 +1,20 @@
-import {
-  computeEarlyLeaveMinutesFromTimes,
-  computeLateMinutesFromTimes,
-  computeWorkedMinutesFromTimes,
-  isWorkingShiftStatus,
-} from './shiftData'
+import { summarizeEmployeeMonthlyWork } from './employeeMonthlyWorkSummary'
 
 /**
- * Period stats from existing shift facts (same late/early/worked rules as schedule UI).
- * Incomplete shifts (no actual end) are excluded from worked hours and completed count.
+ * Period stats for employee profile cards.
+ * Uses the same monthly work aggregator as payroll («Отработано» / «Смены»).
+ *
+ * Pass `{ year, month }` so adjacent calendar-pad days are excluded.
  */
-export function summarizeEmployeePeriod(shifts = []) {
-  let workedMinutes = 0
-  let completedShifts = 0
-  let lateCount = 0
-  let earlyLeaveCount = 0
-
-  for (const shift of shifts) {
-    if (!isWorkingShiftStatus(shift?.status)) continue
-
-    const worked = computeWorkedMinutesFromTimes(shift)
-    if (worked > 0) {
-      workedMinutes += worked
-      completedShifts += 1
-    }
-
-    if (computeLateMinutesFromTimes(shift) > 0) {
-      lateCount += 1
-    }
-    if (computeEarlyLeaveMinutesFromTimes(shift) > 0) {
-      earlyLeaveCount += 1
-    }
-  }
-
+export function summarizeEmployeePeriod(shifts = [], options = {}) {
+  const summary = summarizeEmployeeMonthlyWork(shifts, options)
   return {
-    workedMinutes,
-    workedHours: Math.round((workedMinutes / 60) * 10) / 10,
-    completedShifts,
-    lateCount,
-    earlyLeaveCount,
+    workedMinutes: summary.workedMinutes,
+    workedHours: summary.workedHours,
+    completedShifts: summary.workedShifts,
+    plannedShifts: summary.plannedShifts,
+    lateCount: summary.lateCount,
+    earlyLeaveCount: summary.earlyLeaveCount,
   }
 }
 

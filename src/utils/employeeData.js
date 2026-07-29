@@ -377,9 +377,7 @@ export function normalizeEmployee(raw) {
       raw.employmentStatus || raw.status
     ),
     terminatedAt: toEmployeeDateKey(raw.terminatedAt ?? raw.terminated_at),
-    hiredAt: toEmployeeDateKey(
-      raw.hiredAt ?? raw.hired_at ?? raw.createdAt ?? raw.created_at
-    ),
+    hiredAt: toEmployeeDateKey(raw.hiredAt ?? raw.hired_at),
     workMode: normalizeWorkMode(raw.workMode ?? raw.work_mode),
     salaryCalculationType: normalizeSalaryCalculationType(
       raw.salaryCalculationType ?? raw.salary_calculation_type

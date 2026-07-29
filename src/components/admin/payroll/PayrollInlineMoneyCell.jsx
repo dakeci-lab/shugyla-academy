@@ -6,6 +6,7 @@ export default function PayrollInlineMoneyCell({
   value,
   hint = '',
   detail = '',
+  detailTitle = '',
   disabled = false,
   saving = false,
   onCommit,
@@ -67,7 +68,11 @@ export default function PayrollInlineMoneyCell({
             onKeyDown={handleKeyDown}
             aria-label={ariaLabel}
           />
-          {detail ? <span className="payroll-table__money-detail">{detail}</span> : null}
+          {detail ? (
+            <span className="payroll-table__money-detail" title={detailTitle || undefined}>
+              {detail}
+            </span>
+          ) : null}
         </div>
       </td>
     )
@@ -86,7 +91,11 @@ export default function PayrollInlineMoneyCell({
         <span className="payroll-table__money-value">
           {saving ? '…' : formatMoneyCompact(value)}
         </span>
-        {detail ? <span className="payroll-table__money-detail">{detail}</span> : null}
+        {detail ? (
+          <span className="payroll-table__money-detail" title={detailTitle || undefined}>
+            {detail}
+          </span>
+        ) : null}
       </button>
     </td>
   )
