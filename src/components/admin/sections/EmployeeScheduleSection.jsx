@@ -9,6 +9,13 @@ import {
   isDateKey,
   getMonthCalendarRange,
 } from '../../../utils/shiftData'
+import {
+  canEditEmployeeScheduleDate,
+  doesMonthOverlapEmployeeEmployment,
+  filterScheduleEntriesToEmployment,
+  getEmployeeScheduleDateRestrictionReason,
+  getMonthScheduleSetupDisabledReason,
+} from '../../../utils/employeeSchedulePeriod'
 import { fetchEmployeeWorkforceBundle } from '../../../services/workforceAdminService'
 import { isCloudMode } from '../../../lib/dataMode'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
@@ -16,6 +23,7 @@ import { canEditEmployeeSchedule } from '../../../config/permissions'
 import { useSession } from '../../../context/SessionContext'
 import { useScheduleBackgroundSync, BULK_OPERATION_STATUS } from '../../../hooks/useScheduleBackgroundSync'
 import { allowMobileBrowserBackOnce } from '../../../hooks/useBlockMobileBrowserBack'
+import { toastError, toastWarning } from '../../../services/notificationService'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeScheduleCalendar from '../EmployeeScheduleCalendar'
 import ShiftDayEditModal from '../ShiftDayEditModal'
@@ -164,14 +172,45 @@ export default function EmployeeScheduleSection({
     navigate(-1)
   }
 
+  const resolvedEmployee = employee || sharedEmployee
+
+  function handleEditDay(dateKey) {
+    if (!canEdit || !resolvedEmployee) return
+    if (!canEditEmployeeScheduleDate(resolvedEmployee, dateKey)) return
+    setEditDateKey(dateKey)
+  }
+
   function handleSaveShift(payload) {
+    if (!resolvedEmployee || !canEditEmployeeScheduleDate(resolvedEmployee, payload.shiftDate)) {
+      toastError(getEmployeeScheduleDateRestrictionReason(resolvedEmployee, payload.shiftDate) ||
+        'Дата вне периода работы сотрудника')
+      return
+    }
     const existingShift = shiftMap.get(payload.shiftDate) || null
     setEditDateKey(null)
     enqueueSave(payload, existingShift, setShifts)
   }
 
   function handleBulkApply(snapshot) {
-    return enqueueBulkSave(snapshot, setShifts, () => setShowBulkModal(false))
+    if (!resolvedEmployee) return false
+    const { allowed, skipped } = filterScheduleEntriesToEmployment(
+      resolvedEmployee,
+      snapshot.entries
+    )
+    if (!allowed.length) {
+      toastError('Нет дат в периоде работы сотрудника для выбранного диапазона')
+      return false
+    }
+    if (skipped.length > 0) {
+      toastWarning(
+        `Пропущено ${skipped.length} дн. вне периода работы — сохранены только допустимые даты`
+      )
+    }
+    return enqueueBulkSave(
+      { ...snapshot, entries: allowed },
+      setShifts,
+      () => setShowBulkModal(false)
+    )
   }
 
   function handleRetryBulkSave() {
@@ -180,6 +219,13 @@ export default function EmployeeScheduleSection({
 
   const bulkSaving = bulkOperation.status === BULK_OPERATION_STATUS.SAVING
   const bulkFailed = bulkOperation.status === BULK_OPERATION_STATUS.ERROR
+
+  const monthOverlapsEmployment = resolvedEmployee
+    ? doesMonthOverlapEmployeeEmployment(resolvedEmployee, year, month)
+    : false
+  const setupDisabledReason = resolvedEmployee
+    ? getMonthScheduleSetupDisabledReason(resolvedEmployee, year, month)
+    : null
 
   function handleRetrySync(dateKey) {
     retrySave(dateKey, setShifts)
@@ -193,7 +239,6 @@ export default function EmployeeScheduleSection({
     return <p className="admin-form__error">Сотрудник не найден</p>
   }
 
-  const resolvedEmployee = employee || sharedEmployee
   const hasShifts = shifts.length > 0
   const editShift = editDateKey ? shiftMap.get(editDateKey) : null
 
@@ -233,10 +278,15 @@ export default function EmployeeScheduleSection({
             type="button"
             className="btn btn--primary btn--sm"
             onClick={() => setShowBulkModal(true)}
-            disabled={bulkSaving}
+            disabled={bulkSaving || !monthOverlapsEmployment}
+            title={setupDisabledReason || undefined}
+            aria-disabled={bulkSaving || !monthOverlapsEmployment}
           >
             Настроить график
           </button>
+          {setupDisabledReason && (
+            <span className="schedule-employee-actions__hint">{setupDisabledReason}</span>
+          )}
         </div>
       )}
 
@@ -278,13 +328,20 @@ export default function EmployeeScheduleSection({
             shiftMap={shiftMap}
             syncMetaByDate={syncMetaByDate}
             editable={canEdit}
-            onEditDay={setEditDateKey}
+            canEditDate={(dateKey) => canEditEmployeeScheduleDate(resolvedEmployee, dateKey)}
+            getDateRestrictionReason={(dateKey) =>
+              getEmployeeScheduleDateRestrictionReason(resolvedEmployee, dateKey)
+            }
+            onEditDay={handleEditDay}
             onRetrySync={handleRetrySync}
           />
         </>
       )}
 
-      {editDateKey && canEdit && resolvedEmployee && (
+      {editDateKey &&
+        canEdit &&
+        resolvedEmployee &&
+        canEditEmployeeScheduleDate(resolvedEmployee, editDateKey) && (
         <ShiftDayEditModal
           employeeName={resolvedEmployee.name}
           dateKey={editDateKey}
@@ -296,8 +353,9 @@ export default function EmployeeScheduleSection({
         />
       )}
 
-      {showBulkModal && canEdit && (
+      {showBulkModal && canEdit && monthOverlapsEmployment && (
         <BulkScheduleModal
+          employee={resolvedEmployee}
           onClose={() => setShowBulkModal(false)}
           onApply={handleBulkApply}
         />

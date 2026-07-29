@@ -13,13 +13,23 @@ import { SYNC_STATUS } from '../../hooks/useScheduleBackgroundSync'
 import { PencilIcon } from '../icons/PlatformIcons'
 import './EmployeeSchedule.css'
 
-function ShiftDayCell({ date, shift, syncMeta, editable, onEdit, onRetrySync, outsideMonth = false }) {
+function ShiftDayCell({
+  date,
+  shift,
+  syncMeta,
+  dayEditable,
+  restrictionReason,
+  onEdit,
+  onRetrySync,
+  outsideMonth = false,
+}) {
   const dateKey = toDateKey(date)
   const status = shift?.status
   const statusClass = status ? SHIFT_STATUS_CSS[status] : 'shift-day--empty'
   const isToday = toDateKey(new Date()) === dateKey
   const syncFailed = syncMeta?.syncStatus === SYNC_STATUS.ERROR || syncMeta?.syncStatus === SYNC_STATUS.UNSYNCED
-  const interactive = Boolean(editable && onEdit)
+  const interactive = Boolean(dayEditable && onEdit)
+  const employmentLocked = Boolean(restrictionReason)
 
   function openDay() {
     if (interactive) onEdit(dateKey)
@@ -39,12 +49,15 @@ function ShiftDayCell({ date, shift, syncMeta, editable, onEdit, onRetrySync, ou
           isToday ? 'shift-day--today' : '',
           syncFailed ? 'shift-day--sync-error' : '',
           interactive ? 'shift-day--interactive' : '',
+          employmentLocked ? 'shift-day--employment-locked' : '',
         ]
           .filter(Boolean)
           .join(' ')}
         onClick={openDay}
         role={interactive ? 'button' : undefined}
         tabIndex={interactive ? 0 : undefined}
+        aria-disabled={employmentLocked ? true : undefined}
+        title={restrictionReason || undefined}
         onKeyDown={(event) => {
           if (interactive && (event.key === 'Enter' || event.key === ' ')) {
             event.preventDefault()
@@ -63,7 +76,7 @@ function ShiftDayCell({ date, shift, syncMeta, editable, onEdit, onRetrySync, ou
           >
             {date.getDate()}
           </span>
-          {editable && (
+          {dayEditable && (
             <button
               type="button"
               className="shift-day__edit"
@@ -91,7 +104,7 @@ function ShiftDayCell({ date, shift, syncMeta, editable, onEdit, onRetrySync, ou
           </>
         )}
 
-        {syncFailed && (
+        {syncFailed && dayEditable && (
           <button
             type="button"
             className="shift-day__retry"
@@ -117,6 +130,8 @@ export default function EmployeeScheduleCalendar({
   shiftMap,
   syncMetaByDate = {},
   editable = false,
+  canEditDate = null,
+  getDateRestrictionReason = null,
   onEditDay,
   onRetrySync,
 }) {
@@ -131,13 +146,20 @@ export default function EmployeeScheduleCalendar({
       ))}
       {cells.map((date) => {
         const dateKey = toDateKey(date)
+        const restrictionReason = getDateRestrictionReason?.(dateKey) || null
+        const dayEditable =
+          Boolean(editable) &&
+          (typeof canEditDate === 'function' ? canEditDate(dateKey) : true) &&
+          !restrictionReason
+
         return (
           <ShiftDayCell
             key={dateKey}
             date={date}
             shift={shiftMap.get(dateKey) || null}
             syncMeta={syncMetaByDate[dateKey]}
-            editable={editable}
+            dayEditable={dayEditable}
+            restrictionReason={restrictionReason}
             onEdit={onEditDay}
             onRetrySync={onRetrySync}
             outsideMonth={isOutsideViewMonth(date, year, month)}

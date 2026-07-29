@@ -345,9 +345,12 @@ Deno.serve(async (req) => {
     employeeQuery = employeeQuery
       .lte('hired_at', dateTo)
       .or(`terminated_at.is.null,terminated_at.gte.${dateFrom}`)
-  } else {
+  } else if (scopedEmployeeId == null) {
+    // Team schedule / dashboard / rating: only currently active offline staff.
     employeeQuery = employeeQuery.eq('status', 'active')
   }
+  // Scoped profile/own schedule: keep historical shifts for terminated/inactive staff.
+  // Status must not hide previously assigned shifts on the employee card.
 
   if (scopedEmployeeId != null) {
     // Single-employee profile/own lookup keeps online staff (card still loads).

@@ -1,6 +1,16 @@
 import { normalizeShift } from '../utils/shiftData'
+import { getEmployeeById } from '../utils/employeeData'
+import { canEditEmployeeScheduleDate } from '../utils/employeeSchedulePeriod'
 
 const STORAGE_KEY = 'shugyla_employee_shifts'
+
+function assertWithinEmployment(employeeId, dateKey) {
+  const employee = getEmployeeById(Number(employeeId))
+  if (!employee) return
+  if (!canEditEmployeeScheduleDate(employee, dateKey)) {
+    throw new Error('shift_outside_employment')
+  }
+}
 
 function readShifts() {
   const data = localStorage.getItem(STORAGE_KEY)
@@ -79,6 +89,7 @@ function buildFactualRow(employeeId, payload, existing, createdBy) {
 }
 
 export async function upsertEmployeeShift(employeeId, payload, createdBy = null) {
+  assertWithinEmployment(employeeId, payload.shiftDate)
   const shifts = readShifts()
   const idx = shifts.findIndex(
     (row) => row.employee_id === employeeId && row.shift_date === payload.shiftDate
@@ -102,8 +113,12 @@ export async function bulkApplyEmployeeShifts(
   { overwrite = false, createdBy = null } = {}
 ) {
   const shifts = readShifts()
+  let applied = 0
 
   entries.forEach((entry) => {
+    if (!canEditEmployeeScheduleDate(getEmployeeById(Number(employeeId)), entry.shiftDate)) {
+      return
+    }
     const idx = shifts.findIndex(
       (row) => row.employee_id === employeeId && row.shift_date === entry.shiftDate
     )
@@ -117,8 +132,9 @@ export async function bulkApplyEmployeeShifts(
     } else {
       shifts.push(row)
     }
+    applied += 1
   })
 
   writeShifts(shifts)
-  return entries.length
+  return applied
 }

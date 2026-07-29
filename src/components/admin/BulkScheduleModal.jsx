@@ -7,6 +7,10 @@ import {
   validateBulkScheduleForm,
   buildBulkShiftEntries,
 } from '../../utils/shiftData'
+import {
+  canEditEmployeeScheduleDate,
+  getEmployeeEmploymentBounds,
+} from '../../utils/employeeSchedulePeriod'
 import './admin-shared.css'
 
 const EMPTY_BULK_FORM = {
@@ -21,10 +25,11 @@ const EMPTY_BULK_FORM = {
 }
 
 /** Модальное окно массовой настройки графика */
-export default function BulkScheduleModal({ onClose, onApply }) {
+export default function BulkScheduleModal({ employee = null, onClose, onApply }) {
   const [form, setForm] = useState(EMPTY_BULK_FORM)
   const [errors, setErrors] = useState({})
   const [showOverwriteConfirm, setShowOverwriteConfirm] = useState(false)
+  const { hiredAt, terminatedAt } = getEmployeeEmploymentBounds(employee)
 
   function toggleWeekday(day) {
     setForm((prev) => {
@@ -47,10 +52,21 @@ export default function BulkScheduleModal({ onClose, onApply }) {
       return false
     }
 
+    const allowed = entries.filter((entry) =>
+      canEditEmployeeScheduleDate(employee, entry.shiftDate)
+    )
+    if (!allowed.length) {
+      setErrors({
+        startDate: 'Выбранный диапазон полностью вне периода работы сотрудника',
+      })
+      return false
+    }
+
     return onApply({
-      entries,
+      entries: allowed,
       options: { overwrite },
       form: formSnapshot,
+      skippedOutsideEmployment: entries.length - allowed.length,
     })
   }
 
@@ -80,6 +96,15 @@ export default function BulkScheduleModal({ onClose, onApply }) {
         }
       >
         <div className="admin-form">
+          {(hiredAt || terminatedAt) && (
+            <p className="admin-form__hint">
+              Редактирование доступно
+              {hiredAt ? ` с ${hiredAt.split('-').reverse().join('.')}` : ''}
+              {terminatedAt ? ` по ${terminatedAt.split('-').reverse().join('.')}` : ''}
+              {!terminatedAt && hiredAt ? ' (без даты увольнения)' : ''}
+              .
+            </p>
+          )}
           <div className="admin-form__row">
             <label className="admin-form__label">
               Дата начала *
@@ -87,6 +112,8 @@ export default function BulkScheduleModal({ onClose, onApply }) {
                 type="date"
                 className="admin-form__input"
                 value={form.startDate}
+                min={hiredAt || undefined}
+                max={terminatedAt || undefined}
                 onChange={(e) => setForm({ ...form, startDate: e.target.value })}
               />
               {errors.startDate && <span className="admin-form__error">{errors.startDate}</span>}
@@ -97,6 +124,8 @@ export default function BulkScheduleModal({ onClose, onApply }) {
                 type="date"
                 className="admin-form__input"
                 value={form.endDate}
+                min={hiredAt || undefined}
+                max={terminatedAt || undefined}
                 onChange={(e) => setForm({ ...form, endDate: e.target.value })}
               />
               {errors.endDate && <span className="admin-form__error">{errors.endDate}</span>}

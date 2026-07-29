@@ -37,6 +37,33 @@ export function isDateKey(value: unknown): value is string {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)
 }
 
+/** Calendar YYYY-MM-DD from date-only or ISO timestamp (no UTC day shift). */
+export function toScheduleDateKey(value: unknown): string | null {
+  if (value == null || value === '') return null
+  if (typeof value !== 'string') return null
+  const match = value.trim().match(/^(\d{4}-\d{2}-\d{2})/)
+  return match ? match[1] : null
+}
+
+/**
+ * Inclusive employment window: hire_date <= date <= termination_date.
+ * Missing termination → open-ended from hire. Missing hire → not editable.
+ */
+export function canEditEmployeeScheduleDate(
+  hiredAt: unknown,
+  terminatedAt: unknown,
+  date: unknown
+): boolean {
+  const dateKey = toScheduleDateKey(date)
+  if (!dateKey || !isDateKey(dateKey)) return false
+  const hireKey = toScheduleDateKey(hiredAt)
+  if (!hireKey || !isDateKey(hireKey)) return false
+  if (dateKey < hireKey) return false
+  const termKey = toScheduleDateKey(terminatedAt)
+  if (termKey && isDateKey(termKey) && dateKey > termKey) return false
+  return true
+}
+
 export function isTimeValue(value: unknown): boolean {
   if (value == null || value === '') return true
   return typeof value === 'string' && /^\d{2}:\d{2}(:\d{2})?$/.test(value)

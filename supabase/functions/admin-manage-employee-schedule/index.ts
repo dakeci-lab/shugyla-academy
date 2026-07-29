@@ -2,7 +2,6 @@ import '@supabase/functions-js/edge-runtime.d.ts'
 import {
   authorizeAuthenticatedEmployee,
   adminErrorResponse,
-  canEmployeeLogin,
   roleHasPermissionCode,
 } from '../_shared/employeeAuthorization.ts'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
@@ -10,6 +9,7 @@ import {
   MAX_BULK_SHIFTS,
   assertScheduleChangeAllowed,
   buildShiftRow,
+  canEditEmployeeScheduleDate,
   fetchExistingShiftsByDates,
   normalizeEmployeeId,
   parseShiftInput,
@@ -25,37 +25,56 @@ const PERMISSION_VIEW_TEAM = 'schedule.view_team'
 const ALLOWED_BODY_KEYS = new Set(['action', 'employee_id', 'shift', 'shifts', 'overwrite'])
 const ALLOWED_ACTIONS = new Set(['upsert_shift', 'bulk_upsert_shifts'])
 
+type SchedulableTarget = {
+  id: number
+  status: string | null
+  work_mode: string | null
+  hired_at: string | null
+  terminated_at: string | null
+}
+
 async function assertTargetInScope(
   serviceClient: Parameters<typeof roleHasPermissionCode>[0],
   caller: { id: number; role_id: string | null },
   targetEmployeeId: number,
   requireBulk: boolean
-): Promise<Response | null> {
+): Promise<{ error: Response } | { target: SchedulableTarget }> {
   const permission = requireBulk ? PERMISSION_BULK_EDIT : PERMISSION_EDIT
   const permitted = await roleHasPermissionCode(serviceClient, caller.role_id, permission)
-  if (!permitted) return adminErrorResponse('forbidden', 403)
+  if (!permitted) return { error: adminErrorResponse('forbidden', 403) }
 
-  if (targetEmployeeId === caller.id) return null
-
-  const hasTeam = await roleHasPermissionCode(serviceClient, caller.role_id, PERMISSION_VIEW_TEAM)
-  if (!hasTeam) return adminErrorResponse('forbidden', 403)
+  if (targetEmployeeId !== caller.id) {
+    const hasTeam = await roleHasPermissionCode(serviceClient, caller.role_id, PERMISSION_VIEW_TEAM)
+    if (!hasTeam) return { error: adminErrorResponse('forbidden', 403) }
+  }
 
   const { data: target, error } = await serviceClient
     .from('academy_users')
-    .select('id, status, role, work_mode')
+    .select('id, status, role, work_mode, hired_at, terminated_at, created_at')
     .eq('id', targetEmployeeId)
     .maybeSingle()
 
-  // Admins are schedulable HR employees; role only affects permissions, not target eligibility.
-  if (error || !target || !canEmployeeLogin(target.status)) {
-    return adminErrorResponse('forbidden', 403)
+  // Historical schedule edits stay allowed for terminated/inactive staff.
+  // Employment dates (not login status) gate which days may change.
+  if (error || !target) {
+    return { error: adminErrorResponse('forbidden', 403) }
   }
 
   if (target.work_mode === 'online') {
-    return adminErrorResponse('online_employee_not_schedulable', 422)
+    return { error: adminErrorResponse('online_employee_not_schedulable', 422) }
   }
 
-  return null
+  return {
+    target: {
+      id: Number(target.id),
+      status: (target.status as string | null) ?? null,
+      work_mode: (target.work_mode as string | null) ?? null,
+      hired_at:
+        ((target.hired_at as string | null) ?? null) ||
+        ((target.created_at as string | null) ?? null),
+      terminated_at: (target.terminated_at as string | null) ?? null,
+    },
+  }
 }
 
 function parseShiftList(raw: unknown): ShiftInput[] | Response {
@@ -119,19 +138,24 @@ Deno.serve(async (req) => {
   if (authResult instanceof Response) return authResult
 
   const { serviceClient, caller } = authResult
-  const scopeError = await assertTargetInScope(
+  const scopeResult = await assertTargetInScope(
     serviceClient,
     caller,
     employeeId,
     action === 'bulk_upsert_shifts'
   )
-  if (scopeError) return scopeError
+  if ('error' in scopeResult) return scopeResult.error
+  const { target } = scopeResult
 
   if (action === 'upsert_shift') {
     const parsed = parseShiftInput(payload.shift)
     if (!parsed) return adminErrorResponse('validation_error', 422)
     const validationError = validateShiftInput(parsed)
     if (validationError) return adminErrorResponse('validation_error', 422)
+
+    if (!canEditEmployeeScheduleDate(target.hired_at, target.terminated_at, parsed.shift_date)) {
+      return adminErrorResponse('shift_outside_employment', 422)
+    }
 
     const existingMap = await fetchExistingShiftsByDates(serviceClient, employeeId, [
       parsed.shift_date,
@@ -163,6 +187,12 @@ Deno.serve(async (req) => {
   const shiftsOrError = parseShiftList(payload.shifts)
   if (shiftsOrError instanceof Response) return shiftsOrError
   const shifts = shiftsOrError
+
+  for (const shift of shifts) {
+    if (!canEditEmployeeScheduleDate(target.hired_at, target.terminated_at, shift.shift_date)) {
+      return adminErrorResponse('shift_outside_employment', 422)
+    }
+  }
 
   const overwrite = payload.overwrite === true
   const dates = shifts.map((shift) => shift.shift_date)
