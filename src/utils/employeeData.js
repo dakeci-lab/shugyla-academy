@@ -638,3 +638,83 @@ export function validateEmployeeForm(form, editId = null) {
   }
   return null
 }
+
+function normEmployeeText(value) {
+  if (value == null || value === '') return null
+  return String(value).trim()
+}
+
+/**
+ * Diff-only cloud update payload for employee edit.
+ * Omits unchanged fields. For self-edit never includes roleId / employmentStatus.
+ */
+export function buildEmployeeCloudUpdateChanges(
+  employee,
+  form,
+  { selectedRole = null, editingSelf = false } = {},
+) {
+  if (!employee || !form) return {}
+
+  const roleCode = selectedRole?.code || form.role
+  const next = {
+    firstName: String(form.firstName || '').trim(),
+    lastName: String(form.lastName || '').trim(),
+    roleId: selectedRole?.id || form.roleId || null,
+    position: selectedRole?.name || form.position || '',
+    employmentStatus: normalizeEmploymentStatus(
+      form.employmentStatus || employee.employmentStatus,
+    ),
+    hiredAt: toEmployeeDateKey(form.hiredAt),
+    workMode: normalizeWorkMode(form.workMode),
+    salaryCalculationType: normalizeSalaryCalculationType(form.salaryCalculationType),
+    payrollParticipation: normalizePayrollParticipation(form.payrollParticipation),
+    avatarUrl: form.avatarUrl || null,
+  }
+
+  const changes = {}
+
+  if (normEmployeeText(next.firstName) !== normEmployeeText(employee.firstName)) {
+    changes.firstName = next.firstName
+  }
+  if (normEmployeeText(next.lastName) !== normEmployeeText(employee.lastName)) {
+    changes.lastName = next.lastName
+  }
+  if (normEmployeeText(next.position) !== normEmployeeText(employee.position)) {
+    changes.position = next.position
+  }
+  if (normEmployeeText(next.avatarUrl) !== normEmployeeText(employee.avatarUrl)) {
+    changes.avatarUrl = next.avatarUrl
+  }
+  if (toEmployeeDateKey(next.hiredAt) !== toEmployeeDateKey(employee.hiredAt)) {
+    changes.hiredAt = next.hiredAt
+  }
+  if (normalizeWorkMode(next.workMode) !== normalizeWorkMode(employee.workMode)) {
+    changes.workMode = next.workMode
+  }
+  if (
+    normalizeSalaryCalculationType(next.salaryCalculationType) !==
+    normalizeSalaryCalculationType(employee.salaryCalculationType)
+  ) {
+    changes.salaryCalculationType = next.salaryCalculationType
+  }
+  if (
+    normalizePayrollParticipation(next.payrollParticipation) !==
+    normalizePayrollParticipation(employee.payrollParticipation)
+  ) {
+    changes.payrollParticipation = next.payrollParticipation
+  }
+
+  if (!editingSelf) {
+    if (normEmployeeText(next.roleId) !== normEmployeeText(employee.roleId)) {
+      changes.roleId = next.roleId
+    }
+    if (
+      normalizeEmploymentStatus(next.employmentStatus) !==
+      normalizeEmploymentStatus(employee.employmentStatus)
+    ) {
+      changes.employmentStatus = next.employmentStatus
+    }
+  }
+
+  return changes
+}

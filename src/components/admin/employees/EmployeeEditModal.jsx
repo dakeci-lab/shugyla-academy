@@ -3,6 +3,7 @@ import {
   EMPTY_EMPLOYEE_FORM,
   employeeToForm,
   validateEmployeeForm,
+  buildEmployeeCloudUpdateChanges,
   EMPLOYEE_STATUS_OPTIONS,
   WORK_MODE_OPTIONS,
   SALARY_CALCULATION_TYPE_OPTIONS,
@@ -144,18 +145,16 @@ export default function EmployeeEditModal({
     try {
       if (editId) {
         if (cloudMode) {
-          await updateEmployee(editId, {
-            firstName: form.firstName.trim(),
-            lastName: form.lastName.trim(),
-            roleId: selectedRole?.id || form.roleId || null,
-            position: selectedRole?.name || getRoleLabel(roleCode),
-            employmentStatus: form.employmentStatus,
-            hiredAt: form.hiredAt,
-            workMode: form.workMode,
-            salaryCalculationType: form.salaryCalculationType,
-            payrollParticipation: form.payrollParticipation,
-            avatarUrl: form.avatarUrl || null,
+          const changes = buildEmployeeCloudUpdateChanges(employee, form, {
+            selectedRole,
+            editingSelf,
           })
+          if (Object.keys(changes).length === 0) {
+            showSuccess('Изменений нет')
+            onClose?.()
+            return
+          }
+          await updateEmployee(editId, changes)
         } else {
           await updateEmployee(editId, {
             firstName: form.firstName.trim(),
@@ -391,7 +390,7 @@ export default function EmployeeEditModal({
             ))}
           </select>
           {editingSelf && (
-            <span className="admin-form__hint">Нельзя изменить собственную роль.</span>
+            <span className="admin-form__hint">Собственную роль нельзя изменить.</span>
           )}
           {!editingSelf && (
             <span className="admin-form__hint">
@@ -488,7 +487,9 @@ export default function EmployeeEditModal({
             ))}
           </select>
           {editingSelf && (
-            <span className="admin-form__hint">Нельзя изменить собственный статус.</span>
+            <span className="admin-form__hint">
+              Собственный статус сотрудника нельзя изменить.
+            </span>
           )}
         </label>
 

@@ -83,7 +83,7 @@ Auth user email/password are not modified on this step.
 
 ### Protections
 
-- **Self:** caller cannot change own `role_id` or `status` (`409`).
+- **Self:** caller cannot change own `role_id` or employment `status` to a **different** value (`409`). Sending the same `role_id` / `status` is a no-op and does not block other allowed fields (hire date, work mode, salary type, payroll participation).
 - **Last admin:** cannot remove the last active user with `employees.edit` via deactivation or role demotion (`409 last_admin_protected`).
 
 ## Frontend

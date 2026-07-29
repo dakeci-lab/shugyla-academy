@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     return adminErrorResponse('validation_error', 422)
   }
 
-  const changes = changesRaw as Record<string, unknown>
+  const changes = { ...(changesRaw as Record<string, unknown>) }
   const changeKeys = Object.keys(changes)
   if (changeKeys.length === 0) {
     return adminErrorResponse('validation_error', 422)
@@ -131,12 +131,43 @@ Deno.serve(async (req) => {
 
   const isSelf = caller.id === target.id
 
+  // Field-level self protection: reject only when protected values actually change.
+  // Unchanged role_id/status may still appear in a full form payload — treat as no-op.
   if (isSelf && 'role_id' in changes) {
-    return adminErrorResponse('self_role_change_forbidden', 409)
+    if (typeof changes.role_id !== 'string' || !changes.role_id.trim()) {
+      return adminErrorResponse('invalid_role', 422)
+    }
+    const requestedRoleId = changes.role_id.trim()
+    if (requestedRoleId !== String(target.role_id ?? '')) {
+      return adminErrorResponse('self_role_change_forbidden', 409)
+    }
+    delete changes.role_id
   }
 
   if (isSelf && 'status' in changes) {
-    return adminErrorResponse('self_status_change_forbidden', 409)
+    if (typeof changes.status !== 'string' || !ALLOWED_STATUSES.has(changes.status.trim())) {
+      return adminErrorResponse('invalid_status', 422)
+    }
+    const requestedStatus = changes.status.trim()
+    if (requestedStatus !== String(target.status ?? '').trim()) {
+      return adminErrorResponse('self_status_change_forbidden', 409)
+    }
+    delete changes.status
+  }
+
+  if (Object.keys(changes).length === 0) {
+    const { data: current, error: currentError } = await serviceClient
+      .from('academy_users')
+      .select(SAFE_EMPLOYEE_SELECT)
+      .eq('id', employeeId)
+      .single()
+    if (currentError || !current) {
+      return adminErrorResponse('internal_error', 500)
+    }
+    return jsonResponse({
+      ok: true,
+      employee: mapSafeEmployee(current as DbEmployeeRow),
+    })
   }
 
   const patch: Record<string, unknown> = {}

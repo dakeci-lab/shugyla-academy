@@ -857,6 +857,22 @@ function stageSharedHelperStatic() {
   assert('list selects safe fields', listFn.includes('SAFE_EMPLOYEE_SELECT'))
   assert('password not in list select', !listFn.includes('password'))
   assert('update function has last_admin_protected', updateFn.includes('last_admin_protected'))
+  assert(
+    'self protection compares role values',
+    updateFn.includes('self_role_change_forbidden') &&
+      updateFn.includes('requestedRoleId') &&
+      updateFn.includes('target.role_id'),
+  )
+  assert(
+    'self protection compares status values',
+    updateFn.includes('self_status_change_forbidden') &&
+      updateFn.includes('requestedStatus') &&
+      updateFn.includes('target.status'),
+  )
+  assert(
+    'unchanged self role/status treated as no-op',
+    updateFn.includes("delete changes.role_id") && updateFn.includes("delete changes.status"),
+  )
 
   console.log('')
 }
