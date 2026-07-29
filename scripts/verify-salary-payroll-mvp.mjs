@@ -38,6 +38,7 @@ function main() {
   const utils = read('src/utils/salaryPayroll.js')
   const service = read('src/services/salaryPayrollService.js')
   const list = read('src/components/admin/payroll/PayrollSection.jsx')
+  const filter = read('src/components/admin/payroll/PayrollFilterPopover.jsx')
   const detail = read('src/components/admin/payroll/PayrollRecordSection.jsx')
   const app = read('src/App.jsx')
   const pkg = read('package.json')
@@ -60,8 +61,16 @@ function main() {
   console.log('\nStage 3: UI / routes')
   assert('list page wired', app.includes('PlatformPayroll') && app.includes('employees/payroll'))
   assert('detail route', app.includes('employees/payroll/records/:recordId'))
-  assert('month bar', list.includes('PlatformPeriodHeader'))
+  assert('no green month bar', !list.includes('PlatformPeriodHeader'))
   assert('filter popover', list.includes('PayrollFilterPopover'))
+  assert(
+    'month in filter',
+    filter.includes('Месяц расчёта') &&
+      filter.includes('type="month"') &&
+      filter.includes('Текущий месяц') &&
+      filter.includes('Предыдущий месяц') &&
+      utils.includes('getPayrollCurrentMonthState'),
+  )
   assert(
     'unified search toolbar',
     list.includes('PlatformSearchToolbar') && list.includes('Поиск по ФИО'),
@@ -81,7 +90,9 @@ function main() {
   assert('no status column in list', !list.includes('Статус расчёта'))
   assert('role under name', list.includes('payroll-table__role'))
   assert('employee name links to profile by id', list.includes('getEmployeeProfilePath') && list.includes('payroll-table__person-link') && list.includes('getPayrollEmployeeLink'))
-  assert('totals row', list.includes('payroll-table__totals') && list.includes('payroll-summary'))
+  assert('totals row', list.includes('payroll-table__totals') && list.includes('formatPayrollTotalsLabel'))
+  assert('no top summary cards', !list.includes('payroll-summary') && !list.includes('Фонд оплаты'))
+  assert('compact filter period label', list.includes('payroll-filter-trigger') && list.includes('Фильтр ·'))
   assert('comment icon only', list.includes('PayrollCommentModal') && list.includes('CommentIcon'))
   assert('inline salary editing', list.includes('PayrollInlineMoneyCell'))
   assert('lines popup', list.includes('PayrollLinesModal'))

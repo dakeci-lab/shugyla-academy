@@ -70,6 +70,31 @@
   width: 100%;
 }
 
+.employee-filter-popover--payroll {
+  width: min(360px, calc(100vw - 32px));
+  right: 0;
+  left: auto;
+}
+
+.employee-filter-popover__month-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.employee-filter-popover__month-caption {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+.employee-filter-popover__month-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
 .employee-filter-popover__count {
   margin: 12px 0 0;
   font-size: 13px;

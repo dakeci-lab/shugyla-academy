@@ -3,12 +3,21 @@ import AdminModal from '../AdminModal'
 import useMediaQuery from '../../../hooks/useMediaQuery'
 import { EMPLOYEE_FORM_ROLES, getRoleLabel } from '../../../data/roles'
 import { PAYROLL_PARTICIPATION_FILTER_OPTIONS } from '../../../utils/employeeData'
-import { SALARY_RECORD_STATUSES } from '../../../utils/salaryPayroll'
+import {
+  SALARY_RECORD_STATUSES,
+  changePayrollMonth,
+  getPayrollCurrentMonthState,
+  parsePayrollMonthInputValue,
+  toPayrollMonthInputValue,
+} from '../../../utils/salaryPayroll'
 import '../employees/EmployeeFilterPopover.css'
 
 const MOBILE_QUERY = '(max-width: 900px)'
 
 function PayrollFilterFields({
+  draftYear,
+  draftMonth,
+  onMonthChange,
   draftRoleId,
   draftStatus,
   draftParticipation,
@@ -17,8 +26,56 @@ function PayrollFilterFields({
   onParticipationChange,
   resultCount,
 }) {
+  const current = getPayrollCurrentMonthState()
+  const previous = changePayrollMonth(current.year, current.month, -1)
+  const isCurrent =
+    Number(draftYear) === current.year && Number(draftMonth) === current.month
+  const isPrevious =
+    Number(draftYear) === previous.year && Number(draftMonth) === previous.month
+
   return (
     <>
+      <div className="employee-filter-popover__section">
+        <span className="employee-filter-popover__label">Период</span>
+        <label className="employee-filter-popover__month-field">
+          <span className="employee-filter-popover__month-caption">Месяц расчёта</span>
+          <input
+            type="month"
+            className="admin-form__input employee-filter-popover__month-input"
+            value={toPayrollMonthInputValue(draftYear, draftMonth)}
+            onChange={(event) => {
+              const next = parsePayrollMonthInputValue(event.target.value)
+              if (next) onMonthChange?.(next.year, next.month)
+            }}
+            aria-label="Месяц расчёта"
+          />
+        </label>
+        <div
+          className="employee-filter-popover__options"
+          role="group"
+          aria-label="Быстрый период"
+        >
+          <button
+            type="button"
+            className={`employee-filter-popover__option${
+              isCurrent ? ' employee-filter-popover__option--active' : ''
+            }`}
+            onClick={() => onMonthChange?.(current.year, current.month)}
+          >
+            Текущий месяц
+          </button>
+          <button
+            type="button"
+            className={`employee-filter-popover__option${
+              isPrevious ? ' employee-filter-popover__option--active' : ''
+            }`}
+            onClick={() => onMonthChange?.(previous.year, previous.month)}
+          >
+            Предыдущий месяц
+          </button>
+        </div>
+      </div>
+
       <div className="employee-filter-popover__section">
         <span className="employee-filter-popover__label">Роль</span>
         <select
@@ -111,9 +168,12 @@ function PayrollFilterFields({
   )
 }
 
-/** Фильтр списка зарплаты — тот же UI-паттерн, что у сотрудников */
+/** Фильтр списка зарплаты — период + роль / статус */
 export default function PayrollFilterPopover({
   open,
+  draftYear,
+  draftMonth,
+  onMonthChange,
   draftRoleId,
   draftStatus,
   draftParticipation,
@@ -158,16 +218,9 @@ export default function PayrollFilterPopover({
 
   if (!open) return null
 
-  function handleReset() {
-    onRoleChange?.('')
-    onStatusChange?.('all')
-    onParticipationChange?.('active')
-    onReset?.()
-  }
-
   const actions = (
     <>
-      <button type="button" className="btn btn--ghost btn--sm" onClick={handleReset}>
+      <button type="button" className="btn btn--ghost btn--sm" onClick={() => onReset?.()}>
         Сбросить
       </button>
       <button type="button" className="btn btn--primary btn--sm" onClick={onApply}>
@@ -178,6 +231,9 @@ export default function PayrollFilterPopover({
 
   const fields = (
     <PayrollFilterFields
+      draftYear={draftYear}
+      draftMonth={draftMonth}
+      onMonthChange={onMonthChange}
       draftRoleId={draftRoleId}
       draftStatus={draftStatus}
       draftParticipation={draftParticipation}
@@ -199,7 +255,7 @@ export default function PayrollFilterPopover({
   return (
     <div
       ref={popoverRef}
-      className="employee-filter-popover"
+      className="employee-filter-popover employee-filter-popover--payroll"
       role="dialog"
       aria-modal="false"
       aria-labelledby="payroll-filter-popover-title"

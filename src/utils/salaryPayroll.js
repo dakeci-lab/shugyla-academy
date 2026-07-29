@@ -432,6 +432,45 @@ export function changePayrollMonth(year, month, delta) {
   }
 }
 
+/** Current calendar month in Asia/Aqtobe (payroll company timezone). */
+export function getPayrollCurrentMonthState(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Aqtobe',
+    year: 'numeric',
+    month: '2-digit',
+  }).formatToParts(date)
+  const year = Number(parts.find((part) => part.type === 'year')?.value)
+  const month = Number(parts.find((part) => part.type === 'month')?.value)
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
+    return { year: date.getFullYear(), month: date.getMonth() + 1 }
+  }
+  return { year, month }
+}
+
+/** Footer label: «Итого за июль 2026 года». */
+export function formatPayrollTotalsLabel(year, month) {
+  const y = Number(year)
+  const m = Number(month)
+  if (!Number.isFinite(y) || !Number.isFinite(m) || m < 1 || m > 12) return 'Итого'
+  const monthName = new Date(y, m - 1, 1).toLocaleDateString('ru-RU', { month: 'long' })
+  return `Итого за ${monthName} ${y} года`
+}
+
+/** Value for `<input type="month">`. */
+export function toPayrollMonthInputValue(year, month) {
+  return `${Number(year)}-${String(Number(month)).padStart(2, '0')}`
+}
+
+export function parsePayrollMonthInputValue(value) {
+  if (typeof value !== 'string') return null
+  const match = value.trim().match(/^(\d{4})-(\d{2})$/)
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (!Number.isFinite(year) || month < 1 || month > 12) return null
+  return { year, month }
+}
+
 function pad2(value) {
   return String(value).padStart(2, '0')
 }

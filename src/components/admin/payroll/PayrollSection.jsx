@@ -3,16 +3,15 @@ import { Link } from 'react-router-dom'
 import { isCloudMode } from '../../../lib/dataMode'
 import { getEmployeeProfilePath } from '../../../config/permissions'
 import { getRoleLabel } from '../../../data/roles'
-import { getCurrentMonthState } from '../../../utils/attendanceData'
 import { formatMonthYearLabel } from '../../../utils/shiftData'
 import {
   SALARY_ALLOWANCE_PRESETS,
   SALARY_DEDUCTION_PRESETS,
   buildPayrollShiftStatsByEmployee,
-  changePayrollMonth,
   formatMoneyCompact,
-  formatMoneyKzt,
+  formatPayrollTotalsLabel,
   getPayrollBaseColumnMode,
+  getPayrollCurrentMonthState,
   getPayrollLedgerAmounts,
   getPayrollPaidCap,
   getPayrollShiftStatsForEmployee,
@@ -51,10 +50,8 @@ import {
 } from '../../../services/salaryPayrollService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
-import PlatformPeriodHeader from '../../platform/PlatformPeriodHeader'
-import { CommentIcon } from '../../icons/PlatformIcons'
+import { CommentIcon, FilterIcon } from '../../icons/PlatformIcons'
 import PlatformSearchToolbar, {
-  PlatformFilterButton,
   PlatformToolbarActionWrap,
 } from '../../platform/PlatformSearchToolbar'
 import PayrollFilterPopover from './PayrollFilterPopover'
@@ -184,8 +181,10 @@ export default function PayrollSection() {
     ) {
       return { year: Number(saved.year), month: Number(saved.month) }
     }
-    return getCurrentMonthState()
+    return getPayrollCurrentMonthState()
   })
+  const [draftYear, setDraftYear] = useState(year)
+  const [draftMonth, setDraftMonth] = useState(month)
   const [search, setSearch] = useState(() =>
     typeof restoredUiRef.current?.search === 'string' ? restoredUiRef.current.search : '',
   )
@@ -446,8 +445,10 @@ export default function PayrollSection() {
     appliedParticipation,
   ])
 
-  // Single source for summary cards and table ИТОГО — summed from the same row.amounts.
+  // Single source for table ИТОГО — summed from visible (search/filter) row.amounts.
   const totals = useMemo(() => sumPayrollLedgerRows(rows), [rows])
+  const periodLabel = useMemo(() => formatMonthYearLabel(year, month), [year, month])
+  const totalsLabel = useMemo(() => formatPayrollTotalsLabel(year, month), [year, month])
 
   const draftPreviewCount = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -483,10 +484,34 @@ export default function PayrollSection() {
       setFilterOpen(false)
       return
     }
+    setDraftYear(year)
+    setDraftMonth(month)
     setDraftRoleId(appliedRoleId)
     setDraftStatus(appliedStatus)
     setDraftParticipation(appliedParticipation)
     setFilterOpen(true)
+  }
+
+  function applyFilters() {
+    setMonthState({ year: Number(draftYear), month: Number(draftMonth) })
+    setAppliedRoleId(draftRoleId)
+    setAppliedStatus(draftStatus)
+    setAppliedParticipation(draftParticipation)
+    setFilterOpen(false)
+  }
+
+  function resetFilters() {
+    const current = getPayrollCurrentMonthState()
+    setDraftYear(current.year)
+    setDraftMonth(current.month)
+    setDraftRoleId('')
+    setDraftStatus('all')
+    setDraftParticipation('active')
+    setMonthState(current)
+    setAppliedRoleId('')
+    setAppliedStatus('all')
+    setAppliedParticipation('active')
+    setFilterOpen(false)
   }
 
   function patchEmployeeLocal(employeeId, patch) {
@@ -673,15 +698,6 @@ export default function PayrollSection() {
 
   return (
     <div className="payroll-section">
-      <PlatformPeriodHeader
-        title={formatMonthYearLabel(year, month)}
-        onPrev={() => setMonthState((prev) => changePayrollMonth(prev.year, prev.month, -1))}
-        onNext={() => setMonthState((prev) => changePayrollMonth(prev.year, prev.month, 1))}
-        onToday={() => setMonthState(getCurrentMonthState())}
-        prevLabel="Предыдущий месяц"
-        nextLabel="Следующий месяц"
-      />
-
       <PlatformSearchToolbar
         value={search}
         onChange={(event) => setSearch(event.target.value)}
@@ -690,14 +706,36 @@ export default function PayrollSection() {
         flush
         actions={
           <PlatformToolbarActionWrap>
-            <PlatformFilterButton
-              buttonRef={filterButtonRef}
-              active={filtersActive}
+            <button
+              ref={filterButtonRef}
+              type="button"
+              className={`payroll-filter-trigger${
+                filtersActive ? ' payroll-filter-trigger--active' : ''
+              }`}
               onClick={toggleFilter}
-              ariaExpanded={filterOpen}
-            />
+              aria-expanded={filterOpen}
+              aria-label={`Фильтр · ${periodLabel}`}
+              title={`Фильтр · ${periodLabel}`}
+            >
+              <FilterIcon size={18} />
+              <span className="payroll-filter-trigger__label">
+                Фильтр · {periodLabel}
+              </span>
+              <span className="payroll-filter-trigger__label payroll-filter-trigger__label--short">
+                {periodLabel}
+              </span>
+              {filtersActive ? (
+                <span className="payroll-filter-trigger__dot" aria-hidden="true" />
+              ) : null}
+            </button>
             <PayrollFilterPopover
               open={filterOpen}
+              draftYear={draftYear}
+              draftMonth={draftMonth}
+              onMonthChange={(nextYear, nextMonth) => {
+                setDraftYear(nextYear)
+                setDraftMonth(nextMonth)
+              }}
               draftRoleId={draftRoleId}
               draftStatus={draftStatus}
               draftParticipation={draftParticipation}
@@ -705,21 +743,8 @@ export default function PayrollSection() {
               onStatusChange={setDraftStatus}
               onParticipationChange={setDraftParticipation}
               resultCount={draftPreviewCount}
-              onApply={() => {
-                setAppliedRoleId(draftRoleId)
-                setAppliedStatus(draftStatus)
-                setAppliedParticipation(draftParticipation)
-                setFilterOpen(false)
-              }}
-              onReset={() => {
-                setDraftRoleId('')
-                setDraftStatus('all')
-                setDraftParticipation('active')
-                setAppliedRoleId('')
-                setAppliedStatus('all')
-                setAppliedParticipation('active')
-                setFilterOpen(false)
-              }}
+              onApply={applyFilters}
+              onReset={resetFilters}
               onClose={() => setFilterOpen(false)}
               anchorRef={filterButtonRef}
             />
@@ -738,39 +763,7 @@ export default function PayrollSection() {
             : 'Нет активных сотрудников для расчёта'}
         </p>
       ) : (
-        <>
-          <div className="payroll-summary" aria-label="Итоги ведомости">
-            <div className="payroll-summary__item">
-              <span className="payroll-summary__label">Фонд оплаты</span>
-              <span className="payroll-summary__value">{formatMoneyKzt(totals.baseSalary)}</span>
-            </div>
-            <div className="payroll-summary__item">
-              <span className="payroll-summary__label">Начисления</span>
-              <span className="payroll-summary__value">{formatMoneyKzt(totals.allowances)}</span>
-            </div>
-            <div className="payroll-summary__item">
-              <span className="payroll-summary__label">Удержания</span>
-              <span className="payroll-summary__value">{formatMoneyKzt(totals.deductions)}</span>
-            </div>
-            <div className="payroll-summary__item">
-              <span className="payroll-summary__label">К выдаче</span>
-              <span className="payroll-summary__value">{formatMoneyKzt(totals.payable)}</span>
-            </div>
-            <div className="payroll-summary__item">
-              <span className="payroll-summary__label">Авансы</span>
-              <span className="payroll-summary__value">{formatMoneyKzt(totals.advance)}</span>
-            </div>
-            <div className="payroll-summary__item">
-              <span className="payroll-summary__label">Остаток</span>
-              <span className="payroll-summary__value">{formatMoneyKzt(totals.remainder)}</span>
-            </div>
-            <div className="payroll-summary__item">
-              <span className="payroll-summary__label">Выплачено</span>
-              <span className="payroll-summary__value">{formatMoneyKzt(totals.paid)}</span>
-            </div>
-          </div>
-
-          <div className="payroll-table-wrap">
+        <div className="payroll-table-wrap">
             <table className="payroll-table">
               <thead>
                 <tr>
@@ -896,7 +889,7 @@ export default function PayrollSection() {
               <tfoot>
                 <tr className="payroll-table__totals">
                   <td className="payroll-table__num" />
-                  <td className="payroll-table__totals-label">Итого</td>
+                  <td className="payroll-table__totals-label">{totalsLabel}</td>
                   <TotalsMoney value={totals.baseSalary} />
                   <TotalsMoney value={totals.allowances} />
                   <TotalsMoney value={totals.deductions} />
@@ -909,7 +902,6 @@ export default function PayrollSection() {
               </tfoot>
             </table>
           </div>
-        </>
       )}
 
       {commentTarget && (
