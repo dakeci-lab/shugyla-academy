@@ -1,5 +1,5 @@
 /**
- * umag-sync — UMAG suppliers + supplies + supply returns for settlements.
+ * umag-sync — UMAG suppliers + supplies + supply returns + document payments.
  *
  * Frontend → this Edge Function → api.umag.kz → Supabase tables.
  * Never returns UMAG Authorization or raw credentials to the client.
@@ -8,6 +8,7 @@
  * - GET /rest/cabinet/org/agent/list (agentType=SUPPLIER)
  * - GET /rest/cabinet/opr/supplies/all
  * - GET /rest/cabinet/opr/supply-returns/list
+ * - GET /rest/cabinet/fin/document-payment/list-all
  *
  * Does NOT call supply/return product lines or N+1 detail endpoints.
  */
@@ -30,6 +31,12 @@ import {
   umagFetchAuthed,
   type UmagSession,
 } from '../_shared/umagAuth.ts'
+import {
+  buildPaymentSupplierLinkMaps,
+  fetchDocumentPaymentsForPeriod,
+  rebuildLedgerEventsForPeriod,
+  upsertDocumentPayments,
+} from '../_shared/umagDocumentPayments.ts'
 
 const PERMISSION_SYNC = 'umag.settlements.sync'
 const ALLOWED_BODY_KEYS = new Set(['action', 'dateFrom', 'dateTo', 'syncSuppliers'])
@@ -2286,10 +2293,80 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Document payments (real payment dates from UMAG fin/document-payment)
+    let paymentsStats = {
+      received: 0,
+      created: 0,
+      updated: 0,
+      reactivated: 0,
+      pages: 0,
+      totalCount: null as number | null,
+    }
+    let ledgerUpserted = 0
+    let paymentsWarning: string | null = null
+
+    const paymentsResult = await fetchDocumentPaymentsForPeriod(
+      session,
+      bounds.fromTime,
+      bounds.toTime
+    )
+    if (!paymentsResult.ok) {
+      paymentsWarning = 'Не удалось загрузить оплаты UMAG (document-payment).'
+      console.error('umag_sync_payments_fetch_failed')
+    } else {
+      const { supplyToSupplier, returnToSupplier } = await buildPaymentSupplierLinkMaps(
+        authz.serviceClient,
+        paymentsResult.payments
+      )
+
+      const platformByUmag = new Map<number, string>()
+      for (const [umagId, platformId] of platformMap.entries()) {
+        platformByUmag.set(Number(umagId), String(platformId))
+      }
+
+      const paymentsUpsert = await upsertDocumentPayments(
+        authz.serviceClient,
+        paymentsResult.payments,
+        platformByUmag,
+        supplyToSupplier,
+        returnToSupplier
+      )
+      if (paymentsUpsert instanceof Response) {
+        paymentsWarning = 'Оплаты UMAG получены, но не сохранились.'
+      } else {
+        paymentsStats = {
+          received: paymentsResult.payments.length,
+          created: paymentsUpsert.created,
+          updated: paymentsUpsert.updated,
+          reactivated: paymentsUpsert.reactivated,
+          pages: paymentsResult.pages,
+          totalCount: paymentsResult.totalCount,
+        }
+      }
+
+      const ledgerResult = await rebuildLedgerEventsForPeriod(
+        authz.serviceClient,
+        dateFrom,
+        dateTo
+      )
+      if (ledgerResult instanceof Response) {
+        paymentsWarning = [paymentsWarning, 'Ledger events не обновлены.']
+          .filter(Boolean)
+          .join(' ')
+      } else {
+        ledgerUpserted = ledgerResult.upserted
+      }
+    }
+
     const combinedWarning =
-      [warningMessage, returnsWarning, obligationsWarning].filter(Boolean).join(' | ') || null
+      [warningMessage, returnsWarning, obligationsWarning, paymentsWarning]
+        .filter(Boolean)
+        .join(' | ') || null
     const status: SyncStatus =
-      aggregatesMatch && returnsAggregatesMatch && obligationsRefresh.status === 'success'
+      aggregatesMatch &&
+      returnsAggregatesMatch &&
+      obligationsRefresh.status === 'success' &&
+      !paymentsWarning
         ? 'success'
         : 'partial'
     await finishSyncRun(authz.serviceClient, runId, {
@@ -2356,6 +2433,10 @@ Deno.serve(async (req) => {
         pages: suppliesResult.pages,
       },
       paymentObligations: obligationsRefresh,
+      payments: {
+        ...paymentsStats,
+        ledgerUpserted,
+      },
       returns: {
         received: returnsResult.returns.length,
         created: returnsUpsert.created,

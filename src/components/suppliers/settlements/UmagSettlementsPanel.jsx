@@ -265,15 +265,34 @@ function PaymentStatusBadge({ status }) {
 }
 
 function operationDetailsLabel(op) {
-  if (op.kind === 'return') {
+  if (op.details) return op.details
+  if (op.kind === 'return' || op.kind === 'refund') {
     return (
-      [op.source?.user_name, formatAccountNames(op.source?.account_names)]
+      [op.source?.user_name, op.source?.account_name, formatAccountNames(op.source?.account_names)]
         .filter((part) => part && part !== '—')
-        .join(' · ') || 'Состав товаров'
+        .join(' · ') || 'UMAG'
+    )
+  }
+  if (op.kind === 'payment') {
+    return (
+      [op.source?.user_name, op.source?.account_name, op.source?.note]
+        .filter(Boolean)
+        .join(' · ') || 'UMAG'
     )
   }
   return (
-    [op.source?.umag_user_name, op.source?.account].filter(Boolean).join(' · ') || 'Состав товаров'
+    [op.source?.umag_user_name, op.source?.account].filter(Boolean).join(' · ') || 'UMAG'
+  )
+}
+
+function operationStatusNode(op) {
+  if (op.kind === 'supply' && op.paymentStatus) {
+    return <PaymentStatusBadge status={op.paymentStatus} />
+  }
+  return (
+    <span className="umag-settlements__pay-status umag-settlements__pay-status--posted">
+      {op.statusLabel || 'Проведено'}
+    </span>
   )
 }
 
@@ -483,6 +502,7 @@ function UmagSupplierDetail({
             {[
               { id: 'all', label: 'Все' },
               { id: 'supplies', label: 'Приёмки' },
+              { id: 'payments', label: 'Оплаты' },
               { id: 'returns', label: 'Возвраты' },
             ].map((opt) => (
               <button
@@ -512,18 +532,36 @@ function UmagSupplierDetail({
                 <thead>
                   <tr>
                     <th>Дата</th>
-                    <th>Тип</th>
-                    <th className="umag-settlements__money-col">Сумма</th>
-                    <th className="umag-settlements__money-col">Оплачено</th>
-                    <th className="umag-settlements__money-col">Осталось</th>
+                    <th>Операция</th>
+                    <th>Документ</th>
+                    <th className="umag-settlements__money-col">Увеличение</th>
+                    <th className="umag-settlements__money-col">Уменьшение</th>
+                    <th className="umag-settlements__money-col">Сальдо</th>
                     <th>Статус</th>
                     <th>Детали</th>
                   </tr>
                 </thead>
                 <tbody>
+                  {Number(supplier.openingBalance) !== 0 && (
+                    <tr className="umag-settlements__ops-row umag-settlements__ops-row--opening">
+                      <td colSpan={2}>Начальное сальдо</td>
+                      <td>—</td>
+                      <td className="umag-settlements__money-col">—</td>
+                      <td className="umag-settlements__money-col">—</td>
+                      <td className="umag-settlements__money-col">
+                        {formatUmagMoney(supplier.openingBalance)}
+                      </td>
+                      <td>
+                        <span className="umag-settlements__pay-status umag-settlements__pay-status--posted">
+                          Сальдо
+                        </span>
+                      </td>
+                      <td className="umag-settlements__ops-meta">На начало периода</td>
+                    </tr>
+                  )}
                   {visibleOps.map((op) => {
-                    const isSupply = op.kind === 'supply'
-                    const payStatus = isSupply ? op.paymentStatus : null
+                    const increase = Number(op.debtIncrease) || 0
+                    const decrease = Number(op.debtDecrease) || 0
                     return (
                       <tr
                         key={op.id}
@@ -543,42 +581,17 @@ function UmagSupplierDetail({
                             {op.label}
                           </button>
                         </td>
-                        <td
-                          className={`umag-settlements__money-col${
-                            op.kind === 'return'
-                              ? ' umag-settlements__amount-neg'
-                              : payStatus === 'unpaid'
-                                ? ' umag-settlements__amount-unpaid'
-                                : ' umag-settlements__amount-pos'
-                          }`}
-                        >
-                          {formatSignedUmagMoney(op.signedAmount)}
+                        <td>{op.documentNumber ? `№ ${op.documentNumber}` : '—'}</td>
+                        <td className="umag-settlements__money-col umag-settlements__amount-pos">
+                          {increase > 0 ? formatUmagMoney(increase) : '—'}
                         </td>
-                        <td
-                          className={`umag-settlements__money-col${
-                            isSupply && payStatus === 'paid'
-                              ? ' umag-settlements__money--paid'
-                              : ''
-                          }`}
-                        >
-                          {isSupply ? formatUmagMoney(op.paymentAmount) : '—'}
+                        <td className="umag-settlements__money-col umag-settlements__amount-neg">
+                          {decrease > 0 ? formatUmagMoney(decrease) : '—'}
                         </td>
-                        <td
-                          className={`umag-settlements__money-col${
-                            isSupply
-                              ? payStatus === 'paid'
-                                ? ' umag-settlements__money--paid'
-                                : payStatus === 'partial'
-                                  ? ' umag-settlements__money--partial'
-                                  : ' umag-settlements__money--unpaid'
-                              : ''
-                          }`}
-                        >
-                          {isSupply ? formatUmagMoney(op.debt) : '—'}
+                        <td className="umag-settlements__money-col">
+                          {formatUmagMoney(op.runningBalance)}
                         </td>
-                        <td>
-                          <PaymentStatusBadge status={payStatus} />
-                        </td>
+                        <td>{operationStatusNode(op)}</td>
                         <td className="umag-settlements__ops-meta">{operationDetailsLabel(op)}</td>
                       </tr>
                     )
@@ -589,8 +602,8 @@ function UmagSupplierDetail({
 
             <div className="umag-settlements__cards" aria-label="История операций">
               {visibleOps.map((op) => {
-                const isSupply = op.kind === 'supply'
-                const payStatus = isSupply ? op.paymentStatus : null
+                const increase = Number(op.debtIncrease) || 0
+                const decrease = Number(op.debtDecrease) || 0
                 return (
                   <button
                     key={op.id}
@@ -608,57 +621,29 @@ function UmagSupplierDetail({
                         {formatUmagDate(op.sortAt)}
                       </span>
                     </div>
-                    {isSupply ? (
-                      <div className="umag-settlements__card-finance">
-                        <div>
-                          <span>Сумма</span>
-                          <strong
-                            className={
-                              payStatus === 'unpaid'
-                                ? 'umag-settlements__amount-unpaid'
-                                : 'umag-settlements__amount-pos'
-                            }
-                          >
-                            {formatUmagMoney(op.amount)}
-                          </strong>
-                        </div>
-                        <div>
-                          <span>Оплачено</span>
-                          <strong
-                            className={
-                              payStatus === 'paid' ? 'umag-settlements__money--paid' : ''
-                            }
-                          >
-                            {formatUmagMoney(op.paymentAmount)}
-                          </strong>
-                        </div>
-                        <div>
-                          <span>Осталось</span>
-                          <strong
-                            className={
-                              payStatus === 'paid'
-                                ? 'umag-settlements__money--paid'
-                                : payStatus === 'partial'
-                                  ? 'umag-settlements__money--partial'
-                                  : 'umag-settlements__money--unpaid'
-                            }
-                          >
-                            {formatUmagMoney(op.debt)}
-                          </strong>
-                        </div>
+                    <div className="umag-settlements__card-finance">
+                      <div>
+                        <span>Документ</span>
+                        <strong>{op.documentNumber ? `№ ${op.documentNumber}` : '—'}</strong>
                       </div>
-                    ) : (
-                      <div
-                        className={`umag-settlements__ops-amount umag-settlements__amount-neg`}
-                      >
-                        {formatSignedUmagMoney(op.signedAmount)}
+                      <div>
+                        <span>Увеличение</span>
+                        <strong className="umag-settlements__amount-pos">
+                          {increase > 0 ? formatUmagMoney(increase) : '—'}
+                        </strong>
                       </div>
-                    )}
-                    {isSupply ? (
-                      <div className="umag-settlements__card-status">
-                        <PaymentStatusBadge status={payStatus} />
+                      <div>
+                        <span>Уменьшение</span>
+                        <strong className="umag-settlements__amount-neg">
+                          {decrease > 0 ? formatUmagMoney(decrease) : '—'}
+                        </strong>
                       </div>
-                    ) : null}
+                      <div>
+                        <span>Сальдо</span>
+                        <strong>{formatUmagMoney(op.runningBalance)}</strong>
+                      </div>
+                    </div>
+                    <div className="umag-settlements__card-status">{operationStatusNode(op)}</div>
                     <div className="umag-settlements__card-meta">{operationDetailsLabel(op)}</div>
                   </button>
                 )

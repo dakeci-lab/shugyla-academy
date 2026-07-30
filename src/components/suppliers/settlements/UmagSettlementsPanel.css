@@ -493,9 +493,19 @@
   color: #1d4ed8;
 }
 
-.umag-settlements__op-badge--return {
+.umag-settlements__op-badge--return,
+.umag-settlements__op-badge--refund {
   background: #fff7ed;
   color: #c2410c;
+}
+
+.umag-settlements__op-badge--payment {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.umag-settlements__pay-status--posted {
+  color: var(--color-text-muted, #6b7280);
 }
 
 .umag-settlements__amount-pos {

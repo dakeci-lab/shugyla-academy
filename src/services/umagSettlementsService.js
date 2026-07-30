@@ -5,6 +5,13 @@
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { extractFunctionErrorBody, isGenericInvokeErrorMessage } from '../utils/edgeFunctionErrors'
+import {
+  LEDGER_EVENT_TYPES,
+  attachRunningBalances,
+  ledgerEventLabel,
+  ledgerEventStatusLabel,
+  sortLedgerNewestFirst,
+} from '../utils/supplierLedger'
 
 export const UMAG_SETTLEMENTS_ERROR_CODES = {
   VALIDATION: 'VALIDATION_ERROR',
@@ -70,6 +77,18 @@ export function formatUmagDate(value) {
     month: '2-digit',
     year: 'numeric',
   })
+}
+
+/** Paginate PostgREST selects past the default 1000-row cap. */
+async function fetchAllSupabaseRows(buildQuery, pageSize = 1000) {
+  const rows = []
+  for (let from = 0; from < 100_000; from += pageSize) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1)
+    if (error) return { data: null, error }
+    rows.push(...(data || []))
+    if (!data || data.length < pageSize) break
+  }
+  return { data: rows, error: null }
 }
 
 /** Local calendar YYYY-MM-DD in Asia/Aqtobe wall clock via offset format. */
@@ -266,8 +285,11 @@ function ensureSettlementRow(byKey, seed) {
       debt: 0,
       returnCount: 0,
       returnAmount: 0,
+      documentPaymentAmount: 0,
+      documentRefundAmount: 0,
       supplies: [],
       returns: [],
+      payments: [],
     }
     byKey.set(key, row)
   } else {
@@ -326,59 +348,127 @@ export function supplyPaymentStatusLabel(status) {
 
 /**
  * Build unified chronological operations for one supplier (newest first).
- * Supply amounts are shown as +, return amounts as − (presentation only).
+ * Includes supplies, returns, and UMAG document-payments with running balance.
  */
-export function buildSupplierOperationHistory(supplies = [], returns = []) {
+export function buildSupplierOperationHistory(
+  supplies = [],
+  returns = [],
+  payments = [],
+  openingBalance = 0
+) {
   const ops = []
+
   for (const supply of supplies) {
     const amount = toNumber(supply.amount)
     const paymentAmount = toNumber(supply.payment_amount)
     const debt = toNumber(supply.debt)
     ops.push({
-      id: `supply:${supply.id}`,
+      id: `supply:${supply.id || supply.umag_supply_id}`,
       kind: 'supply',
-      label: 'Приёмка',
+      eventType: LEDGER_EVENT_TYPES.RECEIVING,
+      label: ledgerEventLabel(LEDGER_EVENT_TYPES.RECEIVING),
       sortAt: supply.doc_time,
+      occurredAt: supply.doc_time,
       amount,
       paymentAmount,
       debt,
       paymentStatus: deriveSupplyPaymentStatus(paymentAmount, debt),
+      balanceDelta: amount,
+      documentNumber: String(supply.umag_supply_id || supply.id || ''),
+      statusLabel: ledgerEventStatusLabel(LEDGER_EVENT_TYPES.RECEIVING, 'posted'),
       signedAmount: amount,
       source: supply,
     })
   }
+
   for (const ret of returns) {
     const abs = Math.abs(toNumber(ret.amount))
     ops.push({
-      id: `return:${ret.id}`,
+      id: `return:${ret.id || ret.umag_return_id}`,
       kind: 'return',
-      label: 'Возврат поставщику',
+      eventType: LEDGER_EVENT_TYPES.SUPPLIER_RETURN,
+      label: ledgerEventLabel(LEDGER_EVENT_TYPES.SUPPLIER_RETURN),
       sortAt: ret.document_time,
+      occurredAt: ret.document_time,
       amount: abs,
       paymentAmount: null,
       debt: null,
       paymentStatus: null,
+      balanceDelta: -abs,
+      documentNumber: String(ret.umag_return_id || ret.id || ''),
+      statusLabel: ledgerEventStatusLabel(LEDGER_EVENT_TYPES.SUPPLIER_RETURN, 'posted'),
       signedAmount: -abs,
       source: ret,
     })
   }
-  ops.sort((a, b) => {
-    const ta = new Date(a.sortAt || 0).getTime()
-    const tb = new Date(b.sortAt || 0).getTime()
-    if (tb !== ta) return tb - ta
-    return String(a.id).localeCompare(String(b.id))
-  })
-  return ops
+
+  for (const payment of payments) {
+    const signed = toNumber(payment.amount)
+    const abs = Math.abs(signed)
+    const type = String(payment.payment_type || '').toUpperCase()
+    const isRefund =
+      type === 'SUPPLY_REFUND' ||
+      signed < 0 ||
+      String(payment.class_name || '') === 'SupplyReturn'
+    const eventType = isRefund
+      ? LEDGER_EVENT_TYPES.SUPPLIER_REFUND
+      : LEDGER_EVENT_TYPES.SUPPLIER_PAYMENT
+    ops.push({
+      id: `payment:${payment.id || payment.umag_payment_id}`,
+      kind: isRefund ? 'refund' : 'payment',
+      eventType,
+      label: ledgerEventLabel(eventType),
+      sortAt: payment.payment_time,
+      occurredAt: payment.payment_time,
+      amount: abs,
+      paymentAmount: abs,
+      debt: null,
+      paymentStatus: null,
+      balanceDelta: isRefund ? 0 : -abs,
+      documentNumber: String(payment.umag_payment_id || payment.id || ''),
+      statusLabel: ledgerEventStatusLabel(eventType, 'posted'),
+      signedAmount: isRefund ? abs : -abs,
+      details: [payment.user_name, payment.account_name, payment.note]
+        .filter(Boolean)
+        .join(' · '),
+      source: payment,
+    })
+  }
+
+  const { eventsAsc, closingBalance } = attachRunningBalances(ops, openingBalance)
+  const newestFirst = sortLedgerNewestFirst(eventsAsc)
+  return { operations: newestFirst, closingBalance, openingBalance }
 }
 
 export function filterSupplierOperations(operations, filter = 'all') {
-  if (filter === 'supplies') return operations.filter((op) => op.kind === 'supply')
-  if (filter === 'returns') return operations.filter((op) => op.kind === 'return')
+  if (filter === 'supplies') {
+    return operations.filter(
+      (op) => op.kind === 'supply' || op.eventType === LEDGER_EVENT_TYPES.RECEIVING
+    )
+  }
+  if (filter === 'returns') {
+    return operations.filter(
+      (op) =>
+        op.kind === 'return' ||
+        op.kind === 'refund' ||
+        op.eventType === LEDGER_EVENT_TYPES.SUPPLIER_RETURN ||
+        op.eventType === LEDGER_EVENT_TYPES.SUPPLIER_REFUND
+    )
+  }
+  if (filter === 'payments') {
+    return operations.filter(
+      (op) =>
+        op.kind === 'payment' ||
+        op.kind === 'refund' ||
+        op.eventType === LEDGER_EVENT_TYPES.SUPPLIER_PAYMENT ||
+        op.eventType === LEDGER_EVENT_TYPES.SUPPLIER_REFUND
+    )
+  }
   return operations
 }
 
 /**
- * Load supplies + returns for period and aggregate by canonical supplier.
+ * Load supplies + returns + payments for period and aggregate by canonical supplier.
  * @param {{ dateFrom: string, dateTo: string, search?: string }} params
  */
 export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search = '' }) {
@@ -389,25 +479,47 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
   const fromIso = `${dateFrom}T00:00:00+05:00`
   const toIso = `${dateTo}T23:59:59.999+05:00`
 
-  const [suppliesRes, returnsRes] = await Promise.all([
-    supabase
-      .from('umag_supplies')
-      .select(
-        'id, umag_supply_id, supplier_id, platform_supplier_id, umag_supplier_id, supplier_name, supplier_legal_name, doc_time, amount, payment_amount, payment_refund_amount, debt, account, comment, umag_user_name'
-      )
-      .eq('is_source_deleted', false)
-      .gte('doc_time', fromIso)
-      .lte('doc_time', toIso)
-      .order('doc_time', { ascending: false }),
-    supabase
-      .from('umag_supply_returns')
-      .select(
-        'id, umag_return_id, platform_supplier_id, umag_supplier_id, supplier_name, user_name, amount, payed_amount, document_time, operation_time, note, is_provided, account_names, operation_type'
-      )
-      .eq('is_source_deleted', false)
-      .gte('document_time', fromIso)
-      .lte('document_time', toIso)
-      .order('document_time', { ascending: false }),
+  const [suppliesRes, returnsRes, paymentsRes, openingRes] = await Promise.all([
+    fetchAllSupabaseRows(() =>
+      supabase
+        .from('umag_supplies')
+        .select(
+          'id, umag_supply_id, supplier_id, platform_supplier_id, umag_supplier_id, supplier_name, supplier_legal_name, doc_time, amount, payment_amount, payment_refund_amount, debt, account, comment, umag_user_name'
+        )
+        .eq('is_source_deleted', false)
+        .gte('doc_time', fromIso)
+        .lte('doc_time', toIso)
+        .order('doc_time', { ascending: false })
+    ),
+    fetchAllSupabaseRows(() =>
+      supabase
+        .from('umag_supply_returns')
+        .select(
+          'id, umag_return_id, platform_supplier_id, umag_supplier_id, supplier_name, user_name, amount, payed_amount, document_time, operation_time, note, is_provided, account_names, operation_type'
+        )
+        .eq('is_source_deleted', false)
+        .gte('document_time', fromIso)
+        .lte('document_time', toIso)
+        .order('document_time', { ascending: false })
+    ),
+    fetchAllSupabaseRows(() =>
+      supabase
+        .from('umag_document_payments')
+        .select(
+          'id, umag_payment_id, platform_supplier_id, umag_supplier_id, supplier_name, payment_time, amount, payment_type, class_name, linked_umag_supply_id, linked_umag_return_id, account_name, user_name, note'
+        )
+        .eq('is_source_deleted', false)
+        .gte('payment_time', fromIso)
+        .lte('payment_time', toIso)
+        .order('payment_time', { ascending: false })
+    ),
+    fetchAllSupabaseRows(() =>
+      supabase
+        .from('platform_supplier_ledger_events')
+        .select('platform_supplier_id, umag_supplier_id, balance_delta')
+        .lt('occurred_at', fromIso)
+        .order('occurred_at', { ascending: true })
+    ),
   ])
 
   if (suppliesRes.error) {
@@ -424,10 +536,23 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
       error: returnsRes.error.message || 'Не удалось загрузить возвраты поставщикам UMAG.',
     }
   }
+  // Payments / opening ledger may be absent before migration — treat as empty.
+  const payments = paymentsRes.error ? [] : paymentsRes.data || []
+  const openingRows = openingRes.error ? [] : openingRes.data || []
 
   const supplies = suppliesRes.data || []
   const returns = returnsRes.data || []
   const byKey = new Map()
+
+  const openingByKey = new Map()
+  for (const row of openingRows) {
+    const key = supplierSettlementKey({
+      platformSupplierId: row.platform_supplier_id,
+      umagSupplierId: row.umag_supplier_id,
+      name: null,
+    })
+    openingByKey.set(key, (openingByKey.get(key) || 0) + toNumber(row.balance_delta))
+  }
 
   for (const supply of supplies) {
     const row = ensureSettlementRow(byKey, {
@@ -456,10 +581,48 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
     row.returns.push(ret)
   }
 
-  let rows = [...byKey.values()].map((row) => ({
-    ...row,
-    operations: buildSupplierOperationHistory(row.supplies, row.returns),
-  }))
+  for (const payment of payments) {
+    const row = ensureSettlementRow(byKey, {
+      platformSupplierId: payment.platform_supplier_id,
+      umagSupplierId: payment.umag_supplier_id,
+      name: payment.supplier_name,
+    })
+    const signed = toNumber(payment.amount)
+    const abs = Math.abs(signed)
+    const type = String(payment.payment_type || '').toUpperCase()
+    const isRefund =
+      type === 'SUPPLY_REFUND' ||
+      signed < 0 ||
+      String(payment.class_name || '') === 'SupplyReturn'
+    if (!isRefund) {
+      row.documentPaymentAmount = (row.documentPaymentAmount || 0) + abs
+    } else {
+      row.documentRefundAmount = (row.documentRefundAmount || 0) + abs
+    }
+    row.payments = row.payments || []
+    row.payments.push(payment)
+  }
+
+  let rows = [...byKey.values()].map((row) => {
+    const openingBalance = openingByKey.get(row.key) || 0
+    const history = buildSupplierOperationHistory(
+      row.supplies,
+      row.returns,
+      row.payments || [],
+      openingBalance
+    )
+    const paidFromDocuments = toNumber(row.documentPaymentAmount)
+    return {
+      ...row,
+      openingBalance,
+      closingBalance: history.closingBalance,
+      // Prefer real payment documents for "Оплачено" when available.
+      paymentAmount: paidFromDocuments > 0 ? paidFromDocuments : row.paymentAmount,
+      // Closing ledger balance is the period debt signal when ledger exists.
+      debt: history.operations.length > 0 ? history.closingBalance : row.debt,
+      operations: history.operations,
+    }
+  })
 
   const q = search.trim().toLowerCase()
   if (q) {
@@ -495,6 +658,8 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
     error: null,
     suppliesCount: supplies.length,
     returnsCount: returns.length,
+    paymentsCount: payments.length,
+    paymentsLoadError: paymentsRes.error?.message || null,
   }
 }
 
