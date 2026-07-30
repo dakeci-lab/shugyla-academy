@@ -386,6 +386,31 @@
   min-width: 5.5rem;
 }
 
+.team-schedule-table__day-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.15rem 0.2rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.team-schedule-table__day-btn:hover {
+  background: var(--color-primary-light, #e6f5ec);
+}
+
+.team-schedule-table__day-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #2a9d5c);
+  outline-offset: 1px;
+}
+
 .team-schedule-table__day-weekday {
   display: block;
   font-size: 0.68rem;

@@ -1,0 +1,41 @@
+.schedule-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.2rem;
+  margin: 0 0 0.65rem;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 999px;
+  background: var(--color-white, #fff);
+}
+
+.schedule-view-toggle__btn {
+  min-width: 4.5rem;
+  padding: 0.35rem 0.85rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--color-text-muted, #6b7280);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.schedule-view-toggle__btn:hover {
+  color: var(--color-primary, #2a9d5c);
+}
+
+.schedule-view-toggle__btn:focus-visible {
+  outline: 2px solid var(--color-primary, #2a9d5c);
+  outline-offset: 1px;
+}
+
+.schedule-view-toggle__btn--active {
+  background: var(--color-primary, #2a9d5c);
+  color: #fff;
+}
+
+.schedule-view-toggle__btn--active:hover {
+  color: #fff;
+}

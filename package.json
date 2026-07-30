@@ -36,6 +36,7 @@
     "verify:production-vapid-rotation": "node scripts/verify-production-vapid-rotation.mjs",
     "verify:employee-schedule-weekly-open": "node scripts/verify-employee-schedule-weekly-open.mjs",
     "verify:employee-schedule-period": "node scripts/verify-employee-schedule-period.mjs",
+    "verify:schedule-day-timeline": "node scripts/verify-schedule-day-timeline.mjs",
     "supabase:local:verify-employee-schedule-write": "node scripts/verify-employee-schedule-write.mjs",
     "supabase:local:verify-team-workforce-admin-access": "node scripts/verify-team-workforce-admin-access.mjs",
     "verify:time-tracker-attendance-routing": "node scripts/verify-time-tracker-attendance-routing.mjs",

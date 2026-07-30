@@ -17,8 +17,12 @@ import {
   addWeeks,
   buildWeekDates,
   getMonthsForWeek,
+  getMondayOfWeek,
   isDateKey,
+  parseDateKey,
 } from '../../../utils/shiftData'
+import { addDaysToDateKey, toDateKeyInAppTimezone } from '../../../utils/timezone'
+import { formatScheduleDayTitle } from '../../../utils/scheduleDayTimeline'
 import { getTeamShiftsForMonth } from '../../../services/academyDataService'
 import { fetchTeamWorkforceData } from '../../../services/workforceAdminService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
@@ -27,6 +31,8 @@ import TeamScheduleCell from '../TeamScheduleCell'
 import TeamScheduleMobileCard from '../TeamScheduleMobileCard'
 import TeamScheduleDaySheet from '../TeamScheduleDaySheet'
 import TeamScheduleMobileLegend from '../TeamScheduleMobileLegend'
+import ScheduleViewModeToggle from '../ScheduleViewModeToggle'
+import ScheduleDayTimeline from '../ScheduleDayTimeline'
 import PlatformPeriodHeader from '../../platform/PlatformPeriodHeader'
 import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
 import useMediaQuery, { MOBILE_SCHEDULE_QUERY } from '../../../hooks/useMediaQuery'
@@ -35,18 +41,38 @@ import '../admin-shared.css'
 import '../EmployeeSchedule.css'
 import '../TeamScheduleMobile.css'
 
-/** Общий график всех сотрудников (недельный вид) */
+function resolveViewMode(raw) {
+  return raw === 'day' ? 'day' : 'week'
+}
+
+function mondayKeyForDate(dateKey) {
+  return toDateKey(getMondayOfWeek(parseDateKey(dateKey)))
+}
+
+/** Общий график всех сотрудников (недельный и дневной вид) */
 export default function WorkScheduleSection() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useSession()
   const viewTeam = canViewTeamSchedule(user)
   const canEditSchedule = canEditEmployeeSchedule(user)
   const selfEmployeeId = user?.id != null ? Number(user.id) : null
+
+  const viewMode = resolveViewMode(searchParams.get('view'))
+  const todayKey = toDateKeyInAppTimezone()
+
   const [weekStartKey, setWeekStartKey] = useState(() => {
     const weekFromUrl = searchParams.get('week')
-    return isDateKey(weekFromUrl) ? weekFromUrl : getInitialWeekStartKey()
+    const dateFromUrl = searchParams.get('date')
+    if (isDateKey(weekFromUrl)) return weekFromUrl
+    if (isDateKey(dateFromUrl)) return mondayKeyForDate(dateFromUrl)
+    return getInitialWeekStartKey()
   })
+  const [dayKey, setDayKey] = useState(() => {
+    const dateFromUrl = searchParams.get('date')
+    return isDateKey(dateFromUrl) ? dateFromUrl : todayKey
+  })
+
   const [shifts, setShifts] = useState([])
   const [loadedEmployees, setLoadedEmployees] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -57,14 +83,17 @@ export default function WorkScheduleSection() {
   const isMobileSchedule = useMediaQuery(MOBILE_SCHEDULE_QUERY)
 
   const weekDates = useMemo(() => buildWeekDates(weekStartKey), [weekStartKey])
-  const todayKey = toDateKey(new Date())
   const isCurrentWeek = weekDates.some((date) => toDateKey(date) === todayKey)
   const weekTitle = isCurrentWeek
     ? `Текущая неделя (${formatWeekRangeLabel(weekStartKey)})`
     : formatWeekRangeLabel(weekStartKey)
+  const dayTitle = formatScheduleDayTitle(dayKey)
+
+  const rangeFrom = viewMode === 'day' ? dayKey : toDateKey(weekDates[0])
+  const rangeTo =
+    viewMode === 'day' ? dayKey : toDateKey(weekDates[weekDates.length - 1])
 
   const employees = useMemo(() => {
-    // Cloud: always prefer workforce bundle (team or own scope). Local list is empty for staff.
     const base =
       isCloudMode() && loadedEmployees != null
         ? loadedEmployees
@@ -80,46 +109,72 @@ export default function WorkScheduleSection() {
     })
   }, [search, viewTeam, selfEmployeeId, loadedEmployees])
 
-  const loadShifts = useCallback(async (options = {}) => {
-    const quiet = options?.quiet === true
-    if (!quiet) setLoading(true)
-    setError('')
-    try {
-      if (isCloudMode()) {
-        // Team: full offline staff. Own-only: Edge scopes to caller (schedule.view_own).
-        // Direct academy_employee_shifts select cannot populate the employee row list in cloud.
-        const dateFrom = toDateKey(weekDates[0])
-        const dateTo = toDateKey(weekDates[weekDates.length - 1])
-        const bundle = await fetchTeamWorkforceData({
-          dateFrom,
-          dateTo,
-          view: 'schedule',
-          employeeId: viewTeam ? null : selfEmployeeId,
-        })
-        setLoadedEmployees(bundle.employees)
-        setShifts(bundle.shifts)
+  const syncUrl = useCallback(
+    (next) => {
+      const params = new URLSearchParams(searchParams)
+      params.set('view', next.viewMode)
+      if (next.viewMode === 'day') {
+        params.set('date', next.dayKey)
+        params.set('week', mondayKeyForDate(next.dayKey))
       } else {
-        const months = getMonthsForWeek(weekStartKey)
-        const ids = !viewTeam && selfEmployeeId
-          ? [selfEmployeeId]
-          : getScheduleEligibleEmployees('active')
-              .filter(participatesInStoreSchedule)
-              .map((emp) => emp.id)
-        const monthResults = await Promise.all(
-          months.map(({ year, month }) =>
-            getTeamShiftsForMonth(year, month, ids.length ? ids : null)
-          )
-        )
-        setShifts(monthResults.flat())
+        params.set('week', next.weekStartKey)
+        if (params.has('date') && !isDateKey(params.get('date'))) {
+          params.delete('date')
+        }
       }
-    } catch (err) {
-      setError(err.message || 'Не удалось загрузить график')
-      setLoadedEmployees(null)
-      setShifts([])
-    } finally {
-      if (!quiet) setLoading(false)
-    }
-  }, [weekStartKey, viewTeam, weekDates, selfEmployeeId])
+      setSearchParams(params, { replace: true })
+    },
+    [searchParams, setSearchParams]
+  )
+
+  const loadShifts = useCallback(
+    async (options = {}) => {
+      const quiet = options?.quiet === true
+      if (!quiet) setLoading(true)
+      setError('')
+      try {
+        if (isCloudMode()) {
+          const bundle = await fetchTeamWorkforceData({
+            dateFrom: rangeFrom,
+            dateTo: rangeTo,
+            view: 'schedule',
+            employeeId: viewTeam ? null : selfEmployeeId,
+          })
+          setLoadedEmployees(bundle.employees)
+          setShifts(bundle.shifts)
+        } else {
+          const ids =
+            !viewTeam && selfEmployeeId
+              ? [selfEmployeeId]
+              : getScheduleEligibleEmployees('active')
+                  .filter(participatesInStoreSchedule)
+                  .map((emp) => emp.id)
+          if (viewMode === 'day') {
+            const date = parseDateKey(dayKey)
+            const year = date.getFullYear()
+            const month = date.getMonth() + 1
+            const rows = await getTeamShiftsForMonth(year, month, ids.length ? ids : null)
+            setShifts(rows.filter((row) => row.shiftDate === dayKey))
+          } else {
+            const months = getMonthsForWeek(weekStartKey)
+            const monthResults = await Promise.all(
+              months.map(({ year, month }) =>
+                getTeamShiftsForMonth(year, month, ids.length ? ids : null)
+              )
+            )
+            setShifts(monthResults.flat())
+          }
+        }
+      } catch (err) {
+        setError(err.message || 'Не удалось загрузить график')
+        setLoadedEmployees(null)
+        setShifts([])
+      } finally {
+        if (!quiet) setLoading(false)
+      }
+    },
+    [rangeFrom, rangeTo, viewTeam, selfEmployeeId, viewMode, dayKey, weekStartKey]
+  )
 
   usePlatformPageRefresh(loadShifts)
 
@@ -129,10 +184,20 @@ export default function WorkScheduleSection() {
 
   useEffect(() => {
     const weekFromUrl = searchParams.get('week')
+    const dateFromUrl = searchParams.get('date')
+    const viewFromUrl = resolveViewMode(searchParams.get('view'))
+
+    if (viewFromUrl === 'day') {
+      if (isDateKey(dateFromUrl) && dateFromUrl !== dayKey) {
+        setDayKey(dateFromUrl)
+        setWeekStartKey(mondayKeyForDate(dateFromUrl))
+      }
+      return
+    }
     if (isDateKey(weekFromUrl) && weekFromUrl !== weekStartKey) {
       setWeekStartKey(weekFromUrl)
     }
-  }, [searchParams, weekStartKey])
+  }, [searchParams, dayKey, weekStartKey])
 
   const shiftsByEmployee = useMemo(() => {
     const map = new Map()
@@ -142,17 +207,68 @@ export default function WorkScheduleSection() {
     return map
   }, [employees, shifts])
 
+  function setViewMode(nextMode) {
+    if (nextMode === 'day') {
+      const nextDay =
+        weekDates.some((d) => toDateKey(d) === todayKey) ? todayKey : toDateKey(weekDates[0])
+      const resolvedDay = isDateKey(dayKey) && weekDates.some((d) => toDateKey(d) === dayKey)
+        ? dayKey
+        : nextDay
+      setDayKey(resolvedDay)
+      setWeekStartKey(mondayKeyForDate(resolvedDay))
+      syncUrl({ viewMode: 'day', dayKey: resolvedDay, weekStartKey: mondayKeyForDate(resolvedDay) })
+      return
+    }
+    const nextWeek = mondayKeyForDate(dayKey)
+    setWeekStartKey(nextWeek)
+    syncUrl({ viewMode: 'week', weekStartKey: nextWeek, dayKey })
+  }
+
   function changeWeek(delta) {
-    setWeekStartKey((prev) => addWeeks(prev, delta))
+    setWeekStartKey((prev) => {
+      const next = addWeeks(prev, delta)
+      syncUrl({ viewMode: 'week', weekStartKey: next, dayKey })
+      return next
+    })
   }
 
-  function goToday() {
-    setWeekStartKey(getInitialWeekStartKey())
+  function goTodayWeek() {
+    const next = getInitialWeekStartKey()
+    setWeekStartKey(next)
+    syncUrl({ viewMode: 'week', weekStartKey: next, dayKey: todayKey })
   }
 
-  function openEmployeeSchedule(employeeId) {
+  function changeDay(delta) {
+    setDayKey((prev) => {
+      const next = addDaysToDateKey(prev, delta)
+      const nextWeek = mondayKeyForDate(next)
+      setWeekStartKey(nextWeek)
+      syncUrl({ viewMode: 'day', dayKey: next, weekStartKey: nextWeek })
+      return next
+    })
+  }
+
+  function goTodayDay() {
+    const nextWeek = mondayKeyForDate(todayKey)
+    setDayKey(todayKey)
+    setWeekStartKey(nextWeek)
+    syncUrl({ viewMode: 'day', dayKey: todayKey, weekStartKey: nextWeek })
+  }
+
+  function openDayView(dateKey) {
+    if (!isDateKey(dateKey)) return
+    const nextWeek = mondayKeyForDate(dateKey)
+    setDayKey(dateKey)
+    setWeekStartKey(nextWeek)
+    syncUrl({ viewMode: 'day', dayKey: dateKey, weekStartKey: nextWeek })
+  }
+
+  function openEmployeeSchedule(employeeId, focusDateKey = null) {
     if (!canEditSchedule) return
-    const weekQuery = isDateKey(weekStartKey) ? `?week=${encodeURIComponent(weekStartKey)}` : ''
+    let weekQuery = isDateKey(weekStartKey) ? `?week=${encodeURIComponent(weekStartKey)}` : ''
+    if (isDateKey(focusDateKey)) {
+      weekQuery += `${weekQuery ? '&' : '?'}date=${encodeURIComponent(focusDateKey)}`
+    }
     navigate(`/platform/employees/${employeeId}${weekQuery}#schedule`)
   }
 
@@ -189,17 +305,24 @@ export default function WorkScheduleSection() {
                 .join(' ')
               return (
                 <th key={dateKey} scope="col" className={dayClass}>
-                  {isToday ? (
-                    <span className="team-schedule-table__today-badge">
-                      <span className="team-schedule-table__day-weekday">{weekday}</span>
-                      <span className="team-schedule-table__day-number">{day}</span>
-                    </span>
-                  ) : (
-                    <>
-                      <span className="team-schedule-table__day-weekday">{weekday}</span>
-                      <span className="team-schedule-table__day-number">{day}</span>
-                    </>
-                  )}
+                  <button
+                    type="button"
+                    className="team-schedule-table__day-btn"
+                    onClick={() => openDayView(dateKey)}
+                    aria-label={`Открыть дневной график на ${formatScheduleDayTitle(dateKey)}`}
+                  >
+                    {isToday ? (
+                      <span className="team-schedule-table__today-badge">
+                        <span className="team-schedule-table__day-weekday">{weekday}</span>
+                        <span className="team-schedule-table__day-number">{day}</span>
+                      </span>
+                    ) : (
+                      <>
+                        <span className="team-schedule-table__day-weekday">{weekday}</span>
+                        <span className="team-schedule-table__day-number">{day}</span>
+                      </>
+                    )}
+                  </button>
                 </th>
               )
             })}
@@ -285,13 +408,15 @@ export default function WorkScheduleSection() {
   return (
     <>
       <PlatformPeriodHeader
-        title={weekTitle}
-        onPrev={() => changeWeek(-1)}
-        onNext={() => changeWeek(1)}
-        onToday={goToday}
-        prevLabel="Предыдущая неделя"
-        nextLabel="Следующая неделя"
+        title={viewMode === 'day' ? dayTitle : weekTitle}
+        onPrev={() => (viewMode === 'day' ? changeDay(-1) : changeWeek(-1))}
+        onNext={() => (viewMode === 'day' ? changeDay(1) : changeWeek(1))}
+        onToday={() => (viewMode === 'day' ? goTodayDay() : goTodayWeek())}
+        prevLabel={viewMode === 'day' ? 'Предыдущий день' : 'Предыдущая неделя'}
+        nextLabel={viewMode === 'day' ? 'Следующий день' : 'Следующая неделя'}
       />
+
+      <ScheduleViewModeToggle value={viewMode} onChange={setViewMode} />
 
       {viewTeam && (
         <PlatformSearchToolbar
@@ -315,6 +440,14 @@ export default function WorkScheduleSection() {
         <div className="schedule-loading">Загрузка графика…</div>
       ) : !error && employees.length === 0 ? (
         <p className="schedule-empty">Сотрудники не найдены</p>
+      ) : !error && viewMode === 'day' ? (
+        <ScheduleDayTimeline
+          dateKey={dayKey}
+          employees={employees}
+          shiftsByEmployee={shiftsByEmployee}
+          canEdit={canEditSchedule}
+          onEditEmployee={openEmployeeSchedule}
+        />
       ) : !error ? (
         <>
           {!isMobileSchedule && scheduleTable}
