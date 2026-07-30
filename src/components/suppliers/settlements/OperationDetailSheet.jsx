@@ -61,14 +61,33 @@ function PaymentStatusBadge({ status }) {
 
 export default function OperationDetailSheet({ operation, supplierName, onClose }) {
   const kind = operation?.kind
+  const isPaymentDoc = kind === 'payment' || kind === 'refund'
   const operationType = kind === 'return' ? 'supply_return' : 'supply'
-  const operationId =
-    kind === 'return'
+  const operationId = isPaymentDoc
+    ? null
+    : kind === 'return'
       ? Number(operation?.source?.umag_return_id)
       : Number(operation?.source?.umag_supply_id)
 
   const headerFromHistory = useMemo(() => {
     const source = operation?.source || {}
+    if (kind === 'payment' || kind === 'refund') {
+      const abs = Math.abs(Number(source.amount) || Number(operation?.amount) || 0)
+      return {
+        title: kind === 'refund' ? 'Возврат денежных средств' : 'Оплата поставщику',
+        supplierName: supplierName || source.supplier_name || '—',
+        when: source.payment_time || operation?.occurredAt,
+        amount: abs,
+        signedAmount: kind === 'refund' ? abs : -abs,
+        userName: source.user_name,
+        note: source.note,
+        account: source.account_name,
+        documentNumber: String(source.umag_payment_id || operation?.documentNumber || ''),
+        linkedSupplyId: source.linked_umag_supply_id || null,
+        linkedReturnId: source.linked_umag_return_id || null,
+        paymentStatus: null,
+      }
+    }
     if (kind === 'return') {
       return {
         title: 'Возврат поставщику',
@@ -105,7 +124,7 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
     }
   }, [operation, kind, supplierName])
 
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!isPaymentDoc)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
   const [cacheStatus, setCacheStatus] = useState(null)
@@ -115,6 +134,10 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
   const [query, setQuery] = useState('')
 
   async function load({ forceRefresh = false } = {}) {
+    if (isPaymentDoc) {
+      setLoading(false)
+      return
+    }
     if (!operationId) {
       setError('Некорректный идентификатор операции')
       setLoading(false)
@@ -148,7 +171,7 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
   useEffect(() => {
     void load({ forceRefresh: false })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operationType, operationId])
+  }, [operationType, operationId, isPaymentDoc])
 
   const visibleItems = useMemo(() => filterOperationItems(items, query), [items, query])
   const displayTotals = totals || buildItemTotals(items, headerFromHistory.amount)
@@ -184,7 +207,7 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
             <span>Сумма</span>
             <strong
               className={
-                kind === 'return'
+                kind === 'return' || kind === 'payment'
                   ? 'umag-op-detail__amount-neg'
                   : headerFromHistory.paymentStatus === 'unpaid'
                     ? 'umag-op-detail__money--unpaid'
@@ -194,6 +217,36 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
               {formatSignedUmagMoney(headerFromHistory.signedAmount)}
             </strong>
           </div>
+          {isPaymentDoc ? (
+            <>
+              <div>
+                <span>Документ UMAG</span>
+                <strong>{headerFromHistory.documentNumber || '—'}</strong>
+              </div>
+              <div>
+                <span>Связанная приёмка</span>
+                <strong>{headerFromHistory.linkedSupplyId || '—'}</strong>
+              </div>
+              <div>
+                <span>Связанный возврат</span>
+                <strong>{headerFromHistory.linkedReturnId || '—'}</strong>
+              </div>
+              <div>
+                <span>Счёт</span>
+                <strong>{headerFromHistory.account || '—'}</strong>
+              </div>
+              <div>
+                <span>Сотрудник</span>
+                <strong>{headerFromHistory.userName || '—'}</strong>
+              </div>
+              {headerFromHistory.note ? (
+                <div>
+                  <span>Комментарий</span>
+                  <strong>{headerFromHistory.note}</strong>
+                </div>
+              ) : null}
+            </>
+          ) : null}
           {kind === 'supply' ? (
             <>
               <div>
@@ -228,25 +281,35 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
               </div>
             </>
           ) : null}
-          <div>
-            <span>Сотрудник</span>
-            <strong>{headerFromHistory.userName || document?.userName || '—'}</strong>
-          </div>
-          {kind === 'supply' ? (
+          {!isPaymentDoc ? (
+            <div>
+              <span>Сотрудник</span>
+              <strong>{headerFromHistory.userName || document?.userName || '—'}</strong>
+            </div>
+          ) : null}
+          {!isPaymentDoc && kind === 'supply' ? (
             <div>
               <span>Счёт</span>
               <strong>{headerFromHistory.account || document?.account || '—'}</strong>
             </div>
-          ) : (
+          ) : null}
+          {!isPaymentDoc && kind === 'return' ? (
             <div>
               <span>Счета</span>
               <strong>
                 {formatAccountNames(headerFromHistory.accountNames ?? document?.accountNames)}
               </strong>
             </div>
-          )}
+          ) : null}
         </div>
 
+        {isPaymentDoc ? (
+          <div className="umag-op-detail__empty">
+            Платёжный документ UMAG. Состав товарных позиций для этого типа операции не
+            загружается.
+          </div>
+        ) : (
+          <>
         {(headerFromHistory.comment || headerFromHistory.note || document?.comment || document?.note) ? (
           <p className="umag-op-detail__comment">
             {headerFromHistory.comment ||
@@ -342,6 +405,8 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
             ) : null}
           </div>
         ) : null}
+          </>
+        )}
       </div>
     </div>
   )
