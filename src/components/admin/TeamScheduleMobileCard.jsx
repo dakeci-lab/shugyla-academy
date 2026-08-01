@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import EmployeeAvatar from '../EmployeeAvatar'
 import { ChevronDownIcon } from '../icons/PlatformIcons'
+import { getEmployeePositionDisplay } from '../../utils/employeeData'
 import { toDateKey } from '../../utils/shiftData'
 import { formatTeamScheduleMobileDay } from '../../utils/teamScheduleMobileUtils'
 import './TeamScheduleMobile.css'
@@ -133,7 +134,9 @@ export default function TeamScheduleMobileCard({
           ) : (
             <span className="team-schedule-mobile-card__name">{employee.name}</span>
           )}
-          <span className="team-schedule-mobile-card__role">{employee.position}</span>
+          <span className="team-schedule-mobile-card__role">
+            {getEmployeePositionDisplay(employee)}
+          </span>
         </span>
 
         <span

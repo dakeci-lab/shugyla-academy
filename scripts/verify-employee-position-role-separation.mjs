@@ -98,6 +98,85 @@ function main() {
   assert('inactive role label in modal', modal.includes('(неактивна)'))
   assert('catalog error retry', modal.includes('Повторить'))
 
+  // Wave 2A: UI must not use access role as HR position label
+  const schedule = read('src/components/admin/sections/WorkScheduleSection.jsx')
+  const timeline = read('src/components/admin/ScheduleDayTimeline.jsx')
+  const empSchedule = read('src/components/admin/sections/EmployeeScheduleSection.jsx')
+  const rating = read('src/components/admin/sections/EmployeeRatingSection.jsx')
+  const payroll = read('src/components/admin/payroll/PayrollSection.jsx')
+  const payrollRecord = read('src/components/admin/payroll/PayrollRecordSection.jsx')
+  const ownerDash = read('src/components/admin/OwnerDashboard.jsx')
+  const rolesJs = read('src/data/roles.js')
+  const permissionsJs = read('src/config/permissions.js')
+  const authService = read('src/services/authService.js')
+
+  assert('position display helper exported', employeeData.includes('export function getEmployeePositionDisplay'))
+  assert('normalize position display ignores role label', !/role\?\.label/.test(employeeData.match(/function resolvePositionDisplay[\s\S]*?\n\}/)?.[0] || 'role?.label'))
+  assert('missing position sentinel', employeeData.includes("'Должность не назначена'") || employeeData.includes('Должность не назначена'))
+  assert('weekly schedule uses position display helper', schedule.includes('getEmployeePositionDisplay'))
+  assert('weekly schedule no role-as-position fallback', !schedule.includes('position || getRoleLabel'))
+  assert('daily timeline uses position display helper', timeline.includes('getEmployeePositionDisplay'))
+  assert('daily timeline no role-as-position fallback', !timeline.includes('position || getRoleLabel'))
+  assert('employee schedule uses position display helper', empSchedule.includes('getEmployeePositionDisplay'))
+  assert('employee schedule no role-as-position fallback', !empSchedule.includes('position || getRoleLabel'))
+  assert('rating uses position display helper', rating.includes('getEmployeePositionDisplay'))
+  assert('rating no role-as-position fallback', !rating.includes('position || getRoleLabel'))
+  assert('payroll uses position display helper', payroll.includes('getEmployeePositionDisplay'))
+  assert('payroll no role-as-position fallback', !payroll.includes('position || getRoleLabel'))
+  assert('payroll record uses position display helper', payrollRecord.includes('getEmployeePositionDisplay'))
+  assert('payroll record no role-as-position fallback', !payrollRecord.includes('position || getRoleLabel'))
+  assert('owner dashboard uses position display helper', ownerDash.includes('getEmployeePositionDisplay'))
+  assert('list role column still uses getRoleLabel', employeesSection.includes('getRoleLabel(employee.role)'))
+  assert('profile header still uses getRoleLabel for role', header.includes('getRoleLabel(employee.role)'))
+  assert('EmployeeEditModal unchanged marker', modal.includes('Должность определяет работу сотрудника'))
+  assert('Wave 2A did not change roles.js buyer map', rolesJs.includes("buyer: ROLE_IDS.PURCHASER"))
+  assert('Wave 2A did not change ROUTE_ACCESS', permissionsJs.includes('const ROUTE_ACCESS'))
+  assert('Wave 2A did not change authService position fallback (2B)', authService.includes('role?.label'))
+
+  // Runtime mirror of getEmployeePositionDisplay (avoid importing employeeData → users.js)
+  function getEmployeePositionLabelMirror(employee) {
+    if (!employee) return ''
+    if (employee.positionId && employee.positionName) return employee.positionName
+    if (employee.positionName) return employee.positionName
+    if (employee.positionId && employee.position) return employee.position
+    if (employee.positionId) return ''
+    return employee.position || ''
+  }
+  function getEmployeePositionDisplayMirror(employee) {
+    const label = String(getEmployeePositionLabelMirror(employee) || '').trim()
+    return label || 'Должность не назначена'
+  }
+  assert(
+    'positionName wins over legacy',
+    getEmployeePositionDisplayMirror({ positionName: 'Кассир', position: 'Legacy', role: 'admin' }) ===
+      'Кассир',
+  )
+  assert(
+    'legacy position used when name missing',
+    getEmployeePositionDisplayMirror({ position: 'Приёмщик', role: 'cashier' }) === 'Приёмщик',
+  )
+  assert(
+    'role not used as position',
+    getEmployeePositionDisplayMirror({ role: 'cashier' }) === 'Должность не назначена',
+  )
+  assert(
+    'role label fields ignored',
+    getEmployeePositionDisplayMirror({
+      role: 'cashier',
+      roleLabel: 'Кассир',
+      roleName: 'Кассир',
+    }) === 'Должность не назначена',
+  )
+  const frozen = Object.freeze({ positionName: 'Продавец' })
+  assert('helper does not require mutation', getEmployeePositionDisplayMirror(frozen) === 'Продавец')
+  assert(
+    'archived-style name still shown',
+    getEmployeePositionDisplayMirror({
+      positionName: 'Старая должность',
+      positionIsActive: false,
+    }) === 'Старая должность',
+  )
+
   // Regression
   const migrationDir = path.join(ROOT, 'supabase/migrations')
   const stage4Migrations = fs.existsSync(migrationDir)

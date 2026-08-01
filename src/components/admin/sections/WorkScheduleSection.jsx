@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { isCloudMode } from '../../../lib/dataMode'
 import { canEditEmployeeSchedule, canViewTeamSchedule } from '../../../config/permissions'
-import { getRoleLabel } from '../../../data/roles'
 import {
+  getEmployeePositionDisplay,
   getScheduleEligibleEmployees,
   participatesInStoreSchedule,
 } from '../../../utils/employeeData'
@@ -355,7 +355,7 @@ export default function WorkScheduleSection() {
                       <span className="team-schedule-table__name">{emp.name}</span>
                     )}
                     <span className="team-schedule-table__role">
-                      {emp.position || getRoleLabel(emp.role) || '—'}
+                      {getEmployeePositionDisplay(emp)}
                     </span>
                   </div>
                 </td>

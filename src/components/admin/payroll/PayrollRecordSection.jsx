@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { isCloudMode } from '../../../lib/dataMode'
-import { getRoleLabel } from '../../../data/roles'
+import { getEmployeePositionDisplay } from '../../../utils/employeeData'
 import { formatMonthYearLabel } from '../../../utils/shiftData'
 import {
   SALARY_ALLOWANCE_PRESETS,
@@ -173,7 +173,7 @@ export default function PayrollRecordSection() {
     period?.year && period?.month
       ? formatMonthYearLabel(period.year, period.month)
       : '—'
-  const roleLabel = employee?.position || getRoleLabel(employee?.role) || '—'
+  const positionDisplay = getEmployeePositionDisplay(employee)
 
   async function handleSave() {
     setSaving(true)
@@ -345,7 +345,7 @@ export default function PayrollRecordSection() {
         <div>
           <h1 className="payroll-record__name">{employee?.name || 'Сотрудник'}</h1>
           <p className="payroll-record__meta">
-            {roleLabel} · {periodLabel}
+            {positionDisplay} · {periodLabel}
           </p>
         </div>
         <div className="payroll-record__hero-side">

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { isCloudMode } from '../../../lib/dataMode'
 import { getEmployeeProfilePath } from '../../../config/permissions'
-import { getRoleLabel } from '../../../data/roles'
+import { getEmployeePositionDisplay } from '../../../utils/employeeData'
 import { formatMonthYearLabel } from '../../../utils/shiftData'
 import {
   SALARY_ALLOWANCE_PRESETS,
@@ -791,14 +791,14 @@ export default function PayrollSection() {
               </thead>
               <tbody>
                 {rows.map(({ employee, record, amounts }, index) => {
-                  const roleLabel = employee.position || getRoleLabel(employee.role)
+                  const positionDisplay = getEmployeePositionDisplay(employee)
                   const notesPresent = hasRecordNotes(record)
                   const rowSaving = savingEmployeeId === employee.id
                   const profilePath = getPayrollEmployeeLink(employee)
                   const personBlock = (
                     <span className="payroll-table__person">
                       <span className="payroll-table__name">{employee.name}</span>
-                      <span className="payroll-table__role">{roleLabel}</span>
+                      <span className="payroll-table__role">{positionDisplay}</span>
                     </span>
                   )
                   return (

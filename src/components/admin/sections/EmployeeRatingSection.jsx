@@ -2,10 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { isCloudMode } from '../../../lib/dataMode'
 import {
+  getEmployeePositionDisplay,
   getScheduleEligibleEmployees,
   participatesInStoreSchedule,
 } from '../../../utils/employeeData'
-import { getRoleLabel } from '../../../data/roles'
 import {
   getCurrentMonthState,
   RATING_UPDATED_EVENT,
@@ -32,7 +32,7 @@ const PLACE_CLASS = {
 }
 
 function RatingRow({ row, onSelect }) {
-  const roleLabel = row.employee.position || getRoleLabel(row.employee.role)
+  const positionDisplay = getEmployeePositionDisplay(row.employee)
   const isInsufficient = row.ratingStatus === RATING_STATUS.INSUFFICIENT_DATA
   const placeLabel = row.place ?? '—'
 
@@ -60,7 +60,7 @@ function RatingRow({ row, onSelect }) {
           />
           <span className="rating-list__info">
             <span className="rating-list__name">{row.employee.name}</span>
-            <span className="rating-list__role">{roleLabel}</span>
+            <span className="rating-list__role">{positionDisplay}</span>
             {isInsufficient && (
               <span className="rating-list__badge rating-list__badge--insufficient">
                 Недостаточно данных
@@ -75,7 +75,7 @@ function RatingRow({ row, onSelect }) {
         </span>
 
         <span className="rating-list__col rating-list__col--position rating-list__desktop-only">
-          {roleLabel}
+          {positionDisplay}
         </span>
         <span className="rating-list__col rating-list__col--score rating-list__desktop-only">
           <RatingScoreBar score={row.totalPoints} />

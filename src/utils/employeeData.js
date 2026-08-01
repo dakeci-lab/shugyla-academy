@@ -372,26 +372,25 @@ function splitName(fullName) {
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') }
 }
 
-function resolvePositionDisplay(raw, role) {
-  const positionName =
-    raw.positionName ??
-    raw.position_name ??
-    null
-  const legacy = raw.position || ''
-  return positionName || legacy || role?.label || ''
+/** Resolve HR position text only — never from access role labels. */
+function resolvePositionDisplay(raw) {
+  const positionName = raw?.positionName ?? raw?.position_name ?? null
+  const structured = typeof positionName === 'string' ? positionName.trim() : ''
+  if (structured) return structured
+  const legacy = typeof raw?.position === 'string' ? raw.position.trim() : ''
+  return legacy
 }
 
 /** Нормализация записи сотрудника */
 export function normalizeEmployee(raw) {
   const roleId = normalizeRoleId(raw.role) || raw.role
-  const role = getRole(roleId)
   const fromName = splitName(raw.name)
   const firstName = raw.firstName ?? fromName.firstName
   const lastName = raw.lastName ?? fromName.lastName
   const name = `${firstName} ${lastName}`.trim() || raw.name || ''
   const positionId = raw.positionId ?? raw.position_id ?? null
   const positionName = raw.positionName ?? raw.position_name ?? null
-  const position = resolvePositionDisplay(raw, role)
+  const position = resolvePositionDisplay(raw)
 
   return {
     ...raw,
@@ -752,6 +751,15 @@ export function getEmployeePositionLabel(employee) {
   if (employee.positionId && employee.position) return employee.position
   if (employee.positionId) return ''
   return employee.position || ''
+}
+
+/**
+ * UI label for HR position. Never uses access role / getRoleLabel.
+ * Priority: positionName → legacy position text → «Должность не назначена».
+ */
+export function getEmployeePositionDisplay(employee) {
+  const label = String(getEmployeePositionLabel(employee) || '').trim()
+  return label || 'Должность не назначена'
 }
 
 export function getEmployeePositionGroupLabel(employee) {

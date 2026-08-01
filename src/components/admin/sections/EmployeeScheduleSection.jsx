@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { getEmployeeById } from '../../../utils/employeeData'
-import { getRoleLabel } from '../../../data/roles'
+import { getEmployeeById, getEmployeePositionDisplay } from '../../../utils/employeeData'
 import {
   shiftsToMap,
   formatMonthYearLabel,
@@ -257,7 +256,7 @@ export default function EmployeeScheduleSection({
             />
             <div className="schedule-header__meta">
               <h1>{resolvedEmployee?.name}</h1>
-              <p>{resolvedEmployee?.position || getRoleLabel(resolvedEmployee?.role)}</p>
+              <p>{getEmployeePositionDisplay(resolvedEmployee)}</p>
             </div>
           </div>
         </div>

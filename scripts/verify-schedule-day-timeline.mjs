@@ -152,6 +152,14 @@ function main() {
       section.includes('flattenEmployeeOrganization')
   )
   assert(
+    'timeline position subtitle not role fallback',
+    timeline.includes('getEmployeePositionDisplay') && !timeline.includes('position || getRoleLabel')
+  )
+  assert(
+    'weekly section position subtitle not role fallback',
+    section.includes('getEmployeePositionDisplay') && !section.includes('position || getRoleLabel')
+  )
+  assert(
     'timeline preserves employees prop order',
     timeline.includes('(employees || []).map') && !/\.sort\s*\(/.test(timeline)
   )

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { isCloudMode } from '../../lib/dataMode'
 import {
+  getEmployeePositionDisplay,
   getScheduleEligibleEmployees,
   participatesInStoreSchedule,
 } from '../../utils/employeeData'
@@ -141,7 +142,7 @@ function createDetail(employee, shift, extra = '') {
   return {
     id: employee.id,
     name: employee.name || `Сотрудник #${employee.id}`,
-    position: employee.position || employee.roleName || employee.role || '',
+    position: getEmployeePositionDisplay(employee),
     planned,
     actualIn,
     extra,

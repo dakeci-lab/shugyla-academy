@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { getRoleLabel } from '../../data/roles'
+import { getEmployeePositionDisplay } from '../../utils/employeeData'
 import {
   buildScheduleDayStats,
   buildTimelineTicks,
@@ -159,7 +159,7 @@ function EmployeeRow({
   const cell = classifyScheduleDayCell(shift)
   const layout =
     cell.kind === 'working' ? getShiftBarLayout(cell.start, cell.end, window) : null
-  const role = employee.position || getRoleLabel(employee.role) || '—'
+  const positionDisplay = getEmployeePositionDisplay(employee)
 
   return (
     <div className="schedule-day-row">
@@ -176,7 +176,7 @@ function EmployeeRow({
         ) : (
           <span className="schedule-day-row__name">{employee.name}</span>
         )}
-        <span className="schedule-day-row__role">{role}</span>
+        <span className="schedule-day-row__role">{positionDisplay}</span>
       </div>
       <div className="schedule-day-row__timeline">
         <ShiftBar

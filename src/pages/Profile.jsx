@@ -50,7 +50,8 @@ export default function Profile() {
 
   if (!user) return null
 
-  const roleLabel = user.position || getRoleDisplayName(user) || '—'
+  // Subtitle is access role (not HR position). Session position pollution is Wave 2B.
+  const roleLabel = getRoleDisplayName(user) || '—'
   const phoneLabel = formatPhoneDisplay(user.phone) || user.phone || 'Телефон не указан'
 
   const trimmedFirst = firstName.trim()

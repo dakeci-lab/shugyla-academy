@@ -7,7 +7,8 @@ import './PlatformSidebar.css'
 /** Верхний блок профиля в мобильном drawer */
 export default function PlatformSidebarMobileProfile({ user, onNavigate }) {
   const navigate = useNavigate()
-  const roleLabel = user?.position || getRoleDisplayName(user)
+  // Access role label only — do not show HR position text as role.
+  const roleLabel = getRoleDisplayName(user) || '—'
 
   function openProfile() {
     onNavigate?.()
