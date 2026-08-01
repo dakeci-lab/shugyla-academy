@@ -78,7 +78,7 @@ export function useRoleEditor({ roles, permissions, onSaved }) {
     setEditorMode('duplicate')
     setSelectedRoleId(role.id)
     setForm({
-      name: `${role.name} (копия)`,
+      name: `Копия — ${role.name}`,
       description: role.description || '',
       isActive: true,
     })
@@ -102,20 +102,32 @@ export function useRoleEditor({ roles, permissions, onSaved }) {
     setSaving(true)
     setError('')
     try {
+      let savedRoleId = selectedRoleId
       if (editorMode === 'create' || editorMode === 'duplicate') {
         const code = generateUniqueRoleCode(
           form.name.trim(),
           roles.map((role) => role.code)
         )
         if (editorMode === 'duplicate' && selectedRoleId) {
-          await duplicateRole(selectedRoleId, { code, name: form.name.trim() })
+          const created = await duplicateRole(selectedRoleId, { code, name: form.name.trim() })
+          savedRoleId = created?.id || null
+          if (savedRoleId) {
+            // Apply form description + any permission edits made before confirm.
+            await upsertRole(savedRoleId, {
+              name: form.name.trim(),
+              description: form.description.trim(),
+              isActive: true,
+              permissionIds: selectedPermissionIds,
+            })
+          }
         } else {
-          await createRole({
+          const created = await createRole({
             code,
             name: form.name.trim(),
             description: form.description.trim(),
             permissionIds: selectedPermissionIds,
           })
+          savedRoleId = created?.id || null
         }
       } else if (selectedRoleId) {
         await upsertRole(selectedRoleId, {
@@ -124,10 +136,11 @@ export function useRoleEditor({ roles, permissions, onSaved }) {
           isActive: form.isActive,
           permissionIds: selectedPermissionIds,
         })
+        savedRoleId = selectedRoleId
       }
       await reloadRbac()
       refreshSession()
-      await onSaved?.()
+      await onSaved?.({ roleId: savedRoleId, mode: editorMode })
       setEditorOpen(false)
       toastSuccess('Роль сохранена')
     } catch (err) {
@@ -171,6 +184,7 @@ export function useRoleEditor({ roles, permissions, onSaved }) {
       form={form}
       setForm={setForm}
       selectedRole={selectedRole}
+      roles={roles}
       permissionGroups={permissionGroups}
       selectedPermissionIds={selectedPermissionIds}
       onTogglePermission={(id) =>
@@ -186,6 +200,10 @@ export function useRoleEditor({ roles, permissions, onSaved }) {
       }
       onSelectAll={() => setSelectedPermissionIds(allPermissionIds)}
       onClearAll={() => setSelectedPermissionIds([])}
+      onCopyFromRole={async (roleId) => {
+        const ids = await getRolePermissionIds(roleId)
+        setSelectedPermissionIds(ids)
+      }}
       onSave={handleSave}
       onClose={() => setEditorOpen(false)}
       saving={saving}

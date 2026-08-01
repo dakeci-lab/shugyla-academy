@@ -87,7 +87,8 @@
     "verify:employee-self-edit": "node scripts/verify-employee-self-edit.mjs",
     "verify:position-structure-data-layer": "node scripts/verify-position-structure-data-layer.mjs",
     "verify:profile-position-access-hotfix": "node scripts/verify-profile-position-access-hotfix.mjs",
-    "verify:position-structure-management-backend": "node scripts/verify-position-structure-management-backend.mjs"
+    "verify:position-structure-management-backend": "node scripts/verify-position-structure-management-backend.mjs",
+    "verify:roles-permissions-ui-redesign": "node scripts/verify-roles-permissions-ui-redesign.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",
