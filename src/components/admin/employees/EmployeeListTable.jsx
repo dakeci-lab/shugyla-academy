@@ -7,8 +7,6 @@ import { PencilIcon } from '../../icons/PlatformIcons'
 import {
   getEmploymentStatusLabel,
   getEmploymentStatusBadgeType,
-  getEmployeePositionLabel,
-  isEmployeePositionUnlinked,
 } from '../../../utils/employeeData'
 import '../IconActionButton.css'
 import './EmployeeListTable.css'
@@ -18,38 +16,26 @@ function displayValue(value) {
   return value
 }
 
-function resolvePositionCell(employee) {
-  const structured = getEmployeePositionLabel(employee)
-  const unlinked = isEmployeePositionUnlinked(employee)
-  if (structured) {
+/** Группа должностей для колонки списка (не название должности). */
+function resolvePositionGroupCell(employee) {
+  const groupName = String(employee?.positionGroupName || '').trim()
+  const archived = employee?.positionGroupIsActive === false
+  const positionHint = String(employee?.positionName || employee?.position || '').trim()
+
+  if (groupName) {
     return {
-      label: structured,
-      archived: employee.positionIsActive === false || employee.positionGroupIsActive === false,
-      groupTitle: employee.positionGroupName || '',
+      label: groupName,
+      archived,
       missing: false,
+      title: positionHint ? `${groupName} · ${positionHint}` : groupName,
     }
   }
-  if (unlinked && employee.position) {
-    return {
-      label: employee.position,
-      archived: false,
-      groupTitle: '',
-      missing: true,
-    }
-  }
-  if (!employee?.positionId) {
-    return {
-      label: 'Должность не назначена',
-      archived: false,
-      groupTitle: '',
-      missing: true,
-    }
-  }
+
   return {
-    label: 'Должность не назначена',
+    label: 'Не назначена',
     archived: false,
-    groupTitle: '',
     missing: true,
+    title: positionHint ? `Не назначена · ${positionHint}` : 'Не назначена',
   }
 }
 
@@ -130,7 +116,7 @@ export default function EmployeeListTable({
               <col className="employee-list-table__col-num" />
               <col className="employee-list-table__col-name" />
               <col className="employee-list-table__col-login" />
-              <col className="employee-list-table__col-position" />
+              <col className="employee-list-table__col-group" />
               <col className="employee-list-table__col-role" />
               <col className="employee-list-table__col-status" />
               <col className="employee-list-table__col-actions" />
@@ -140,7 +126,7 @@ export default function EmployeeListTable({
                 <th scope="col">№</th>
                 <th scope="col">Сотрудник</th>
                 <th scope="col">Логин</th>
-                <th scope="col">Должность</th>
+                <th scope="col">Группа должностей</th>
                 <th scope="col">Роль</th>
                 <th scope="col">Статус</th>
                 <th scope="col" className="employee-list-table__actions-head">
@@ -150,7 +136,7 @@ export default function EmployeeListTable({
             </thead>
             <tbody>
               {employees.map((employee, index) => {
-                const position = resolvePositionCell(employee)
+                const group = resolvePositionGroupCell(employee)
                 const roleLabel = displayValue(getRoleLabelForEmployee(employee))
                 return (
                   <tr
@@ -199,17 +185,13 @@ export default function EmployeeListTable({
                     <td>
                       <span
                         className={`employee-list-table__clamp${
-                          position.missing ? ' employee-list-table__clamp--muted' : ''
+                          group.missing ? ' employee-list-table__clamp--muted' : ''
                         }`}
-                        title={
-                          position.groupTitle
-                            ? `${position.label} · ${position.groupTitle}`
-                            : position.label
-                        }
+                        title={group.title}
                       >
-                        {position.label}
+                        {group.label}
                       </span>
-                      {position.archived ? (
+                      {group.archived ? (
                         <span className="employee-list-table__archive-badge">Архивная</span>
                       ) : null}
                     </td>
@@ -251,7 +233,7 @@ export default function EmployeeListTable({
       <ul className="employee-cards">
         {employees.map((employee, index) => {
           const isInteractive = Boolean(onOpen)
-          const position = resolvePositionCell(employee)
+          const group = resolvePositionGroupCell(employee)
           const roleLabel = displayValue(getRoleLabelForEmployee(employee))
 
           return (
@@ -299,10 +281,10 @@ export default function EmployeeListTable({
 
               <div className="employee-card-item__meta">
                 <p className="employee-card-item__meta-line">
-                  <span className="employee-card-item__meta-label">Должность:</span>{' '}
+                  <span className="employee-card-item__meta-label">Группа должностей:</span>{' '}
                   <span className="employee-card-item__meta-value">
-                    {position.label}
-                    {position.archived ? ' · Архивная' : ''}
+                    {group.label}
+                    {group.archived ? ' · Архивная' : ''}
                   </span>
                 </p>
                 <p className="employee-card-item__meta-line">

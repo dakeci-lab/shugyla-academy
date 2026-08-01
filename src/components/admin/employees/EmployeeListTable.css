@@ -45,8 +45,8 @@
   width: 140px;
 }
 
-.employee-list-table__col-position {
-  width: 240px;
+.employee-list-table__col-group {
+  width: 260px;
 }
 
 .employee-list-table__col-role {
@@ -362,8 +362,8 @@
 }
 
 @media (max-width: 1100px) {
-  .employee-list-table__col-position {
-    width: 200px;
+  .employee-list-table__col-group {
+    width: 210px;
   }
 
   .employee-list-table__col-role {

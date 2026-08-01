@@ -225,11 +225,20 @@ function main() {
   assert('section uses EmployeeListTable', section.includes('<EmployeeListTable'))
   assert('OrganizationList not primary path', !section.includes('<EmployeeOrganizationList'))
   assert('OrganizationList file kept for future', fs.existsSync(path.join(ROOT, 'src/components/admin/employees/EmployeeOrganizationList.jsx')))
-  assert('flat list has position column', listTable.includes('Должность'))
+  assert(
+    'flat list has position group column',
+    listTable.includes('Группа должностей') || listTable.includes('>Группа<')
+  )
   assert('flat list has role column', listTable.includes('Роль'))
-  assert('position before role in table', listTable.indexOf('Должность') < listTable.indexOf('Роль'))
-  assert('position from structured data', listTable.includes('getEmployeePositionLabel'))
-  assert('missing position fallback', listTable.includes('Должность не назначена'))
+  assert(
+    'group before role in table',
+    (listTable.includes('Группа должностей')
+      ? listTable.indexOf('Группа должностей')
+      : listTable.indexOf('Группа')) < listTable.indexOf('Роль')
+  )
+  assert('group from positionGroupName', listTable.includes('positionGroupName'))
+  assert('missing group fallback', listTable.includes('Не назначена'))
+  assert('position name not list column header', !listTable.includes('Должность</th>'))
   assert('no group headers in list table', !listTable.includes('employee-org__group-toggle'))
   assert('no position separator in list table', !listTable.includes('employee-org-table__position-row'))
   assert('no shown summary in section', !section.includes('Показано:'))

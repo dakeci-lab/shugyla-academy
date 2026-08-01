@@ -72,21 +72,26 @@ function main() {
   assert('desktop filter popover', filter.includes('employee-filter-popover'))
   assert('focus return ref', filter.includes('returnFocusRef={anchorRef}'))
 
-  console.log('Stage 3: Flat list + position column')
+  console.log('Stage 3: Flat list + position group column')
 
   assert('EmployeeListTable is primary render', section.includes('<EmployeeListTable'))
   assert('OrganizationList not primary render', !section.includes('<EmployeeOrganizationList'))
   assert('uses flatten after group sort', section.includes('flattenEmployeeOrganization'))
   assert('uses group helper for order', section.includes('groupEmployeesByPositionStructure'))
-  assert('position column header', table.includes('>Должность<') || table.includes('Должность</th>'))
+  assert(
+    'position group column header',
+    table.includes('Группа должностей</th>') || table.includes('>Группа должностей<') || table.includes('>Группа<')
+  )
   assert('role column header', table.includes('>Роль<') || table.includes('Роль</th>'))
   assert(
-    'position column before role',
-    table.indexOf('Должность') < table.indexOf('Роль') && table.indexOf('Должность') > 0
+    'group column before role',
+    (table.includes('Группа должностей') ? table.indexOf('Группа должностей') : table.indexOf('Группа')) <
+      table.indexOf('Роль')
   )
-  assert('position from structured helper', table.includes('getEmployeePositionLabel'))
+  assert('group value from positionGroupName', table.includes('positionGroupName'))
   assert('role via getRoleLabelForEmployee', table.includes('getRoleLabelForEmployee'))
-  assert('missing position fallback', table.includes('Должность не назначена'))
+  assert('missing group fallback', table.includes('Не назначена'))
+  assert('position name not a list column header', !table.includes('Должность</th>') && !table.includes('>Должность<'))
   assert('archived badge', table.includes('Архивная'))
   assert('no group headers in table', !table.includes('employee-org__group') && !table.includes('Архивная группа'))
   assert('no position separator rows', !table.includes('position-row') && !table.includes('employee-org-table__position'))
@@ -94,13 +99,15 @@ function main() {
   assert('colgroup present', table.includes('<colgroup>'))
   assert('fixed table layout', tableCss.includes('table-layout: fixed'))
   assert('action column fixed width', tableCss.includes('employee-list-table__col-actions'))
+  assert('group column width', tableCss.includes('employee-list-table__col-group'))
   assert('compact row height', tableCss.includes('height: 58px') || tableCss.includes('height: 56px'))
 
   console.log('Stage 4: Mobile cards')
 
   assert('mobile cards component', table.includes('employee-cards'))
   assert('desktop table preserved', table.includes('employee-list-table-desktop'))
-  assert('card shows position', table.includes('Должность:'))
+  assert('card shows position group', table.includes('Группа должностей:') || table.includes('Группа:'))
+  assert('card does not show position as list field', !table.includes('Должность:'))
   assert('card shows role', table.includes('Роль:'))
   assert('card avatar', table.includes('EmployeeAvatar'))
   assert('card no trash icon', !table.includes('TrashIcon'))
