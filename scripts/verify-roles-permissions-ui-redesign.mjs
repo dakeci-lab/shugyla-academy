@@ -59,8 +59,12 @@ function main() {
   assert('roles tab', teamPage.includes('Роли и доступы') || utils.includes('Роли и доступы'))
   assert('groups placeholder tab', utils.includes('Группы должностей'))
   assert('positions placeholder tab', utils.includes('Должности'))
-  assert('coming soon copy', teamPage.includes('TeamComingSoonPanel') || exists('src/components/admin/team/TeamComingSoonPanel.jsx'))
-  assert('coming soon text', read('src/components/admin/team/TeamComingSoonPanel.jsx').includes('Интерфейс будет подключён на следующем этапе'))
+  assert(
+    'structure tabs wired or placeholder available',
+    teamPage.includes('PositionGroupsWorkspace') ||
+      teamPage.includes('TeamComingSoonPanel') ||
+      exists('src/components/admin/team/TeamComingSoonPanel.jsx'),
+  )
 
   assert('desktop grid sidebar+detail', teamCss.includes('grid-template-columns') && teamCss.includes('320px'))
   assert('mobile single column', teamCss.includes('max-width: 860px') && teamCss.includes('grid-template-columns: 1fr'))
