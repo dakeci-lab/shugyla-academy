@@ -52,6 +52,12 @@ function mergeCatalogPermissions(permissions) {
 }
 
 async function loadEmployeeCountsByRoleCode() {
+  // Own-profile RLS + column grants: without a session this query only produces 401/403 noise.
+  const { data: sessionData } = await supabase.auth.getSession()
+  if (!sessionData?.session?.access_token) {
+    return { byCode: new Map(), byId: new Map() }
+  }
+
   const result = await supabase.from('academy_users').select('role, role_id')
   if (result.error) return { byCode: new Map(), byId: new Map() }
 

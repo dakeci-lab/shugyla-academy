@@ -32,9 +32,38 @@ import { getAppUrl } from '../router/basename'
 export const ACADEMY_AUTH_PROFILE_FIELDS =
   'id, first_name, last_name, full_name, login, role, role_id, status, position, position_id, avatar_url, auth_user_id, contact_email, created_at'
 
+/** Fallback without position_id when column grants lag behind schema (hotfix 2.1). */
+export const ACADEMY_AUTH_PROFILE_FIELDS_WITHOUT_POSITION_ID =
+  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, auth_user_id, contact_email, created_at'
+
 /** Safe academy_users columns for Auth-first cloud queries (never includes password). */
 export const ACADEMY_PROFILE_SAFE_FIELDS =
   `${ACADEMY_AUTH_PROFILE_FIELDS}, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation`
+
+export const PROFILE_LOAD_ERROR = {
+  FORBIDDEN: 'profile_forbidden',
+  NOT_FOUND: 'profile_not_found',
+  FAILED: 'profile_load_failed',
+}
+
+function isProfilePermissionDeniedError(error) {
+  if (!error) return false
+  const code = String(error.code || '')
+  const status = Number(error.status || error.statusCode || 0)
+  const message = String(error.message || '').toLowerCase()
+  return (
+    code === '42501' ||
+    status === 403 ||
+    message.includes('permission denied') ||
+    message.includes('403')
+  )
+}
+
+function createProfileLoadError(code, message) {
+  const err = new Error(message || 'Не удалось загрузить профиль сотрудника')
+  err.code = code
+  return err
+}
 
 const DEACTIVATED_ACCOUNT_MESSAGE =
   'Доступ закрыт: сотрудник уволен. Обратитесь к администратору.'
@@ -126,7 +155,19 @@ export async function loadAcademyAssignmentsForEmployee(employeeId) {
  * Employment dates are attached when the extended select succeeds.
  */
 async function loadAcademyUserRow(match) {
-  const authResult = await match(ACADEMY_AUTH_PROFILE_FIELDS)
+  let authResult = await match(ACADEMY_AUTH_PROFILE_FIELDS)
+
+  // Hotfix 2.1: column-level GRANT may lag after ADD COLUMN position_id.
+  // Retry without position_id so Auth session can still become a platform profile.
+  if (authResult.error && isProfilePermissionDeniedError(authResult.error)) {
+    if (import.meta.env.DEV) {
+      console.warn('[auth] profile select forbidden; retrying without position_id', {
+        code: PROFILE_LOAD_ERROR.FORBIDDEN,
+      })
+    }
+    authResult = await match(ACADEMY_AUTH_PROFILE_FIELDS_WITHOUT_POSITION_ID)
+  }
+
   if (authResult.error || !authResult.data) return authResult
 
   const extendedResult = await match(
@@ -170,7 +211,16 @@ export async function loadAcademyProfileByAuthUserId(authUserId) {
   )
 
   if (result.error) {
-    throw new Error('Не удалось загрузить профиль сотрудника')
+    if (isProfilePermissionDeniedError(result.error)) {
+      throw createProfileLoadError(
+        PROFILE_LOAD_ERROR.FORBIDDEN,
+        'Не удалось загрузить профиль сотрудника',
+      )
+    }
+    throw createProfileLoadError(
+      PROFILE_LOAD_ERROR.FAILED,
+      'Не удалось загрузить профиль сотрудника',
+    )
   }
 
   if (!result.data) return null

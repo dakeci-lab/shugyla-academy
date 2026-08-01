@@ -70,6 +70,9 @@ export const LOGIN_ERROR = {
   INVALID: 'invalid',
   DEACTIVATED: 'deactivated',
   PROFILE_NOT_CONFIGURED: 'profile_not_configured',
+  PROFILE_FORBIDDEN: 'profile_forbidden',
+  PROFILE_LOAD_FAILED: 'profile_load_failed',
+  RBAC_LOAD_FAILED: 'rbac_load_failed',
   NETWORK: 'network',
 }
 
@@ -174,12 +177,19 @@ async function loginCloud(loginValue, password) {
   } catch (err) {
     await supabase.auth.signOut().catch(() => {})
     clearUser()
-    return {
-      success: false,
-      error: isAuthNetworkError(err)
-        ? LOGIN_ERROR.NETWORK
-        : 'Не удалось загрузить профиль. Обновите страницу или обратитесь к администратору.',
+    if (isAuthNetworkError(err)) {
+      return { success: false, error: LOGIN_ERROR.NETWORK }
     }
+    if (err?.code === LOGIN_ERROR.PROFILE_FORBIDDEN || err?.code === 'profile_forbidden') {
+      if (import.meta.env.DEV) {
+        console.warn('[login] profile_forbidden after Auth 200')
+      }
+      return { success: false, error: LOGIN_ERROR.PROFILE_FORBIDDEN }
+    }
+    if (import.meta.env.DEV) {
+      console.warn('[login] profile_load_failed after Auth 200', { code: err?.code })
+    }
+    return { success: false, error: LOGIN_ERROR.PROFILE_LOAD_FAILED }
   }
 
   if (profileRow?.deactivated) {
@@ -200,10 +210,13 @@ async function loginCloud(loginValue, password) {
   } catch (err) {
     await supabase.auth.signOut().catch(() => {})
     clearUser()
-    return {
-      success: false,
-      error: isAuthNetworkError(err) ? LOGIN_ERROR.NETWORK : LOGIN_ERROR.INVALID,
+    if (isAuthNetworkError(err)) {
+      return { success: false, error: LOGIN_ERROR.NETWORK }
     }
+    if (import.meta.env.DEV) {
+      console.warn('[login] rbac_load_failed after profile', { code: err?.code })
+    }
+    return { success: false, error: LOGIN_ERROR.RBAC_LOAD_FAILED }
   }
 
   if (!sessionUser) {

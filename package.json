@@ -85,7 +85,8 @@
     "verify:web-push-vapid-consistency": "node scripts/verify-web-push-vapid-consistency.mjs",
     "verify:procurement-cross-device-sync": "node scripts/verify-procurement-cross-device-sync.mjs",
     "verify:employee-self-edit": "node scripts/verify-employee-self-edit.mjs",
-    "verify:position-structure-data-layer": "node scripts/verify-position-structure-data-layer.mjs"
+    "verify:position-structure-data-layer": "node scripts/verify-position-structure-data-layer.mjs",
+    "verify:profile-position-access-hotfix": "node scripts/verify-profile-position-access-hotfix.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",

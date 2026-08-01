@@ -103,6 +103,15 @@ export default function Login() {
           setError(DEACTIVATED_MESSAGE)
         } else if (result.error === LOGIN_ERROR.PROFILE_NOT_CONFIGURED) {
           setError(PROFILE_NOT_CONFIGURED_MESSAGE)
+        } else if (
+          result.error === LOGIN_ERROR.PROFILE_FORBIDDEN ||
+          result.error === LOGIN_ERROR.PROFILE_LOAD_FAILED
+        ) {
+          setError(
+            'Не удалось загрузить профиль. Обновите страницу или обратитесь к администратору.',
+          )
+        } else if (result.error === LOGIN_ERROR.RBAC_LOAD_FAILED) {
+          setError('Не удалось загрузить права доступа. Обновите страницу и попробуйте снова.')
         } else if (result.error === LOGIN_ERROR.NETWORK) {
           setError(NETWORK_ERROR_MESSAGE)
         } else if (typeof result.error === 'string' && result.error) {

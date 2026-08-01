@@ -122,10 +122,14 @@ export function SessionProvider({ children }) {
         }
       }
 
-      try {
-        await ensureRbacLoaded()
-      } catch {
-        // RBAC fallback обрабатывается в permissions.js
+      // RBAC must not hit protected tables before a valid Auth/platform session exists.
+      // Login/restore paths that succeed already load RBAC inside buildCloudPlatformSessionUser.
+      if (restored?.user && restored?.supabaseAuthenticated) {
+        try {
+          await ensureRbacLoaded()
+        } catch {
+          // RBAC fallback обрабатывается в permissions.js
+        }
       }
 
       await applyRestoredSession(restored)
