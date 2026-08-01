@@ -33,7 +33,11 @@ export const STORAGE_KEYS = {
   EXTRA_USERS: 'shugyla_extra_users',
   USER_EDITS: 'shugyla_user_edits',
   DELETED_USER_IDS: 'shugyla_deleted_user_ids',
+  /** Bumped when employee local shape gains positionId-aware merge rules. */
+  EMPLOYEE_LOCAL_SCHEMA: 'shugyla_employee_local_schema_v',
 }
+
+export const EMPLOYEE_LOCAL_SCHEMA_VERSION = 2
 
 export const EMPLOYMENT_STATUS = {
   ACTIVE: 'active',
@@ -356,6 +360,15 @@ function splitName(fullName) {
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') }
 }
 
+function resolvePositionDisplay(raw, role) {
+  const positionName =
+    raw.positionName ??
+    raw.position_name ??
+    null
+  const legacy = raw.position || ''
+  return positionName || legacy || role?.label || ''
+}
+
 /** Нормализация записи сотрудника */
 export function normalizeEmployee(raw) {
   const roleId = normalizeRoleId(raw.role) || raw.role
@@ -364,6 +377,9 @@ export function normalizeEmployee(raw) {
   const firstName = raw.firstName ?? fromName.firstName
   const lastName = raw.lastName ?? fromName.lastName
   const name = `${firstName} ${lastName}`.trim() || raw.name || ''
+  const positionId = raw.positionId ?? raw.position_id ?? null
+  const positionName = raw.positionName ?? raw.position_name ?? null
+  const position = resolvePositionDisplay(raw, role)
 
   return {
     ...raw,
@@ -371,7 +387,17 @@ export function normalizeEmployee(raw) {
     firstName,
     lastName,
     name,
-    position: raw.position || role?.label || roleId,
+    position,
+    positionId,
+    positionName: positionName || position || null,
+    positionGroupId: raw.positionGroupId ?? raw.position_group_id ?? null,
+    positionGroupName: raw.positionGroupName ?? raw.position_group_name ?? null,
+    positionSortOrder: raw.positionSortOrder ?? raw.position_sort_order ?? null,
+    positionGroupSortOrder:
+      raw.positionGroupSortOrder ?? raw.position_group_sort_order ?? null,
+    positionIsActive: raw.positionIsActive ?? raw.position_is_active ?? null,
+    positionGroupIsActive:
+      raw.positionGroupIsActive ?? raw.position_group_is_active ?? null,
     roleId: raw.roleId ?? raw.role_id ?? null,
     employmentStatus: normalizeEmploymentStatus(
       raw.employmentStatus || raw.status
@@ -392,6 +418,64 @@ export function normalizeEmployee(raw) {
   }
 }
 
+/**
+ * Merge cloud employee with optional local edit overlay.
+ * Cloud positionId always wins over local legacy position text.
+ */
+export function mergeEmployeeWithLocalEdit(cloudEmployee, localEdit) {
+  if (!cloudEmployee) return null
+  if (!localEdit || typeof localEdit !== 'object') return normalizeEmployee(cloudEmployee)
+
+  const merged = {
+    ...cloudEmployee,
+    ...localEdit,
+  }
+
+  if (cloudEmployee.positionId) {
+    merged.positionId = cloudEmployee.positionId
+    merged.positionName = cloudEmployee.positionName ?? cloudEmployee.position
+    merged.position = cloudEmployee.positionName || cloudEmployee.position
+    merged.positionGroupId = cloudEmployee.positionGroupId ?? null
+    merged.positionGroupName = cloudEmployee.positionGroupName ?? null
+    merged.positionSortOrder = cloudEmployee.positionSortOrder ?? null
+    merged.positionGroupSortOrder = cloudEmployee.positionGroupSortOrder ?? null
+    merged.positionIsActive = cloudEmployee.positionIsActive ?? null
+    merged.positionGroupIsActive = cloudEmployee.positionGroupIsActive ?? null
+  } else if (localEdit.positionId) {
+    merged.positionId = localEdit.positionId
+  }
+
+  return normalizeEmployee(merged)
+}
+
+/** Idempotent selective migration of local employee cache keys. */
+export function migrateEmployeeLocalSchema() {
+  if (typeof localStorage === 'undefined') return
+  const key = STORAGE_KEYS.EMPLOYEE_LOCAL_SCHEMA
+  const current = Number(localStorage.getItem(key) || '0')
+  if (current >= EMPLOYEE_LOCAL_SCHEMA_VERSION) return
+
+  // v2: strip position from local edits when it was only a role-label mirror.
+  // Keep other fields; do not clear auth or unrelated offline data.
+  try {
+    const edits = readJson(STORAGE_KEYS.USER_EDITS, {})
+    let changed = false
+    for (const id of Object.keys(edits)) {
+      if (edits[id] && typeof edits[id] === 'object' && 'position' in edits[id] && !edits[id].positionId) {
+        const next = { ...edits[id] }
+        delete next.position
+        edits[id] = next
+        changed = true
+      }
+    }
+    if (changed) writeJson(STORAGE_KEYS.USER_EDITS, edits)
+  } catch {
+    // ignore corrupt local cache
+  }
+
+  localStorage.setItem(key, String(EMPLOYEE_LOCAL_SCHEMA_VERSION))
+}
+
 function isMockUser(id) {
   return USERS.some((u) => u.id === id)
 }
@@ -402,12 +486,13 @@ function getDeletedIds() {
 
 /** Все сотрудники из localStorage (без облачного кэша) */
 export function getAllEmployeesLocal() {
+  migrateEmployeeLocalSchema()
   const extra = readJson(STORAGE_KEYS.EXTRA_USERS, [])
   const edits = readJson(STORAGE_KEYS.USER_EDITS, {})
   const deleted = getDeletedIds()
 
   const base = USERS.filter((u) => !deleted.includes(u.id)).map((u) =>
-    normalizeEmployee({ ...u, ...edits[u.id] })
+    mergeEmployeeWithLocalEdit(u, edits[u.id]),
   )
 
   const added = extra.map((u) => normalizeEmployee(u))
@@ -647,6 +732,8 @@ function normEmployeeText(value) {
 /**
  * Diff-only cloud update payload for employee edit.
  * Omits unchanged fields. For self-edit never includes roleId / employmentStatus.
+ * Role changes never include position / positionId — position is independent.
+ * Position changes only when form.positionId is explicitly provided and differs.
  */
 export function buildEmployeeCloudUpdateChanges(
   employee,
@@ -655,12 +742,11 @@ export function buildEmployeeCloudUpdateChanges(
 ) {
   if (!employee || !form) return {}
 
-  const roleCode = selectedRole?.code || form.role
   const next = {
     firstName: String(form.firstName || '').trim(),
     lastName: String(form.lastName || '').trim(),
     roleId: selectedRole?.id || form.roleId || null,
-    position: selectedRole?.name || form.position || '',
+    positionId: form.positionId ?? form.position_id ?? null,
     employmentStatus: normalizeEmploymentStatus(
       form.employmentStatus || employee.employmentStatus,
     ),
@@ -679,8 +765,13 @@ export function buildEmployeeCloudUpdateChanges(
   if (normEmployeeText(next.lastName) !== normEmployeeText(employee.lastName)) {
     changes.lastName = next.lastName
   }
-  if (normEmployeeText(next.position) !== normEmployeeText(employee.position)) {
-    changes.position = next.position
+  // Explicit positionId only — never derive from selectedRole.name.
+  if (
+    next.positionId != null &&
+    next.positionId !== '' &&
+    normEmployeeText(next.positionId) !== normEmployeeText(employee.positionId)
+  ) {
+    changes.positionId = next.positionId
   }
   if (normEmployeeText(next.avatarUrl) !== normEmployeeText(employee.avatarUrl)) {
     changes.avatarUrl = next.avatarUrl

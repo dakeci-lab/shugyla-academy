@@ -14,6 +14,7 @@ import {
   type DbEmployeeRow,
   type SortableField,
 } from '../_shared/employeeFields.ts'
+import { loadPositionCatalogByIds } from '../_shared/employeePositions.ts'
 import {
   buildServerTimingHeader,
   corsPreflightResponse,
@@ -214,10 +215,16 @@ Deno.serve(async (req) => {
 
   const transformStart = performance.now()
   const total = count ?? 0
+  const rows = (data ?? []) as DbEmployeeRow[]
+  trackDbCall(dbCalls)
+  const catalogById = await loadPositionCatalogByIds(
+    serviceClient,
+    rows.map((row) => row.position_id),
+  )
   const employees = []
-  for (const row of data ?? []) {
+  for (const row of rows) {
     try {
-      employees.push(mapSafeEmployee(row as DbEmployeeRow))
+      employees.push(mapSafeEmployee(row, catalogById))
     } catch (mapError) {
       console.error('admin_list_employees_map_failed', {
         requestId,

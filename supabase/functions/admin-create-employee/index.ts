@@ -11,6 +11,12 @@ import {
   MAX_NAME_LENGTH,
   todayDateKeyAlmaty,
 } from '../_shared/employeeFields.ts'
+import {
+  buildStructuredPosition,
+  extractPositionIdFromPayload,
+  resolveActivePositionForAssignment,
+  resolvePositionByRoleName,
+} from '../_shared/employeePositions.ts'
 
 const PERMISSION_CREATE = 'employees.create'
 const ACTIVE_STATUS = 'active'
@@ -19,7 +25,7 @@ const MAX_PASSWORD_LENGTH = 128
 const MAX_LOGIN_LENGTH = 128
 
 const EMPLOYEE_RETURN_SELECT =
-  'id, login, full_name, first_name, last_name, role, role_id, status, position, avatar_url, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation, created_at, auth_user_id'
+  'id, login, full_name, first_name, last_name, role, role_id, status, position, position_id, avatar_url, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation, created_at, auth_user_id'
 
 const FORBIDDEN_BODY_KEYS = new Set([
   'id',
@@ -47,6 +53,12 @@ type ErrorCode =
   | 'validation_error'
   | 'provisioning_error'
   | 'rollback_failed'
+  | 'invalid_position_id'
+  | 'position_not_found'
+  | 'position_inactive'
+  | 'position_group_not_found'
+  | 'position_group_inactive'
+  | 'position_mapping_ambiguous'
 
 function errorResponse(code: ErrorCode, message: string, status: number) {
   return jsonResponse({ ok: false, error: { code, message } }, status)
@@ -180,8 +192,9 @@ Deno.serve(async (req) => {
     typeof payload.first_name === 'string' ? payload.first_name.trim().slice(0, MAX_NAME_LENGTH) : ''
   const lastName =
     typeof payload.last_name === 'string' ? payload.last_name.trim().slice(0, MAX_NAME_LENGTH) : ''
-  const position =
+  const legacyPositionHint =
     typeof payload.position === 'string' ? payload.position.trim().slice(0, MAX_NAME_LENGTH) : ''
+  const explicitPositionId = extractPositionIdFromPayload(payload)
   const avatarUrl =
     typeof payload.avatar_url === 'string' && payload.avatar_url.trim()
       ? payload.avatar_url.trim().slice(0, 2048)
@@ -225,12 +238,41 @@ Deno.serve(async (req) => {
 
     const { data: targetRole, error: roleError } = await serviceClient
       .from('roles')
-      .select('id, code, is_active')
+      .select('id, code, name, is_active')
       .eq('id', roleId)
       .maybeSingle()
 
     if (roleError || !targetRole?.id || targetRole.is_active === false) {
       return errorResponse('validation_error', 'Invalid role', 422)
+    }
+
+    let resolvedPositionId: string | null = null
+    let resolvedPositionName = ''
+    let positionDiagnostic: string | null = null
+
+    if (explicitPositionId !== undefined && explicitPositionId !== null && explicitPositionId !== '') {
+      const resolved = await resolveActivePositionForAssignment(serviceClient, explicitPositionId)
+      if (!resolved.ok) {
+        return errorResponse(resolved.code, 'Invalid position', 422)
+      }
+      resolvedPositionId = resolved.position.id
+      resolvedPositionName = resolved.position.name
+    } else {
+      const mapped = await resolvePositionByRoleName(serviceClient, targetRole.name)
+      if (mapped.ok) {
+        resolvedPositionId = mapped.position.id
+        resolvedPositionName = mapped.position.name
+      } else if (mapped.code === 'position_mapping_ambiguous') {
+        return errorResponse('position_mapping_ambiguous', 'Ambiguous position mapping', 422)
+      } else {
+        positionDiagnostic = 'position_unresolved'
+        resolvedPositionId = null
+        resolvedPositionName = legacyPositionHint || String(targetRole.name || '').trim()
+        console.warn('employee_create_position_unresolved', {
+          requestId,
+          role_code: targetRole.code,
+        })
+      }
     }
 
     const existingEmployee = await findEmployeeByLogin(serviceClient, canonical)
@@ -291,7 +333,8 @@ Deno.serve(async (req) => {
         login: canonical,
         role: targetRole.code,
         role_id: targetRole.id,
-        position: position || '',
+        position_id: resolvedPositionId,
+        position: (resolvedPositionName || legacyPositionHint || '').slice(0, MAX_NAME_LENGTH),
         status: ACTIVE_STATUS,
         hired_at: todayDateKeyAlmaty(),
         terminated_at: null,
@@ -324,7 +367,70 @@ Deno.serve(async (req) => {
         return errorResponse('provisioning_error', 'Could not create employee', 500)
       }
 
-      return jsonResponse({ ok: true, employee: inserted }, 201)
+      const structured = buildStructuredPosition(
+        inserted.position,
+        resolvedPositionId
+          ? {
+              id: resolvedPositionId,
+              name: resolvedPositionName,
+              group_id: '',
+              sort_order: 0,
+              is_active: true,
+              group_name: null,
+              group_sort_order: null,
+              group_is_active: null,
+            }
+          : null,
+      )
+
+      // Prefer DB row + resolved ids; enrich catalog fields when mapping succeeded.
+      const employee = {
+        ...inserted,
+        position_id: inserted.position_id ?? resolvedPositionId,
+        position: structured.position || inserted.position,
+        position_name: structured.position_name,
+        position_group_id: structured.position_group_id,
+        position_group_name: structured.position_group_name,
+        position_sort_order: structured.position_sort_order,
+        position_group_sort_order: structured.position_group_sort_order,
+        position_is_active: structured.position_is_active,
+        position_group_is_active: structured.position_group_is_active,
+      }
+
+      if (resolvedPositionId) {
+        const { data: catalogRow } = await serviceClient
+          .from('positions')
+          .select(
+            'id, name, group_id, sort_order, is_active, position_groups(id, name, sort_order, is_active)',
+          )
+          .eq('id', resolvedPositionId)
+          .maybeSingle()
+        if (catalogRow) {
+          const group = (catalogRow as { position_groups?: {
+            id: string
+            name: string
+            sort_order: number
+            is_active: boolean
+          } | null }).position_groups
+          employee.position_name = catalogRow.name
+          employee.position = catalogRow.name
+          employee.position_group_id = catalogRow.group_id
+          employee.position_group_name = group?.name ?? null
+          employee.position_sort_order = catalogRow.sort_order
+          employee.position_group_sort_order = group?.sort_order ?? null
+          employee.position_is_active = catalogRow.is_active !== false
+          employee.position_group_is_active = group ? group.is_active !== false : null
+        }
+      }
+
+      return jsonResponse(
+        {
+          ok: true,
+          employee,
+          ...(positionDiagnostic ? { diagnostics: { position: positionDiagnostic } } : {}),
+        },
+        201,
+      )
     } catch (err) {
       console.error('provisioning_unexpected', {
         requestId,

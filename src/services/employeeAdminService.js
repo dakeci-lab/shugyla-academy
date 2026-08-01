@@ -91,6 +91,14 @@ function serverEmployeeToUi(row) {
     role: row.role,
     roleId: row.role_id,
     position: row.position,
+    positionId: row.position_id ?? null,
+    positionName: row.position_name ?? null,
+    positionGroupId: row.position_group_id ?? null,
+    positionGroupName: row.position_group_name ?? null,
+    positionSortOrder: row.position_sort_order ?? null,
+    positionGroupSortOrder: row.position_group_sort_order ?? null,
+    positionIsActive: row.position_is_active ?? null,
+    positionGroupIsActive: row.position_group_is_active ?? null,
     employmentStatus: row.status,
     avatarUrl: row.avatar_url,
     hiredAt: row.hired_at,
@@ -245,7 +253,8 @@ export async function updateEmployeeAsAdmin(employeeId, changes) {
   const payloadChanges = {}
   if (changes.firstName != null) payloadChanges.first_name = changes.firstName
   if (changes.lastName != null) payloadChanges.last_name = changes.lastName
-  if (changes.position != null) payloadChanges.position = changes.position
+  // position text alone is not a safe write; only explicit positionId.
+  if (changes.positionId != null) payloadChanges.position_id = changes.positionId
   if (changes.avatarUrl !== undefined) payloadChanges.avatar_url = changes.avatarUrl
   if (changes.roleId != null) payloadChanges.role_id = changes.roleId
   if (changes.employmentStatus != null) payloadChanges.status = changes.employmentStatus

@@ -7,11 +7,44 @@ import {
   normalizeEmployee,
   canEmployeeLogin,
   todayEmployeeDateKey,
+  migrateEmployeeLocalSchema,
 } from '../utils/employeeData'
 import { normalizeLesson } from '../utils/lessonData'
 import { fetchTestsData } from './testSupabaseAdapter'
 import { normalizeRoleId } from '../data/roles'
 import { resolveRoleIdByCode } from './rbacService'
+import {
+  buildPositionFieldsFromCatalog,
+  ensurePositionCatalogLoaded,
+} from './positionCatalogService'
+
+function mapAcademyUserRow(row, assignmentMap) {
+  const positionFields = buildPositionFieldsFromCatalog(
+    row.position_id,
+    row.position || '',
+  )
+  return normalizeEmployee({
+    id: row.id,
+    firstName: row.first_name,
+    lastName: row.last_name,
+    name: row.full_name,
+    login: row.login,
+    role: row.role,
+    roleId: row.role_id,
+    ...positionFields,
+    employmentStatus: row.status,
+    hiredAt: row.hired_at,
+    terminatedAt: row.terminated_at,
+    workMode: row.work_mode,
+    salaryCalculationType: row.salary_calculation_type,
+    payrollParticipation: row.payroll_participation,
+    createdAt: row.created_at,
+    assignedCourseIds: assignmentMap ? assignmentMap.get(row.id) || [] : [],
+    avatarUrl: row.avatar_url,
+    contactEmail: row.contact_email || '',
+    workLocationId: row.work_location_id,
+  })
+}
 
 async function resolveRoleIdForSlug(roleSlug) {
   try {
@@ -174,6 +207,7 @@ function settleTableResult(result, context, fallback = []) {
 
 /** Core academy tables (employees / courses / lessons / assignments / progress). */
 export async function fetchCoreAcademyData() {
+  migrateEmployeeLocalSchema()
   let usersRes = await supabase
     .from('academy_users')
     .select(ACADEMY_PROFILE_SAFE_FIELDS)
@@ -192,6 +226,9 @@ export async function fetchCoreAcademyData() {
     supabase.from('academy_progress').select('*'),
   ])
 
+  // Batch catalog load (not per employee). Failures leave legacy position text intact.
+  await ensurePositionCatalogLoaded().catch(() => null)
+
   const users = settleTableResult(usersRes, 'Загрузка сотрудников', [])
   const courses = settleTableResult(coursesRes, 'Загрузка курсов', [])
   const lessons = settleTableResult(lessonsRes, 'Загрузка уроков', [])
@@ -201,29 +238,7 @@ export async function fetchCoreAcademyData() {
   const assignmentMap = groupAssignments(assignments)
   const normalizedLessons = lessons.map(rowToLesson)
 
-  const employees = users.map((row) =>
-    normalizeEmployee({
-      id: row.id,
-      firstName: row.first_name,
-      lastName: row.last_name,
-      name: row.full_name,
-      login: row.login,
-      role: row.role,
-      roleId: row.role_id,
-      position: row.position,
-      employmentStatus: row.status,
-      hiredAt: row.hired_at,
-      terminatedAt: row.terminated_at,
-      workMode: row.work_mode,
-      salaryCalculationType: row.salary_calculation_type,
-      payrollParticipation: row.payroll_participation,
-      createdAt: row.created_at,
-      assignedCourseIds: assignmentMap.get(row.id) || [],
-      avatarUrl: row.avatar_url,
-      contactEmail: row.contact_email || '',
-      workLocationId: row.work_location_id,
-    })
-  )
+  const employees = users.map((row) => mapAcademyUserRow(row, assignmentMap))
 
   const normalizedCourses = attachLessonCounts(
     courses.map(rowToCourse),
@@ -406,6 +421,7 @@ async function createUser(data) {
     password: employee.password || '',
     role: employee.role,
     role_id: employee.roleId || null,
+    position_id: employee.positionId || null,
     position: employee.position || '',
     status: employee.employmentStatus,
     hired_at: employee.hiredAt || null,
@@ -455,7 +471,11 @@ async function updateUser(id, updates) {
     patch.role_id = await resolveRoleIdForSlug(updates.role)
   }
   if (updates.roleId != null) patch.role_id = updates.roleId
-  if (updates.position != null) patch.position = updates.position
+  if (updates.positionId != null) {
+    patch.position_id = updates.positionId
+    if (updates.position != null) patch.position = updates.position
+  }
+  // Legacy position text without positionId is not applied (cloud Edge path is canonical).
   if (updates.employmentStatus != null) patch.status = updates.employmentStatus
   if (updates.status != null) patch.status = updates.status
   if (updates.hiredAt !== undefined) patch.hired_at = updates.hiredAt
@@ -767,21 +787,13 @@ export async function authenticateUser(loginValue, password) {
     .eq('user_id', row.id)
   const assignments = await throwIfError(assignmentsRes, 'Назначения')
 
+  await ensurePositionCatalogLoaded().catch(() => null)
   return {
     ok: true,
-    user: normalizeEmployee({
-      id: row.id,
-      firstName: row.first_name,
-      lastName: row.last_name,
-      name: row.full_name,
-      login: row.login,
-      password: row.password,
-      role: row.role,
-      roleId: row.role_id,
-      position: row.position,
-      employmentStatus: row.status,
-      assignedCourseIds: assignments.map((a) => a.course_id),
-    }),
+    user: mapAcademyUserRow(
+      { ...row, assignedCourseIds: undefined },
+      new Map([[row.id, assignments.map((a) => a.course_id)]]),
+    ),
   }
 }
 

@@ -30,7 +30,7 @@ import { getAppUrl } from '../router/basename'
  * after migrations cannot break sign-in.
  */
 export const ACADEMY_AUTH_PROFILE_FIELDS =
-  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, auth_user_id, contact_email, created_at'
+  'id, first_name, last_name, full_name, login, role, role_id, status, position, position_id, avatar_url, auth_user_id, contact_email, created_at'
 
 /** Safe academy_users columns for Auth-first cloud queries (never includes password). */
 export const ACADEMY_PROFILE_SAFE_FIELDS =
@@ -50,6 +50,8 @@ export function getPasswordResetRedirectUrl() {
 function buildSessionUser(employee, phone = null) {
   const role = getRole(employee.role)
   const loginPhone = phone || technicalEmailToPhone(employee.login) || employee.login
+  const positionLabel =
+    employee.positionName || employee.position || role?.label || employee.role
   return {
     id: employee.id,
     login: employee.login,
@@ -59,7 +61,11 @@ function buildSessionUser(employee, phone = null) {
     role: employee.role,
     roleId: employee.roleId ?? employee.role_id ?? null,
     roleName: role?.label || employee.role,
-    position: employee.position || role?.label || employee.role,
+    positionId: employee.positionId ?? employee.position_id ?? null,
+    position: positionLabel,
+    positionName: employee.positionName || positionLabel || null,
+    positionGroupId: employee.positionGroupId ?? employee.position_group_id ?? null,
+    positionGroupName: employee.positionGroupName ?? employee.position_group_name ?? null,
     avatarUrl: employee.avatarUrl || null,
     workMode: employee.workMode || employee.work_mode || 'offline',
     permissions: role?.permissions || [],
@@ -77,6 +83,7 @@ function profileRowToEmployee(row, assignedCourseIds = []) {
     role: row.role,
     roleId: row.role_id,
     position: row.position,
+    positionId: row.position_id ?? null,
     employmentStatus: row.status,
     hiredAt: row.hired_at,
     terminatedAt: row.terminated_at,
@@ -834,6 +841,7 @@ export async function signInWithEmail(email, password) {
       name: legacy.user.name,
       role: legacy.user.role,
       roleName: role?.label || legacy.user.role,
+      positionId: legacy.user.positionId || null,
       position: legacy.user.position || role?.label || legacy.user.role,
       avatarUrl: legacy.user.avatarUrl || null,
       permissions: role?.permissions || [],

@@ -25,11 +25,25 @@ function mapProvisioningError(errorBody, fallbackMessage) {
     if (message?.toLowerCase().includes('auth')) return ERROR_MESSAGES.conflict_auth
     return ERROR_MESSAGES.conflict_login
   }
-  if (code === 'validation_error') {
+  if (
+    code === 'validation_error' ||
+    code === 'invalid_position_id' ||
+    code === 'position_not_found' ||
+    code === 'position_inactive' ||
+    code === 'position_group_not_found' ||
+    code === 'position_group_inactive' ||
+    code === 'position_mapping_ambiguous'
+  ) {
     const normalized = message.toLowerCase()
     if (normalized.includes('password')) return ERROR_MESSAGES.password
     if (normalized.includes('role')) return ERROR_MESSAGES.role
     if (normalized.includes('login')) return 'Укажите корректный логин'
+    if (code === 'position_mapping_ambiguous') {
+      return 'Не удалось однозначно сопоставить должность. Обратитесь к администратору.'
+    }
+    if (String(code).startsWith('position_') || code === 'invalid_position_id') {
+      return 'Выбранная должность недоступна'
+    }
     return ERROR_MESSAGES.validation
   }
   if (code === 'malformed_json') return ERROR_MESSAGES.validation
@@ -61,6 +75,8 @@ export async function createEmployeeWithAuth(payload) {
     last_name: payload.lastName?.trim(),
     full_name: payload.fullName?.trim(),
     role_id: payload.roleId,
+    // Optional explicit id; otherwise Edge maps role.name → active position.
+    position_id: payload.positionId || undefined,
     position: payload.position?.trim() || undefined,
     avatar_url: payload.avatarUrl || undefined,
     source_candidate_id: payload.sourceCandidateId || undefined,

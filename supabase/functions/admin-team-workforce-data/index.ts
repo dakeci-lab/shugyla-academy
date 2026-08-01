@@ -18,6 +18,7 @@ import {
   mapSafeWorkforceShift,
   type DbWorkforceEmployeeRow,
 } from '../_shared/workforceFields.ts'
+import { loadPositionCatalogByIds } from '../_shared/employeePositions.ts'
 
 const ALLOWED_BODY_KEYS = new Set(['date_from', 'date_to', 'timezone', 'view', 'employee_id'])
 const ALLOWED_VIEWS = new Set(['dashboard', 'schedule', 'rating', 'home-summary', 'payroll'])
@@ -125,6 +126,7 @@ type HomeShiftEmbedRow = Record<string, unknown> & {
     full_name: string
     role: string
     position: string
+    position_id?: string | null
   } | null
 }
 
@@ -237,9 +239,15 @@ Deno.serve(async (req) => {
     }
 
     const transformStart = performance.now()
+    const homeRows = (workforceRes.data ?? []) as HomeShiftEmbedRow[]
+    trackDbCall(dbCalls)
+    const homeCatalog = await loadPositionCatalogByIds(
+      serviceClient,
+      homeRows.map((row) => row.academy_users?.position_id),
+    )
     const employeeById = new Map<number, ReturnType<typeof mapHomeSummaryEmployee>>()
     const shifts = []
-    for (const row of (workforceRes.data ?? []) as HomeShiftEmbedRow[]) {
+    for (const row of homeRows) {
       const nested = row.academy_users
       if (!nested?.id) {
         console.error('admin_team_workforce_home_missing_employee', { requestId })
@@ -247,7 +255,7 @@ Deno.serve(async (req) => {
       }
       try {
         if (!employeeById.has(nested.id)) {
-          employeeById.set(nested.id, mapHomeSummaryEmployee(nested))
+          employeeById.set(nested.id, mapHomeSummaryEmployee(nested, homeCatalog))
         }
         const mapped = mapSafeWorkforceShift(row)
         if (mapped.employee_id !== nested.id) continue
@@ -400,12 +408,18 @@ Deno.serve(async (req) => {
   }
 
   const transformStart = performance.now()
+  const workforceRows = (workforceRes.data ?? []) as EmployeeWithShiftsRow[]
+  trackDbCall(dbCalls)
+  const catalogById = await loadPositionCatalogByIds(
+    serviceClient,
+    workforceRows.map((row) => (row as DbWorkforceEmployeeRow).position_id),
+  )
   const employees = []
   const shifts = []
-  for (const row of (workforceRes.data ?? []) as EmployeeWithShiftsRow[]) {
+  for (const row of workforceRows) {
     try {
       const { academy_employee_shifts: nestedShifts, ...employeeRow } = row
-      employees.push(mapSafeWorkforceEmployee(employeeRow as DbWorkforceEmployeeRow))
+      employees.push(mapSafeWorkforceEmployee(employeeRow as DbWorkforceEmployeeRow, catalogById))
       for (const shiftRow of nestedShifts ?? []) {
         try {
           const mapped = mapSafeWorkforceShift(shiftRow)

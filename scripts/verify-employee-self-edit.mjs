@@ -49,12 +49,15 @@ function main() {
   assert('hired_at is allowed change key', edge.includes("'hired_at'"))
   assert('diff helper exists', data.includes('buildEmployeeCloudUpdateChanges'))
   assert('diff omits self role/status', data.includes('if (!editingSelf)') && data.includes('changes.roleId') && data.includes('changes.employmentStatus'))
+  assert('diff does not mirror role into position', !data.includes("position: selectedRole?.name"))
   assert('modal uses diff helper', modal.includes('buildEmployeeCloudUpdateChanges'))
   assert('modal skips empty diff', modal.includes("Object.keys(changes).length === 0"))
   assert('error mentions основной статус', service.includes('основной статус'))
   assert('role hint for self', modal.includes('Собственную роль нельзя изменить'))
   assert('status hint for self', modal.includes('Собственный статус сотрудника нельзя изменить'))
   assert('verify script registered', pkg.includes('verify:employee-self-edit'))
+  assert('edge ignores legacy position without id', edge.includes('legacy_position_text_ignored'))
+  assert('edge blocks self position change', edge.includes('Self-edit must not change position'))
 
   // Lightweight behavioral mirror of the diff helper contract
   assert(

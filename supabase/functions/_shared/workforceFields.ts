@@ -1,5 +1,10 @@
+import {
+  buildStructuredPosition,
+  type PositionCatalogRow,
+} from './employeePositions.ts'
+
 export const WORKFORCE_EMPLOYEE_SELECT =
-  'id, first_name, last_name, full_name, role, role_id, status, position, avatar_url, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation, created_at'
+  'id, first_name, last_name, full_name, role, role_id, status, position, position_id, avatar_url, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation, created_at'
 
 // Break columns omitted from SELECT (not used by Home/Schedule/Rating/Profile consumers).
 // mapSafeWorkforceShift still returns break keys as null for response-contract stability.
@@ -8,7 +13,7 @@ export const WORKFORCE_SHIFT_SELECT =
 
 /** Home summary: only fields used by OwnerDashboard metrics / detail rows. */
 export const HOME_SUMMARY_EMPLOYEE_SELECT =
-  'id, first_name, last_name, full_name, role, position'
+  'id, first_name, last_name, full_name, role, position, position_id'
 
 export const HOME_SUMMARY_SHIFT_SELECT =
   'id, employee_id, shift_date, status, planned_start_time, planned_end_time, actual_start_time'
@@ -37,6 +42,7 @@ export type DbWorkforceEmployeeRow = {
   role_id: string | null
   status: string
   position: string
+  position_id?: string | null
   avatar_url: string | null
   hired_at?: string | null
   terminated_at?: string | null
@@ -55,6 +61,14 @@ export type SafeWorkforceEmployee = {
   role_id: string | null
   status: string
   position: string
+  position_id: string | null
+  position_name: string | null
+  position_group_id: string | null
+  position_group_name: string | null
+  position_sort_order: number | null
+  position_group_sort_order: number | null
+  position_is_active: boolean | null
+  position_group_is_active: boolean | null
   avatar_url: string | null
   hired_at: string | null
   terminated_at: string | null
@@ -98,7 +112,14 @@ function normalizePayrollParticipation(value: string | null | undefined): string
   return value === 'excluded' ? 'excluded' : 'active'
 }
 
-export function mapSafeWorkforceEmployee(row: DbWorkforceEmployeeRow): SafeWorkforceEmployee {
+export function mapSafeWorkforceEmployee(
+  row: DbWorkforceEmployeeRow,
+  catalogById?: Map<string, PositionCatalogRow>,
+): SafeWorkforceEmployee {
+  const catalog =
+    row.position_id && catalogById ? catalogById.get(row.position_id) ?? null : null
+  const structured = buildStructuredPosition(row.position, catalog)
+
   return {
     id: row.id,
     first_name: row.first_name,
@@ -107,7 +128,15 @@ export function mapSafeWorkforceEmployee(row: DbWorkforceEmployeeRow): SafeWorkf
     role: row.role,
     role_id: row.role_id,
     status: row.status,
-    position: row.position,
+    position: structured.position,
+    position_id: structured.position_id ?? row.position_id ?? null,
+    position_name: structured.position_name,
+    position_group_id: structured.position_group_id,
+    position_group_name: structured.position_group_name,
+    position_sort_order: structured.position_sort_order,
+    position_group_sort_order: structured.position_group_sort_order,
+    position_is_active: structured.position_is_active,
+    position_group_is_active: structured.position_group_is_active,
     avatar_url: row.avatar_url,
     hired_at: toDateKey(row.hired_at) ?? toDateKey(row.created_at),
     terminated_at: toDateKey(row.terminated_at),
@@ -118,31 +147,39 @@ export function mapSafeWorkforceEmployee(row: DbWorkforceEmployeeRow): SafeWorkf
   }
 }
 
-export function mapHomeSummaryEmployee(row: {
-  id: number
-  first_name: string
-  last_name: string
-  full_name: string
-  role: string
-  position: string
-}): SafeWorkforceEmployee {
-  return {
-    id: row.id,
-    first_name: row.first_name,
-    last_name: row.last_name,
-    full_name: row.full_name,
-    role: row.role,
-    role_id: null,
-    status: 'active',
-    position: row.position,
-    avatar_url: null,
-    hired_at: null,
-    terminated_at: null,
-    work_mode: 'offline',
-    salary_calculation_type: 'shift_based',
-    payroll_participation: 'active',
-    created_at: null,
-  }
+export function mapHomeSummaryEmployee(
+  row: {
+    id: number
+    first_name: string
+    last_name: string
+    full_name: string
+    role: string
+    position: string
+    position_id?: string | null
+  },
+  catalogById?: Map<string, PositionCatalogRow>,
+): SafeWorkforceEmployee {
+  return mapSafeWorkforceEmployee(
+    {
+      id: row.id,
+      first_name: row.first_name,
+      last_name: row.last_name,
+      full_name: row.full_name,
+      role: row.role,
+      role_id: null,
+      status: 'active',
+      position: row.position,
+      position_id: row.position_id ?? null,
+      avatar_url: null,
+      hired_at: null,
+      terminated_at: null,
+      work_mode: 'offline',
+      salary_calculation_type: 'shift_based',
+      payroll_participation: 'active',
+      created_at: null,
+    },
+    catalogById,
+  )
 }
 
 export function mapSafeWorkforceShift(row: Record<string, unknown>): SafeWorkforceShift {

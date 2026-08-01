@@ -1,3 +1,8 @@
+import {
+  buildStructuredPosition,
+  type PositionCatalogRow,
+} from './employeePositions.ts'
+
 export const MAX_NAME_LENGTH = 200
 export const MAX_LOGIN_LENGTH = 128
 export const MAX_SEARCH_LENGTH = 100
@@ -26,7 +31,7 @@ export const ALLOWED_STATUSES = new Set([
 ])
 
 export const SAFE_EMPLOYEE_SELECT =
-  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation, created_at, updated_at, auth_user_id'
+  'id, first_name, last_name, full_name, login, role, role_id, status, position, position_id, avatar_url, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation, created_at, updated_at, auth_user_id'
 
 export const ALLOWED_WORK_MODES = new Set(['offline', 'online'])
 export const ALLOWED_SALARY_CALCULATION_TYPES = new Set(['shift_based', 'fixed_salary'])
@@ -42,6 +47,7 @@ export type DbEmployeeRow = {
   role_id: string | null
   status: string
   position: string
+  position_id?: string | null
   avatar_url: string | null
   hired_at?: string | null
   terminated_at?: string | null
@@ -63,6 +69,14 @@ export type SafeEmployee = {
   role_id: string | null
   status: string
   position: string
+  position_id: string | null
+  position_name: string | null
+  position_group_id: string | null
+  position_group_name: string | null
+  position_sort_order: number | null
+  position_group_sort_order: number | null
+  position_is_active: boolean | null
+  position_group_is_active: boolean | null
   avatar_url: string | null
   hired_at: string | null
   terminated_at: string | null
@@ -102,7 +116,14 @@ export function normalizePayrollParticipation(value: unknown): string {
   return value === 'excluded' ? 'excluded' : 'active'
 }
 
-export function mapSafeEmployee(row: DbEmployeeRow): SafeEmployee {
+export function mapSafeEmployee(
+  row: DbEmployeeRow,
+  catalogById?: Map<string, PositionCatalogRow>,
+): SafeEmployee {
+  const catalog =
+    row.position_id && catalogById ? catalogById.get(row.position_id) ?? null : null
+  const structured = buildStructuredPosition(row.position, catalog)
+
   return {
     id: row.id,
     first_name: row.first_name,
@@ -112,7 +133,15 @@ export function mapSafeEmployee(row: DbEmployeeRow): SafeEmployee {
     role: row.role,
     role_id: row.role_id,
     status: row.status,
-    position: row.position,
+    position: structured.position,
+    position_id: structured.position_id ?? row.position_id ?? null,
+    position_name: structured.position_name,
+    position_group_id: structured.position_group_id,
+    position_group_name: structured.position_group_name,
+    position_sort_order: structured.position_sort_order,
+    position_group_sort_order: structured.position_group_sort_order,
+    position_is_active: structured.position_is_active,
+    position_group_is_active: structured.position_group_is_active,
     avatar_url: row.avatar_url,
     hired_at: normalizeDateKey(row.hired_at) ?? normalizeDateKey(row.created_at),
     terminated_at: normalizeDateKey(row.terminated_at),

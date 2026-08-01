@@ -23,6 +23,11 @@ import {
   todayDateKeyAlmaty,
   type DbEmployeeRow,
 } from '../_shared/employeeFields.ts'
+import {
+  extractPositionIdFromPayload,
+  loadPositionCatalogByIds,
+  resolveActivePositionForAssignment,
+} from '../_shared/employeePositions.ts'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
 
 const PERMISSION_EDIT = 'employees.edit'
@@ -31,6 +36,8 @@ const ALLOWED_CHANGE_KEYS = new Set([
   'first_name',
   'last_name',
   'position',
+  'position_id',
+  'positionId',
   'avatar_url',
   'role_id',
   'status',
@@ -95,6 +102,15 @@ Deno.serve(async (req) => {
   }
 
   const changes = { ...(changesRaw as Record<string, unknown>) }
+
+  // Normalize camelCase positionId → position_id for allowlist / processing.
+  if ('positionId' in changes) {
+    if (!('position_id' in changes)) {
+      changes.position_id = changes.positionId
+    }
+    delete changes.positionId
+  }
+
   const changeKeys = Object.keys(changes)
   if (changeKeys.length === 0) {
     return adminErrorResponse('validation_error', 422)
@@ -116,7 +132,9 @@ Deno.serve(async (req) => {
 
   const { data: target, error: targetError } = await serviceClient
     .from('academy_users')
-    .select('id, status, role, role_id, auth_user_id, login, password, first_name, last_name')
+    .select(
+      'id, status, role, role_id, position, position_id, auth_user_id, login, password, first_name, last_name',
+    )
     .eq('id', employeeId)
     .maybeSingle()
 
@@ -155,6 +173,25 @@ Deno.serve(async (req) => {
     delete changes.status
   }
 
+  // Self-edit must not change position assignment.
+  if (isSelf && 'position_id' in changes) {
+    const requested = changes.position_id
+    const currentId = target.position_id ? String(target.position_id) : null
+    const requestedId =
+      requested == null || requested === ''
+        ? null
+        : typeof requested === 'string'
+          ? requested.trim()
+          : null
+    if (requestedId !== currentId) {
+      return adminErrorResponse('forbidden_field', 422)
+    }
+    delete changes.position_id
+  }
+  if (isSelf && 'position' in changes) {
+    delete changes.position
+  }
+
   if (Object.keys(changes).length === 0) {
     const { data: current, error: currentError } = await serviceClient
       .from('academy_users')
@@ -164,9 +201,12 @@ Deno.serve(async (req) => {
     if (currentError || !current) {
       return adminErrorResponse('internal_error', 500)
     }
+    const catalog = await loadPositionCatalogByIds(serviceClient, [
+      (current as DbEmployeeRow).position_id,
+    ])
     return jsonResponse({
       ok: true,
-      employee: mapSafeEmployee(current as DbEmployeeRow),
+      employee: mapSafeEmployee(current as DbEmployeeRow, catalog),
     })
   }
 
@@ -196,11 +236,27 @@ Deno.serve(async (req) => {
     }
   }
 
-  if ('position' in changes) {
-    if (typeof changes.position !== 'string') {
-      return adminErrorResponse('validation_error', 422)
+  // Legacy text `position` without explicit position_id is ignored so old PWA
+  // clients cannot overwrite a correct position_id (or invent a new assignment).
+  if ('position' in changes && !('position_id' in changes)) {
+    console.warn('legacy_position_text_ignored', {
+      employee_id: employeeId,
+      has_position_id: Boolean(target.position_id),
+    })
+    delete changes.position
+  }
+
+  if ('position_id' in changes) {
+    const rawPositionId = extractPositionIdFromPayload(changes)
+    if (rawPositionId === null || rawPositionId === '') {
+      return adminErrorResponse('invalid_position_id', 422)
     }
-    patch.position = changes.position.trim().slice(0, MAX_NAME_LENGTH)
+    const resolved = await resolveActivePositionForAssignment(serviceClient, rawPositionId)
+    if (!resolved.ok) {
+      return adminErrorResponse(resolved.code, 422)
+    }
+    patch.position_id = resolved.position.id
+    patch.position = resolved.position.name.slice(0, MAX_NAME_LENGTH)
   }
 
   if ('avatar_url' in changes) {
@@ -325,6 +381,24 @@ Deno.serve(async (req) => {
     }
   }
 
+  if (Object.keys(patch).length === 0) {
+    const { data: current, error: currentError } = await serviceClient
+      .from('academy_users')
+      .select(SAFE_EMPLOYEE_SELECT)
+      .eq('id', employeeId)
+      .single()
+    if (currentError || !current) {
+      return adminErrorResponse('internal_error', 500)
+    }
+    const catalog = await loadPositionCatalogByIds(serviceClient, [
+      (current as DbEmployeeRow).position_id,
+    ])
+    return jsonResponse({
+      ok: true,
+      employee: mapSafeEmployee(current as DbEmployeeRow, catalog),
+    })
+  }
+
   const { data: updated, error: updateError } = await serviceClient
     .from('academy_users')
     .update(patch)
@@ -337,8 +411,12 @@ Deno.serve(async (req) => {
     return adminErrorResponse('internal_error', 500)
   }
 
+  const catalog = await loadPositionCatalogByIds(serviceClient, [
+    (updated as DbEmployeeRow).position_id,
+  ])
+
   return jsonResponse({
     ok: true,
-    employee: mapSafeEmployee(updated as DbEmployeeRow),
+    employee: mapSafeEmployee(updated as DbEmployeeRow, catalog),
   })
 })

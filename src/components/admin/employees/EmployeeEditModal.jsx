@@ -162,7 +162,7 @@ export default function EmployeeEditModal({
             role: roleCode,
             roleId: selectedRole?.id || form.roleId || null,
             login: form.login.trim(),
-            position: selectedRole?.name || getRoleLabel(roleCode),
+            // Local mode: keep existing position; do not mirror role label into position.
             employmentStatus: form.employmentStatus,
             hiredAt: form.hiredAt,
             workMode: form.workMode,
