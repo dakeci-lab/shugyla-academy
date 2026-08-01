@@ -131,7 +131,6 @@ export default function EmployeesSection() {
       })
       setCloudEmployees(result.employees)
       setCloudPagination(result.pagination)
-      hasLoadedOnceRef.current = true
     } catch (err) {
       if (!quiet) {
         setCloudEmployees([])

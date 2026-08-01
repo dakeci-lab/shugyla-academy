@@ -114,6 +114,11 @@ function main() {
   assert('editable hire date in form', editModal.includes('Дата приёма на работу') && editModal.includes('type="date"'))
   assert('loading uses organization list skeleton', section.includes('loading={Boolean(cloudMode && listLoading)}'))
   assert('inline AdminModal form removed from list', !section.includes('<AdminModal'))
+  assert(
+    'hotfix 5A.1: no undeclared hasLoadedOnceRef',
+    !section.includes('hasLoadedOnceRef') ||
+      /const\s+hasLoadedOnceRef\s*=\s*useRef\s*\(/.test(section),
+  )
 
   console.log('Stage 6: Layout')
 

@@ -242,6 +242,70 @@ function main() {
   // Confirm schedule files not in this change set via helper purity
   assert('helper has no React', !helper.includes('from \'react\'') && !helper.includes('from "react"'))
 
+  // Hotfix 5A.1: undeclared hasLoadedOnceRef must never ship again.
+  const usesLoadedOnceRef = section.includes('hasLoadedOnceRef')
+  const declaresLoadedOnceRef = /const\s+hasLoadedOnceRef\s*=\s*useRef\s*\(/.test(section)
+  if (usesLoadedOnceRef) {
+    assert('hasLoadedOnceRef declared via useRef when used', declaresLoadedOnceRef)
+  } else {
+    assert('hasLoadedOnceRef fully removed (preferred hotfix)', !usesLoadedOnceRef)
+  }
+  assert(
+    'success path does not assign undeclared hasLoadedOnceRef',
+    !/setCloudPagination\([\s\S]{0,80}hasLoadedOnceRef\.current\s*=\s*true/.test(section),
+  )
+
+  // Lightweight runtime mirror of successful cloud load (no ReferenceError / no wipe).
+  function simulateSuccessfulCloudLoad(result) {
+    let cloudEmployees = []
+    let cloudPagination = null
+    let listError = ''
+    let listLoading = true
+    const quiet = false
+    try {
+      cloudEmployees = result.employees
+      cloudPagination = result.pagination
+      // Intentionally no hasLoadedOnceRef — production crash was here.
+    } catch (err) {
+      if (!quiet) {
+        cloudEmployees = []
+        cloudPagination = null
+      }
+      listError = err.message || 'Не удалось загрузить сотрудников'
+    } finally {
+      if (!quiet) listLoading = false
+    }
+    return { cloudEmployees, cloudPagination, listError, listLoading }
+  }
+
+  const mockOk = simulateSuccessfulCloudLoad({
+    employees: [
+      {
+        id: 1,
+        firstName: 'Анна',
+        lastName: 'Кассир',
+        name: 'Анна Кассир',
+        positionId: 'pos-cashier',
+        positionName: 'Кассир',
+        positionSortOrder: 20,
+        positionIsActive: true,
+        positionGroupId: 'grp-cash',
+        positionGroupName: 'Кассовая зона',
+        positionGroupSortOrder: 30,
+        positionGroupIsActive: true,
+      },
+    ],
+    pagination: { total: 1, total_pages: 1 },
+  })
+  assert('mock success keeps employees', mockOk.cloudEmployees.length === 1)
+  assert('mock success keeps pagination', mockOk.cloudPagination?.total === 1)
+  assert('mock success leaves listError empty', mockOk.listError === '')
+  assert('mock success clears listLoading', mockOk.listLoading === false)
+  assert(
+    'mock success groups without throw',
+    groupEmployeesByPositionStructure(mockOk.cloudEmployees).length === 1,
+  )
+
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }
 
