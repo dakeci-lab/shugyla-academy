@@ -2,6 +2,12 @@
   display: block;
 }
 
+.employee-list-table-desktop--compact .admin-table thead th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+}
+
 .employee-cards {
   display: none;
   list-style: none;

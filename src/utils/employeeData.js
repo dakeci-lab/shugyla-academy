@@ -328,13 +328,21 @@ export function filterEmployees(
   if (!query) return list
 
   return list.filter((employee) => {
+    const roleMeta = getRole(normalizeRoleId(employee.role) || employee.role)
     const haystack = [
       employee.name,
       employee.firstName,
       employee.lastName,
+      employee.fullName,
       employee.login,
       employee.position,
+      employee.positionName,
+      employee.positionGroupName,
       employee.role,
+      employee.roleName,
+      employee.roleLabel,
+      roleMeta?.label,
+      roleMeta?.name,
     ]
       .filter(Boolean)
       .join(' ')

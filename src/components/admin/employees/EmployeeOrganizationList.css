@@ -1,0 +1,226 @@
+.employee-org {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.employee-org__summary {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.employee-org__group {
+  min-width: 0;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 14px;
+  background: var(--color-white, #fff);
+  overflow: clip;
+}
+
+.employee-org__group--unassigned {
+  border-color: rgba(180, 83, 9, 0.28);
+}
+
+.employee-org__group-heading {
+  margin: 0;
+  font-size: inherit;
+  font-weight: inherit;
+}
+
+.employee-org__group-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: none;
+  background: rgba(15, 23, 42, 0.02);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.employee-org__group-toggle:hover {
+  background: rgba(5, 150, 105, 0.05);
+}
+
+.employee-org__group-toggle:focus-visible {
+  outline: 2px solid var(--color-primary, #059669);
+  outline-offset: -2px;
+}
+
+.employee-org__chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-text-secondary, #64748b);
+  transition: transform 0.15s ease;
+  transform: rotate(-90deg);
+}
+
+.employee-org__chevron--open {
+  transform: rotate(0deg);
+}
+
+.employee-org__group-title-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.employee-org__group-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+  overflow-wrap: anywhere;
+}
+
+.employee-org__group-meta {
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #64748b);
+  white-space: nowrap;
+}
+
+.employee-org__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+  background: rgba(15, 23, 42, 0.06);
+}
+
+.employee-org__badge--warn {
+  color: #92400e;
+  background: rgba(245, 158, 11, 0.16);
+}
+
+.employee-org__group-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 10px 12px;
+}
+
+.employee-org__group-body[hidden] {
+  display: none;
+}
+
+.employee-org__position {
+  min-width: 0;
+  padding-top: 8px;
+}
+
+.employee-org__position-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin: 0 0 8px;
+  padding: 0 4px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+}
+
+.employee-org__position-name {
+  overflow-wrap: anywhere;
+}
+
+.employee-org__position-count {
+  font-weight: 500;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.employee-org__skeleton-block {
+  border-radius: 10px;
+  background: linear-gradient(
+    90deg,
+    rgba(15, 23, 42, 0.06),
+    rgba(15, 23, 42, 0.1),
+    rgba(15, 23, 42, 0.06)
+  );
+  background-size: 200% 100%;
+  animation: employee-org-shimmer 1.2s ease-in-out infinite;
+}
+
+.employee-org__group--skeleton {
+  padding: 12px;
+}
+
+.employee-org__group-header.employee-org__skeleton-block {
+  height: 44px;
+  margin-bottom: 10px;
+}
+
+.employee-org__position-header.employee-org__skeleton-block {
+  height: 22px;
+  width: 55%;
+  margin-bottom: 10px;
+}
+
+.employee-org__skeleton-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.employee-org__skeleton-card {
+  height: 56px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes employee-org-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .employee-org__group-toggle {
+    align-items: flex-start;
+  }
+
+  .employee-org__group-meta {
+    margin-left: 26px;
+    width: 100%;
+    white-space: normal;
+  }
+
+  .employee-org__group-body {
+    padding-inline: 8px;
+  }
+}
+
+/* Nested table spacing inside organization sections */
+.employee-org__position .employee-list-table-desktop .admin-table-wrap {
+  margin: 0;
+}
+
+.employee-org__position .employee-cards {
+  margin-top: 0;
+}

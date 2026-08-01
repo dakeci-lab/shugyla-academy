@@ -93,6 +93,8 @@ function main() {
   assert('name link present', table.includes('employee-name-link'))
   assert('row opens profile', table.includes('employee-list-table__row--clickable'))
   assert('shared edit modal used by list', section.includes('EmployeeEditModal'))
+  assert('organization list wired', section.includes('EmployeeOrganizationList'))
+  assert('organization grouping helper used', section.includes('groupEmployeesByPositionStructure'))
 
   console.log('Stage 5: Status actions in modal')
 
@@ -110,7 +112,7 @@ function main() {
   assert('hire date in profile', header.includes('Принят на работу') && header.includes('formatEmployeeDateRu'))
   assert('termination date only when fired', header.includes('isTerminatedEmployeeStatus'))
   assert('editable hire date in form', editModal.includes('Дата приёма на работу') && editModal.includes('type="date"'))
-  assert('loading not over ready list', section.includes('showInitialLoading'))
+  assert('loading uses organization list skeleton', section.includes('loading={Boolean(cloudMode && listLoading)}'))
   assert('inline AdminModal form removed from list', !section.includes('<AdminModal'))
 
   console.log('Stage 6: Layout')

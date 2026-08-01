@@ -32,6 +32,8 @@ export default function EmployeeListTable({
   onEdit,
   onOpen,
   emptyMessage,
+  showHeader = true,
+  compactSection = false,
 }) {
   function openProfile(employee, event) {
     event?.stopPropagation?.()
@@ -45,19 +47,25 @@ export default function EmployeeListTable({
 
   return (
     <>
-      <div className="employee-list-table-desktop">
+      <div
+        className={`employee-list-table-desktop${
+          compactSection ? ' employee-list-table-desktop--compact' : ''
+        }`}
+      >
         <div className="admin-table-wrap">
           <table className="admin-table">
-            <thead>
-              <tr>
-                <th className="employee-list-table__num-col">№</th>
-                <th>Сотрудник</th>
-                <th>Логин</th>
-                <th>Роль</th>
-                <th>Статус</th>
-                <th className="employee-list-table__actions-col">Действия</th>
-              </tr>
-            </thead>
+            {showHeader ? (
+              <thead>
+                <tr>
+                  <th className="employee-list-table__num-col">№</th>
+                  <th>Сотрудник</th>
+                  <th>Логин</th>
+                  <th>Роль</th>
+                  <th>Статус</th>
+                  <th className="employee-list-table__actions-col">Действия</th>
+                </tr>
+              </thead>
+            ) : null}
             <tbody>
               {employees.length === 0 ? (
                 <tr>

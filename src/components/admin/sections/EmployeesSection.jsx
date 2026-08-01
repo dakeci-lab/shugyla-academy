@@ -9,6 +9,7 @@ import {
   isDeactivatedStaffEmployee,
   isActiveStaffEmployee,
 } from '../../../utils/employeeData'
+import { groupEmployeesByPositionStructure } from '../../../utils/employeeOrganizationStructure'
 import {
   deactivateEmployee,
   restoreEmployee,
@@ -39,7 +40,7 @@ import {
 } from '../../../config/permissions'
 import ConfirmDialog from '../ConfirmDialog'
 import EmployeeFilterPopover from '../employees/EmployeeFilterPopover'
-import EmployeeListTable from '../employees/EmployeeListTable'
+import EmployeeOrganizationList from '../employees/EmployeeOrganizationList'
 import EmployeeEditModal from '../employees/EmployeeEditModal'
 import { PlusIcon } from '../../icons/PlatformIcons'
 import PlatformSearchToolbar, {
@@ -52,6 +53,8 @@ import '../RecruitmentSection.css'
 import './EmployeesSection.css'
 
 const CLOUD_PAGE_SIZE = 50
+/** Larger page when client-side search needs group/position/role fields. */
+const CLOUD_SEARCH_PAGE_SIZE = 200
 const NARROW_SEARCH_QUERY = '(max-width: 480px)'
 
 function mapFilterToListStatus(filter) {
@@ -69,7 +72,6 @@ export default function EmployeesSection() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const filterButtonRef = useRef(null)
-  const hasLoadedOnceRef = useRef(false)
   const activeCandidateIdRef = useRef(null)
   const formTouchedRef = useRef(false)
   const isNarrowSearch = useMediaQuery(NARROW_SEARCH_QUERY)
@@ -112,13 +114,16 @@ export default function EmployeesSection() {
   const loadCloudEmployees = useCallback(async (options = {}) => {
     if (!cloudMode) return
     const quiet = options?.quiet === true
+    const hasSearch = Boolean(debouncedSearch.trim())
     if (!quiet) setListLoading(true)
     setListError('')
     try {
+      // Search (incl. group/position/role) is applied client-side after batch load
+      // so organizational fields participate without N+1 or Edge changes.
       const result = await listEmployeesForAdmin({
-        page,
-        pageSize: CLOUD_PAGE_SIZE,
-        search: debouncedSearch,
+        page: hasSearch ? 1 : page,
+        pageSize: hasSearch ? CLOUD_SEARCH_PAGE_SIZE : CLOUD_PAGE_SIZE,
+        search: '',
         status: mapFilterToListStatus(appliedStatus),
         roleId: appliedRoleId || undefined,
         sortBy: 'full_name',
@@ -165,15 +170,26 @@ export default function EmployeesSection() {
     let cancelled = false
     listEmployeesForAdmin({
       page: 1,
-      pageSize: 1,
-      search: debouncedSearch,
+      pageSize: debouncedSearch.trim() ? CLOUD_SEARCH_PAGE_SIZE : 1,
+      search: '',
       status: mapFilterToListStatus(draftStatus),
       roleId: draftRoleId || undefined,
       sortBy: 'full_name',
       sortDirection: 'asc',
     })
       .then((result) => {
-        if (!cancelled) setFilterPreviewTotal(result.pagination?.total ?? 0)
+        if (cancelled) return
+        if (debouncedSearch.trim()) {
+          setFilterPreviewTotal(
+            filterEmployees(result.employees, {
+              search: debouncedSearch,
+              status: 'all',
+              roleId: '',
+            }).length
+          )
+        } else {
+          setFilterPreviewTotal(result.pagination?.total ?? 0)
+        }
       })
       .catch(() => {
         if (!cancelled) setFilterPreviewTotal(0)
@@ -185,13 +201,25 @@ export default function EmployeesSection() {
   }, [cloudMode, filterOpen, debouncedSearch, draftStatus, draftRoleId])
 
   const filteredEmployees = useMemo(() => {
-    if (cloudMode) return cloudEmployees
+    if (cloudMode) {
+      // Status/role already applied by admin-list-employees; search is client-side.
+      return filterEmployees(cloudEmployees, {
+        search: debouncedSearch,
+        status: 'all',
+        roleId: '',
+      })
+    }
     return filterEmployees(getStaffEmployees('all'), {
       search: debouncedSearch,
       status: appliedStatus,
       roleId: appliedRoleId,
     })
   }, [cloudMode, cloudEmployees, debouncedSearch, appliedStatus, appliedRoleId, version])
+
+  const organizationGroups = useMemo(
+    () => groupEmployeesByPositionStructure(filteredEmployees),
+    [filteredEmployees]
+  )
 
   const filterPreviewCount = useMemo(() => {
     if (cloudMode) return filterPreviewTotal
@@ -209,14 +237,14 @@ export default function EmployeesSection() {
     version,
   ])
 
-  const rowOffset = cloudMode ? (page - 1) * CLOUD_PAGE_SIZE : 0
-  const totalPages = cloudPagination?.total_pages ?? 1
-  const showInitialLoading =
-    cloudMode && listLoading && !hasLoadedOnceRef.current && filteredEmployees.length === 0
+  const hasSearch = Boolean(debouncedSearch.trim())
+  const rowOffset = cloudMode && !hasSearch ? (page - 1) * CLOUD_PAGE_SIZE : 0
+  const totalPages = hasSearch ? 1 : cloudPagination?.total_pages ?? 1
+  const searchActive = hasSearch
 
   const searchPlaceholder = isNarrowSearch
     ? 'Поиск по ФИО'
-    : 'Поиск по ФИО, логину, должности…'
+    : 'Поиск по ФИО, логину, должности, группе…'
 
   function getRoleLabelForEmployee(employee) {
     const role =
@@ -228,12 +256,15 @@ export default function EmployeesSection() {
 
   function getEmptyMessage() {
     if (listError) return 'Не удалось загрузить список сотрудников.'
+    if (debouncedSearch.trim() && !filtersActive) {
+      return 'По запросу сотрудники не найдены.'
+    }
     if (filtersActive || debouncedSearch.trim()) {
-      return 'По выбранным фильтрам сотрудники не найдены.'
+      return 'Нет сотрудников, соответствующих выбранным фильтрам.'
     }
     if (appliedStatus === 'active') return 'Работающие сотрудники не найдены.'
     if (appliedStatus === 'deactivated') return 'Уволенные сотрудники не найдены.'
-    return 'Сотрудники не найдены.'
+    return 'Сотрудники не созданы.'
   }
 
   function clearCandidateQuery() {
@@ -458,16 +489,23 @@ export default function EmployeesSection() {
         }
       />
 
-      {listError && <p className="admin-form__error">{listError}</p>}
+      {listError && (
+        <div className="employees-section__error" role="alert">
+          <p className="admin-form__error">{listError}</p>
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={() => loadCloudEmployees()}
+          >
+            Повторить
+          </button>
+        </div>
+      )}
       {actionError && <p className="admin-form__error">{actionError}</p>}
 
-      {showInitialLoading ? (
-        <p className="admin-form__hint" role="status">
-          Загрузка сотрудников…
-        </p>
-      ) : (
-        <EmployeeListTable
-          employees={filteredEmployees}
+      {!listError && (
+        <EmployeeOrganizationList
+          groups={organizationGroups}
           rowOffset={rowOffset}
           getRoleLabelForEmployee={getRoleLabelForEmployee}
           canEdit={canEdit}
@@ -478,10 +516,12 @@ export default function EmployeesSection() {
               : null
           }
           emptyMessage={getEmptyMessage()}
+          searchActive={searchActive}
+          loading={Boolean(cloudMode && listLoading)}
         />
       )}
 
-      {cloudMode && totalPages > 1 && (
+      {cloudMode && !hasSearch && totalPages > 1 && (
         <div className="admin-toolbar">
           <button
             type="button"

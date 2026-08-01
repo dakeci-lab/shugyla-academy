@@ -1,3 +1,15 @@
+.employees-section__error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.employees-section__error .admin-form__error {
+  margin: 0;
+}
+
 .employees-section__toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
