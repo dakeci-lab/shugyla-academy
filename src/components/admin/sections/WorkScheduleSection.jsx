@@ -9,6 +9,10 @@ import {
   participatesInStoreSchedule,
 } from '../../../utils/employeeData'
 import {
+  flattenEmployeeOrganization,
+  groupEmployeesByPositionStructure,
+} from '../../../utils/employeeOrganizationStructure'
+import {
   shiftsToMap,
   toDateKey,
   formatWeekRangeLabel,
@@ -103,10 +107,12 @@ export default function WorkScheduleSection() {
       list = list.filter((emp) => Number(emp.id) === selfEmployeeId)
     }
     const q = search.trim().toLowerCase()
-    return list.filter((emp) => {
+    const filtered = list.filter((emp) => {
       if (!q) return true
       return emp.name.toLowerCase().includes(q)
     })
+    // Flat organisational order (group → position → FIO). No visual group headers.
+    return flattenEmployeeOrganization(groupEmployeesByPositionStructure(filtered))
   }, [search, viewTeam, selfEmployeeId, loadedEmployees])
 
   const syncUrl = useCallback(

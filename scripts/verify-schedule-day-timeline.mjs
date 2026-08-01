@@ -146,6 +146,15 @@ function main() {
     'no positionOrder hardcode',
     !section.includes('positionOrder') && !timeline.includes("['Администратор'")
   )
+  assert(
+    'organisational order via shared helper',
+    section.includes('groupEmployeesByPositionStructure') &&
+      section.includes('flattenEmployeeOrganization')
+  )
+  assert(
+    'timeline preserves employees prop order',
+    timeline.includes('(employees || []).map') && !/\.sort\s*\(/.test(timeline)
+  )
   assert('reuses employee editor navigation', section.includes('openEmployeeSchedule'))
 
   console.log(`\nSchedule day timeline verification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
