@@ -97,3 +97,70 @@ export function buildPositionFieldsFromCatalog(positionId, legacyPosition = '') 
     positionGroupIsActive: null,
   }
 }
+
+/**
+ * Grouped options for employee position select.
+ * Active assignable positions only, plus optional current (possibly archived) position.
+ */
+export function buildPositionSelectGroups({
+  currentPositionId = null,
+  includeArchivedCurrent = true,
+} = {}) {
+  if (!cache) return []
+
+  const active = getFlatPositions({ includeArchived: false })
+  const groupsMap = new Map()
+
+  for (const position of active) {
+    const groupKey = position.groupId || '__ungrouped__'
+    if (!groupsMap.has(groupKey)) {
+      groupsMap.set(groupKey, {
+        groupId: position.groupId,
+        groupName: position.groupName || 'Без группы',
+        groupSortOrder: Number(position.groupSortOrder ?? 100),
+        groupIsActive: position.groupIsActive !== false,
+        positions: [],
+      })
+    }
+    groupsMap.get(groupKey).positions.push(position)
+  }
+
+  if (includeArchivedCurrent && currentPositionId) {
+    const current = getPositionById(currentPositionId)
+    const alreadyListed = active.some((row) => row.id === currentPositionId)
+    if (current && !alreadyListed) {
+      const groupKey = current.groupId || '__ungrouped__'
+      if (!groupsMap.has(groupKey)) {
+        groupsMap.set(groupKey, {
+          groupId: current.groupId,
+          groupName: current.groupName || 'Без группы',
+          groupSortOrder: Number(current.groupSortOrder ?? 100),
+          groupIsActive: current.groupIsActive !== false,
+          positions: [],
+        })
+      }
+      groupsMap.get(groupKey).positions.push({
+        ...current,
+        __isCurrentArchived: true,
+      })
+    }
+  }
+
+  return [...groupsMap.values()]
+    .map((group) => ({
+      ...group,
+      positions: [...group.positions].sort(sortByOrderThenName),
+    }))
+    .sort((a, b) => {
+      const orderCmp = Number(a.groupSortOrder) - Number(b.groupSortOrder)
+      if (orderCmp !== 0) return orderCmp
+      return String(a.groupName || '').localeCompare(String(b.groupName || ''), 'ru')
+    })
+}
+
+export function isPositionAssignable(positionId) {
+  if (!positionId) return false
+  const position = getPositionById(positionId)
+  if (!position) return false
+  return position.isActive === true && position.groupIsActive !== false
+}

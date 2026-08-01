@@ -75,7 +75,8 @@ function main() {
   assert('auth session includes positionId', authService.includes('positionId: employee.positionId'))
   assert('adapter loads catalog once', adapter.includes('ensurePositionCatalogLoaded'))
   assert('adapter migrates local schema', adapter.includes('migrateEmployeeLocalSchema'))
-  assert('local modal update does not set position from role', !modal.includes("position: selectedRole?.name || getRoleLabel(roleCode),\n            employmentStatus: form.employmentStatus,\n            hiredAt"))
+  assert('modal create/update does not set position from role name', !modal.includes('position: selectedRole'))
+  assert('modal sends explicit positionId on create', modal.includes('positionId: form.positionId'))
   assert('verify script registered', pkg.includes('verify:position-structure-data-layer'))
   assert('no Stage 3 org-structure UI', !fs.existsSync(path.join(ROOT, 'src/pages/platform/PositionStructurePage.jsx')))
 

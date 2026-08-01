@@ -54,10 +54,12 @@ function main() {
   assert('modal skips empty diff', modal.includes("Object.keys(changes).length === 0"))
   assert('error mentions основной статус', service.includes('основной статус'))
   assert('role hint for self', modal.includes('Собственную роль нельзя изменить'))
+  assert('position hint for self', modal.includes('Собственную должность нельзя изменить'))
   assert('status hint for self', modal.includes('Собственный статус сотрудника нельзя изменить'))
   assert('verify script registered', pkg.includes('verify:employee-self-edit'))
   assert('edge ignores legacy position without id', edge.includes('legacy_position_text_ignored'))
   assert('edge blocks self position change', edge.includes('Self-edit must not change position'))
+  assert('diff omits self positionId', data.includes('if (!editingSelf)') && data.includes('changes.positionId'))
 
   // Lightweight behavioral mirror of the diff helper contract
   assert(

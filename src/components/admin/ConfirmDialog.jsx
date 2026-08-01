@@ -40,7 +40,9 @@ export default function ConfirmDialog({
         </>
       }
     >
-      <p className="confirm-dialog__message">{message}</p>
+      <div className="confirm-dialog__message" style={{ whiteSpace: 'pre-line' }}>
+        {message}
+      </div>
     </AdminModal>
   )
 }

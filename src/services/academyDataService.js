@@ -79,7 +79,6 @@ import {
   getCandidateByIdSync,
   generateUniqueVacancySlug,
   CANDIDATE_STATUS,
-  getVacancyRoleLabel,
   getVacancyEmployeeRole,
 } from '../utils/recruitmentData'
 import {
@@ -559,7 +558,9 @@ export async function createEmployee(data) {
       lastName: data.lastName,
       fullName,
       roleId: data.roleId,
-      position: data.position,
+      positionId: data.positionId || data.position_id || undefined,
+      // Legacy text only as last-resort fallback for old callers; new UI sends positionId.
+      position: data.positionId ? undefined : data.position,
       avatarUrl: data.avatarUrl,
       sourceCandidateId: data.sourceCandidateId,
     })
@@ -1384,12 +1385,17 @@ export async function hireCandidateAsUser(candidateId, userData, options = {}) {
   const vacancy = candidate.vacancyId ? getVacancyByIdSync(candidate.vacancyId) : null
   const role = userData.role || getVacancyEmployeeRole(vacancy) || 'cashier'
   const asTrainee = options.asTrainee !== false && userData.employmentStatus !== EMPLOYMENT_STATUS.ACTIVE
+  const positionId = userData.positionId || userData.position_id || null
+  if (!positionId) {
+    throw new Error('Укажите должность сотрудника')
+  }
 
   const employeePayload = {
     firstName: userData.firstName || candidate.firstName,
     lastName: userData.lastName || candidate.lastName,
-    position: getVacancyRoleLabel(role),
+    positionId,
     role,
+    roleId: userData.roleId || null,
     login: userData.login,
     password: userData.password,
     employmentStatus: userData.employmentStatus || EMPLOYMENT_STATUS.ACTIVE,

@@ -1,3 +1,40 @@
+.employee-form-section {
+  margin: 0 0 16px;
+  padding: 12px 14px 4px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.employee-form-section__legend {
+  padding: 0 6px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+}
+
+.employee-form-section__note {
+  margin: 0 0 12px;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.employee-form-catalog-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+
+.employee-form-position-link {
+  display: block;
+}
+
+.employee-form-position-link a {
+  color: var(--color-primary-dark, #047857);
+}
+
 .employees-modal-footer {
   display: flex;
   flex-wrap: wrap;

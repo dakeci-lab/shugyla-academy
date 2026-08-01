@@ -676,6 +676,7 @@ export const EMPTY_EMPLOYEE_FORM = {
   lastName: '',
   role: ROLE_IDS.CASHIER,
   roleId: '',
+  positionId: '',
   login: '',
   password: '',
   avatarUrl: '',
@@ -693,6 +694,7 @@ export function employeeToForm(employee) {
     lastName: employee.lastName || '',
     role: employee.role || ROLE_IDS.CASHIER,
     roleId: employee.roleId || '',
+    positionId: employee.positionId || '',
     login: employee.login || '',
     password: '',
     avatarUrl: employee.avatarUrl || '',
@@ -705,7 +707,7 @@ export function employeeToForm(employee) {
   }
 }
 
-export function validateEmployeeForm(form, editId = null) {
+export function validateEmployeeForm(form, editId = null, { requirePositionId = false } = {}) {
   if (!form.firstName?.trim()) {
     return 'Укажите имя сотрудника'
   }
@@ -715,6 +717,12 @@ export function validateEmployeeForm(form, editId = null) {
   if (!editId && !form.password?.trim()) {
     return 'Укажите пароль'
   }
+  if (!editId && !form.roleId) {
+    return 'Укажите роль в системе'
+  }
+  if ((requirePositionId || !editId) && !form.positionId) {
+    return 'Укажите должность'
+  }
   if (editId && !toEmployeeDateKey(form.hiredAt)) {
     return 'Укажите дату приёма на работу'
   }
@@ -722,6 +730,26 @@ export function validateEmployeeForm(form, editId = null) {
     return 'Сотрудник с таким логином уже существует'
   }
   return null
+}
+
+/** Display helpers for employee position / role separation in UI. */
+export function getEmployeePositionLabel(employee) {
+  if (!employee) return ''
+  if (employee.positionId && employee.positionName) return employee.positionName
+  if (employee.positionName) return employee.positionName
+  if (employee.positionId && employee.position) return employee.position
+  if (employee.positionId) return ''
+  return employee.position || ''
+}
+
+export function getEmployeePositionGroupLabel(employee) {
+  if (!employee) return ''
+  return employee.positionGroupName || ''
+}
+
+export function isEmployeePositionUnlinked(employee) {
+  if (!employee) return false
+  return !employee.positionId && Boolean(employee.position)
 }
 
 function normEmployeeText(value) {
@@ -765,14 +793,6 @@ export function buildEmployeeCloudUpdateChanges(
   if (normEmployeeText(next.lastName) !== normEmployeeText(employee.lastName)) {
     changes.lastName = next.lastName
   }
-  // Explicit positionId only — never derive from selectedRole.name.
-  if (
-    next.positionId != null &&
-    next.positionId !== '' &&
-    normEmployeeText(next.positionId) !== normEmployeeText(employee.positionId)
-  ) {
-    changes.positionId = next.positionId
-  }
   if (normEmployeeText(next.avatarUrl) !== normEmployeeText(employee.avatarUrl)) {
     changes.avatarUrl = next.avatarUrl
   }
@@ -796,6 +816,14 @@ export function buildEmployeeCloudUpdateChanges(
   }
 
   if (!editingSelf) {
+    // Explicit positionId only — never derive from selectedRole.name.
+    if (
+      next.positionId != null &&
+      next.positionId !== '' &&
+      normEmployeeText(next.positionId) !== normEmployeeText(employee.positionId)
+    ) {
+      changes.positionId = next.positionId
+    }
     if (normEmployeeText(next.roleId) !== normEmployeeText(employee.roleId)) {
       changes.roleId = next.roleId
     }

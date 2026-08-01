@@ -212,12 +212,12 @@ export default function EmployeeProfileSection({ employeeId }) {
           setRoleLabel(
             role
               ? formatRoleDisplayLabel(role, roles)
-              : nextEmployee.position || getRoleLabel(nextEmployee.role)
+              : getRoleLabel(nextEmployee.role)
           )
         }
       } catch {
         if (mountedRef.current) {
-          setRoleLabel(nextEmployee.position || getRoleLabel(nextEmployee.role))
+          setRoleLabel(getRoleLabel(nextEmployee.role))
         }
       }
     } catch (err) {

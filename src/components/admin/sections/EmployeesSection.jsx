@@ -309,6 +309,8 @@ export default function EmployeesSection() {
     }
 
     const vacancy = candidate.vacancyId ? getVacancyById(candidate.vacancyId) : null
+    // Prefill RBAC role from vacancy.employeeRole only when explicitly set.
+    // Never invent positionId from vacancy title / role label.
     const role = getVacancyEmployeeRole(vacancy) || EMPTY_EMPLOYEE_FORM.role
 
     if (candidateChanged) {
@@ -319,6 +321,8 @@ export default function EmployeesSection() {
         firstName: candidate.firstName || '',
         lastName: candidate.lastName || '',
         role,
+        roleId: '',
+        positionId: '',
         avatarUrl: candidate.photoUrl || '',
         employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
       })

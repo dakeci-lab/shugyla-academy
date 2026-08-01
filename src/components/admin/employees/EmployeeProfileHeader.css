@@ -37,6 +37,14 @@
   margin: 4px 0 0;
   color: var(--color-text-secondary, #64748b);
   font-size: 0.95rem;
+  overflow-wrap: anywhere;
+}
+
+.employee-profile-header__legacy-position {
+  margin: 2px 0 0;
+  color: var(--color-text-secondary, #64748b);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
 }
 
 .employee-profile-header__status {
