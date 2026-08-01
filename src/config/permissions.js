@@ -56,7 +56,7 @@ export const ROUTE_KEYS = {
 
 const ALL_PLATFORM_ROLES = [
   ROLE_IDS.ADMIN,
-  ROLE_IDS.PURCHASER,
+  ROLE_IDS.BUYER,
   ROLE_IDS.RECEIVER,
   ROLE_IDS.FLOOR_ADMIN,
   ROLE_IDS.CASHIER,
@@ -67,7 +67,7 @@ const STAFF_EMPLOYEES_ROLES = [
   ROLE_IDS.FLOOR_ADMIN,
   ROLE_IDS.CASHIER,
   ROLE_IDS.SELLER,
-  ROLE_IDS.PURCHASER,
+  ROLE_IDS.BUYER,
   ROLE_IDS.RECEIVER,
 ]
 
@@ -83,28 +83,28 @@ const ROUTE_ACCESS = {
   [ROUTE_KEYS.HR_CANDIDATES]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.PROCUREMENT_GROUP]: [
     ROLE_IDS.ADMIN,
-    ROLE_IDS.PURCHASER,
+    ROLE_IDS.BUYER,
     ROLE_IDS.RECEIVER,
   ],
-  [ROUTE_KEYS.PROCUREMENT]: [ROLE_IDS.ADMIN, ROLE_IDS.PURCHASER],
+  [ROUTE_KEYS.PROCUREMENT]: [ROLE_IDS.ADMIN, ROLE_IDS.BUYER],
   [ROUTE_KEYS.RECEIVING]: [
     ROLE_IDS.ADMIN,
-    ROLE_IDS.PURCHASER,
+    ROLE_IDS.BUYER,
     ROLE_IDS.RECEIVER,
   ],
-  [ROUTE_KEYS.SUPPLIERS]: [ROLE_IDS.ADMIN, ROLE_IDS.PURCHASER],
+  [ROUTE_KEYS.SUPPLIERS]: [ROLE_IDS.ADMIN, ROLE_IDS.BUYER],
   // Settlements: permission-first (umag.settlements.view); role fallback admin-only.
   [ROUTE_KEYS.SETTLEMENTS]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SUPPLIER_PAYMENTS]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.PRODUCTS_GROUP]: [
     ROLE_IDS.ADMIN,
-    ROLE_IDS.PURCHASER,
+    ROLE_IDS.BUYER,
     ROLE_IDS.RECEIVER,
     ROLE_IDS.FLOOR_ADMIN,
   ],
   [ROUTE_KEYS.PRICE_TAGS]: [
     ROLE_IDS.ADMIN,
-    ROLE_IDS.PURCHASER,
+    ROLE_IDS.BUYER,
     ROLE_IDS.RECEIVER,
     ROLE_IDS.FLOOR_ADMIN,
   ],
@@ -427,7 +427,7 @@ export function canEditSimplePurchase(user, order) {
   const role = resolveUserRole(user)
   if (isAdmin(role)) return true
   if (isSimplePurchaseReceived(order)) return false
-  if (role !== ROLE_IDS.PURCHASER) return false
+  if (role !== ROLE_IDS.BUYER) return false
   const author = order?.createdBy ?? order?.created_by ?? ''
   const userKey = user?.login || String(user?.id || '')
   return author === userKey

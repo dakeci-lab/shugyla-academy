@@ -129,8 +129,9 @@ function main() {
   assert('list role column still uses getRoleLabel', employeesSection.includes('getRoleLabel(employee.role)'))
   assert('profile header still uses getRoleLabel for role', header.includes('getRoleLabel(employee.role)'))
   assert('EmployeeEditModal unchanged marker', modal.includes('Должность определяет работу сотрудника'))
-  assert('Wave 2A did not change roles.js buyer map', rolesJs.includes("buyer: ROLE_IDS.PURCHASER"))
-  assert('Wave 2A did not change ROUTE_ACCESS', permissionsJs.includes('const ROUTE_ACCESS'))
+  assert('roles.js purchaser aliases to buyer', rolesJs.includes('purchaser: ROLE_IDS.BUYER'))
+  assert('ROUTE_ACCESS still present', permissionsJs.includes('const ROUTE_ACCESS'))
+  assert('ROUTE_ACCESS uses ROLE_IDS.BUYER', permissionsJs.includes('ROLE_IDS.BUYER'))
   assert('authService roleName still uses role catalog', /roleName:\s*role\?\.label/.test(authService))
   assert('authService session position uses resolveSessionPosition', authService.includes('resolveSessionPosition'))
   assert(

@@ -1,9 +1,9 @@
-import { isAdmin, normalizeRoleId } from '../data/roles'
+import { isAdmin, normalizeRoleId, roleListIncludes } from '../data/roles'
 import { getAllCourses, getActiveCourses } from './adminData'
 import { getEmployeeById, getActiveEmployees } from './employeeData'
 import { isActiveCourseStatus } from './courseData'
 
-/** Только активные курсы для каталога и сотрудников */
+/** Only active courses for catalog and employees */
 export function getPublishedCourses() {
   return getActiveCourses()
 }
@@ -12,7 +12,7 @@ export function getPublishedCourses() {
  * Курсы для сотрудника:
  * - admin — все активные
  * - если назначены assignedCourseIds — только они (активные)
- * - иначе — по роли allowedRoles
+ * - иначе — по роли allowedRoles (buyer/purchaser compatibility via normalize)
  */
 export function getCoursesForEmployee(employeeOrId) {
   const employee =
@@ -35,7 +35,7 @@ export function getCoursesForEmployee(employeeOrId) {
     return published.filter((c) => assigned.includes(c.id))
   }
 
-  return published.filter((c) => c.allowedRoles?.includes(role))
+  return published.filter((c) => roleListIncludes(c.allowedRoles, role))
 }
 
 /** Может ли сотрудник открыть курс */
@@ -50,7 +50,7 @@ export function canEmployeeAccessCourse(employee, course) {
     return assigned.includes(course.id)
   }
 
-  return Array.isArray(course.allowedRoles) && course.allowedRoles.includes(role)
+  return roleListIncludes(course.allowedRoles, role)
 }
 
 /** Активные курсы для назначения в админке */

@@ -36,7 +36,7 @@ export const USERS = [
     login: 'zakup',
     password: '123456',
     name: 'Ерлан Толеуов',
-    role: 'purchaser',
+    role: 'buyer',
   },
   {
     id: 6,

@@ -6,7 +6,7 @@ import { useLanguage } from '../../context/LanguageContext'
 import { useAcademyData } from '../../context/AcademyDataContext'
 import { isCloudMode } from '../../lib/dataMode'
 import { isModuleReady, isModuleLoading, getModuleError } from '../../lib/cloudStore'
-import { normalizeRoleId } from '../../data/roles'
+import { normalizeRoleId, roleListIncludes } from '../../data/roles'
 import CategoryFilter from '../CategoryFilter'
 import CourseCard from '../CourseCard'
 import '../../pages/Academy.css'
@@ -36,13 +36,13 @@ export default function AcademyCatalogContent() {
       if (activeCategory !== 'all' && course.category !== activeCategory) return false
 
       if (roleFilter !== 'all') {
-        return course.allowedRoles?.includes(roleFilter)
+        return roleListIncludes(course.allowedRoles, roleFilter)
       }
 
       if (userRole) {
         return (
-          course.allowedRoles?.includes(userRole) ||
-          course.allowedRoles?.includes('for_all')
+          roleListIncludes(course.allowedRoles, userRole) ||
+          roleListIncludes(course.allowedRoles, 'for_all')
         )
       }
 
@@ -84,7 +84,7 @@ export default function AcademyCatalogContent() {
               <option value="seller">Продавец</option>
               <option value="floor_admin">Администратор</option>
               <option value="receiver">Приёмщик</option>
-              <option value="purchaser">Закупщик</option>
+              <option value="buyer">Закупщик</option>
               <option value="for_all">Для всех</option>
             </select>
           </label>

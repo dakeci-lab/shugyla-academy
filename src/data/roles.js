@@ -1,5 +1,8 @@
 /**
  * Система ролей Shugyla Platform + Academy
+ *
+ * Production access-role canonical for procurement staff: `buyer`.
+ * `purchaser` remains a legacy compatibility code (inactive DB role / old content).
  */
 
 export const PERMISSIONS = {
@@ -24,6 +27,8 @@ export const PERMISSION_LABELS = {
 
 export const ROLE_IDS = {
   ADMIN: 'admin',
+  BUYER: 'buyer',
+  /** Legacy compatibility code. New assignments and frontend defaults use ROLE_IDS.BUYER. */
   PURCHASER: 'purchaser',
   RECEIVER: 'receiver',
   FLOOR_ADMIN: 'floor_admin',
@@ -31,22 +36,44 @@ export const ROLE_IDS = {
   SELLER: 'seller',
 }
 
-/** @deprecated используйте ROLE_IDS.PURCHASER */
-export const BUYER = ROLE_IDS.PURCHASER
+/** Canonical production procurement role code. */
+export const BUYER = ROLE_IDS.BUYER
 
+/**
+ * Legacy role-code aliases → current frontend canonical.
+ * purchaser (inactive DB / old PWA / old Academy content) maps to buyer.
+ */
 const LEGACY_ROLE_ALIASES = {
-  buyer: ROLE_IDS.PURCHASER,
+  purchaser: ROLE_IDS.BUYER,
 }
 
-/** Нормализация legacy-идентификаторов ролей */
+/** Нормализация legacy-идентификаторов ролей (не мутирует input, не трогает role_id). */
 export function normalizeRoleId(roleId) {
-  if (!roleId) return null
-  return LEGACY_ROLE_ALIASES[roleId] || roleId
+  if (roleId == null || roleId === '') return null
+  const normalized = String(roleId).trim()
+  if (!normalized) return null
+  return LEGACY_ROLE_ALIASES[normalized] || normalized
+}
+
+/** True when two role codes refer to the same access role after compatibility normalize. */
+export function roleIdsMatch(a, b) {
+  const left = normalizeRoleId(a)
+  const right = normalizeRoleId(b)
+  if (left == null || right == null) return false
+  return left === right
+}
+
+/** Membership check that normalizes both the needle and list entries (no mutation). */
+export function roleListIncludes(list, roleId) {
+  if (!Array.isArray(list)) return false
+  const target = normalizeRoleId(roleId)
+  if (target == null) return false
+  return list.some((item) => normalizeRoleId(item) === target)
 }
 
 /** Роли, назначаемые сотрудникам (кроме admin) */
 export const ALL_EMPLOYEE_ROLES = [
-  ROLE_IDS.PURCHASER,
+  ROLE_IDS.BUYER,
   ROLE_IDS.RECEIVER,
   ROLE_IDS.FLOOR_ADMIN,
   ROLE_IDS.CASHIER,
@@ -73,8 +100,8 @@ export const ROLES = {
       PERMISSIONS.PASS_TESTS,
     ],
   },
-  [ROLE_IDS.PURCHASER]: {
-    id: ROLE_IDS.PURCHASER,
+  [ROLE_IDS.BUYER]: {
+    id: ROLE_IDS.BUYER,
     label: 'Закупщик',
     description: 'Закуп, приёмка, поставщики и ценники.',
     permissions: [PERMISSIONS.VIEW_OWN_COURSES, PERMISSIONS.PASS_TESTS],
@@ -116,7 +143,7 @@ export const CATEGORIES = [
   { id: ROLE_IDS.CASHIER, label: 'Кассир' },
   { id: ROLE_IDS.FLOOR_ADMIN, label: 'Администратор торгового зала' },
   { id: ROLE_IDS.SELLER, label: 'Продавец' },
-  { id: ROLE_IDS.PURCHASER, label: 'Закупщик' },
+  { id: ROLE_IDS.BUYER, label: 'Закупщик' },
   { id: ROLE_IDS.RECEIVER, label: 'Приёмщик' },
   { id: 'for_all', label: 'Для всех' },
   { id: 'onboarding', label: 'Введение' },
@@ -130,7 +157,7 @@ export const ACADEMY_COURSE_ROLES = [
   { id: ROLE_IDS.SELLER, label: 'Продавец' },
   { id: ROLE_IDS.FLOOR_ADMIN, label: 'Администратор торгового зала' },
   { id: ROLE_IDS.RECEIVER, label: 'Приёмщик' },
-  { id: ROLE_IDS.PURCHASER, label: 'Закупщик' },
+  { id: ROLE_IDS.BUYER, label: 'Закупщик' },
   { id: ROLE_IDS.ADMIN, label: 'Администратор' },
   { id: 'warehouse', label: 'Кладовщик' },
   { id: 'security', label: 'Охранник' },
@@ -142,7 +169,10 @@ export const ACADEMY_COURSE_ROLES = [
 ]
 
 export function getAcademyCourseRoleLabel(roleId) {
-  const found = ACADEMY_COURSE_ROLES.find((r) => r.id === roleId)
+  const normalized = normalizeRoleId(roleId)
+  const found = ACADEMY_COURSE_ROLES.find(
+    (r) => r.id === roleId || r.id === normalized || normalizeRoleId(r.id) === normalized
+  )
   if (found) return found.label
   return getRole(roleId)?.label || roleId || '—'
 }

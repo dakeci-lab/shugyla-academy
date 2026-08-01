@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { getProgressRows } from '../../../utils/adminStats'
-import { ROLES } from '../../../data/roles'
+import { getRoleLabel } from '../../../data/roles'
 import StatusBadge from '../StatusBadge'
 import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
 import '../admin-shared.css'
@@ -54,7 +54,7 @@ export default function ProgressSection() {
               filtered.map((row) => (
                 <tr key={row.employeeId}>
                   <td><strong>{row.employeeName}</strong></td>
-                  <td>{ROLES[row.employeeRole]?.label || row.employeeRole}</td>
+                  <td>{getRoleLabel(row.employeeRole)}</td>
                   <td>{row.coursesLabel}</td>
                   <td>
                     <div className="admin-progress-cell">

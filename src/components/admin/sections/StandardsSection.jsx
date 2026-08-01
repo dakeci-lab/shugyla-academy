@@ -23,7 +23,12 @@ import {
   ROLE_OPTIONS,
   getVisibilityRoleLabels,
 } from '../../../utils/standardsData'
-import { ALL_EMPLOYEE_ROLES, ROLES } from '../../../data/roles'
+import {
+  ALL_EMPLOYEE_ROLES,
+  ROLES,
+  normalizeRoleId,
+  roleListIncludes,
+} from '../../../data/roles'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
 import StatusBadge from '../StatusBadge'
@@ -105,7 +110,7 @@ export default function StandardsSection() {
       if (roleFilter !== 'all') {
         if (!a.visibilityRoles?.length) return roleFilter === 'all_staff'
         if (roleFilter === 'all_staff') return false
-        if (!a.visibilityRoles.includes(roleFilter)) return false
+        if (!roleListIncludes(a.visibilityRoles, roleFilter)) return false
       }
       if (!q) return true
       return (
@@ -143,9 +148,16 @@ export default function StandardsSection() {
 
   function toggleVisibilityRole(roleId) {
     if (articleForm.allRoles) return
-    const roles = articleForm.visibilityRoles.includes(roleId)
-      ? articleForm.visibilityRoles.filter((r) => r !== roleId)
-      : [...articleForm.visibilityRoles, roleId]
+    const canonical = normalizeRoleId(roleId) || roleId
+    const selected = roleListIncludes(articleForm.visibilityRoles, roleId)
+    const roles = selected
+      ? articleForm.visibilityRoles.filter((r) => normalizeRoleId(r) !== canonical)
+      : [
+          ...articleForm.visibilityRoles.filter(
+            (r) => normalizeRoleId(r) !== canonical
+          ),
+          roleId,
+        ]
     setArticleForm({ ...articleForm, visibilityRoles: roles })
   }
 
@@ -547,14 +559,14 @@ export default function StandardsSection() {
                     <label
                       key={role.id}
                       className={`standards-role-chip ${
-                        articleForm.visibilityRoles.includes(role.id)
+                        roleListIncludes(articleForm.visibilityRoles, role.id)
                           ? 'standards-role-chip--active'
                           : ''
                       }`}
                     >
                       <input
                         type="checkbox"
-                        checked={articleForm.visibilityRoles.includes(role.id)}
+                        checked={roleListIncludes(articleForm.visibilityRoles, role.id)}
                         onChange={() => toggleVisibilityRole(role.id)}
                       />
                       {role.label}

@@ -72,17 +72,34 @@ export const VACANCY_ROLE_LABELS = {
   cashier: 'Кассир',
   seller: 'Продавец',
   floor_admin: 'Администратор торгового зала',
-  purchaser: 'Закупщик',
   buyer: 'Закупщик',
+  // Legacy read compatibility — not offered as a new selection option.
+  purchaser: 'Закупщик',
   receiver: 'Приёмщик',
   loader: 'Грузчик',
   admin: 'Админ',
 }
 
-export const VACANCY_ROLES = Object.keys(VACANCY_ROLE_LABELS)
+/** New vacancy role selections — canonical buyer, no duplicate purchaser option. */
+export const VACANCY_ROLES = [
+  'cashier',
+  'seller',
+  'floor_admin',
+  'buyer',
+  'receiver',
+  'loader',
+  'admin',
+]
 
 export function getVacancyRoleLabel(role) {
-  return VACANCY_ROLE_LABELS[role] || ROLES[role]?.label || role || '—'
+  if (!role) return '—'
+  return (
+    VACANCY_ROLE_LABELS[role] ||
+    VACANCY_ROLE_LABELS[normalizeRoleId(role)] ||
+    ROLES[normalizeRoleId(role)]?.label ||
+    role ||
+    '—'
+  )
 }
 
 export function generateUniqueVacancySlug(title, vacancies, excludeId = null) {

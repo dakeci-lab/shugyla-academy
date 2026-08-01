@@ -19,6 +19,8 @@ import {
   CATEGORIES,
   ACADEMY_COURSE_ROLES,
   getAcademyCourseRoleLabel,
+  normalizeRoleId,
+  roleListIncludes,
 } from '../../../data/roles'
 import { getCategoryLabel } from '../../../utils/i18n'
 import { getLessonsForCourse } from '../../../utils/lessonData'
@@ -77,7 +79,9 @@ export default function CoursesSection() {
     return courses.filter((course) => {
       if (statusFilter !== 'all' && course.status !== statusFilter) return false
       if (categoryFilter !== 'all' && course.category !== categoryFilter) return false
-      if (roleFilter !== 'all' && !course.allowedRoles?.includes(roleFilter)) return false
+      if (roleFilter !== 'all' && !roleListIncludes(course.allowedRoles, roleFilter)) {
+        return false
+      }
       if (q && !course.title.toLowerCase().includes(q)) return false
       return true
     })
@@ -107,9 +111,14 @@ export default function CoursesSection() {
   }
 
   function toggleRole(roleId) {
-    const roles = form.allowedRoles.includes(roleId)
-      ? form.allowedRoles.filter((r) => r !== roleId)
-      : [...form.allowedRoles, roleId]
+    const canonical = normalizeRoleId(roleId) || roleId
+    const selected = roleListIncludes(form.allowedRoles, roleId)
+    const roles = selected
+      ? form.allowedRoles.filter((r) => normalizeRoleId(r) !== canonical)
+      : [
+          ...form.allowedRoles.filter((r) => normalizeRoleId(r) !== canonical),
+          roleId,
+        ]
     setForm({ ...form, allowedRoles: roles.length ? roles : [roleId] })
   }
 
@@ -423,14 +432,14 @@ export default function CoursesSection() {
                   <label
                     key={role.id}
                     className={`admin-form__role-chip ${
-                      form.allowedRoles.includes(role.id)
+                      roleListIncludes(form.allowedRoles, role.id)
                         ? 'admin-form__role-chip--active'
                         : ''
                     }`}
                   >
                     <input
                       type="checkbox"
-                      checked={form.allowedRoles.includes(role.id)}
+                      checked={roleListIncludes(form.allowedRoles, role.id)}
                       onChange={() => toggleRole(role.id)}
                     />
                     {role.label}

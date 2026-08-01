@@ -6,7 +6,7 @@ import {
 } from '../lib/cloudStore'
 import { getLocalStandardsBundle } from '../services/standardsLocalAdapter'
 import { getActiveEmployees } from './employeeData'
-import { ROLES, ALL_EMPLOYEE_ROLES } from '../data/roles'
+import { ALL_EMPLOYEE_ROLES, getRoleLabel, roleListIncludes, ROLES } from '../data/roles'
 
 export const CATEGORY_STATUS = {
   ACTIVE: 'active',
@@ -198,7 +198,7 @@ export function getArticleReadsSync(articleId) {
 export function isArticleVisibleToRole(article, role) {
   if (!article || article.status !== ARTICLE_STATUS.PUBLISHED) return false
   if (!article.visibilityRoles?.length) return true
-  return article.visibilityRoles.includes(role)
+  return roleListIncludes(article.visibilityRoles, role)
 }
 
 export function isArticleVisibleToUser(article, user) {
@@ -224,7 +224,7 @@ export function getPublishedStandardArticlesForUserSync(user) {
 export function getEligibleEmployeesForArticle(article) {
   const employees = getActiveEmployees()
   if (!article.visibilityRoles?.length) return employees
-  return employees.filter((emp) => article.visibilityRoles.includes(emp.role))
+  return employees.filter((emp) => roleListIncludes(article.visibilityRoles, emp.role))
 }
 
 export function getStandardArticleReadStatsSync(articleId) {
@@ -249,7 +249,7 @@ export function getStandardArticleReadStatsSync(articleId) {
       userId: emp.id,
       name: emp.name,
       role: emp.role,
-      roleLabel: ROLES[emp.role]?.label || emp.role,
+      roleLabel: getRoleLabel(emp.role),
       acknowledged: Boolean(read?.acknowledged),
       readAt: read?.readAt || null,
       acknowledgedAt: read?.acknowledgedAt || null,
@@ -289,7 +289,7 @@ export function getUserStandardsSummary(userId, user) {
 
 export function getVisibilityRoleLabels(article) {
   if (!article.visibilityRoles?.length) return ['Все сотрудники']
-  return article.visibilityRoles.map((roleId) => ROLES[roleId]?.label || roleId)
+  return article.visibilityRoles.map((roleId) => getRoleLabel(roleId) || roleId)
 }
 
 export function searchArticles(articles, query) {

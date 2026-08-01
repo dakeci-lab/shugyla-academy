@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { roleListIncludes } from '../../data/roles'
 import { getAllCourses } from '../../utils/adminData'
 import {
   getLearningPathCourses,
@@ -32,7 +33,7 @@ export default function LearningPathCourseEditor({ pathId, pathRole }) {
   const availableCourses = allCourses.filter((course) => {
     if (pathCourses.some((pc) => pc.courseId === course.id)) return false
     if (pathRole && course.allowedRoles?.length) {
-      return course.allowedRoles.includes(pathRole)
+      return roleListIncludes(course.allowedRoles, pathRole)
     }
     return true
   })

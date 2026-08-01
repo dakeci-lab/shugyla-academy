@@ -248,8 +248,12 @@ export async function login(loginValue, password) {
 /** Курсы по роли (legacy — для admin stats fallback) */
 export function getCoursesForRole(roleId) {
   if (isAdmin(roleId)) return getAllCourses()
+  const normalizedRole = normalizeRoleId(roleId)
   return getAllCourses().filter(
-    (c) => c.status === 'published' && c.allowedRoles?.includes(roleId)
+    (c) =>
+      c.status === 'published' &&
+      Array.isArray(c.allowedRoles) &&
+      c.allowedRoles.some((allowed) => normalizeRoleId(allowed) === normalizedRole)
   )
 }
 
@@ -268,7 +272,11 @@ export function canAccessCourse(userOrRole, course) {
   if (typeof userOrRole === 'string') {
     if (isAdmin(userOrRole)) return true
     if (course.status !== 'published') return false
-    return course.allowedRoles?.includes(userOrRole)
+    const normalizedRole = normalizeRoleId(userOrRole)
+    return (
+      Array.isArray(course.allowedRoles) &&
+      course.allowedRoles.some((allowed) => normalizeRoleId(allowed) === normalizedRole)
+    )
   }
 
   const employee = getEmployeeById(userOrRole.id) || userOrRole

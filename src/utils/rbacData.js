@@ -3,6 +3,7 @@ import {
   RBAC_DEFAULT_ROLE_PERMISSIONS,
   RBAC_SYSTEM_ROLES,
 } from '../config/permissionCatalog'
+import { normalizeRoleId } from '../data/roles'
 
 function genStableId(prefix, code) {
   return `${prefix}-${code}`
@@ -106,7 +107,11 @@ export function getPermissionCodesForRole(roleId, roles, rolePermissions, permis
 }
 
 export function getPermissionCodesForRoleCode(roleCode, roles, rolePermissions, permissions) {
-  const role = roles.find((item) => item.code === roleCode)
+  const normalized = normalizeRoleId(roleCode) || roleCode
+  const role =
+    roles.find((item) => item.code === roleCode) ||
+    roles.find((item) => item.code === normalized) ||
+    roles.find((item) => normalizeRoleId(item.code) === normalized)
   if (!role) return []
   return getPermissionCodesForRole(role.id, roles, rolePermissions, permissions)
 }

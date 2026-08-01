@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { isCloudMode } from '../../../lib/dataMode'
 import { getEmployeeProfilePath } from '../../../config/permissions'
 import { getEmployeePositionDisplay } from '../../../utils/employeeData'
+import { normalizeRoleId } from '../../../data/roles'
 import { formatMonthYearLabel } from '../../../utils/shiftData'
 import {
   SALARY_ALLOWANCE_PRESETS,
@@ -416,7 +417,12 @@ export default function PayrollSection() {
     const q = search.trim().toLowerCase()
     return employees
       .filter((emp) => {
-        if (appliedRoleId && emp.role !== appliedRoleId) return false
+        if (
+          appliedRoleId &&
+          normalizeRoleId(emp.role) !== normalizeRoleId(appliedRoleId)
+        ) {
+          return false
+        }
         const participation = normalizePayrollParticipation(emp.payrollParticipation)
         if (appliedParticipation !== 'all' && participation !== appliedParticipation) {
           return false
@@ -458,7 +464,12 @@ export default function PayrollSection() {
   const draftPreviewCount = useMemo(() => {
     const q = search.trim().toLowerCase()
     return employees.filter((emp) => {
-      if (draftRoleId && emp.role !== draftRoleId) return false
+      if (
+        draftRoleId &&
+        normalizeRoleId(emp.role) !== normalizeRoleId(draftRoleId)
+      ) {
+        return false
+      }
       const participation = normalizePayrollParticipation(emp.payrollParticipation)
       if (draftParticipation !== 'all' && participation !== draftParticipation) {
         return false

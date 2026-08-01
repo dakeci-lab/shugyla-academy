@@ -63,8 +63,8 @@ export const COURSES = [
     title: 'Система закупа и работа с поставщиками',
     description:
       'Процесс закупа товаров, ведение переговоров с поставщиками, контроль поставок и документооборот.',
-    category: 'purchaser',
-    allowedRoles: [ROLE_IDS.PURCHASER, ROLE_IDS.ADMIN],
+    category: 'buyer',
+    allowedRoles: [ROLE_IDS.BUYER, ROLE_IDS.ADMIN],
     duration: '4 часа',
     lessonsCount: 6,
     blocksCount: 3,
