@@ -84,6 +84,9 @@ export const PERMISSION_CODES = {
   SETTINGS_VIEW: 'settings.view',
   SETTINGS_MANAGE: 'settings.manage',
   NOTIFICATIONS_MANAGE: 'notifications.manage',
+
+  POSITIONS_VIEW: 'positions.view',
+  POSITIONS_MANAGE: 'positions.manage',
 }
 
 /** @deprecated используйте PERMISSION_CODES */
@@ -128,6 +131,7 @@ export const PERMISSION_MODULES = {
   products: 'Товары',
   payroll: 'Зарплата',
   finance: 'Финансы',
+  positions: 'Организационная структура',
   settings: 'Настройки',
 }
 
@@ -148,6 +152,7 @@ export const RBAC_MATRIX_MODULES = [
   'products',
   'standards',
   'academy',
+  'positions',
   'settings',
   'roles',
 ]
@@ -247,6 +252,20 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.PAYROLL_MANAGE_SETTINGS, name: 'Настройки зарплаты', module: 'payroll', sortOrder: 142 },
   { code: PERMISSION_CODES.FINANCE_VIEW, name: 'Просмотр финансов', module: 'finance', sortOrder: 150 },
   { code: PERMISSION_CODES.FINANCE_MANAGE, name: 'Управление финансами', module: 'finance', sortOrder: 151 },
+  {
+    code: PERMISSION_CODES.POSITIONS_VIEW,
+    name: 'Просмотр организационной структуры',
+    description: 'Просмотр групп должностей, должностей и их порядка',
+    module: 'positions',
+    sortOrder: 155,
+  },
+  {
+    code: PERMISSION_CODES.POSITIONS_MANAGE,
+    name: 'Управление организационной структурой',
+    description: 'Создание, редактирование, перемещение, архивирование и изменение порядка групп должностей и должностей',
+    module: 'positions',
+    sortOrder: 156,
+  },
   { code: PERMISSION_CODES.SETTINGS_VIEW, name: 'Просмотр настроек', module: 'settings', sortOrder: 160 },
   { code: PERMISSION_CODES.SETTINGS_MANAGE, name: 'Управление настройками', module: 'settings', sortOrder: 161 },
   { code: PERMISSION_CODES.NOTIFICATIONS_MANAGE, name: 'Управление уведомлениями', module: 'settings', sortOrder: 162 },
