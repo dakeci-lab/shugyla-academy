@@ -92,6 +92,7 @@
     "verify:roles-permissions-ui-redesign": "node scripts/verify-roles-permissions-ui-redesign.mjs",
     "verify:position-structure-ui": "node scripts/verify-position-structure-ui.mjs",
     "verify:employee-position-role-separation": "node scripts/verify-employee-position-role-separation.mjs",
+    "verify:session-position-contract": "node scripts/verify-session-position-contract.mjs",
     "verify:employee-organization-structure": "node scripts/verify-employee-organization-structure.mjs"
   },
   "dependencies": {

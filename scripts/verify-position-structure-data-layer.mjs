@@ -72,7 +72,10 @@ function main() {
   assert('admin service writes position_id not bare text', adminService.includes('payloadChanges.position_id') && !adminService.includes('payloadChanges.position = changes.position'))
   assert('catalog service API', catalogService.includes('getFlatPositions') && catalogService.includes('getPositionById'))
   assert('auth profile selects position_id', authService.includes('position_id'))
-  assert('auth session includes positionId', authService.includes('positionId: employee.positionId'))
+  assert(
+    'auth session includes positionId via resolveSessionPosition',
+    authService.includes('resolveSessionPosition') && authService.includes('positionId'),
+  )
   assert('adapter loads catalog once', adapter.includes('ensurePositionCatalogLoaded'))
   assert('adapter migrates local schema', adapter.includes('migrateEmployeeLocalSchema'))
   assert('modal create/update does not set position from role name', !modal.includes('position: selectedRole'))

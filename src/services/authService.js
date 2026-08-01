@@ -23,6 +23,7 @@ import {
 } from '../utils/phoneUtils'
 
 import { getAppUrl } from '../router/basename'
+import { resolveSessionPosition } from '../utils/sessionPosition'
 
 /**
  * Minimal profile columns for Auth login/session restore.
@@ -79,8 +80,7 @@ export function getPasswordResetRedirectUrl() {
 function buildSessionUser(employee, phone = null) {
   const role = getRole(employee.role)
   const loginPhone = phone || technicalEmailToPhone(employee.login) || employee.login
-  const positionLabel =
-    employee.positionName || employee.position || role?.label || employee.role
+  const sessionPosition = resolveSessionPosition(employee)
   return {
     id: employee.id,
     login: employee.login,
@@ -90,11 +90,7 @@ function buildSessionUser(employee, phone = null) {
     role: employee.role,
     roleId: employee.roleId ?? employee.role_id ?? null,
     roleName: role?.label || employee.role,
-    positionId: employee.positionId ?? employee.position_id ?? null,
-    position: positionLabel,
-    positionName: employee.positionName || positionLabel || null,
-    positionGroupId: employee.positionGroupId ?? employee.position_group_id ?? null,
-    positionGroupName: employee.positionGroupName ?? employee.position_group_name ?? null,
+    ...sessionPosition,
     avatarUrl: employee.avatarUrl || null,
     workMode: employee.workMode || employee.work_mode || 'offline',
     permissions: role?.permissions || [],
@@ -563,6 +559,8 @@ async function restoreLegacyPlatformSession(storedSnapshot) {
     roleId: rbacRole.id,
   })
 
+  const sessionPosition = resolveSessionPosition(profile)
+
   return {
     user: {
       id: profile.id,
@@ -571,6 +569,7 @@ async function restoreLegacyPlatformSession(storedSnapshot) {
       role: rbacRole.code,
       roleId: rbacRole.id,
       roleName: rbacRole.name,
+      ...sessionPosition,
       permissions: [],
       permissionCodes,
       permissionSlugs: permissionCodes,
@@ -882,6 +881,7 @@ export async function signInWithEmail(email, password) {
   }
 
   const role = getRole(legacy.user.role)
+  const sessionPosition = resolveSessionPosition(legacy.user)
   return {
     ok: true,
     user: {
@@ -891,8 +891,7 @@ export async function signInWithEmail(email, password) {
       name: legacy.user.name,
       role: legacy.user.role,
       roleName: role?.label || legacy.user.role,
-      positionId: legacy.user.positionId || null,
-      position: legacy.user.position || role?.label || legacy.user.role,
+      ...sessionPosition,
       avatarUrl: legacy.user.avatarUrl || null,
       permissions: role?.permissions || [],
       assignedCourseIds: legacy.user.assignedCourseIds || [],

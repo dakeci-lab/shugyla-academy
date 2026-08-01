@@ -131,7 +131,13 @@ function main() {
   assert('EmployeeEditModal unchanged marker', modal.includes('Должность определяет работу сотрудника'))
   assert('Wave 2A did not change roles.js buyer map', rolesJs.includes("buyer: ROLE_IDS.PURCHASER"))
   assert('Wave 2A did not change ROUTE_ACCESS', permissionsJs.includes('const ROUTE_ACCESS'))
-  assert('Wave 2A did not change authService position fallback (2B)', authService.includes('role?.label'))
+  assert('authService roleName still uses role catalog', /roleName:\s*role\?\.label/.test(authService))
+  assert('authService session position uses resolveSessionPosition', authService.includes('resolveSessionPosition'))
+  assert(
+    'authService no longer uses role as position fallback',
+    !/position:\s*[^\n]*role\?\.label/.test(authService) &&
+      !authService.includes('positionLabel'),
+  )
 
   // Runtime mirror of getEmployeePositionDisplay (avoid importing employeeData → users.js)
   function getEmployeePositionLabelMirror(employee) {
