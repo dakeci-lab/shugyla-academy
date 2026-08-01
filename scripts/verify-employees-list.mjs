@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Verification for simplified employee list toolbar and cards.
+ * Verification for simplified employee list toolbar and flat table.
  *
  * Usage:
  *   npm run verify:employees-list
@@ -72,29 +72,44 @@ function main() {
   assert('desktop filter popover', filter.includes('employee-filter-popover'))
   assert('focus return ref', filter.includes('returnFocusRef={anchorRef}'))
 
-  console.log('Stage 3: Mobile cards')
+  console.log('Stage 3: Flat list + position column')
 
-  const orgList = read('src/components/admin/employees/EmployeeOrganizationList.jsx')
-  assert('mobile cards in organization list', orgList.includes('employee-org-card'))
-  assert('desktop org table', orgList.includes('employee-org-table'))
-  assert('card avatar', orgList.includes('EmployeeAvatar'))
-  assert('card role and login', orgList.includes('Роль:') && orgList.includes('Логин:'))
-  assert('card no trash icon', !orgList.includes('TrashIcon'))
-  assert('card clickable opens profile', orgList.includes('employee-org-card--clickable'))
-  assert('card profile aria label', orgList.includes('Открыть карточку сотрудника'))
-  assert('pencil edit action present', orgList.includes('Редактировать сотрудника'))
+  assert('EmployeeListTable is primary render', section.includes('<EmployeeListTable'))
+  assert('OrganizationList not primary render', !section.includes('<EmployeeOrganizationList'))
+  assert('uses flatten after group sort', section.includes('flattenEmployeeOrganization'))
+  assert('uses group helper for order', section.includes('groupEmployeesByPositionStructure'))
+  assert('position column header', table.includes('>Должность<') || table.includes('Должность</th>'))
+  assert('role column header', table.includes('>Роль<') || table.includes('Роль</th>'))
+  assert(
+    'position column before role',
+    table.indexOf('Должность') < table.indexOf('Роль') && table.indexOf('Должность') > 0
+  )
+  assert('position from structured helper', table.includes('getEmployeePositionLabel'))
+  assert('role via getRoleLabelForEmployee', table.includes('getRoleLabelForEmployee'))
+  assert('missing position fallback', table.includes('Должность не назначена'))
+  assert('archived badge', table.includes('Архивная'))
+  assert('no group headers in table', !table.includes('employee-org__group') && !table.includes('Архивная группа'))
+  assert('no position separator rows', !table.includes('position-row') && !table.includes('employee-org-table__position'))
+  assert('no global shown summary', !section.includes('Показано:') && !table.includes('Показано:'))
+  assert('colgroup present', table.includes('<colgroup>'))
+  assert('fixed table layout', tableCss.includes('table-layout: fixed'))
+  assert('action column fixed width', tableCss.includes('employee-list-table__col-actions'))
+  assert('compact row height', tableCss.includes('height: 58px') || tableCss.includes('height: 56px'))
+
+  console.log('Stage 4: Mobile cards')
+
+  assert('mobile cards component', table.includes('employee-cards'))
+  assert('desktop table preserved', table.includes('employee-list-table-desktop'))
+  assert('card shows position', table.includes('Должность:'))
+  assert('card shows role', table.includes('Роль:'))
+  assert('card avatar', table.includes('EmployeeAvatar'))
+  assert('card no trash icon', !table.includes('TrashIcon'))
+  assert('card clickable opens profile', table.includes('employee-card-item--clickable'))
+  assert('card profile aria label', table.includes('Открыть карточку сотрудника'))
+  assert('pencil edit action present', table.includes('Редактировать сотрудника'))
   assert('no schedule navigation in table', !table.includes('openSchedule'))
   assert('no schedule route in section', !section.includes('/schedule'))
-
-  console.log('Stage 4: Desktop table')
-
-  assert('number column', orgList.includes('employee-org-table__num') || orgList.includes('employee-org-table__col-num'))
-  assert('edit action only', orgList.includes('PencilIcon') && !orgList.includes('TrashIcon'))
-  assert('name link present', orgList.includes('employee-name-link'))
-  assert('row opens profile', orgList.includes('employee-org-table__row--clickable'))
   assert('shared edit modal used by list', section.includes('EmployeeEditModal'))
-  assert('organization list wired', section.includes('EmployeeOrganizationList'))
-  assert('organization grouping helper used', section.includes('groupEmployeesByPositionStructure'))
   assert('safe multi-page search loader', section.includes('loadAllEmployeesForClientSearch'))
   assert('no pageSize 200', !section.includes('pageSize: 200') && !section.includes('CLOUD_SEARCH_PAGE_SIZE'))
 
@@ -114,21 +129,23 @@ function main() {
   assert('hire date in profile', header.includes('Принят на работу') && header.includes('formatEmployeeDateRu'))
   assert('termination date only when fired', header.includes('isTerminatedEmployeeStatus'))
   assert('editable hire date in form', editModal.includes('Дата приёма на работу') && editModal.includes('type="date"'))
-  assert('loading uses organization list skeleton', section.includes('loading={Boolean(cloudMode && listLoading)}'))
+  assert('loading uses list skeleton', table.includes('employee-list__skeleton') || section.includes('loading={Boolean(cloudMode && listLoading)}'))
   assert('inline AdminModal form removed from list', !section.includes('<AdminModal'))
   assert(
     'hotfix 5A.1: no undeclared hasLoadedOnceRef',
     !section.includes('hasLoadedOnceRef') ||
       /const\s+hasLoadedOnceRef\s*=\s*useRef\s*\(/.test(section),
   )
+  assert('empty clear search', table.includes('Очистить поиск'))
+  assert('empty title', table.includes('Сотрудники не найдены'))
 
   console.log('Stage 6: Layout')
 
   assert('toolbar icon size 44px', sectionCss.includes('width: 44px'))
   assert('search min-width zero', sectionCss.includes('min-width: 0'))
-  const orgCss = read('src/components/admin/employees/EmployeeOrganizationList.css')
-  assert('mobile cards breakpoint', orgCss.includes('max-width: 900px'))
+  assert('mobile cards breakpoint', tableCss.includes('max-width: 900px') || tableCss.includes('max-width: 768px'))
   assert('cloud list preserved', section.includes('listEmployeesForAdmin'))
+  assert('neutral hover accent', tableCss.includes('#f4faf6') || tableCss.includes('#F4FAF6'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

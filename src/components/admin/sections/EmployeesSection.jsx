@@ -9,7 +9,10 @@ import {
   isDeactivatedStaffEmployee,
   isActiveStaffEmployee,
 } from '../../../utils/employeeData'
-import { groupEmployeesByPositionStructure } from '../../../utils/employeeOrganizationStructure'
+import {
+  flattenEmployeeOrganization,
+  groupEmployeesByPositionStructure,
+} from '../../../utils/employeeOrganizationStructure'
 import {
   deactivateEmployee,
   restoreEmployee,
@@ -45,7 +48,7 @@ import {
 } from '../../../config/permissions'
 import ConfirmDialog from '../ConfirmDialog'
 import EmployeeFilterPopover from '../employees/EmployeeFilterPopover'
-import EmployeeOrganizationList from '../employees/EmployeeOrganizationList'
+import EmployeeListTable from '../employees/EmployeeListTable'
 import EmployeeEditModal from '../employees/EmployeeEditModal'
 import { PlusIcon } from '../../icons/PlatformIcons'
 import PlatformSearchToolbar, {
@@ -263,8 +266,9 @@ export default function EmployeesSection() {
     })
   }, [cloudMode, cloudEmployees, debouncedSearch, appliedStatus, appliedRoleId, version])
 
-  const organizationGroups = useMemo(
-    () => groupEmployeesByPositionStructure(filteredEmployees),
+  const orderedEmployees = useMemo(
+    () =>
+      flattenEmployeeOrganization(groupEmployeesByPositionStructure(filteredEmployees)),
     [filteredEmployees]
   )
 
@@ -287,7 +291,6 @@ export default function EmployeesSection() {
   const hasSearch = Boolean(debouncedSearch.trim())
   const rowOffset = cloudMode && !hasSearch ? (page - 1) * CLOUD_PAGE_SIZE : 0
   const totalPages = hasSearch ? 1 : cloudPagination?.total_pages ?? 1
-  const searchActive = hasSearch
 
   const searchPlaceholder = isNarrowSearch
     ? 'Поиск по ФИО'
@@ -577,8 +580,8 @@ export default function EmployeesSection() {
       {actionError && <p className="admin-form__error">{actionError}</p>}
 
       {!listError && (
-        <EmployeeOrganizationList
-          groups={organizationGroups}
+        <EmployeeListTable
+          employees={orderedEmployees}
           rowOffset={rowOffset}
           getRoleLabelForEmployee={getRoleLabelForEmployee}
           canEdit={canEdit}
@@ -590,7 +593,6 @@ export default function EmployeesSection() {
           }
           emptyCopy={getEmptyCopy()}
           onClearSearch={() => setSearchInput('')}
-          searchActive={searchActive}
           loading={Boolean(cloudMode && listLoading)}
         />
       )}

@@ -7,6 +7,8 @@ import { PencilIcon } from '../../icons/PlatformIcons'
 import {
   getEmploymentStatusLabel,
   getEmploymentStatusBadgeType,
+  getEmployeePositionLabel,
+  isEmployeePositionUnlinked,
 } from '../../../utils/employeeData'
 import '../IconActionButton.css'
 import './EmployeeListTable.css'
@@ -16,6 +18,41 @@ function displayValue(value) {
   return value
 }
 
+function resolvePositionCell(employee) {
+  const structured = getEmployeePositionLabel(employee)
+  const unlinked = isEmployeePositionUnlinked(employee)
+  if (structured) {
+    return {
+      label: structured,
+      archived: employee.positionIsActive === false || employee.positionGroupIsActive === false,
+      groupTitle: employee.positionGroupName || '',
+      missing: false,
+    }
+  }
+  if (unlinked && employee.position) {
+    return {
+      label: employee.position,
+      archived: false,
+      groupTitle: '',
+      missing: true,
+    }
+  }
+  if (!employee?.positionId) {
+    return {
+      label: 'Должность не назначена',
+      archived: false,
+      groupTitle: '',
+      missing: true,
+    }
+  }
+  return {
+    label: 'Должность не назначена',
+    archived: false,
+    groupTitle: '',
+    missing: true,
+  }
+}
+
 function handleCardKeyDown(event, onOpen, employee) {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
@@ -23,7 +60,7 @@ function handleCardKeyDown(event, onOpen, employee) {
   }
 }
 
-/** Таблица (desktop) и карточки (mobile) сотрудников */
+/** Единая таблица (desktop) и карточки (mobile) сотрудников */
 export default function EmployeeListTable({
   employees,
   rowOffset = 0,
@@ -31,9 +68,10 @@ export default function EmployeeListTable({
   canEdit = false,
   onEdit,
   onOpen,
-  emptyMessage,
-  showHeader = true,
-  compactSection = false,
+  emptyMessage = '',
+  emptyCopy = null,
+  onClearSearch,
+  loading = false,
 }) {
   function openProfile(employee, event) {
     event?.stopPropagation?.()
@@ -45,36 +83,76 @@ export default function EmployeeListTable({
     onEdit?.(employee)
   }
 
+  if (loading && employees.length === 0) {
+    return (
+      <div className="employee-list" aria-busy="true" aria-live="polite">
+        <div className="employee-list__skeleton">
+          {[0, 1, 2, 3, 4].map((index) => (
+            <div key={index} className="employee-list__skeleton-row" />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (!employees.length) {
+    const title = emptyCopy?.title || 'Сотрудники не найдены'
+    const description =
+      emptyCopy?.description || emptyMessage || 'По выбранным условиям сотрудники не найдены.'
+    return (
+      <div className="employee-list-empty" role="status">
+        <div className="employee-list-empty__icon" aria-hidden="true">
+          ⌕
+        </div>
+        <h3 className="employee-list-empty__title">{title}</h3>
+        <p className="employee-list-empty__description">{description}</p>
+        {emptyCopy?.showClearSearch && typeof onClearSearch === 'function' ? (
+          <button type="button" className="btn btn--outline" onClick={onClearSearch}>
+            Очистить поиск
+          </button>
+        ) : null}
+      </div>
+    )
+  }
+
   return (
-    <>
-      <div
-        className={`employee-list-table-desktop${
-          compactSection ? ' employee-list-table-desktop--compact' : ''
-        }`}
-      >
-        <div className="admin-table-wrap">
-          <table className="admin-table">
-            {showHeader ? (
-              <thead>
-                <tr>
-                  <th className="employee-list-table__num-col">№</th>
-                  <th>Сотрудник</th>
-                  <th>Логин</th>
-                  <th>Роль</th>
-                  <th>Статус</th>
-                  <th className="employee-list-table__actions-col">Действия</th>
-                </tr>
-              </thead>
-            ) : null}
+    <div className={`employee-list${loading ? ' employee-list--loading' : ''}`}>
+      {loading ? (
+        <p className="employee-list__loading-hint" role="status">
+          Обновление списка…
+        </p>
+      ) : null}
+
+      <div className="employee-list-table-desktop">
+        <div className="employee-list-table-wrap">
+          <table className="employee-list-table">
+            <colgroup>
+              <col className="employee-list-table__col-num" />
+              <col className="employee-list-table__col-name" />
+              <col className="employee-list-table__col-login" />
+              <col className="employee-list-table__col-position" />
+              <col className="employee-list-table__col-role" />
+              <col className="employee-list-table__col-status" />
+              <col className="employee-list-table__col-actions" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th scope="col">№</th>
+                <th scope="col">Сотрудник</th>
+                <th scope="col">Логин</th>
+                <th scope="col">Должность</th>
+                <th scope="col">Роль</th>
+                <th scope="col">Статус</th>
+                <th scope="col" className="employee-list-table__actions-head">
+                  <span className="visually-hidden">Действия</span>
+                </th>
+              </tr>
+            </thead>
             <tbody>
-              {employees.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="admin-empty">
-                    {emptyMessage}
-                  </td>
-                </tr>
-              ) : (
-                employees.map((employee, index) => (
+              {employees.map((employee, index) => {
+                const position = resolvePositionCell(employee)
+                const roleLabel = displayValue(getRoleLabelForEmployee(employee))
+                return (
                   <tr
                     key={employee.id}
                     className={`employee-list-table__row${
@@ -96,7 +174,7 @@ export default function EmployeeListTable({
                               avatarUrl={employee.avatarUrl}
                               size="sm"
                             />
-                            <strong>{employee.name}</strong>
+                            <strong title={employee.name}>{employee.name}</strong>
                           </span>
                         </button>
                       ) : (
@@ -106,112 +184,142 @@ export default function EmployeeListTable({
                             avatarUrl={employee.avatarUrl}
                             size="sm"
                           />
-                          <strong>{employee.name}</strong>
+                          <strong title={employee.name}>{employee.name}</strong>
                         </span>
                       )}
                     </td>
                     <td>
-                      <code className="admin-code">{displayValue(employee.login)}</code>
+                      <code
+                        className="admin-code employee-list-table__login"
+                        title={employee.login || ''}
+                      >
+                        {displayValue(employee.login)}
+                      </code>
                     </td>
-                    <td>{displayValue(getRoleLabelForEmployee(employee))}</td>
+                    <td>
+                      <span
+                        className={`employee-list-table__clamp${
+                          position.missing ? ' employee-list-table__clamp--muted' : ''
+                        }`}
+                        title={
+                          position.groupTitle
+                            ? `${position.label} · ${position.groupTitle}`
+                            : position.label
+                        }
+                      >
+                        {position.label}
+                      </span>
+                      {position.archived ? (
+                        <span className="employee-list-table__archive-badge">Архивная</span>
+                      ) : null}
+                    </td>
+                    <td>
+                      <span className="employee-list-table__clamp" title={roleLabel}>
+                        {roleLabel}
+                      </span>
+                    </td>
                     <td>
                       <StatusBadge
                         label={getEmploymentStatusLabel(employee.employmentStatus)}
                         type={getEmploymentStatusBadgeType(employee.employmentStatus)}
                       />
                     </td>
-                    <td onClick={(event) => event.stopPropagation()}>
+                    <td
+                      className="employee-list-table__actions"
+                      onClick={(event) => event.stopPropagation()}
+                    >
                       <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
-                        {canEdit && onEdit && (
-                          <div className="admin-table__actions">
-                            <IconActionButton
-                              label="Редактировать сотрудника"
-                              variant="primary"
-                              onClick={(event) => openEdit(employee, event)}
-                            >
-                              <PencilIcon />
-                            </IconActionButton>
-                          </div>
-                        )}
+                        {canEdit && onEdit ? (
+                          <IconActionButton
+                            label="Редактировать сотрудника"
+                            variant="primary"
+                            onClick={(event) => openEdit(employee, event)}
+                          >
+                            <PencilIcon />
+                          </IconActionButton>
+                        ) : null}
                       </Can>
                     </td>
                   </tr>
-                ))
-              )}
+                )
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
       <ul className="employee-cards">
-        {employees.length === 0 ? (
-          <li className="employee-cards__empty">{emptyMessage}</li>
-        ) : (
-          employees.map((employee, index) => {
-            const isInteractive = Boolean(onOpen)
+        {employees.map((employee, index) => {
+          const isInteractive = Boolean(onOpen)
+          const position = resolvePositionCell(employee)
+          const roleLabel = displayValue(getRoleLabelForEmployee(employee))
 
-            return (
-              <li
-                key={employee.id}
-                className={`employee-card-item${isInteractive ? ' employee-card-item--clickable' : ''}`}
-                {...(isInteractive
-                  ? {
-                      role: 'button',
-                      tabIndex: 0,
-                      'aria-label': `Открыть карточку сотрудника ${employee.name}`,
-                      onClick: () => onOpen(employee),
-                      onKeyDown: (event) => handleCardKeyDown(event, onOpen, employee),
-                    }
-                  : {})}
-              >
-                <div className="employee-card-item__head">
-                  <div className="employee-card-item__identity">
-                    <span className="employee-card-item__num">{rowOffset + index + 1}</span>
-                    <EmployeeAvatar
-                      name={employee.name}
-                      avatarUrl={employee.avatarUrl}
-                      size="sm"
-                    />
-                    <h3 className="employee-card-item__title">{employee.name}</h3>
-                  </div>
-                  <div className="employee-card-item__head-actions">
-                    <StatusBadge
-                      label={getEmploymentStatusLabel(employee.employmentStatus)}
-                      type={getEmploymentStatusBadgeType(employee.employmentStatus)}
-                    />
-                    <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
-                      {canEdit && onEdit && (
-                        <IconActionButton
-                          label="Редактировать сотрудника"
-                          variant="primary"
-                          onClick={(event) => openEdit(employee, event)}
-                        >
-                          <PencilIcon />
-                        </IconActionButton>
-                      )}
-                    </Can>
-                  </div>
+          return (
+            <li
+              key={employee.id}
+              className={`employee-card-item${isInteractive ? ' employee-card-item--clickable' : ''}`}
+              {...(isInteractive
+                ? {
+                    role: 'button',
+                    tabIndex: 0,
+                    'aria-label': `Открыть карточку сотрудника ${employee.name}`,
+                    onClick: () => onOpen(employee),
+                    onKeyDown: (event) => handleCardKeyDown(event, onOpen, employee),
+                  }
+                : {})}
+            >
+              <div className="employee-card-item__head">
+                <div className="employee-card-item__identity">
+                  <span className="employee-card-item__num">{rowOffset + index + 1}</span>
+                  <EmployeeAvatar
+                    name={employee.name}
+                    avatarUrl={employee.avatarUrl}
+                    size="sm"
+                  />
+                  <h3 className="employee-card-item__title">{employee.name}</h3>
                 </div>
+                <div className="employee-card-item__head-actions">
+                  <StatusBadge
+                    label={getEmploymentStatusLabel(employee.employmentStatus)}
+                    type={getEmploymentStatusBadgeType(employee.employmentStatus)}
+                  />
+                  <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
+                    {canEdit && onEdit ? (
+                      <IconActionButton
+                        label="Редактировать сотрудника"
+                        variant="primary"
+                        onClick={(event) => openEdit(employee, event)}
+                      >
+                        <PencilIcon />
+                      </IconActionButton>
+                    ) : null}
+                  </Can>
+                </div>
+              </div>
 
-                <div className="employee-card-item__meta">
-                  <p className="employee-card-item__meta-line">
-                    <span className="employee-card-item__meta-label">Роль:</span>{' '}
-                    <span className="employee-card-item__meta-value">
-                      {displayValue(getRoleLabelForEmployee(employee))}
-                    </span>
-                  </p>
-                  <p className="employee-card-item__meta-line employee-card-item__meta-line--login">
-                    <span className="employee-card-item__meta-label">Логин:</span>{' '}
-                    <span className="employee-card-item__meta-value">
-                      {displayValue(employee.login)}
-                    </span>
-                  </p>
-                </div>
-              </li>
-            )
-          })
-        )}
+              <div className="employee-card-item__meta">
+                <p className="employee-card-item__meta-line">
+                  <span className="employee-card-item__meta-label">Должность:</span>{' '}
+                  <span className="employee-card-item__meta-value">
+                    {position.label}
+                    {position.archived ? ' · Архивная' : ''}
+                  </span>
+                </p>
+                <p className="employee-card-item__meta-line">
+                  <span className="employee-card-item__meta-label">Роль:</span>{' '}
+                  <span className="employee-card-item__meta-value">{roleLabel}</span>
+                </p>
+                <p className="employee-card-item__meta-line employee-card-item__meta-line--login">
+                  <span className="employee-card-item__meta-label">Логин:</span>{' '}
+                  <span className="employee-card-item__meta-value">
+                    {displayValue(employee.login)}
+                  </span>
+                </p>
+              </div>
+            </li>
+          )
+        })}
       </ul>
-    </>
+    </div>
   )
 }
