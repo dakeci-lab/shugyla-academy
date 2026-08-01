@@ -76,6 +76,14 @@ function main() {
 
   assert('EmployeeListTable is primary render', section.includes('<EmployeeListTable'))
   assert('OrganizationList not primary render', !section.includes('<EmployeeOrganizationList'))
+  assert(
+    'OrganizationList.jsx removed',
+    !fs.existsSync(path.join(ROOT, 'src/components/admin/employees/EmployeeOrganizationList.jsx')),
+  )
+  assert(
+    'OrganizationList.css removed',
+    !fs.existsSync(path.join(ROOT, 'src/components/admin/employees/EmployeeOrganizationList.css')),
+  )
   assert('uses flatten after group sort', section.includes('flattenEmployeeOrganization'))
   assert('uses group helper for order', section.includes('groupEmployeesByPositionStructure'))
   assert(

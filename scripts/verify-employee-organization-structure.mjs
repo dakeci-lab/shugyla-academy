@@ -207,8 +207,6 @@ function main() {
   // UI wiring
   const helper = read('src/utils/employeeOrganizationStructure.js')
   const section = read('src/components/admin/sections/EmployeesSection.jsx')
-  const orgList = read('src/components/admin/employees/EmployeeOrganizationList.jsx')
-  const orgCss = read('src/components/admin/employees/EmployeeOrganizationList.css')
   const adminService = read('src/services/employeeAdminService.js')
   const edgeList = read('supabase/functions/admin-list-employees/index.ts')
   const employeeData = read('src/utils/employeeData.js')
@@ -230,7 +228,14 @@ function main() {
     scheduleSection.includes('groupEmployeesByPositionStructure') &&
       scheduleSection.includes('flattenEmployeeOrganization')
   )
-  assert('OrganizationList file kept for future', fs.existsSync(path.join(ROOT, 'src/components/admin/employees/EmployeeOrganizationList.jsx')))
+  assert(
+    'OrganizationList.jsx removed (Wave 1)',
+    !fs.existsSync(path.join(ROOT, 'src/components/admin/employees/EmployeeOrganizationList.jsx')),
+  )
+  assert(
+    'OrganizationList.css removed (Wave 1)',
+    !fs.existsSync(path.join(ROOT, 'src/components/admin/employees/EmployeeOrganizationList.css')),
+  )
   assert(
     'flat list has position group column',
     listTable.includes('Группа должностей') || listTable.includes('>Группа<')
@@ -274,8 +279,6 @@ function main() {
   assert('fixed table layout', listCss.includes('table-layout: fixed'))
   assert('action column width fixed', listCss.includes('employee-list-table__col-actions'))
   assert('compact rows', listCss.includes('height: 58px') || listCss.includes('height: 56px'))
-  // Keep orgList/orgCss referenced so unused-file polish still exists without being primary UI
-  assert('legacy org list file still present', Boolean(orgList) && Boolean(orgCss))
 
   const migrationDir = path.join(ROOT, 'supabase/migrations')
   const stage5Migrations = fs.existsSync(migrationDir)

@@ -52,6 +52,10 @@ function main() {
   const rolesPage = read('src/pages/platform/PlatformSettingsRoles.jsx')
 
   assert('placeholder groups removed from page', !page.includes('TeamComingSoonPanel'))
+  assert(
+    'TeamComingSoonPanel.jsx removed',
+    !fs.existsSync(path.join(ROOT, 'src/components/admin/team/TeamComingSoonPanel.jsx')),
+  )
   assert('groups workspace wired', page.includes('PositionGroupsWorkspace'))
   assert('positions workspace wired', page.includes('PositionsWorkspace'))
   assert('tab query param', page.includes("searchParams.get('tab')") || page.includes("get('tab')"))

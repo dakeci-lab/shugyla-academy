@@ -57,13 +57,26 @@ function main() {
   assert('old 720px overridden for team', settingsCss.includes('platform-settings--team') && settingsCss.includes('1600px'))
   assert('team title', teamPage.includes('Управление командой'))
   assert('roles tab', teamPage.includes('Роли и доступы') || utils.includes('Роли и доступы'))
-  assert('groups placeholder tab', utils.includes('Группы должностей'))
-  assert('positions placeholder tab', utils.includes('Должности'))
+  assert('groups tab label', utils.includes('Группы должностей'))
+  assert('positions tab label', utils.includes('Должности'))
+  assert('groups workspace wired', teamPage.includes('PositionGroupsWorkspace'))
+  assert('positions workspace wired', teamPage.includes('PositionsWorkspace'))
   assert(
-    'structure tabs wired or placeholder available',
-    teamPage.includes('PositionGroupsWorkspace') ||
-      teamPage.includes('TeamComingSoonPanel') ||
-      exists('src/components/admin/team/TeamComingSoonPanel.jsx'),
+    'TeamComingSoonPanel.jsx removed (Wave 1)',
+    !exists('src/components/admin/team/TeamComingSoonPanel.jsx'),
+  )
+  assert(
+    'RolesManagementPanel.jsx removed (Wave 1)',
+    !exists('src/components/admin/RolesManagementPanel.jsx'),
+  )
+  assert(
+    'RolesManagementPanel.css removed (Wave 1)',
+    !exists('src/components/admin/RolesManagementPanel.css'),
+  )
+  assert('RolesWorkspace replacement present', exists('src/components/admin/team/RolesWorkspace.jsx'))
+  assert(
+    'PlatformSettingsRoles uses TeamManagementPage',
+    page.includes('TeamManagementPage') && exists('src/pages/platform/PlatformSettingsRoles.jsx'),
   )
 
   assert('desktop grid sidebar+detail', teamCss.includes('grid-template-columns') && teamCss.includes('320px'))
@@ -119,7 +132,6 @@ function main() {
   const components = [
     'TeamManagementPage.jsx',
     'TeamManagementTabs.jsx',
-    'TeamComingSoonPanel.jsx',
     'RolesWorkspace.jsx',
     'RolesSidebar.jsx',
     'RoleListItem.jsx',
@@ -131,6 +143,8 @@ function main() {
     'PermissionItem.jsx',
     'UnsavedChangesBar.jsx',
     'ConfirmRoleActionModal.jsx',
+    'PositionGroupsWorkspace.jsx',
+    'PositionsWorkspace.jsx',
   ]
   for (const name of components) {
     assert(`component exists: ${name}`, exists(`src/components/admin/team/${name}`))
