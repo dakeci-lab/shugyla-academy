@@ -7,6 +7,12 @@ import {
   isGenericInvokeErrorMessage,
 } from '../utils/edgeFunctionErrors'
 
+/** Hard ceiling matching admin-list-employees MAX_PAGE_SIZE. Never send above this. */
+export const ADMIN_LIST_MAX_PAGE_SIZE = 100
+export const ADMIN_LIST_DEFAULT_PAGE_SIZE = 50
+/** Safety cap: 100 × 50 = 5000 employees for client-side search loads. */
+const CLIENT_SEARCH_MAX_PAGES = 50
+
 const ERROR_MESSAGES = {
   forbidden: 'У вас нет прав для просмотра сотрудников',
   editForbidden: 'У вас нет прав для редактирования сотрудников',
@@ -17,8 +23,14 @@ const ERROR_MESSAGES = {
   lastAdmin: 'Нельзя уволить последнего администратора',
   validation: 'Проверьте заполненные поля',
   unauthorized: 'Сессия завершена. Войдите повторно',
-  listDefault: 'Не удалось загрузить список сотрудников',
+  listDefault: 'Не удалось загрузить сотрудников. Проверьте подключение и повторите попытку.',
   updateDefault: 'Не удалось сохранить изменения',
+}
+
+function clampAdminListPageSize(pageSize, fallback = ADMIN_LIST_DEFAULT_PAGE_SIZE) {
+  const n = Number(pageSize)
+  if (!Number.isFinite(n) || n < 1) return fallback
+  return Math.min(Math.floor(n), ADMIN_LIST_MAX_PAGE_SIZE)
 }
 
 export class EmployeeAdminError extends Error {
@@ -50,18 +62,24 @@ function mapAdminError(errorBody, fallbackMessage, { edit = false } = {}) {
   if (code === 'last_admin_protected') {
     return { code, message: ERROR_MESSAGES.lastAdmin }
   }
+  if (code === 'invalid_pagination') {
+    // List/search must never surface "Проверьте заполненные поля" for pagination bugs.
+    return {
+      code: 'invalid_pagination',
+      message: edit ? ERROR_MESSAGES.validation : ERROR_MESSAGES.listDefault,
+    }
+  }
   if (
     code === 'validation_error' ||
     code === 'malformed_json' ||
     code === 'forbidden_field' ||
     code === 'invalid_role' ||
     code === 'invalid_status' ||
-    code === 'invalid_pagination' ||
     code === 'invalid_sort'
   ) {
     return {
       code: code || 'validation_error',
-      message: ERROR_MESSAGES.validation,
+      message: edit ? ERROR_MESSAGES.validation : ERROR_MESSAGES.listDefault,
     }
   }
   if (code === 'internal_error') {
@@ -133,7 +151,7 @@ export async function listEmployeesForAdmin(options = {}) {
 
   const body = {
     page: options.page ?? 1,
-    page_size: options.pageSize ?? 50,
+    page_size: clampAdminListPageSize(options.pageSize, ADMIN_LIST_DEFAULT_PAGE_SIZE),
     search: options.search?.trim() || undefined,
     status: options.status ?? undefined,
     role_id: options.roleId ?? undefined,
@@ -169,6 +187,67 @@ export async function listEmployeesForAdmin(options = {}) {
       },
     }
   })
+}
+
+/**
+ * Load all employees matching status/role filters using safe pageSize ≤ 100.
+ * Used for client-side search across organizational fields (group/position/role).
+ * Does not send server-side search text.
+ */
+export async function loadAllEmployeesForClientSearch({
+  status,
+  roleId,
+  pageSize = ADMIN_LIST_MAX_PAGE_SIZE,
+  sortBy = 'full_name',
+  sortDirection = 'asc',
+} = {}) {
+  const safePageSize = clampAdminListPageSize(pageSize, ADMIN_LIST_MAX_PAGE_SIZE)
+
+  const first = await listEmployeesForAdmin({
+    page: 1,
+    pageSize: safePageSize,
+    search: '',
+    status,
+    roleId,
+    sortBy,
+    sortDirection,
+  })
+
+  const totalPagesRaw = Number(first.pagination?.total_pages)
+  const totalPages =
+    Number.isFinite(totalPagesRaw) && totalPagesRaw > 0 ? Math.floor(totalPagesRaw) : 1
+  const pagesToLoad = Math.min(totalPages, CLIENT_SEARCH_MAX_PAGES)
+
+  const byId = new Map()
+  for (const employee of first.employees) {
+    byId.set(String(employee.id), employee)
+  }
+
+  for (let page = 2; page <= pagesToLoad; page += 1) {
+    const next = await listEmployeesForAdmin({
+      page,
+      pageSize: safePageSize,
+      search: '',
+      status,
+      roleId,
+      sortBy,
+      sortDirection,
+    })
+    for (const employee of next.employees) {
+      byId.set(String(employee.id), employee)
+    }
+  }
+
+  return {
+    employees: [...byId.values()],
+    pagination: {
+      ...(first.pagination || {}),
+      page: 1,
+      page_size: safePageSize,
+      total: byId.size,
+      total_pages: pagesToLoad,
+    },
+  }
 }
 
 function isLegacyEmployeeIdRejection(error) {

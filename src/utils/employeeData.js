@@ -324,7 +324,10 @@ export function filterEmployees(
     )
   }
 
-  const query = search.trim().toLowerCase()
+  const query = search
+    .trim()
+    .replace(/\s+/g, ' ')
+    .toLocaleLowerCase('ru-KZ')
   if (!query) return list
 
   return list.filter((employee) => {
@@ -346,7 +349,8 @@ export function filterEmployees(
     ]
       .filter(Boolean)
       .join(' ')
-      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .toLocaleLowerCase('ru-KZ')
 
     return haystack.includes(query)
   })

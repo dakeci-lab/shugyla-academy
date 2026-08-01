@@ -16,7 +16,12 @@ import {
   getCandidateById,
   getVacancyById,
 } from '../../../services/academyDataService'
-import { listEmployeesForAdmin } from '../../../services/employeeAdminService'
+import {
+  listEmployeesForAdmin,
+  loadAllEmployeesForClientSearch,
+  EmployeeAdminError,
+  ADMIN_LIST_DEFAULT_PAGE_SIZE,
+} from '../../../services/employeeAdminService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import {
   getVacancyEmployeeRole,
@@ -52,15 +57,23 @@ import '../admin-shared.css'
 import '../RecruitmentSection.css'
 import './EmployeesSection.css'
 
-const CLOUD_PAGE_SIZE = 50
-/** Larger page when client-side search needs group/position/role fields. */
-const CLOUD_SEARCH_PAGE_SIZE = 200
+const CLOUD_PAGE_SIZE = ADMIN_LIST_DEFAULT_PAGE_SIZE
 const NARROW_SEARCH_QUERY = '(max-width: 480px)'
 
 function mapFilterToListStatus(filter) {
   if (filter === 'all') return 'all'
   if (filter === 'deactivated') return 'deactivated'
   return 'active'
+}
+
+function mapListLoadError(err) {
+  if (err instanceof EmployeeAdminError) {
+    if (err.code === 'unauthorized') {
+      return 'Сессия завершена. Войдите повторно.'
+    }
+    return err.message || 'Не удалось загрузить сотрудников. Проверьте подключение и повторите попытку.'
+  }
+  return err?.message || 'Не удалось загрузить сотрудников. Проверьте подключение и повторите попытку.'
 }
 
 /** Раздел «Сотрудники» — учётные записи, роли и статус */
@@ -74,7 +87,16 @@ export default function EmployeesSection() {
   const filterButtonRef = useRef(null)
   const activeCandidateIdRef = useRef(null)
   const formTouchedRef = useRef(false)
+  const loadSeqRef = useRef(0)
+  const mountedRef = useRef(true)
   const isNarrowSearch = useMediaQuery(NARROW_SEARCH_QUERY)
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   const [searchInput, setSearchInput] = useState('')
   const debouncedSearch = useDebouncedValue(searchInput, 300)
@@ -115,30 +137,45 @@ export default function EmployeesSection() {
     if (!cloudMode) return
     const quiet = options?.quiet === true
     const hasSearch = Boolean(debouncedSearch.trim())
+    const seq = ++loadSeqRef.current
     if (!quiet) setListLoading(true)
+    // Clear previous error only for the active request; keep list until success.
     setListError('')
     try {
-      // Search (incl. group/position/role) is applied client-side after batch load
-      // so organizational fields participate without N+1 or Edge changes.
-      const result = await listEmployeesForAdmin({
-        page: hasSearch ? 1 : page,
-        pageSize: hasSearch ? CLOUD_SEARCH_PAGE_SIZE : CLOUD_PAGE_SIZE,
-        search: '',
-        status: mapFilterToListStatus(appliedStatus),
-        roleId: appliedRoleId || undefined,
-        sortBy: 'full_name',
-        sortDirection: 'asc',
-      })
+      const status = mapFilterToListStatus(appliedStatus)
+      const roleId = appliedRoleId || undefined
+      const result = hasSearch
+        ? await loadAllEmployeesForClientSearch({
+            status,
+            roleId,
+            sortBy: 'full_name',
+            sortDirection: 'asc',
+          })
+        : await listEmployeesForAdmin({
+            page,
+            pageSize: CLOUD_PAGE_SIZE,
+            search: '',
+            status,
+            roleId,
+            sortBy: 'full_name',
+            sortDirection: 'asc',
+          })
+
+      if (!mountedRef.current || seq !== loadSeqRef.current) return
       setCloudEmployees(result.employees)
       setCloudPagination(result.pagination)
+      setListError('')
     } catch (err) {
+      if (!mountedRef.current || seq !== loadSeqRef.current) return
       if (!quiet) {
         setCloudEmployees([])
         setCloudPagination(null)
       }
-      setListError(err.message || 'Не удалось загрузить сотрудников')
+      setListError(mapListLoadError(err))
     } finally {
-      if (!quiet) setListLoading(false)
+      if (mountedRef.current && seq === loadSeqRef.current && !quiet) {
+        setListLoading(false)
+      }
     }
   }, [cloudMode, page, debouncedSearch, appliedStatus, appliedRoleId])
 
@@ -167,15 +204,26 @@ export default function EmployeesSection() {
     if (!cloudMode || !filterOpen) return undefined
 
     let cancelled = false
-    listEmployeesForAdmin({
-      page: 1,
-      pageSize: debouncedSearch.trim() ? CLOUD_SEARCH_PAGE_SIZE : 1,
-      search: '',
-      status: mapFilterToListStatus(draftStatus),
-      roleId: draftRoleId || undefined,
-      sortBy: 'full_name',
-      sortDirection: 'asc',
-    })
+    const status = mapFilterToListStatus(draftStatus)
+    const roleId = draftRoleId || undefined
+    const previewPromise = debouncedSearch.trim()
+      ? loadAllEmployeesForClientSearch({
+          status,
+          roleId,
+          sortBy: 'full_name',
+          sortDirection: 'asc',
+        })
+      : listEmployeesForAdmin({
+          page: 1,
+          pageSize: 1,
+          search: '',
+          status,
+          roleId,
+          sortBy: 'full_name',
+          sortDirection: 'asc',
+        })
+
+    previewPromise
       .then((result) => {
         if (cancelled) return
         if (debouncedSearch.trim()) {
@@ -253,17 +301,43 @@ export default function EmployeesSection() {
     return getRoleLabel(employee.role)
   }
 
-  function getEmptyMessage() {
-    if (listError) return 'Не удалось загрузить список сотрудников.'
-    if (debouncedSearch.trim() && !filtersActive) {
-      return 'По запросу сотрудники не найдены.'
+  function getEmptyCopy() {
+    const query = searchInput.trim() || debouncedSearch.trim()
+    if (query) {
+      return {
+        title: 'Сотрудники не найдены',
+        description: filtersActive
+          ? `По запросу «${query}» с выбранными фильтрами сотрудники не найдены.`
+          : `По запросу «${query}» в текущем списке совпадений нет.`,
+        showClearSearch: true,
+      }
     }
-    if (filtersActive || debouncedSearch.trim()) {
-      return 'Нет сотрудников, соответствующих выбранным фильтрам.'
+    if (filtersActive) {
+      return {
+        title: 'Сотрудники не найдены',
+        description: 'Нет сотрудников, соответствующих выбранным фильтрам.',
+        showClearSearch: false,
+      }
     }
-    if (appliedStatus === 'active') return 'Работающие сотрудники не найдены.'
-    if (appliedStatus === 'deactivated') return 'Уволенные сотрудники не найдены.'
-    return 'Сотрудники не созданы.'
+    if (appliedStatus === 'active') {
+      return {
+        title: 'Сотрудники не найдены',
+        description: 'Работающие сотрудники не найдены.',
+        showClearSearch: false,
+      }
+    }
+    if (appliedStatus === 'deactivated') {
+      return {
+        title: 'Сотрудники не найдены',
+        description: 'Уволенные сотрудники не найдены.',
+        showClearSearch: false,
+      }
+    }
+    return {
+      title: 'Сотрудники не созданы',
+      description: 'Добавьте первого сотрудника, чтобы начать работу со списком.',
+      showClearSearch: false,
+    }
   }
 
   function clearCandidateQuery() {
@@ -514,7 +588,8 @@ export default function EmployeesSection() {
               ? (employee) => navigate(`/platform/employees/${employee.id}`)
               : null
           }
-          emptyMessage={getEmptyMessage()}
+          emptyCopy={getEmptyCopy()}
+          onClearSearch={() => setSearchInput('')}
           searchActive={searchActive}
           loading={Boolean(cloudMode && listLoading)}
         />

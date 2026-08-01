@@ -74,27 +74,29 @@ function main() {
 
   console.log('Stage 3: Mobile cards')
 
-  assert('mobile cards component', table.includes('employee-cards'))
-  assert('desktop table preserved', table.includes('employee-list-table-desktop'))
-  assert('card number', table.includes('employee-card-item__num'))
-  assert('card avatar', table.includes('EmployeeAvatar'))
-  assert('card role and login', table.includes('Роль:') && table.includes('Логин:'))
-  assert('card no trash icon', !table.includes('TrashIcon'))
-  assert('card clickable opens profile', table.includes('employee-card-item--clickable'))
-  assert('card profile aria label', table.includes('Открыть карточку сотрудника'))
-  assert('pencil edit action present', table.includes('Редактировать сотрудника'))
+  const orgList = read('src/components/admin/employees/EmployeeOrganizationList.jsx')
+  assert('mobile cards in organization list', orgList.includes('employee-org-card'))
+  assert('desktop org table', orgList.includes('employee-org-table'))
+  assert('card avatar', orgList.includes('EmployeeAvatar'))
+  assert('card role and login', orgList.includes('Роль:') && orgList.includes('Логин:'))
+  assert('card no trash icon', !orgList.includes('TrashIcon'))
+  assert('card clickable opens profile', orgList.includes('employee-org-card--clickable'))
+  assert('card profile aria label', orgList.includes('Открыть карточку сотрудника'))
+  assert('pencil edit action present', orgList.includes('Редактировать сотрудника'))
   assert('no schedule navigation in table', !table.includes('openSchedule'))
   assert('no schedule route in section', !section.includes('/schedule'))
 
   console.log('Stage 4: Desktop table')
 
-  assert('number column', table.includes('employee-list-table__num-col'))
-  assert('edit action only', table.includes('PencilIcon') && !table.includes('TrashIcon'))
-  assert('name link present', table.includes('employee-name-link'))
-  assert('row opens profile', table.includes('employee-list-table__row--clickable'))
+  assert('number column', orgList.includes('employee-org-table__num') || orgList.includes('employee-org-table__col-num'))
+  assert('edit action only', orgList.includes('PencilIcon') && !orgList.includes('TrashIcon'))
+  assert('name link present', orgList.includes('employee-name-link'))
+  assert('row opens profile', orgList.includes('employee-org-table__row--clickable'))
   assert('shared edit modal used by list', section.includes('EmployeeEditModal'))
   assert('organization list wired', section.includes('EmployeeOrganizationList'))
   assert('organization grouping helper used', section.includes('groupEmployeesByPositionStructure'))
+  assert('safe multi-page search loader', section.includes('loadAllEmployeesForClientSearch'))
+  assert('no pageSize 200', !section.includes('pageSize: 200') && !section.includes('CLOUD_SEARCH_PAGE_SIZE'))
 
   console.log('Stage 5: Status actions in modal')
 
@@ -124,7 +126,8 @@ function main() {
 
   assert('toolbar icon size 44px', sectionCss.includes('width: 44px'))
   assert('search min-width zero', sectionCss.includes('min-width: 0'))
-  assert('mobile cards breakpoint', tableCss.includes('max-width: 768px'))
+  const orgCss = read('src/components/admin/employees/EmployeeOrganizationList.css')
+  assert('mobile cards breakpoint', orgCss.includes('max-width: 900px'))
   assert('cloud list preserved', section.includes('listEmployeesForAdmin'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
