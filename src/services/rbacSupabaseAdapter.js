@@ -32,8 +32,18 @@ async function throwIfError(result, message) {
   return result.data
 }
 
+/**
+ * Merge DB permission rows with the active frontend catalog.
+ * Unknown/retired codes from Supabase (e.g. legacy academy.*) are ignored —
+ * they stay in the DB but never enter the RBAC UI or access checks.
+ */
 function mergeCatalogPermissions(permissions) {
-  const byCode = new Map((permissions || []).map((perm) => [perm.code, perm]))
+  const catalogCodes = new Set(PERMISSION_CATALOG.map((item) => item.code))
+  const byCode = new Map(
+    (permissions || [])
+      .filter((perm) => perm?.code && catalogCodes.has(perm.code))
+      .map((perm) => [perm.code, perm])
+  )
   PERMISSION_CATALOG.forEach((item) => {
     if (!byCode.has(item.code)) {
       byCode.set(

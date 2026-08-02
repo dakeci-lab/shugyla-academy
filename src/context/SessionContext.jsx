@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
 import { getUser, saveUser, clearUser } from '../utils/storage'
 import { getUserPermissionCodes, resolveUserRole } from '../config/permissions'
+import { isKnownPermissionCode, resolvePermissionCode } from '../config/permissionCatalog'
 import { getRole, normalizeRoleId } from '../data/roles'
 import { ensureRbacLoaded, getRoleById, getRoleByCode } from '../services/rbacService'
 import {
@@ -45,7 +46,9 @@ function normalizeSessionUser(raw, options = {}) {
 
   const permissionSlugs =
     trustPermissionCodes && Array.isArray(raw.permissionCodes) && raw.permissionCodes.length > 0
-      ? [...raw.permissionCodes]
+      ? raw.permissionCodes
+          .map((code) => resolvePermissionCode(code))
+          .filter((code) => isKnownPermissionCode(code))
       : [...getUserPermissionCodes(enriched)]
 
   return {

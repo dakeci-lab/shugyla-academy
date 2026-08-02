@@ -3,7 +3,7 @@ import { canAccessRoute, ROUTE_KEYS } from '../../config/permissions'
 import PlatformAccessDenied from './PlatformAccessDenied'
 
 /** Маршрут раздела платформы с проверкой доступа по RBAC */
-export default function PlatformRoute({ children, routeKey = ROUTE_KEYS.ACADEMY }) {
+export default function PlatformRoute({ children, routeKey = ROUTE_KEYS.HOME }) {
   const { user, rbacReady, authStatus } = useSession()
 
   if (authStatus === AUTH_STATUS.LOADING) {

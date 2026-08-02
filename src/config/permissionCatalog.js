@@ -3,8 +3,6 @@
  * code — стабильный идентификатор для can('employees.view')
  */
 
-import { isAcademyModuleEnabled } from './featureFlags'
-
 export const PERMISSION_CODES = {
   DASHBOARD_VIEW: 'dashboard.view',
 
@@ -37,10 +35,6 @@ export const PERMISSION_CODES = {
   RECRUITMENT_MANAGE_CANDIDATES: 'recruitment.manage_candidates',
   RECRUITMENT_INVITE_CANDIDATE: 'recruitment.invite_candidate',
   RECRUITMENT_HIRE_CANDIDATE: 'recruitment.hire_candidate',
-
-  ACADEMY_VIEW: 'academy.view',
-  ACADEMY_MANAGE_COURSES: 'academy.manage_courses',
-  ACADEMY_ASSIGN_COURSES: 'academy.assign_courses',
 
   STANDARDS_VIEW: 'standards.view',
   STANDARDS_MANAGE: 'standards.manage',
@@ -106,8 +100,6 @@ export const LEGACY_PERMISSION_ALIASES = {
   'hr.candidates.edit': PERMISSION_CODES.RECRUITMENT_MANAGE_CANDIDATES,
   'receiving.receive': PERMISSION_CODES.RECEIVING_MANAGE,
   'suppliers.archive': PERMISSION_CODES.SUPPLIERS_EDIT,
-  'academy.manage': PERMISSION_CODES.ACADEMY_MANAGE_COURSES,
-  'academy.assign': PERMISSION_CODES.ACADEMY_ASSIGN_COURSES,
   'roles.manage': PERMISSION_CODES.ROLES_ASSIGN_PERMISSIONS,
   'users.manage': PERMISSION_CODES.EMPLOYEES_MANAGE_ROLES,
 }
@@ -120,7 +112,6 @@ export const PERMISSION_MODULES = {
   attendance: 'Тайм-трекер',
   rating: 'Рейтинг',
   recruitment: 'HR',
-  academy: 'Академия',
   standards: 'База стандартов',
   procurement: 'Закупки',
   receiving: 'Приёмка',
@@ -151,17 +142,14 @@ export const RBAC_MATRIX_MODULES = [
   'price_tags',
   'products',
   'standards',
-  'academy',
   'positions',
   'settings',
   'roles',
 ]
 
-/** Visible RBAC matrix modules — Academy hidden while feature toggle is off. */
+/** Visible RBAC matrix modules (catalog order). */
 export function getRbacMatrixModules() {
-  return RBAC_MATRIX_MODULES.filter(
-    (module) => module !== 'academy' || isAcademyModuleEnabled()
-  )
+  return RBAC_MATRIX_MODULES
 }
 
 export const PERMISSION_ACTION_LABELS = {
@@ -182,8 +170,6 @@ export const PERMISSION_ACTION_LABELS = {
   manage_candidates: 'Управление кандидатами',
   invite_candidate: 'Приглашение кандидата',
   hire_candidate: 'Приём кандидата',
-  manage_courses: 'Управление курсами',
-  assign_courses: 'Назначение обучения',
   transfer: 'Передача в приёмку',
   calculate: 'Расчёт',
   manage_settings: 'Настройки модуля',
@@ -220,9 +206,6 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.RECRUITMENT_MANAGE_CANDIDATES, name: 'Управление кандидатами', module: 'recruitment', sortOrder: 72 },
   { code: PERMISSION_CODES.RECRUITMENT_INVITE_CANDIDATE, name: 'Приглашение кандидата', module: 'recruitment', sortOrder: 73 },
   { code: PERMISSION_CODES.RECRUITMENT_HIRE_CANDIDATE, name: 'Приём кандидата', module: 'recruitment', sortOrder: 74 },
-  { code: PERMISSION_CODES.ACADEMY_VIEW, name: 'Academy', module: 'academy', sortOrder: 80 },
-  { code: PERMISSION_CODES.ACADEMY_MANAGE_COURSES, name: 'Управление курсами', module: 'academy', sortOrder: 81 },
-  { code: PERMISSION_CODES.ACADEMY_ASSIGN_COURSES, name: 'Назначение обучения', module: 'academy', sortOrder: 82 },
   { code: PERMISSION_CODES.STANDARDS_VIEW, name: 'Стандарты', module: 'standards', sortOrder: 90 },
   { code: PERMISSION_CODES.STANDARDS_MANAGE, name: 'Редактирование стандартов', module: 'standards', sortOrder: 91 },
   { code: PERMISSION_CODES.PROCUREMENT_VIEW, name: 'Просмотр закупок', module: 'procurement', sortOrder: 100 },
@@ -273,6 +256,8 @@ export const PERMISSION_CATALOG = [
 
 export const ALL_PERMISSION_CODES = PERMISSION_CATALOG.map((item) => item.code)
 
+export const KNOWN_PERMISSION_CODES = new Set(ALL_PERMISSION_CODES)
+
 export const ADMIN_PROTECTED_PERMISSIONS = [
   PERMISSION_CODES.ROLES_VIEW,
   PERMISSION_CODES.ROLES_ASSIGN_PERMISSIONS,
@@ -283,9 +268,9 @@ export const RBAC_SYSTEM_ROLES = [
   { code: 'admin', name: 'Администратор', description: 'Полный доступ ко всем разделам платформы.', isSystem: true },
   { code: 'buyer', name: 'Закупщик', description: 'Закуп, приёмка, поставщики и ценники.', isSystem: true },
   { code: 'receiver', name: 'Приёмщик', description: 'Приёмка товара и ценники.', isSystem: true },
-  { code: 'floor_admin', name: 'Администратор торгового зала', description: 'Рейтинг, ценники, график и Academy.', isSystem: true },
-  { code: 'cashier', name: 'Кассир', description: 'Рейтинг, обучение и личный график.', isSystem: true },
-  { code: 'seller', name: 'Продавец', description: 'Рейтинг, обучение и личный график.', isSystem: true },
+  { code: 'floor_admin', name: 'Администратор торгового зала', description: 'Рейтинг, ценники и график.', isSystem: true },
+  { code: 'cashier', name: 'Кассир', description: 'Рейтинг и личный график.', isSystem: true },
+  { code: 'seller', name: 'Продавец', description: 'Рейтинг и личный график.', isSystem: true },
 ]
 
 const P = PERMISSION_CODES
@@ -299,33 +284,38 @@ export const RBAC_DEFAULT_ROLE_PERMISSIONS = {
     P.RECEIVING_VIEW, P.RECEIVING_MANAGE,
     P.SUPPLIERS_VIEW, P.SUPPLIERS_CREATE, P.SUPPLIERS_EDIT, P.SUPPLIERS_DELETE,
     P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE,
-    P.ACADEMY_VIEW, P.STANDARDS_VIEW,
+    P.STANDARDS_VIEW,
   ],
   receiver: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
     P.SCHEDULE_VIEW_OWN, P.RATING_VIEW,
     P.RECEIVING_VIEW, P.RECEIVING_MANAGE, P.PRICE_TAGS_VIEW,
-    P.ACADEMY_VIEW, P.STANDARDS_VIEW,
+    P.STANDARDS_VIEW,
   ],
   floor_admin: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
     P.SCHEDULE_VIEW_OWN, P.SCHEDULE_VIEW_TEAM, P.SCHEDULE_EDIT, P.RATING_VIEW,
     P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE,
-    P.ACADEMY_VIEW, P.STANDARDS_VIEW,
+    P.STANDARDS_VIEW,
   ],
   cashier: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN, P.RATING_VIEW, P.ACADEMY_VIEW, P.STANDARDS_VIEW,
+    P.SCHEDULE_VIEW_OWN, P.RATING_VIEW, P.STANDARDS_VIEW,
   ],
   seller: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN, P.RATING_VIEW, P.ACADEMY_VIEW, P.STANDARDS_VIEW,
+    P.SCHEDULE_VIEW_OWN, P.RATING_VIEW, P.STANDARDS_VIEW,
   ],
 }
 
 export function resolvePermissionCode(code) {
   if (!code) return code
   return LEGACY_PERMISSION_ALIASES[code] || code
+}
+
+export function isKnownPermissionCode(code) {
+  if (!code) return false
+  return KNOWN_PERMISSION_CODES.has(resolvePermissionCode(code))
 }
 
 export function getPermissionLabel(code) {

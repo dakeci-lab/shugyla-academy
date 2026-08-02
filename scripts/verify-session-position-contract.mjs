@@ -164,7 +164,11 @@ function main() {
   assertEqual('session role preserved', sessionNamed.role, 'cashier')
   assertEqual('session roleName from catalog', sessionNamed.roleName, 'Кассир')
   assertEqual('session position from HR', sessionNamed.positionName, 'Кассир торгового зала')
-  assertEqual('session permissions present', Array.isArray(sessionNamed.permissions) && sessionNamed.permissions.length > 0, true)
+  assertEqual(
+    'session permissions is array (RBAC carries real codes; static learning perms removed)',
+    Array.isArray(sessionNamed.permissions),
+    true,
+  )
   assert(
     'session omits assignedCourseIds',
     !Object.prototype.hasOwnProperty.call(sessionNamed, 'assignedCourseIds'),

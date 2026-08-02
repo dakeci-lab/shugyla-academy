@@ -362,6 +362,7 @@ export default function App() {
         <Route path="/admin/attestation" element={<Navigate to="/platform" replace />} />
         <Route path="/admin/progress" element={<Navigate to="/platform" replace />} />
         <Route path="/courses/:id" element={<Navigate to="/platform" replace />} />
+        <Route path="/course/:id" element={<Navigate to="/platform" replace />} />
         <Route path="/standards" element={<Navigate to="/platform/standards" replace />} />
         <Route path="/standards/:slug" element={<LegacyStandardRedirect />} />
 

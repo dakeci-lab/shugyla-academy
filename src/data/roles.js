@@ -1,5 +1,5 @@
 /**
- * Система ролей Shugyla Platform + Academy
+ * Система ролей Shugyla Platform
  *
  * Production access-role canonical for procurement staff: `buyer`.
  * `purchaser` remains a legacy compatibility code (inactive DB role / old content).
@@ -7,22 +7,10 @@
 
 export const PERMISSIONS = {
   MANAGE_USERS: 'manage_users',
-  MANAGE_COURSES: 'manage_courses',
-  VIEW_PROGRESS: 'view_progress',
-  MANAGE_TESTS: 'manage_tests',
-  VIEW_OWN_COURSES: 'view_own_courses',
-  PASS_TESTS: 'pass_tests',
-  VIEW_TEAM_CHECKLISTS: 'view_team_checklists',
 }
 
 export const PERMISSION_LABELS = {
   [PERMISSIONS.MANAGE_USERS]: 'Управление сотрудниками',
-  [PERMISSIONS.MANAGE_COURSES]: 'Управление курсами',
-  [PERMISSIONS.VIEW_PROGRESS]: 'Просмотр прогресса',
-  [PERMISSIONS.MANAGE_TESTS]: 'Управление тестами',
-  [PERMISSIONS.VIEW_OWN_COURSES]: 'Доступ к своим курсам',
-  [PERMISSIONS.PASS_TESTS]: 'Прохождение тестов',
-  [PERMISSIONS.VIEW_TEAM_CHECKLISTS]: 'Чек-листы команды',
 }
 
 export const ROLE_IDS = {
@@ -41,7 +29,7 @@ export const BUYER = ROLE_IDS.BUYER
 
 /**
  * Legacy role-code aliases → current frontend canonical.
- * purchaser (inactive DB / old PWA / old Academy content) maps to buyer.
+ * purchaser (inactive DB / old PWA) maps to buyer.
  */
 const LEGACY_ROLE_ALIASES = {
   purchaser: ROLE_IDS.BUYER,
@@ -91,48 +79,37 @@ export const ROLES = {
     id: ROLE_IDS.ADMIN,
     label: 'Админ',
     description: 'Полный доступ ко всем разделам платформы.',
-    permissions: [
-      PERMISSIONS.MANAGE_USERS,
-      PERMISSIONS.MANAGE_COURSES,
-      PERMISSIONS.VIEW_PROGRESS,
-      PERMISSIONS.MANAGE_TESTS,
-      PERMISSIONS.VIEW_OWN_COURSES,
-      PERMISSIONS.PASS_TESTS,
-    ],
+    permissions: [PERMISSIONS.MANAGE_USERS],
   },
   [ROLE_IDS.BUYER]: {
     id: ROLE_IDS.BUYER,
     label: 'Закупщик',
     description: 'Закуп, приёмка, поставщики и ценники.',
-    permissions: [PERMISSIONS.VIEW_OWN_COURSES, PERMISSIONS.PASS_TESTS],
+    permissions: [],
   },
   [ROLE_IDS.RECEIVER]: {
     id: ROLE_IDS.RECEIVER,
     label: 'Приёмщик',
     description: 'Приёмка товара и ценники.',
-    permissions: [PERMISSIONS.VIEW_OWN_COURSES, PERMISSIONS.PASS_TESTS],
+    permissions: [],
   },
   [ROLE_IDS.FLOOR_ADMIN]: {
     id: ROLE_IDS.FLOOR_ADMIN,
     label: 'Администратор торгового зала',
-    description: 'Рейтинг сотрудников, ценники и Academy.',
-    permissions: [
-      PERMISSIONS.VIEW_OWN_COURSES,
-      PERMISSIONS.PASS_TESTS,
-      PERMISSIONS.VIEW_TEAM_CHECKLISTS,
-    ],
+    description: 'Рейтинг сотрудников и ценники.',
+    permissions: [],
   },
   [ROLE_IDS.CASHIER]: {
     id: ROLE_IDS.CASHIER,
     label: 'Кассир',
-    description: 'Рейтинг и обучение.',
-    permissions: [PERMISSIONS.VIEW_OWN_COURSES, PERMISSIONS.PASS_TESTS],
+    description: 'Рейтинг и личный кабинет.',
+    permissions: [],
   },
   [ROLE_IDS.SELLER]: {
     id: ROLE_IDS.SELLER,
     label: 'Продавец',
-    description: 'Рейтинг и обучение.',
-    permissions: [PERMISSIONS.VIEW_OWN_COURSES, PERMISSIONS.PASS_TESTS],
+    description: 'Рейтинг и личный кабинет.',
+    permissions: [],
   },
 }
 

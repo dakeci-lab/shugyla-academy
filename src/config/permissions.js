@@ -7,12 +7,9 @@ import {
   PERMISSION_CODES,
   PERMISSION_KEYS,
   RBAC_DEFAULT_ROLE_PERMISSIONS,
+  isKnownPermissionCode,
   resolvePermissionCode,
 } from './permissionCatalog'
-import {
-  isAcademyFeatureRouteKey,
-  isAcademyModuleEnabled,
-} from './featureFlags'
 import {
   getPermissionCodesForUserRole,
   getRbacCache,
@@ -42,9 +39,6 @@ export const ROUTE_KEYS = {
   PRODUCTS_GROUP: 'products_group',
   PRICE_TAGS: 'price_tags',
   PRICE_CHECKER: 'price_checker',
-  ACADEMY: 'academy',
-  ACADEMY_GROUP: 'academy_group',
-  ACADEMY_MANAGE: 'academy_manage',
   STANDARDS_GROUP: 'standards_group',
   STANDARDS: 'standards',
   STANDARDS_MANAGE: 'standards_manage',
@@ -109,9 +103,6 @@ const ROUTE_ACCESS = {
     ROLE_IDS.FLOOR_ADMIN,
   ],
   [ROUTE_KEYS.PRICE_CHECKER]: [ROLE_IDS.ADMIN],
-  [ROUTE_KEYS.ACADEMY]: ALL_PLATFORM_ROLES,
-  [ROUTE_KEYS.ACADEMY_GROUP]: ALL_PLATFORM_ROLES,
-  [ROUTE_KEYS.ACADEMY_MANAGE]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.STANDARDS_GROUP]: ALL_PLATFORM_ROLES,
   [ROUTE_KEYS.STANDARDS]: ALL_PLATFORM_ROLES,
   [ROUTE_KEYS.STANDARDS_MANAGE]: [ROLE_IDS.ADMIN],
@@ -136,18 +127,27 @@ export function resolveUserRole(user) {
 
 const MINIMAL_SAFE_PERMISSIONS = [
   PERMISSION_CODES.DASHBOARD_VIEW,
-  PERMISSION_CODES.ACADEMY_VIEW,
+  PERMISSION_CODES.STANDARDS_VIEW,
 ]
+
+function toKnownPermissionSet(codes) {
+  const result = new Set()
+  for (const raw of codes) {
+    const code = resolvePermissionCode(raw)
+    if (isKnownPermissionCode(code)) result.add(code)
+  }
+  return result
+}
 
 function getLegacyPermissionCodes(user) {
   const role = resolveUserRole(user)
   if (!role) return new Set()
   if (isAdmin(role)) {
     const adminPerms = getRbacCache()?.permissions?.map((p) => p.code || p.slug)
-    if (adminPerms?.length) return new Set(adminPerms.map(resolvePermissionCode))
-    return new Set((RBAC_DEFAULT_ROLE_PERMISSIONS.admin || []).map(resolvePermissionCode))
+    if (adminPerms?.length) return toKnownPermissionSet(adminPerms)
+    return toKnownPermissionSet(RBAC_DEFAULT_ROLE_PERMISSIONS.admin || [])
   }
-  return new Set((RBAC_DEFAULT_ROLE_PERMISSIONS[role] || []).map(resolvePermissionCode))
+  return toKnownPermissionSet(RBAC_DEFAULT_ROLE_PERMISSIONS[role] || [])
 }
 
 /** Набор code-прав пользователя (RBAC-кэш или legacy seed) */
@@ -159,7 +159,7 @@ export function getUserPermissionCodes(user) {
 
   if (rbacState === RBAC_LOAD_STATE.LOADED) {
     if (fromCache.length > 0) {
-      return new Set(fromCache.map(resolvePermissionCode))
+      return toKnownPermissionSet(fromCache)
     }
     if (isAdmin(resolveUserRole(user))) {
       return getLegacyPermissionCodes(user)
@@ -169,16 +169,16 @@ export function getUserPermissionCodes(user) {
 
   if (rbacState === RBAC_LOAD_STATE.ERROR) {
     if (fromCache.length > 0) {
-      return new Set(fromCache.map(resolvePermissionCode))
+      return toKnownPermissionSet(fromCache)
     }
     if (isAdmin(resolveUserRole(user))) {
       return getLegacyPermissionCodes(user)
     }
-    return new Set(MINIMAL_SAFE_PERMISSIONS.map(resolvePermissionCode))
+    return toKnownPermissionSet(MINIMAL_SAFE_PERMISSIONS)
   }
 
   if (fromCache.length > 0) {
-    return new Set(fromCache.map(resolvePermissionCode))
+    return toKnownPermissionSet(fromCache)
   }
 
   return getLegacyPermissionCodes(user)
@@ -220,10 +220,6 @@ export function hasRole(user, roles) {
 
 export function canAccessRoute(user, routeKey) {
   if (!user) return false
-  // Feature toggle wins over RBAC/admin so disabled modules stay invisible.
-  if (!isAcademyModuleEnabled() && isAcademyFeatureRouteKey(routeKey)) {
-    return false
-  }
   const role = resolveUserRole(user)
   if (role && isAdmin(role)) return true
 
@@ -244,8 +240,6 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.SUPPLIER_PAYMENTS]: [P.SUPPLIER_PAYMENTS_VIEW],
     [ROUTE_KEYS.PRICE_TAGS]: [P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE],
     [ROUTE_KEYS.PRICE_CHECKER]: [P.PRICE_CHECKER_VIEW],
-    [ROUTE_KEYS.ACADEMY]: [P.ACADEMY_VIEW],
-    [ROUTE_KEYS.ACADEMY_MANAGE]: [P.ACADEMY_MANAGE_COURSES, P.ACADEMY_ASSIGN_COURSES],
     [ROUTE_KEYS.STANDARDS]: [P.STANDARDS_VIEW],
     [ROUTE_KEYS.STANDARDS_MANAGE]: [P.STANDARDS_MANAGE],
     [ROUTE_KEYS.SETTINGS]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],
@@ -293,10 +287,6 @@ export function getDefaultPlatformPath(userOrRole) {
 export function filterPlatformNav(nav, user) {
   return nav
     .map((item) => {
-      // Academy Learning UI removed — never surface academy nav even if flag/permissions linger.
-      if (item.id === 'academy-group' || isAcademyFeatureRouteKey(item.routeKey)) {
-        return null
-      }
       if (item.children) {
         const children = item.children
           .filter((child) => canViewMenuItem(user, child))
@@ -475,10 +465,6 @@ export function canManageSettings(user) {
 
 export function canManageNotifications(user) {
   return can(user, PERMISSION_CODES.NOTIFICATIONS_MANAGE)
-}
-
-export function canManageAcademy(user) {
-  return canAny(user, [PERMISSION_CODES.ACADEMY_MANAGE_COURSES, PERMISSION_CODES.ACADEMY_ASSIGN_COURSES])
 }
 
 export function canManageStandards(user) {

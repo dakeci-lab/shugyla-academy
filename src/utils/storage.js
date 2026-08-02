@@ -1,6 +1,6 @@
 /**
  * Session user persistence in localStorage.
- * Extra fields on stored payloads (e.g. legacy assignedCourseIds) are ignored by callers.
+ * Extra fields on stored payloads are ignored by callers.
  */
 
 const STORAGE_KEYS = {

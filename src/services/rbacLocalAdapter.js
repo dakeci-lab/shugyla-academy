@@ -1,7 +1,33 @@
-import { buildDefaultRbacSnapshot } from '../utils/rbacData'
-import { slugifyRoleCode } from '../config/permissionCatalog'
+import { buildDefaultRbacSnapshot, normalizePermission } from '../utils/rbacData'
+import { PERMISSION_CATALOG, slugifyRoleCode } from '../config/permissionCatalog'
 import { getRoleLabel } from '../data/roles'
 import { getAllEmployeesLocal } from '../utils/employeeData'
+
+/** Keep local snapshots aligned with the active catalog; drop unknown codes. */
+function mergeCatalogPermissions(permissions) {
+  const catalogCodes = new Set(PERMISSION_CATALOG.map((item) => item.code))
+  const byCode = new Map(
+    (permissions || [])
+      .filter((perm) => perm?.code && catalogCodes.has(perm.code))
+      .map((perm) => [perm.code, perm])
+  )
+  PERMISSION_CATALOG.forEach((item) => {
+    if (!byCode.has(item.code)) {
+      byCode.set(
+        item.code,
+        normalizePermission({
+          id: `perm-${item.code}`,
+          code: item.code,
+          name: item.name,
+          description: item.description || '',
+          module: item.module,
+          sort_order: item.sortOrder,
+        })
+      )
+    }
+  })
+  return [...byCode.values()].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+}
 
 const STORAGE_KEY = 'shugyla_rbac_snapshot_v2'
 
@@ -63,7 +89,11 @@ function ensureEmployeeRoles(snapshot) {
 function ensureSnapshot() {
   const existing = readSnapshot()
   if (existing?.roles?.length && existing?.permissions?.length) {
-    return attachEmployeeCounts(ensureEmployeeRoles(existing))
+    const merged = {
+      ...existing,
+      permissions: mergeCatalogPermissions(existing.permissions),
+    }
+    return attachEmployeeCounts(ensureEmployeeRoles(merged))
   }
   const seeded = ensureEmployeeRoles(buildDefaultRbacSnapshot())
   writeSnapshot(seeded)
