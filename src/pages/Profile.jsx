@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { updateProfile } from '../services/academyDataService'
+import { updateProfile } from '../services/platformDataService'
 import { useSession } from '../context/SessionContext'
 import { useToast } from '../context/ToastContext'
 import { getEmployeeById } from '../utils/employeeData'

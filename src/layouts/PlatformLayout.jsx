@@ -12,7 +12,7 @@ import PlatformErrorBoundary from '../components/platform/PlatformErrorBoundary'
 import PlatformSessionGate from '../components/platform/PlatformSessionGate'
 import { PullToRefreshProvider } from '../context/PullToRefreshContext'
 import { PlatformPageTitleProvider, usePlatformPageTitleContext } from '../context/PlatformPageTitleContext'
-import { useAcademyData } from '../context/AcademyDataContext'
+import { usePlatformData } from '../context/PlatformDataContext'
 import { useProcurementRealtime } from '../hooks/useProcurementRealtime'
 import useMediaQuery from '../hooks/useMediaQuery'
 import useBlockMobileBrowserBack, {
@@ -29,7 +29,7 @@ const MOBILE_LAYOUT_QUERY = '(max-width: 900px)'
 
 function PlatformLayoutShell({ onLogout }) {
   const { user } = useSession()
-  const { reload } = useAcademyData()
+  const { reload } = usePlatformData()
   const { pathname } = useLocation()
   const procurementRealtimeEnabled = useMemo(() => {
     if (!user) return false

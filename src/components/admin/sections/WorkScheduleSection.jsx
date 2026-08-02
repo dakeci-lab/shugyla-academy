@@ -27,7 +27,7 @@ import {
 } from '../../../utils/shiftData'
 import { addDaysToDateKey, toDateKeyInAppTimezone } from '../../../utils/timezone'
 import { formatScheduleDayTitle } from '../../../utils/scheduleDayTimeline'
-import { getTeamShiftsForMonth } from '../../../services/academyDataService'
+import { getTeamShiftsForMonth } from '../../../services/platformDataService'
 import { fetchTeamWorkforceData } from '../../../services/workforceAdminService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import AdminModal from '../AdminModal'

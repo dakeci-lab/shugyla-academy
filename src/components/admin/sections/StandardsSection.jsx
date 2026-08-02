@@ -14,7 +14,7 @@ import {
   deleteStandardCategory,
   reorderStandardCategories,
   getStandardArticleReadStats,
-} from '../../../services/academyDataService'
+} from '../../../services/platformDataService'
 import {
   ARTICLE_STATUS_LABELS,
   PRIORITY_LABELS,

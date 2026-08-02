@@ -39,7 +39,7 @@ function main() {
   const profile = read('src/components/admin/sections/EmployeeProfileSection.jsx')
   const employeeData = read('src/utils/employeeData.js')
   const catalog = read('src/services/positionCatalogService.js')
-  const academy = read('src/services/academyDataService.js')
+  const platformSvc = read('src/services/platformDataService.js')
   const provisioning = read('src/services/employeeProvisioningService.js')
   const employeesSection = read('src/components/admin/sections/EmployeesSection.jsx')
   const pkg = read('package.json')
@@ -69,9 +69,9 @@ function main() {
   assert('diff self omits position and role', /if \(!editingSelf\)[\s\S]*changes\.positionId[\s\S]*changes\.roleId/.test(employeeData))
   assert('create payload uses positionId', modal.includes('positionId: form.positionId'))
   assert('create UI does not map role name to position', !modal.includes('position: selectedRole'))
-  assert('createEmployee forwards positionId', academy.includes('positionId: data.positionId'))
+  assert('createEmployee forwards positionId', platformSvc.includes('positionId: data.positionId'))
   assert('provisioning sends position_id', provisioning.includes('position_id: payload.positionId'))
-  assert('legacy position text omitted when positionId set', academy.includes('data.positionId ? undefined : data.position'))
+  assert('legacy position text omitted when positionId set', platformSvc.includes('data.positionId ? undefined : data.position'))
 
   // Permissions / self
   assert('position gated by employees.edit', modal.includes('EMPLOYEES_EDIT'))
@@ -84,7 +84,7 @@ function main() {
   // Hire
   assert('hire prefill clears positionId', employeesSection.includes("positionId: ''"))
   assert('hire does not invent position from vacancy', !employeesSection.includes('position: getVacancy'))
-  assert('hireCandidateAsUser requires positionId', academy.includes('Укажите должность сотрудника'))
+  assert('hireCandidateAsUser requires positionId', platformSvc.includes('Укажите должность сотрудника'))
   assert('candidate hint asks for position and role', modal.includes('должность и роль'))
 
   // Profile

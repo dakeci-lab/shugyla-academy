@@ -152,7 +152,7 @@ export function SessionProvider({ children }) {
           setRbacReady(false)
           // Drop session-scoped caches so the next user never reuses in-flight/RBAC data.
           try {
-            const { resetCloudBootstrapState } = await import('../services/academyDataService')
+            const { resetCloudBootstrapState } = await import('../services/platformDataService')
             resetCloudBootstrapState()
             const { invalidateRbacCache } = await import('../services/rbacService')
             invalidateRbacCache()
@@ -305,7 +305,7 @@ export function SessionProvider({ children }) {
     setAuthStatus(AUTH_STATUS.UNAUTHENTICATED)
     setRbacReady(false)
     if (isCloudMode()) {
-      const { resetCloudBootstrapState } = await import('../services/academyDataService')
+      const { resetCloudBootstrapState } = await import('../services/platformDataService')
       resetCloudBootstrapState()
       const { invalidateRbacCache } = await import('../services/rbacService')
       invalidateRbacCache()

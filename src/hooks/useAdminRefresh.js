@@ -1,12 +1,12 @@
 import { useCallback, useState } from 'react'
-import { useAcademyData } from '../context/AcademyDataContext'
+import { usePlatformData } from '../context/PlatformDataContext'
 
 /**
  * Хук для перерисовки разделов после изменений данных.
  * Вызывайте refresh() после add/update операций.
  */
 export function useAdminRefresh() {
-  const { version: dataVersion, reload, notifyChange } = useAcademyData()
+  const { version: dataVersion, reload, notifyChange } = usePlatformData()
   const [version, setVersion] = useState(0)
 
   const refresh = useCallback(async () => {

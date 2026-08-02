@@ -1,4 +1,4 @@
-.academy-data-loading {
+.platform-data-loading {
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -7,7 +7,7 @@
   padding: 24px;
 }
 
-.academy-data-loading__card {
+.platform-data-loading__card {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -21,7 +21,7 @@
   min-width: 280px;
 }
 
-.academy-data-loading__logo {
+.platform-data-loading__logo {
   width: 56px;
   height: 56px;
   border-radius: 14px;
@@ -34,14 +34,14 @@
   font-weight: 700;
 }
 
-.academy-data-loading__brand {
+.platform-data-loading__brand {
   margin: 0;
   font-size: 18px;
   font-weight: 700;
   color: var(--color-text);
 }
 
-.academy-data-loading__spinner {
+.platform-data-loading__spinner {
   width: 32px;
   height: 32px;
   border: 3px solid var(--color-border);

@@ -6,7 +6,7 @@ import {
   getModuleLoadState,
   MODULE_STATUS,
 } from '../lib/cloudStore'
-import { refreshProcurementData } from './academyDataService'
+import { refreshProcurementData } from './platformDataService'
 import * as local from './receivingLocalAdapter'
 import * as cloud from './receivingSupabaseAdapter'
 import {

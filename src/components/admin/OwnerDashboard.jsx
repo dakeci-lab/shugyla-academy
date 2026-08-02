@@ -15,7 +15,7 @@ import {
 import {
   getAttendanceSettings,
   getTeamShiftsForMonth,
-} from '../../services/academyDataService'
+} from '../../services/platformDataService'
 import { fetchHomeWorkforceSummary } from '../../services/workforceAdminService'
 import { usePlatformPageRefresh } from '../../context/PullToRefreshContext'
 import PlatformPeriodHeader from '../platform/PlatformPeriodHeader'

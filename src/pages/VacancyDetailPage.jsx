@@ -1,5 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
-import { getPublishedVacancyBySlug } from '../services/academyDataService'
+import { getPublishedVacancyBySlug } from '../services/platformDataService'
 import { getVacancyRoleLabel } from '../utils/recruitmentData'
 import Header from '../components/Header'
 import './Vacancies.css'

@@ -3,14 +3,14 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import Header from '../components/Header'
 import StatusBadge from '../components/admin/StatusBadge'
 import { useSession } from '../context/SessionContext'
-import { useAcademyData } from '../context/AcademyDataContext'
+import { usePlatformData } from '../context/PlatformDataContext'
 import {
   getPublishedStandardArticlesForUser,
   getStandardArticleBySlug,
   getStandardCategories,
   markStandardArticleRead,
   acknowledgeStandardArticle,
-} from '../services/academyDataService'
+} from '../services/platformDataService'
 import {
   PRIORITY_BADGE,
   searchArticles,
@@ -198,7 +198,7 @@ export default function StandardsPage({ embedded = false, basePath = '/standards
   const { slug } = useParams()
   const navigate = useNavigate()
   const { user } = useSession()
-  const { version, reload, ensureModules } = useAcademyData()
+  const { version, reload, ensureModules } = usePlatformData()
   const [search, setSearch] = useState('')
   const [readFilter, setReadFilter] = useState('all')
   const [categoryId, setCategoryId] = useState('')

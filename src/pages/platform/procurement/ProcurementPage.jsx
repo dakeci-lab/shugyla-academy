@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
-import { useAcademyData } from '../../../context/AcademyDataContext'
+import { usePlatformData } from '../../../context/PlatformDataContext'
 import { useToast } from '../../../context/ToastContext'
 import {
   canViewPurchases,
@@ -64,7 +64,7 @@ export default function ProcurementPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const { error: showError } = useToast()
-  const { loadError, reloadProcurement, ensureModules, version: dataVersion } = useAcademyData()
+  const { loadError, reloadProcurement, ensureModules, version: dataVersion } = usePlatformData()
   const { version, refresh, notifyChange } = useAdminRefresh()
 
   useEffect(() => {

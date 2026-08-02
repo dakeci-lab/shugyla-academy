@@ -95,7 +95,8 @@
     "verify:session-position-contract": "node scripts/verify-session-position-contract.mjs",
     "verify:buyer-role-compatibility": "node scripts/verify-buyer-role-compatibility.mjs",
     "verify:employee-organization-structure": "node scripts/verify-employee-organization-structure.mjs",
-    "verify:academy-rbac-removal": "node scripts/verify-academy-rbac-removal.mjs"
+    "verify:academy-rbac-removal": "node scripts/verify-academy-rbac-removal.mjs",
+    "verify:platform-data-rename": "node scripts/verify-platform-data-rename.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",

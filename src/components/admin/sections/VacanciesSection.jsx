@@ -5,7 +5,7 @@ import {
   updateVacancy,
   deleteVacancy,
   duplicateVacancy,
-} from '../../../services/academyDataService'
+} from '../../../services/platformDataService'
 import { toastSuccess } from '../../../services/notificationService'
 import {
   VACANCY_STATUS_LABELS,

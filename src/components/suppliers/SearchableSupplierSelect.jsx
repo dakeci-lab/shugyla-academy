@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
-import { getSuppliers } from '../../services/academyDataService'
+import { getSuppliers } from '../../services/platformDataService'
 import {
   SUPPLIER_STATUS,
   compareSuppliersForSelection,

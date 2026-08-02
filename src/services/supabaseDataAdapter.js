@@ -138,7 +138,7 @@ export async function fetchReceivingModuleData() {
 
 /**
  * Full dump for legacy callers. Soft-isolates optional modules (including procurement).
- * Prefer progressive bootstrap via academyDataService.ensureModuleLoaded.
+ * Prefer progressive bootstrap via platformDataService.ensureModuleLoaded.
  */
 export async function fetchAllData() {
   const { employees } = await fetchCoreEmployeeData()

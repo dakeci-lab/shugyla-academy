@@ -18,7 +18,7 @@ import {
   restoreEmployee,
   getCandidateById,
   getVacancyById,
-} from '../../../services/academyDataService'
+} from '../../../services/platformDataService'
 import {
   listEmployeesForAdmin,
   loadAllEmployeesForClientSearch,
@@ -188,7 +188,7 @@ export default function EmployeesSection() {
     if (cloudMode) {
       loadCloudEmployees()
     }
-    // Intentionally omit AcademyData `version`: progressive bootstrap bumps it and
+    // Intentionally omit PlatformData `version`: progressive bootstrap bumps it and
     // was replaying admin-list-employees. Mutations call loadCloudEmployees/refresh.
   }, [cloudMode, loadCloudEmployees])
 

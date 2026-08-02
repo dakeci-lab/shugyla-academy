@@ -68,7 +68,7 @@ function main() {
   )
   assert('contact email migration', migration.includes('contact_email'))
   assert('self profile update policy', migration.includes('academy_users_update_own_profile'))
-  assert('updateProfile service', read('src/services/academyDataService.js').includes('export async function updateProfile'))
+  assert('updateProfile service', read('src/services/platformDataService.js').includes('export async function updateProfile'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

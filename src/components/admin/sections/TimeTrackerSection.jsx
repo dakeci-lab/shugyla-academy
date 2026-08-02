@@ -30,7 +30,7 @@ import {
   getTodayShiftForEmployee,
   checkInEmployee,
   checkOutEmployee,
-} from '../../../services/academyDataService'
+} from '../../../services/platformDataService'
 import { useSession } from '../../../context/SessionContext'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import TimeTrackerHomeCard from './TimeTrackerHomeCard'

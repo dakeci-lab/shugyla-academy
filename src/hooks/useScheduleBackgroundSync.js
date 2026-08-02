@@ -3,7 +3,7 @@ import { normalizeShift } from '../utils/shiftData'
 import {
   saveEmployeeShift,
   applyBulkEmployeeShifts,
-} from '../services/academyDataService'
+} from '../services/platformDataService'
 import { toastSuccess, toastError, toastWarning } from '../services/notificationService'
 
 export const SYNC_STATUS = {

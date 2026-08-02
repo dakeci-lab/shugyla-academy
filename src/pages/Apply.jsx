@@ -5,7 +5,7 @@ import {
   getCandidateQuestions,
   submitCandidateApplication,
   refreshData,
-} from '../services/academyDataService'
+} from '../services/platformDataService'
 import { getVacancyRoleLabel } from '../utils/recruitmentData'
 import { isCloudMode } from '../lib/dataMode'
 import {

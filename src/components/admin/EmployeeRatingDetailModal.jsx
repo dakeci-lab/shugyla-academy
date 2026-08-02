@@ -9,7 +9,7 @@ import {
 import {
   getEmployeeShiftsForMonth,
   getAttendanceSettings,
-} from '../../services/academyDataService'
+} from '../../services/platformDataService'
 import { fetchEmployeeWorkforceBundle } from '../../services/workforceAdminService'
 import './admin-shared.css'
 

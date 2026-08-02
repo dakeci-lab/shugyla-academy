@@ -48,7 +48,7 @@ function main() {
   assert('PageRefreshIndicator component exists', indicator.includes('page-refresh-indicator'))
   assert('compact label Обновление', indicator.includes("'Обновление'") || indicator.includes('"Обновление"'))
   assert('PullToRefresh uses PageRefreshIndicator', ptr.includes('PageRefreshIndicator'))
-  assert('no fullscreen loader in indicator', !indicator.includes('academy-data-loading'))
+  assert('no fullscreen loader in indicator', !indicator.includes('platform-data-loading'))
 
   console.log('Stage 2: Header stays outside refresh transform')
   assert('layout wraps main outside PullToRefresh', layout.includes('platform-layout__main'))

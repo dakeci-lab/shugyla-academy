@@ -31,7 +31,7 @@ import {
   PAYROLL_PARTICIPATION,
   normalizePayrollParticipation,
 } from '../../../utils/employeeData'
-import { updateEmployee } from '../../../services/academyDataService'
+import { updateEmployee } from '../../../services/platformDataService'
 import { fetchTeamWorkforceForMonth } from '../../../services/workforceAdminService'
 import {
   addSalaryAllowance,

@@ -24,7 +24,7 @@ import * as receivingCloud from './receivingSupabaseAdapter'
 import * as receivingLocal from './receivingLocalAdapter'
 import { getPurchaseOrdersSync } from './purchaseDataService'
 import { getReceivingDocumentsSync } from './receivingDataService'
-import { refreshData } from './academyDataService'
+import { refreshData } from './platformDataService'
 import { getLocalReceivingBundle } from './receivingLocalAdapter'
 import {
   saveOptimisticPurchase,

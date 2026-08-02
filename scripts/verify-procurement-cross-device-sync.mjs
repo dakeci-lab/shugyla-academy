@@ -34,10 +34,10 @@ function read(relPath) {
 function main() {
   console.log('=== Procurement cross-device sync verification ===\n')
 
-  const academyCtx = read('src/context/AcademyDataContext.jsx')
+  const platformCtx = read('src/context/PlatformDataContext.jsx')
   const cloudStore = read('src/lib/cloudStore.js')
   const supabaseAdapter = read('src/services/supabaseDataAdapter.js')
-  const academyService = read('src/services/academyDataService.js')
+  const platformService = read('src/services/platformDataService.js')
   const page = read('src/pages/platform/procurement/ProcurementPage.jsx')
   const purchaseService = read('src/services/purchaseDataService.js')
   const optimistic = read('src/services/purchaseOptimisticService.js')
@@ -45,10 +45,10 @@ function main() {
   const sw = read('public/sw.js')
 
   console.log('Stage 1: Auth-gated cloud bootstrap')
-  assert('waits for AUTH_STATUS', academyCtx.includes('AUTH_STATUS.LOADING'))
-  assert('requires supabaseAuthenticated', academyCtx.includes('supabaseAuthenticated'))
-  assert('exposes loadError', academyCtx.includes('loadError'))
-  assert('classifies access errors', academyCtx.includes("code: 'access'"))
+  assert('waits for AUTH_STATUS', platformCtx.includes('AUTH_STATUS.LOADING'))
+  assert('requires supabaseAuthenticated', platformCtx.includes('supabaseAuthenticated'))
+  assert('exposes loadError', platformCtx.includes('loadError'))
+  assert('classifies access errors', platformCtx.includes("code: 'access'"))
 
   console.log('Stage 2: Purchase fetch failure isolation (Stage 1)')
   assert('soft-fails non-procurement tables', supabaseAdapter.includes('settleTableResult'))
@@ -66,9 +66,9 @@ function main() {
   console.log('Stage 3: Procurement refresh works after partial boot')
   assert('ensureCloudStoreReady exists', cloudStore.includes('ensureCloudStoreReady'))
   assert('patchCloudStore boots store if needed', cloudStore.includes('if (!store.loaded)'))
-  assert('refreshProcurement uses ensureCloudStoreReady', academyService.includes('ensureCloudStoreReady()'))
-  assert('refreshProcurement surfaces purchase errors', academyService.includes("throw purchasesResult.reason"))
-  assert('refreshProcurement marks module error', academyService.includes("markModuleError('procurement'"))
+  assert('refreshProcurement uses ensureCloudStoreReady', platformService.includes('ensureCloudStoreReady()'))
+  assert('refreshProcurement surfaces purchase errors', platformService.includes("throw purchasesResult.reason"))
+  assert('refreshProcurement marks module error', platformService.includes("markModuleError('procurement'"))
 
   console.log('Stage 4: Procurement page sync + error UX')
   assert('page reloads procurement on open', page.includes('reloadProcurement()'))

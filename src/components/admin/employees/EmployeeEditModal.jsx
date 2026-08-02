@@ -18,7 +18,7 @@ import {
   updateEmployee,
   linkCandidateToEmployee,
   getWorkLocations,
-} from '../../../services/academyDataService'
+} from '../../../services/platformDataService'
 import { getRoleLabel } from '../../../data/roles'
 import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
 import {

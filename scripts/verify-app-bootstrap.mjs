@@ -93,14 +93,14 @@ function main() {
 
   console.log('Stage 6: Progressive data bootstrap (shell after Auth)')
 
-  const academyCtx = read('src/context/AcademyDataContext.jsx')
+  const platformCtx = read('src/context/PlatformDataContext.jsx')
   assert(
-    'AcademyDataProvider unblocks shell before full cloud dump',
-    !academyCtx.includes('(loading || !ready) && !isPublicRoute')
+    'PlatformDataProvider unblocks shell before full cloud dump',
+    !platformCtx.includes('(loading || !ready) && !isPublicRoute')
   )
   assert(
-    'AcademyDataProvider still gates on AUTH loading',
-    academyCtx.includes('AUTH_STATUS.LOADING')
+    'PlatformDataProvider still gates on AUTH loading',
+    platformCtx.includes('AUTH_STATUS.LOADING')
   )
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)

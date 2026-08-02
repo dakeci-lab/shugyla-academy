@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { getRouterBasename } from './router/basename'
 import { LanguageProvider } from './context/LanguageContext'
-import { AcademyDataProvider } from './context/AcademyDataContext'
+import { PlatformDataProvider } from './context/PlatformDataContext'
 import { SessionProvider } from './context/SessionContext'
 import { PermissionProvider } from './context/PermissionContext'
 import { ToastProvider } from './context/ToastContext'
@@ -65,7 +65,7 @@ export default function App() {
     <LanguageProvider>
       <SessionProvider>
       <BrowserRouter basename={getRouterBasename()}>
-      <AcademyDataProvider>
+      <PlatformDataProvider>
       <PermissionProvider>
       <ToastProvider>
       <NotificationInboxProvider>
@@ -371,7 +371,7 @@ export default function App() {
       </NotificationInboxProvider>
       </ToastProvider>
       </PermissionProvider>
-      </AcademyDataProvider>
+      </PlatformDataProvider>
       </BrowserRouter>
       </SessionProvider>
     </LanguageProvider>

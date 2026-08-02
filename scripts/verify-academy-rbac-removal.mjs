@@ -151,14 +151,23 @@ function main() {
   assert('/admin/attestation redirect', app.includes('path="/admin/attestation"'))
   assert('/admin/routes redirect', app.includes('path="/admin/routes"'))
 
-  console.log('\nLegacy infrastructure names kept')
-  assert('AcademyDataProvider kept', exists('src/context/AcademyDataContext.jsx'))
+  console.log('\nPlatform data infrastructure (renamed from Academy*)')
+  assert('PlatformDataProvider file exists', exists('src/context/PlatformDataContext.jsx'))
+  assert('legacy AcademyDataContext.jsx removed', !exists('src/context/AcademyDataContext.jsx'))
+  assert('legacy academyDataService.js removed', !exists('src/services/academyDataService.js'))
   assert(
-    'AcademyDataProvider export present',
-    read('src/context/AcademyDataContext.jsx').includes('AcademyDataProvider'),
+    'PlatformDataProvider export present',
+    read('src/context/PlatformDataContext.jsx').includes('PlatformDataProvider'),
   )
-  assert('academyDataService kept', exists('src/services/academyDataService.js'))
-  assert('useAcademyData kept', read('src/context/AcademyDataContext.jsx').includes('useAcademyData'))
+  assert('platformDataService exists', exists('src/services/platformDataService.js'))
+  assert(
+    'usePlatformData present',
+    read('src/context/PlatformDataContext.jsx').includes('usePlatformData'),
+  )
+  assert(
+    'no AcademyDataProvider in App',
+    !read('src/App.jsx').includes('AcademyDataProvider'),
+  )
 
   console.log('\nStandards surface kept')
   assert('PlatformStandards route file or import in App', app.includes('standards') && app.includes('ROUTE_KEYS.STANDARDS'))

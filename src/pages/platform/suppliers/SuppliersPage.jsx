@@ -6,7 +6,7 @@ import {
   createSupplier,
   updateSupplier,
   deleteSupplier,
-} from '../../../services/academyDataService'
+} from '../../../services/platformDataService'
 import {
   filterSuppliers,
   SUPPLIER_CATALOG_FILTER,

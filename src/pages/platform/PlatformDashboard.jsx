@@ -5,7 +5,7 @@ import { getOverviewStats } from '../../utils/adminStats'
 import { getActiveSuppliersCount } from '../../utils/supplierData'
 import { isCloudMode, getDataModeLabel } from '../../lib/dataMode'
 import { isModuleReady } from '../../lib/cloudStore'
-import { useAcademyData } from '../../context/AcademyDataContext'
+import { usePlatformData } from '../../context/PlatformDataContext'
 import '../../components/admin/admin-shared.css'
 import './PlatformDashboard.css'
 
@@ -16,7 +16,7 @@ function formatStatValue(ready, value) {
 
 /** Панель управления Shugyla Platform */
 export default function PlatformDashboard() {
-  const { ensureModules, version } = useAcademyData()
+  const { ensureModules, version } = usePlatformData()
   const cloudMode = isCloudMode()
 
   useEffect(() => {

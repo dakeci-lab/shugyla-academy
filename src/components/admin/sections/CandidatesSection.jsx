@@ -12,7 +12,7 @@ import {
   restoreCandidateToNew,
   saveCandidateInterviewInvitation,
   convertCandidateToTrainee,
-} from '../../../services/academyDataService'
+} from '../../../services/platformDataService'
 import { toastSuccess } from '../../../services/notificationService'
 import CandidateInterviewInviteModal, {
   copyTextToClipboard,

@@ -35,8 +35,8 @@ function main() {
   console.log('=== Progressive bootstrap verification ===\n')
 
   const cloudStore = read('src/lib/cloudStore.js')
-  const academyCtx = read('src/context/AcademyDataContext.jsx')
-  const academySvc = read('src/services/academyDataService.js')
+  const platformCtx = read('src/context/PlatformDataContext.jsx')
+  const platformSvc = read('src/services/platformDataService.js')
   const adapter = read('src/services/supabaseDataAdapter.js')
   const layout = read('src/layouts/PlatformLayout.jsx')
   const purchaseSvc = read('src/services/purchaseDataService.js')
@@ -54,25 +54,25 @@ function main() {
 
   console.log('Stage 2: Shell does not wait for full dump')
   assert(
-    'AcademyDataProvider does not await initializeData before ready',
-    /setReady\(true\)[\s\S]*setLoading\(false\)[\s\S]*initializeData\(/.test(academyCtx)
+    'PlatformDataProvider does not await initializeData before ready',
+    /setReady\(true\)[\s\S]*setLoading\(false\)[\s\S]*initializeData\(/.test(platformCtx)
   )
   assert(
     'DataLoadingScreen only during AUTH loading',
-    academyCtx.includes("authStatus === AUTH_STATUS.LOADING") &&
-      academyCtx.includes('DataLoadingScreen')
+    platformCtx.includes("authStatus === AUTH_STATUS.LOADING") &&
+      platformCtx.includes('DataLoadingScreen')
   )
   assert(
     'no global gate on loading || !ready for all routes',
-    !academyCtx.includes('(loading || !ready) && !isPublicRoute')
+    !platformCtx.includes('(loading || !ready) && !isPublicRoute')
   )
   assert('Session gate still waits for rbacReady', sessionGate.includes('!rbacReady'))
 
   console.log('Stage 3: Failure isolation')
   assert('fetchAllData does not throw on purchases reject', !/purchasesResult\.status === 'rejected'[\s\S]{0,80}throw/.test(adapter))
   assert('fetchAllData does not throw on receiving reject', !/receivingResult\.status === 'rejected'[\s\S]{0,80}throw/.test(adapter))
-  assert('ensureModuleLoaded exists', academySvc.includes('export async function ensureModuleLoaded'))
-  assert('progressive initializeData mode', academySvc.includes("mode = 'progressive'"))
+  assert('ensureModuleLoaded exists', platformSvc.includes('export async function ensureModuleLoaded'))
+  assert('progressive initializeData mode', platformSvc.includes("mode = 'progressive'"))
 
   console.log('Stage 4: Loading vs empty')
   assert('purchases ready helper', purchaseSvc.includes('isPurchasesDataReady'))
@@ -89,8 +89,8 @@ function main() {
     'procurement realtime gated to procurement/receiving routes',
     layout.includes('/platform/procurement') && layout.includes('/platform/receiving')
   )
-  assert('getEmployees does not call fetchAllData', !/export async function getEmployees\(\)[\s\S]*fetchAllData/.test(academySvc))
-  assert('getCourses API removed from academyDataService', !academySvc.includes('export async function getCourses'))
+  assert('getEmployees does not call fetchAllData', !/export async function getEmployees\(\)[\s\S]*fetchAllData/.test(platformSvc))
+  assert('getCourses API removed from platformDataService', !platformSvc.includes('export async function getCourses'))
   assert('purchase mutations refresh procurement only', purchaseSvc.includes('refreshProcurementData'))
   assert('TOKEN_REFRESHED does not clear store', /TOKEN_REFRESHED[\s\S]*setSupabaseAuthenticated\(true\)\s*return/.test(session))
   assert('logout clears cloud bootstrap', session.includes('resetCloudBootstrapState'))
@@ -109,10 +109,10 @@ function main() {
   )
   assert(
     'employees module loader independent',
-    academySvc.includes('ensureEmployeesCore') &&
-      academySvc.includes("case 'employees'") &&
-      !academySvc.includes('ensureEmployeesCoursesCore') &&
-      !academySvc.includes('ensureCoursesCore'),
+    platformSvc.includes('ensureEmployeesCore') &&
+      platformSvc.includes("case 'employees'") &&
+      !platformSvc.includes('ensureEmployeesCoursesCore') &&
+      !platformSvc.includes('ensureCoursesCore'),
   )
   assert(
     'cloud store has no learning modules',

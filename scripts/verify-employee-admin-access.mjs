@@ -252,7 +252,7 @@ function stageStaticFrontend() {
     'utf8'
   )
   const adminService = fs.readFileSync(path.join(ROOT, 'src/services/employeeAdminService.js'), 'utf8')
-  const academy = fs.readFileSync(path.join(ROOT, 'src/services/academyDataService.js'), 'utf8')
+  const platformSvc = fs.readFileSync(path.join(ROOT, 'src/services/platformDataService.js'), 'utf8')
 
   assert('EmployeesSection uses listEmployeesForAdmin', section.includes('listEmployeesForAdmin'))
   assert('EmployeesSection uses shared EmployeeEditModal', section.includes('EmployeeEditModal'))
@@ -262,7 +262,7 @@ function stageStaticFrontend() {
   assert('employeeAdminService uses functions.invoke', adminService.includes("supabase.functions.invoke('admin-list-employees'"))
   assert('cloud update uses admin function', adminService.includes("supabase.functions.invoke('admin-update-employee'"))
   assert('direct employee_id lookup helper', adminService.includes('export async function getEmployeeForAdmin'))
-  assert('academyDataService cloud update uses updateEmployeeAsAdmin', academy.includes('updateEmployeeAsAdmin'))
+  assert('platformDataService cloud update uses updateEmployeeAsAdmin', platformSvc.includes('updateEmployeeAsAdmin'))
   assert('no service key in employeeAdminService', !adminService.includes('SERVICE_ROLE'))
   console.log('')
 }

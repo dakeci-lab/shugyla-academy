@@ -1,4 +1,4 @@
-import { getVacancyById } from '../../services/academyDataService'
+import { getVacancyById } from '../../services/platformDataService'
 import { formatCandidateScoreDisplay } from '../../utils/candidateDisplayUtils'
 import { formatRecruitmentDate } from '../admin/sections/recruitmentAdminShared'
 import CandidateAvatar from '../CandidateAvatar'

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
-import { useAcademyData } from '../../../context/AcademyDataContext'
+import { usePlatformData } from '../../../context/PlatformDataContext'
 import {
   canViewPurchases,
   canEditPurchase,
@@ -32,7 +32,7 @@ import './ProcurementPage.css'
 export default function AnalyticsProcurementPage() {
   const { user } = useSession()
   const navigate = useNavigate()
-  const { ensureModules } = useAcademyData()
+  const { ensureModules } = usePlatformData()
   const { version, refresh } = useAdminRefresh()
   const [showCreate, setShowCreate] = useState(false)
   const [showImport, setShowImport] = useState(false)

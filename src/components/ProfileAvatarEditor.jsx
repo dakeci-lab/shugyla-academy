@@ -5,7 +5,7 @@ import {
   deleteEmployeeAvatarFile,
   validateEmployeeAvatarFile,
 } from '../services/employeeAvatarService'
-import { updateEmployeeAvatar, removeEmployeeAvatar } from '../services/academyDataService'
+import { updateEmployeeAvatar, removeEmployeeAvatar } from '../services/platformDataService'
 import { canEditEmployeeAvatar } from '../config/permissions'
 import { useSession } from '../context/SessionContext'
 import { useToast } from '../context/ToastContext'

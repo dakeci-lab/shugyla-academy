@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { getSuppliers } from '../../services/academyDataService'
+import { getSuppliers } from '../../services/platformDataService'
 import SearchableSupplierSelect from '../suppliers/SearchableSupplierSelect'
 import './CreatePurchaseModal.css'
 

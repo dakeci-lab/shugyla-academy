@@ -136,7 +136,7 @@ function stageEmployeeAdmin() {
   const section = read('src/components/admin/sections/EmployeesSection.jsx')
   const adminService = read('src/services/employeeAdminService.js')
   const provisioning = read('src/services/employeeProvisioningService.js')
-  const academy = read('src/services/academyDataService.js')
+  const platformSvc = read('src/services/platformDataService.js')
 
   const modal = read('src/components/admin/employees/EmployeeEditModal.jsx')
 
@@ -149,8 +149,8 @@ function stageEmployeeAdmin() {
   assert('admin-update-employees via functions.invoke', adminService.includes("supabase.functions.invoke('admin-update-employee'"))
   assert('admin-create via functions.invoke', provisioning.includes("supabase.functions.invoke('admin-create-employee'"))
   assert('createEmployeeWithAuth sends temporary_password not academy password column', provisioning.includes('temporary_password'))
-  assert('academyDataService cloud create uses createEmployeeWithAuth', academy.includes('createEmployeeWithAuth'))
-  assert('academyDataService cloud update uses updateEmployeeAsAdmin', academy.includes('updateEmployeeAsAdmin'))
+  assert('platformDataService cloud create uses createEmployeeWithAuth', platformSvc.includes('createEmployeeWithAuth'))
+  assert('platformDataService cloud update uses updateEmployeeAsAdmin', platformSvc.includes('updateEmployeeAsAdmin'))
   assert('employee list DTO uses authLinked not auth_user_id', adminService.includes('authLinked: row.auth_linked'))
   console.log('')
 }

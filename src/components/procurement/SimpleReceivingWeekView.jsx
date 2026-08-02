@@ -15,7 +15,7 @@ import {
   getPurchasesDataError,
 } from '../../services/purchaseDataService'
 import { getAllSuppliersSync } from '../../utils/supplierData'
-import { useAcademyData } from '../../context/AcademyDataContext'
+import { usePlatformData } from '../../context/PlatformDataContext'
 import { toUserErrorMessage } from '../../utils/userErrorMessage'
 import {
   acceptSimpleDeliveryOptimistic,
@@ -40,7 +40,7 @@ import './SimpleDeliveryCard.css'
 export default function SimpleReceivingWeekView() {
   const { user } = useSession()
   const { version, notifyChange } = useAdminRefresh()
-  const { ensureModules, reloadProcurement } = useAcademyData()
+  const { ensureModules, reloadProcurement } = usePlatformData()
   const {
     weekStartKey,
     selectedDateKey,

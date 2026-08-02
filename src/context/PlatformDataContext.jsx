@@ -8,14 +8,14 @@ import {
   getRouteCriticalModules,
   setCloudBootstrapListener,
   resetCloudBootstrapState,
-} from '../services/academyDataService'
+} from '../services/platformDataService'
 import { getAllModuleLoadStates } from '../lib/cloudStore'
 import { isPublicAppPath } from '../router/authRoutes'
 import { useSession, AUTH_STATUS } from './SessionContext'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
-import './AcademyDataContext.css'
+import './PlatformDataContext.css'
 
-const AcademyDataContext = createContext({
+const PlatformDataContext = createContext({
   ready: true,
   loading: false,
   loadError: null,
@@ -29,11 +29,11 @@ const AcademyDataContext = createContext({
 
 function DataLoadingScreen() {
   return (
-    <div className="academy-data-loading">
-      <div className="academy-data-loading__card">
-        <div className="academy-data-loading__logo" aria-hidden="true">S</div>
-        <h1 className="academy-data-loading__brand">Shugyla Platform</h1>
-        <span className="academy-data-loading__spinner" aria-hidden />
+    <div className="platform-data-loading">
+      <div className="platform-data-loading__card">
+        <div className="platform-data-loading__logo" aria-hidden="true">S</div>
+        <h1 className="platform-data-loading__brand">Shugyla Platform</h1>
+        <span className="platform-data-loading__spinner" aria-hidden />
         <p>Загрузка…</p>
       </div>
     </div>
@@ -87,7 +87,7 @@ function classifyDataLoadError(error) {
   }
 }
 
-export function AcademyDataProvider({ children }) {
+export function PlatformDataProvider({ children }) {
   const { pathname } = useLocation()
   const isPublicRoute = isPublicAppPath(pathname)
   const { authStatus, supabaseAuthenticated, user } = useSession()
@@ -129,7 +129,7 @@ export function AcademyDataProvider({ children }) {
       } catch (error) {
         // Module errors stay in module state; do not gate the whole shell.
         if (import.meta.env.DEV) {
-          console.error('[AcademyDataEnsureModules]', error)
+          console.error('[PlatformDataEnsureModules]', error)
         }
       } finally {
         bumpVersion()
@@ -239,7 +239,7 @@ export function AcademyDataProvider({ children }) {
   }
 
   return (
-    <AcademyDataContext.Provider
+    <PlatformDataContext.Provider
       value={{
         ready,
         loading,
@@ -253,10 +253,10 @@ export function AcademyDataProvider({ children }) {
       }}
     >
       {children}
-    </AcademyDataContext.Provider>
+    </PlatformDataContext.Provider>
   )
 }
 
-export function useAcademyData() {
-  return useContext(AcademyDataContext)
+export function usePlatformData() {
+  return useContext(PlatformDataContext)
 }

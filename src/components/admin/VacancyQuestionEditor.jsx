@@ -5,7 +5,7 @@ import {
   updateCandidateQuestion,
   deleteCandidateQuestion,
   reorderCandidateQuestions,
-} from '../../services/academyDataService'
+} from '../../services/platformDataService'
 import {
   validateQuestionForm,
   questionFormToPayload,

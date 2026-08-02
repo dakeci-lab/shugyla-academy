@@ -6,7 +6,7 @@ import {
   saveWorkLocation,
   getAttendanceSettings,
   saveAttendanceSettings,
-} from '../../services/academyDataService'
+} from '../../services/platformDataService'
 import { useSession } from '../../context/SessionContext'
 import './admin-shared.css'
 

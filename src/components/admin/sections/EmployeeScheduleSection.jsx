@@ -105,7 +105,7 @@ export default function EmployeeScheduleSection({
         setEmployeeMissing(!localEmployee)
         if (localEmployee) {
           const { getEmployeeShiftsForDateRange } = await import(
-            '../../../services/academyDataService'
+            '../../../services/platformDataService'
           )
           const { dateFrom, dateTo } = getMonthCalendarRange(year, month)
           const rows = await getEmployeeShiftsForDateRange(employeeId, dateFrom, dateTo)

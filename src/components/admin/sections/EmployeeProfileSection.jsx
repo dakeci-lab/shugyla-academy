@@ -11,7 +11,7 @@ import {
   getEmployeeForAdmin,
 } from '../../../services/employeeAdminService'
 import { fetchEmployeeWorkforceBundle } from '../../../services/workforceAdminService'
-import { getAttendanceSettings } from '../../../services/academyDataService'
+import { getAttendanceSettings } from '../../../services/platformDataService'
 import {
   calculateEmployeeRatingFromShifts,
   RATING_STATUS,
@@ -37,7 +37,7 @@ import ConfirmDialog from '../ConfirmDialog'
 import {
   deactivateEmployee,
   restoreEmployee,
-} from '../../../services/academyDataService'
+} from '../../../services/platformDataService'
 import {
   isActiveStaffEmployee,
   isDeactivatedStaffEmployee,
@@ -246,7 +246,7 @@ export default function EmployeeProfileSection({ employeeId }) {
 
   useEffect(() => {
     loadEmployee()
-    // Intentionally omit AcademyData `version`: progressive bootstrap was replaying
+    // Intentionally omit PlatformData `version`: progressive bootstrap was replaying
     // admin-list-employees / workforce. Mutations call loadEmployee + refresh.
   }, [loadEmployee])
 

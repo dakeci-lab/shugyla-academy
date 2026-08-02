@@ -14,7 +14,7 @@ import {
 import { buildRatingDisplayRows, RATING_STATUS } from '../../../utils/ratingEligibility'
 import { formatMonthYearLabel, getMondayOfWeek, toDateKey, parseDateKey } from '../../../utils/shiftData'
 import { fetchTeamWorkforceForMonth } from '../../../services/workforceAdminService'
-import { getAttendanceSettings, computeEmployeeRatingsForMonth } from '../../../services/academyDataService'
+import { getAttendanceSettings, computeEmployeeRatingsForMonth } from '../../../services/platformDataService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeRatingDetailModal from '../EmployeeRatingDetailModal'
