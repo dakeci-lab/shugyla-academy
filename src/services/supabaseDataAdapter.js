@@ -17,6 +17,7 @@ import {
   buildPositionFieldsFromCatalog,
   ensurePositionCatalogLoaded,
 } from './positionCatalogService'
+import { isAcademyModuleEnabled } from '../config/featureFlags'
 
 function mapAcademyUserRow(row, assignmentMap) {
   const positionFields = buildPositionFieldsFromCatalog(
@@ -205,8 +206,11 @@ function settleTableResult(result, context, fallback = []) {
   return result?.data ?? fallback
 }
 
-/** Core academy tables (employees / courses / lessons / assignments / progress). */
-export async function fetchCoreAcademyData() {
+/**
+ * Platform employee core — never touches Academy Learning tables.
+ * assignedCourseIds stays empty here; learning modules may enrich later when enabled.
+ */
+export async function fetchCoreEmployeeData() {
   migrateEmployeeLocalSchema()
   let usersRes = await supabase
     .from('academy_users')
@@ -219,6 +223,20 @@ export async function fetchCoreAcademyData() {
       .order('id')
   }
 
+  // Batch catalog load (not per employee). Failures leave legacy position text intact.
+  await ensurePositionCatalogLoaded().catch(() => null)
+
+  const users = settleTableResult(usersRes, 'Загрузка сотрудников', [])
+  const employees = users.map((row) => mapAcademyUserRow(row, null))
+
+  return { employees }
+}
+
+/**
+ * Academy Learning tables only (courses / lessons / assignments / progress).
+ * Must not be required for employees, auth, or operational modules.
+ */
+export async function fetchAcademyLearningCore() {
   const [coursesRes, lessonsRes, assignmentsRes, progressRes] = await Promise.all([
     supabase.from('academy_courses').select('*').order('id'),
     supabase.from('academy_lessons').select('*').eq('is_deleted', false).order('sort_order'),
@@ -226,31 +244,45 @@ export async function fetchCoreAcademyData() {
     supabase.from('academy_progress').select('*'),
   ])
 
-  // Batch catalog load (not per employee). Failures leave legacy position text intact.
-  await ensurePositionCatalogLoaded().catch(() => null)
-
-  const users = settleTableResult(usersRes, 'Загрузка сотрудников', [])
   const courses = settleTableResult(coursesRes, 'Загрузка курсов', [])
   const lessons = settleTableResult(lessonsRes, 'Загрузка уроков', [])
   const assignments = settleTableResult(assignmentsRes, 'Загрузка назначений', [])
   const progressRows = settleTableResult(progressRes, 'Загрузка прогресса', [])
 
-  const assignmentMap = groupAssignments(assignments)
   const normalizedLessons = lessons.map(rowToLesson)
-
-  const employees = users.map((row) => mapAcademyUserRow(row, assignmentMap))
-
   const normalizedCourses = attachLessonCounts(
     courses.map(rowToCourse),
     normalizedLessons
   )
 
   return {
-    employees,
     courses: normalizedCourses,
     lessons: normalizedLessons,
     assignments,
     progress: buildProgressMap(progressRows),
+    assignmentMap: groupAssignments(assignments),
+  }
+}
+
+/**
+ * Legacy combined core (employees + learning). Prefer fetchCoreEmployeeData /
+ * fetchAcademyLearningCore. Kept for Academy-enabled full dumps / migrate.
+ */
+export async function fetchCoreAcademyData() {
+  const { employees } = await fetchCoreEmployeeData()
+  const learning = await fetchAcademyLearningCore()
+  const assignmentMap = learning.assignmentMap
+  const employeesWithAssignments = employees.map((employee) => ({
+    ...employee,
+    assignedCourseIds: assignmentMap.get(employee.id) || employee.assignedCourseIds || [],
+  }))
+
+  return {
+    employees: employeesWithAssignments,
+    courses: learning.courses,
+    lessons: learning.lessons,
+    assignments: learning.assignments,
+    progress: learning.progress,
   }
 }
 
@@ -329,9 +361,36 @@ export async function fetchReceivingModuleData() {
 /**
  * Full dump for legacy callers. Soft-isolates optional modules (including procurement).
  * Prefer progressive bootstrap via academyDataService.ensureModuleLoaded.
+ * When Academy Learning is disabled, skips all learning-table reads.
  */
 export async function fetchAllData() {
-  const core = await fetchCoreAcademyData()
+  const academyOn = isAcademyModuleEnabled()
+  const employeeCore = await fetchCoreEmployeeData()
+  const learningCore = academyOn
+    ? await fetchAcademyLearningCore()
+    : {
+        courses: [],
+        lessons: [],
+        assignments: [],
+        progress: {},
+        assignmentMap: new Map(),
+      }
+
+  const employees = academyOn
+    ? employeeCore.employees.map((employee) => ({
+        ...employee,
+        assignedCourseIds:
+          learningCore.assignmentMap.get(employee.id) || employee.assignedCourseIds || [],
+      }))
+    : employeeCore.employees
+
+  const core = {
+    employees,
+    courses: learningCore.courses,
+    lessons: learningCore.lessons,
+    assignments: learningCore.assignments,
+    progress: learningCore.progress,
+  }
 
   const [
     learningResult,
@@ -341,7 +400,16 @@ export async function fetchAllData() {
     purchasesResult,
     receivingResult,
   ] = await Promise.allSettled([
-    fetchAcademyLearningExtras(),
+    academyOn
+      ? fetchAcademyLearningExtras()
+      : Promise.resolve({
+          tests: [],
+          testQuestions: [],
+          testAttempts: [],
+          learningPaths: [],
+          learningPathCourses: [],
+          userLearningPaths: [],
+        }),
     fetchStandardsModuleData(),
     fetchRecruitmentModuleData(),
     fetchSuppliersModuleData(),
@@ -442,7 +510,9 @@ async function createUser(data) {
     'Создание сотрудника'
   )
 
-  await syncAssignments(employee.id, employee.assignedCourseIds)
+  if (isAcademyModuleEnabled()) {
+    await syncAssignments(employee.id, employee.assignedCourseIds)
+  }
   return employee.id
 }
 
@@ -497,7 +567,7 @@ async function updateUser(id, updates) {
     )
   }
 
-  if (updates.assignedCourseIds != null) {
+  if (isAcademyModuleEnabled() && updates.assignedCourseIds != null) {
     await syncAssignments(id, updates.assignedCourseIds)
   }
 }
@@ -517,14 +587,18 @@ export async function restoreEmployee(id) {
 }
 
 export async function permanentlyDeleteEmployee(id) {
-  await throwIfError(
-    await supabase.from('academy_course_assignments').delete().eq('user_id', id),
-    'Удаление назначений'
-  )
-  await throwIfError(
-    await supabase.from('academy_progress').delete().eq('user_id', id),
-    'Удаление прогресса'
-  )
+  // Learning cleanup only when Academy Learning is enabled — do not touch
+  // course tables during ordinary platform operation while the module is off.
+  if (isAcademyModuleEnabled()) {
+    await throwIfError(
+      await supabase.from('academy_course_assignments').delete().eq('user_id', id),
+      'Удаление назначений'
+    )
+    await throwIfError(
+      await supabase.from('academy_progress').delete().eq('user_id', id),
+      'Удаление прогресса'
+    )
+  }
   await throwIfError(
     await supabase.from('academy_users').delete().eq('id', id),
     'Удаление сотрудника'
@@ -570,6 +644,8 @@ export async function updateProfile(userId, { firstName, lastName, contactEmail 
 }
 
 async function syncAssignments(userId, courseIds) {
+  if (!isAcademyModuleEnabled()) return
+
   await throwIfError(
     await supabase.from('academy_course_assignments').delete().eq('user_id', userId),
     'Очистка назначений'
@@ -781,19 +857,12 @@ export async function authenticateUser(loginValue, password) {
     return { ok: false, reason: 'deactivated' }
   }
 
-  const assignmentsRes = await supabase
-    .from('academy_course_assignments')
-    .select('course_id')
-    .eq('user_id', row.id)
-  const assignments = await throwIfError(assignmentsRes, 'Назначения')
-
+  // Do not read academy_course_assignments during auth-adjacent flows.
+  // Academy Learning may enrich assignedCourseIds later when the module is on.
   await ensurePositionCatalogLoaded().catch(() => null)
   return {
     ok: true,
-    user: mapAcademyUserRow(
-      { ...row, assignedCourseIds: undefined },
-      new Map([[row.id, assignments.map((a) => a.course_id)]]),
-    ),
+    user: mapAcademyUserRow({ ...row, assignedCourseIds: undefined }, null),
   }
 }
 

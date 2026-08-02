@@ -122,7 +122,8 @@ function profileRowToEmployee(row, assignedCourseIds = []) {
 }
 
 /**
- * Load course assignments for the authenticated employee (after Auth session exists).
+ * Load course assignments for Academy Learning UI only.
+ * Must not be called from Auth / session restore / platform bootstrap.
  */
 export async function loadAcademyAssignmentsForEmployee(employeeId) {
   if (employeeId === undefined || employeeId === null || employeeId === '' || !supabase) {
@@ -231,10 +232,10 @@ export async function loadAcademyProfileByAuthUserId(authUserId) {
 
 /** Build platform session user from an academy_users row (no password). */
 export async function buildCloudPlatformSessionUser(profileRow, options = {}) {
-  const { skipAssignments = false } = options
-  const assignedCourseIds = skipAssignments
-    ? []
-    : await loadAcademyAssignmentsForEmployee(profileRow.id)
+  // Academy Learning is decoupled from Auth: never query academy_course_assignments
+  // during login/session restore. Keep contract field as empty for compatibility.
+  void options
+  const assignedCourseIds = []
 
   await ensureRbacLoaded()
 
@@ -298,17 +299,8 @@ export async function loadAcademyProfileByLogin(loginValue) {
       return { deactivated: true }
     }
 
-    const assignmentsRes = await supabase
-      .from('academy_course_assignments')
-      .select('course_id')
-      .eq('user_id', row.id)
-
-    if (assignmentsRes.error) {
-      throw new Error('Не удалось загрузить назначения курсов')
-    }
-
     return buildSessionUser(
-      profileRowToEmployee(row, (assignmentsRes.data || []).map((a) => a.course_id)),
+      profileRowToEmployee(row, []),
       technicalEmailToPhone(row.login) || row.login
     )
   }
@@ -345,17 +337,8 @@ export async function loadAcademyProfileById(userId) {
       return { deactivated: true }
     }
 
-    const assignmentsRes = await supabase
-      .from('academy_course_assignments')
-      .select('course_id')
-      .eq('user_id', row.id)
-
-    if (assignmentsRes.error) {
-      throw new Error('Не удалось загрузить назначения курсов')
-    }
-
     return buildSessionUser(
-      profileRowToEmployee(row, (assignmentsRes.data || []).map((a) => a.course_id)),
+      profileRowToEmployee(row, []),
       technicalEmailToPhone(row.login) || row.login
     )
   }

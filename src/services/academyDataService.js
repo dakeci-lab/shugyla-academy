@@ -194,61 +194,143 @@ export function getRouteCriticalModules(pathname = '') {
     return academyOn ? ['employees', 'courses', 'academyLearning'] : []
   }
   if (path === '/platform' || path === '/platform/') {
-    // Home no longer depends on academy core; suppliers stay in background prefetch.
-    return academyOn ? ['employees', 'courses', 'suppliers'] : []
+    // Home: employees are operational; learning modules only when Academy is on.
+    // Suppliers stay in background prefetch.
+    return academyOn ? ['employees', 'courses', 'suppliers'] : ['employees']
+  }
+  if (path.includes('/platform/employees') || path.includes('/platform/dashboard')) {
+    return ['employees']
   }
   return []
 }
 
-const CORE_MODULE_KEY = '__coreEmployeesCourses'
+const EMPLOYEES_MODULE_KEY = '__coreEmployees'
+const COURSES_MODULE_KEY = '__coreCourses'
 
-async function loadEmployeesCoursesCore() {
-  const core = await supabaseAdapter.fetchCoreAcademyData()
+async function loadEmployeesCore() {
+  const core = await supabaseAdapter.fetchCoreEmployeeData()
   ensureCloudStoreReady()
   patchCloudStore({
     employees: core.employees,
-    courses: core.courses,
-    lessons: core.lessons,
-    assignments: core.assignments,
-    progress: core.progress,
   })
   markModuleReady('employees')
-  markModuleReady('courses')
   return core
 }
 
-async function ensureEmployeesCoursesCore() {
-  if (isModuleReady('employees') && isModuleReady('courses')) {
+async function ensureEmployeesCore() {
+  if (isModuleReady('employees')) {
     return getCloudStore()
   }
-  if (modulePromises[CORE_MODULE_KEY]) {
-    return modulePromises[CORE_MODULE_KEY]
+  if (modulePromises[EMPLOYEES_MODULE_KEY]) {
+    return modulePromises[EMPLOYEES_MODULE_KEY]
   }
 
   markModuleLoading('employees')
-  markModuleLoading('courses')
   notifyModulesChanged()
 
-  modulePromises[CORE_MODULE_KEY] = (async () => {
+  modulePromises[EMPLOYEES_MODULE_KEY] = (async () => {
     try {
-      await loadEmployeesCoursesCore()
+      await loadEmployeesCore()
       notifyModulesChanged()
       return getCloudStore()
     } catch (error) {
       markModuleError('employees', error)
+      notifyModulesChanged()
+      throw error
+    } finally {
+      delete modulePromises[EMPLOYEES_MODULE_KEY]
+    }
+  })()
+
+  return modulePromises[EMPLOYEES_MODULE_KEY]
+}
+
+async function loadCoursesCore() {
+  const learning = await supabaseAdapter.fetchAcademyLearningCore()
+  ensureCloudStoreReady()
+  patchCloudStore({
+    courses: learning.courses,
+    lessons: learning.lessons,
+    assignments: learning.assignments,
+    progress: learning.progress,
+  })
+
+  // Enrich already-loaded employees with assignment ids (Academy UI only path).
+  const store = getCloudStore()
+  if (Array.isArray(store.employees) && store.employees.length > 0) {
+    const assignmentMap = learning.assignmentMap
+    patchCloudStore({
+      employees: store.employees.map((employee) => ({
+        ...employee,
+        assignedCourseIds:
+          assignmentMap.get(employee.id) || employee.assignedCourseIds || [],
+      })),
+    })
+  }
+
+  markModuleReady('courses')
+  return learning
+}
+
+async function ensureCoursesCore() {
+  if (!isAcademyModuleEnabled()) {
+    if (!isModuleReady('courses')) {
+      ensureCloudStoreReady()
+      patchCloudStore({
+        courses: [],
+        lessons: [],
+        assignments: [],
+        progress: {},
+      })
+      markModuleReady('courses')
+      notifyModulesChanged()
+    }
+    return getCloudStore()
+  }
+
+  if (isModuleReady('courses')) {
+    return getCloudStore()
+  }
+  if (modulePromises[COURSES_MODULE_KEY]) {
+    return modulePromises[COURSES_MODULE_KEY]
+  }
+
+  markModuleLoading('courses')
+  notifyModulesChanged()
+
+  modulePromises[COURSES_MODULE_KEY] = (async () => {
+    try {
+      await loadCoursesCore()
+      notifyModulesChanged()
+      return getCloudStore()
+    } catch (error) {
       markModuleError('courses', error)
       notifyModulesChanged()
       throw error
     } finally {
-      delete modulePromises[CORE_MODULE_KEY]
+      delete modulePromises[COURSES_MODULE_KEY]
     }
   })()
 
-  return modulePromises[CORE_MODULE_KEY]
+  return modulePromises[COURSES_MODULE_KEY]
 }
 
 async function loadAcademyLearningModule() {
-  await ensureEmployeesCoursesCore()
+  if (!isAcademyModuleEnabled()) {
+    ensureCloudStoreReady()
+    patchCloudStore({
+      tests: [],
+      testQuestions: [],
+      testAttempts: [],
+      learningPaths: [],
+      learningPathCourses: [],
+      userLearningPaths: [],
+    })
+    markModuleReady('academyLearning')
+    return {}
+  }
+
+  await ensureCoursesCore()
   const extras = await supabaseAdapter.fetchAcademyLearningExtras()
   ensureCloudStoreReady()
   patchCloudStore({
@@ -265,9 +347,12 @@ async function loadAcademyLearningModule() {
 
 async function loadModule(moduleName) {
   switch (moduleName) {
-    case 'employees':
+    case 'employees': {
+      await ensureEmployeesCore()
+      return
+    }
     case 'courses': {
-      await ensureEmployeesCoursesCore()
+      await ensureCoursesCore()
       return
     }
     case 'academyLearning': {
@@ -318,8 +403,11 @@ export async function ensureModuleLoaded(moduleName) {
 
   if (isModuleReady(moduleName)) return getCloudStore()
 
-  if (moduleName === 'employees' || moduleName === 'courses') {
-    return ensureEmployeesCoursesCore()
+  if (moduleName === 'employees') {
+    return ensureEmployeesCore()
+  }
+  if (moduleName === 'courses') {
+    return ensureCoursesCore()
   }
 
   if (modulePromises[moduleName]) {

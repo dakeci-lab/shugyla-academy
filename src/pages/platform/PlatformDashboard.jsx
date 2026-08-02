@@ -24,9 +24,10 @@ export default function PlatformDashboard() {
 
   useEffect(() => {
     if (!cloudMode) return
+    // Employees load independently of Academy Learning; courses only when enabled.
     const modules = academyOn
       ? ['employees', 'courses', 'suppliers']
-      : ['suppliers']
+      : ['employees', 'suppliers']
     void ensureModules(modules)
   }, [cloudMode, ensureModules, academyOn])
 

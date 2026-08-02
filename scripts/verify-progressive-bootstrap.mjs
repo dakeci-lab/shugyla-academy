@@ -95,6 +95,45 @@ function main() {
   assert('TOKEN_REFRESHED does not clear store', /TOKEN_REFRESHED[\s\S]*setSupabaseAuthenticated\(true\)\s*return/.test(session))
   assert('logout clears cloud bootstrap', session.includes('resetCloudBootstrapState'))
 
+  console.log('Stage 6: Academy Learning decoupled from employees/auth bootstrap')
+  const authService = read('src/services/authService.js')
+  assert(
+    'employees core fetch exists',
+    adapter.includes('export async function fetchCoreEmployeeData'),
+  )
+  assert(
+    'learning core fetch exists',
+    adapter.includes('export async function fetchAcademyLearningCore'),
+  )
+  assert(
+    'employees module loader independent',
+    academySvc.includes('ensureEmployeesCore') &&
+      academySvc.includes('case \'employees\'') &&
+      !academySvc.includes('ensureEmployeesCoursesCore'),
+  )
+  assert(
+    'courses module gated by feature flag',
+    academySvc.includes('async function ensureCoursesCore') &&
+      /ensureCoursesCore[\s\S]*isAcademyModuleEnabled\(\)/.test(academySvc),
+  )
+  assert(
+    'cloud session does not await assignments load',
+    !/buildCloudPlatformSessionUser[\s\S]*await loadAcademyAssignmentsForEmployee/.test(authService),
+  )
+  assert(
+    'deprecated profile-by-login does not query assignments',
+    !/loadAcademyProfileByLogin[\s\S]*academy_course_assignments/.test(authService),
+  )
+  assert(
+    'deprecated profile-by-id does not query assignments',
+    !/loadAcademyProfileById[\s\S]*academy_course_assignments/.test(authService),
+  )
+  assert(
+    'fetchAllData skips learning when Academy off',
+    adapter.includes('isAcademyModuleEnabled') &&
+      /fetchAllData[\s\S]*academyOn/.test(adapter),
+  )
+
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }
 
