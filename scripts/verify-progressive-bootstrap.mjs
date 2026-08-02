@@ -90,48 +90,51 @@ function main() {
     layout.includes('/platform/procurement') && layout.includes('/platform/receiving')
   )
   assert('getEmployees does not call fetchAllData', !/export async function getEmployees\(\)[\s\S]*fetchAllData/.test(academySvc))
-  assert('getCourses does not call fetchAllData', !/export async function getCourses\(\)[\s\S]*fetchAllData/.test(academySvc))
+  assert('getCourses API removed from academyDataService', !academySvc.includes('export async function getCourses'))
   assert('purchase mutations refresh procurement only', purchaseSvc.includes('refreshProcurementData'))
   assert('TOKEN_REFRESHED does not clear store', /TOKEN_REFRESHED[\s\S]*setSupabaseAuthenticated\(true\)\s*return/.test(session))
   assert('logout clears cloud bootstrap', session.includes('resetCloudBootstrapState'))
 
-  console.log('Stage 6: Academy Learning decoupled from employees/auth bootstrap')
+  console.log('Stage 6: Academy Learning data layer removed from bootstrap')
   const authService = read('src/services/authService.js')
   assert(
     'employees core fetch exists',
     adapter.includes('export async function fetchCoreEmployeeData'),
   )
   assert(
-    'learning core fetch exists',
-    adapter.includes('export async function fetchAcademyLearningCore'),
+    'learning core fetch removed',
+    !adapter.includes('fetchAcademyLearningCore') &&
+      !adapter.includes('fetchAcademyLearningExtras') &&
+      !adapter.includes('fetchCoreAcademyData'),
   )
   assert(
     'employees module loader independent',
     academySvc.includes('ensureEmployeesCore') &&
-      academySvc.includes('case \'employees\'') &&
-      !academySvc.includes('ensureEmployeesCoursesCore'),
+      academySvc.includes("case 'employees'") &&
+      !academySvc.includes('ensureEmployeesCoursesCore') &&
+      !academySvc.includes('ensureCoursesCore'),
   )
   assert(
-    'courses module gated by feature flag',
-    academySvc.includes('async function ensureCoursesCore') &&
-      /ensureCoursesCore[\s\S]*isAcademyModuleEnabled\(\)/.test(academySvc),
+    'cloud store has no learning modules',
+    !cloudStore.includes("'courses'") &&
+      !cloudStore.includes("'academyLearning'"),
   )
   assert(
-    'cloud session does not await assignments load',
-    !/buildCloudPlatformSessionUser[\s\S]*await loadAcademyAssignmentsForEmployee/.test(authService),
+    'assignment loader removed',
+    !authService.includes('loadAcademyAssignmentsForEmployee') &&
+      !authService.includes('academy_course_assignments'),
   )
   assert(
-    'deprecated profile-by-login does not query assignments',
-    !/loadAcademyProfileByLogin[\s\S]*academy_course_assignments/.test(authService),
+    'session does not write assignedCourseIds',
+    !authService.includes('assignedCourseIds'),
   )
   assert(
-    'deprecated profile-by-id does not query assignments',
-    !/loadAcademyProfileById[\s\S]*academy_course_assignments/.test(authService),
-  )
-  assert(
-    'fetchAllData skips learning when Academy off',
-    adapter.includes('isAcademyModuleEnabled') &&
-      /fetchAllData[\s\S]*academyOn/.test(adapter),
+    'adapter has no learning table queries',
+    !adapter.includes("from('academy_courses')") &&
+      !adapter.includes("from('academy_lessons')") &&
+      !adapter.includes("from('academy_course_assignments')") &&
+      !adapter.includes("from('academy_progress')") &&
+      !adapter.includes("from('academy_tests')"),
   )
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)

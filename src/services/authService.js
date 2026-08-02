@@ -94,11 +94,10 @@ function buildSessionUser(employee, phone = null) {
     avatarUrl: employee.avatarUrl || null,
     workMode: employee.workMode || employee.work_mode || 'offline',
     permissions: role?.permissions || [],
-    assignedCourseIds: employee.assignedCourseIds || [],
   }
 }
 
-function profileRowToEmployee(row, assignedCourseIds = []) {
+function profileRowToEmployee(row) {
   return normalizeEmployee({
     id: row.id,
     firstName: row.first_name,
@@ -116,30 +115,8 @@ function profileRowToEmployee(row, assignedCourseIds = []) {
     salaryCalculationType: row.salary_calculation_type,
     payrollParticipation: row.payroll_participation,
     createdAt: row.created_at,
-    assignedCourseIds,
     avatarUrl: row.avatar_url,
   })
-}
-
-/**
- * Load course assignments for Academy Learning UI only.
- * Must not be called from Auth / session restore / platform bootstrap.
- */
-export async function loadAcademyAssignmentsForEmployee(employeeId) {
-  if (employeeId === undefined || employeeId === null || employeeId === '' || !supabase) {
-    return []
-  }
-
-  const assignmentsRes = await supabase
-    .from('academy_course_assignments')
-    .select('course_id')
-    .eq('user_id', employeeId)
-
-  if (assignmentsRes.error) {
-    throw new Error('Не удалось загрузить назначения курсов')
-  }
-
-  return (assignmentsRes.data || []).map((a) => a.course_id)
 }
 
 /**
@@ -232,14 +209,11 @@ export async function loadAcademyProfileByAuthUserId(authUserId) {
 
 /** Build platform session user from an academy_users row (no password). */
 export async function buildCloudPlatformSessionUser(profileRow, options = {}) {
-  // Academy Learning is decoupled from Auth: never query academy_course_assignments
-  // during login/session restore. Keep contract field as empty for compatibility.
   void options
-  const assignedCourseIds = []
 
   await ensureRbacLoaded()
 
-  const employee = profileRowToEmployee(profileRow, assignedCourseIds)
+  const employee = profileRowToEmployee(profileRow)
   const sessionProfile = buildSessionUser(
     employee,
     technicalEmailToPhone(profileRow.login) || profileRow.login
@@ -270,7 +244,6 @@ export async function buildCloudPlatformSessionUser(profileRow, options = {}) {
     permissions: [],
     permissionCodes,
     permissionSlugs: permissionCodes,
-    assignedCourseIds,
     sessionType: SESSION_TYPE.SUPABASE,
     supabaseAuthenticated: true,
   }
@@ -300,7 +273,7 @@ export async function loadAcademyProfileByLogin(loginValue) {
     }
 
     return buildSessionUser(
-      profileRowToEmployee(row, []),
+      profileRowToEmployee(row),
       technicalEmailToPhone(row.login) || row.login
     )
   }
@@ -338,7 +311,7 @@ export async function loadAcademyProfileById(userId) {
     }
 
     return buildSessionUser(
-      profileRowToEmployee(row, []),
+      profileRowToEmployee(row),
       technicalEmailToPhone(row.login) || row.login
     )
   }
@@ -556,7 +529,6 @@ async function restoreLegacyPlatformSession(storedSnapshot) {
       permissions: [],
       permissionCodes,
       permissionSlugs: permissionCodes,
-      assignedCourseIds: profile.assignedCourseIds || [],
       sessionType: SESSION_TYPE.LEGACY,
     },
     sessionType: SESSION_TYPE.LEGACY,
@@ -877,7 +849,6 @@ export async function signInWithEmail(email, password) {
       ...sessionPosition,
       avatarUrl: legacy.user.avatarUrl || null,
       permissions: role?.permissions || [],
-      assignedCourseIds: legacy.user.assignedCourseIds || [],
     },
     session: null,
   }

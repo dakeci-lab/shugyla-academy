@@ -53,7 +53,6 @@ function buildSessionUserMirror(employee) {
     roleName: role?.label || employee.role,
     ...sessionPosition,
     permissions: role?.permissions || [],
-    assignedCourseIds: employee.assignedCourseIds || [],
   }
 }
 
@@ -161,13 +160,19 @@ function main() {
     roleId: 'role-cashier',
     positionId: 'p1',
     positionName: 'Кассир торгового зала',
-    assignedCourseIds: ['c1'],
   })
   assertEqual('session role preserved', sessionNamed.role, 'cashier')
   assertEqual('session roleName from catalog', sessionNamed.roleName, 'Кассир')
   assertEqual('session position from HR', sessionNamed.positionName, 'Кассир торгового зала')
   assertEqual('session permissions present', Array.isArray(sessionNamed.permissions) && sessionNamed.permissions.length > 0, true)
-  assertEqual('assigned courses kept', sessionNamed.assignedCourseIds[0], 'c1')
+  assert(
+    'session omits assignedCourseIds',
+    !Object.prototype.hasOwnProperty.call(sessionNamed, 'assignedCourseIds'),
+  )
+  assert(
+    'authService omits assignedCourseIds writes',
+    !authService.includes('assignedCourseIds'),
+  )
 
   const sessionMissing = buildSessionUserMirror({
     id: 'u2',

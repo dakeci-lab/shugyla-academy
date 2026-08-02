@@ -10,12 +10,8 @@ import {
 import { resolveUserRole } from '../config/permissions'
 import { getDefaultPlatformPath } from '../platform/platformAccess'
 import { LOGIN_PATH } from '../router/authRoutes'
-import { getAllCourses } from './adminData'
 import { saveUser, clearUser } from './storage'
-import {
-  authenticateEmployee,
-  getEmployeeById,
-} from './employeeData'
+import { authenticateEmployee } from './employeeData'
 import {
   DEACTIVATED_ACCOUNT_MESSAGE,
   buildCloudPlatformSessionUser,
@@ -26,19 +22,6 @@ import {
 import { isCloudMode } from '../lib/dataMode'
 import { supabase } from '../lib/supabaseClient'
 import { loginToTechnicalEmail } from './phoneUtils'
-import {
-  getCoursesForEmployee,
-  canEmployeeAccessCourse,
-} from './courseAccess'
-
-/** Причины отказа в доступе к курсу */
-export const ACCESS_REASON = {
-  GRANTED: 'granted',
-  NOT_FOUND: 'not_found',
-  UNAUTHENTICATED: 'unauthenticated',
-  FORBIDDEN: 'forbidden',
-  DRAFT: 'draft',
-}
 
 /** Безопасный redirect после входа */
 export function getSafeRedirectPath(redirectPath) {
@@ -112,7 +95,6 @@ function loginOffline(loginValue, password) {
     roleId: user.roleId ?? user.role_id ?? null,
     roleName: role?.label || roleId,
     permissions: role?.permissions || [],
-    assignedCourseIds: user.assignedCourseIds || [],
     sessionType: SESSION_TYPE.LEGACY,
     supabaseAuthenticated: false,
   }
@@ -245,101 +227,12 @@ export async function login(loginValue, password) {
   return loginOffline(loginValue, password)
 }
 
-/** Курсы по роли (legacy — для admin stats fallback) */
-export function getCoursesForRole(roleId) {
-  if (isAdmin(roleId)) return getAllCourses()
-  const normalizedRole = normalizeRoleId(roleId)
-  return getAllCourses().filter(
-    (c) =>
-      c.status === 'published' &&
-      Array.isArray(c.allowedRoles) &&
-      c.allowedRoles.some((allowed) => normalizeRoleId(allowed) === normalizedRole)
-  )
-}
-
-/** Курсы для текущего пользователя (по id или role) */
-export function getAccessibleCourses(userOrRole) {
-  if (typeof userOrRole === 'string') {
-    return getCoursesForRole(userOrRole)
-  }
-  const employee = getEmployeeById(userOrRole.id) || userOrRole
-  return getCoursesForEmployee(employee)
-}
-
-export function canAccessCourse(userOrRole, course) {
-  if (!course) return false
-
-  if (typeof userOrRole === 'string') {
-    if (isAdmin(userOrRole)) return true
-    if (course.status !== 'published') return false
-    const normalizedRole = normalizeRoleId(userOrRole)
-    return (
-      Array.isArray(course.allowedRoles) &&
-      course.allowedRoles.some((allowed) => normalizeRoleId(allowed) === normalizedRole)
-    )
-  }
-
-  const employee = getEmployeeById(userOrRole.id) || userOrRole
-  return canEmployeeAccessCourse(employee, course)
-}
-
-export function resolveCourseAccess(user, courseId) {
-  const course = getAllCourses().find((c) => c.id === Number(courseId))
-
-  if (!course) {
-    return { allowed: false, reason: ACCESS_REASON.NOT_FOUND, course: null }
-  }
-
-  if (!user) {
-    return { allowed: false, reason: ACCESS_REASON.UNAUTHENTICATED, course }
-  }
-
-  const employee = getEmployeeById(user.id) || user
-
-  if (!isAdmin(employee.role) && course.status !== 'published') {
-    return { allowed: false, reason: ACCESS_REASON.DRAFT, course }
-  }
-
-  if (!canEmployeeAccessCourse(employee, course)) {
-    return { allowed: false, reason: ACCESS_REASON.FORBIDDEN, course }
-  }
-
-  return { allowed: true, reason: ACCESS_REASON.GRANTED, course }
-}
-
 export function roleHasPermission(roleId, permission) {
   return hasPermission(roleId, permission)
 }
 
 export function canManageAdmin(roleId) {
   return isAdmin(roleId) || hasPermission(roleId, PERMISSIONS.MANAGE_USERS)
-}
-
-export function canManageCourses(roleId) {
-  return isAdmin(roleId) || hasPermission(roleId, PERMISSIONS.MANAGE_COURSES)
-}
-
-export function canViewProgress(roleId) {
-  return isAdmin(roleId) || hasPermission(roleId, PERMISSIONS.VIEW_PROGRESS)
-}
-
-export function canManageTests(roleId) {
-  return isAdmin(roleId) || hasPermission(roleId, PERMISSIONS.MANAGE_TESTS)
-}
-
-export function canPassTests(roleId) {
-  return hasPermission(roleId, PERMISSIONS.PASS_TESTS)
-}
-
-export function canViewTeamChecklists(roleId) {
-  return hasPermission(roleId, PERMISSIONS.VIEW_TEAM_CHECKLISTS)
-}
-
-export function getCourseAllowedRoleLabels(course) {
-  if (!course?.allowedRoles) return []
-  return course.allowedRoles
-    .map((roleId) => getRole(roleId)?.label || roleId)
-    .filter(Boolean)
 }
 
 export { ROLES, getRole, isAdmin, PERMISSIONS }

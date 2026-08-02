@@ -9,17 +9,14 @@ import {
   todayEmployeeDateKey,
   migrateEmployeeLocalSchema,
 } from '../utils/employeeData'
-import { normalizeLesson } from '../utils/lessonData'
-import { fetchTestsData } from './testSupabaseAdapter'
 import { normalizeRoleId } from '../data/roles'
 import { resolveRoleIdByCode } from './rbacService'
 import {
   buildPositionFieldsFromCatalog,
   ensurePositionCatalogLoaded,
 } from './positionCatalogService'
-import { isAcademyModuleEnabled } from '../config/featureFlags'
 
-function mapAcademyUserRow(row, assignmentMap) {
+function mapAcademyUserRow(row) {
   const positionFields = buildPositionFieldsFromCatalog(
     row.position_id,
     row.position || '',
@@ -40,7 +37,6 @@ function mapAcademyUserRow(row, assignmentMap) {
     salaryCalculationType: row.salary_calculation_type,
     payrollParticipation: row.payroll_participation,
     createdAt: row.created_at,
-    assignedCourseIds: assignmentMap ? assignmentMap.get(row.id) || [] : [],
     avatarUrl: row.avatar_url,
     contactEmail: row.contact_email || '',
     workLocationId: row.work_location_id,
@@ -53,133 +49,6 @@ async function resolveRoleIdForSlug(roleSlug) {
   } catch {
     return null
   }
-}
-
-function parseDurationHours(durationLabel) {
-  if (!durationLabel) return null
-  const match = String(durationLabel).match(/([\d.,]+)/)
-  return match ? Number(match[1].replace(',', '.')) : null
-}
-
-import { normalizeCourse, courseStatusToStorage } from '../utils/courseData'
-
-function rowToCourse(row) {
-  const allowedRoles = Array.isArray(row.allowed_roles) && row.allowed_roles.length
-    ? row.allowed_roles
-    : [row.role || row.category || 'cashier']
-
-  return normalizeCourse({
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    category: row.category,
-    allowedRoles,
-    status: row.status,
-    duration: row.duration_label,
-    imageColor: row.image_color,
-    blocksCount: row.blocks_count,
-    lessonsCount: 0,
-    createdAt: row.created_at,
-    updatedAt: row.updated_at,
-  })
-}
-
-function courseToRow(course) {
-  const allowedRoles = course.allowedRoles?.length
-    ? course.allowedRoles
-    : [course.category || course.role || 'cashier']
-
-  const status = courseStatusToStorage(course.status || 'draft')
-
-  return {
-    id: course.id,
-    title: course.title || '',
-    description: course.description || '',
-    category: course.category || allowedRoles[0],
-    role: allowedRoles[0],
-    status,
-    duration_hours: parseDurationHours(course.duration),
-    duration_label: course.duration || '—',
-    allowed_roles: allowedRoles,
-    image_color: course.imageColor || '#2d8f4e',
-    blocks_count: course.blocksCount ?? 1,
-  }
-}
-
-function rowToLesson(row) {
-  return normalizeLesson({
-    id: row.id,
-    courseId: row.course_id,
-    blockId: row.block_id,
-    title: row.title,
-    description: row.description,
-    videoUrl: row.video_url,
-    durationMinutes: row.duration_minutes,
-    summary: row.summary,
-    mandatory: row.mandatory,
-    order: row.sort_order,
-  })
-}
-
-function lessonToRow(lesson) {
-  return {
-    id: lesson.id,
-    course_id: lesson.courseId,
-    block_id: lesson.blockId ?? null,
-    title: lesson.title || '',
-    description: lesson.description || '',
-    video_url: lesson.videoUrl || '',
-    duration_minutes: lesson.durationMinutes ?? 15,
-    summary: lesson.summary || '',
-    mandatory: lesson.mandatory !== false,
-    sort_order: lesson.order ?? 1,
-    is_deleted: false,
-  }
-}
-
-function buildProgressMap(rows) {
-  const progress = {}
-
-  rows.forEach((row) => {
-    if (!progress[row.user_id]) progress[row.user_id] = {}
-    if (!progress[row.user_id][row.course_id]) {
-      progress[row.user_id][row.course_id] = {
-        completedLessons: [],
-        testPassed: false,
-        testScore: null,
-      }
-    }
-
-    const entry = progress[row.user_id][row.course_id]
-
-    if (row.lesson_id == null) {
-      if (row.test_passed != null) entry.testPassed = row.test_passed
-      if (row.test_score != null) entry.testScore = row.test_score
-      return
-    }
-
-    if (row.completed && !entry.completedLessons.includes(row.lesson_id)) {
-      entry.completedLessons.push(row.lesson_id)
-    }
-  })
-
-  return progress
-}
-
-function attachLessonCounts(courses, lessons) {
-  return courses.map((course) => ({
-    ...course,
-    lessonsCount: lessons.filter((l) => l.courseId === course.id).length,
-  }))
-}
-
-function groupAssignments(rows) {
-  const map = new Map()
-  rows.forEach((row) => {
-    if (!map.has(row.user_id)) map.set(row.user_id, [])
-    map.get(row.user_id).push(row.course_id)
-  })
-  return map
 }
 
 async function throwIfError(result, context) {
@@ -206,10 +75,7 @@ function settleTableResult(result, context, fallback = []) {
   return result?.data ?? fallback
 }
 
-/**
- * Platform employee core — never touches Academy Learning tables.
- * assignedCourseIds stays empty here; learning modules may enrich later when enabled.
- */
+/** Platform employee core — never touches Academy Learning tables. */
 export async function fetchCoreEmployeeData() {
   migrateEmployeeLocalSchema()
   let usersRes = await supabase
@@ -227,97 +93,9 @@ export async function fetchCoreEmployeeData() {
   await ensurePositionCatalogLoaded().catch(() => null)
 
   const users = settleTableResult(usersRes, 'Загрузка сотрудников', [])
-  const employees = users.map((row) => mapAcademyUserRow(row, null))
+  const employees = users.map((row) => mapAcademyUserRow(row))
 
   return { employees }
-}
-
-/**
- * Academy Learning tables only (courses / lessons / assignments / progress).
- * Must not be required for employees, auth, or operational modules.
- */
-export async function fetchAcademyLearningCore() {
-  const [coursesRes, lessonsRes, assignmentsRes, progressRes] = await Promise.all([
-    supabase.from('academy_courses').select('*').order('id'),
-    supabase.from('academy_lessons').select('*').eq('is_deleted', false).order('sort_order'),
-    supabase.from('academy_course_assignments').select('*'),
-    supabase.from('academy_progress').select('*'),
-  ])
-
-  const courses = settleTableResult(coursesRes, 'Загрузка курсов', [])
-  const lessons = settleTableResult(lessonsRes, 'Загрузка уроков', [])
-  const assignments = settleTableResult(assignmentsRes, 'Загрузка назначений', [])
-  const progressRows = settleTableResult(progressRes, 'Загрузка прогресса', [])
-
-  const normalizedLessons = lessons.map(rowToLesson)
-  const normalizedCourses = attachLessonCounts(
-    courses.map(rowToCourse),
-    normalizedLessons
-  )
-
-  return {
-    courses: normalizedCourses,
-    lessons: normalizedLessons,
-    assignments,
-    progress: buildProgressMap(progressRows),
-    assignmentMap: groupAssignments(assignments),
-  }
-}
-
-/**
- * Legacy combined core (employees + learning). Prefer fetchCoreEmployeeData /
- * fetchAcademyLearningCore. Kept for Academy-enabled full dumps / migrate.
- */
-export async function fetchCoreAcademyData() {
-  const { employees } = await fetchCoreEmployeeData()
-  const learning = await fetchAcademyLearningCore()
-  const assignmentMap = learning.assignmentMap
-  const employeesWithAssignments = employees.map((employee) => ({
-    ...employee,
-    assignedCourseIds: assignmentMap.get(employee.id) || employee.assignedCourseIds || [],
-  }))
-
-  return {
-    employees: employeesWithAssignments,
-    courses: learning.courses,
-    lessons: learning.lessons,
-    assignments: learning.assignments,
-    progress: learning.progress,
-  }
-}
-
-export async function fetchAcademyLearningExtras() {
-  const [testsResult, pathsResult] = await Promise.allSettled([
-    fetchTestsData(),
-    import('./learningPathSupabaseAdapter').then(({ fetchLearningPathsData }) =>
-      fetchLearningPathsData()
-    ),
-  ])
-
-  const testsData =
-    testsResult.status === 'fulfilled'
-      ? testsResult.value
-      : { tests: [], questions: [], attempts: [] }
-  const pathsData =
-    pathsResult.status === 'fulfilled'
-      ? pathsResult.value
-      : { paths: [], pathCourses: [], userPaths: [] }
-
-  if (testsResult.status === 'rejected') {
-    console.error('[Загрузка тестов]', testsResult.reason)
-  }
-  if (pathsResult.status === 'rejected') {
-    console.error('[Загрузка learning paths]', pathsResult.reason)
-  }
-
-  return {
-    tests: testsData.tests,
-    testQuestions: testsData.questions,
-    testAttempts: testsData.attempts,
-    learningPaths: pathsData.paths,
-    learningPathCourses: pathsData.pathCourses,
-    userLearningPaths: pathsData.userPaths,
-  }
 }
 
 export async function fetchStandardsModuleData() {
@@ -361,55 +139,17 @@ export async function fetchReceivingModuleData() {
 /**
  * Full dump for legacy callers. Soft-isolates optional modules (including procurement).
  * Prefer progressive bootstrap via academyDataService.ensureModuleLoaded.
- * When Academy Learning is disabled, skips all learning-table reads.
  */
 export async function fetchAllData() {
-  const academyOn = isAcademyModuleEnabled()
-  const employeeCore = await fetchCoreEmployeeData()
-  const learningCore = academyOn
-    ? await fetchAcademyLearningCore()
-    : {
-        courses: [],
-        lessons: [],
-        assignments: [],
-        progress: {},
-        assignmentMap: new Map(),
-      }
-
-  const employees = academyOn
-    ? employeeCore.employees.map((employee) => ({
-        ...employee,
-        assignedCourseIds:
-          learningCore.assignmentMap.get(employee.id) || employee.assignedCourseIds || [],
-      }))
-    : employeeCore.employees
-
-  const core = {
-    employees,
-    courses: learningCore.courses,
-    lessons: learningCore.lessons,
-    assignments: learningCore.assignments,
-    progress: learningCore.progress,
-  }
+  const { employees } = await fetchCoreEmployeeData()
 
   const [
-    learningResult,
     standardsResult,
     recruitmentResult,
     suppliersResult,
     purchasesResult,
     receivingResult,
   ] = await Promise.allSettled([
-    academyOn
-      ? fetchAcademyLearningExtras()
-      : Promise.resolve({
-          tests: [],
-          testQuestions: [],
-          testAttempts: [],
-          learningPaths: [],
-          learningPathCourses: [],
-          userLearningPaths: [],
-        }),
     fetchStandardsModuleData(),
     fetchRecruitmentModuleData(),
     fetchSuppliersModuleData(),
@@ -417,17 +157,6 @@ export async function fetchAllData() {
     fetchReceivingModuleData(),
   ])
 
-  const learning =
-    learningResult.status === 'fulfilled'
-      ? learningResult.value
-      : {
-          tests: [],
-          testQuestions: [],
-          testAttempts: [],
-          learningPaths: [],
-          learningPathCourses: [],
-          userLearningPaths: [],
-        }
   const standards =
     standardsResult.status === 'fulfilled'
       ? standardsResult.value
@@ -454,15 +183,13 @@ export async function fetchAllData() {
       : { receivingDocuments: [] }
 
   return {
-    ...core,
-    ...learning,
+    employees,
     ...standards,
     ...recruitment,
     ...suppliers,
     ...purchases,
     ...receiving,
     _moduleFailures: {
-      academyLearning: learningResult.status === 'rejected' ? learningResult.reason : null,
       standards: standardsResult.status === 'rejected' ? standardsResult.reason : null,
       recruitment: recruitmentResult.status === 'rejected' ? recruitmentResult.reason : null,
       suppliers: suppliersResult.status === 'rejected' ? suppliersResult.reason : null,
@@ -477,7 +204,6 @@ async function createUser(data) {
     ...data,
     id: data.id,
     employmentStatus: data.employmentStatus || data.status || 'active',
-    assignedCourseIds: data.assignedCourseIds || [],
   })
 
   const row = {
@@ -510,9 +236,6 @@ async function createUser(data) {
     'Создание сотрудника'
   )
 
-  if (isAcademyModuleEnabled()) {
-    await syncAssignments(employee.id, employee.assignedCourseIds)
-  }
   return employee.id
 }
 
@@ -566,10 +289,6 @@ async function updateUser(id, updates) {
       'Обновление сотрудника'
     )
   }
-
-  if (isAcademyModuleEnabled() && updates.assignedCourseIds != null) {
-    await syncAssignments(id, updates.assignedCourseIds)
-  }
 }
 
 export async function deactivateEmployee(id) {
@@ -587,18 +306,6 @@ export async function restoreEmployee(id) {
 }
 
 export async function permanentlyDeleteEmployee(id) {
-  // Learning cleanup only when Academy Learning is enabled — do not touch
-  // course tables during ordinary platform operation while the module is off.
-  if (isAcademyModuleEnabled()) {
-    await throwIfError(
-      await supabase.from('academy_course_assignments').delete().eq('user_id', id),
-      'Удаление назначений'
-    )
-    await throwIfError(
-      await supabase.from('academy_progress').delete().eq('user_id', id),
-      'Удаление прогресса'
-    )
-  }
   await throwIfError(
     await supabase.from('academy_users').delete().eq('id', id),
     'Удаление сотрудника'
@@ -643,201 +350,6 @@ export async function updateProfile(userId, { firstName, lastName, contactEmail 
   )
 }
 
-async function syncAssignments(userId, courseIds) {
-  if (!isAcademyModuleEnabled()) return
-
-  await throwIfError(
-    await supabase.from('academy_course_assignments').delete().eq('user_id', userId),
-    'Очистка назначений'
-  )
-
-  if (!courseIds?.length) return
-
-  const rows = courseIds.map((courseId) => ({
-    user_id: userId,
-    course_id: courseId,
-  }))
-
-  await throwIfError(
-    await supabase.from('academy_course_assignments').insert(rows),
-    'Назначение курсов'
-  )
-}
-
-export async function createCourse(course) {
-  const allRes = await supabase.from('academy_courses').select('id')
-  const existing = await throwIfError(allRes, 'Получение id курса')
-  const newId =
-    course.id ??
-    (existing.length > 0 ? Math.max(...existing.map((c) => c.id)) + 1 : 1)
-
-  const row = courseToRow({ ...course, id: newId })
-  await throwIfError(
-    await supabase.from('academy_courses').insert(row),
-    'Создание курса'
-  )
-  return newId
-}
-
-export async function updateCourse(courseId, updates) {
-  const row = {}
-  if (updates.title != null) row.title = updates.title
-  if (updates.description != null) row.description = updates.description
-  if (updates.category != null) row.category = updates.category
-  if (updates.status != null) row.status = updates.status
-  if (updates.duration != null) {
-    row.duration_label = updates.duration
-    row.duration_hours = parseDurationHours(updates.duration)
-  }
-  if (updates.allowedRoles != null) {
-    row.allowed_roles = updates.allowedRoles
-    row.role = updates.allowedRoles[0] || row.role
-  }
-  if (updates.imageColor != null) row.image_color = updates.imageColor
-  if (updates.blocksCount != null) row.blocks_count = updates.blocksCount
-
-  if (Object.keys(row).length > 0) {
-    await throwIfError(
-      await supabase.from('academy_courses').update(row).eq('id', courseId),
-      'Обновление курса'
-    )
-  }
-}
-
-export async function hideCourse(courseId) {
-  await updateCourse(courseId, { status: 'archive' })
-}
-
-export async function deleteCourse(courseId) {
-  await throwIfError(
-    await supabase.from('academy_courses').delete().eq('id', courseId),
-    'Удаление курса'
-  )
-}
-
-export async function createLesson(courseId, lessonData) {
-  const allRes = await supabase.from('academy_lessons').select('id')
-  const existing = await throwIfError(allRes, 'Получение id урока')
-  const newId =
-    lessonData.id ??
-    (existing.length > 0 ? Math.max(...existing.map((l) => l.id)) + 1 : 1)
-
-  const courseLessonsRes = await supabase
-    .from('academy_lessons')
-    .select('sort_order')
-    .eq('course_id', courseId)
-    .eq('is_deleted', false)
-  const courseLessons = await throwIfError(courseLessonsRes, 'Подсчёт уроков')
-
-  const lesson = normalizeLesson({
-    ...lessonData,
-    id: newId,
-    courseId,
-    order: lessonData.order ?? courseLessons.length + 1,
-  })
-
-  await throwIfError(
-    await supabase.from('academy_lessons').insert(lessonToRow(lesson)),
-    'Создание урока'
-  )
-  return newId
-}
-
-export async function updateLesson(lessonId, updates) {
-  const row = {}
-  if (updates.title != null) row.title = updates.title
-  if (updates.description != null) row.description = updates.description
-  if (updates.videoUrl != null) row.video_url = updates.videoUrl
-  if (updates.durationMinutes != null) row.duration_minutes = updates.durationMinutes
-  if (updates.summary != null) row.summary = updates.summary
-  if (updates.mandatory != null) row.mandatory = updates.mandatory
-  if (updates.order != null) row.sort_order = updates.order
-  if (updates.courseId != null) row.course_id = updates.courseId
-  if (updates.blockId != null) row.block_id = updates.blockId
-
-  if (Object.keys(row).length > 0) {
-    await throwIfError(
-      await supabase.from('academy_lessons').update(row).eq('id', lessonId),
-      'Обновление урока'
-    )
-  }
-}
-
-export async function deleteLesson(lessonId) {
-  await throwIfError(
-    await supabase
-      .from('academy_lessons')
-      .update({ is_deleted: true })
-      .eq('id', lessonId),
-    'Удаление урока'
-  )
-}
-
-export async function assignCourse(userId, courseId) {
-  await throwIfError(
-    await supabase
-      .from('academy_course_assignments')
-      .upsert({ user_id: userId, course_id: courseId }, { onConflict: 'user_id,course_id' }),
-    'Назначение курса'
-  )
-}
-
-export async function assignCourseToRole(roleId, courseId) {
-  const usersResult = await supabase
-    .from('academy_users')
-    .select('id')
-    .eq('role', roleId)
-    .eq('status', 'active')
-
-  const users = await throwIfError(usersResult, 'Загрузка сотрудников по роли')
-  for (const user of users || []) {
-    await assignCourse(user.id, courseId)
-  }
-}
-
-export async function getUserProgress(userId) {
-  const result = await supabase
-    .from('academy_progress')
-    .select('*')
-    .eq('user_id', userId)
-  const rows = await throwIfError(result, 'Загрузка прогресса')
-  return buildProgressMap(rows)[userId] || {}
-}
-
-export async function markLessonComplete(userId, courseId, lessonId) {
-  await throwIfError(
-    await supabase.from('academy_progress').upsert(
-      {
-        user_id: userId,
-        course_id: courseId,
-        lesson_id: lessonId,
-        completed: true,
-        completed_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id,course_id,lesson_id' }
-    ),
-    'Сохранение прогресса'
-  )
-}
-
-export async function saveTestResult(userId, courseId, score, passed) {
-  await throwIfError(
-    await supabase.from('academy_progress').upsert(
-      {
-        user_id: userId,
-        course_id: courseId,
-        lesson_id: null,
-        completed: passed,
-        completed_at: passed ? new Date().toISOString() : null,
-        test_passed: passed,
-        test_score: score,
-      },
-      { onConflict: 'user_id,course_id,lesson_id' }
-    ),
-    'Сохранение результата теста'
-  )
-}
-
 /** @deprecated Pre-Auth password compare — not used in Auth-first cloud login. */
 export async function authenticateUser(loginValue, password) {
   if (!loginValue?.trim()) return { ok: false, reason: 'invalid' }
@@ -857,56 +369,21 @@ export async function authenticateUser(loginValue, password) {
     return { ok: false, reason: 'deactivated' }
   }
 
-  // Do not read academy_course_assignments during auth-adjacent flows.
-  // Academy Learning may enrich assignedCourseIds later when the module is on.
   await ensurePositionCatalogLoaded().catch(() => null)
   return {
     ok: true,
-    user: mapAcademyUserRow({ ...row, assignedCourseIds: undefined }, null),
+    user: mapAcademyUserRow(row),
   }
 }
 
+/** Users-only migration upsert (learning tables removed from this adapter). */
 export async function upsertMigrationBatch(payload) {
-  const { users, courses, lessons, assignments, progressRows } = payload
+  const { users } = payload
 
-  if (users.length) {
+  if (users?.length) {
     await throwIfError(
       await supabase.from('academy_users').upsert(users, { onConflict: 'id' }),
       'Миграция сотрудников'
     )
   }
-
-  if (courses.length) {
-    await throwIfError(
-      await supabase.from('academy_courses').upsert(courses, { onConflict: 'id' }),
-      'Миграция курсов'
-    )
-  }
-
-  if (lessons.length) {
-    await throwIfError(
-      await supabase.from('academy_lessons').upsert(lessons, { onConflict: 'id' }),
-      'Миграция уроков'
-    )
-  }
-
-  if (assignments.length) {
-    await throwIfError(
-      await supabase
-        .from('academy_course_assignments')
-        .upsert(assignments, { onConflict: 'user_id,course_id' }),
-      'Миграция назначений'
-    )
-  }
-
-  if (progressRows.length) {
-    await throwIfError(
-      await supabase
-        .from('academy_progress')
-        .upsert(progressRows, { onConflict: 'user_id,course_id,lesson_id' }),
-      'Миграция прогресса'
-    )
-  }
 }
-
-export { courseToRow, lessonToRow, parseDurationHours }

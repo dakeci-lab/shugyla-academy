@@ -15,7 +15,6 @@ import {
   ROLES,
   ALL_EMPLOYEE_ROLES,
   EMPLOYEE_FORM_ROLES,
-  ACADEMY_COURSE_ROLES,
   normalizeRoleId,
   getRole,
   getRoleLabel,
@@ -78,23 +77,15 @@ function main() {
   assert('ALL_EMPLOYEE_ROLES uses buyer', ALL_EMPLOYEE_ROLES.includes(ROLE_IDS.BUYER))
   assert('ALL_EMPLOYEE_ROLES has no purchaser', !ALL_EMPLOYEE_ROLES.includes(ROLE_IDS.PURCHASER))
   assert('EMPLOYEE_FORM_ROLES uses buyer', EMPLOYEE_FORM_ROLES.includes(ROLE_IDS.BUYER))
-  assert(
-    'ACADEMY_COURSE_ROLES uses buyer once',
-    ACADEMY_COURSE_ROLES.filter((r) => r.id === 'buyer').length === 1,
-  )
-  assert(
-    'ACADEMY_COURSE_ROLES has no purchaser option',
-    !ACADEMY_COURSE_ROLES.some((r) => r.id === 'purchaser'),
-  )
   assert('roleIdsMatch buyer/purchaser', roleIdsMatch('buyer', 'purchaser'))
 
   console.log('\nAudience comparison helpers (runtime)')
   const allowedBuyer = ['buyer', 'admin']
   const allowedPurchaser = ['purchaser', 'admin']
   const allowedMixed = ['buyer', 'purchaser', 'cashier']
-  assert('buyer sees buyer course', roleListIncludes(allowedBuyer, 'buyer'))
-  assert('buyer sees purchaser course', roleListIncludes(allowedPurchaser, 'buyer'))
-  assert('purchaser sees buyer course', roleListIncludes(allowedBuyer, 'purchaser'))
+  assert('buyer matches buyer list', roleListIncludes(allowedBuyer, 'buyer'))
+  assert('buyer matches purchaser list via alias', roleListIncludes(allowedPurchaser, 'buyer'))
+  assert('purchaser matches buyer list via alias', roleListIncludes(allowedBuyer, 'purchaser'))
   assert(
     'mixed list matches both codes',
     roleListIncludes(allowedMixed, 'buyer') && roleListIncludes(allowedMixed, 'purchaser'),
@@ -113,9 +104,7 @@ function main() {
   const permissionsJs = read('src/config/permissions.js')
   const catalogJs = read('src/config/permissionCatalog.js')
   const payroll = read('src/components/admin/payroll/PayrollSection.jsx')
-  const courseAccess = read('src/utils/courseAccess.js')
   const standardsData = read('src/utils/standardsData.js')
-  const authJs = read('src/utils/auth.js')
   const recruitment = read('src/utils/recruitmentData.js')
   const modal = read('src/components/admin/employees/EmployeeEditModal.jsx')
   const pkg = read('package.json')
@@ -123,6 +112,7 @@ function main() {
   assert('alias purchaser→buyer', rolesJs.includes('purchaser: ROLE_IDS.BUYER'))
   assert('no buyer→purchaser alias', !rolesJs.includes('buyer: ROLE_IDS.PURCHASER'))
   assert('BUYER export equals ROLE_IDS.BUYER', rolesJs.includes('export const BUYER = ROLE_IDS.BUYER'))
+  assert('ACADEMY_COURSE_ROLES removed', !rolesJs.includes('ACADEMY_COURSE_ROLES'))
   assert('ROUTE_ACCESS present', permissionsJs.includes('const ROUTE_ACCESS'))
   assert('ROUTE_ACCESS uses BUYER', permissionsJs.includes('ROLE_IDS.BUYER'))
   assert(
@@ -143,13 +133,8 @@ function main() {
   assert("system role seed code 'buyer'", catalogJs.includes("code: 'buyer'"))
   assert("system role seed no code 'purchaser'", !catalogJs.includes("code: 'purchaser'"))
   assert('payroll filter normalizes roles', payroll.includes('normalizeRoleId(emp.role)'))
-  assert('courseAccess uses roleListIncludes', courseAccess.includes('roleListIncludes'))
   assert('standards visibility uses roleListIncludes', standardsData.includes('roleListIncludes'))
-  assert('auth course helpers normalize both sides', authJs.includes('normalizeRoleId(allowed)'))
-  assert(
-    'courseAccess buyer/purchaser compatibility via roleListIncludes',
-    courseAccess.includes('roleListIncludes') && courseAccess.includes('normalizeRoleId'),
-  )
+  assert('roles.js keeps roleListIncludes for audience checks', rolesJs.includes('export function roleListIncludes'))
   assert('vacancy roles prefer buyer', recruitment.includes("'buyer'") && recruitment.includes('VACANCY_ROLES'))
   assert('vacancy keeps purchaser label for read', recruitment.includes('purchaser: \'Закупщик\''))
   assert('EmployeeEditModal still uses DB rbacService', modal.includes('getRolesForEmployeeForm'))

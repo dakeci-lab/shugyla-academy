@@ -1,6 +1,5 @@
 import { getOverviewStats } from '../../../utils/adminStats'
 import StatCard from '../StatCard'
-import MigrateToCloudPanel from '../MigrateToCloudPanel'
 import '../admin-shared.css'
 
 /** Раздел «Обзор» — сводные карточки (без Academy Learning). */
@@ -9,8 +8,6 @@ export default function OverviewSection() {
 
   return (
     <div className="admin-overview">
-      <MigrateToCloudPanel />
-
       <div className="admin-stats-grid admin-stats-grid--overview">
         <StatCard
           icon="👥"

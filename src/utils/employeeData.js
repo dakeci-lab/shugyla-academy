@@ -422,7 +422,6 @@ export function normalizeEmployee(raw) {
     payrollParticipation: normalizePayrollParticipation(
       raw.payrollParticipation ?? raw.payroll_participation
     ),
-    assignedCourseIds: Array.isArray(raw.assignedCourseIds) ? raw.assignedCourseIds : [],
     avatarUrl: raw.avatarUrl ?? raw.avatar_url ?? null,
     contactEmail: raw.contactEmail ?? raw.contact_email ?? '',
     workLocationId: raw.workLocationId ?? raw.work_location_id ?? null,
@@ -531,11 +530,6 @@ export function getDeactivatedEmployees() {
   return getStaffEmployees('deactivated')
 }
 
-/** Для статистики обучения — alias */
-export function getTrainingEmployees() {
-  return getActiveEmployees()
-}
-
 export function getEmployeeById(id) {
   return getAllEmployees().find((u) => u.id === id) || null
 }
@@ -576,7 +570,6 @@ export function addEmployee(data) {
       data.salaryCalculationType || SALARY_CALCULATION_TYPE.SHIFT_BASED,
     payrollParticipation:
       data.payrollParticipation || PAYROLL_PARTICIPATION.ACTIVE,
-    assignedCourseIds: data.assignedCourseIds || [],
   })
 
   extra.push(employee)

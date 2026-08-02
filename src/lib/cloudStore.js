@@ -10,8 +10,6 @@ export const MODULE_STATUS = {
 /** Logical cloud data modules (bootstrap / route readiness). */
 export const CLOUD_MODULES = [
   'employees',
-  'courses',
-  'academyLearning',
   'standards',
   'recruitment',
   'suppliers',
@@ -22,16 +20,6 @@ export const CLOUD_MODULES = [
 const emptyStore = {
   loaded: false,
   employees: [],
-  courses: [],
-  lessons: [],
-  assignments: [],
-  progress: {},
-  tests: [],
-  testQuestions: [],
-  testAttempts: [],
-  learningPaths: [],
-  learningPathCourses: [],
-  userLearningPaths: [],
   standardCategories: [],
   standardArticles: [],
   standardArticleReads: [],
@@ -126,18 +114,6 @@ export function patchCloudStore(patch) {
     ensureCloudStoreReady()
   }
   if (patch.employees !== undefined) store.employees = patch.employees
-  if (patch.courses !== undefined) store.courses = patch.courses
-  if (patch.lessons !== undefined) store.lessons = patch.lessons
-  if (patch.assignments !== undefined) store.assignments = patch.assignments
-  if (patch.progress !== undefined) store.progress = patch.progress
-  if (patch.tests !== undefined) store.tests = patch.tests
-  if (patch.testQuestions !== undefined) store.testQuestions = patch.testQuestions
-  if (patch.testAttempts !== undefined) store.testAttempts = patch.testAttempts
-  if (patch.learningPaths !== undefined) store.learningPaths = patch.learningPaths
-  if (patch.learningPathCourses !== undefined) {
-    store.learningPathCourses = patch.learningPathCourses
-  }
-  if (patch.userLearningPaths !== undefined) store.userLearningPaths = patch.userLearningPaths
   if (patch.standardCategories !== undefined) {
     store.standardCategories = patch.standardCategories
   }
@@ -161,16 +137,6 @@ export function setCloudStore(data) {
   store = {
     loaded: true,
     employees: data.employees || [],
-    courses: data.courses || [],
-    lessons: data.lessons || [],
-    assignments: data.assignments || [],
-    progress: data.progress || {},
-    tests: data.tests || [],
-    testQuestions: data.testQuestions || data.questions || [],
-    testAttempts: data.testAttempts || data.attempts || [],
-    learningPaths: data.learningPaths || [],
-    learningPathCourses: data.learningPathCourses || [],
-    userLearningPaths: data.userLearningPaths || [],
     standardCategories: data.standardCategories || [],
     standardArticles: data.standardArticles || [],
     standardArticleReads: data.standardArticleReads || [],
@@ -198,43 +164,6 @@ function readWhenReady(moduleName, value) {
 
 export function getCloudEmployees() {
   return readWhenReady('employees', store.employees)
-}
-
-export function getCloudCourses() {
-  return readWhenReady('courses', store.courses)
-}
-
-export function getCloudLessons() {
-  // Lessons/progress arrive with core employees+courses fetch.
-  return readWhenReady('employees', store.lessons)
-}
-
-export function getCloudProgress() {
-  return readWhenReady('employees', store.progress)
-}
-
-export function getCloudTests() {
-  return readWhenReady('academyLearning', store.tests)
-}
-
-export function getCloudTestQuestions() {
-  return readWhenReady('academyLearning', store.testQuestions)
-}
-
-export function getCloudTestAttempts() {
-  return readWhenReady('academyLearning', store.testAttempts)
-}
-
-export function getCloudLearningPaths() {
-  return readWhenReady('academyLearning', store.learningPaths)
-}
-
-export function getCloudLearningPathCourses() {
-  return readWhenReady('academyLearning', store.learningPathCourses)
-}
-
-export function getCloudUserLearningPaths() {
-  return readWhenReady('academyLearning', store.userLearningPaths)
 }
 
 export function getCloudStandardCategories() {

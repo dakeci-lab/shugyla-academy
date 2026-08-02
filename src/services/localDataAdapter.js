@@ -7,74 +7,11 @@ import {
   permanentlyDeleteEmployee as localPermanentlyDeleteEmployee,
   authenticateEmployee as localAuthenticateEmployee,
 } from '../utils/employeeData'
-import {
-  getAllCoursesLocal,
-  addCourse as localAddCourse,
-  updateCourse as localUpdateCourse,
-} from '../utils/adminData'
-import {
-  getLessonsForCourseLocal,
-  addLesson as localAddLesson,
-  updateLesson as localUpdateLesson,
-  deleteLesson as localDeleteLesson,
-} from '../utils/lessonData'
-import {
-  getProgress as localGetProgress,
-  getCourseProgress as localGetCourseProgress,
-  markLessonComplete as localMarkLessonComplete,
-  saveTestResult as localSaveTestResult,
-} from '../utils/storage'
 import { normalizeEmployee } from '../utils/employeeData'
-import { normalizeLesson } from '../utils/lessonData'
-import { courseToRow, lessonToRow, parseDurationHours } from './supabaseDataAdapter'
-import { getLocalTestsBundle } from './testLocalAdapter'
 
-/** Collect all data from localStorage for migration */
+/** Collect employee data from localStorage for migration */
 export function collectLocalSnapshot() {
   const employees = getAllEmployeesLocal()
-  const courses = getAllCoursesLocal()
-
-  const lessons = []
-  courses.forEach((course) => {
-    getLessonsForCourseLocal(course.id).forEach((lesson) => {
-      lessons.push(lesson)
-    })
-  })
-
-  const assignments = []
-  employees.forEach((emp) => {
-    ;(emp.assignedCourseIds || []).forEach((courseId) => {
-      assignments.push({ user_id: emp.id, course_id: courseId })
-    })
-  })
-
-  const progressRaw = localGetProgress()
-  const progressRows = []
-
-  Object.entries(progressRaw).forEach(([userId, coursesMap]) => {
-    Object.entries(coursesMap).forEach(([courseId, entry]) => {
-      ;(entry.completedLessons || []).forEach((lessonId) => {
-        progressRows.push({
-          user_id: Number(userId),
-          course_id: Number(courseId),
-          lesson_id: lessonId,
-          completed: true,
-          completed_at: new Date().toISOString(),
-        })
-      })
-
-      if (entry.testPassed != null || entry.testScore != null) {
-        progressRows.push({
-          user_id: Number(userId),
-          course_id: Number(courseId),
-          lesson_id: null,
-          completed: Boolean(entry.testPassed),
-          test_passed: entry.testPassed,
-          test_score: entry.testScore,
-        })
-      }
-    })
-  })
 
   const users = employees.map((emp) => ({
     id: emp.id,
@@ -88,27 +25,11 @@ export function collectLocalSnapshot() {
     status: emp.employmentStatus || 'active',
   }))
 
-  const courseRows = courses.map((course) =>
-    courseToRow({
-      ...course,
-      allowedRoles: course.allowedRoles,
-    })
-  )
-
-  const lessonRows = lessons.map((lesson) => lessonToRow(lesson))
-
   return {
     counts: {
       employees: employees.length,
-      courses: courses.length,
-      lessons: lessons.length,
-      progress: progressRows.length,
     },
     users,
-    courses: courseRows,
-    lessons: lessonRows,
-    assignments,
-    progressRows,
   }
 }
 
@@ -160,79 +81,11 @@ export async function updateProfile(userId, { firstName, lastName, contactEmail 
   })
 }
 
-export async function getCourses() {
-  return getAllCoursesLocal()
-}
-
-export async function createCourse(course) {
-  return localAddCourse(course)
-}
-
-export async function updateCourse(courseId, updates) {
-  localUpdateCourse(courseId, updates)
-}
-
-export async function hideCourse(courseId) {
-  localUpdateCourse(courseId, { status: 'archive' })
-}
-
-export async function deleteCourse(courseId) {
-  const { deleteCourse: removeCourse } = await import('../utils/adminData')
-  removeCourse(courseId)
-}
-
-export async function getCourseLessons(courseId) {
-  return getLessonsForCourseLocal(courseId)
-}
-
-export async function createLesson(courseId, lessonData) {
-  return localAddLesson(courseId, lessonData)
-}
-
-export async function updateLesson(lessonId, updates) {
-  localUpdateLesson(lessonId, updates)
-}
-
-export async function deleteLesson(lessonId) {
-  localDeleteLesson(lessonId)
-}
-
-export async function assignCourse(userId, courseId) {
-  const emp = getAllEmployeesLocal().find((e) => e.id === userId)
-  if (!emp) return
-  const ids = new Set(emp.assignedCourseIds || [])
-  ids.add(courseId)
-  localUpdateEmployee(userId, { assignedCourseIds: [...ids] })
-}
-
-export async function assignCourseToRole(roleId, courseId) {
-  const { getEmployeesByRole } = await import('../utils/courseAccess')
-  const employees = getEmployeesByRole(roleId)
-  for (const emp of employees) {
-    await assignCourse(emp.id, courseId)
-  }
-}
-
-export async function getUserProgress(userId) {
-  return localGetProgress()[userId] || {}
-}
-
-export async function markLessonComplete(userId, courseId, lessonId) {
-  localMarkLessonComplete(userId, courseId, lessonId)
-}
-
-export async function saveTestResult(userId, courseId, score, passed) {
-  localSaveTestResult(userId, courseId, score, passed)
-}
-
 export async function authenticateUser(loginValue, password) {
   return localAuthenticateEmployee(loginValue, password)
 }
 
 export async function initializeLocal() {
-  const testsBundle = getLocalTestsBundle()
-  const { getLocalPathsBundle } = await import('./learningPathLocalAdapter')
-  const pathsBundle = getLocalPathsBundle()
   const { getLocalStandardsBundle } = await import('./standardsLocalAdapter')
   const standardsBundle = getLocalStandardsBundle()
   const { getLocalRecruitmentBundle } = await import('./recruitmentLocalAdapter')
@@ -241,16 +94,6 @@ export async function initializeLocal() {
   const suppliersBundle = getLocalSuppliersBundle()
   return {
     employees: getAllEmployeesLocal(),
-    courses: getAllCoursesLocal(),
-    lessons: [],
-    assignments: [],
-    progress: localGetProgress(),
-    tests: testsBundle.tests,
-    testQuestions: testsBundle.questions,
-    testAttempts: testsBundle.attempts,
-    learningPaths: pathsBundle.paths,
-    learningPathCourses: pathsBundle.pathCourses,
-    userLearningPaths: pathsBundle.userPaths,
     standardCategories: standardsBundle.categories,
     standardArticles: standardsBundle.articles,
     standardArticleReads: standardsBundle.reads,
@@ -261,8 +104,4 @@ export async function initializeLocal() {
   }
 }
 
-export function getCourseProgressSync(userId, courseId) {
-  return localGetCourseProgress(userId, courseId)
-}
-
-export { normalizeEmployee, normalizeLesson, parseDurationHours }
+export { normalizeEmployee }
