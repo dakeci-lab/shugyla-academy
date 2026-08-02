@@ -287,17 +287,14 @@ export function getDefaultPlatformPath(userOrRole) {
 
   if (!resolveUserRole(user)) return '/platform/profile'
   if (canAccessRoute(user, ROUTE_KEYS.HOME)) return '/platform'
-  if (isAcademyModuleEnabled() && canAccessRoute(user, ROUTE_KEYS.ACADEMY)) {
-    return '/platform/academy/cabinet'
-  }
   return '/platform/profile'
 }
 
 export function filterPlatformNav(nav, user) {
-  const academyOn = isAcademyModuleEnabled()
   return nav
     .map((item) => {
-      if (!academyOn && (item.id === 'academy-group' || isAcademyFeatureRouteKey(item.routeKey))) {
+      // Academy Learning UI removed — never surface academy nav even if flag/permissions linger.
+      if (item.id === 'academy-group' || isAcademyFeatureRouteKey(item.routeKey)) {
         return null
       }
       if (item.children) {

@@ -3,23 +3,15 @@ import Sidebar from '../components/Sidebar'
 import DataModeBadge from '../components/admin/DataModeBadge'
 import './AdminLayout.css'
 
-/** Метаданные разделов админ-панели */
+/** Метаданные разделов legacy-админ-панели (без Academy Learning). */
 export const ADMIN_SECTIONS = {
   overview: {
     title: 'Обзор',
-    description: 'Сводная информация по обучению сотрудников.',
+    description: 'Сводная информация по платформе.',
   },
   employees: {
     title: 'Сотрудники',
-    description: 'Управление сотрудниками, назначение ролей и курсов.',
-  },
-  courses: {
-    title: 'Курсы',
-    description: 'Создание и редактирование учебных курсов.',
-  },
-  paths: {
-    title: 'Маршруты',
-    description: 'Обучающие маршруты по должностям и порядок курсов.',
+    description: 'Управление сотрудниками и ролями доступа.',
   },
   standards: {
     title: 'Стандарты',
@@ -28,18 +20,6 @@ export const ADMIN_SECTIONS = {
   recruitment: {
     title: 'Найм',
     description: 'Вакансии, фильтр-вопросы и кандидаты на должности.',
-  },
-  tests: {
-    title: 'Тесты',
-    description: 'Управление тестами и вопросами для аттестации.',
-  },
-  certification: {
-    title: 'Аттестация',
-    description: 'Результаты аттестации и выдача сертификатов.',
-  },
-  progress: {
-    title: 'Прогресс',
-    description: 'Отслеживание прогресса обучения по сотрудникам.',
   },
 }
 

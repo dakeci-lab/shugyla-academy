@@ -5,7 +5,6 @@ import {
   resolveUserRole,
   getFirstAllowedPathFromNav,
 } from '../config/permissions'
-import { isAcademyModuleEnabled } from '../config/featureFlags'
 import { normalizeRoleId } from '../data/roles'
 
 /** Первый разрешённый маршрут по конфигурации меню платформы. */
@@ -26,9 +25,6 @@ export function getDefaultPlatformPath(userOrRole) {
   const firstAllowed = getFirstAllowedPlatformPath(user)
   if (firstAllowed) return firstAllowed
 
-  if (isAcademyModuleEnabled() && canAccessRoute(user, ROUTE_KEYS.ACADEMY)) {
-    return '/platform/academy/cabinet'
-  }
   return '/platform/profile'
 }
 

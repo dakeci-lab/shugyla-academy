@@ -116,9 +116,7 @@ function main() {
   const courseAccess = read('src/utils/courseAccess.js')
   const standardsData = read('src/utils/standardsData.js')
   const authJs = read('src/utils/auth.js')
-  const academyCatalog = read('src/components/academy/AcademyCatalogContent.jsx')
   const recruitment = read('src/utils/recruitmentData.js')
-  const progress = read('src/components/admin/sections/ProgressSection.jsx')
   const modal = read('src/components/admin/employees/EmployeeEditModal.jsx')
   const pkg = read('package.json')
 
@@ -148,11 +146,12 @@ function main() {
   assert('courseAccess uses roleListIncludes', courseAccess.includes('roleListIncludes'))
   assert('standards visibility uses roleListIncludes', standardsData.includes('roleListIncludes'))
   assert('auth course helpers normalize both sides', authJs.includes('normalizeRoleId(allowed)'))
-  assert('academy catalog filter option buyer', academyCatalog.includes('value="buyer"'))
-  assert('academy catalog uses roleListIncludes', academyCatalog.includes('roleListIncludes'))
+  assert(
+    'courseAccess buyer/purchaser compatibility via roleListIncludes',
+    courseAccess.includes('roleListIncludes') && courseAccess.includes('normalizeRoleId'),
+  )
   assert('vacancy roles prefer buyer', recruitment.includes("'buyer'") && recruitment.includes('VACANCY_ROLES'))
   assert('vacancy keeps purchaser label for read', recruitment.includes('purchaser: \'Закупщик\''))
-  assert('progress uses getRoleLabel', progress.includes('getRoleLabel(row.employeeRole)'))
   assert('EmployeeEditModal still uses DB rbacService', modal.includes('getRolesForEmployeeForm'))
   assert('PWA schema version not bumped in employeeData', !read('src/utils/employeeData.js').includes('EMPLOYEE_LOCAL_SCHEMA_VERSION = 3'))
   assert('script registered', pkg.includes('verify:buyer-role-compatibility'))

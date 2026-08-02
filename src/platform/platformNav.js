@@ -186,68 +186,6 @@ export const PLATFORM_NAV = [
     ],
   },
   {
-    id: 'academy-group',
-    label: 'Академия',
-    icon: '🎓',
-    routeKey: ROUTE_KEYS.ACADEMY_GROUP,
-    title: 'Академия',
-    description: 'Обучение, курсы, тесты и прогресс сотрудников.',
-    pathPrefixes: ['/platform/academy', '/platform/courses/'],
-    children: [
-      {
-        id: 'academy-cabinet',
-        path: '/platform/academy/cabinet',
-        label: 'Мой кабинет',
-        routeKey: ROUTE_KEYS.ACADEMY,
-        title: 'Мой кабинет',
-        description: 'Прогресс обучения, назначенные курсы и стандарты.',
-      },
-      {
-        id: 'academy-catalog',
-        path: '/platform/academy/catalog',
-        label: 'Каталог курсов',
-        routeKey: ROUTE_KEYS.ACADEMY,
-        title: 'Каталог курсов',
-        description: 'Доступные обучающие материалы Shugyla Academy.',
-        coursePlayerActive: true,
-      },
-      {
-        id: 'academy-assignment',
-        path: '/platform/academy/assignment',
-        label: 'Назначение обучения',
-        routeKey: ROUTE_KEYS.ACADEMY_MANAGE,
-        title: 'Назначение обучения',
-        description: 'Назначение курсов сотрудникам и группам по ролям.',
-      },
-      {
-        id: 'academy-manage',
-        path: '/platform/academy/manage',
-        label: 'Управление академией',
-        end: true,
-        manageHubActive: true,
-        routeKey: ROUTE_KEYS.ACADEMY_MANAGE,
-        title: 'Управление академией',
-        description: 'Курсы, тесты и прогресс сотрудников.',
-      },
-      {
-        id: 'academy-tests',
-        path: '/platform/academy/manage/tests',
-        label: 'Тесты',
-        routeKey: ROUTE_KEYS.ACADEMY_MANAGE,
-        title: 'Тесты',
-        description: 'Управление тестами и вопросами внутри курсов.',
-      },
-      {
-        id: 'academy-progress',
-        path: '/platform/academy/manage/progress',
-        label: 'Прогресс',
-        routeKey: ROUTE_KEYS.ACADEMY_MANAGE,
-        title: 'Прогресс сотрудников',
-        description: 'Отслеживание прогресса обучения по сотрудникам.',
-      },
-    ],
-  },
-  {
     id: 'settings',
     label: 'Настройки',
     routeKey: ROUTE_KEYS.SETTINGS,
@@ -319,22 +257,9 @@ export function isPathInGroup(pathname, group) {
 export function isNavItemActive(pathname, item) {
   if (!item?.path) return false
 
-  if (pathname.startsWith('/platform/courses/') && item.coursePlayerActive) {
-    return true
-  }
-
   if (item.standardsReadActive) {
     if (!pathname.startsWith('/platform/standards')) return false
     return !pathname.startsWith('/platform/standards/manage')
-  }
-
-  if (item.manageHubActive) {
-    const managePrefix = '/platform/academy/manage'
-    if (!pathname.startsWith(managePrefix)) return false
-    const rest = pathname.slice(managePrefix.length).replace(/^\//, '')
-    if (!rest) return true
-    const section = rest.split('/')[0]
-    return !['tests', 'progress'].includes(section)
   }
 
   if (item.end) {
@@ -350,7 +275,6 @@ export function getAutoExpandedGroupIds(pathname, navItems = PLATFORM_NAV) {
     .map((item) => item.id)
 }
 
-import { getAcademySection } from './academyNav'
 import { getStandardsSection } from './standardsNav'
 
 export function getPlatformSection(pathname) {
@@ -364,9 +288,6 @@ export function getPlatformSection(pathname) {
 
   const standardsSection = getStandardsSection(pathname)
   if (standardsSection) return standardsSection
-
-  const academySection = getAcademySection(pathname)
-  if (academySection) return academySection
 
   const flat = flattenNav()
 

@@ -1,17 +1,12 @@
 import { NavLink } from 'react-router-dom'
 import './Sidebar.css'
 
-/** Пункты бокового меню админ-панели */
+/** Пункты бокового меню legacy-админ-панели (без Academy Learning). */
 export const ADMIN_MENU_ITEMS = [
   { id: 'overview', label: 'Обзор', icon: '◉' },
   { id: 'employees', label: 'Сотрудники', icon: '◎' },
-  { id: 'courses', label: 'Курсы', icon: '▤' },
-  { id: 'paths', label: 'Маршруты', icon: '⤳' },
   { id: 'standards', label: 'Стандарты', icon: '◫' },
   { id: 'recruitment', label: 'Найм', icon: '◑' },
-  { id: 'tests', label: 'Тесты', icon: '✎' },
-  { id: 'certification', label: 'Аттестация', icon: '◈' },
-  { id: 'progress', label: 'Прогресс', icon: '↗' },
 ]
 
 /**
@@ -24,7 +19,7 @@ export default function Sidebar({ activeTab, onTabChange }) {
         <span className="sidebar__logo-icon">S</span>
         <div className="sidebar__brand">
           <span className="sidebar__title">Shugyla Platform</span>
-          <span className="sidebar__subtitle">Academy · Админ</span>
+          <span className="sidebar__subtitle">Админ</span>
         </div>
       </div>
 

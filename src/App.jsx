@@ -11,7 +11,6 @@ import PlatformRoute from './components/platform/PlatformRoute'
 import PlatformNotFound from './components/platform/PlatformNotFound'
 import { LOGIN_PATH } from './router/authRoutes'
 import { ROUTE_KEYS } from './config/permissions'
-import { isAcademyModuleEnabled } from './config/featureFlags'
 import PlatformLayout from './layouts/PlatformLayout'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
@@ -20,10 +19,8 @@ import VacanciesPage from './pages/VacanciesPage'
 import VacancyDetailPage from './pages/VacancyDetailPage'
 import ApplyPage from './pages/Apply'
 import Profile from './pages/Profile'
-import CoursePage from './pages/CoursePage'
 import StandardsPage from './pages/Standards'
 import PlatformIndex from './pages/platform/PlatformIndex'
-import PlatformAcademy from './pages/platform/PlatformAcademy'
 import PlatformSettings from './pages/platform/PlatformSettings'
 import PlatformSettingsGeneral from './pages/platform/PlatformSettingsGeneral'
 import PlatformSettingsRoles from './pages/platform/PlatformSettingsRoles'
@@ -51,42 +48,19 @@ import AnalyticsProcurementPage from './pages/platform/procurement/AnalyticsProc
 import PurchaseDetailPage from './pages/platform/procurement/PurchaseDetailPage'
 import ReceivingPage from './pages/platform/receiving/ReceivingPage'
 import ReceivingDetailPage from './pages/platform/receiving/ReceivingDetailPage'
-import ModulePlaceholder from './pages/platform/ModulePlaceholder'
 import PriceTagsPage from './pages/platform/price-tags/PriceTagsPage'
 import PriceCheckerPage from './pages/platform/products/PriceCheckerPage'
-import AcademyCabinetContent from './components/academy/AcademyCabinetContent'
-import AcademyCatalogContent from './components/academy/AcademyCatalogContent'
-import AcademyAssignmentContent from './components/academy/AcademyAssignmentContent'
-import {
-  PlatformAcademyManageHub,
-  PlatformAcademyManageLayout,
-  PlatformAcademyManageSection,
-} from './pages/platform/academy/PlatformAcademyManage'
 
 /**
  * Маршрутизация Shugyla Platform
  */
-
-function LegacyCourseRedirect() {
-  const { id } = useParams()
-  if (!isAcademyModuleEnabled()) {
-    return <Navigate to="/platform" replace />
-  }
-  return <Navigate to={`/platform/courses/${id}`} replace />
-}
 
 function LegacyStandardRedirect() {
   const { slug } = useParams()
   return <Navigate to={`/platform/standards/${slug}`} replace />
 }
 
-function academyOrPlatform(path) {
-  return isAcademyModuleEnabled() ? path : '/platform'
-}
-
 export default function App() {
-  const academyOn = isAcademyModuleEnabled()
-
   return (
     <LanguageProvider>
       <SessionProvider>
@@ -336,58 +310,9 @@ export default function App() {
             }
           />
 
-          {/* Academy — внутри платформы (скрыта feature toggle’ом, код сохранён) */}
-          {academyOn ? (
-            <Route path="academy">
-              <Route
-                index
-                element={
-                  <PlatformRoute routeKey={ROUTE_KEYS.ACADEMY}>
-                    <PlatformAcademy />
-                  </PlatformRoute>
-                }
-              />
-              <Route path="cabinet" element={<AcademyCabinetContent />} />
-              <Route path="catalog" element={<AcademyCatalogContent />} />
-              <Route
-                path="assignment"
-                element={
-                  <PlatformRoute routeKey={ROUTE_KEYS.ACADEMY_MANAGE}>
-                    <AcademyAssignmentContent />
-                  </PlatformRoute>
-                }
-              />
-              <Route
-                path="standards"
-                element={<Navigate to="/platform/standards" replace />}
-              />
-              <Route
-                path="standards/:slug"
-                element={<LegacyStandardRedirect />}
-              />
-              <Route
-                path="manage"
-                element={
-                  <PlatformRoute routeKey={ROUTE_KEYS.ACADEMY_MANAGE}>
-                    <PlatformAcademyManageLayout />
-                  </PlatformRoute>
-                }
-              >
-                <Route index element={<PlatformAcademyManageHub />} />
-                <Route path="hiring" element={<Navigate to="/platform/hr/vacancies" replace />} />
-                <Route path="standards" element={<Navigate to="/platform/standards/manage" replace />} />
-                <Route path=":section" element={<PlatformAcademyManageSection />} />
-              </Route>
-            </Route>
-          ) : (
-            <Route path="academy/*" element={<Navigate to="/platform" replace />} />
-          )}
-
-          {academyOn ? (
-            <Route path="courses/:id" element={<CoursePage embedded />} />
-          ) : (
-            <Route path="courses/:id" element={<Navigate to="/platform" replace />} />
-          )}
+          {/* Legacy Academy Learning URLs → home (UI removed) */}
+          <Route path="academy/*" element={<Navigate to="/platform" replace />} />
+          <Route path="courses/:id" element={<Navigate to="/platform" replace />} />
 
           <Route path="settings" element={<PlatformSettings />} />
           <Route
@@ -420,51 +345,23 @@ export default function App() {
 
         {/* Редиректы со старых маршрутов */}
         <Route path="/profile" element={<Navigate to="/platform/profile" replace />} />
-        <Route
-          path="/dashboard"
-          element={<Navigate to={academyOrPlatform('/platform/academy/cabinet')} replace />}
-        />
-        <Route
-          path="/academy"
-          element={<Navigate to={academyOrPlatform('/platform/academy/catalog')} replace />}
-        />
-        <Route
-          path="/admin"
-          element={
-            <Navigate
-              to={academyOn ? '/platform/academy/manage' : '/platform/employees/list'}
-              replace
-            />
-          }
-        />
+        <Route path="/dashboard" element={<Navigate to="/platform" replace />} />
+        <Route path="/academy" element={<Navigate to="/platform" replace />} />
+        <Route path="/academy/*" element={<Navigate to="/platform" replace />} />
+        <Route path="/admin" element={<Navigate to="/platform" replace />} />
         <Route path="/admin/employees" element={<Navigate to="/platform/employees/list" replace />} />
-        <Route
-          path="/admin/courses"
-          element={<Navigate to={academyOrPlatform('/platform/academy/manage/courses')} replace />}
-        />
-        <Route
-          path="/admin/routes"
-          element={<Navigate to={academyOrPlatform('/platform/academy/manage/courses')} replace />}
-        />
+        <Route path="/admin/courses" element={<Navigate to="/platform" replace />} />
+        <Route path="/admin/routes" element={<Navigate to="/platform" replace />} />
         <Route path="/admin/standards" element={<Navigate to="/platform/standards/manage" replace />} />
         <Route path="/admin/hiring" element={<Navigate to="/platform/hr/vacancies" replace />} />
         <Route path="/hiring" element={<Navigate to="/platform/hr/vacancies" replace />} />
         <Route path="/recruitment" element={<Navigate to="/platform/hr/vacancies" replace />} />
         <Route path="/employees/hiring" element={<Navigate to="/platform/hr/vacancies" replace />} />
         <Route path="/employees/recruitment" element={<Navigate to="/platform/hr/vacancies" replace />} />
-        <Route
-          path="/admin/tests"
-          element={<Navigate to={academyOrPlatform('/platform/academy/manage/tests')} replace />}
-        />
-        <Route
-          path="/admin/attestation"
-          element={<Navigate to={academyOrPlatform('/platform/academy/manage/courses')} replace />}
-        />
-        <Route
-          path="/admin/progress"
-          element={<Navigate to={academyOrPlatform('/platform/academy/manage/progress')} replace />}
-        />
-        <Route path="/courses/:id" element={<LegacyCourseRedirect />} />
+        <Route path="/admin/tests" element={<Navigate to="/platform" replace />} />
+        <Route path="/admin/attestation" element={<Navigate to="/platform" replace />} />
+        <Route path="/admin/progress" element={<Navigate to="/platform" replace />} />
+        <Route path="/courses/:id" element={<Navigate to="/platform" replace />} />
         <Route path="/standards" element={<Navigate to="/platform/standards" replace />} />
         <Route path="/standards/:slug" element={<LegacyStandardRedirect />} />
 

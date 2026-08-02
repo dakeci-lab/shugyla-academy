@@ -6,7 +6,6 @@ import { getActiveSuppliersCount } from '../../utils/supplierData'
 import { isCloudMode, getDataModeLabel } from '../../lib/dataMode'
 import { isModuleReady } from '../../lib/cloudStore'
 import { useAcademyData } from '../../context/AcademyDataContext'
-import { isAcademyModuleEnabled } from '../../config/featureFlags'
 import '../../components/admin/admin-shared.css'
 import './PlatformDashboard.css'
 
@@ -20,30 +19,21 @@ export default function PlatformDashboard() {
   const { ensureModules, version } = useAcademyData()
   const cloudMode = isCloudMode()
 
-  const academyOn = isAcademyModuleEnabled()
-
   useEffect(() => {
     if (!cloudMode) return
-    // Employees load independently of Academy Learning; courses only when enabled.
-    const modules = academyOn
-      ? ['employees', 'courses', 'suppliers']
-      : ['employees', 'suppliers']
-    void ensureModules(modules)
-  }, [cloudMode, ensureModules, academyOn])
+    void ensureModules(['employees', 'suppliers'])
+  }, [cloudMode, ensureModules])
 
   void version
 
   const employeesReady = !cloudMode || isModuleReady('employees')
-  const coursesReady = !cloudMode || isModuleReady('courses')
   const suppliersReady = !cloudMode || isModuleReady('suppliers')
 
-  const stats =
-    employeesReady && (!academyOn || coursesReady)
-      ? getOverviewStats()
-      : {
-          totalEmployees: 0,
-          totalCourses: 0,
-        }
+  const stats = employeesReady
+    ? getOverviewStats()
+    : {
+        totalEmployees: 0,
+      }
   const activeSuppliers = suppliersReady ? getActiveSuppliersCount() : 0
 
   const cards = [
@@ -55,18 +45,6 @@ export default function PlatformDashboard() {
       to: '/platform/employees',
       variant: 'default',
     },
-    ...(academyOn
-      ? [
-          {
-            icon: '📚',
-            value: formatStatValue(coursesReady, stats.totalCourses),
-            label: 'Курсы',
-            hint: coursesReady ? 'Курсы в модуле Academy' : 'Загрузка…',
-            to: '/platform/academy',
-            variant: 'info',
-          },
-        ]
-      : []),
     {
       icon: '▦',
       value: '—',

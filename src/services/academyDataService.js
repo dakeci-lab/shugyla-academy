@@ -167,7 +167,6 @@ export function resetCloudBootstrapState() {
 /** Map pathname → modules needed before page can show real empty/error states. */
 export function getRouteCriticalModules(pathname = '') {
   const path = String(pathname || '')
-  const academyOn = isAcademyModuleEnabled()
   if (path.includes('/platform/procurement') || path.includes('/platform/receiving')) {
     return ['suppliers', 'procurement', 'receiving']
   }
@@ -184,19 +183,10 @@ export function getRouteCriticalModules(pathname = '') {
   ) {
     return ['recruitment']
   }
-  if (
-    path.includes('/platform/academy') ||
-    path.includes('/platform/admin') ||
-    path.includes('/courses') ||
-    path.includes('/course/')
-  ) {
-    // Academy UI is gated; do not pull learning data when the module is off.
-    return academyOn ? ['employees', 'courses', 'academyLearning'] : []
-  }
   if (path === '/platform' || path === '/platform/') {
-    // Home: employees are operational; learning modules only when Academy is on.
-    // Suppliers stay in background prefetch.
-    return academyOn ? ['employees', 'courses', 'suppliers'] : ['employees']
+    // Home: employees are operational; suppliers stay in background prefetch.
+    // Academy Learning UI is removed — never route-critical.
+    return ['employees']
   }
   if (path.includes('/platform/employees') || path.includes('/platform/dashboard')) {
     return ['employees']
