@@ -1,4 +1,5 @@
 import { getVacancyById } from '../../services/platformDataService'
+import { getVacancyPositionLabel } from '../../utils/recruitmentData'
 import { formatRecruitmentDate } from '../admin/sections/recruitmentAdminShared'
 import CandidateAvatar from '../CandidateAvatar'
 import CandidateStatusBadge from './CandidateStatusBadge'
@@ -7,7 +8,13 @@ import './CandidatesList.css'
 
 /** Мобильная карточка кандидата */
 export default function CandidateMobileCard({ candidate, index, onOpen }) {
-  const vacancyTitle = getVacancyById(candidate.vacancyId)?.title || '—'
+  const vacancy = getVacancyById(candidate.vacancyId)
+  const positionLabel = vacancy ? getVacancyPositionLabel(vacancy) : null
+  const vacancyTitle = vacancy
+    ? `${vacancy.title}${
+        positionLabel && positionLabel !== vacancy.title ? ` · ${positionLabel}` : ''
+      }`
+    : '—'
   const experience = candidate.experience || '—'
 
   return (
