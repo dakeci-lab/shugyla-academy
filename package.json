@@ -96,7 +96,14 @@
     "verify:buyer-role-compatibility": "node scripts/verify-buyer-role-compatibility.mjs",
     "verify:employee-organization-structure": "node scripts/verify-employee-organization-structure.mjs",
     "verify:academy-rbac-removal": "node scripts/verify-academy-rbac-removal.mjs",
-    "verify:platform-data-rename": "node scripts/verify-platform-data-rename.mjs"
+    "verify:platform-data-rename": "node scripts/verify-platform-data-rename.mjs",
+    "verify:recruitment-public-apply": "node scripts/verify-recruitment-public-apply.mjs",
+    "verify:recruitment-private-photos": "node scripts/verify-recruitment-private-photos.mjs",
+    "verify:recruitment-vacancy-positions": "node scripts/verify-recruitment-vacancy-positions.mjs",
+    "verify:recruitment-apply-hub": "node scripts/verify-recruitment-apply-hub.mjs",
+    "verify:recruitment-flexible-form": "node scripts/verify-recruitment-flexible-form.mjs",
+    "verify:recruitment-form-hardening": "node scripts/verify-recruitment-form-hardening.mjs",
+    "test:e2e:recruitment": "playwright test -c tests/e2e/playwright.config.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",
@@ -106,6 +113,7 @@
     "react-router-dom": "^7.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "@vitejs/plugin-react": "^4.3.4",
     "vite": "^6.0.0",
     "xlsx": "^0.18.5"
