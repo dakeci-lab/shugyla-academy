@@ -141,11 +141,8 @@ export function getRouteCriticalModules(pathname = '') {
   if (path.includes('/platform/standards') || path.includes('/standards')) {
     return ['standards']
   }
-  if (
-    path.includes('/platform/recruitment') ||
-    path.includes('/vacancies') ||
-    path.includes('/candidates')
-  ) {
+  // Internal HR only — never match public /vacancies or /apply.
+  if (path.includes('/platform/hr') || path.includes('/platform/recruitment')) {
     return ['recruitment']
   }
   if (path === '/platform' || path === '/platform/') {
@@ -897,21 +894,13 @@ export async function submitCandidateApplication(applicationData) {
 
   const { photoFile, vacancySlug, ...rest } = applicationData
 
+  // Prefer publicApplySubmitService for /apply — this path must not refresh PlatformData.
   const result = await getRecruitmentAdapter().submitCandidateApplication({
     ...rest,
     photoUrl: photoPayload.photoUrl,
     photoPath: photoPayload.photoPath,
     photoUploadId: photoPayload.photoUploadId,
   })
-
-  // Public apply must not require candidates SELECT (anon RLS). Best-effort refresh.
-  if (isCloudMode()) {
-    try {
-      await refreshData()
-    } catch {
-      /* ignore — success already persisted via RPC */
-    }
-  }
 
   return {
     ...result,

@@ -1,26 +1,36 @@
+import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { getPublishedVacancies } from '../services/platformDataService'
-import { getVacancyPositionLabel } from '../utils/recruitmentData'
-import '../pages/Apply.css'
+import { fetchPublishedVacanciesForApply } from '../services/publicApplyVacanciesService'
 
-/** Блок вакансий на главной странице */
+/** Блок опубликованных вакансий для публичных поверхностей */
 export default function VacanciesPublicBlock() {
-  const vacancies = getPublishedVacancies()
+  const [vacancies, setVacancies] = useState([])
 
-  if (!vacancies.length) return null
+  const load = useCallback(async () => {
+    try {
+      const rows = await fetchPublishedVacanciesForApply()
+      setVacancies(rows)
+    } catch {
+      setVacancies([])
+    }
+  }, [])
+
+  useEffect(() => {
+    load()
+  }, [load])
+
+  if (vacancies.length === 0) return null
 
   return (
-    <section className="vacancies-public container">
-      <h2 className="academy-page__heading">Работа в Shugyla Market</h2>
-      <p className="academy-page__subheading">Открытые вакансии — заполните анкету онлайн</p>
-      <div className="vacancies-public__list">
-        {vacancies.map((vacancy) => (
-          <Link key={vacancy.id} to={`/vacancies/${vacancy.slug}`} className="vacancies-public__link">
-            <strong>{vacancy.title}</strong>
-            <span> · {getVacancyPositionLabel(vacancy)}</span>
-          </Link>
+    <section className="vacancies-public-block">
+      <h2>Открытые вакансии</h2>
+      <ul>
+        {vacancies.map((v) => (
+          <li key={v.id}>
+            <Link to={`/apply/${v.slug}`}>{v.title}</Link>
+          </li>
         ))}
-      </div>
+      </ul>
     </section>
   )
 }

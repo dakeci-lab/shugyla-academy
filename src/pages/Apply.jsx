@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
-import { submitCandidateApplication } from '../services/platformDataService'
+import { submitPublicCandidateApplication } from '../services/publicApplySubmitService'
 import { fetchPublicVacancyApplicationForm } from '../services/publicApplyFormService'
 import {
   validateCandidatePhotoFile,
@@ -284,7 +284,7 @@ export default function ApplyPage() {
         answers[q.id] = values[q.id]
       }
 
-      const result = await submitCandidateApplication({
+      const result = await submitPublicCandidateApplication({
         vacancyId: vacancy.id,
         vacancySlug: vacancy.slug,
         formVersion,

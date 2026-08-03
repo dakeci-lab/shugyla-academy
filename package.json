@@ -103,6 +103,7 @@
     "verify:recruitment-apply-hub": "node scripts/verify-recruitment-apply-hub.mjs",
     "verify:recruitment-flexible-form": "node scripts/verify-recruitment-flexible-form.mjs",
     "verify:recruitment-form-hardening": "node scripts/verify-recruitment-form-hardening.mjs",
+    "verify:public-route-isolation": "node scripts/verify-public-route-isolation.mjs",
     "test:e2e:recruitment": "playwright test -c tests/e2e/playwright.config.mjs"
   },
   "dependencies": {

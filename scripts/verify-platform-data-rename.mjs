@@ -72,12 +72,23 @@ function main() {
   assert('defines PlatformDataContext', ctx.includes('const PlatformDataContext = createContext'))
   assert('imports platformDataService', ctx.includes("from '../services/platformDataService'"))
   assert('imports PlatformDataContext.css', ctx.includes("./PlatformDataContext.css"))
-  assert('App uses PlatformDataProvider', app.includes('PlatformDataProvider'))
-  assert('App provider order: Session then PlatformData then Permission', (() => {
+  assert(
+    'App mounts PlatformData via InternalPlatformProviders',
+    app.includes('InternalPlatformProviders')
+  )
+  const internalProviders = read('src/components/platform/InternalPlatformProviders.jsx')
+  assert(
+    'InternalPlatformProviders order: PlatformData then Permission',
+    (() => {
+      const platform = internalProviders.indexOf('<PlatformDataProvider>')
+      const permission = internalProviders.indexOf('<PermissionProvider>')
+      return platform >= 0 && permission > platform
+    })()
+  )
+  assert('App keeps SessionProvider above Router', (() => {
     const session = app.indexOf('<SessionProvider>')
-    const platform = app.indexOf('<PlatformDataProvider>')
-    const permission = app.indexOf('<PermissionProvider>')
-    return session >= 0 && platform > session && permission > platform
+    const router = app.indexOf('<BrowserRouter')
+    return session >= 0 && router > session
   })())
 
   console.log('\nNo legacy infrastructure names in active src')

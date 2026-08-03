@@ -2,7 +2,8 @@ import { test, expect } from '@playwright/test'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { attachConsoleGuard, PUBLIC_APPLY_ALLOW } from './helpers/consoleGuard.mjs'
+import { attachConsoleGuard, HR_SOFT_PROBE_ALLOW } from './helpers/consoleGuard.mjs'
+import { attachPublicNetworkGuard } from './helpers/publicNetworkGuard.mjs'
 import {
   createAdminClient,
   createAnonClient,
@@ -102,7 +103,7 @@ test.afterAll(async () => {
 })
 
 test('1. HR login and vacancies access', async ({ page }) => {
-  const guard = attachConsoleGuard(page)
+  const guard = attachConsoleGuard(page, { allow: HR_SOFT_PROBE_ALLOW })
   await loginAsHr(page)
   await expect(page).toHaveURL(/\/platform\/hr\/vacancies/)
   await expect(page.getByText(/42501|permission denied|JWT/i)).toHaveCount(0)
@@ -111,7 +112,7 @@ test('1. HR login and vacancies access', async ({ page }) => {
 })
 
 test('2. Create draft vacancy with centralized position', async ({ page }) => {
-  const guard = attachConsoleGuard(page)
+  const guard = attachConsoleGuard(page, { allow: HR_SOFT_PROBE_ALLOW })
   await loginAsHr(page)
   await createDraftVacancy(page, { title: ctx.title, positionName: ctx.positionName })
 
@@ -154,7 +155,7 @@ test('2. Create draft vacancy with centralized position', async ({ page }) => {
 
 test('3. Form editor: protected fields, all types, preview, save/refresh', async ({ page }) => {
   test.setTimeout(300_000)
-  const guard = attachConsoleGuard(page)
+  const guard = attachConsoleGuard(page, { allow: HR_SOFT_PROBE_ALLOW })
   await loginAsHr(page)
   await openVacancyByTitle(page, ctx.title)
 
@@ -267,7 +268,7 @@ test('3. Form editor: protected fields, all types, preview, save/refresh', async
 
 test('4. Form versioning rules', async ({ page }) => {
   test.setTimeout(180_000)
-  const guard = attachConsoleGuard(page)
+  const guard = attachConsoleGuard(page, { allow: HR_SOFT_PROBE_ALLOW })
   await loginAsHr(page)
   await openVacancyByTitle(page, ctx.title)
   const before = (await getVacancyDiagnostics(ctx.vacancyId)).vacancy.application_form_version
@@ -313,7 +314,7 @@ test('4. Form versioning rules', async ({ page }) => {
 })
 
 test('5. Publish vacancy and public hub payload hygiene', async ({ page }) => {
-  const guard = attachConsoleGuard(page)
+  const guard = attachConsoleGuard(page, { allow: HR_SOFT_PROBE_ALLOW })
   await loginAsHr(page)
   await openVacancyByTitle(page, ctx.title)
   await publishVacancyInModal(page)
@@ -348,11 +349,33 @@ test('5. Publish vacancy and public hub payload hygiene', async ({ page }) => {
   expect(formJson).not.toMatch(/field_binding|employee_role|"permissions"/i)
   expect(formJson).not.toMatch(/candidate/i)
 
-  await page.goto(appUrl(`/apply/${ctx.vacancySlug}`), { waitUntil: 'domcontentloaded' })
-  await expect(page.getByRole('button', { name: 'Отправить анкету' })).toBeVisible({
+  // Anonymous network isolation (no PlatformData / internal tables)
+  const anonContext = await page.context().browser().newContext()
+  const anonHubPage = await anonContext.newPage()
+  const hubNet = attachPublicNetworkGuard(anonHubPage, { mode: 'hub' })
+  const hubGuard = attachConsoleGuard(anonHubPage)
+  await anonHubPage.goto(appUrl('/apply'), { waitUntil: 'domcontentloaded' })
+  await expect(anonHubPage.getByText(ctx.title)).toBeVisible({ timeout: 30_000 })
+  await anonHubPage.waitForTimeout(1500)
+  hubNet.assertIsolated('anon-apply-hub')
+  hubGuard.assertClean('anon-apply-hub')
+
+  const anonFormPage = await anonContext.newPage()
+  const formNet = attachPublicNetworkGuard(anonFormPage, { mode: 'form' })
+  const formGuard = attachConsoleGuard(anonFormPage)
+  await anonFormPage.goto(appUrl(`/apply/${ctx.vacancySlug}`), { waitUntil: 'domcontentloaded' })
+  await expect(anonFormPage.getByRole('button', { name: 'Отправить анкету' })).toBeVisible({
     timeout: 30_000,
   })
-  await page.screenshot({ path: path.join(ARTIFACT_DIR, '05-public-apply.png'), fullPage: true })
+  await anonFormPage.waitForTimeout(1500)
+  formNet.assertIsolated('anon-apply-form')
+  formGuard.assertClean('anon-apply-form')
+  await anonFormPage.screenshot({
+    path: path.join(ARTIFACT_DIR, '05-public-apply.png'),
+    fullPage: true,
+  })
+  await anonContext.close()
+
   guard.assertClean('publish-hub')
 })
 
@@ -360,8 +383,9 @@ test('6. Submit first candidate with photo upload-session', async ({ browser }) 
   const context = await browser.newContext()
   const page = await context.newPage()
   const guard = attachConsoleGuard(page, {
-    allow: [/photo_token/i, ...PUBLIC_APPLY_ALLOW],
+    allow: [/photo_token/i],
   })
+  const net = attachPublicNetworkGuard(page, { mode: 'form' })
 
   const anon = createAnonClient()
   const { data: form } = await anon.rpc('get_public_vacancy_application_form', {
@@ -397,6 +421,19 @@ test('6. Submit first candidate with photo upload-session', async ({ browser }) 
   await submitPublicApplication(page)
   await expect(page.getByText('Анкета отправлена')).toBeVisible({ timeout: 60_000 })
   await expect(page.getByText(/42501|permission denied|SQLSTATE|RLS/i)).toHaveCount(0)
+  await page.waitForTimeout(1000)
+  const summary = net.summary()
+  expect(summary.rpcs).toContain('get_public_vacancy_application_form')
+  expect(summary.rpcs).toContain('submit_candidate_application')
+  expect(summary.rpcs).toContain('create_candidate_photo_upload_session')
+  // After submit, isolation still forbids internal table bootstrap (upload/submit RPCs OK)
+  for (const req of net.state.requests) {
+    expect(req.url).not.toMatch(/academy_candidates\?/)
+    expect(req.url).not.toMatch(/\/rest\/v1\/positions/)
+    expect(req.url).not.toMatch(/purchase_orders/)
+    expect(req.url).not.toMatch(/receiving_documents/)
+  }
+  expect(net.state.responses.some((r) => [401, 403, 42501].includes(r.status))).toBe(false)
 
   const candidates = await findCandidatesForVacancy(ctx.vacancyId)
   expect(candidates.length).toBeGreaterThanOrEqual(1)
@@ -439,7 +476,7 @@ test('6. Submit first candidate with photo upload-session', async ({ browser }) 
 })
 
 test('7. Snapshot history after form mutation + second candidate', async ({ page, browser }) => {
-  const guard = attachConsoleGuard(page)
+  const guard = attachConsoleGuard(page, { allow: HR_SOFT_PROBE_ALLOW })
   await loginAsHr(page)
   await openVacancyByTitle(page, ctx.title)
 
@@ -486,7 +523,7 @@ test('7. Snapshot history after form mutation + second candidate', async ({ page
   // Second candidate on new form
   const context = await browser.newContext()
   const anonPage = await context.newPage()
-  attachConsoleGuard(anonPage, { allow: PUBLIC_APPLY_ALLOW })
+  const anonGuard = attachConsoleGuard(anonPage)
   const anon = createAnonClient()
   const { data: form } = await anon.rpc('get_public_vacancy_application_form', {
     p_slug: ctx.vacancySlug,
@@ -500,6 +537,7 @@ test('7. Snapshot history after form mutation + second candidate', async ({ page
   })
   await submitPublicApplication(anonPage)
   await expect(anonPage.getByText('Анкета отправлена')).toBeVisible({ timeout: 60_000 })
+  anonGuard.assertClean('anon-c2-submit')
   await context.close()
 
   const candidates = await findCandidatesForVacancy(ctx.vacancyId)
@@ -519,7 +557,7 @@ test('8. Outdated form submit is rejected', async ({ browser }) => {
   const hrPage = await hrContext.newPage()
   const anonPage = await anonContext.newPage()
   const guardAnon = attachConsoleGuard(anonPage, {
-    allow: [/form_outdated|обновлена/i, ...PUBLIC_APPLY_ALLOW],
+    allow: [/form_outdated|обновлена/i],
   })
 
   const anon = createAnonClient()
@@ -626,7 +664,7 @@ test('9. Photo question removed after upload => form_outdated, no attach', async
 })
 
 test('10. Candidate card: notes, invite, signed photo, createFromCandidate', async ({ page }) => {
-  const guard = attachConsoleGuard(page)
+  const guard = attachConsoleGuard(page, { allow: HR_SOFT_PROBE_ALLOW })
   await loginAsHr(page)
   await page.goto(appUrl('/platform/hr/candidates'), { waitUntil: 'domcontentloaded' })
   await page.getByText(`${ctx.runId}-C1`).first().click()
@@ -697,7 +735,7 @@ test('10. Candidate card: notes, invite, signed photo, createFromCandidate', asy
 })
 
 test('11. Duplicate vacancy via UI', async ({ page }) => {
-  const guard = attachConsoleGuard(page)
+  const guard = attachConsoleGuard(page, { allow: HR_SOFT_PROBE_ALLOW })
   await loginAsHr(page)
   await page.goto(appUrl('/platform/hr/vacancies'), { waitUntil: 'domcontentloaded' })
   const row = page.locator('tr', { hasText: ctx.title })
@@ -754,7 +792,7 @@ test('12. Mobile viewports smoke', async ({ browser }) => {
   for (const vp of viewports) {
     const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } })
     const page = await context.newPage()
-    const guard = attachConsoleGuard(page, { allow: PUBLIC_APPLY_ALLOW })
+    const guard = attachConsoleGuard(page, { allow: HR_SOFT_PROBE_ALLOW })
     await loginAsHr(page)
     await openVacancyByTitle(page, ctx.title)
     await expectNoHorizontalScroll(page)
