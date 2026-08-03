@@ -576,8 +576,12 @@ test('8. Outdated form submit is rejected', async ({ browser }) => {
   })
   ctx.customLabels.number = `${ctx.customLabels.number} bumped`
   await saveApplicationForm(hrPage)
+  await expect
+    .poll(async () => (await getVacancyDiagnostics(ctx.vacancyId)).vacancy?.application_form_version, {
+      timeout: 30_000,
+    })
+    .toBeGreaterThan(Number(versionBefore || 0))
   const after = await getVacancyDiagnostics(ctx.vacancyId)
-  expect(after.vacancy.application_form_version).toBeGreaterThan(Number(versionBefore || 0))
 
   // Anon tries submit with stale version via RPC (authoritative)
   const beforeCandidates = (await findCandidatesForVacancy(ctx.vacancyId)).length

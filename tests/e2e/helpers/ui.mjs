@@ -184,7 +184,9 @@ export async function saveApplicationForm(page) {
   const btn = page.getByRole('button', { name: 'Сохранить анкету' })
   await expect(btn).toBeEnabled()
   await btn.click()
+  // Saving disables the button; wait until it finishes and re-enables.
   await expect(btn).toBeDisabled({ timeout: 30_000 })
+  await expect(btn).toBeEnabled({ timeout: 60_000 })
 }
 
 export async function openPreview(page) {
