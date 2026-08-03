@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
 import { getPublishedVacancies } from '../services/platformDataService'
-import { getVacancyRoleLabel } from '../utils/recruitmentData'
+import { getVacancyPositionLabel } from '../utils/recruitmentData'
 import '../pages/Apply.css'
 
 /** Блок вакансий на главной странице */
@@ -17,7 +17,7 @@ export default function VacanciesPublicBlock() {
         {vacancies.map((vacancy) => (
           <Link key={vacancy.id} to={`/vacancies/${vacancy.slug}`} className="vacancies-public__link">
             <strong>{vacancy.title}</strong>
-            <span> · {getVacancyRoleLabel(vacancy.role)}</span>
+            <span> · {getVacancyPositionLabel(vacancy)}</span>
           </Link>
         ))}
       </div>

@@ -25,6 +25,9 @@ function rowToVacancy(row) {
     description: row.description,
     role: row.role,
     employeeRole: row.employee_role,
+    positionId: row.position_id,
+    positionNameSnapshot: row.position_name_snapshot,
+    positions: row.positions,
     status: row.status,
     passingScore: row.passing_score,
     createdBy: row.created_by,
@@ -97,8 +100,18 @@ async function hasAuthSession() {
 }
 
 export async function fetchRecruitmentData() {
+  const authed = await hasAuthSession()
+  // Anon cannot SELECT positions (RLS); embed only for authenticated HR.
+  // Public UI uses position_name_snapshot / title fallback.
+  const vacancySelect = authed
+    ? '*, positions(id, name, is_active, archived_at)'
+    : '*'
+
   const [vacRes, qRes] = await Promise.all([
-    supabase.from('academy_vacancies').select('*').order('created_at', { ascending: false }),
+    supabase
+      .from('academy_vacancies')
+      .select(vacancySelect)
+      .order('created_at', { ascending: false }),
     supabase.from('academy_candidate_questions').select('*').order('sort_order'),
   ])
 
@@ -106,7 +119,7 @@ export async function fetchRecruitmentData() {
   const questions = (await throwIfError(qRes, 'Загрузка вопросов')).map(rowToQuestion)
 
   let candidates = []
-  if (await hasAuthSession()) {
+  if (authed) {
     const cRes = await supabase
       .from('academy_candidates')
       .select('*')
@@ -126,6 +139,7 @@ export async function fetchRecruitmentData() {
 }
 
 export async function createVacancy(data) {
+  if (!data.positionId) throw new Error('Выберите должность')
   const vacancies = getAllVacanciesSync()
   const slug = data.slug || generateUniqueVacancySlug(data.title, vacancies)
   const row = {
@@ -133,8 +147,10 @@ export async function createVacancy(data) {
     title: data.title,
     slug,
     description: data.description || '',
-    role: data.role,
+    role: data.role ?? null,
     employee_role: data.employeeRole ?? data.role ?? null,
+    position_id: data.positionId,
+    position_name_snapshot: data.positionNameSnapshot || null,
     status: data.status || VACANCY_STATUS.DRAFT,
     // Legacy column kept for schema compatibility; scoring UI disabled.
     passing_score: 80,
@@ -154,10 +170,23 @@ export async function updateVacancy(vacancyId, updates) {
   if (updates.description != null) patch.description = updates.description
   if (updates.role != null) patch.role = updates.role
   if (updates.employeeRole != null) patch.employee_role = updates.employeeRole
+  if (updates.positionId != null) {
+    patch.position_id = updates.positionId
+    if (updates.positionNameSnapshot != null) {
+      patch.position_name_snapshot = updates.positionNameSnapshot
+    }
+  }
   if (updates.status != null) patch.status = updates.status
   if (updates.title && updates.slug == null) {
     patch.slug = generateUniqueVacancySlug(updates.title, getAllVacanciesSync(), vacancyId)
   }
+
+  const nextStatus = patch.status ?? current.status
+  const nextPositionId = patch.position_id ?? current.positionId
+  if (nextStatus === VACANCY_STATUS.PUBLISHED && !nextPositionId) {
+    throw new Error('Перед публикацией выберите должность из справочника')
+  }
+
   if (Object.keys(patch).length) {
     await throwIfError(
       await supabase.from('academy_vacancies').update(patch).eq('id', vacancyId),
@@ -188,6 +217,9 @@ export async function archiveVacancy(vacancyId) {
 export async function duplicateVacancy(sourceVacancyId) {
   const source = getVacancyByIdSync(sourceVacancyId)
   if (!source) throw new Error('Вакансия не найдена')
+  if (!source.positionId) {
+    throw new Error('Сначала выберите должность для исходной вакансии')
+  }
 
   const title = `${source.title} (копия)`
   const slug = generateUniqueVacancySlug(title, getAllVacanciesSync())
@@ -199,6 +231,8 @@ export async function duplicateVacancy(sourceVacancyId) {
     description: source.description,
     role: source.role,
     employeeRole: source.employeeRole,
+    positionId: source.positionId,
+    positionNameSnapshot: source.positionNameSnapshot,
     status: VACANCY_STATUS.DRAFT,
     slug,
   })

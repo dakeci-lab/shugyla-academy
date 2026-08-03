@@ -35,6 +35,10 @@ import {
   createCandidatePhotoSignedUrl,
   resolveCandidatePhotoStoragePath,
 } from '../../../services/candidatePhotoService'
+import {
+  ensurePositionCatalogLoaded,
+  isPositionAssignable,
+} from '../../../services/positionCatalogService'
 import { getRoleLabel } from '../../../data/roles'
 import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
 import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
@@ -421,22 +425,45 @@ export default function EmployeesSection() {
 
     const vacancy = candidate.vacancyId ? getVacancyById(candidate.vacancyId) : null
     // Prefill RBAC role from vacancy.employeeRole only when explicitly set.
-    // Never invent positionId from vacancy title / role label.
+    // Prefill position from vacancy.position_id when assignable; never invent from title/role.
     const role = getVacancyEmployeeRole(vacancy) || EMPTY_EMPLOYEE_FORM.role
 
     if (candidateChanged) {
       activeCandidateIdRef.current = candidateId
       formTouchedRef.current = false
-      setCreateInitialForm({
-        ...EMPTY_EMPLOYEE_FORM,
-        firstName: candidate.firstName || '',
-        lastName: candidate.lastName || '',
-        role,
-        roleId: '',
-        positionId: '',
-        avatarUrl: candidate.photoUrl || '',
-        employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
-      })
+
+      const applyPrefill = (positionId = '') => {
+        setCreateInitialForm({
+          ...EMPTY_EMPLOYEE_FORM,
+          firstName: candidate.firstName || '',
+          lastName: candidate.lastName || '',
+          role,
+          roleId: '',
+          positionId,
+          avatarUrl: candidate.photoUrl || '',
+          employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
+        })
+      }
+
+      applyPrefill('')
+
+      if (isCloudMode() && vacancy?.positionId) {
+        ensurePositionCatalogLoaded()
+          .then(() => {
+            if (activeCandidateIdRef.current !== candidateId) return
+            if (isPositionAssignable(vacancy.positionId)) {
+              applyPrefill(vacancy.positionId)
+            } else {
+              setActionError(
+                'Должность вакансии архивна или недоступна. Выберите действующую должность перед созданием сотрудника.'
+              )
+              applyPrefill('')
+            }
+          })
+          .catch(() => {
+            /* catalog failure: leave position empty for manual select */
+          })
+      }
 
       // Refresh short-lived signed URL for preview (not persisted on create).
       const photoPath = resolveCandidatePhotoStoragePath(candidate)

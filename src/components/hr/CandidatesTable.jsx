@@ -1,4 +1,5 @@
 import { getVacancyById } from '../../services/platformDataService'
+import { getVacancyPositionLabel } from '../../utils/recruitmentData'
 import { AGE_SORT, cycleAgeSort } from '../../utils/candidateListUtils'
 import { formatRecruitmentDate } from '../admin/sections/recruitmentAdminShared'
 import CandidateAvatar from '../CandidateAvatar'
@@ -65,7 +66,15 @@ export default function CandidatesTable({
           </thead>
           <tbody>
             {candidates.map((candidate, index) => {
-              const vacancyTitle = getVacancyById(candidate.vacancyId)?.title || '—'
+              const vacancy = getVacancyById(candidate.vacancyId)
+              const vacancyTitle = vacancy
+                ? `${vacancy.title}${
+                    getVacancyPositionLabel(vacancy) &&
+                    getVacancyPositionLabel(vacancy) !== vacancy.title
+                      ? ` · ${getVacancyPositionLabel(vacancy)}`
+                      : ''
+                  }`
+                : '—'
               const experience = candidate.experience || '—'
 
               return (

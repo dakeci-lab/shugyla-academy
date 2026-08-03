@@ -131,6 +131,8 @@ function saveVacancies(vacancies) {
       description: v.description,
       role: v.role,
       employee_role: v.employeeRole ?? v.role,
+      position_id: v.positionId ?? null,
+      position_name_snapshot: v.positionNameSnapshot ?? null,
       status: v.status,
       passing_score: v.passingScore,
       created_by: v.createdBy,
@@ -192,11 +194,14 @@ function saveCandidates(candidates) {
 }
 
 export async function createVacancy(data) {
+  if (!data.positionId) throw new Error('Выберите должность')
   const bundle = getLocalRecruitmentBundle()
   const slug = data.slug || generateUniqueVacancySlug(data.title, bundle.vacancies)
   const vacancy = normalizeVacancy({
     id: genId(),
     ...data,
+    positionId: data.positionId,
+    positionNameSnapshot: data.positionNameSnapshot || null,
     slug,
     status: data.status || VACANCY_STATUS.DRAFT,
     passingScore: data.passingScore ?? 80,
@@ -247,12 +252,18 @@ export async function duplicateVacancy(sourceVacancyId) {
   const slug = generateUniqueVacancySlug(title, bundle.vacancies)
   const newId = genId()
 
+  if (!source.positionId) {
+    throw new Error('Сначала выберите должность для исходной вакансии')
+  }
+
   const vacancy = normalizeVacancy({
     id: newId,
     title,
     description: source.description,
     role: source.role,
     employeeRole: source.employeeRole,
+    positionId: source.positionId,
+    positionNameSnapshot: source.positionNameSnapshot,
     passingScore: source.passingScore,
     status: VACANCY_STATUS.DRAFT,
     slug,

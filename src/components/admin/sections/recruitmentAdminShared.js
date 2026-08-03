@@ -9,8 +9,9 @@ export const STATUS_BADGE = {
 export const EMPTY_VACANCY = {
   title: '',
   description: '',
-  role: 'cashier',
-  employeeRole: 'cashier',
+  positionId: '',
+  role: '',
+  employeeRole: '',
   status: 'draft',
 }
 

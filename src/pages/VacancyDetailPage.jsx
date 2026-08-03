@@ -1,6 +1,6 @@
 import { Link, useParams } from 'react-router-dom'
 import { getPublishedVacancyBySlug } from '../services/platformDataService'
-import { getVacancyRoleLabel } from '../utils/recruitmentData'
+import { getVacancyPositionLabel } from '../utils/recruitmentData'
 import Header from '../components/Header'
 import './Vacancies.css'
 
@@ -27,7 +27,7 @@ export default function VacancyDetailPage() {
               ← Все вакансии
             </Link>
             <h1 className="vacancy-detail__title">{vacancy.title}</h1>
-            <p className="vacancy-detail__role">{getVacancyRoleLabel(vacancy.role)}</p>
+            <p className="vacancy-detail__role">{getVacancyPositionLabel(vacancy)}</p>
             {vacancy.description && (
               <div className="vacancy-detail__description">{vacancy.description}</div>
             )}

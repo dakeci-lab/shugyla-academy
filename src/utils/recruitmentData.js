@@ -102,6 +102,32 @@ export function getVacancyRoleLabel(role) {
   )
 }
 
+/**
+ * Display label for vacancy organizational position.
+ * Prefer live catalog name (HR), then snapshot, then title / legacy role.
+ */
+export function getVacancyPositionLabel(vacancy) {
+  if (!vacancy) return '—'
+  return (
+    vacancy.positionName ||
+    vacancy.positionNameSnapshot ||
+    vacancy.title ||
+    getVacancyRoleLabel(vacancy.employeeRole || vacancy.role) ||
+    '—'
+  )
+}
+
+export function vacancyNeedsPositionSelection(vacancy) {
+  return !vacancy?.positionId
+}
+
+export function vacancyHasArchivedPosition(vacancy) {
+  if (!vacancy?.positionId) return false
+  if (vacancy.positionIsActive === false) return true
+  if (vacancy.positionArchived === true) return true
+  return false
+}
+
 export function generateUniqueVacancySlug(title, vacancies, excludeId = null) {
   const base = slugify(title)
   const existing = new Set(
@@ -120,6 +146,26 @@ export function getApplyUrl(slug) {
 }
 
 export function normalizeVacancy(raw) {
+  const embedded =
+    raw.positions && !Array.isArray(raw.positions)
+      ? raw.positions
+      : Array.isArray(raw.positions)
+        ? raw.positions[0]
+        : null
+
+  const positionId = raw.positionId ?? raw.position_id ?? null
+  const positionNameSnapshot =
+    raw.positionNameSnapshot ?? raw.position_name_snapshot ?? null
+  const liveName = raw.positionName ?? embedded?.name ?? null
+  const positionIsActive =
+    raw.positionIsActive ??
+    (embedded ? embedded.is_active !== false : null)
+  const positionArchived =
+    raw.positionArchived ??
+    (embedded
+      ? Boolean(embedded.archived_at) || embedded.is_active === false
+      : null)
+
   return {
     id: raw.id,
     title: raw.title || '',
@@ -127,6 +173,11 @@ export function normalizeVacancy(raw) {
     description: raw.description || '',
     role: raw.role,
     employeeRole: raw.employeeRole ?? raw.employee_role ?? raw.role,
+    positionId,
+    positionNameSnapshot,
+    positionName: liveName || positionNameSnapshot || null,
+    positionIsActive,
+    positionArchived,
     status: raw.status || VACANCY_STATUS.DRAFT,
     passingScore: raw.passingScore ?? raw.passing_score ?? 80,
     createdBy: raw.createdBy ?? raw.created_by ?? null,

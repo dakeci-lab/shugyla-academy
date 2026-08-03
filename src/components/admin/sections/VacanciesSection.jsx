@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   getVacancies,
   createVacancy,
@@ -9,10 +9,18 @@ import {
 import { toastSuccess } from '../../../services/notificationService'
 import {
   VACANCY_STATUS_LABELS,
-  VACANCY_ROLES,
-  getVacancyRoleLabel,
+  getVacancyPositionLabel,
+  vacancyNeedsPositionSelection,
+  vacancyHasArchivedPosition,
 } from '../../../utils/recruitmentData'
-import { EMPLOYEE_FORM_ROLES, ROLES } from '../../../data/roles'
+import {
+  ensurePositionCatalogLoaded,
+  reloadPositionCatalog,
+  buildPositionSelectGroups,
+  getPositionById,
+  isPositionAssignable,
+} from '../../../services/positionCatalogService'
+import { isCloudMode } from '../../../lib/dataMode'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../AdminModal'
 import ConfirmDialog from '../ConfirmDialog'
@@ -35,14 +43,65 @@ export default function VacanciesSection() {
   const [deleteVacancyTarget, setDeleteVacancyTarget] = useState(null)
   const [deletingVacancy, setDeletingVacancy] = useState(false)
   const [duplicatingVacancyId, setDuplicatingVacancyId] = useState(null)
+  const [positionGroups, setPositionGroups] = useState([])
+  const [catalogLoading, setCatalogLoading] = useState(false)
+  const [catalogError, setCatalogError] = useState('')
+  const [titleTouched, setTitleTouched] = useState(false)
 
   void version
 
   const vacancies = getVacancies()
+  const cloudMode = isCloudMode()
+
+  async function loadCatalog({ force = false, currentPositionId = null } = {}) {
+    if (!cloudMode) {
+      setPositionGroups([])
+      setCatalogError('')
+      setCatalogLoading(false)
+      return
+    }
+    setCatalogLoading(true)
+    setCatalogError('')
+    try {
+      if (force) await reloadPositionCatalog()
+      else await ensurePositionCatalogLoaded()
+      setPositionGroups(
+        buildPositionSelectGroups({
+          currentPositionId,
+          includeArchivedCurrent: Boolean(currentPositionId),
+        })
+      )
+    } catch (err) {
+      setCatalogError(err?.message || 'Не удалось загрузить справочник должностей')
+      setPositionGroups([])
+    } finally {
+      setCatalogLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (showVacancyForm) {
+      loadCatalog({ currentPositionId: vacancyForm.positionId || null })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load on open / position change
+  }, [showVacancyForm, vacancyForm.positionId, cloudMode])
+
+  const selectedPosition = useMemo(() => {
+    if (!vacancyForm.positionId) return null
+    return getPositionById(vacancyForm.positionId)
+  }, [vacancyForm.positionId, positionGroups])
+
+  const selectedArchived = Boolean(
+    selectedPosition &&
+      (selectedPosition.isActive === false ||
+        selectedPosition.groupIsActive === false ||
+        selectedPosition.__isCurrentArchived)
+  )
 
   function openCreateVacancy() {
     setEditVacancyId(null)
     setVacancyForm(EMPTY_VACANCY)
+    setTitleTouched(false)
     setVacancyError('')
     setShowVacancyForm(true)
   }
@@ -52,20 +111,25 @@ export default function VacanciesSection() {
     setVacancyForm({
       title: vacancy.title,
       description: vacancy.description || '',
-      role: vacancy.role,
-      employeeRole: vacancy.employeeRole || vacancy.role,
+      positionId: vacancy.positionId || '',
+      role: vacancy.role || '',
+      employeeRole: vacancy.employeeRole || vacancy.role || '',
       status: vacancy.status,
     })
+    setTitleTouched(true)
     setVacancyError('')
     setShowVacancyForm(true)
   }
 
-  function updateVacancyRole(role) {
-    setVacancyForm((prev) => ({
-      ...prev,
-      role,
-      employeeRole: prev.employeeRole === prev.role ? role : prev.employeeRole,
-    }))
+  function handlePositionChange(positionId) {
+    const position = positionId ? getPositionById(positionId) : null
+    setVacancyForm((prev) => {
+      const next = { ...prev, positionId }
+      if (!editVacancyId && position && (!titleTouched || !prev.title.trim())) {
+        next.title = position.name
+      }
+      return next
+    })
   }
 
   async function handleVacancySave(e) {
@@ -74,12 +138,33 @@ export default function VacanciesSection() {
       setVacancyError('Укажите название вакансии')
       return
     }
+    if (!vacancyForm.positionId) {
+      setVacancyError('Выберите должность')
+      return
+    }
+    if (!isPositionAssignable(vacancyForm.positionId) && !editVacancyId) {
+      setVacancyError('Выберите активную должность из справочника')
+      return
+    }
+    if (
+      editVacancyId &&
+      vacancyForm.status === 'published' &&
+      !isPositionAssignable(vacancyForm.positionId)
+    ) {
+      setVacancyError('Для публикации выберите активную должность')
+      return
+    }
+
+    const position = getPositionById(vacancyForm.positionId)
     try {
       const payload = {
         title: vacancyForm.title.trim(),
         description: vacancyForm.description.trim(),
-        role: vacancyForm.role,
-        employeeRole: vacancyForm.employeeRole || vacancyForm.role,
+        positionId: vacancyForm.positionId,
+        positionNameSnapshot: position?.name || null,
+        // Preserve legacy RBAC fields; do not invent from position name.
+        role: vacancyForm.role || null,
+        employeeRole: vacancyForm.employeeRole || vacancyForm.role || null,
         status: vacancyForm.status,
       }
       if (editVacancyId) {
@@ -90,6 +175,7 @@ export default function VacanciesSection() {
       }
       setVacancyError('')
       await refresh()
+      toastSuccess('Вакансия сохранена')
     } catch (err) {
       setVacancyError(err.message || 'Не удалось сохранить вакансию')
     }
@@ -101,6 +187,11 @@ export default function VacanciesSection() {
   }
 
   async function handleDuplicateVacancy(vacancy) {
+    if (!vacancy.positionId) {
+      setActionError('Сначала выберите должность для исходной вакансии')
+      openEditVacancy(vacancy)
+      return
+    }
     setDuplicatingVacancyId(vacancy.id)
     setActionError('')
     try {
@@ -112,10 +203,12 @@ export default function VacanciesSection() {
         setVacancyForm({
           title: created.title,
           description: created.description || '',
-          role: created.role,
-          employeeRole: created.employeeRole || created.role,
+          positionId: created.positionId || '',
+          role: created.role || '',
+          employeeRole: created.employeeRole || created.role || '',
           status: created.status,
         })
+        setTitleTouched(true)
       }
       setShowVacancyForm(true)
       toastSuccess('Вакансия продублирована как черновик')
@@ -158,7 +251,7 @@ export default function VacanciesSection() {
             <tr>
               <th className="recruitment-vacancies-table__index">№</th>
               <th>Название вакансии</th>
-              <th>Роль</th>
+              <th>Должность</th>
               <th>Статус</th>
               <th>Кандидатов</th>
               <th>Ссылка</th>
@@ -184,8 +277,16 @@ export default function VacanciesSection() {
                     >
                       {v.title}
                     </button>
+                    {vacancyNeedsPositionSelection(v) && (
+                      <p className="admin-form__hint" style={{ color: 'var(--color-danger, #b42318)' }}>
+                        Нужно выбрать должность
+                      </p>
+                    )}
+                    {vacancyHasArchivedPosition(v) && (
+                      <p className="admin-form__hint">Должность архивна — выберите активную</p>
+                    )}
                   </td>
-                  <td>{getVacancyRoleLabel(v.employeeRole || v.role)}</td>
+                  <td>{getVacancyPositionLabel(v)}</td>
                   <td>
                     <StatusBadge
                       label={VACANCY_STATUS_LABELS[v.status]}
@@ -264,15 +365,92 @@ export default function VacanciesSection() {
           }
         >
           <form id="vacancy-form" className="admin-form" onSubmit={handleVacancySave}>
+            {editVacancyId && !vacancyForm.positionId && (
+              <p className="admin-form__error" role="alert">
+                У вакансии нет связи с централизованной должностью. Выберите должность перед
+                сохранением.
+              </p>
+            )}
+            {selectedArchived && (
+              <p className="admin-form__hint" role="status">
+                Текущая должность архивна. Для публикации выберите активную должность из
+                справочника.
+              </p>
+            )}
+
+            <label className="admin-form__label" htmlFor="vacancy-position-select">
+              Должность *
+              {catalogError ? (
+                <div className="admin-form__error">
+                  {catalogError}{' '}
+                  <button
+                    type="button"
+                    className="btn btn--outline btn--sm"
+                    onClick={() =>
+                      loadCatalog({ force: true, currentPositionId: vacancyForm.positionId || null })
+                    }
+                  >
+                    Повторить
+                  </button>
+                </div>
+              ) : null}
+              <select
+                id="vacancy-position-select"
+                className="admin-form__select"
+                value={vacancyForm.positionId || ''}
+                disabled={catalogLoading || Boolean(catalogError)}
+                required
+                onChange={(e) => handlePositionChange(e.target.value)}
+              >
+                <option value="">
+                  {catalogLoading ? 'Загрузка должностей…' : 'Выберите должность'}
+                </option>
+                {positionGroups.map((group) => (
+                  <optgroup
+                    key={group.groupId || group.groupName}
+                    label={
+                      group.groupIsActive === false
+                        ? `${group.groupName} (архивная группа)`
+                        : group.groupName
+                    }
+                  >
+                    {group.positions.map((position) => {
+                      const archived =
+                        position.isActive === false ||
+                        position.groupIsActive === false ||
+                        position.__isCurrentArchived
+                      return (
+                        <option key={position.id} value={position.id}>
+                          {position.name}
+                          {archived ? ' (архивная)' : ''}
+                        </option>
+                      )
+                    })}
+                  </optgroup>
+                ))}
+              </select>
+              <span className="admin-form__hint">
+                Должность выбирается из справочника платформы. Архивные должности недоступны для
+                новых вакансий.
+              </span>
+            </label>
+
             <label className="admin-form__label">
               Название вакансии *
               <input
                 className="admin-form__input"
                 value={vacancyForm.title}
-                onChange={(e) => setVacancyForm({ ...vacancyForm, title: e.target.value })}
+                onChange={(e) => {
+                  setTitleTouched(true)
+                  setVacancyForm({ ...vacancyForm, title: e.target.value })
+                }}
                 required
               />
+              <span className="admin-form__hint">
+                Публичный заголовок. Должность определяется только выбранной записью справочника.
+              </span>
             </label>
+
             <label className="admin-form__label">
               Описание
               <textarea
@@ -282,51 +460,23 @@ export default function VacanciesSection() {
                 onChange={(e) => setVacancyForm({ ...vacancyForm, description: e.target.value })}
               />
             </label>
-            <div className="admin-form__row">
-              <label className="admin-form__label">
-                Роль вакансии
-                <select
-                  className="admin-form__select"
-                  value={vacancyForm.role}
-                  onChange={(e) => updateVacancyRole(e.target.value)}
-                >
-                  {VACANCY_ROLES.map((roleId) => (
-                    <option key={roleId} value={roleId}>
-                      {getVacancyRoleLabel(roleId)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="admin-form__label">
-                Роль сотрудника после найма
-                <select
-                  className="admin-form__select"
-                  value={vacancyForm.employeeRole}
-                  onChange={(e) => setVacancyForm({ ...vacancyForm, employeeRole: e.target.value })}
-                >
-                  {EMPLOYEE_FORM_ROLES.map((roleId) => (
-                    <option key={roleId} value={roleId}>
-                      {ROLES[roleId]?.label || roleId}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="admin-form__label">
-                Статус
-                <select
-                  className="admin-form__select"
-                  value={vacancyForm.status}
-                  onChange={(e) => setVacancyForm({ ...vacancyForm, status: e.target.value })}
-                >
-                  <option value="draft">Черновик</option>
-                  <option value="published">Опубликовано</option>
-                  <option value="archived">Архив</option>
-                </select>
-                <span className="admin-form__hint">
-                  Публикация, снятие с публикации и архивирование выполняются через статус вакансии.
-                </span>
-              </label>
-            </div>
+
+            <label className="admin-form__label">
+              Статус
+              <select
+                className="admin-form__select"
+                value={vacancyForm.status}
+                onChange={(e) => setVacancyForm({ ...vacancyForm, status: e.target.value })}
+              >
+                <option value="draft">Черновик</option>
+                <option value="published">Опубликовано</option>
+                <option value="archived">Архив</option>
+              </select>
+              <span className="admin-form__hint">
+                Публикация, снятие с публикации и архивирование выполняются через статус вакансии.
+              </span>
+            </label>
+
             {vacancyError && <p className="admin-form__error">{vacancyError}</p>}
           </form>
         </AdminModal>

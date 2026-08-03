@@ -5,7 +5,7 @@ import {
   submitCandidateApplication,
   refreshData,
 } from '../services/platformDataService'
-import { getVacancyRoleLabel } from '../utils/recruitmentData'
+import { getVacancyPositionLabel } from '../utils/recruitmentData'
 import { isCloudMode } from '../lib/dataMode'
 import {
   validateCandidatePhotoFile,
@@ -221,7 +221,7 @@ export default function ApplyPage() {
         <section>
           <h2 className="apply-page__vacancy-title">{vacancy.title}</h2>
           <p className="apply-page__vacancy-desc">
-            {getVacancyRoleLabel(vacancy.role)}
+            {getVacancyPositionLabel(vacancy)}
             {vacancy.description ? ` · ${vacancy.description}` : ''}
           </p>
         </section>

@@ -797,7 +797,7 @@ export function getCandidateById(candidateId) {
 
 export async function createVacancy(vacancyData) {
   if (!vacancyData.title?.trim()) throw new Error('Укажите название вакансии')
-  if (!vacancyData.role) throw new Error('Выберите роль для вакансии')
+  if (!vacancyData.positionId) throw new Error('Выберите должность')
   const vacancies = getAllVacanciesSync()
   const slug = vacancyData.slug || generateUniqueVacancySlug(vacancyData.title, vacancies)
   const id = await getRecruitmentAdapter().createVacancy({ ...vacancyData, slug })
@@ -808,6 +808,9 @@ export async function createVacancy(vacancyData) {
 export async function updateVacancy(vacancyId, updates) {
   if (updates.title != null && !updates.title.trim()) {
     throw new Error('Укажите название вакансии')
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'positionId') && !updates.positionId) {
+    throw new Error('Выберите должность')
   }
   await getRecruitmentAdapter().updateVacancy(vacancyId, updates)
   if (isCloudMode()) await refreshData()

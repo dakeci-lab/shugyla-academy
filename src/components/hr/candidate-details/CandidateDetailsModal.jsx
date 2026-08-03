@@ -23,6 +23,7 @@ import {
   CANDIDATE_STATUS_LABELS,
   formatInterviewDateLabel,
   formatInterviewTimeLabel,
+  getVacancyPositionLabel,
   hasInterviewInvitation,
   isCandidateEmployeeCreated,
 } from '../../../utils/recruitmentData'
@@ -497,6 +498,7 @@ export default function CandidateDetailsModal({
               <div className="candidate-main-info__grid">
                 <InfoField label="Телефон" value={formatPhoneDisplay(candidate.phone) || candidate.phone} href={phoneTel} />
                 <InfoField label="Вакансия" value={vacancy?.title} />
+                <InfoField label="Должность" value={getVacancyPositionLabel(vacancy)} />
                 <InfoField label="Возраст" value={ageLabel} />
                 <InfoField label="Город" value={candidate.city} />
                 <InfoField label="Опыт" value={candidate.experience} />
