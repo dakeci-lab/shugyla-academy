@@ -7,6 +7,7 @@ import {
 import { getLocalRecruitmentBundle } from '../services/recruitmentLocalAdapter'
 import { ROLES, normalizeRoleId } from '../data/roles'
 import { slugify } from './standardsData'
+import { getAppUrl } from '../router/basename'
 
 export const VACANCY_STATUS = {
   DRAFT: 'draft',
@@ -139,10 +140,27 @@ export function generateUniqueVacancySlug(title, vacancies, excludeId = null) {
   return `${base}-${counter}`
 }
 
-export function getApplyUrl(slug) {
-  const base = import.meta.env.BASE_URL || '/'
-  const normalized = base.endsWith('/') ? base.slice(0, -1) : base
-  return `${window.location.origin}${normalized}/apply/${slug}`
+/** Absolute public URL for the store apply hub (`/apply`). */
+export function getApplyHubUrl(search = '') {
+  const query = String(search || '')
+  const suffix = !query
+    ? ''
+    : query.startsWith('?')
+      ? query
+      : `?${query.replace(/^\?/, '')}`
+  return `${getAppUrl('apply')}${suffix}`
+}
+
+/** Absolute public URL for a vacancy apply form (`/apply/:slug`). */
+export function getApplyUrl(slug, search = '') {
+  const safeSlug = String(slug || '').replace(/^\/+|\/+$/g, '')
+  const query = String(search || '')
+  const suffix = !query
+    ? ''
+    : query.startsWith('?')
+      ? query
+      : `?${query.replace(/^\?/, '')}`
+  return `${getAppUrl(`apply/${safeSlug}`)}${suffix}`
 }
 
 export function normalizeVacancy(raw) {

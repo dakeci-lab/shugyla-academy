@@ -18,6 +18,7 @@ import ResetPassword from './pages/ResetPassword'
 import VacanciesPage from './pages/VacanciesPage'
 import VacancyDetailPage from './pages/VacancyDetailPage'
 import ApplyPage from './pages/Apply'
+import ApplyHubPage from './pages/ApplyHub'
 import Profile from './pages/Profile'
 import StandardsPage from './pages/Standards'
 import PlatformIndex from './pages/platform/PlatformIndex'
@@ -74,6 +75,8 @@ export default function App() {
         <Route path="/" element={<Navigate to={LOGIN_PATH} replace />} />
         <Route path="/vacancies" element={<VacanciesPage />} />
         <Route path="/vacancies/:slug" element={<VacancyDetailPage />} />
+        {/* Exact /apply before /apply/:slug so hub is never treated as a slug */}
+        <Route path="/apply" element={<ApplyHubPage />} />
         <Route path="/apply/:slug" element={<ApplyPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

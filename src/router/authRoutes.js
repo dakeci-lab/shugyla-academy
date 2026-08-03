@@ -5,15 +5,17 @@ export const LOGIN_PATH = '/login'
 export const PUBLIC_AUTH_PATHS = [
   LOGIN_PATH,
   '/vacancies',
+  '/apply',
   '/forgot-password',
   '/reset-password',
 ]
 
 export function isPublicAppPath(pathname = '') {
   if (!pathname) return false
-  if (PUBLIC_AUTH_PATHS.includes(pathname)) return true
-  if (pathname.startsWith('/vacancies/')) return true
-  if (pathname.startsWith('/apply/')) return true
+  const normalized = pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
+  if (PUBLIC_AUTH_PATHS.includes(normalized)) return true
+  if (normalized.startsWith('/vacancies/')) return true
+  if (normalized.startsWith('/apply/')) return true
   return false
 }
 

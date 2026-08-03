@@ -28,6 +28,8 @@ import StatusBadge from '../StatusBadge'
 import IconActionButton from '../IconActionButton'
 import { PencilIcon, TrashIcon, LinkIcon, CopyIcon } from '../../icons/PlatformIcons'
 import { copyApplyLink, EMPTY_VACANCY, STATUS_BADGE } from './recruitmentAdminShared'
+import ApplyHubQrModal from '../ApplyHubQrModal'
+import { getApplyHubUrl } from '../../../utils/recruitmentData'
 import '../admin-shared.css'
 import '../IconActionButton.css'
 import '../RecruitmentSection.css'
@@ -47,6 +49,7 @@ export default function VacanciesSection() {
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState('')
   const [titleTouched, setTitleTouched] = useState(false)
+  const [showHubQr, setShowHubQr] = useState(false)
 
   void version
 
@@ -240,9 +243,28 @@ export default function VacanciesSection() {
 
       <div className="admin-toolbar">
         <span className="admin-toolbar__info">{vacancies.length} вакансий</span>
-        <button type="button" className="btn btn--primary btn--sm" onClick={openCreateVacancy}>
-          + Создать вакансию
-        </button>
+        <div className="admin-toolbar__actions" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={() => setShowHubQr(true)}
+          >
+            Общий QR-код
+          </button>
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={() => {
+              navigator.clipboard?.writeText(getApplyHubUrl()).catch(() => {})
+              toastSuccess('Ссылка /apply скопирована')
+            }}
+          >
+            Копировать /apply
+          </button>
+          <button type="button" className="btn btn--primary btn--sm" onClick={openCreateVacancy}>
+            + Создать вакансию
+          </button>
+        </div>
       </div>
 
       <div className="admin-table-wrap">
@@ -347,6 +369,8 @@ export default function VacanciesSection() {
           loading={deletingVacancy}
         />
       )}
+
+      {showHubQr && <ApplyHubQrModal onClose={() => setShowHubQr(false)} />}
 
       {showVacancyForm && (
         <AdminModal

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useLocation } from 'react-router-dom'
 import {
   getPublishedVacancyBySlug,
   submitCandidateApplication,
@@ -32,6 +32,8 @@ const EMPTY_FORM = {
 /** Публичная анкета кандидата — /apply/:slug */
 export default function ApplyPage() {
   const { slug } = useParams()
+  const location = useLocation()
+  const hubPath = `/apply${location.search || ''}`
   const [loadState, setLoadState] = useState(isCloudMode() ? 'loading' : 'loaded')
   const [loadVersion, setLoadVersion] = useState(0)
 
@@ -100,7 +102,7 @@ export default function ApplyPage() {
           <h1>Не удалось загрузить анкету</h1>
           <p>Попробуйте обновить страницу или вернитесь позже.</p>
           <p>
-            <Link to="/vacancies">← К вакансиям</Link>
+            <Link to={hubPath}>← Все вакансии</Link>
           </p>
         </div>
       </div>
@@ -111,9 +113,12 @@ export default function ApplyPage() {
     return (
       <div className="apply-page">
         <div className="apply-page__card apply-page__closed">
-          <h1>Вакансия недоступна или закрыта.</h1>
+          <h1>Эта вакансия больше недоступна.</h1>
+          <p>Посмотрите актуальный список открытых вакансий.</p>
           <p>
-            <Link to="/vacancies">← К вакансиям</Link>
+            <Link to={hubPath} className="btn btn--primary">
+              Посмотреть открытые вакансии
+            </Link>
           </p>
         </div>
       </div>
@@ -127,7 +132,9 @@ export default function ApplyPage() {
           <h1 className="apply-page__success-title">Анкета отправлена</h1>
           <p>{successMessage}</p>
           <p>
-            <Link to="/vacancies">← К вакансиям</Link>
+            <Link to={hubPath} className="btn btn--outline">
+              Вернуться к вакансиям
+            </Link>
           </p>
         </div>
       </div>
@@ -216,6 +223,9 @@ export default function ApplyPage() {
         <div className="apply-page__brand">
           <h1 className="apply-page__brand-title">Shugyla Market</h1>
           <p className="apply-page__brand-sub">Анкета кандидата</p>
+          <p className="apply-page__brand-sub">
+            <Link to={hubPath}>← Все вакансии</Link>
+          </p>
         </div>
 
         <section>
