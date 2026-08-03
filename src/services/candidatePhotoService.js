@@ -29,7 +29,7 @@ function extensionForMime(mime) {
   return 'jpg'
 }
 
-/** Build unpredictable private storage path for a new candidate photo. */
+/** @deprecated Client must not choose path; kept for path-format checks only. */
 export function buildCandidatePhotoPath(file) {
   const ext = extensionForMime(file?.type)
   const id =
@@ -126,33 +126,75 @@ export async function attachCandidatePhotoSignedUrls(candidates, expiresIn = CAN
   })
 }
 
-export async function uploadCandidatePhoto(file) {
+/**
+ * Request a one-time server-issued upload session, then upload to that path only.
+ */
+export async function createAndUploadCandidatePhoto(file, { vacancyId, formVersion }) {
   if (!isSupabaseConfigured() || !supabase) {
     throw new Error('Supabase Storage не настроен')
   }
 
   const validationError = validateCandidatePhotoFile(file)
   if (validationError) throw new Error(validationError)
+  if (!vacancyId) throw new Error('Вакансия не указана')
+  if (formVersion == null) throw new Error('Анкета устарела. Обновите страницу.')
 
-  const path = buildCandidatePhotoPath(file)
-  if (!NEW_PHOTO_PATH_RE.test(path)) {
+  const { data: session, error: sessionError } = await supabase.rpc(
+    'create_candidate_photo_upload_session',
+    {
+      p_vacancy_id: vacancyId,
+      p_form_version: Number(formVersion),
+      p_extension: extensionForMime(file.type),
+    }
+  )
+
+  if (sessionError || !session?.upload_id || !session?.storage_path) {
+    const msg = sessionError?.message || ''
+    if (msg.includes('form_outdated')) {
+      throw new Error('Анкета была обновлена. Обновите страницу и заполните её ещё раз.')
+    }
+    throw new Error('Не удалось начать загрузку фото. Попробуйте ещё раз.')
+  }
+
+  if (!NEW_PHOTO_PATH_RE.test(session.storage_path)) {
     throw new Error('Не удалось подготовить путь для фото')
   }
 
-  const { error } = await supabase.storage.from(CANDIDATE_PHOTO_BUCKET).upload(path, file, {
-    cacheControl: '3600',
-    upsert: false,
-    contentType: file.type,
-  })
+  const { error: uploadError } = await supabase.storage
+    .from(CANDIDATE_PHOTO_BUCKET)
+    .upload(session.storage_path, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type,
+    })
 
-  if (error) {
+  if (uploadError) {
+    try {
+      await supabase.rpc('cancel_candidate_photo_upload_session', {
+        p_upload_id: session.upload_id,
+      })
+    } catch {
+      /* best-effort */
+    }
     throw new Error('Не удалось загрузить фото. Попробуйте другой файл.')
   }
 
-  // Private bucket: never store/return a permanent public URL.
   return {
     photoUrl: null,
-    photoPath: path,
+    photoPath: session.storage_path,
+    photoUploadId: session.upload_id,
+    expiresAt: session.expires_at,
+  }
+}
+
+export async function cancelCandidatePhotoUploadSession(uploadId) {
+  if (!uploadId || !isSupabaseConfigured() || !supabase) return
+  try {
+    await supabase.rpc('cancel_candidate_photo_upload_session', {
+      p_upload_id: uploadId,
+    })
+  } catch {
+    /* ignore */
   }
 }
 
@@ -166,15 +208,15 @@ export function readPhotoAsDataUrl(file) {
   })
 }
 
-export async function prepareCandidatePhotoForSubmit(file) {
-  if (!file) return { photoUrl: null, photoPath: null }
+export async function prepareCandidatePhotoForSubmit(file, context = {}) {
+  if (!file) return { photoUrl: null, photoPath: null, photoUploadId: null }
 
   if (isCloudMode() && isSupabaseConfigured()) {
-    return uploadCandidatePhoto(file)
+    return createAndUploadCandidatePhoto(file, context)
   }
 
   const dataUrl = await readPhotoAsDataUrl(file)
-  return { photoUrl: dataUrl, photoPath: null, isLocalFallback: true }
+  return { photoUrl: dataUrl, photoPath: null, photoUploadId: null, isLocalFallback: true }
 }
 
 /**

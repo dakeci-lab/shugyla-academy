@@ -482,6 +482,7 @@ export async function submitCandidateApplication(applicationData) {
     },
     photoUrl: applicationData.photoUrl || null,
     photoPath: applicationData.photoPath || null,
+    // photoUploadId ignored in local mode; cloud uses server sessions.
     totalScore: 0,
     maxScore: 0,
     scorePercent: 0,

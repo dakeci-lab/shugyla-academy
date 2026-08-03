@@ -18,21 +18,20 @@ const photoService = read('src/services/candidatePhotoService.js')
 const adapter = read('src/services/recruitmentSupabaseAdapter.js')
 const migration = read('supabase/migrations/20260803140000_privatize_candidate_photos.sql')
 const applyPage = read('src/pages/Apply.jsx')
+const hardening = read('supabase/migrations/20260803210000_recruitment_form_hardening.sql')
 
 assert('upload builds applications/uuid path', photoService.includes('applications/'))
 assert('upload uses upsert false', photoService.includes('upsert: false'))
 assert('no getPublicUrl in photo service', !photoService.includes('getPublicUrl'))
 assert('signed URL helper exists', photoService.includes('createCandidatePhotoSignedUrl'))
 assert('batch signed URLs for HR fetch', adapter.includes('attachCandidatePhotoSignedUrls'))
-const submitMigration = read(
-  'supabase/migrations/20260803200100_flexible_application_form_rpcs.sql'
-)
+assert('upload session RPC used', photoService.includes('create_candidate_photo_upload_session'))
 assert(
-  'RPC submit stores path only (no client photo_url)',
-  adapter.includes('p_photo_path') &&
+  'RPC submit binds photo via upload session',
+  adapter.includes('p_photo_upload_id') &&
     !adapter.includes('p_photo_url') &&
-    submitMigration.includes('photo_url') &&
-    submitMigration.includes('null')
+    hardening.includes('p_photo_upload_id') &&
+    hardening.includes('photo_url')
 )
 assert('migration sets bucket private', migration.includes('public = false'))
 assert('migration sets mime limits', migration.includes('image/jpeg') && migration.includes('file_size_limit'))

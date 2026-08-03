@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
 import { submitCandidateApplication } from '../services/platformDataService'
 import { fetchPublicVacancyApplicationForm } from '../services/publicApplyFormService'
-import { validateCandidatePhotoFile } from '../services/candidatePhotoService'
+import {
+  validateCandidatePhotoFile,
+  prepareCandidatePhotoForSubmit,
+  cancelCandidatePhotoUploadSession,
+} from '../services/candidatePhotoService'
 import { isCloudMode } from '../lib/dataMode'
 import { APPLICATION_QUESTION_TYPES, mapApplicationFormRpcError } from '../utils/applicationForm'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
@@ -35,6 +39,8 @@ export default function ApplyPage() {
   const [photoPreview, setPhotoPreview] = useState('')
   const [photoWarning, setPhotoWarning] = useState('')
   const [photoQuestionId, setPhotoQuestionId] = useState(null)
+  const [photoUploadId, setPhotoUploadId] = useState(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -158,17 +164,26 @@ export default function ApplyPage() {
     })
   }
 
-  function handlePhotoChange(_questionId, e) {
+  async function clearPhotoSelection() {
+    if (photoUploadId) {
+      await cancelCandidatePhotoUploadSession(photoUploadId)
+    }
+    setPhotoUploadId(null)
+    setPhotoFile(null)
+    if (photoPreview && photoPreview.startsWith('blob:')) {
+      URL.revokeObjectURL(photoPreview)
+    }
+    setPhotoPreview('')
+    setPhotoWarning('')
+  }
+
+  async function handlePhotoChange(_questionId, e) {
     const file = e.target.files?.[0]
     setError('')
     setPhotoWarning('')
 
     if (!file) {
-      setPhotoFile(null)
-      if (photoPreview && photoPreview.startsWith('blob:')) {
-        URL.revokeObjectURL(photoPreview)
-      }
-      setPhotoPreview('')
+      await clearPhotoSelection()
       return
     }
 
@@ -179,16 +194,43 @@ export default function ApplyPage() {
       return
     }
 
-    if (!isCloudMode()) {
-      setPhotoWarning('В локальном режиме фото не сохраняется постоянно.')
-    }
-
     if (photoPreview && photoPreview.startsWith('blob:')) {
       URL.revokeObjectURL(photoPreview)
     }
+    if (photoUploadId) {
+      await cancelCandidatePhotoUploadSession(photoUploadId)
+      setPhotoUploadId(null)
+    }
 
+    const nextPreview = URL.createObjectURL(file)
     setPhotoFile(file)
-    setPhotoPreview(URL.createObjectURL(file))
+    setPhotoPreview(nextPreview)
+
+    if (!isCloudMode()) {
+      setPhotoWarning('В локальном режиме фото не сохраняется постоянно.')
+      return
+    }
+
+    setPhotoUploading(true)
+    try {
+      const uploaded = await prepareCandidatePhotoForSubmit(file, {
+        vacancyId: vacancy.id,
+        formVersion,
+      })
+      setPhotoUploadId(uploaded.photoUploadId || null)
+    } catch (err) {
+      setPhotoFile(null)
+      URL.revokeObjectURL(nextPreview)
+      setPhotoPreview('')
+      e.target.value = ''
+      setError(
+        mapApplicationFormRpcError(err) ||
+          err?.message ||
+          'Не удалось загрузить фото. Попробуйте ещё раз.'
+      )
+    } finally {
+      setPhotoUploading(false)
+    }
   }
 
   function validateClient() {
@@ -201,7 +243,9 @@ export default function ApplyPage() {
       if (!q.required) continue
       const value = values[q.id]
       if (q.questionType === 'photo') {
-        if (!photoFile) nextErrors[q.id] = 'Загрузите фотографию'
+        if (isCloudMode() ? !photoUploadId : !photoFile) {
+          nextErrors[q.id] = 'Загрузите фотографию'
+        }
       } else if (q.questionType === 'multi_choice') {
         if (!Array.isArray(value) || value.length === 0) nextErrors[q.id] = 'Выберите вариант'
       } else if (q.questionType === 'yes_no') {
@@ -216,7 +260,7 @@ export default function ApplyPage() {
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (submitting) return
+    if (submitting || photoUploading) return
     setError('')
 
     if (hasUnknownType) {
@@ -225,6 +269,10 @@ export default function ApplyPage() {
     }
     if (!validateClient()) {
       setError('Заполните обязательные поля')
+      return
+    }
+    if (photoQuestionId && isCloudMode() && photoFile && !photoUploadId) {
+      setError('Загрузка фото не завершена. Подождите или выберите файл снова.')
       return
     }
 
@@ -241,7 +289,8 @@ export default function ApplyPage() {
         vacancySlug: vacancy.slug,
         formVersion,
         answers,
-        photoFile: photoQuestionId ? photoFile : null,
+        photoUploadId: photoQuestionId ? photoUploadId : null,
+        photoFile: null,
       })
 
       setSuccessMessage(
@@ -291,8 +340,12 @@ export default function ApplyPage() {
               onChange={handleValueChange}
               onPhotoChange={handlePhotoChange}
               photoPreview={photoPreview}
-              photoWarning={photoWarning}
-              disabled={submitting}
+              photoWarning={
+                photoUploading
+                  ? 'Загрузка фотографии…'
+                  : photoWarning
+              }
+              disabled={submitting || photoUploading}
             />
           </section>
 
@@ -301,9 +354,9 @@ export default function ApplyPage() {
           <button
             type="submit"
             className="btn btn--primary"
-            disabled={submitting || hasUnknownType}
+            disabled={submitting || photoUploading || hasUnknownType}
           >
-            {submitting ? 'Отправка…' : 'Отправить анкету'}
+            {photoUploading ? 'Загрузка фото…' : submitting ? 'Отправка…' : 'Отправить анкету'}
           </button>
         </form>
       </div>

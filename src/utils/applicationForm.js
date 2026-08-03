@@ -227,64 +227,97 @@ export function questionsToSavePayload(questions) {
 /**
  * Backward-compatible reader for candidate.answers.
  * Supports snapshot v2, legacy option-index map, and fixed columns.
+ * Never throws on malformed JSON fragments.
  */
 export function getCandidateAnswerDisplayRows(candidate, questions = []) {
-  const answers = candidate?.answers
+  let answers = candidate?.answers
+  if (typeof answers === 'string') {
+    try {
+      answers = JSON.parse(answers)
+    } catch {
+      return []
+    }
+  }
+  if (!answers || typeof answers !== 'object' || Array.isArray(answers)) return []
+
   const questionById = new Map((questions || []).map((q) => [q.id, q]))
 
-  if (answers && typeof answers === 'object' && Number(answers.version) >= 2 && Array.isArray(answers.items)) {
-    return answers.items
-      .slice()
-      .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
-      .filter((item) => !item.profile_bound)
-      .map((item) => ({
-        questionId: item.question_id,
-        questionText: item.label || 'Дополнительный ответ',
-        displayValue: formatSnapshotDisplayValue(item),
-        fromSnapshot: true,
-      }))
+  if (Number(answers.version) >= 2) {
+    const items = Array.isArray(answers.items) ? answers.items : []
+    return items
+      .map((item, index) => {
+        if (!item || typeof item !== 'object') return null
+        if (item.profile_bound) return null
+        const label = String(item.label || '').trim()
+        return {
+          questionId: item.question_id || `snap-${index}`,
+          questionText: label || 'Дополнительный ответ',
+          displayValue: formatSnapshotDisplayValue(item),
+          fromSnapshot: true,
+        }
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        const ai = items.find((i) => i?.question_id === a.questionId)?.sort_order
+        const bi = items.find((i) => i?.question_id === b.questionId)?.sort_order
+        return (Number(ai) || 0) - (Number(bi) || 0)
+      })
   }
 
-  // Legacy: { [questionId]: optionIndex }
-  if (answers && typeof answers === 'object' && !Array.isArray(answers) && answers.version == null) {
-    const keys = Object.keys(answers)
-    if (keys.length === 0) return []
-    return keys.map((qid) => {
-      const q = questionById.get(qid)
-      const idx = Number(answers[qid])
-      let displayValue = '—'
-      if (q) {
-        const opts = normalizeQuestionOptions(q.options)
-        if (Number.isFinite(idx) && opts[idx]) displayValue = opts[idx].label
-        else if (Array.isArray(q.options) && typeof q.options[idx] === 'string') {
-          displayValue = q.options[idx]
+  // Legacy: { [questionId]: optionIndex } — skip reserved meta keys
+  const keys = Object.keys(answers).filter(
+    (k) => !['version', 'form_version', 'submitted_at', 'items'].includes(k)
+  )
+  if (keys.length === 0) return []
+
+  return keys
+    .map((qid) => {
+      try {
+        const q = questionById.get(qid)
+        const raw = answers[qid]
+        const idx = Number(raw)
+        let displayValue = '—'
+        if (q) {
+          const opts = normalizeQuestionOptions(q.options)
+          if (Number.isFinite(idx) && opts[idx]) displayValue = opts[idx].label
+          else if (Array.isArray(q.options) && typeof q.options[idx] === 'string') {
+            displayValue = q.options[idx]
+          }
+        } else if (raw != null && typeof raw !== 'object') {
+          displayValue = 'Дополнительный ответ'
         }
-      } else {
-        displayValue = 'Дополнительный ответ'
-      }
-      return {
-        questionId: qid,
-        questionText: q?.questionText || 'Дополнительный ответ',
-        displayValue,
-        fromSnapshot: false,
+        return {
+          questionId: qid,
+          questionText: q?.questionText || 'Дополнительный ответ',
+          displayValue,
+          fromSnapshot: false,
+        }
+      } catch {
+        return null
       }
     })
-  }
-
-  return []
+    .filter(Boolean)
 }
 
 function formatSnapshotDisplayValue(item) {
-  if (!item) return '—'
-  if (item.display_value != null && String(item.display_value).trim() !== '') {
-    return String(item.display_value)
+  try {
+    if (!item) return '—'
+    if (item.display_value != null && String(item.display_value).trim() !== '') {
+      return String(item.display_value)
+    }
+    const value = item.value
+    if (value == null || value === '') return '—'
+    if (Array.isArray(value)) {
+      const parts = value.map((v) => String(v ?? '').trim()).filter(Boolean)
+      return parts.length ? parts.join(', ') : '—'
+    }
+    if (typeof value === 'boolean') return value ? 'Да' : 'Нет'
+    if (item.question_type === 'photo') return value ? 'Фото загружено' : '—'
+    if (typeof value === 'object') return '—'
+    return String(value)
+  } catch {
+    return '—'
   }
-  const value = item.value
-  if (value == null || value === '') return '—'
-  if (Array.isArray(value)) return value.length ? value.join(', ') : '—'
-  if (typeof value === 'boolean') return value ? 'Да' : 'Нет'
-  if (item.question_type === 'photo') return value ? 'Фото загружено' : '—'
-  return String(value)
 }
 
 export function mapApplicationFormRpcError(error) {
@@ -300,8 +333,20 @@ export function mapApplicationFormRpcError(error) {
   if (message.includes('unknown_question')) return 'Анкета устарела. Обновите страницу.'
   if (message.includes('invalid_option')) return 'Выбран недопустимый вариант ответа'
   if (message.includes('photo_required')) return 'Загрузите фотографию'
+  if (message.includes('photo_token_expired')) {
+    return 'Срок загрузки фото истёк. Загрузите фотографию повторно.'
+  }
+  if (message.includes('photo_token_used') || message.includes('photo_token_cancelled')) {
+    return 'Фотографию необходимо загрузить повторно.'
+  }
   if (message.includes('photo_invalid')) return 'Не удалось сохранить фото'
-  if (message.includes('form_invalid')) return 'Анкета вакансии настроена некорректно'
+  if (message.includes('form_invalid')) {
+    if (message.includes('position')) {
+      return 'Сначала исправьте должность и анкету исходной вакансии'
+    }
+    return 'Анкета вакансии настроена некорректно'
+  }
+  if (message.includes('slug_conflict')) return 'Не удалось создать уникальную ссылку вакансии'
   if (message.includes('permission_denied') || message.includes('42501')) {
     return 'Недостаточно прав для изменения анкеты'
   }

@@ -877,11 +877,19 @@ export async function submitCandidateApplication(applicationData) {
   if (!applicationData.vacancyId) throw new Error('Вакансия не указана')
   if (applicationData.formVersion == null) throw new Error('Анкета устарела. Обновите страницу.')
 
-  let photoPayload = { photoUrl: null, photoPath: null }
+  let photoPayload = {
+    photoUrl: null,
+    photoPath: null,
+    photoUploadId: applicationData.photoUploadId || null,
+  }
 
-  if (applicationData.photoFile) {
+  // Prefer pre-uploaded session from the form (avoids double upload).
+  if (applicationData.photoFile && !applicationData.photoUploadId) {
     try {
-      photoPayload = await prepareCandidatePhotoForSubmit(applicationData.photoFile)
+      photoPayload = await prepareCandidatePhotoForSubmit(applicationData.photoFile, {
+        vacancyId: applicationData.vacancyId,
+        formVersion: applicationData.formVersion,
+      })
     } catch (err) {
       throw new Error(err.message || 'Не удалось загрузить фото')
     }
@@ -893,6 +901,7 @@ export async function submitCandidateApplication(applicationData) {
     ...rest,
     photoUrl: photoPayload.photoUrl,
     photoPath: photoPayload.photoPath,
+    photoUploadId: photoPayload.photoUploadId,
   })
 
   // Public apply must not require candidates SELECT (anon RLS). Best-effort refresh.

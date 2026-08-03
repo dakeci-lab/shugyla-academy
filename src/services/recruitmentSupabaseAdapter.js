@@ -224,66 +224,19 @@ export async function archiveVacancy(vacancyId) {
 }
 
 export async function duplicateVacancy(sourceVacancyId) {
-  const source = getVacancyByIdSync(sourceVacancyId)
-  if (!source) throw new Error('Вакансия не найдена')
-  if (!source.positionId) {
-    throw new Error('Сначала выберите должность для исходной вакансии')
-  }
-
-  const title = `${source.title} (копия)`
-  const slug = generateUniqueVacancySlug(title, getAllVacanciesSync())
-  const newId = crypto.randomUUID()
-
-  await createVacancy({
-    id: newId,
-    title,
-    description: source.description,
-    role: source.role,
-    employeeRole: source.employeeRole,
-    positionId: source.positionId,
-    positionNameSnapshot: source.positionNameSnapshot,
-    status: VACANCY_STATUS.DRAFT,
-    slug,
+  const { data, error } = await supabase.rpc('duplicate_vacancy_with_application_form', {
+    p_source_vacancy_id: sourceVacancyId,
   })
-
-  // Copy application form (insert trigger seeds minimal name/phone; replace with source).
-  const { getAllCandidateQuestionsSync } = await import('../utils/recruitmentData')
-  const sourceQuestions = getAllCandidateQuestionsSync()
-    .filter((q) => q.vacancyId === sourceVacancyId)
-    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
-  if (sourceQuestions.length) {
-    const payload = sourceQuestions.map((q, index) => ({
-      id: null,
-      question_text: q.questionText,
-      question_type: q.questionType,
-      required: q.required !== false,
-      sort_order: index,
-      is_active: q.isActive !== false,
-      field_binding: q.fieldBinding || null,
-      help_text: q.helpText || null,
-      placeholder: q.placeholder || null,
-      options: q.options || [],
-    }))
-    // Remove auto-seeded protected rows by saving a full replacement set.
-    // save RPC forbids deleting protected bindings, so update seeded ones first.
-    const { data: seeded } = await supabase
-      .from('academy_candidate_questions')
-      .select('id, field_binding')
-      .eq('vacancy_id', newId)
-    const seededByBinding = Object.fromEntries(
-      (seeded || []).filter((r) => r.field_binding).map((r) => [r.field_binding, r.id])
+  if (error) {
+    throw new Error(
+      mapApplicationFormRpcError(error) ||
+        'Не удалось продублировать вакансию. Проверьте исходную анкету и должность.'
     )
-    const withIds = payload.map((q) => ({
-      ...q,
-      id: q.field_binding && seededByBinding[q.field_binding] ? seededByBinding[q.field_binding] : null,
-    }))
-    await saveVacancyApplicationForm(newId, {
-      questions: withIds,
-      expectedVersion: 1,
-    })
   }
-
-  return newId
+  if (!data?.vacancy_id) {
+    throw new Error('Не удалось продублировать вакансию')
+  }
+  return data.vacancy_id
 }
 
 export async function saveVacancyApplicationForm(vacancyId, { questions, expectedVersion }) {
@@ -327,7 +280,7 @@ export async function submitCandidateApplication(applicationData) {
     p_vacancy_id: applicationData.vacancyId,
     p_answers: { answers: applicationData.answers || {} },
     p_form_version: Number(applicationData.formVersion) || 1,
-    p_photo_path: applicationData.photoPath || null,
+    p_photo_upload_id: applicationData.photoUploadId || null,
   })
 
   if (error) {
