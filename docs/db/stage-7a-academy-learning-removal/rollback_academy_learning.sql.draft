@@ -1,0 +1,38 @@
+-- DRAFT rollback — depends on verified backup directory:
+--   ~/secure-backups/shugyla-platform/20260802T231625Z/
+--
+-- Primary restore path (preferred):
+--   1) Keep current production intact for non-learning objects.
+--   2) Restore ONLY learning tables from custom dump:
+--        academy_learning_tables.pgdump
+--      using pg_restore --no-owner --no-privileges
+--      (requires academy_users rows referenced by FKs to still exist)
+--   3) Re-apply permission rows + role links:
+--        learning_permissions_restore.sql
+--   4) Re-run preflight counts and compare to manifest.json
+--
+-- Full disaster path (if schema also damaged):
+--   Use full_schema.sql + full_data.sql from the same backup directory.
+--   Prefer restoring into a disposable DB first, then selectively copy
+--   learning objects — do NOT blindly replay full_data.sql onto live
+--   production (would overwrite working platform data).
+--
+-- Checksums: verify SHA256SUMS before any restore.
+--
+-- This file intentionally does not embed production row data.
+
+-- Example (run on a workstation with network to production; never commit passwords):
+--
+--   export PGHOST=... PGPORT=5432 PGUSER=... PGDATABASE=postgres
+--   read -s PGPASSWORD; export PGPASSWORD
+--   shasum -a 256 -c ~/secure-backups/shugyla-platform/20260802T231625Z/SHA256SUMS
+--   pg_restore --no-owner --no-privileges --role=postgres \
+--     -d "$PGDATABASE" \
+--     ~/secure-backups/shugyla-platform/20260802T231625Z/academy_learning_tables.pgdump
+--   psql -v ON_ERROR_STOP=1 -f \
+--     ~/secure-backups/shugyla-platform/20260802T231625Z/learning_permissions_restore.sql
+--   # then count(*) checks from preflight.sql / manifest.json
+--   unset PGPASSWORD
+--
+-- Do not recreate academy_users, Standards, or shared academy_set_updated_at()
+-- unless they are actually missing (they must survive the DROP migration).

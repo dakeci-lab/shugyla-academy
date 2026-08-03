@@ -1,0 +1,57 @@
+{
+  "stage": "7B",
+  "verdict": "GO_APPLIED",
+  "verdict_pending_owner_confirmation": false,
+  "applied": true,
+  "production_project_ref": "cxadzerxndlscwvdaymk",
+  "frontend_git_sha": "0fe0aad",
+  "backup_dir": "~/secure-backups/shugyla-platform/20260802T231625Z",
+  "backup_created": true,
+  "restore_test_counts_matched": true,
+  "learning_tables_candidate": [
+    "academy_courses",
+    "academy_lessons",
+    "academy_course_assignments",
+    "academy_progress",
+    "academy_tests",
+    "academy_test_questions",
+    "academy_test_attempts",
+    "academy_learning_paths",
+    "academy_learning_path_courses",
+    "academy_user_learning_paths"
+  ],
+  "exact_counts": {
+    "academy_courses": 7,
+    "academy_lessons": 36,
+    "academy_course_assignments": 1,
+    "academy_progress": 0,
+    "academy_tests": 1,
+    "academy_test_questions": 2,
+    "academy_test_attempts": 0,
+    "academy_learning_paths": 1,
+    "academy_learning_path_courses": 2,
+    "academy_user_learning_paths": 0
+  },
+  "permission_codes_to_delete": [
+    "academy.view",
+    "academy.manage_courses",
+    "academy.assign_courses"
+  ],
+  "permission_role_links": {
+    "academy.view": 7,
+    "academy.manage_courses": 1,
+    "academy.assign_courses": 1
+  },
+  "fk_safe_drop_order": [
+    "academy_test_attempts",
+    "academy_test_questions",
+    "academy_tests",
+    "academy_user_learning_paths",
+    "academy_learning_path_courses",
+    "academy_learning_paths",
+    "academy_progress",
+    "academy_course_assignments",
+    "academy_lessons",
+    "academy_courses"
+  ]
+}
