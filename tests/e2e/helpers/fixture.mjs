@@ -190,8 +190,12 @@ async function assertOk(label, error) {
 }
 
 /** Count global E2E-HR leftovers that must never remain after a suite. */
-export async function countGlobalE2eLeftovers(adminClient) {
+export async function countGlobalE2eLeftovers(adminClient, options = {}) {
   const admin = adminClient || createAdminClient()
+  const ignoreRunId = options.ignoreRunId || null
+  const ignoreLogin = options.ignoreLogin || null
+  const ignoreRoleId = options.ignoreRoleId || null
+
   const { data: vacs, error: vErr } = await admin
     .from('academy_vacancies')
     .select('id, title, slug, status')
@@ -216,24 +220,41 @@ export async function countGlobalE2eLeftovers(adminClient) {
     .ilike('code', 'e2e_hr_%')
   assertOk('leftover roles scan', rErr)
 
-  const { count: qCount, error: qErr } = await admin
+  const { data: questions, error: qErr } = await admin
     .from('academy_candidate_questions')
-    .select('id', { count: 'exact', head: true })
+    .select('id, question_text')
     .ilike('question_text', '%E2E-HR-%')
   assertOk('leftover questions scan', qErr)
 
+  const filterRun = (text) => {
+    if (!ignoreRunId) return true
+    return !String(text || '').includes(ignoreRunId)
+  }
+
+  const vacancies = (vacs || []).filter((v) => filterRun(v.title) && filterRun(v.slug))
+  const candidates = (cands || []).filter((c) => filterRun(c.first_name))
+  const usersLeft = (users || []).filter((u) => {
+    if (ignoreLogin && u.login === ignoreLogin) return false
+    return filterRun(u.login)
+  })
+  const rolesLeft = (roles || []).filter((r) => {
+    if (ignoreRoleId && r.id === ignoreRoleId) return false
+    return filterRun(r.code) && filterRun(r.name)
+  })
+  const questionsLeft = (questions || []).filter((q) => filterRun(q.question_text))
+
   return {
-    vacancies: vacs || [],
-    candidates: cands || [],
-    users: users || [],
-    roles: roles || [],
-    questions: qCount || 0,
+    vacancies,
+    candidates,
+    users: usersLeft,
+    roles: rolesLeft,
+    questions: questionsLeft.length,
     total:
-      (vacs || []).length +
-      (cands || []).length +
-      (users || []).length +
-      (roles || []).length +
-      (qCount || 0),
+      vacancies.length +
+      candidates.length +
+      usersLeft.length +
+      rolesLeft.length +
+      questionsLeft.length,
   }
 }
 

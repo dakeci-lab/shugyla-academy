@@ -47,8 +47,16 @@ async function assertPublicShell(page, label) {
 }
 
 test('1. Hub RPC has no E2E leftovers', async () => {
-  const leftovers = await countGlobalE2eLeftovers()
-  expect(leftovers.total).toBe(0)
+  const state = loadState()
+  // Ignore the temporary HR account created for this smoke run.
+  const leftovers = await countGlobalE2eLeftovers(undefined, {
+    ignoreRunId: state?.runId,
+    ignoreLogin: state?.login,
+    ignoreRoleId: state?.roleId,
+  })
+  expect(leftovers.vacancies).toEqual([])
+  expect(leftovers.candidates).toEqual([])
+  expect(leftovers.questions).toBe(0)
   const anon = createAnonClient()
   const { data, error } = await anon.rpc('list_published_vacancies_for_apply')
   expect(error).toBeFalsy()
