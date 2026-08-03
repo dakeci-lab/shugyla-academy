@@ -185,11 +185,84 @@ async function listStorageUnderPrefix(admin, bucket, prefix) {
   return data || []
 }
 
+async function assertOk(label, error) {
+  if (error) throw new Error(`${label}: ${error.message || error}`)
+}
+
+/** Count global E2E-HR leftovers that must never remain after a suite. */
+export async function countGlobalE2eLeftovers(adminClient) {
+  const admin = adminClient || createAdminClient()
+  const { data: vacs, error: vErr } = await admin
+    .from('academy_vacancies')
+    .select('id, title, slug, status')
+    .or('title.ilike.E2E-HR-%,slug.ilike.e2e-hr-%')
+  assertOk('leftover vacancies scan', vErr)
+
+  const { data: cands, error: cErr } = await admin
+    .from('academy_candidates')
+    .select('id, first_name, vacancy_id')
+    .ilike('first_name', '%E2E-HR-%')
+  assertOk('leftover candidates scan', cErr)
+
+  const { data: users, error: uErr } = await admin
+    .from('academy_users')
+    .select('id, login')
+    .ilike('login', 'e2e_hr_%')
+  assertOk('leftover users scan', uErr)
+
+  const { data: roles, error: rErr } = await admin
+    .from('roles')
+    .select('id, code')
+    .ilike('code', 'e2e_hr_%')
+  assertOk('leftover roles scan', rErr)
+
+  const { count: qCount, error: qErr } = await admin
+    .from('academy_candidate_questions')
+    .select('id', { count: 'exact', head: true })
+    .ilike('question_text', '%E2E-HR-%')
+  assertOk('leftover questions scan', qErr)
+
+  return {
+    vacancies: vacs || [],
+    candidates: cands || [],
+    users: users || [],
+    roles: roles || [],
+    questions: qCount || 0,
+    total:
+      (vacs || []).length +
+      (cands || []).length +
+      (users || []).length +
+      (roles || []).length +
+      (qCount || 0),
+  }
+}
+
 export async function cleanupE2eFixture(stateInput) {
   const state = stateInput || loadState()
   if (!state?.runId) {
-    return { ok: true, skipped: true }
+    // Still fail the suite if orphaned E2E entities exist in production.
+    const leftovers = await countGlobalE2eLeftovers()
+    return {
+      ok: leftovers.total === 0,
+      skipped: true,
+      vacanciesDeleted: 0,
+      candidatesDeleted: 0,
+      uploadsDeleted: 0,
+      storageDeleted: 0,
+      roleDeleted: false,
+      profileDeleted: false,
+      authDeleted: false,
+      leftovers: {
+        vacancies: leftovers.vacancies.length,
+        candidates: leftovers.candidates.length,
+        users: leftovers.users.length,
+        roles: leftovers.roles.length,
+        questions: leftovers.questions,
+        global: leftovers.total,
+      },
+    }
   }
+
   const admin = createAdminClient()
   const anon = createAnonClient()
   const runId = state.runId
@@ -203,91 +276,131 @@ export async function cleanupE2eFixture(stateInput) {
     profileDeleted: false,
     authDeleted: false,
     leftovers: {},
+    errors: [],
   }
 
-  // Candidates by vacancy title prefix or tracked ids
-  const { data: vacancies } = await admin
+  const { data: vacanciesByTitle, error: vacTitleErr } = await admin
     .from('academy_vacancies')
     .select('id, title, slug')
     .ilike('title', `${runId}%`)
+  assertOk('vacancy title lookup', vacTitleErr)
+
+  const { data: vacanciesBySlug, error: vacSlugErr } = await admin
+    .from('academy_vacancies')
+    .select('id, title, slug')
+    .ilike('slug', `${runId.toLowerCase()}%`)
+  assertOk('vacancy slug lookup', vacSlugErr)
 
   const vacancyIds = Array.from(
-    new Set([...(state.vacancyIds || []), ...(vacancies || []).map((v) => v.id)])
+    new Set([
+      ...(state.vacancyIds || []),
+      ...(vacanciesByTitle || []).map((v) => v.id),
+      ...(vacanciesBySlug || []).map((v) => v.id),
+    ])
   )
 
   let candidateIds = [...(state.candidateIds || [])]
   if (vacancyIds.length) {
-    const { data: cands } = await admin
+    const { data: cands, error } = await admin
       .from('academy_candidates')
       .select('id, photo_path, vacancy_id')
       .in('vacancy_id', vacancyIds)
+    assertOk('candidates by vacancy', error)
     for (const c of cands || []) candidateIds.push(c.id)
   }
+
+  // Orphans: vacancy deleted with ON DELETE SET NULL still leaves E2E candidates.
+  const { data: orphanCands, error: orphanErr } = await admin
+    .from('academy_candidates')
+    .select('id, photo_path, vacancy_id, first_name')
+    .ilike('first_name', `%${runId}%`)
+  assertOk('orphan candidates lookup', orphanErr)
+  for (const c of orphanCands || []) candidateIds.push(c.id)
   candidateIds = Array.from(new Set(candidateIds))
 
-  // Upload sessions for these vacancies
   if (vacancyIds.length) {
-    const { data: uploads } = await admin
+    const { data: uploads, error } = await admin
       .from('recruitment_application_uploads')
       .select('id, storage_path, vacancy_id')
       .in('vacancy_id', vacancyIds)
+    assertOk('uploads lookup', error)
     for (const u of uploads || []) {
       if (u.storage_path) {
-        await admin.storage.from('candidate-photos').remove([u.storage_path]).catch(() => {})
-        report.storageDeleted += 1
+        const { error: storageErr } = await admin.storage
+          .from('candidate-photos')
+          .remove([u.storage_path])
+        if (storageErr) report.errors.push(`storage upload ${u.id}: ${storageErr.message}`)
+        else report.storageDeleted += 1
       }
-      await admin.from('recruitment_application_uploads').delete().eq('id', u.id)
+      const { error: delErr } = await admin
+        .from('recruitment_application_uploads')
+        .delete()
+        .eq('id', u.id)
+      assertOk(`upload delete ${u.id}`, delErr)
       report.uploadsDeleted += 1
     }
   }
 
   for (const id of candidateIds) {
-    const { data: cand } = await admin
+    const { data: cand, error } = await admin
       .from('academy_candidates')
       .select('id, photo_path')
       .eq('id', id)
       .maybeSingle()
+    assertOk(`candidate lookup ${id}`, error)
     if (cand?.photo_path) {
-      await admin.storage.from('candidate-photos').remove([cand.photo_path]).catch(() => {})
-      report.storageDeleted += 1
+      const { error: storageErr } = await admin.storage
+        .from('candidate-photos')
+        .remove([cand.photo_path])
+      if (storageErr) report.errors.push(`storage candidate ${id}: ${storageErr.message}`)
+      else report.storageDeleted += 1
     }
-    await admin.from('academy_candidates').delete().eq('id', id)
+    const { error: delErr } = await admin.from('academy_candidates').delete().eq('id', id)
+    assertOk(`candidate delete ${id}`, delErr)
     report.candidatesDeleted += 1
   }
 
   for (const vacancyId of vacancyIds) {
-    await admin.from('academy_candidate_questions').delete().eq('vacancy_id', vacancyId)
-    await admin.from('academy_vacancies').delete().eq('id', vacancyId)
+    const { error: qErr } = await admin
+      .from('academy_candidate_questions')
+      .delete()
+      .eq('vacancy_id', vacancyId)
+    assertOk(`questions delete ${vacancyId}`, qErr)
+    const { error: vErr } = await admin.from('academy_vacancies').delete().eq('id', vacancyId)
+    assertOk(`vacancy delete ${vacancyId}`, vErr)
     report.vacanciesDeleted += 1
   }
 
-  // HR profile + auth + role (skip when reusing durable secret account)
   if (!state.reuseAccount) {
     if (state.employeeId) {
-      await admin.from('academy_users').delete().eq('id', state.employeeId)
+      const { error } = await admin.from('academy_users').delete().eq('id', state.employeeId)
+      assertOk('profile delete by id', error)
       report.profileDeleted = true
     } else if (state.login) {
-      await admin.from('academy_users').delete().eq('login', state.login)
+      const { error } = await admin.from('academy_users').delete().eq('login', state.login)
+      assertOk('profile delete by login', error)
       report.profileDeleted = true
     }
 
     if (state.authUserId) {
       const { error } = await admin.auth.admin.deleteUser(state.authUserId)
-      report.authDeleted = !error
+      assertOk('auth delete', error)
+      report.authDeleted = true
     }
 
     if (state.roleId) {
-      await admin.from('role_permissions').delete().eq('role_id', state.roleId)
-      await admin.from('roles').delete().eq('id', state.roleId)
+      const { error: rpErr } = await admin
+        .from('role_permissions')
+        .delete()
+        .eq('role_id', state.roleId)
+      assertOk('role_permissions delete', rpErr)
+      const { error: roleErr } = await admin.from('roles').delete().eq('id', state.roleId)
+      assertOk('role delete', roleErr)
       report.roleDeleted = true
     }
-  } else {
-    report.profileDeleted = false
-    report.authDeleted = false
-    report.roleDeleted = false
   }
 
-  // Post-cleanup verification
+  const global = await countGlobalE2eLeftovers(admin)
   const { count: vacLeft } = await admin
     .from('academy_vacancies')
     .select('id', { count: 'exact', head: true })
@@ -300,23 +413,40 @@ export async function cleanupE2eFixture(stateInput) {
     .from('academy_users')
     .select('id', { count: 'exact', head: true })
     .eq('login', state.login || '__none__')
+  const { count: candLeft } = await admin
+    .from('academy_candidates')
+    .select('id', { count: 'exact', head: true })
+    .ilike('first_name', `%${runId}%`)
 
   report.leftovers = {
     vacancies: vacLeft || 0,
-    roles: roleLeft || 0,
-    users: userLeft || 0,
+    roles: state.reuseAccount ? 0 : roleLeft || 0,
+    users: state.reuseAccount ? 0 : userLeft || 0,
+    candidates: candLeft || 0,
+    global: global.total,
+    globalVacancies: global.vacancies.length,
+    globalCandidates: global.candidates.length,
+    globalUsers: global.users.length,
+    globalRoles: global.roles.length,
+    questions: global.questions,
   }
 
-  // Confirm protected vacancies untouched (diagnostic only)
   const { data: protectedRows } = await admin
     .from('academy_vacancies')
     .select('slug, title')
     .in('slug', ['kassir', 'prodavets'])
   report.protectedVacancies = (protectedRows || []).map((r) => r.slug)
 
-  // Anon cannot list private bucket (expected security)
   const { error: anonListErr } = await anon.storage.from('candidate-photos').list('', { limit: 1 })
   report.anonStorageBlocked = Boolean(anonListErr)
+
+  const runClean =
+    report.leftovers.vacancies === 0 &&
+    report.leftovers.candidates === 0 &&
+    report.leftovers.roles === 0 &&
+    report.leftovers.users === 0
+  const globallyClean = report.leftovers.global === 0
+  report.ok = runClean && globallyClean && report.errors.length === 0
 
   clearStateFile()
   return report

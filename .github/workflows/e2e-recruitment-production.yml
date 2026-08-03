@@ -1,4 +1,4 @@
-name: E2E Recruitment (production, manual)
+name: E2E Recruitment (production smoke, manual)
 
 on:
   workflow_dispatch:
@@ -12,13 +12,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: e2e-recruitment-production
+  group: e2e-recruitment-production-smoke
   cancel-in-progress: false
 
 jobs:
-  e2e-recruitment:
+  e2e-recruitment-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,24 +35,21 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run recruitment E2E against production
+      - name: Run non-destructive production smoke
         env:
+          E2E_SUITE: smoke
           E2E_BASE_URL: ${{ inputs.base_url }}
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          # Optional durable account (skip temp user creation):
-          # E2E_REUSE_HR: '1'
-          # E2E_HR_LOGIN: ${{ secrets.E2E_HR_LOGIN }}
-          # E2E_HR_PASSWORD: ${{ secrets.E2E_HR_PASSWORD }}
-        run: npm run test:e2e:recruitment
+        run: npm run test:e2e:recruitment:smoke
 
       - name: Upload Playwright artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: recruitment-e2e-artifacts
+          name: recruitment-e2e-smoke-artifacts
           path: |
             test-results/e2e-recruitment/
             playwright-report/recruitment/

@@ -35,15 +35,25 @@ assert('/apply/:slug still registered', slugRouteIdx !== -1)
 assert('/apply declared before /apply/:slug', applyRouteIdx !== -1 && applyRouteIdx < slugRouteIdx)
 assert('/apply is public path', authRoutes.includes("'/apply'"))
 assert('hub uses lightweight RPC service', hub.includes('fetchPublishedVacanciesForApply'))
-assert('hub empty state copy', hub.includes('Сейчас открытых вакансий нет'))
+assert(
+  'hub empty state copy',
+  hub.includes('careersEmptyTitle') || hub.includes('Сейчас открытых вакансий нет')
+)
 assert('hub no employee_role UI', !hub.includes('employee_role') && !hub.includes('employeeRole'))
 assert('hub no other-position option', !hub.includes('Другая должность'))
 assert('service uses list RPC', service.includes("rpc('list_published_vacancies_for_apply')"))
 assert('migration whitelist only', migration.includes('returns table') && !migration.includes('select *'))
 assert('migration joins active positions', migration.includes('p.is_active = true'))
 assert('migration grants execute to anon', migration.includes('to anon'))
-assert('Apply links back to /apply hub', apply.includes('hubPath') && apply.includes('Все вакансии'))
-assert('closed vacancy message', apply.includes('Эта вакансия больше недоступна'))
+assert(
+  'Apply links back to /apply hub',
+  apply.includes('hubPath') &&
+    (apply.includes('careersBackToVacancies') || apply.includes('Все вакансии'))
+)
+assert(
+  'closed vacancy message',
+  apply.includes('careersClosedTitle') || apply.includes('Эта вакансия больше недоступна')
+)
 assert('QR modal uses getApplyHubUrl', qrModal.includes('getApplyHubUrl'))
 assert('QR URL is hub not slug vacancy', qrModal.includes("getApplyHubUrl('?source=store_qr')"))
 assert('VacanciesSection has QR action', vacanciesSection.includes('Общий QR-код'))

@@ -22,18 +22,24 @@ function isLocalUrl(url) {
 }
 
 export function getSupabaseUrl() {
+  const suite = process.env.E2E_SUITE || 'mutating'
+  const allowNonProd =
+    process.env.E2E_ALLOW_NON_PROD === '1' || suite === 'mutating'
   const candidates = [
     process.env.E2E_SUPABASE_URL,
     process.env.SUPABASE_URL,
     process.env.VITE_SUPABASE_URL,
     `https://${PRODUCTION_REF}.supabase.co`,
   ].filter(Boolean)
-  let url = candidates.find((u) => u.includes(PRODUCTION_REF)) || candidates[0]
+  let url =
+    (allowNonProd && process.env.E2E_SUPABASE_URL?.trim()) ||
+    candidates.find((u) => u.includes(PRODUCTION_REF)) ||
+    candidates[0]
   if (isLocalUrl(url)) {
     url = `https://${PRODUCTION_REF}.supabase.co`
   }
-  if (!url.includes(PRODUCTION_REF) && process.env.E2E_ALLOW_NON_PROD !== '1') {
-    throw new Error(`E2E must target production project ${PRODUCTION_REF}`)
+  if (!url.includes(PRODUCTION_REF) && !allowNonProd) {
+    throw new Error(`E2E smoke must target production project ${PRODUCTION_REF}`)
   }
   process.env.SUPABASE_URL = url.replace(/\/$/, '')
   process.env.VITE_SUPABASE_URL = process.env.SUPABASE_URL
@@ -65,11 +71,11 @@ function fetchProductionApiKeys() {
 }
 
 export function resolveServiceRoleKey() {
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
-    return process.env.SUPABASE_SERVICE_ROLE_KEY.trim()
-  }
   if (process.env.E2E_SUPABASE_SERVICE_ROLE_KEY?.trim()) {
     return process.env.E2E_SUPABASE_SERVICE_ROLE_KEY.trim()
+  }
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()) {
+    return process.env.SUPABASE_SERVICE_ROLE_KEY.trim()
   }
 
   const keys = fetchProductionApiKeys()
@@ -94,7 +100,13 @@ export function resolveAnonKey() {
   if (process.env.SUPABASE_ANON_KEY?.trim()) {
     return process.env.SUPABASE_ANON_KEY.trim()
   }
-  // Always resolve production anon for E2E (local .env may point at localhost).
+  if (
+    process.env.VITE_SUPABASE_ANON_KEY?.trim() &&
+    String(process.env.SUPABASE_URL || '').includes(PRODUCTION_REF)
+  ) {
+    return process.env.VITE_SUPABASE_ANON_KEY.trim()
+  }
+  // Resolve production anon for smoke (local .env may point at localhost).
   const keys = fetchProductionApiKeys()
   const anon = keys.find((k) => k.id === 'anon' || k.name === 'anon')
   if (!anon?.api_key) throw new Error('anon key not found')

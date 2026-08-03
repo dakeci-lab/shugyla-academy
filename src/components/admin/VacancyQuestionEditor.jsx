@@ -18,6 +18,7 @@ import {
 import { useAdminRefresh } from '../../hooks/useAdminRefresh'
 import AdminModal from './AdminModal'
 import DynamicApplicationForm from '../apply/DynamicApplicationForm'
+import '../../pages/Apply.css'
 import './admin-shared.css'
 import './VacancyQuestionEditor.css'
 

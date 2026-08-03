@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import Header from '../components/Header'
 import { fetchPublishedVacanciesForApply } from '../services/publicApplyVacanciesService'
+import { getPublicVacancyDisplay } from '../utils/careersVacancyDisplay'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
+import { useLanguage } from '../context/LanguageContext'
 import './Apply.css'
 import './ApplyHub.css'
 
 /** Единая публичная страница трудоустройства — /apply */
 export default function ApplyHubPage() {
   const location = useLocation()
+  const { t } = useLanguage()
   const [vacancies, setVacancies] = useState([])
   const [loadState, setLoadState] = useState('loading')
   const [error, setError] = useState('')
@@ -22,15 +24,10 @@ export default function ApplyHubPage() {
       setLoadState('loaded')
     } catch (err) {
       setVacancies([])
-      setError(
-        toUserErrorMessage(
-          err,
-          'Не удалось загрузить вакансии. Проверьте интернет и попробуйте ещё раз.'
-        )
-      )
+      setError(toUserErrorMessage(err, t.careersLoadError))
       setLoadState('error')
     }
-  }, [])
+  }, [t.careersLoadError])
 
   useEffect(() => {
     load()
@@ -43,70 +40,72 @@ export default function ApplyHubPage() {
 
   return (
     <div className="apply-hub-page">
-      <Header variant="landing" />
-
       <main className="apply-hub-page__main container">
-        <header className="apply-hub-page__header">
+        <header className="apply-hub-page__hero">
           <p className="apply-hub-page__brand">Shugyla Market</p>
-          <h1 className="apply-hub-page__title">Работа в Shugyla</h1>
-          <p className="apply-hub-page__lead">
-            Выберите вакансию, на которую хотите подать анкету.
-          </p>
+          <h1 className="apply-hub-page__title">{t.careersHeroTitle}</h1>
+          <p className="apply-hub-page__lead">{t.careersHeroLead}</p>
+          <p className="apply-hub-page__note">{t.careersHeroNote}</p>
         </header>
 
-        {loadState === 'loading' && (
-          <div className="apply-hub-page__state" aria-busy="true" aria-live="polite">
-            <div className="apply-hub-page__skeleton" />
-            <div className="apply-hub-page__skeleton" />
-            <p className="apply-hub-page__state-text">Загрузка вакансий…</p>
-          </div>
-        )}
+        <section className="apply-hub-page__section" aria-labelledby="careers-open-heading">
+          <h2 id="careers-open-heading" className="apply-hub-page__section-title">
+            {t.careersOpenTitle}
+          </h2>
+          <p className="apply-hub-page__section-lead">{t.careersOpenLead}</p>
 
-        {loadState === 'error' && (
-          <div className="apply-hub-page__state" role="alert">
-            <h2 className="apply-hub-page__state-title">Не удалось загрузить вакансии</h2>
-            <p className="apply-hub-page__state-text">
-              {error ||
-                'Не удалось загрузить вакансии. Проверьте интернет и попробуйте ещё раз.'}
-            </p>
-            <button type="button" className="btn btn--primary" onClick={load}>
-              Повторить
-            </button>
-          </div>
-        )}
+          {loadState === 'loading' && (
+            <div className="apply-hub-page__state" aria-busy="true" aria-live="polite">
+              <div className="apply-hub-page__skeleton" />
+              <div className="apply-hub-page__skeleton" />
+              <p className="apply-hub-page__state-text">{t.careersLoading}</p>
+            </div>
+          )}
 
-        {loadState === 'loaded' && vacancies.length === 0 && (
-          <div className="apply-hub-page__state" role="status">
-            <h2 className="apply-hub-page__state-title">Сейчас открытых вакансий нет</h2>
-            <p className="apply-hub-page__state-text">
-              Следите за нашими объявлениями. Новые вакансии появятся на этой странице.
-            </p>
-          </div>
-        )}
+          {loadState === 'error' && (
+            <div className="apply-hub-page__state" role="alert">
+              <h3 className="apply-hub-page__state-title">{t.careersLoadErrorTitle}</h3>
+              <p className="apply-hub-page__state-text">{error || t.careersLoadError}</p>
+              <button type="button" className="btn btn--primary" onClick={load}>
+                {t.careersRetry}
+              </button>
+            </div>
+          )}
 
-        {loadState === 'loaded' && vacancies.length > 0 && (
-          <ul className="apply-hub-page__list">
-            {vacancies.map((vacancy) => (
-              <li key={vacancy.id} className="apply-hub-card">
-                <div className="apply-hub-card__body">
-                  <h2 className="apply-hub-card__title">{vacancy.title}</h2>
-                  {vacancy.positionName ? (
-                    <p className="apply-hub-card__position">{vacancy.positionName}</p>
-                  ) : null}
-                  {vacancy.description ? (
-                    <p className="apply-hub-card__desc">{vacancy.description}</p>
-                  ) : null}
-                </div>
-                <Link
-                  className="btn btn--primary apply-hub-card__cta"
-                  to={applyPathForSlug(vacancy.slug)}
-                >
-                  Заполнить анкету
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+          {loadState === 'loaded' && vacancies.length === 0 && (
+            <div className="apply-hub-page__state" role="status">
+              <h3 className="apply-hub-page__state-title">{t.careersEmptyTitle}</h3>
+              <p className="apply-hub-page__state-text">{t.careersEmptyLead}</p>
+            </div>
+          )}
+
+          {loadState === 'loaded' && vacancies.length > 0 && (
+            <ul className="apply-hub-page__list">
+              {vacancies.map((vacancy) => {
+                const display = getPublicVacancyDisplay(vacancy)
+                return (
+                  <li key={vacancy.id} className="apply-hub-card">
+                    <div className="apply-hub-card__body">
+                      <h3 className="apply-hub-card__title">{display.title}</h3>
+                      {display.positionName ? (
+                        <p className="apply-hub-card__position">{display.positionName}</p>
+                      ) : null}
+                      {display.description ? (
+                        <p className="apply-hub-card__desc">{display.description}</p>
+                      ) : null}
+                    </div>
+                    <Link
+                      className="btn btn--primary apply-hub-card__cta"
+                      to={applyPathForSlug(vacancy.slug)}
+                    >
+                      {t.careersApplyCta}
+                    </Link>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </section>
       </main>
     </div>
   )

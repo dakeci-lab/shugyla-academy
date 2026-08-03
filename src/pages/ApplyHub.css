@@ -1,36 +1,54 @@
 .apply-hub-page {
-  min-height: 100vh;
-  background: var(--color-bg, #f8fafc);
+  min-height: auto;
 }
 
 .apply-hub-page__main {
-  padding: 1.5rem 1rem 3rem;
+  padding: 1.25rem 1rem 3.5rem;
   max-width: 640px;
 }
 
-.apply-hub-page__header {
-  margin-bottom: 1.5rem;
+.apply-hub-page__hero {
+  margin-bottom: 1.75rem;
 }
 
 .apply-hub-page__brand {
-  margin: 0 0 0.35rem;
+  margin: 0 0 0.45rem;
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.02em;
-  color: var(--color-text-muted, #6b7280);
+  color: #15803d;
 }
 
 .apply-hub-page__title {
-  margin: 0 0 0.5rem;
-  font-size: clamp(1.5rem, 5vw, 1.875rem);
+  margin: 0 0 0.65rem;
+  font-size: clamp(1.55rem, 5.5vw, 2rem);
   line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .apply-hub-page__lead {
+  margin: 0 0 0.55rem;
+  color: #3f4f47;
+  font-size: 1.02rem;
+  line-height: 1.5;
+}
+
+.apply-hub-page__note {
   margin: 0;
-  color: var(--color-text-muted, #6b7280);
-  font-size: 1rem;
+  color: #5b6b63;
+  font-size: 0.95rem;
   line-height: 1.45;
+}
+
+.apply-hub-page__section-title {
+  margin: 0 0 0.35rem;
+  font-size: 1.2rem;
+}
+
+.apply-hub-page__section-lead {
+  margin: 0 0 1rem;
+  color: #5b6b63;
+  font-size: 0.975rem;
 }
 
 .apply-hub-page__list {

@@ -1,0 +1,70 @@
+name: E2E Recruitment (staging mutating, manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Staging app base URL (required)
+        required: true
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-recruitment-staging-mutating
+  cancel-in-progress: false
+
+jobs:
+  e2e-recruitment-mutating:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Require staging base URL
+        run: |
+          if [ -z "${{ inputs.base_url }}" ]; then
+            echo "Staging base URL is required"
+            exit 1
+          fi
+          if echo "${{ inputs.base_url }}" | grep -qi 'dakeci-lab.github.io/shugyla-academy'; then
+            echo "Refusing mutating suite against production Pages URL"
+            exit 1
+          fi
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run mutating recruitment E2E against staging
+        env:
+          E2E_SUITE: mutating
+          E2E_BASE_URL: ${{ inputs.base_url }}
+          E2E_SUPABASE_URL: ${{ secrets.E2E_STAGING_SUPABASE_URL }}
+          E2E_SUPABASE_ANON_KEY: ${{ secrets.E2E_STAGING_SUPABASE_ANON_KEY }}
+          E2E_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+          SUPABASE_URL: ${{ secrets.E2E_STAGING_SUPABASE_URL }}
+          VITE_SUPABASE_URL: ${{ secrets.E2E_STAGING_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.E2E_STAGING_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.E2E_STAGING_SUPABASE_SERVICE_ROLE_KEY }}
+        run: npm run test:e2e:recruitment:mutating
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: recruitment-e2e-staging-artifacts
+          path: |
+            test-results/e2e-recruitment/
+            playwright-report/recruitment/
+          if-no-files-found: ignore

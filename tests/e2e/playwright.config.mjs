@@ -4,10 +4,15 @@ import { fileURLToPath } from 'node:url'
 import { getBaseUrl } from './helpers/env.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const suite = process.env.E2E_SUITE || 'mutating'
+const testMatch =
+  suite === 'smoke'
+    ? /recruitment-production-smoke\.spec\.(mjs|js|ts)/
+    : /recruitment-flexible-form\.spec\.(mjs|js|ts)/
 
 export default defineConfig({
   testDir: __dirname,
-  testMatch: /recruitment-flexible-form\.spec\.(mjs|js|ts)/,
+  testMatch,
   fullyParallel: false,
   workers: 1,
   retries: 0,

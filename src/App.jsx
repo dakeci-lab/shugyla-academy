@@ -18,6 +18,7 @@ import VacanciesPage from './pages/VacanciesPage'
 import VacancyDetailPage from './pages/VacancyDetailPage'
 import ApplyPage from './pages/Apply'
 import ApplyHubPage from './pages/ApplyHub'
+import CareersPublicLayout from './layouts/CareersPublicLayout'
 import AuthLoadingScreen from './components/AuthLoadingScreen'
 
 /**
@@ -109,11 +110,13 @@ export default function App() {
             <Routes>
               {/* Публичные маршруты — без PlatformData / Permission / NotificationInbox */}
               <Route path="/" element={<Navigate to={LOGIN_PATH} replace />} />
-              <Route path="/vacancies" element={<VacanciesPage />} />
-              <Route path="/vacancies/:slug" element={<VacancyDetailPage />} />
-              {/* Exact /apply before /apply/:slug so hub is never treated as a slug */}
-              <Route path="/apply" element={<ApplyHubPage />} />
-              <Route path="/apply/:slug" element={<ApplyPage />} />
+              <Route element={<CareersPublicLayout />}>
+                <Route path="/vacancies" element={<VacanciesPage />} />
+                <Route path="/vacancies/:slug" element={<VacancyDetailPage />} />
+                {/* Exact /apply before /apply/:slug so hub is never treated as a slug */}
+                <Route path="/apply" element={<ApplyHubPage />} />
+                <Route path="/apply/:slug" element={<ApplyPage />} />
+              </Route>
               <Route path="/login" element={<Login />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password" element={<ResetPassword />} />

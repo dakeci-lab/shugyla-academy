@@ -9,7 +9,9 @@ import {
 } from '../services/candidatePhotoService'
 import { isCloudMode } from '../lib/dataMode'
 import { APPLICATION_QUESTION_TYPES, mapApplicationFormRpcError } from '../utils/applicationForm'
+import { getPublicVacancyDisplay } from '../utils/careersVacancyDisplay'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
+import { useLanguage } from '../context/LanguageContext'
 import DynamicApplicationForm from '../components/apply/DynamicApplicationForm'
 import '../components/admin/admin-shared.css'
 import '../components/CandidateAvatar.css'
@@ -27,6 +29,7 @@ function emptyValues(questions) {
 export default function ApplyPage() {
   const { slug } = useParams()
   const location = useLocation()
+  const { t } = useLanguage()
   const hubPath = `/apply${location.search || ''}`
 
   const [loadState, setLoadState] = useState('loading')
@@ -51,6 +54,17 @@ export default function ApplyPage() {
     [questions]
   )
 
+  const display = getPublicVacancyDisplay(vacancy || {})
+
+  useEffect(() => {
+    if (!vacancy?.title) return undefined
+    const prev = document.title
+    document.title = `${vacancy.title} — Shugyla Market`
+    return () => {
+      document.title = prev
+    }
+  }, [vacancy?.title])
+
   useEffect(() => {
     if (!slug) {
       setLoadState('missing')
@@ -69,9 +83,7 @@ export default function ApplyPage() {
         setQuestions(form.questions)
         setFormVersion(form.formVersion)
         setValues(emptyValues(form.questions))
-        setPhotoQuestionId(
-          form.questions.find((q) => q.questionType === 'photo')?.id || null
-        )
+        setPhotoQuestionId(form.questions.find((q) => q.questionType === 'photo')?.id || null)
         setLoadState('loaded')
       })
       .catch((err) => {
@@ -102,7 +114,8 @@ export default function ApplyPage() {
     return (
       <div className="apply-page">
         <div className="apply-page__card apply-page__closed">
-          <h1>Загрузка анкеты…</h1>
+          <p className="apply-page__brand-title">Shugyla Market</p>
+          <h1>{t.careersLoading}</h1>
         </div>
       </div>
     )
@@ -112,10 +125,13 @@ export default function ApplyPage() {
     return (
       <div className="apply-page">
         <div className="apply-page__card apply-page__closed">
-          <h1>Не удалось загрузить анкету</h1>
-          <p>Попробуйте обновить страницу или вернитесь позже.</p>
+          <p className="apply-page__brand-title">Shugyla Market</p>
+          <h1>{t.careersLoadErrorTitle}</h1>
+          <p>{t.careersLoadError}</p>
           <p>
-            <Link to={hubPath}>← Все вакансии</Link>
+            <Link to={hubPath} className="btn btn--outline">
+              {t.careersBackToVacancies}
+            </Link>
           </p>
         </div>
       </div>
@@ -126,11 +142,11 @@ export default function ApplyPage() {
     return (
       <div className="apply-page">
         <div className="apply-page__card apply-page__closed">
-          <h1>Эта вакансия больше недоступна.</h1>
-          <p>Посмотрите актуальный список открытых вакансий.</p>
+          <p className="apply-page__brand-title">Shugyla Market</p>
+          <h1>{t.careersClosedTitle}</h1>
           <p>
             <Link to={hubPath} className="btn btn--primary">
-              Посмотреть открытые вакансии
+              {t.careersClosedCta}
             </Link>
           </p>
         </div>
@@ -142,11 +158,12 @@ export default function ApplyPage() {
     return (
       <div className="apply-page">
         <div className="apply-page__card apply-page__success">
-          <h1 className="apply-page__success-title">Анкета отправлена</h1>
+          <p className="apply-page__brand-title">Shugyla Market</p>
+          <h1 className="apply-page__success-title">{t.careersSuccessTitle}</h1>
           <p>{successMessage}</p>
           <p>
             <Link to={hubPath} className="btn btn--outline">
-              Вернуться к вакансиям
+              {t.careersClosedCta}
             </Link>
           </p>
         </div>
@@ -315,24 +332,26 @@ export default function ApplyPage() {
     <div className="apply-page">
       <div className="apply-page__card">
         <div className="apply-page__brand">
-          <h1 className="apply-page__brand-title">Shugyla Market</h1>
-          <p className="apply-page__brand-sub">Анкета кандидата</p>
+          <p className="apply-page__brand-title">Shugyla Market</p>
+          <p className="apply-page__brand-sub">{t.careersFormLabel}</p>
           <p className="apply-page__brand-sub">
-            <Link to={hubPath}>← Все вакансии</Link>
+            <Link to={hubPath}>{t.careersBackToVacancies}</Link>
           </p>
         </div>
 
         <section>
-          <h2 className="apply-page__vacancy-title">{vacancy.title}</h2>
-          <p className="apply-page__vacancy-desc">
-            {vacancy.positionName || ''}
-            {vacancy.description ? ` · ${vacancy.description}` : ''}
-          </p>
+          <h1 className="apply-page__vacancy-title">{display.title}</h1>
+          {display.positionName ? (
+            <p className="apply-page__vacancy-position">{display.positionName}</p>
+          ) : null}
+          {display.description ? (
+            <p className="apply-page__vacancy-desc">{display.description}</p>
+          ) : null}
         </section>
 
-        <form className="admin-form" onSubmit={handleSubmit}>
+        <form className="careers-apply-form" onSubmit={handleSubmit}>
           <section className="apply-form__section">
-            <h3 className="apply-form__section-title">Данные кандидата</h3>
+            <h2 className="apply-form__section-title">{t.careersFormSection}</h2>
             <DynamicApplicationForm
               questions={questions}
               values={values}
@@ -340,23 +359,23 @@ export default function ApplyPage() {
               onChange={handleValueChange}
               onPhotoChange={handlePhotoChange}
               photoPreview={photoPreview}
-              photoWarning={
-                photoUploading
-                  ? 'Загрузка фотографии…'
-                  : photoWarning
-              }
+              photoWarning={photoUploading ? t.careersPhotoUploading : photoWarning}
               disabled={submitting || photoUploading}
             />
           </section>
 
-          {error && <p className="admin-form__error">{error}</p>}
+          {error && <p className="careers-apply-form__error">{error}</p>}
 
           <button
             type="submit"
-            className="btn btn--primary"
+            className="btn btn--primary careers-apply-form__submit"
             disabled={submitting || photoUploading || hasUnknownType}
           >
-            {photoUploading ? 'Загрузка фото…' : submitting ? 'Отправка…' : 'Отправить анкету'}
+            {photoUploading
+              ? t.careersPhotoUploading
+              : submitting
+                ? t.careersSubmitting
+                : t.careersSubmit}
           </button>
         </form>
       </div>

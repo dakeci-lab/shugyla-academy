@@ -419,7 +419,9 @@ test('6. Submit first candidate with photo upload-session', async ({ browser }) 
   }
 
   await submitPublicApplication(page)
-  await expect(page.getByText('Анкета отправлена')).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByText(/Анкета отправлена|Сауалнама жіберілді/)).toBeVisible({
+    timeout: 60_000,
+  })
   await expect(page.getByText(/42501|permission denied|SQLSTATE|RLS/i)).toHaveCount(0)
   await page.waitForTimeout(1000)
   const summary = net.summary()
@@ -536,7 +538,9 @@ test('7. Snapshot history after form mutation + second candidate', async ({ page
     phone: `7701${String(Date.now()).slice(-7)}`,
   })
   await submitPublicApplication(anonPage)
-  await expect(anonPage.getByText('Анкета отправлена')).toBeVisible({ timeout: 60_000 })
+  await expect(anonPage.getByText(/Анкета отправлена|Сауалнама жіберілді/)).toBeVisible({
+    timeout: 60_000,
+  })
   anonGuard.assertClean('anon-c2-submit')
   await context.close()
 

@@ -104,7 +104,10 @@
     "verify:recruitment-flexible-form": "node scripts/verify-recruitment-flexible-form.mjs",
     "verify:recruitment-form-hardening": "node scripts/verify-recruitment-form-hardening.mjs",
     "verify:public-route-isolation": "node scripts/verify-public-route-isolation.mjs",
-    "test:e2e:recruitment": "playwright test -c tests/e2e/playwright.config.mjs"
+    "verify:recruitment-public-careers-ui": "node scripts/verify-recruitment-public-careers-ui.mjs",
+    "test:e2e:recruitment": "E2E_SUITE=smoke playwright test -c tests/e2e/playwright.config.mjs",
+    "test:e2e:recruitment:smoke": "E2E_SUITE=smoke playwright test -c tests/e2e/playwright.config.mjs",
+    "test:e2e:recruitment:mutating": "E2E_SUITE=mutating playwright test -c tests/e2e/playwright.config.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",

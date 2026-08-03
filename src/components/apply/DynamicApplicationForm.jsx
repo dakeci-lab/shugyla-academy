@@ -22,7 +22,7 @@ export default function DynamicApplicationForm({
       {(questions || []).map((q) => {
         const id = `q-${q.id}`
         const err = errors[q.id]
-        const label = (
+        const labelText = (
           <>
             {q.questionText}
             {q.required ? ' *' : ''}
@@ -32,34 +32,36 @@ export default function DynamicApplicationForm({
         return (
           <div key={q.id} className="apply-form__field">
             {q.questionType === 'long_text' ? (
-              <label className="admin-form__label" htmlFor={id}>
-                {label}
+              <>
+                <label className="apply-form__label" htmlFor={id}>
+                  {labelText}
+                </label>
                 <textarea
                   id={id}
-                  className="admin-form__input"
-                  rows={3}
+                  className="apply-form__control"
+                  rows={4}
                   value={values[q.id] ?? ''}
                   placeholder={q.placeholder || undefined}
                   required={q.required}
                   disabled={disabled}
                   onChange={(e) => onChange(q.id, e.target.value)}
                 />
-              </label>
+              </>
             ) : q.questionType === 'photo' ? (
               <div className="apply-photo-field">
-                <label className="admin-form__label" htmlFor={id}>
-                  {label}
-                  <input
-                    id={id}
-                    className="admin-form__input"
-                    type="file"
-                    accept={ALLOWED_CANDIDATE_PHOTO_TYPES.join(',')}
-                    disabled={disabled || preview}
-                    required={q.required && !preview}
-                    onChange={(e) => onPhotoChange?.(q.id, e)}
-                  />
+                <label className="apply-form__label" htmlFor={id}>
+                  {labelText}
                 </label>
-                {q.helpText ? <p className="apply-photo-hint">{q.helpText}</p> : null}
+                <input
+                  id={id}
+                  className="apply-form__control"
+                  type="file"
+                  accept={ALLOWED_CANDIDATE_PHOTO_TYPES.join(',')}
+                  disabled={disabled || preview}
+                  required={q.required && !preview}
+                  onChange={(e) => onPhotoChange?.(q.id, e)}
+                />
+                {q.helpText ? <p className="apply-form__help">{q.helpText}</p> : null}
                 {photoWarning ? <p className="apply-photo-warning">{photoWarning}</p> : null}
                 {photoPreview ? (
                   <div className="apply-photo-preview">
@@ -67,13 +69,13 @@ export default function DynamicApplicationForm({
                   </div>
                 ) : null}
                 {preview ? (
-                  <p className="apply-photo-hint">В предварительном просмотре файл не загружается.</p>
+                  <p className="apply-form__help">В предварительном просмотре файл не загружается.</p>
                 ) : null}
               </div>
             ) : q.questionType === 'yes_no' ? (
               <fieldset className="apply-choice-fieldset">
-                <legend className="admin-form__label">{label}</legend>
-                {q.helpText ? <p className="apply-photo-hint">{q.helpText}</p> : null}
+                <legend className="apply-form__label">{labelText}</legend>
+                {q.helpText ? <p className="apply-form__help">{q.helpText}</p> : null}
                 <div className="apply-choice-list">
                   {[
                     { id: 'yes', label: 'Да', value: true },
@@ -94,8 +96,8 @@ export default function DynamicApplicationForm({
               </fieldset>
             ) : q.questionType === 'single_choice' ? (
               <fieldset className="apply-choice-fieldset">
-                <legend className="admin-form__label">{label}</legend>
-                {q.helpText ? <p className="apply-photo-hint">{q.helpText}</p> : null}
+                <legend className="apply-form__label">{labelText}</legend>
+                {q.helpText ? <p className="apply-form__help">{q.helpText}</p> : null}
                 <div className="apply-choice-list">
                   {(q.options || []).map((opt) => (
                     <label key={opt.id} className="apply-choice-option">
@@ -113,8 +115,8 @@ export default function DynamicApplicationForm({
               </fieldset>
             ) : q.questionType === 'multi_choice' ? (
               <fieldset className="apply-choice-fieldset">
-                <legend className="admin-form__label">{label}</legend>
-                {q.helpText ? <p className="apply-photo-hint">{q.helpText}</p> : null}
+                <legend className="apply-form__label">{labelText}</legend>
+                {q.helpText ? <p className="apply-form__help">{q.helpText}</p> : null}
                 <div className="apply-choice-list">
                   {(q.options || []).map((opt) => {
                     const selected = Array.isArray(values[q.id]) ? values[q.id] : []
@@ -139,15 +141,17 @@ export default function DynamicApplicationForm({
                 </div>
               </fieldset>
             ) : !['short_text', 'phone', 'number', 'date'].includes(q.questionType) ? (
-              <p className="admin-form__error" role="alert">
+              <p className="careers-apply-form__error" role="alert">
                 Неизвестный тип вопроса. Обновите страницу или обратитесь в магазин.
               </p>
             ) : (
-              <label className="admin-form__label" htmlFor={id}>
-                {label}
+              <>
+                <label className="apply-form__label" htmlFor={id}>
+                  {labelText}
+                </label>
                 <input
                   id={id}
-                  className="admin-form__input"
+                  className="apply-form__control"
                   type={
                     q.questionType === 'number'
                       ? 'number'
@@ -170,13 +174,17 @@ export default function DynamicApplicationForm({
                   disabled={disabled}
                   onChange={(e) => onChange(q.id, e.target.value)}
                 />
-              </label>
+              </>
             )}
 
-            {q.helpText && q.questionType !== 'photo' && q.questionType !== 'single_choice' && q.questionType !== 'multi_choice' && q.questionType !== 'yes_no' ? (
-              <p className="apply-photo-hint">{q.helpText}</p>
+            {q.helpText &&
+            q.questionType !== 'photo' &&
+            q.questionType !== 'single_choice' &&
+            q.questionType !== 'multi_choice' &&
+            q.questionType !== 'yes_no' ? (
+              <p className="apply-form__help">{q.helpText}</p>
             ) : null}
-            {err ? <p className="admin-form__error">{err}</p> : null}
+            {err ? <p className="careers-apply-form__error">{err}</p> : null}
           </div>
         )
       })}
