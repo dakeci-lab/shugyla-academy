@@ -31,6 +31,10 @@ import {
   canCreateEmployeeForCandidate,
   isCandidateEmployeeCreated,
 } from '../../../utils/recruitmentData'
+import {
+  createCandidatePhotoSignedUrl,
+  resolveCandidatePhotoStoragePath,
+} from '../../../services/candidatePhotoService'
 import { getRoleLabel } from '../../../data/roles'
 import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
 import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
@@ -433,6 +437,26 @@ export default function EmployeesSection() {
         avatarUrl: candidate.photoUrl || '',
         employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
       })
+
+      // Refresh short-lived signed URL for preview (not persisted on create).
+      const photoPath = resolveCandidatePhotoStoragePath(candidate)
+      if (photoPath && isCloudMode()) {
+        createCandidatePhotoSignedUrl(photoPath)
+          .then((signedUrl) => {
+            if (activeCandidateIdRef.current !== candidateId) return
+            setCreateInitialForm((prev) =>
+              prev
+                ? {
+                    ...prev,
+                    avatarUrl: signedUrl,
+                  }
+                : prev
+            )
+          })
+          .catch(() => {
+            /* preview without photo is acceptable */
+          })
+      }
     }
 
     setSourceCandidateId(candidateId)

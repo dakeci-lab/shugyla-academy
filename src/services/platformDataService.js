@@ -872,10 +872,7 @@ export async function submitCandidateApplication(applicationData) {
 
   if (applicationData.photoFile) {
     try {
-      photoPayload = await prepareCandidatePhotoForSubmit(
-        applicationData.photoFile,
-        applicationData.vacancySlug
-      )
+      photoPayload = await prepareCandidatePhotoForSubmit(applicationData.photoFile)
     } catch (err) {
       throw new Error(err.message || 'Не удалось загрузить фото')
     }
@@ -970,7 +967,8 @@ export async function hireCandidateAsUser(candidateId, userData, options = {}) {
     login: userData.login,
     password: userData.password,
     employmentStatus: userData.employmentStatus || EMPLOYMENT_STATUS.ACTIVE,
-    avatarUrl: userData.avatarUrl || candidate.photoUrl || null,
+    // Prefer explicit employee avatar; candidate photos are private and transferred below.
+    avatarUrl: userData.avatarUrl || null,
   }
 
   const newUserId = await createEmployee(employeePayload)
@@ -980,6 +978,16 @@ export async function hireCandidateAsUser(candidateId, userData, options = {}) {
     newUserId,
     CANDIDATE_STATUS.HIRED
   )
+
+  if (isCloudMode() && !employeePayload.avatarUrl) {
+    try {
+      const { transferCandidatePhotoToEmployee } = await import('./candidatePhotoService')
+      const avatarUrl = await transferCandidatePhotoToEmployee(candidate, newUserId)
+      if (avatarUrl) await updateEmployee(newUserId, { avatarUrl })
+    } catch {
+      /* hire succeeds even if photo copy fails */
+    }
+  }
 
   if (isCloudMode()) await refreshData()
   return newUserId

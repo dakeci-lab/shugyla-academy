@@ -10,6 +10,7 @@ import {
   VACANCY_STATUS,
   CANDIDATE_STATUS,
 } from '../utils/recruitmentData'
+import { attachCandidatePhotoSignedUrls } from './candidatePhotoService'
 
 async function throwIfError(result, context) {
   if (result.error) throw new Error(`${context}: ${result.error.message}`)
@@ -111,7 +112,9 @@ export async function fetchRecruitmentData() {
       .select('*')
       .order('submitted_at', { ascending: false })
     if (!cRes.error) {
-      candidates = (cRes.data || []).map(rowToCandidate)
+      candidates = await attachCandidatePhotoSignedUrls(
+        (cRes.data || []).map(rowToCandidate)
+      )
     }
   }
 
@@ -248,7 +251,8 @@ export async function submitCandidateApplication(applicationData) {
     p_expected_salary: applicationData.expectedSalary?.trim() || null,
     p_available_from: applicationData.availableFrom?.trim() || null,
     p_about: applicationData.about?.trim() || null,
-    p_photo_url: applicationData.photoUrl || null,
+    // Private bucket: never accept permanent photo URLs from the client.
+    p_photo_url: null,
     p_photo_path: applicationData.photoPath || null,
   })
 

@@ -18,7 +18,9 @@ import {
   updateEmployee,
   linkCandidateToEmployee,
   getWorkLocations,
+  getCandidateById,
 } from '../../../services/platformDataService'
+import { transferCandidatePhotoToEmployee } from '../../../services/candidatePhotoService'
 import { getRoleLabel } from '../../../data/roles'
 import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
 import {
@@ -315,7 +317,8 @@ export default function EmployeeEditModal({
           payrollParticipation: form.payrollParticipation,
           workLocationId: form.workLocationId || null,
           sourceCandidateId: sourceCandidateId || undefined,
-          ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
+          // Never persist short-lived candidate-photo signed URLs as employee avatar.
+          ...(!sourceCandidateId && form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
           ...(form.password?.trim() ? { password: form.password } : {}),
         }
         const newUserId = await createEmployee(payload)
@@ -331,6 +334,15 @@ export default function EmployeeEditModal({
                 `Сотрудник создан, но связь с кандидатом не сохранилась. Откройте кандидата и повторите оформление. ${retryError.message || linkError.message || ''}`
               )
             }
+          }
+          try {
+            const candidate = getCandidateById(sourceCandidateId)
+            const avatarUrl = await transferCandidatePhotoToEmployee(candidate, newUserId)
+            if (avatarUrl) {
+              await updateEmployee(newUserId, { avatarUrl })
+            }
+          } catch (photoError) {
+            console.warn('Не удалось перенести фото кандидата:', photoError?.message)
           }
         }
         await onSaved?.({ id: newUserId, mode: 'create' })

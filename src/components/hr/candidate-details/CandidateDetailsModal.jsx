@@ -7,6 +7,10 @@ import CandidateStatusBadge from '../CandidateStatusBadge'
 import CandidatePhotoPreviewModal from '../../CandidatePhotoPreviewModal'
 import { resolveAvatarUrl } from '../../../utils/avatarUtils'
 import {
+  createCandidatePhotoSignedUrl,
+  resolveCandidatePhotoStoragePath,
+} from '../../../services/candidatePhotoService'
+import {
   formatDisplayValue,
   formatAgeYears,
   formatPhoneDisplay,
@@ -474,7 +478,18 @@ export default function CandidateDetailsModal({
               candidate={candidate}
               vacancy={vacancy}
               photoTriggerRef={photoTriggerRef}
-              onPhotoClick={() => photoUrl && setPreviewPhoto(photoUrl)}
+              onPhotoClick={async () => {
+                const path = resolveCandidatePhotoStoragePath(candidate)
+                if (path) {
+                  try {
+                    setPreviewPhoto(await createCandidatePhotoSignedUrl(path))
+                    return
+                  } catch {
+                    /* fall through to cached URL */
+                  }
+                }
+                if (photoUrl) setPreviewPhoto(photoUrl)
+              }}
             />
 
             <section className="candidate-main-info">
