@@ -121,10 +121,11 @@ function CandidateAnswersSection({ answerBreakdown, questionsCount }) {
   const count = answerBreakdown.length
 
   let emptyMessage = null
-  if (questionsCount === 0) {
-    emptyMessage = 'Для этой вакансии дополнительные вопросы не были настроены.'
-  } else if (count === 0) {
-    emptyMessage = 'Кандидат не ответил на дополнительные вопросы.'
+  if (count === 0) {
+    emptyMessage =
+      questionsCount === 0
+        ? 'Дополнительных ответов анкеты нет.'
+        : 'Дополнительные ответы анкеты отсутствуют.'
   }
 
   return (
@@ -135,7 +136,7 @@ function CandidateAnswersSection({ answerBreakdown, questionsCount }) {
         onClick={() => setExpanded((prev) => !prev)}
         aria-expanded={expanded}
       >
-        <h3 className="candidate-section-title candidate-answers-section__title">Ответы на вопросы</h3>
+        <h3 className="candidate-section-title candidate-answers-section__title">Ответы анкеты</h3>
         {count > 0 && <span className="candidate-answers-section__count">{count}</span>}
         <span
           className={`candidate-answers-section__chevron ${expanded ? 'candidate-answers-section__chevron--open' : ''}`}
@@ -511,7 +512,7 @@ export default function CandidateDetailsModal({
             <CandidateTextBlock title="Опыт работы" text={candidate.previousWork} />
             <CandidateTextBlock title="О себе" text={candidate.about} />
 
-            {questionsCount > 0 && (
+            {(answerBreakdown?.length > 0 || questionsCount > 0) && (
               <CandidateAnswersSection
                 answerBreakdown={answerBreakdown}
                 questionsCount={questionsCount}

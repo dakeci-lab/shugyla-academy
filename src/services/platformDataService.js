@@ -842,11 +842,17 @@ export async function duplicateVacancy(vacancyId) {
   return id
 }
 
-export async function createCandidateQuestion(vacancyId, questionData) {
-  if (!questionData.questionText?.trim()) throw new Error('Укажите текст вопроса')
-  if (!questionData.options?.length || questionData.options.length < 2) {
-    throw new Error('Добавьте минимум 2 варианта ответа')
+export async function saveVacancyApplicationForm(vacancyId, payload) {
+  const adapter = getRecruitmentAdapter()
+  if (typeof adapter.saveVacancyApplicationForm !== 'function') {
+    throw new Error('Сохранение анкеты недоступно в этом режиме')
   }
+  const result = await adapter.saveVacancyApplicationForm(vacancyId, payload)
+  if (isCloudMode()) await refreshData()
+  return result
+}
+
+export async function createCandidateQuestion(vacancyId, questionData) {
   const id = await getRecruitmentAdapter().createCandidateQuestion(vacancyId, questionData)
   if (isCloudMode()) await refreshData()
   return id
@@ -868,8 +874,8 @@ export async function reorderCandidateQuestions(vacancyId, orderedQuestionIds) {
 }
 
 export async function submitCandidateApplication(applicationData) {
-  if (!applicationData.firstName?.trim()) throw new Error('Укажите имя')
-  if (!applicationData.phone?.trim()) throw new Error('Укажите телефон')
+  if (!applicationData.vacancyId) throw new Error('Вакансия не указана')
+  if (applicationData.formVersion == null) throw new Error('Анкета устарела. Обновите страницу.')
 
   let photoPayload = { photoUrl: null, photoPath: null }
 

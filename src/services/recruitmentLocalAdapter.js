@@ -193,6 +193,36 @@ function saveCandidates(candidates) {
   )
 }
 
+function seedLocalDefaultQuestions(vacancyId, questions) {
+  const hasName = questions.some((q) => q.vacancyId === vacancyId && q.fieldBinding === 'first_name')
+  if (hasName) return questions
+  return [
+    ...questions,
+    normalizeCandidateQuestion({
+      id: genId(),
+      vacancyId,
+      questionText: 'Имя',
+      questionType: 'short_text',
+      required: true,
+      sortOrder: 0,
+      fieldBinding: 'first_name',
+      isActive: true,
+      options: [],
+    }),
+    normalizeCandidateQuestion({
+      id: genId(),
+      vacancyId,
+      questionText: 'Телефон',
+      questionType: 'phone',
+      required: true,
+      sortOrder: 1,
+      fieldBinding: 'phone',
+      isActive: true,
+      options: [],
+    }),
+  ]
+}
+
 export async function createVacancy(data) {
   if (!data.positionId) throw new Error('Выберите должность')
   const bundle = getLocalRecruitmentBundle()
@@ -205,10 +235,53 @@ export async function createVacancy(data) {
     slug,
     status: data.status || VACANCY_STATUS.DRAFT,
     passingScore: data.passingScore ?? 80,
+    applicationFormVersion: 1,
   })
   bundle.vacancies.push(vacancy)
+  bundle.questions = seedLocalDefaultQuestions(vacancy.id, bundle.questions)
   saveVacancies(bundle.vacancies)
+  saveQuestions(bundle.questions)
   return vacancy.id
+}
+
+export async function saveVacancyApplicationForm(vacancyId, { questions, expectedVersion }) {
+  const bundle = getLocalRecruitmentBundle()
+  const vacancy = bundle.vacancies.find((v) => v.id === vacancyId)
+  if (!vacancy) throw new Error('Вакансия не найдена')
+  if (
+    expectedVersion != null &&
+    Number(vacancy.applicationFormVersion || 1) !== Number(expectedVersion)
+  ) {
+    throw new Error('Анкета изменилась. Обновите страницу и сохраните снова.')
+  }
+
+  const keptIds = new Set()
+  const nextQuestions = bundle.questions.filter((q) => q.vacancyId !== vacancyId)
+  ;(questions || []).forEach((raw, index) => {
+    const id = raw.id || genId()
+    keptIds.add(id)
+    nextQuestions.push(
+      normalizeCandidateQuestion({
+        id,
+        vacancyId,
+        questionText: raw.question_text || raw.questionText,
+        questionType: raw.question_type || raw.questionType,
+        required: raw.required !== false,
+        sortOrder: raw.sort_order ?? index,
+        isActive: raw.is_active !== false,
+        fieldBinding: raw.field_binding ?? raw.fieldBinding ?? null,
+        helpText: raw.help_text ?? raw.helpText ?? '',
+        placeholder: raw.placeholder ?? '',
+        options: raw.options || [],
+        scores: [],
+      })
+    )
+  })
+  bundle.questions = nextQuestions
+  vacancy.applicationFormVersion = Number(vacancy.applicationFormVersion || 1) + 1
+  saveQuestions(bundle.questions)
+  saveVacancies(bundle.vacancies)
+  return { ok: true, formVersion: vacancy.applicationFormVersion, questions: [] }
 }
 
 export async function updateVacancy(vacancyId, updates) {
@@ -343,24 +416,70 @@ export async function submitCandidateApplication(applicationData) {
   if (vacancy.status !== VACANCY_STATUS.PUBLISHED) {
     throw new Error('Вакансия недоступна или закрыта')
   }
+  if (
+    Number(applicationData.formVersion) !== Number(vacancy.applicationFormVersion || 1)
+  ) {
+    throw new Error('Анкета была обновлена. Обновите страницу и заполните её ещё раз.')
+  }
 
-  const firstName = applicationData.firstName?.trim()
-  const lastName = applicationData.lastName?.trim() || ''
+  const activeQuestions = bundle.questions
+    .filter((q) => q.vacancyId === vacancy.id && q.isActive !== false)
+    .sort((a, b) => a.sortOrder - b.sortOrder)
+  const answersMap = applicationData.answers || {}
+  const fields = {}
+  const items = []
+
+  for (const q of activeQuestions) {
+    const value = answersMap[q.id]
+    if (q.fieldBinding === 'first_name') fields.firstName = String(value || '').trim()
+    if (q.fieldBinding === 'last_name') fields.lastName = String(value || '').trim()
+    if (q.fieldBinding === 'phone') fields.phone = String(value || '').trim()
+    if (q.fieldBinding === 'age') fields.age = value ? Number(value) : null
+    if (q.fieldBinding === 'city') fields.city = String(value || '').trim()
+    if (q.fieldBinding === 'experience') fields.experience = String(value || '').trim()
+    if (q.fieldBinding === 'previous_work') fields.previousWork = String(value || '').trim()
+    if (q.fieldBinding === 'expected_salary') fields.expectedSalary = String(value || '').trim()
+    if (q.fieldBinding === 'available_from') fields.availableFrom = String(value || '').trim()
+    if (q.fieldBinding === 'about') fields.about = String(value || '').trim()
+
+    if (q.required && q.questionType !== 'photo' && (value == null || value === '' || (Array.isArray(value) && !value.length))) {
+      throw new Error('Заполните обязательные поля')
+    }
+
+    items.push({
+      question_id: q.id,
+      label: q.questionText,
+      question_type: q.questionType,
+      required: q.required,
+      sort_order: q.sortOrder,
+      value,
+      display_value: Array.isArray(value) ? value.join(', ') : value,
+      profile_bound: Boolean(q.fieldBinding),
+    })
+  }
+
+  if (!fields.firstName || !fields.phone) throw new Error('Заполните обязательные поля')
+
   const candidate = normalizeCandidate({
     id: genId(),
     vacancyId: vacancy.id,
-    firstName,
-    lastName,
-    fullName: `${firstName} ${lastName}`.trim(),
-    phone: applicationData.phone?.trim(),
-    age: applicationData.age ? Number(applicationData.age) : null,
-    city: applicationData.city?.trim() || '',
-    experience: applicationData.experience?.trim() || '',
-    previousWork: applicationData.previousWork?.trim() || '',
-    expectedSalary: applicationData.expectedSalary?.trim() || '',
-    availableFrom: applicationData.availableFrom?.trim() || '',
-    about: applicationData.about?.trim() || '',
-    answers: {},
+    firstName: fields.firstName,
+    lastName: fields.lastName || '',
+    fullName: `${fields.firstName} ${fields.lastName || ''}`.trim(),
+    phone: fields.phone,
+    age: fields.age ?? null,
+    city: fields.city || '',
+    experience: fields.experience || '',
+    previousWork: fields.previousWork || '',
+    expectedSalary: fields.expectedSalary || '',
+    availableFrom: fields.availableFrom || '',
+    about: fields.about || '',
+    answers: {
+      version: 2,
+      form_version: vacancy.applicationFormVersion || 1,
+      submitted_at: new Date().toISOString(),
+      items,
+    },
     photoUrl: applicationData.photoUrl || null,
     photoPath: applicationData.photoPath || null,
     totalScore: 0,

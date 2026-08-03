@@ -8,6 +8,7 @@ import { getLocalRecruitmentBundle } from '../services/recruitmentLocalAdapter'
 import { ROLES, normalizeRoleId } from '../data/roles'
 import { slugify } from './standardsData'
 import { getAppUrl } from '../router/basename'
+import { getCandidateAnswerDisplayRows } from './applicationForm'
 
 export const VACANCY_STATUS = {
   DRAFT: 'draft',
@@ -198,6 +199,8 @@ export function normalizeVacancy(raw) {
     positionArchived,
     status: raw.status || VACANCY_STATUS.DRAFT,
     passingScore: raw.passingScore ?? raw.passing_score ?? 80,
+    applicationFormVersion:
+      raw.applicationFormVersion ?? raw.application_form_version ?? 1,
     createdBy: raw.createdBy ?? raw.created_by ?? null,
     questionCount: raw.questionCount ?? 0,
     candidateCount: raw.candidateCount ?? 0,
@@ -216,15 +219,37 @@ export function normalizeCandidateQuestion(raw) {
     try { scores = JSON.parse(scores) } catch { scores = [] }
   }
 
+  // Prefer object options [{id,label}]; keep legacy string[] readable.
+  if (Array.isArray(options)) {
+    options = options.map((item, index) => {
+      if (item && typeof item === 'object' && !Array.isArray(item)) {
+        return {
+          id: String(item.id || `opt-${index + 1}`),
+          label: String(item.label ?? item.text ?? '').trim(),
+        }
+      }
+      return {
+        id: `opt-${index + 1}`,
+        label: String(item ?? '').trim(),
+      }
+    }).filter((o) => o.label)
+  } else {
+    options = []
+  }
+
   return {
     id: raw.id,
     vacancyId: raw.vacancyId ?? raw.vacancy_id,
     questionText: raw.questionText ?? raw.question_text ?? '',
-    questionType: raw.questionType ?? raw.question_type ?? 'single_choice',
-    options: Array.isArray(options) ? options : [],
+    questionType: raw.questionType ?? raw.question_type ?? 'short_text',
+    options,
     scores: Array.isArray(scores) ? scores.map(Number) : [],
     required: raw.required !== false,
     sortOrder: raw.sortOrder ?? raw.sort_order ?? 0,
+    isActive: raw.isActive ?? raw.is_active !== false,
+    fieldBinding: raw.fieldBinding ?? raw.field_binding ?? null,
+    helpText: raw.helpText ?? raw.help_text ?? '',
+    placeholder: raw.placeholder ?? '',
     createdAt: raw.createdAt ?? raw.created_at,
     updatedAt: raw.updatedAt ?? raw.updated_at,
   }
@@ -347,69 +372,22 @@ export function getCandidateByIdSync(candidateId) {
   return getAllCandidatesSync().find((c) => c.id === candidateId) || null
 }
 
-export function isVacancyQuestionsLocked(vacancy) {
-  if (!vacancy) return false
-  if (vacancy.status === VACANCY_STATUS.PUBLISHED) return true
-  if (vacancy.status === VACANCY_STATUS.ARCHIVED) return true
-  return Number(vacancy.candidateCount ?? 0) > 0
+/** Flexible forms stay editable after candidates arrive. */
+export function isVacancyQuestionsLocked() {
+  return false
 }
 
-/** @deprecated Scored-question editor removed; kept for local adapter stubs. */
-export const VACANCY_QUESTIONS_LOCKED_MESSAGE =
-  'Редактор тестовых вопросов отключён. Гибкая анкета будет добавлена отдельным этапом.'
+export const VACANCY_QUESTIONS_LOCKED_MESSAGE = ''
 
 /**
- * Legacy helper for historical filter-question answers.
- * Scoring no longer affects candidate status.
+ * Display rows for candidate answers (snapshot v2 + legacy option-index map).
  */
 export function getCandidateAnswerBreakdown(candidate, questions) {
-  return (questions || []).map((q) => {
-    const answerIndex = candidate.answers?.[q.id]
-    const idx = answerIndex !== undefined && answerIndex !== null ? Number(answerIndex) : null
-    const selectedOption = idx !== null && q.options[idx] != null ? q.options[idx] : '—'
-
-    return {
-      questionId: q.id,
-      questionText: q.questionText,
-      selectedOption,
-    }
-  })
-}
-
-export function validateQuestionForm(form) {
-  if (!form.questionText?.trim()) return 'Укажите текст вопроса'
-  const pairs = form.optionPairs.filter((p) => p.text.trim())
-  if (pairs.length < 2) return 'Добавьте минимум 2 варианта ответа'
-  for (const pair of pairs) {
-    if (pair.score === '' || Number.isNaN(Number(pair.score))) {
-      return 'Баллы должны быть числами'
-    }
-  }
-  return null
-}
-
-export function questionFormToPayload(form) {
-  const pairs = form.optionPairs.filter((p) => p.text.trim())
-  return {
-    questionText: form.questionText.trim(),
-    questionType: 'single_choice',
-    options: pairs.map((p) => p.text.trim()),
-    scores: pairs.map((p) => Number(p.score)),
-    required: form.required !== false,
-  }
-}
-
-export function questionToForm(question) {
-  const pairs = (question?.options || []).map((text, i) => ({
-    text,
-    score: question.scores?.[i] ?? 0,
+  return getCandidateAnswerDisplayRows(candidate, questions).map((row) => ({
+    questionId: row.questionId,
+    questionText: row.questionText,
+    selectedOption: row.displayValue,
   }))
-  while (pairs.length < 4) pairs.push({ text: '', score: 0 })
-  return {
-    questionText: question?.questionText || '',
-    required: question?.required !== false,
-    optionPairs: pairs,
-  }
 }
 
 export const CANDIDATE_STATUS_FILTER_OPTIONS = [

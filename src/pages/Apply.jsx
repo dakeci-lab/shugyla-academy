@@ -1,32 +1,22 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams, Link, useLocation } from 'react-router-dom'
-import {
-  getPublishedVacancyBySlug,
-  submitCandidateApplication,
-  refreshData,
-} from '../services/platformDataService'
-import { getVacancyPositionLabel } from '../utils/recruitmentData'
+import { submitCandidateApplication } from '../services/platformDataService'
+import { fetchPublicVacancyApplicationForm } from '../services/publicApplyFormService'
+import { validateCandidatePhotoFile } from '../services/candidatePhotoService'
 import { isCloudMode } from '../lib/dataMode'
-import {
-  validateCandidatePhotoFile,
-  ALLOWED_CANDIDATE_PHOTO_TYPES,
-} from '../services/candidatePhotoService'
+import { APPLICATION_QUESTION_TYPES, mapApplicationFormRpcError } from '../utils/applicationForm'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
+import DynamicApplicationForm from '../components/apply/DynamicApplicationForm'
 import '../components/admin/admin-shared.css'
 import '../components/CandidateAvatar.css'
 import './Apply.css'
 
-const EMPTY_FORM = {
-  firstName: '',
-  lastName: '',
-  phone: '',
-  age: '',
-  city: '',
-  experience: '',
-  previousWork: '',
-  expectedSalary: '',
-  availableFrom: '',
-  about: '',
+function emptyValues(questions) {
+  const values = {}
+  for (const q of questions || []) {
+    values[q.id] = q.questionType === 'multi_choice' ? [] : q.questionType === 'yes_no' ? null : ''
+  }
+  return values
 }
 
 /** Публичная анкета кандидата — /apply/:slug */
@@ -34,48 +24,65 @@ export default function ApplyPage() {
   const { slug } = useParams()
   const location = useLocation()
   const hubPath = `/apply${location.search || ''}`
-  const [loadState, setLoadState] = useState(isCloudMode() ? 'loading' : 'loaded')
-  const [loadVersion, setLoadVersion] = useState(0)
+
+  const [loadState, setLoadState] = useState('loading')
+  const [vacancy, setVacancy] = useState(null)
+  const [questions, setQuestions] = useState([])
+  const [formVersion, setFormVersion] = useState(1)
+  const [values, setValues] = useState({})
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [photoFile, setPhotoFile] = useState(null)
+  const [photoPreview, setPhotoPreview] = useState('')
+  const [photoWarning, setPhotoWarning] = useState('')
+  const [photoQuestionId, setPhotoQuestionId] = useState(null)
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [successMessage, setSuccessMessage] = useState('')
+
+  const hasUnknownType = useMemo(
+    () => (questions || []).some((q) => !APPLICATION_QUESTION_TYPES.includes(q.questionType)),
+    [questions]
+  )
 
   useEffect(() => {
-    if (!slug) return undefined
-    if (!isCloudMode()) {
-      setLoadState('loaded')
+    if (!slug) {
+      setLoadState('missing')
       return undefined
     }
 
     let cancelled = false
     setLoadState('loading')
+    setError('')
+    setSubmitted(false)
 
-    refreshData()
-      .then(() => {
-        if (!cancelled) {
-          setLoadState('loaded')
-          setLoadVersion((v) => v + 1)
-        }
+    fetchPublicVacancyApplicationForm(slug)
+      .then((form) => {
+        if (cancelled) return
+        setVacancy(form.vacancy)
+        setQuestions(form.questions)
+        setFormVersion(form.formVersion)
+        setValues(emptyValues(form.questions))
+        setPhotoQuestionId(
+          form.questions.find((q) => q.questionType === 'photo')?.id || null
+        )
+        setLoadState('loaded')
       })
       .catch((err) => {
-        console.error('[Apply] Не удалось загрузить данные вакансии', err)
-        if (!cancelled) setLoadState('error')
+        if (cancelled) return
+        if (err?.code === 'vacancy_not_found' || err?.message === 'vacancy_not_found') {
+          setVacancy(null)
+          setLoadState('missing')
+          return
+        }
+        console.error('[Apply] Не удалось загрузить анкету', err)
+        setLoadState('error')
       })
 
     return () => {
       cancelled = true
     }
   }, [slug])
-
-  void loadVersion
-
-  const vacancy = slug && loadState === 'loaded' ? getPublishedVacancyBySlug(slug) : null
-
-  const [form, setForm] = useState(EMPTY_FORM)
-  const [photoFile, setPhotoFile] = useState(null)
-  const [photoPreview, setPhotoPreview] = useState('')
-  const [photoWarning, setPhotoWarning] = useState('')
-  const [error, setError] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [submitted, setSubmitted] = useState(false)
-  const [successMessage, setSuccessMessage] = useState('')
 
   useEffect(() => {
     return () => {
@@ -109,7 +116,7 @@ export default function ApplyPage() {
     )
   }
 
-  if (!slug || !vacancy) {
+  if (loadState === 'missing' || !slug || !vacancy) {
     return (
       <div className="apply-page">
         <div className="apply-page__card apply-page__closed">
@@ -141,7 +148,17 @@ export default function ApplyPage() {
     )
   }
 
-  function handlePhotoChange(e) {
+  function handleValueChange(questionId, value) {
+    setValues((prev) => ({ ...prev, [questionId]: value }))
+    setFieldErrors((prev) => {
+      if (!prev[questionId]) return prev
+      const next = { ...prev }
+      delete next[questionId]
+      return next
+    })
+  }
+
+  function handlePhotoChange(_questionId, e) {
     const file = e.target.files?.[0]
     setError('')
     setPhotoWarning('')
@@ -174,32 +191,59 @@ export default function ApplyPage() {
     setPhotoPreview(URL.createObjectURL(file))
   }
 
+  function validateClient() {
+    const nextErrors = {}
+    for (const q of questions) {
+      if (!APPLICATION_QUESTION_TYPES.includes(q.questionType)) {
+        nextErrors[q.id] = 'Неизвестный тип вопроса'
+        continue
+      }
+      if (!q.required) continue
+      const value = values[q.id]
+      if (q.questionType === 'photo') {
+        if (!photoFile) nextErrors[q.id] = 'Загрузите фотографию'
+      } else if (q.questionType === 'multi_choice') {
+        if (!Array.isArray(value) || value.length === 0) nextErrors[q.id] = 'Выберите вариант'
+      } else if (q.questionType === 'yes_no') {
+        if (value !== true && value !== false) nextErrors[q.id] = 'Выберите ответ'
+      } else if (value == null || String(value).trim() === '') {
+        nextErrors[q.id] = 'Обязательное поле'
+      }
+    }
+    setFieldErrors(nextErrors)
+    return Object.keys(nextErrors).length === 0
+  }
+
   async function handleSubmit(e) {
     e.preventDefault()
     if (submitting) return
     setError('')
 
-    if (!form.firstName.trim()) {
-      setError('Укажите имя')
+    if (hasUnknownType) {
+      setError('Анкета содержит неизвестный тип вопроса. Обновите страницу.')
       return
     }
-    if (!form.phone.trim()) {
-      setError('Укажите телефон')
-      return
-    }
-    if (form.age && Number.isNaN(Number(form.age))) {
-      setError('Возраст должен быть числом')
+    if (!validateClient()) {
+      setError('Заполните обязательные поля')
       return
     }
 
     setSubmitting(true)
     try {
+      const answers = {}
+      for (const q of questions) {
+        if (q.questionType === 'photo') continue
+        answers[q.id] = values[q.id]
+      }
+
       const result = await submitCandidateApplication({
         vacancyId: vacancy.id,
         vacancySlug: vacancy.slug,
-        ...form,
-        photoFile,
+        formVersion,
+        answers,
+        photoFile: photoQuestionId ? photoFile : null,
       })
+
       setSuccessMessage(
         result.message ||
           'Анкета успешно отправлена. Мы свяжемся с вами после рассмотрения.'
@@ -211,7 +255,8 @@ export default function ApplyPage() {
       }
       setSubmitted(true)
     } catch (err) {
-      setError(toUserErrorMessage(err, 'Не удалось отправить анкету. Попробуйте ещё раз.'))
+      const mapped = mapApplicationFormRpcError(err) || mapApplicationFormRpcError({ message: err?.message })
+      setError(mapped || toUserErrorMessage(err, 'Не удалось отправить анкету. Попробуйте ещё раз.'))
     } finally {
       setSubmitting(false)
     }
@@ -231,7 +276,7 @@ export default function ApplyPage() {
         <section>
           <h2 className="apply-page__vacancy-title">{vacancy.title}</h2>
           <p className="apply-page__vacancy-desc">
-            {getVacancyPositionLabel(vacancy)}
+            {vacancy.positionName || ''}
             {vacancy.description ? ` · ${vacancy.description}` : ''}
           </p>
         </section>
@@ -239,80 +284,25 @@ export default function ApplyPage() {
         <form className="admin-form" onSubmit={handleSubmit}>
           <section className="apply-form__section">
             <h3 className="apply-form__section-title">Данные кандидата</h3>
-            <div className="admin-form__row">
-              <label className="admin-form__label">
-                Имя *
-                <input className="admin-form__input" value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} required />
-              </label>
-              <label className="admin-form__label">
-                Фамилия
-                <input className="admin-form__input" value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} />
-              </label>
-            </div>
-            <div className="admin-form__row">
-              <label className="admin-form__label">
-                Телефон *
-                <input className="admin-form__input" type="tel" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} required />
-              </label>
-              <label className="admin-form__label">
-                Возраст
-                <input className="admin-form__input" type="number" min={16} max={99} value={form.age} onChange={(e) => setForm({ ...form, age: e.target.value })} />
-              </label>
-            </div>
-
-            <div className="apply-photo-field">
-              <label className="admin-form__label">
-                Ваша фотография
-                <input
-                  className="admin-form__input"
-                  type="file"
-                  accept={ALLOWED_CANDIDATE_PHOTO_TYPES.join(',')}
-                  onChange={handlePhotoChange}
-                />
-              </label>
-              <p className="apply-photo-hint">
-                Загрузите фото, чтобы мы могли быстрее узнать вас на собеседовании.
-                JPEG, PNG или WebP, до 5 MB.
-              </p>
-              {photoWarning && <p className="apply-photo-warning">{photoWarning}</p>}
-              {photoPreview && (
-                <div className="apply-photo-preview">
-                  <img src={photoPreview} alt="Превью фото" />
-                </div>
-              )}
-            </div>
-
-            <label className="admin-form__label">
-              Город / район
-              <input className="admin-form__input" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-            </label>
-            <label className="admin-form__label">
-              Опыт работы
-              <input className="admin-form__input" value={form.experience} onChange={(e) => setForm({ ...form, experience: e.target.value })} />
-            </label>
-            <label className="admin-form__label">
-              Где раньше работал
-              <input className="admin-form__input" value={form.previousWork} onChange={(e) => setForm({ ...form, previousWork: e.target.value })} />
-            </label>
-            <div className="admin-form__row">
-              <label className="admin-form__label">
-                Ожидаемая зарплата
-                <input className="admin-form__input" value={form.expectedSalary} onChange={(e) => setForm({ ...form, expectedSalary: e.target.value })} />
-              </label>
-              <label className="admin-form__label">
-                Когда готов выйти
-                <input className="admin-form__input" value={form.availableFrom} onChange={(e) => setForm({ ...form, availableFrom: e.target.value })} />
-              </label>
-            </div>
-            <label className="admin-form__label">
-              О себе
-              <textarea className="admin-form__input" rows={3} value={form.about} onChange={(e) => setForm({ ...form, about: e.target.value })} />
-            </label>
+            <DynamicApplicationForm
+              questions={questions}
+              values={values}
+              errors={fieldErrors}
+              onChange={handleValueChange}
+              onPhotoChange={handlePhotoChange}
+              photoPreview={photoPreview}
+              photoWarning={photoWarning}
+              disabled={submitting}
+            />
           </section>
 
           {error && <p className="admin-form__error">{error}</p>}
 
-          <button type="submit" className="btn btn--primary" disabled={submitting}>
+          <button
+            type="submit"
+            className="btn btn--primary"
+            disabled={submitting || hasUnknownType}
+          >
             {submitting ? 'Отправка…' : 'Отправить анкету'}
           </button>
         </form>

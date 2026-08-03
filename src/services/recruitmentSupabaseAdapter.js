@@ -11,6 +11,7 @@ import {
   CANDIDATE_STATUS,
 } from '../utils/recruitmentData'
 import { attachCandidatePhotoSignedUrls } from './candidatePhotoService'
+import { mapApplicationFormRpcError } from '../utils/applicationForm'
 
 async function throwIfError(result, context) {
   if (result.error) throw new Error(`${context}: ${result.error.message}`)
@@ -30,6 +31,7 @@ function rowToVacancy(row) {
     positions: row.positions,
     status: row.status,
     passingScore: row.passing_score,
+    applicationFormVersion: row.application_form_version,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -46,6 +48,10 @@ function rowToQuestion(row) {
     scores: row.scores,
     required: row.required,
     sortOrder: row.sort_order,
+    isActive: row.is_active,
+    fieldBinding: row.field_binding,
+    helpText: row.help_text,
+    placeholder: row.placeholder,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   })
@@ -89,7 +95,7 @@ function rowToCandidate(row) {
 function attachCounts(vacancies, questions, candidates) {
   return vacancies.map((v) => ({
     ...v,
-    questionCount: questions.filter((q) => q.vacancyId === v.id).length,
+    questionCount: questions.filter((q) => q.vacancyId === v.id && q.isActive !== false).length,
     candidateCount: candidates.filter((c) => c.vacancyId === v.id).length,
   }))
 }
@@ -107,23 +113,26 @@ export async function fetchRecruitmentData() {
     ? '*, positions(id, name, is_active, archived_at)'
     : '*'
 
-  const [vacRes, qRes] = await Promise.all([
-    supabase
-      .from('academy_vacancies')
-      .select(vacancySelect)
-      .order('created_at', { ascending: false }),
-    supabase.from('academy_candidate_questions').select('*').order('sort_order'),
-  ])
+  const vacRes = await supabase
+    .from('academy_vacancies')
+    .select(vacancySelect)
+    .order('created_at', { ascending: false })
 
   const vacancies = (await throwIfError(vacRes, 'Загрузка вакансий')).map(rowToVacancy)
-  const questions = (await throwIfError(qRes, 'Загрузка вопросов')).map(rowToQuestion)
 
+  // Public apply uses get_public_vacancy_application_form RPC; anon cannot SELECT questions
+  // (bindings must stay private).
+  let questions = []
   let candidates = []
   if (authed) {
-    const cRes = await supabase
-      .from('academy_candidates')
-      .select('*')
-      .order('submitted_at', { ascending: false })
+    const [qRes, cRes] = await Promise.all([
+      supabase.from('academy_candidate_questions').select('*').order('sort_order'),
+      supabase
+        .from('academy_candidates')
+        .select('*')
+        .order('submitted_at', { ascending: false }),
+    ])
+    questions = (await throwIfError(qRes, 'Загрузка вопросов')).map(rowToQuestion)
     if (!cRes.error) {
       candidates = await attachCandidatePhotoSignedUrls(
         (cRes.data || []).map(rowToCandidate)
@@ -237,61 +246,95 @@ export async function duplicateVacancy(sourceVacancyId) {
     slug,
   })
 
+  // Copy application form (insert trigger seeds minimal name/phone; replace with source).
+  const { getAllCandidateQuestionsSync } = await import('../utils/recruitmentData')
+  const sourceQuestions = getAllCandidateQuestionsSync()
+    .filter((q) => q.vacancyId === sourceVacancyId)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
+  if (sourceQuestions.length) {
+    const payload = sourceQuestions.map((q, index) => ({
+      id: null,
+      question_text: q.questionText,
+      question_type: q.questionType,
+      required: q.required !== false,
+      sort_order: index,
+      is_active: q.isActive !== false,
+      field_binding: q.fieldBinding || null,
+      help_text: q.helpText || null,
+      placeholder: q.placeholder || null,
+      options: q.options || [],
+    }))
+    // Remove auto-seeded protected rows by saving a full replacement set.
+    // save RPC forbids deleting protected bindings, so update seeded ones first.
+    const { data: seeded } = await supabase
+      .from('academy_candidate_questions')
+      .select('id, field_binding')
+      .eq('vacancy_id', newId)
+    const seededByBinding = Object.fromEntries(
+      (seeded || []).filter((r) => r.field_binding).map((r) => [r.field_binding, r.id])
+    )
+    const withIds = payload.map((q) => ({
+      ...q,
+      id: q.field_binding && seededByBinding[q.field_binding] ? seededByBinding[q.field_binding] : null,
+    }))
+    await saveVacancyApplicationForm(newId, {
+      questions: withIds,
+      expectedVersion: 1,
+    })
+  }
+
   return newId
 }
 
-/** @deprecated Scored question editor disabled; table retained for future flexible questionnaire. */
-export async function createCandidateQuestion() {
-  throw new Error('Редактор тестовых вопросов отключён')
-}
-
-/** @deprecated Scored question editor disabled. */
-export async function updateCandidateQuestion() {
-  throw new Error('Редактор тестовых вопросов отключён')
-}
-
-/** @deprecated Scored question editor disabled. */
-export async function deleteCandidateQuestion() {
-  throw new Error('Редактор тестовых вопросов отключён')
-}
-
-/** @deprecated Scored question editor disabled. */
-export async function reorderCandidateQuestions() {
-  throw new Error('Редактор тестовых вопросов отключён')
-}
-
-function mapSubmitRpcError(error) {
-  const message = error?.message || ''
-  if (message.includes('vacancy_closed') || message.includes('vacancy_not_found')) {
-    return 'Вакансия недоступна или закрыта'
+export async function saveVacancyApplicationForm(vacancyId, { questions, expectedVersion }) {
+  const { data, error } = await supabase.rpc('save_vacancy_application_form', {
+    p_vacancy_id: vacancyId,
+    p_questions: questions,
+    p_expected_version: expectedVersion ?? null,
+  })
+  if (error) {
+    throw new Error(
+      mapApplicationFormRpcError(error) ||
+        'Не удалось сохранить анкету. Проверьте вопросы и попробуйте снова.'
+    )
   }
-  if (message.includes('first_name_required')) return 'Укажите имя'
-  if (message.includes('phone_required')) return 'Укажите телефон'
-  if (message.includes('age_invalid')) return 'Проверьте возраст'
-  if (message.includes('photo_invalid')) return 'Не удалось сохранить фото'
-  return 'Не удалось отправить анкету. Попробуйте ещё раз.'
+  return {
+    ok: true,
+    formVersion: data?.form_version,
+    questions: data?.questions || [],
+  }
+}
+
+/** Legacy per-question CRUD replaced by saveVacancyApplicationForm. */
+export async function createCandidateQuestion() {
+  throw new Error('Используйте сохранение всей анкеты')
+}
+
+export async function updateCandidateQuestion() {
+  throw new Error('Используйте сохранение всей анкеты')
+}
+
+export async function deleteCandidateQuestion() {
+  throw new Error('Используйте сохранение всей анкеты')
+}
+
+export async function reorderCandidateQuestions() {
+  throw new Error('Используйте сохранение всей анкеты')
 }
 
 export async function submitCandidateApplication(applicationData) {
   const { data, error } = await supabase.rpc('submit_candidate_application', {
     p_vacancy_id: applicationData.vacancyId,
-    p_first_name: applicationData.firstName?.trim() || '',
-    p_last_name: applicationData.lastName?.trim() || '',
-    p_phone: applicationData.phone?.trim() || '',
-    p_age: applicationData.age ? Number(applicationData.age) : null,
-    p_city: applicationData.city?.trim() || null,
-    p_experience: applicationData.experience?.trim() || null,
-    p_previous_work: applicationData.previousWork?.trim() || null,
-    p_expected_salary: applicationData.expectedSalary?.trim() || null,
-    p_available_from: applicationData.availableFrom?.trim() || null,
-    p_about: applicationData.about?.trim() || null,
-    // Private bucket: never accept permanent photo URLs from the client.
-    p_photo_url: null,
+    p_answers: { answers: applicationData.answers || {} },
+    p_form_version: Number(applicationData.formVersion) || 1,
     p_photo_path: applicationData.photoPath || null,
   })
 
   if (error) {
-    throw new Error(mapSubmitRpcError(error))
+    throw new Error(
+      mapApplicationFormRpcError(error) ||
+        'Не удалось отправить анкету. Попробуйте ещё раз.'
+    )
   }
 
   return {

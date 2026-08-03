@@ -29,8 +29,19 @@ assert('submit uses RPC', adapter.includes("supabase.rpc('submit_candidate_appli
 assert('adapter does not call evaluateCandidateScreening', !adapter.includes('evaluateCandidateScreening'))
 assert('Apply has no filter-questions UI', !applyPage.includes('Фильтр-вопросы'))
 assert('Apply uses toUserErrorMessage', applyPage.includes('toUserErrorMessage'))
-assert('VacanciesSection has no VacancyQuestionEditor', !vacanciesSection.includes('VacancyQuestionEditor'))
-assert('VacanciesSection has no passing score UI', !vacanciesSection.includes('Проходной'))
+assert(
+  'VacanciesSection has no scoring UI',
+  !vacanciesSection.includes('Проходной') &&
+    !vacanciesSection.includes('passing_score') &&
+    !vacanciesSection.includes('Балл')
+)
+assert(
+  'VacanciesSection uses flexible form editor',
+  vacanciesSection.includes('VacancyQuestionEditor')
+)
+const questionEditor = read('src/components/admin/VacancyQuestionEditor.jsx')
+assert('Question editor has no score pairs', !questionEditor.includes('optionPairs') && !questionEditor.includes('score:'))
+assert('Question editor has no filter-test copy', !questionEditor.includes('Фильтр-вопросы'))
 assert('CandidatesTable has no Результат column', !candidatesTable.includes('Результат'))
 assert('Filters have no score select', !filters.includes('SCORE_FILTER') && !filters.includes('Результат'))
 assert('SCORE_FILTER_OPTIONS removed', !recruitmentData.includes('SCORE_FILTER_OPTIONS'))

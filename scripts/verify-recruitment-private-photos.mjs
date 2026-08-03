@@ -24,7 +24,16 @@ assert('upload uses upsert false', photoService.includes('upsert: false'))
 assert('no getPublicUrl in photo service', !photoService.includes('getPublicUrl'))
 assert('signed URL helper exists', photoService.includes('createCandidatePhotoSignedUrl'))
 assert('batch signed URLs for HR fetch', adapter.includes('attachCandidatePhotoSignedUrls'))
-assert('RPC submit clears photo_url', adapter.includes('p_photo_url: null'))
+const submitMigration = read(
+  'supabase/migrations/20260803200100_flexible_application_form_rpcs.sql'
+)
+assert(
+  'RPC submit stores path only (no client photo_url)',
+  adapter.includes('p_photo_path') &&
+    !adapter.includes('p_photo_url') &&
+    submitMigration.includes('photo_url') &&
+    submitMigration.includes('null')
+)
 assert('migration sets bucket private', migration.includes('public = false'))
 assert('migration sets mime limits', migration.includes('image/jpeg') && migration.includes('file_size_limit'))
 assert('migration clears public photo_url', migration.includes('photo_url = null'))

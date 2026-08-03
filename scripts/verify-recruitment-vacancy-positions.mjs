@@ -40,7 +40,10 @@ assert(
     adapter.includes('Anon cannot SELECT positions')
 )
 assert('getVacancyPositionLabel exists', recruitmentData.includes('getVacancyPositionLabel'))
-assert('Apply uses position label', applyPage.includes('getVacancyPositionLabel'))
+assert(
+  'Apply shows public position name',
+  applyPage.includes('positionName') || applyPage.includes('getVacancyPositionLabel')
+)
 assert('hire prefill uses vacancy.positionId', employeesSection.includes('vacancy.positionId'))
 assert('archived position blocked for hire', employeesSection.includes('isPositionAssignable'))
 assert('reuses positionCatalogService', positionService.includes('buildPositionSelectGroups'))

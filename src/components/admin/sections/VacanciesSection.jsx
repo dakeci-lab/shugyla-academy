@@ -29,6 +29,7 @@ import IconActionButton from '../IconActionButton'
 import { PencilIcon, TrashIcon, LinkIcon, CopyIcon } from '../../icons/PlatformIcons'
 import { copyApplyLink, EMPTY_VACANCY, STATUS_BADGE } from './recruitmentAdminShared'
 import ApplyHubQrModal from '../ApplyHubQrModal'
+import VacancyQuestionEditor from '../VacancyQuestionEditor'
 import { getApplyHubUrl } from '../../../utils/recruitmentData'
 import '../admin-shared.css'
 import '../IconActionButton.css'
@@ -503,6 +504,8 @@ export default function VacanciesSection() {
 
             {vacancyError && <p className="admin-form__error">{vacancyError}</p>}
           </form>
+
+          {editVacancyId ? <VacancyQuestionEditor vacancyId={editVacancyId} /> : null}
         </AdminModal>
       )}
     </>
