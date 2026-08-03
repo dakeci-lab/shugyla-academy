@@ -320,7 +320,18 @@ export default function EmployeeEditModal({
         }
         const newUserId = await createEmployee(payload)
         if (sourceCandidateId) {
-          await linkCandidateToEmployee(sourceCandidateId, newUserId)
+          try {
+            await linkCandidateToEmployee(sourceCandidateId, newUserId)
+          } catch (linkError) {
+            // Employee already created — retry link once without creating a second account.
+            try {
+              await linkCandidateToEmployee(sourceCandidateId, newUserId)
+            } catch (retryError) {
+              throw new Error(
+                `Сотрудник создан, но связь с кандидатом не сохранилась. Откройте кандидата и повторите оформление. ${retryError.message || linkError.message || ''}`
+              )
+            }
+          }
         }
         await onSaved?.({ id: newUserId, mode: 'create' })
         showSuccess('Сотрудник успешно создан')

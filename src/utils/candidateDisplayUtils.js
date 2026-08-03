@@ -1,8 +1,6 @@
 import {
   CANDIDATE_STATUS,
-  candidateHasScreening,
   canCreateEmployeeForCandidate,
-  hasInterviewInvitation,
   isCandidateEmployeeCreated,
   normalizeCandidateStatus,
 } from './recruitmentData'
@@ -67,42 +65,6 @@ export function formatSalaryDisplay(salary) {
     return `${Math.round(num).toLocaleString('ru-RU')} ₸`
   }
   return raw
-}
-
-/** Отображение результата в списке кандидатов */
-export function formatCandidateScoreDisplay(candidate) {
-  if (!candidateHasScreening(candidate)) {
-    return { type: 'no_test', label: 'Без теста' }
-  }
-  return { type: 'percent', label: `${candidate.scorePercent ?? 0}%` }
-}
-
-export function formatTestResultSummary(candidate, answerBreakdown = []) {
-  if (!candidateHasScreening(candidate)) {
-    return {
-      hasTest: false,
-      percentLabel: null,
-      detailLabel: 'Тест не проводился',
-      hint: 'Для этой вакансии вопросы не были настроены.',
-    }
-  }
-
-  const totalQuestions = answerBreakdown.length
-  const scorePercent = Number(candidate?.scorePercent ?? 0)
-  const maxScore = Number(candidate?.maxScore ?? 0)
-  const correctCount = answerBreakdown.filter(
-    (row) => row.maxScore > 0 && row.score === row.maxScore
-  ).length
-
-  return {
-    hasTest: true,
-    percentLabel: `${scorePercent}%`,
-    detailLabel:
-      totalQuestions > 0
-        ? `${correctCount} правильных из ${totalQuestions}`
-        : `${candidate.totalScore ?? 0} из ${maxScore}`,
-    hint: null,
-  }
 }
 
 const URL_REGEX = /https?:\/\/[^\s]+/gi

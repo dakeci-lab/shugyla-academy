@@ -1,3 +1,7 @@
+/**
+ * @deprecated Scored filter-question editor removed from VacanciesSection (Stage 2 HR).
+ * File kept temporarily until the flexible questionnaire stage; do not remount as-is.
+ */
 import { useState } from 'react'
 import {
   getCandidateQuestions,

@@ -11,7 +11,6 @@ import {
   VACANCY_STATUS_LABELS,
   VACANCY_ROLES,
   getVacancyRoleLabel,
-  isVacancyPassingScoreLocked,
 } from '../../../utils/recruitmentData'
 import { EMPLOYEE_FORM_ROLES, ROLES } from '../../../data/roles'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
@@ -20,7 +19,6 @@ import ConfirmDialog from '../ConfirmDialog'
 import StatusBadge from '../StatusBadge'
 import IconActionButton from '../IconActionButton'
 import { PencilIcon, TrashIcon, LinkIcon, CopyIcon } from '../../icons/PlatformIcons'
-import VacancyQuestionEditor from '../VacancyQuestionEditor'
 import { copyApplyLink, EMPTY_VACANCY, STATUS_BADGE } from './recruitmentAdminShared'
 import '../admin-shared.css'
 import '../IconActionButton.css'
@@ -41,8 +39,6 @@ export default function VacanciesSection() {
   void version
 
   const vacancies = getVacancies()
-  const editingVacancy = editVacancyId ? vacancies.find((v) => v.id === editVacancyId) : null
-  const passingScoreLocked = isVacancyPassingScoreLocked(editingVacancy)
 
   function openCreateVacancy() {
     setEditVacancyId(null)
@@ -58,7 +54,6 @@ export default function VacanciesSection() {
       description: vacancy.description || '',
       role: vacancy.role,
       employeeRole: vacancy.employeeRole || vacancy.role,
-      passingScore: vacancy.passingScore,
       status: vacancy.status,
     })
     setVacancyError('')
@@ -85,7 +80,6 @@ export default function VacanciesSection() {
         description: vacancyForm.description.trim(),
         role: vacancyForm.role,
         employeeRole: vacancyForm.employeeRole || vacancyForm.role,
-        passingScore: Number(vacancyForm.passingScore) || 80,
         status: vacancyForm.status,
       }
       if (editVacancyId) {
@@ -120,7 +114,6 @@ export default function VacanciesSection() {
           description: created.description || '',
           role: created.role,
           employeeRole: created.employeeRole || created.role,
-          passingScore: created.passingScore,
           status: created.status,
         })
       }
@@ -167,7 +160,6 @@ export default function VacanciesSection() {
               <th>Название вакансии</th>
               <th>Роль</th>
               <th>Статус</th>
-              <th>Проходной %</th>
               <th>Кандидатов</th>
               <th>Ссылка</th>
               <th>Действия</th>
@@ -176,7 +168,7 @@ export default function VacanciesSection() {
           <tbody>
             {vacancies.length === 0 ? (
               <tr>
-                <td colSpan={8} className="admin-empty">
+                <td colSpan={7} className="admin-empty">
                   Вакансии не созданы
                 </td>
               </tr>
@@ -200,7 +192,6 @@ export default function VacanciesSection() {
                       type={STATUS_BADGE[v.status]}
                     />
                   </td>
-                  <td>{v.passingScore}%</td>
                   <td>{v.candidateCount ?? 0}</td>
                   <td>
                     <code className="admin-code recruitment-vacancies-table__link">
@@ -321,23 +312,6 @@ export default function VacanciesSection() {
                 </select>
               </label>
               <label className="admin-form__label">
-                Проходной балл %
-                <input
-                  className="admin-form__input"
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={vacancyForm.passingScore}
-                  onChange={(e) => setVacancyForm({ ...vacancyForm, passingScore: e.target.value })}
-                  disabled={passingScoreLocked}
-                />
-                {passingScoreLocked && (
-                  <span className="admin-form__hint">
-                    Проходной процент зафиксирован — по вакансии уже есть кандидаты.
-                  </span>
-                )}
-              </label>
-              <label className="admin-form__label">
                 Статус
                 <select
                   className="admin-form__select"
@@ -355,16 +329,6 @@ export default function VacanciesSection() {
             </div>
             {vacancyError && <p className="admin-form__error">{vacancyError}</p>}
           </form>
-
-          <div className="vacancy-questions-block">
-            {editVacancyId ? (
-              <VacancyQuestionEditor vacancyId={editVacancyId} vacancy={editingVacancy} />
-            ) : (
-              <p className="admin-form__hint">
-                Сохраните вакансию, чтобы добавить фильтр-вопросы для кандидата.
-              </p>
-            )}
-          </div>
         </AdminModal>
       )}
     </>

@@ -77,7 +77,6 @@ export default function CandidatesSection() {
     debouncedSearch.trim() ||
     appliedFilters.vacancyId !== 'all' ||
     appliedFilters.status !== 'all' ||
-    appliedFilters.score !== 'all' ||
     appliedFilters.ageMin !== '' ||
     appliedFilters.ageMax !== '' ||
     appliedFilters.ageSort !== 'default'

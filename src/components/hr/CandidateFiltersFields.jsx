@@ -1,7 +1,6 @@
 import {
   CANDIDATE_STATUS_LABELS,
   CANDIDATE_STATUS_FILTER_OPTIONS,
-  SCORE_FILTER_OPTIONS,
 } from '../../utils/recruitmentData'
 import { AGE_SORT } from '../../utils/candidateListUtils'
 
@@ -51,21 +50,6 @@ export default function CandidateFiltersFields({
           {CANDIDATE_STATUS_FILTER_OPTIONS.map((id) => (
             <option key={id} value={id}>
               {CANDIDATE_STATUS_LABELS[id]}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="admin-form__label">
-        Результат
-        <select
-          className="admin-form__select"
-          value={draft.score}
-          onChange={(e) => patch({ score: e.target.value })}
-        >
-          {SCORE_FILTER_OPTIONS.map((opt) => (
-            <option key={opt.id} value={opt.id}>
-              {opt.label}
             </option>
           ))}
         </select>

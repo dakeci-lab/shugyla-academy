@@ -4,23 +4,12 @@ import {
   normalizeCandidateQuestion,
   normalizeCandidate,
   generateUniqueVacancySlug,
-  evaluateCandidateScreening,
   getAllVacanciesSync,
   getAllCandidatesSync,
   getVacancyByIdSync,
-  isVacancyQuestionsLocked,
-  isVacancyPassingScoreLocked,
-  VACANCY_QUESTIONS_LOCKED_MESSAGE,
   VACANCY_STATUS,
   CANDIDATE_STATUS,
 } from '../utils/recruitmentData'
-
-async function assertVacancyQuestionsEditable(vacancyId) {
-  const vacancy = getVacancyByIdSync(vacancyId)
-  if (isVacancyQuestionsLocked(vacancy)) {
-    throw new Error(VACANCY_QUESTIONS_LOCKED_MESSAGE)
-  }
-}
 
 async function throwIfError(result, context) {
   if (result.error) throw new Error(`${context}: ${result.error.message}`)
@@ -101,16 +90,30 @@ function attachCounts(vacancies, questions, candidates) {
   }))
 }
 
+async function hasAuthSession() {
+  const { data } = await supabase.auth.getSession()
+  return Boolean(data?.session?.access_token)
+}
+
 export async function fetchRecruitmentData() {
-  const [vacRes, qRes, cRes] = await Promise.all([
+  const [vacRes, qRes] = await Promise.all([
     supabase.from('academy_vacancies').select('*').order('created_at', { ascending: false }),
     supabase.from('academy_candidate_questions').select('*').order('sort_order'),
-    supabase.from('academy_candidates').select('*').order('submitted_at', { ascending: false }),
   ])
 
   const vacancies = (await throwIfError(vacRes, 'Загрузка вакансий')).map(rowToVacancy)
   const questions = (await throwIfError(qRes, 'Загрузка вопросов')).map(rowToQuestion)
-  const candidates = (await throwIfError(cRes, 'Загрузка кандидатов')).map(rowToCandidate)
+
+  let candidates = []
+  if (await hasAuthSession()) {
+    const cRes = await supabase
+      .from('academy_candidates')
+      .select('*')
+      .order('submitted_at', { ascending: false })
+    if (!cRes.error) {
+      candidates = (cRes.data || []).map(rowToCandidate)
+    }
+  }
 
   return {
     vacancies: attachCounts(vacancies, questions, candidates),
@@ -130,7 +133,8 @@ export async function createVacancy(data) {
     role: data.role,
     employee_role: data.employeeRole ?? data.role ?? null,
     status: data.status || VACANCY_STATUS.DRAFT,
-    passing_score: data.passingScore ?? 80,
+    // Legacy column kept for schema compatibility; scoring UI disabled.
+    passing_score: 80,
     created_by: data.createdBy ?? null,
   }
   await throwIfError(await supabase.from('academy_vacancies').insert(row), 'Создание вакансии')
@@ -141,12 +145,6 @@ export async function updateVacancy(vacancyId, updates) {
   const current = getVacancyByIdSync(vacancyId)
   if (!current) throw new Error('Вакансия не найдена')
 
-  if (updates.passingScore != null && isVacancyPassingScoreLocked(current)) {
-    throw new Error(
-      'Проходной процент зафиксирован: по этой вакансии уже есть кандидаты. Создайте новую вакансию для другого порога.'
-    )
-  }
-
   const patch = {}
   if (updates.title != null) patch.title = updates.title
   if (updates.slug != null) patch.slug = updates.slug
@@ -154,7 +152,6 @@ export async function updateVacancy(vacancyId, updates) {
   if (updates.role != null) patch.role = updates.role
   if (updates.employeeRole != null) patch.employee_role = updates.employeeRole
   if (updates.status != null) patch.status = updates.status
-  if (updates.passingScore != null) patch.passing_score = updates.passingScore
   if (updates.title && updates.slug == null) {
     patch.slug = generateUniqueVacancySlug(updates.title, getAllVacanciesSync(), vacancyId)
   }
@@ -199,173 +196,72 @@ export async function duplicateVacancy(sourceVacancyId) {
     description: source.description,
     role: source.role,
     employeeRole: source.employeeRole,
-    passingScore: source.passingScore,
     status: VACANCY_STATUS.DRAFT,
     slug,
   })
 
-  const questionsRes = await supabase
-    .from('academy_candidate_questions')
-    .select('*')
-    .eq('vacancy_id', sourceVacancyId)
-    .order('sort_order')
-  const sourceQuestions = (await throwIfError(questionsRes, 'Загрузка вопросов')).map(rowToQuestion)
-
-  if (sourceQuestions.length) {
-    const rows = sourceQuestions.map((q, index) => ({
-      id: crypto.randomUUID(),
-      vacancy_id: newId,
-      question_text: q.questionText,
-      question_type: q.questionType || 'single_choice',
-      options: q.options,
-      scores: q.scores,
-      required: q.required !== false,
-      sort_order: index,
-    }))
-    await throwIfError(
-      await supabase.from('academy_candidate_questions').insert(rows),
-      'Копирование вопросов'
-    )
-  }
-
   return newId
 }
 
-export async function createCandidateQuestion(vacancyId, data) {
-  await assertVacancyQuestionsEditable(vacancyId)
-  const countRes = await supabase
-    .from('academy_candidate_questions')
-    .select('sort_order')
-    .eq('vacancy_id', vacancyId)
-  const existing = await throwIfError(countRes, 'Подсчёт вопросов')
+/** @deprecated Scored question editor disabled; table retained for future flexible questionnaire. */
+export async function createCandidateQuestion() {
+  throw new Error('Редактор тестовых вопросов отключён')
+}
 
-  const row = {
-    id: crypto.randomUUID(),
-    vacancy_id: vacancyId,
-    question_text: data.questionText,
-    question_type: data.questionType || 'single_choice',
-    options: data.options,
-    scores: data.scores,
-    required: data.required !== false,
-    sort_order: data.sortOrder ?? existing.length,
+/** @deprecated Scored question editor disabled. */
+export async function updateCandidateQuestion() {
+  throw new Error('Редактор тестовых вопросов отключён')
+}
+
+/** @deprecated Scored question editor disabled. */
+export async function deleteCandidateQuestion() {
+  throw new Error('Редактор тестовых вопросов отключён')
+}
+
+/** @deprecated Scored question editor disabled. */
+export async function reorderCandidateQuestions() {
+  throw new Error('Редактор тестовых вопросов отключён')
+}
+
+function mapSubmitRpcError(error) {
+  const message = error?.message || ''
+  if (message.includes('vacancy_closed') || message.includes('vacancy_not_found')) {
+    return 'Вакансия недоступна или закрыта'
   }
-  await throwIfError(
-    await supabase.from('academy_candidate_questions').insert(row),
-    'Создание вопроса'
-  )
-  return row.id
-}
-
-export async function updateCandidateQuestion(questionId, updates) {
-  const qRes = await supabase
-    .from('academy_candidate_questions')
-    .select('vacancy_id')
-    .eq('id', questionId)
-    .maybeSingle()
-  const qRow = await throwIfError(qRes, 'Загрузка вопроса')
-  if (qRow?.vacancy_id) await assertVacancyQuestionsEditable(qRow.vacancy_id)
-
-  const patch = {}
-  if (updates.questionText != null) patch.question_text = updates.questionText
-  if (updates.options != null) patch.options = updates.options
-  if (updates.scores != null) patch.scores = updates.scores
-  if (updates.required != null) patch.required = updates.required
-  if (updates.sortOrder != null) patch.sort_order = updates.sortOrder
-  if (Object.keys(patch).length) {
-    await throwIfError(
-      await supabase.from('academy_candidate_questions').update(patch).eq('id', questionId),
-      'Обновление вопроса'
-    )
-  }
-}
-
-export async function deleteCandidateQuestion(questionId) {
-  const qRes = await supabase
-    .from('academy_candidate_questions')
-    .select('vacancy_id')
-    .eq('id', questionId)
-    .maybeSingle()
-  const qRow = await throwIfError(qRes, 'Загрузка вопроса')
-  if (qRow?.vacancy_id) await assertVacancyQuestionsEditable(qRow.vacancy_id)
-
-  await throwIfError(
-    await supabase.from('academy_candidate_questions').delete().eq('id', questionId),
-    'Удаление вопроса'
-  )
-}
-
-export async function reorderCandidateQuestions(vacancyId, orderedQuestionIds) {
-  await assertVacancyQuestionsEditable(vacancyId)
-  await Promise.all(
-    orderedQuestionIds.map((id, index) =>
-      supabase
-        .from('academy_candidate_questions')
-        .update({ sort_order: index })
-        .eq('id', id)
-        .eq('vacancy_id', vacancyId)
-    )
-  )
+  if (message.includes('first_name_required')) return 'Укажите имя'
+  if (message.includes('phone_required')) return 'Укажите телефон'
+  if (message.includes('age_invalid')) return 'Проверьте возраст'
+  if (message.includes('photo_invalid')) return 'Не удалось сохранить фото'
+  return 'Не удалось отправить анкету. Попробуйте ещё раз.'
 }
 
 export async function submitCandidateApplication(applicationData) {
-  const vacancyRes = await supabase
-    .from('academy_vacancies')
-    .select('*')
-    .eq('id', applicationData.vacancyId)
-    .maybeSingle()
-  const vacancyRow = await throwIfError(vacancyRes, 'Загрузка вакансии')
-  if (!vacancyRow) throw new Error('Вакансия не найдена')
-  if (vacancyRow.status !== VACANCY_STATUS.PUBLISHED) {
-    throw new Error('Вакансия недоступна или закрыта')
+  const { data, error } = await supabase.rpc('submit_candidate_application', {
+    p_vacancy_id: applicationData.vacancyId,
+    p_first_name: applicationData.firstName?.trim() || '',
+    p_last_name: applicationData.lastName?.trim() || '',
+    p_phone: applicationData.phone?.trim() || '',
+    p_age: applicationData.age ? Number(applicationData.age) : null,
+    p_city: applicationData.city?.trim() || null,
+    p_experience: applicationData.experience?.trim() || null,
+    p_previous_work: applicationData.previousWork?.trim() || null,
+    p_expected_salary: applicationData.expectedSalary?.trim() || null,
+    p_available_from: applicationData.availableFrom?.trim() || null,
+    p_about: applicationData.about?.trim() || null,
+    p_photo_url: applicationData.photoUrl || null,
+    p_photo_path: applicationData.photoPath || null,
+  })
+
+  if (error) {
+    throw new Error(mapSubmitRpcError(error))
   }
-
-  const questionsRes = await supabase
-    .from('academy_candidate_questions')
-    .select('*')
-    .eq('vacancy_id', applicationData.vacancyId)
-    .order('sort_order')
-  const questions = (await throwIfError(questionsRes, 'Загрузка вопросов')).map(rowToQuestion)
-
-  const screening = evaluateCandidateScreening(
-    questions,
-    applicationData.answers || {},
-    vacancyRow.passing_score
-  )
-
-  const firstName = applicationData.firstName?.trim()
-  const lastName = applicationData.lastName?.trim() || ''
-
-  const row = {
-    vacancy_id: applicationData.vacancyId,
-    first_name: firstName,
-    last_name: lastName,
-    full_name: `${firstName} ${lastName}`.trim(),
-    phone: applicationData.phone?.trim(),
-    age: applicationData.age ? Number(applicationData.age) : null,
-    city: applicationData.city?.trim() || '',
-    experience: applicationData.experience?.trim() || '',
-    previous_work: applicationData.previousWork?.trim() || '',
-    expected_salary: applicationData.expectedSalary?.trim() || '',
-    available_from: applicationData.availableFrom?.trim() || '',
-    about: applicationData.about?.trim() || '',
-    answers: applicationData.answers || {},
-    photo_url: applicationData.photoUrl || null,
-    photo_path: applicationData.photoPath || null,
-    score_percent: screening.scorePercent,
-    total_score: screening.totalScore,
-    max_score: screening.maxScore,
-    status: screening.status,
-  }
-
-  const inserted = await throwIfError(
-    await supabase.from('academy_candidates').insert(row).select().single(),
-    'Сохранение анкеты'
-  )
 
   return {
     ok: true,
-    candidateId: inserted.id,
-    message: 'Спасибо! Ваша анкета отправлена. Если вы подойдёте, мы свяжемся с вами.',
+    candidateId: data?.candidate_id,
+    message:
+      data?.message ||
+      'Анкета успешно отправлена. Мы свяжемся с вами после рассмотрения.',
   }
 }
 
@@ -425,9 +321,20 @@ export async function convertCandidateToTrainee(candidateId) {
 }
 
 export async function linkCandidateToEmployee(candidateId, userId) {
-  const candidate = getAllCandidatesSync().find((c) => c.id === candidateId)
-  if (!candidate) throw new Error('Кандидат не найден')
-  if (candidate.createdUserId) throw new Error('Сотрудник уже создан для этого кандидата')
+  const { data, error } = await supabase
+    .from('academy_candidates')
+    .select('id, created_user_id, status')
+    .eq('id', candidateId)
+    .maybeSingle()
+
+  if (error) throw new Error(`Связь кандидата: ${error.message}`)
+  if (!data) throw new Error('Кандидат не найден')
+
+  if (data.created_user_id) {
+    if (String(data.created_user_id) === String(userId)) return
+    throw new Error('Сотрудник уже создан для этого кандидата')
+  }
+
   await markCandidateHired(candidateId, userId, CANDIDATE_STATUS.HIRED)
 }
 

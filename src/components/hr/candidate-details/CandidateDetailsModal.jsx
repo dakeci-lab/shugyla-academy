@@ -12,7 +12,6 @@ import {
   formatPhoneDisplay,
   formatPhoneTel,
   formatSalaryDisplay,
-  formatTestResultSummary,
   parseInterviewAddress,
   getCandidateDetailActions,
 } from '../../../utils/candidateDisplayUtils'
@@ -50,9 +49,8 @@ function InfoField({ label, value, href, icon }) {
   )
 }
 
-function CandidateSummaryCard({ candidate, vacancy, answerBreakdown, photoTriggerRef, onPhotoClick }) {
+function CandidateSummaryCard({ candidate, vacancy, photoTriggerRef, onPhotoClick }) {
   const photoUrl = resolveAvatarUrl({ photoUrl: candidate.photoUrl })
-  const testResult = formatTestResultSummary(candidate, answerBreakdown)
   const phoneDisplay = formatPhoneDisplay(candidate.phone)
   const cityDisplay = formatDisplayValue(candidate.city)
 
@@ -89,22 +87,6 @@ function CandidateSummaryCard({ candidate, vacancy, answerBreakdown, photoTrigge
       </div>
 
       <div className="candidate-summary-card__right">
-        <div className="candidate-summary-card__score">
-          {testResult.hasTest ? (
-            <>
-              <span className="candidate-summary-card__score-value">{testResult.percentLabel}</span>
-              <span className="candidate-summary-card__score-detail">{testResult.detailLabel}</span>
-            </>
-          ) : (
-            <>
-              <span className="candidate-summary-card__score-empty">{testResult.detailLabel}</span>
-              {testResult.hint && (
-                <span className="candidate-summary-card__score-hint">{testResult.hint}</span>
-              )}
-            </>
-          )}
-        </div>
-
         <CandidateStatusBadge status={candidate.status} />
 
         <p className="candidate-summary-card__date">
@@ -491,7 +473,6 @@ export default function CandidateDetailsModal({
             <CandidateSummaryCard
               candidate={candidate}
               vacancy={vacancy}
-              answerBreakdown={answerBreakdown}
               photoTriggerRef={photoTriggerRef}
               onPhotoClick={() => photoUrl && setPreviewPhoto(photoUrl)}
             />
@@ -513,10 +494,12 @@ export default function CandidateDetailsModal({
             <CandidateTextBlock title="Опыт работы" text={candidate.previousWork} />
             <CandidateTextBlock title="О себе" text={candidate.about} />
 
-            <CandidateAnswersSection
-              answerBreakdown={answerBreakdown}
-              questionsCount={questionsCount}
-            />
+            {questionsCount > 0 && (
+              <CandidateAnswersSection
+                answerBreakdown={answerBreakdown}
+                questionsCount={questionsCount}
+              />
+            )}
 
             <CandidateAdminNotes
               initialNotes={candidate.adminNotes}

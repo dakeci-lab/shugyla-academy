@@ -186,11 +186,8 @@ export function normalizeCandidate(raw) {
     availableFrom: raw.availableFrom ?? raw.available_from ?? '',
     about: raw.about || '',
     answers,
-    scorePercent: (() => {
-      const maxScore = raw.maxScore ?? raw.max_score ?? 0
-      if (maxScore <= 0) return null
-      return raw.scorePercent ?? raw.score_percent ?? 0
-    })(),
+    // Legacy scoring columns retained in DB/API; no longer drive UI or status.
+    scorePercent: raw.scorePercent ?? raw.score_percent ?? 0,
     totalScore: raw.totalScore ?? raw.total_score ?? 0,
     maxScore: raw.maxScore ?? raw.max_score ?? 0,
     status: normalizeCandidateStatus(raw.status),
@@ -281,10 +278,6 @@ export function getCandidateByIdSync(candidateId) {
   return getAllCandidatesSync().find((c) => c.id === candidateId) || null
 }
 
-export function candidateHasScreening(candidate) {
-  return Number(candidate?.maxScore ?? 0) > 0
-}
-
 export function isVacancyQuestionsLocked(vacancy) {
   if (!vacancy) return false
   if (vacancy.status === VACANCY_STATUS.PUBLISHED) return true
@@ -292,102 +285,24 @@ export function isVacancyQuestionsLocked(vacancy) {
   return Number(vacancy.candidateCount ?? 0) > 0
 }
 
-export function isVacancyPassingScoreLocked(vacancy) {
-  return isVacancyQuestionsLocked(vacancy) && Number(vacancy.candidateCount ?? 0) > 0
-}
-
+/** @deprecated Scored-question editor removed; kept for local adapter stubs. */
 export const VACANCY_QUESTIONS_LOCKED_MESSAGE =
-  'Вопросы этой вакансии зафиксированы. После публикации или получения первой анкеты набор вопросов нельзя изменить, поскольку по нему рассчитываются результаты кандидатов. Для другого набора вопросов создайте новую вакансию.'
+  'Редактор тестовых вопросов отключён. Гибкая анкета будет добавлена отдельным этапом.'
 
 /**
- * Единый расчёт результата фильтр-вопросов и начального HR-статуса.
- * При отсутствии вопросов тест не проводится — кандидат получает статус «Новый».
+ * Legacy helper for historical filter-question answers.
+ * Scoring no longer affects candidate status.
  */
-export function evaluateCandidateScreening(questions, answers, passingScore) {
-  const questionCount = Array.isArray(questions) ? questions.length : 0
-
-  if (questionCount === 0) {
-    return {
-      hasScreening: false,
-      totalScore: 0,
-      maxScore: 0,
-      scorePercent: null,
-      status: CANDIDATE_STATUS.NEW,
-    }
-  }
-
-  let totalScore = 0
-  let maxScore = 0
-
-  questions.forEach((q) => {
-    const qMax = q.scores?.length ? Math.max(...q.scores.map(Number)) : 0
-    maxScore += qMax
-
-    const answerIndex = answers?.[q.id]
-    if (answerIndex !== undefined && answerIndex !== null && answerIndex !== '') {
-      const idx = Number(answerIndex)
-      totalScore += Number(q.scores[idx] ?? 0)
-    }
-  })
-
-  if (maxScore <= 0) {
-    console.warn('[recruitment] Вакансия содержит вопросы без баллов — кандидат сохранён как «Новый»')
-    return {
-      hasScreening: false,
-      totalScore: 0,
-      maxScore: 0,
-      scorePercent: null,
-      status: CANDIDATE_STATUS.NEW,
-    }
-  }
-
-  const scorePercent = Math.round((totalScore / maxScore) * 100)
-  const passing = Number(passingScore)
-  const hasPassingThreshold = Number.isFinite(passing) && passing > 0
-
-  let status = CANDIDATE_STATUS.NEW
-  if (hasPassingThreshold && scorePercent >= passing) {
-    status = CANDIDATE_STATUS.SUITABLE
-  } else if (hasPassingThreshold && scorePercent >= 50) {
-    status = CANDIDATE_STATUS.QUESTIONABLE
-  } else if (hasPassingThreshold && scorePercent < passing) {
-    status = CANDIDATE_STATUS.REJECTED
-  }
-
-  return {
-    hasScreening: true,
-    totalScore,
-    maxScore,
-    scorePercent,
-    status,
-  }
-}
-
-/** @deprecated Используйте evaluateCandidateScreening */
-export function calculateApplicationScore(questions, answers, passingScore) {
-  const result = evaluateCandidateScreening(questions, answers, passingScore)
-  return {
-    totalScore: result.totalScore,
-    maxScore: result.maxScore,
-    scorePercent: result.scorePercent ?? 0,
-    status: result.status,
-  }
-}
-
 export function getCandidateAnswerBreakdown(candidate, questions) {
-  return questions.map((q) => {
+  return (questions || []).map((q) => {
     const answerIndex = candidate.answers?.[q.id]
     const idx = answerIndex !== undefined && answerIndex !== null ? Number(answerIndex) : null
     const selectedOption = idx !== null && q.options[idx] != null ? q.options[idx] : '—'
-    const score = idx !== null ? Number(q.scores[idx] ?? 0) : 0
-    const maxScore = q.scores.length ? Math.max(...q.scores.map(Number)) : 0
 
     return {
       questionId: q.id,
       questionText: q.questionText,
       selectedOption,
-      score,
-      maxScore,
     }
   })
 }
@@ -428,14 +343,6 @@ export function questionToForm(question) {
   }
 }
 
-export const SCORE_FILTER_OPTIONS = [
-  { id: 'all', label: 'Все результаты' },
-  { id: 'no_test', label: 'Без теста' },
-  { id: 'high', label: '80%+' },
-  { id: 'mid', label: '50–79%' },
-  { id: 'low', label: 'Ниже 50%' },
-]
-
 export const CANDIDATE_STATUS_FILTER_OPTIONS = [
   CANDIDATE_STATUS.NEW,
   CANDIDATE_STATUS.SUITABLE,
@@ -466,16 +373,6 @@ export function isCandidateEmployeeCreated(candidate) {
   return Boolean(candidate?.createdUserId)
 }
 
-export function matchesScoreFilter(candidate, filterId) {
-  if (filterId === 'all') return true
-  if (filterId === 'no_test') return !candidateHasScreening(candidate)
-  if (!candidateHasScreening(candidate)) return false
-  const p = candidate.scorePercent ?? 0
-  if (filterId === 'high') return p >= 80
-  if (filterId === 'mid') return p >= 50 && p <= 79
-  if (filterId === 'low') return p < 50
-  return true
-}
 
 export const INTERVIEW_SALUTATION_OPTIONS = [
   { id: 'neutral', label: 'Уважаемый(ая)' },

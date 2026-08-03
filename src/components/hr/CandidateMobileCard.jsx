@@ -1,5 +1,4 @@
 import { getVacancyById } from '../../services/platformDataService'
-import { formatCandidateScoreDisplay } from '../../utils/candidateDisplayUtils'
 import { formatRecruitmentDate } from '../admin/sections/recruitmentAdminShared'
 import CandidateAvatar from '../CandidateAvatar'
 import CandidateStatusBadge from './CandidateStatusBadge'
@@ -10,7 +9,6 @@ import './CandidatesList.css'
 export default function CandidateMobileCard({ candidate, index, onOpen }) {
   const vacancyTitle = getVacancyById(candidate.vacancyId)?.title || '—'
   const experience = candidate.experience || '—'
-  const scoreDisplay = formatCandidateScoreDisplay(candidate)
 
   return (
     <button
@@ -41,12 +39,6 @@ export default function CandidateMobileCard({ candidate, index, onOpen }) {
         <div className="candidate-mobile-card__fact candidate-mobile-card__fact--wide">
           <dt>Опыт</dt>
           <dd title={experience !== '—' ? experience : undefined}>{experience}</dd>
-        </div>
-        <div className="candidate-mobile-card__fact">
-          <dt>Результат</dt>
-          <dd className={scoreDisplay.type === 'no_test' ? 'candidate-mobile-card__score--no-test' : undefined}>
-            {scoreDisplay.label}
-          </dd>
         </div>
         <div className="candidate-mobile-card__fact">
           <dt>Дата</dt>

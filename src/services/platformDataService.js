@@ -889,7 +889,14 @@ export async function submitCandidateApplication(applicationData) {
     photoPath: photoPayload.photoPath,
   })
 
-  if (isCloudMode()) await refreshData()
+  // Public apply must not require candidates SELECT (anon RLS). Best-effort refresh.
+  if (isCloudMode()) {
+    try {
+      await refreshData()
+    } catch {
+      /* ignore — success already persisted via RPC */
+    }
+  }
 
   return {
     ...result,

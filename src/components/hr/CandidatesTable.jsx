@@ -1,5 +1,4 @@
 import { getVacancyById } from '../../services/platformDataService'
-import { formatCandidateScoreDisplay } from '../../utils/candidateDisplayUtils'
 import { AGE_SORT, cycleAgeSort } from '../../utils/candidateListUtils'
 import { formatRecruitmentDate } from '../admin/sections/recruitmentAdminShared'
 import CandidateAvatar from '../CandidateAvatar'
@@ -60,7 +59,6 @@ export default function CandidatesTable({
                 </button>
               </th>
               <th className="candidates-table__col-experience">Опыт</th>
-              <th className="candidates-table__col-score">Результат</th>
               <th className="candidates-table__col-status">Статус</th>
               <th className="candidates-table__col-date">Дата</th>
             </tr>
@@ -69,7 +67,6 @@ export default function CandidatesTable({
             {candidates.map((candidate, index) => {
               const vacancyTitle = getVacancyById(candidate.vacancyId)?.title || '—'
               const experience = candidate.experience || '—'
-              const scoreDisplay = formatCandidateScoreDisplay(candidate)
 
               return (
                 <tr
@@ -102,13 +99,6 @@ export default function CandidatesTable({
                   <td className="candidates-table__col-age">{candidate.age ?? '—'}</td>
                   <td className="candidates-table__col-experience" title={experience !== '—' ? experience : undefined}>
                     {experience}
-                  </td>
-                  <td className="candidates-table__col-score">
-                    <span
-                      className={`candidates-table__score${scoreDisplay.type === 'no_test' ? ' candidates-table__score--no-test' : ''}`}
-                    >
-                      {scoreDisplay.label}
-                    </span>
                   </td>
                   <td className="candidates-table__col-status">
                     <CandidateStatusBadge status={candidate.status} />

@@ -3,10 +3,8 @@ import {
   normalizeCandidateQuestion,
   normalizeCandidate,
   generateUniqueVacancySlug,
-  evaluateCandidateScreening,
   getVacancyByIdSync,
   isVacancyQuestionsLocked,
-  isVacancyPassingScoreLocked,
   VACANCY_QUESTIONS_LOCKED_MESSAGE,
   VACANCY_STATUS,
   CANDIDATE_STATUS,
@@ -213,17 +211,6 @@ export async function updateVacancy(vacancyId, updates) {
   const idx = bundle.vacancies.findIndex((v) => v.id === vacancyId)
   if (idx < 0) throw new Error('Вакансия не найдена')
   const current = bundle.vacancies[idx]
-  const vacancyWithCounts = normalizeVacancy({
-    ...current,
-    candidateCount: bundle.candidates.filter((c) => c.vacancyId === vacancyId).length,
-    questionCount: bundle.questions.filter((q) => q.vacancyId === vacancyId).length,
-  })
-
-  if (updates.passingScore != null && isVacancyPassingScoreLocked(vacancyWithCounts)) {
-    throw new Error(
-      'Проходной процент зафиксирован: по этой вакансии уже есть кандидаты. Создайте новую вакансию для другого порога.'
-    )
-  }
 
   const next = { ...current, ...updates }
   if (updates.title && !updates.slug) {
@@ -346,16 +333,6 @@ export async function submitCandidateApplication(applicationData) {
     throw new Error('Вакансия недоступна или закрыта')
   }
 
-  const questions = bundle.questions
-    .filter((q) => q.vacancyId === vacancy.id)
-    .sort((a, b) => a.sortOrder - b.sortOrder)
-
-  const screening = evaluateCandidateScreening(
-    questions,
-    applicationData.answers || {},
-    vacancy.passingScore
-  )
-
   const firstName = applicationData.firstName?.trim()
   const lastName = applicationData.lastName?.trim() || ''
   const candidate = normalizeCandidate({
@@ -372,13 +349,13 @@ export async function submitCandidateApplication(applicationData) {
     expectedSalary: applicationData.expectedSalary?.trim() || '',
     availableFrom: applicationData.availableFrom?.trim() || '',
     about: applicationData.about?.trim() || '',
-    answers: applicationData.answers || {},
+    answers: {},
     photoUrl: applicationData.photoUrl || null,
     photoPath: applicationData.photoPath || null,
-    totalScore: screening.totalScore,
-    maxScore: screening.maxScore,
-    scorePercent: screening.scorePercent,
-    status: screening.status,
+    totalScore: 0,
+    maxScore: 0,
+    scorePercent: 0,
+    status: CANDIDATE_STATUS.NEW,
     submittedAt: new Date().toISOString(),
   })
 
@@ -388,7 +365,7 @@ export async function submitCandidateApplication(applicationData) {
   return {
     ok: true,
     candidateId: candidate.id,
-    message: 'Спасибо! Ваша анкета отправлена. Если вы подойдёте, мы свяжемся с вами.',
+    message: 'Анкета успешно отправлена. Мы свяжемся с вами после рассмотрения.',
   }
 }
 

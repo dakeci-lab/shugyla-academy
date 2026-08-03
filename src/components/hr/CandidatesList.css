@@ -74,7 +74,7 @@
 
 .candidates-table {
   width: 100%;
-  min-width: 880px;
+  min-width: 760px;
   border-collapse: collapse;
 }
 
@@ -124,37 +124,32 @@
 }
 
 .candidates-table__col-candidate {
-  min-width: 180px;
+  min-width: 200px;
 }
 
 .candidates-table__col-vacancy {
-  min-width: 140px;
-  max-width: 220px;
+  min-width: 160px;
+  max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .candidates-table__col-age {
-  width: 96px;
+  width: 108px;
   text-align: center;
 }
 
 .candidates-table__col-experience {
-  min-width: 120px;
-  max-width: 180px;
+  min-width: 160px;
+  max-width: 240px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.candidates-table__col-score {
-  width: 88px;
-  text-align: center;
-}
-
 .candidates-table__col-status {
-  width: 140px;
+  width: 150px;
 }
 
 .candidates-table__col-date {

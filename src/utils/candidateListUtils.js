@@ -1,8 +1,6 @@
 import {
   CANDIDATE_STATUS,
   CANDIDATE_STATUS_LABELS,
-  matchesScoreFilter,
-  SCORE_FILTER_OPTIONS,
 } from './recruitmentData'
 
 export const AGE_SORT = {
@@ -14,7 +12,6 @@ export const AGE_SORT = {
 export const DEFAULT_CANDIDATE_FILTERS = {
   vacancyId: 'all',
   status: 'all',
-  score: 'all',
   ageMin: '',
   ageMax: '',
   ageSort: AGE_SORT.DEFAULT,
@@ -67,7 +64,6 @@ export function filterCandidates(candidates, filters, searchQuery = '') {
       }
     }
 
-    if (!matchesScoreFilter(candidate, filters.score)) return false
     if (!matchesAgeFilter(candidate, filters.ageMin, filters.ageMax)) return false
 
     if (q) {
@@ -117,7 +113,6 @@ export function countActiveCandidateFilters(filters) {
   let count = 0
   if (filters.vacancyId !== 'all') count += 1
   if (filters.status !== 'all') count += 1
-  if (filters.score !== 'all') count += 1
   if (filters.ageMin !== '' && filters.ageMin != null) count += 1
   if (filters.ageMax !== '' && filters.ageMax != null) count += 1
   return count
@@ -142,14 +137,6 @@ export function buildCandidateFilterChips(filters, vacancies = []) {
     chips.push({
       id: 'status',
       label: CANDIDATE_STATUS_LABELS[filters.status] || filters.status,
-    })
-  }
-
-  if (filters.score !== 'all') {
-    const scoreLabel = SCORE_FILTER_OPTIONS.find((opt) => opt.id === filters.score)?.label
-    chips.push({
-      id: 'score',
-      label: scoreLabel || 'Результат',
     })
   }
 
@@ -179,7 +166,6 @@ export function removeCandidateFilterChip(filters, chipId) {
   const next = { ...filters }
   if (chipId === 'vacancy') next.vacancyId = 'all'
   if (chipId === 'status') next.status = 'all'
-  if (chipId === 'score') next.score = 'all'
   if (chipId === 'age' || chipId === 'ageMin' || chipId === 'ageMax') {
     next.ageMin = ''
     next.ageMax = ''

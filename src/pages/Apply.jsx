@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import {
   getPublishedVacancyBySlug,
-  getCandidateQuestions,
   submitCandidateApplication,
   refreshData,
 } from '../services/platformDataService'
@@ -12,6 +11,7 @@ import {
   validateCandidatePhotoFile,
   ALLOWED_CANDIDATE_PHOTO_TYPES,
 } from '../services/candidatePhotoService'
+import { toUserErrorMessage } from '../utils/userErrorMessage'
 import '../components/admin/admin-shared.css'
 import '../components/CandidateAvatar.css'
 import './Apply.css'
@@ -65,10 +65,8 @@ export default function ApplyPage() {
   void loadVersion
 
   const vacancy = slug && loadState === 'loaded' ? getPublishedVacancyBySlug(slug) : null
-  const questions = vacancy ? getCandidateQuestions(vacancy.id) : []
 
   const [form, setForm] = useState(EMPTY_FORM)
-  const [answers, setAnswers] = useState({})
   const [photoFile, setPhotoFile] = useState(null)
   const [photoPreview, setPhotoPreview] = useState('')
   const [photoWarning, setPhotoWarning] = useState('')
@@ -187,29 +185,26 @@ export default function ApplyPage() {
       return
     }
 
-    for (const q of questions) {
-      if (q.required && (answers[q.id] === undefined || answers[q.id] === '')) {
-        setError(`Ответьте на обязательный вопрос: «${q.questionText}»`)
-        return
-      }
-    }
-
     setSubmitting(true)
     try {
       const result = await submitCandidateApplication({
         vacancyId: vacancy.id,
         vacancySlug: vacancy.slug,
         ...form,
-        answers,
         photoFile,
       })
-      setSuccessMessage(result.message)
+      setSuccessMessage(
+        result.message ||
+          'Анкета успешно отправлена. Мы свяжемся с вами после рассмотрения.'
+      )
       if (result.localPhotoWarning) {
-        setSuccessMessage(`${result.message} ${result.localPhotoWarning}`)
+        setSuccessMessage(
+          `${result.message || 'Анкета успешно отправлена.'} ${result.localPhotoWarning}`
+        )
       }
       setSubmitted(true)
     } catch (err) {
-      setError(err.message || 'Не удалось отправить анкету')
+      setError(toUserErrorMessage(err, 'Не удалось отправить анкету. Попробуйте ещё раз.'))
     } finally {
       setSubmitting(false)
     }
@@ -304,34 +299,6 @@ export default function ApplyPage() {
               <textarea className="admin-form__input" rows={3} value={form.about} onChange={(e) => setForm({ ...form, about: e.target.value })} />
             </label>
           </section>
-
-          {questions.length > 0 && (
-            <section className="apply-form__section">
-              <h3 className="apply-form__section-title">Фильтр-вопросы</h3>
-              {questions.map((q, index) => (
-                <div key={q.id} className="apply-form__question">
-                  <p className="apply-form__question-text">
-                    {index + 1}. {q.questionText}
-                    {q.required && ' *'}
-                  </p>
-                  <div className="apply-form__options">
-                    {q.options.map((option, optionIndex) => (
-                      <label key={optionIndex} className="apply-form__option">
-                        <input
-                          type="radio"
-                          name={`question-${q.id}`}
-                          value={optionIndex}
-                          checked={String(answers[q.id]) === String(optionIndex)}
-                          onChange={() => setAnswers({ ...answers, [q.id]: optionIndex })}
-                        />
-                        {option}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </section>
-          )}
 
           {error && <p className="admin-form__error">{error}</p>}
 

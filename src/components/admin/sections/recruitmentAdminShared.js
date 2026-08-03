@@ -11,7 +11,6 @@ export const EMPTY_VACANCY = {
   description: '',
   role: 'cashier',
   employeeRole: 'cashier',
-  passingScore: 80,
   status: 'draft',
 }
 
