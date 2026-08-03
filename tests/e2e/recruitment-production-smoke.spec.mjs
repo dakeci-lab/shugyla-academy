@@ -117,8 +117,8 @@ test('5. Internal platform header still works', async ({ page }) => {
   await loginAsHr(page)
   await expect(page).toHaveURL(/\/platform\/hr\/vacancies/)
   await expect(page.getByRole('button', { name: '+ Создать вакансию' })).toBeVisible()
-  await expect(page.getByText(/Shugyla/i).first()).toBeVisible()
   await expect(page.locator('.careers-header')).toHaveCount(0)
+  await expect(page.locator('.platform-layout__topbar')).toBeVisible()
   guard.assertClean('internal-hr')
 })
 
