@@ -23,7 +23,7 @@ import PushNotificationDiagnostics from './PushNotificationDiagnostics'
 import './PushNotificationSettings.css'
 
 const DISCONNECT_CONFIRM_MESSAGE =
-  'Отключить уведомления на этом устройстве? Напоминания о смене больше не будут приходить.'
+  'Отключить уведомления на этом устройстве? Вы перестанете получать напоминания о начале и завершении смены. Другие ваши устройства не будут затронуты.'
 
 export default function PushNotificationSettings() {
   const { user, supabaseAuthenticated } = useSession()
@@ -228,7 +228,7 @@ export default function PushNotificationSettings() {
 
       {status === DEVICE_CONNECTION_STATUS.NOT_CONNECTED && (
         <div className="push-settings__panel">
-          <p className="push-settings__status-title">Не подключено</p>
+          <p className="push-settings__status-title">Уведомления не подключены</p>
           <p className="push-settings__status-text">
             Подключите уведомления, чтобы получать напоминания о своей смене.
           </p>

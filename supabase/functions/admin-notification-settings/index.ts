@@ -8,6 +8,7 @@ import {
   sendTestBroadcast,
 } from '../_shared/testBroadcastPush.ts'
 import { getSubscriptionReadiness } from '../_shared/subscriptionReadiness.ts'
+import { sendEmployeePersonalTest } from '../_shared/employeePersonalTestPush.ts'
 
 const PERMISSION_MANAGE = 'notifications.manage'
 
@@ -54,6 +55,7 @@ type Action =
   | 'get_test_broadcast_summary'
   | 'send_test_broadcast'
   | 'get_subscription_readiness'
+  | 'send_employee_personal_test'
 
 type RuleCode = (typeof TIME_TRACKER_RULE_CODES)[number]
 
@@ -83,6 +85,8 @@ const ALLOWED_KEYS_BY_ACTION: Record<Action, Set<string>> = {
   get_test_broadcast_summary: new Set(['action']),
   send_test_broadcast: new Set(['action', 'request_id']),
   get_subscription_readiness: new Set(['action']),
+  // target_employee_id — not raw employee_id (globally forbidden on this function)
+  send_employee_personal_test: new Set(['action', 'target_employee_id', 'request_id']),
 }
 
 function isRuleCode(value: string): value is RuleCode {
@@ -96,11 +100,19 @@ function parseAction(payload: Record<string, unknown>): Action | Response {
     action === 'update_settings' ||
     action === 'get_test_broadcast_summary' ||
     action === 'send_test_broadcast' ||
-    action === 'get_subscription_readiness'
+    action === 'get_subscription_readiness' ||
+    action === 'send_employee_personal_test'
   ) {
     return action
   }
   return adminErrorResponse('validation_error', 422)
+}
+
+function parseTargetEmployeeId(value: unknown): number | Response {
+  if (!Number.isInteger(value) || Number(value) <= 0) {
+    return adminErrorResponse('validation_error', 422)
+  }
+  return Number(value)
 }
 
 function validateAllowedKeys(payload: Record<string, unknown>, action: Action): Response | null {
@@ -246,6 +258,40 @@ async function handleGetSubscriptionReadiness(serviceClient: SupabaseClient): Pr
   }
 }
 
+async function handleSendEmployeePersonalTest(
+  serviceClient: SupabaseClient,
+  caller: { id: number },
+  targetEmployeeId: number,
+  requestId: string
+): Promise<Response> {
+  try {
+    const result = await sendEmployeePersonalTest({
+      serviceClient,
+      targetEmployeeId,
+      actorEmployeeId: caller.id,
+      requestId,
+    })
+
+    if (!result.ok) {
+      return jsonResponse({ ok: false, code: result.code }, result.status)
+    }
+
+    return jsonResponse({
+      ok: true,
+      personal_test: result.result,
+      // success only when at least one device accepted
+      success: result.result.outcome === 'accepted' || result.result.outcome === 'partial',
+    })
+  } catch (error) {
+    console.error('Employee personal test failed', {
+      targetEmployeeId,
+      actorEmployeeId: caller.id,
+      message: (error as Error)?.message,
+    })
+    return adminErrorResponse('internal_error', 500)
+  }
+}
+
 async function handleSendTestBroadcast(
   serviceClient: SupabaseClient,
   caller: { id: number; auth_user_id: string | null },
@@ -362,6 +408,14 @@ Deno.serve(async (req) => {
 
   if (action === 'get_subscription_readiness') {
     return handleGetSubscriptionReadiness(serviceClient)
+  }
+
+  if (action === 'send_employee_personal_test') {
+    const targetEmployeeId = parseTargetEmployeeId(payload.target_employee_id)
+    if (targetEmployeeId instanceof Response) return targetEmployeeId
+    const requestId = parseUuid(payload.request_id)
+    if (requestId instanceof Response) return requestId
+    return handleSendEmployeePersonalTest(serviceClient, caller, targetEmployeeId, requestId)
   }
 
   if (action === 'send_test_broadcast') {

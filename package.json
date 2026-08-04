@@ -35,6 +35,7 @@
     "verify:push-notification-settings-ui": "node scripts/verify-push-notification-settings-ui.mjs",
     "verify:device-permissions-onboarding": "node scripts/verify-device-permissions-onboarding.mjs",
     "verify:scheduler-controlled-run": "node scripts/verify-scheduler-controlled-run.mjs",
+    "verify:subscription-readiness-rollout": "node scripts/verify-subscription-readiness-rollout.mjs",
     "tt:production:controlled-e2e": "node scripts/run-production-tt-push-e2e.mjs",
     "verify:production-vapid-rotation": "node scripts/verify-production-vapid-rotation.mjs",
     "verify:production-vapid-alignment": "node scripts/verify-production-vapid-alignment.mjs",

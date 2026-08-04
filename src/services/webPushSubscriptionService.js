@@ -1706,3 +1706,42 @@ export async function sendServerTestWebPush() {
     deliveryStatus: 'accepted',
   }
 }
+
+/**
+ * Employee self-confirm after connect (no admin permit).
+ * Confirms delivery only when provider returns accepted.
+ */
+export async function sendConnectionConfirmWebPush() {
+  if (!isCloudMode() || !supabase) {
+    throw new WebPushError('offline', 'Доступно только в облачном режиме')
+  }
+
+  const deviceId = getOrCreateDeviceId()
+  const requestId =
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `00000000-0000-4000-8000-${Date.now().toString(16).padStart(12, '0')}`.slice(0, 36)
+
+  const { data, error } = await supabase.functions.invoke('send-test-web-push', {
+    body: {
+      action: 'send_connection_confirm',
+      device_id: deviceId,
+      request_id: requestId,
+    },
+  })
+
+  if (error) {
+    const errorBody = await parseFunctionInvokeContext(error)
+    const code = errorBody?.code ?? 'delivery_failed'
+    throw new WebPushError(code, 'Не удалось отправить проверку')
+  }
+
+  if (!data?.ok) {
+    throw new WebPushError(data?.code || 'delivery_failed', 'Не удалось подтвердить доставку')
+  }
+
+  return {
+    notificationId: data.notification_id,
+    delivery: data.delivery,
+  }
+}

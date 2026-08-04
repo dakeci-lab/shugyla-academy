@@ -6,7 +6,10 @@ import {
   enableNotificationsFromUserGesture,
   recheckNotificationPermissionState,
 } from '../../services/devicePermissionsService'
-import { WebPushError } from '../../services/webPushSubscriptionService'
+import {
+  sendConnectionConfirmWebPush,
+  WebPushError,
+} from '../../services/webPushSubscriptionService'
 import { lockModalScroll, unlockModalScroll } from '../../utils/modalScrollLock'
 import './DeviceSetupOnboarding.css'
 
@@ -79,7 +82,9 @@ export default function DeviceSetupOnboarding() {
   const { success: showSuccess, warning: showWarning } = useToast()
   const [busyNotifications, setBusyNotifications] = useState(false)
   const [busyGeo, setBusyGeo] = useState(false)
+  const [busyConfirm, setBusyConfirm] = useState(false)
   const [localError, setLocalError] = useState('')
+  const [confirmHint, setConfirmHint] = useState('')
 
   useEffect(() => {
     if (!showOnboarding) return undefined
@@ -102,17 +107,43 @@ export default function DeviceSetupOnboarding() {
     try {
       await enableNotificationsFromUserGesture({ reconnect: needsReconnect })
       showSuccess('Уведомления подключены')
+      setConfirmHint('Проверьте уведомление, чтобы подтвердить доставку.')
       await refresh()
     } catch (err) {
       if (err instanceof WebPushError && err.code === 'permission_denied') {
-        showWarning('Уведомления запрещены в настройках устройства')
+        showWarning('Уведомления запрещены')
+        setLocalError('Уведомления запрещены')
+      } else if (err instanceof WebPushError && err.code === 'needs_pwa') {
+        setLocalError('Установите приложение на главный экран')
       } else {
-        setLocalError(err?.message || 'Не удалось подключить уведомления')
-        showWarning('Не удалось подключить уведомления')
+        setLocalError(err?.message || 'Не удалось подключить')
+        showWarning('Не удалось подключить')
       }
       await refresh()
     } finally {
       setBusyNotifications(false)
+    }
+  }
+
+  async function handleConfirmNotification() {
+    if (busyConfirm) return
+    setBusyConfirm(true)
+    setLocalError('')
+    try {
+      const result = await sendConnectionConfirmWebPush()
+      if (result?.delivery?.status === 'accepted') {
+        showSuccess('Уведомления подключены')
+        setConfirmHint('Доставка подтверждена (accepted).')
+      } else {
+        showWarning('Не удалось подтвердить доставку')
+        setConfirmHint('Доставка не подтверждена. Попробуйте ещё раз.')
+      }
+      await refresh()
+    } catch (err) {
+      setLocalError(err?.message || 'Не удалось отправить проверку')
+      showWarning('Не удалось отправить проверку')
+    } finally {
+      setBusyConfirm(false)
     }
   }
 
@@ -174,7 +205,7 @@ export default function DeviceSetupOnboarding() {
         >
           <h3 className="device-setup-onboarding__step-title">Уведомления</h3>
           <p className="device-setup-onboarding__step-text">
-            Разрешите уведомления, чтобы получать напоминания о начале и завершении рабочей смены.
+            Разрешите уведомления, чтобы получать напоминания о начале и завершении смены.
           </p>
 
           {state.needsPwaInstall && <PwaInstallHelp isIos={isIos} />}
@@ -189,6 +220,14 @@ export default function DeviceSetupOnboarding() {
             <p className="device-setup-onboarding__status device-setup-onboarding__status--warn">
               Требуется переподключение
             </p>
+          ) : notificationDenied ? (
+            <p className="device-setup-onboarding__status device-setup-onboarding__status--warn">
+              Уведомления запрещены
+            </p>
+          ) : null}
+
+          {confirmHint ? (
+            <p className="device-setup-onboarding__status">{confirmHint}</p>
           ) : null}
 
           {!state.needsPwaInstall && !notificationsDone && (
@@ -213,9 +252,22 @@ export default function DeviceSetupOnboarding() {
                     ? 'Подключаем…'
                     : needsReconnect
                       ? 'Переподключить уведомления'
-                      : 'Разрешить уведомления'}
+                      : 'Подключить уведомления'}
                 </button>
               )}
+            </div>
+          )}
+
+          {notificationsDone && (
+            <div className="device-setup-onboarding__actions">
+              <button
+                type="button"
+                className="btn btn--outline device-setup-onboarding__secondary"
+                onClick={() => void handleConfirmNotification()}
+                disabled={busyConfirm}
+              >
+                {busyConfirm ? 'Отправляем…' : 'Проверить уведомление'}
+              </button>
             </div>
           )}
         </section>

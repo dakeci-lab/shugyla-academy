@@ -51,7 +51,7 @@ const RATE_LIMIT_WINDOW_SECONDS = 60
 const RATE_LIMIT_MAX = 3
 const RATE_LIMIT_MIN_INTERVAL_SECONDS = 10
 
-type Action = 'preflight' | 'issue_permit' | 'permit_status' | 'send'
+type Action = 'preflight' | 'issue_permit' | 'permit_status' | 'send' | 'send_connection_confirm'
 
 function parseUuid(value: unknown): string | Response {
   if (typeof value !== 'string' || !UUID_RE.test(value.trim())) {
@@ -63,7 +63,13 @@ function parseUuid(value: unknown): string | Response {
 function resolveAction(payload: Record<string, unknown>): Action | 'legacy' {
   const raw = payload.action
   if (raw == null || raw === '') return 'legacy'
-  if (raw === 'preflight' || raw === 'issue_permit' || raw === 'permit_status' || raw === 'send') {
+  if (
+    raw === 'preflight' ||
+    raw === 'issue_permit' ||
+    raw === 'permit_status' ||
+    raw === 'send' ||
+    raw === 'send_connection_confirm'
+  ) {
     return raw
   }
   return 'send'
@@ -76,6 +82,7 @@ function validateAllowedKeys(payload: Record<string, unknown>, action: Action | 
     issue_permit: new Set(['action', 'device_id']),
     permit_status: new Set(['action', 'device_id', 'permit_id']),
     send: new Set(['action', 'device_id', 'request_id', 'permit_id']),
+    send_connection_confirm: new Set(['action', 'device_id', 'request_id']),
   }
 
   const allowed = allowedByAction[action]
@@ -597,6 +604,138 @@ async function handleSend(
   )
 }
 
+/** Self connection confirm for any authenticated employee (no admin permit). */
+async function handleSendConnectionConfirm(
+  serviceClient: SupabaseClient,
+  caller: { id: number; auth_user_id: string | null },
+  deviceId: string,
+  requestId: string
+): Promise<Response> {
+  if (!isProductionTestEnabled() && !isTestGateEnabled()) {
+    return jsonResponse({ ok: false, code: 'production_test_disabled' }, 403)
+  }
+
+  const matching = await countMatchingActiveSubscriptions(serviceClient, caller.id, deviceId)
+  if (matching.error) return matching.error
+  if (matching.count === 0) {
+    return jsonResponse({ ok: false, code: 'active_subscription_not_found' }, 409)
+  }
+  if (matching.count > 1) {
+    return jsonResponse({ ok: false, code: 'matching_subscription_conflict' }, 409)
+  }
+  if (!isWebPushConfigured()) {
+    return jsonResponse({ ok: false, code: 'web_push_not_configured' }, 503)
+  }
+  if (!caller.auth_user_id) {
+    return adminErrorResponse('forbidden', 403)
+  }
+
+  const rateLimited = await checkRateLimit(serviceClient, caller.id)
+  if (rateLimited) return rateLimited
+
+  const currentVapidFingerprint = await getCurrentServerVapidFingerprint()
+  if (!currentVapidFingerprint) {
+    return jsonResponse({ ok: false, code: 'web_push_not_configured' }, 503)
+  }
+
+  const { data: subscription, error: subscriptionError } = await serviceClient
+    .from('notification_push_subscriptions')
+    .select('id, endpoint, p256dh_key, auth_key, failure_count, vapid_key_fingerprint')
+    .eq('employee_id', caller.id)
+    .eq('device_id', deviceId)
+    .eq('is_active', true)
+    .eq('permission_status', 'granted')
+    .maybeSingle()
+
+  if (subscriptionError) return adminErrorResponse('internal_error', 500)
+  if (!subscription) {
+    return jsonResponse({ ok: false, code: 'active_subscription_not_found' }, 409)
+  }
+  if (subscription.vapid_key_fingerprint !== currentVapidFingerprint) {
+    return jsonResponse({ ok: false, code: 'vapid_subscription_outdated' }, 409)
+  }
+
+  const title = 'Shugyla Platform'
+  const body =
+    'Уведомления успешно подключены. Теперь вы будете получать напоминания о начале и завершении смены.'
+  const actionUrl = '/platform/time-tracker'
+  const deduplicationKey = `web_push_connection_confirm:${requestId}`
+
+  const { data: notification, error: notificationError } = await serviceClient
+    .from('notifications')
+    .insert({
+      employee_id: caller.id,
+      auth_user_id: caller.auth_user_id,
+      module_code: 'web_push',
+      event_code: 'web_push_connection_confirm',
+      title,
+      body,
+      action_url: actionUrl,
+      priority: 'normal',
+      status: 'processing',
+      metadata: {
+        source: 'send-connection-confirm',
+        request_id: requestId,
+        channel: 'web_push',
+        test: true,
+      },
+      deduplication_key: deduplicationKey,
+    })
+    .select('id')
+    .single()
+
+  if (notificationError || !notification?.id) {
+    return adminErrorResponse('internal_error', 500)
+  }
+
+  let deliveryOutcome
+  try {
+    deliveryOutcome = await deliverNotificationToSubscription({
+      serviceClient,
+      notification: {
+        id: notification.id,
+        title,
+        body,
+        action_url: actionUrl,
+      },
+      subscription,
+      requestId,
+      attemptNumber: 1,
+      buildPayload: (notificationId, reqId) =>
+        buildWebPushPayload({
+          title,
+          body,
+          url: '/shugyla-academy/platform/time-tracker',
+          type: 'connection_confirm',
+          tag: `confirm-${reqId.replace(/-/g, '').slice(0, 8)}`,
+          notificationId,
+          requestId: reqId,
+        }),
+      pushOptions: { ttl: 180, urgency: 'normal' },
+    })
+  } catch {
+    return jsonResponse({ ok: false, code: 'delivery_tracking_error' }, 500)
+  }
+
+  if (deliveryOutcome.status === 'accepted') {
+    return jsonResponse({
+      ok: true,
+      notification_id: notification.id,
+      delivery: { status: 'accepted' },
+    })
+  }
+
+  return jsonResponse(
+    {
+      ok: false,
+      code: 'delivery_failed',
+      notification_id: notification.id,
+      delivery: { status: deliveryOutcome.status },
+    },
+    502
+  )
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return corsPreflightResponse()
@@ -651,6 +790,10 @@ Deno.serve(async (req) => {
 
   const requestId = parseUuid(payload.request_id)
   if (requestId instanceof Response) return requestId
+
+  if (action === 'send_connection_confirm') {
+    return handleSendConnectionConfirm(serviceClient, caller, deviceId, requestId)
+  }
 
   const permitId = parseUuid(payload.permit_id)
   if (permitId instanceof Response) return permitId

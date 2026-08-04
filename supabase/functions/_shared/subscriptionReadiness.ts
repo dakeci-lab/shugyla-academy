@@ -2,38 +2,43 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildStructuredPosition, loadPositionCatalogByIds } from './employeePositions.ts'
 import { getCurrentServerVapidFingerprint } from './vapidFingerprint.ts'
 import { isActiveEmployeeStatus } from './testBroadcastPush.ts'
+import {
+  buildReadinessWarnings,
+  resolveEmployeeReadiness,
+  type AcceptedDeliveryInput,
+  type EmployeeReadinessRow,
+  type ReadinessState,
+  type SubscriptionInput,
+} from './subscriptionReadinessLogic.ts'
 
-export type ReadinessEmployeeRow = {
-  employee_id: number
-  full_name: string
-  position_name: string | null
-  connection_state: 'current' | 'outdated' | 'missing' | 'denied'
-  device_count: number
-  last_success_at: string | null
-}
+export type { EmployeeReadinessRow, ReadinessState }
 
 export type SubscriptionReadinessResult = {
   summary: {
     active_employees: number
+    eligible_employees: number
+    confirmed: number
+    connected_unconfirmed: number
+    missing: number
+    outdated_only: number
+    delivery_failed: number
+    denied: number
+    current_devices: number
+    confirmed_devices: number
+    outdated_devices: number
+    employees_with_multiple_current: number
+    last_accepted_delivery_at: string | null
+    /** Backward-compatible aliases used by older UI/tests */
     employees_with_current: number
     employees_without_subscriptions: number
     employees_only_outdated: number
     employees_with_denied: number
-    current_devices: number
-    outdated_devices: number
     devices_with_last_success: number
-    last_accepted_delivery_at: string | null
   }
-  employees_needing_setup: ReadinessEmployeeRow[]
-}
-
-type SubRow = {
-  employee_id: number
-  device_id: string | null
-  is_active: boolean
-  permission_status: string | null
-  vapid_key_fingerprint: string | null
-  last_success_at: string | null
+  employees: EmployeeReadinessRow[]
+  employees_needing_setup: EmployeeReadinessRow[]
+  warnings: Array<{ code: string; severity: 'info' | 'warning'; message: string }>
+  canonical_fingerprint: string | null
 }
 
 type EmployeeRow = {
@@ -44,6 +49,7 @@ type EmployeeRow = {
   status: string | null
   position: string | null
   position_id: string | null
+  auth_user_id: string | null
 }
 
 function displayName(row: EmployeeRow): string {
@@ -59,146 +65,157 @@ export async function getSubscriptionReadiness(
   serviceClient: SupabaseClient
 ): Promise<SubscriptionReadinessResult> {
   const currentFingerprint = await getCurrentServerVapidFingerprint()
+  const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
 
-  const [{ data: employees, error: employeesError }, { data: subscriptions, error: subsError }, deliveryResult] =
-    await Promise.all([
-      serviceClient
-        .from('academy_users')
-        .select('id, full_name, first_name, last_name, status, position, position_id'),
-      serviceClient
-        .from('notification_push_subscriptions')
-        .select(
-          'employee_id, device_id, is_active, permission_status, vapid_key_fingerprint, last_success_at'
-        ),
-      serviceClient
-        .from('notification_deliveries')
-        .select('created_at')
-        .eq('status', 'accepted')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-    ])
+  const [
+    { data: employees, error: employeesError },
+    { data: subscriptions, error: subsError },
+    deliveryResult,
+    acceptedRowsResult,
+    autoNotificationsResult,
+    accepted24hResult,
+  ] = await Promise.all([
+    serviceClient
+      .from('academy_users')
+      .select('id, full_name, first_name, last_name, status, position, position_id, auth_user_id'),
+    serviceClient
+      .from('notification_push_subscriptions')
+      .select(
+        'id, employee_id, device_id, is_active, revoked_at, permission_status, vapid_key_fingerprint, created_at, updated_at, last_success_at, failure_count'
+      ),
+    serviceClient
+      .from('notification_deliveries')
+      .select('created_at')
+      .eq('status', 'accepted')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    serviceClient
+      .from('notification_deliveries')
+      .select('subscription_id, created_at')
+      .eq('status', 'accepted')
+      .not('subscription_id', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(5000),
+    serviceClient
+      .from('notifications')
+      .select('id', { count: 'exact', head: true })
+      .contains('metadata', { source: 'time_tracker_dispatcher' })
+      .gte('created_at', since24h),
+    serviceClient
+      .from('notification_deliveries')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'accepted')
+      .gte('created_at', since24h),
+  ])
 
   if (employeesError) throw new Error('employee_load_error')
   if (subsError) throw new Error('subscription_load_error')
 
-  const activeEmployees = ((employees ?? []) as EmployeeRow[]).filter((row) =>
-    isActiveEmployeeStatus(row.status)
-  )
+  const acceptedBySubscription = new Map<string, string>()
+  for (const row of (acceptedRowsResult.data ?? []) as AcceptedDeliveryInput[]) {
+    if (!row.subscription_id || !row.created_at) continue
+    if (!acceptedBySubscription.has(row.subscription_id)) {
+      acceptedBySubscription.set(row.subscription_id, row.created_at)
+    }
+  }
+
+  const allEmployees = (employees ?? []) as EmployeeRow[]
+  const activeEmployees = allEmployees.filter((row) => isActiveEmployeeStatus(row.status))
 
   const positionIds = activeEmployees
     .map((row) => row.position_id)
     .filter((id): id is string => typeof id === 'string' && id.length > 0)
   const positionCatalog = await loadPositionCatalogByIds(serviceClient, positionIds)
 
-  const byEmployee = new Map<
-    number,
-    {
-      employee_id: number
-      full_name: string
-      position_name: string | null
-      device_count: number
-      current_device_count: number
-      outdated_device_count: number
-      denied_device_count: number
-      last_success_at: string | null
-    }
-  >()
+  const subs = (subscriptions ?? []) as SubscriptionInput[]
 
-  for (const employee of activeEmployees) {
+  const rows: EmployeeReadinessRow[] = activeEmployees.map((employee) => {
     const catalog =
       typeof employee.position_id === 'string'
         ? positionCatalog.get(employee.position_id) ?? null
         : null
     const positionFields = buildStructuredPosition(employee.position, catalog)
-    byEmployee.set(employee.id, {
-      employee_id: employee.id,
-      full_name: displayName(employee),
-      position_name: positionFields.position_name,
-      device_count: 0,
-      current_device_count: 0,
-      outdated_device_count: 0,
-      denied_device_count: 0,
-      last_success_at: null,
+    return resolveEmployeeReadiness({
+      employee: {
+        id: employee.id,
+        status: employee.status,
+        auth_user_id: employee.auth_user_id,
+        full_name: displayName(employee),
+        position_name: positionFields.position_name,
+      },
+      subscriptions: subs,
+      currentFingerprint,
+      acceptedBySubscription,
     })
-  }
+  })
+
+  const eligible = rows.filter((row) => row.readiness_state !== 'not_eligible')
+  const confirmed = eligible.filter((row) => row.readiness_state === 'confirmed')
+  const connectedUnconfirmed = eligible.filter(
+    (row) => row.readiness_state === 'connected_unconfirmed'
+  )
+  const missing = eligible.filter((row) => row.readiness_state === 'missing')
+  const outdatedOnly = eligible.filter((row) => row.readiness_state === 'outdated')
+  const deliveryFailed = eligible.filter((row) => row.readiness_state === 'delivery_failed')
+  const denied = eligible.filter((row) => row.readiness_state === 'denied')
 
   let currentDevices = 0
   let outdatedDevices = 0
-  let devicesWithSuccess = 0
-
-  for (const sub of (subscriptions ?? []) as SubRow[]) {
-    const employee = byEmployee.get(sub.employee_id)
-    if (!employee) continue
-
-    if (sub.permission_status === 'denied') {
-      employee.denied_device_count += 1
-    }
-
-    if (!(sub.is_active && sub.permission_status === 'granted')) continue
-
-    employee.device_count += 1
-    const isCurrent =
-      Boolean(currentFingerprint) && sub.vapid_key_fingerprint === currentFingerprint
-
-    if (isCurrent) {
-      employee.current_device_count += 1
-      currentDevices += 1
-    } else {
-      employee.outdated_device_count += 1
-      outdatedDevices += 1
-    }
-
-    if (sub.last_success_at) {
-      devicesWithSuccess += 1
-      if (
-        !employee.last_success_at ||
-        new Date(sub.last_success_at) > new Date(employee.last_success_at)
-      ) {
-        employee.last_success_at = sub.last_success_at
-      }
-    }
+  let confirmedDevices = 0
+  let multiCurrent = 0
+  for (const row of eligible) {
+    currentDevices += row.current_device_count
+    outdatedDevices += row.outdated_device_count
+    confirmedDevices += row.confirmed_device_count
+    if (row.current_device_count > 1) multiCurrent += 1
   }
-
-  const rows = [...byEmployee.values()].map((row) => {
-    let connection_state: ReadinessEmployeeRow['connection_state'] = 'missing'
-    if (row.current_device_count > 0) connection_state = 'current'
-    else if (row.outdated_device_count > 0) connection_state = 'outdated'
-    else if (row.denied_device_count > 0 && row.device_count === 0) connection_state = 'denied'
-    return {
-      employee_id: row.employee_id,
-      full_name: row.full_name,
-      position_name: row.position_name,
-      connection_state,
-      device_count: row.device_count,
-      last_success_at: row.last_success_at,
-    }
-  })
-
-  const withCurrent = rows.filter((row) => row.connection_state === 'current').length
-  const withOnlyOutdated = rows.filter((row) => row.connection_state === 'outdated').length
-  const withMissing = rows.filter((row) => row.connection_state === 'missing').length
-  const withDenied = rows.filter((row) => row.connection_state === 'denied').length
 
   const lastAccepted =
     deliveryResult.error || !deliveryResult.data?.created_at
       ? null
       : String(deliveryResult.data.created_at)
 
+  const autoNotificationsLast24h = autoNotificationsResult.count ?? 0
+  const acceptedDeliveriesLast24h = accepted24hResult.count ?? 0
+
+  const warnings = buildReadinessWarnings({
+    eligible,
+    lastSchedulerAcceptedWithin24h: acceptedDeliveriesLast24h > 0,
+    autoNotificationsLast24h,
+    acceptedDeliveriesLast24h,
+    frontendFingerprint: currentFingerprint,
+    backendFingerprint: currentFingerprint,
+  })
+
+  const needingSetup = eligible
+    .filter((row) => row.readiness_state !== 'confirmed')
+    .sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'))
+
   return {
     summary: {
       active_employees: activeEmployees.length,
-      employees_with_current: withCurrent,
-      employees_without_subscriptions: withMissing,
-      employees_only_outdated: withOnlyOutdated,
-      employees_with_denied: withDenied,
+      eligible_employees: eligible.length,
+      confirmed: confirmed.length,
+      connected_unconfirmed: connectedUnconfirmed.length,
+      missing: missing.length,
+      outdated_only: outdatedOnly.length,
+      delivery_failed: deliveryFailed.length,
+      denied: denied.length,
       current_devices: currentDevices,
+      confirmed_devices: confirmedDevices,
       outdated_devices: outdatedDevices,
-      devices_with_last_success: devicesWithSuccess,
+      employees_with_multiple_current: multiCurrent,
       last_accepted_delivery_at: lastAccepted,
+      employees_with_current: confirmed.length + connectedUnconfirmed.length + deliveryFailed.length,
+      employees_without_subscriptions: missing.length,
+      employees_only_outdated: outdatedOnly.length,
+      employees_with_denied: denied.length,
+      devices_with_last_success: confirmedDevices,
     },
-    employees_needing_setup: rows
-      .filter((row) => row.connection_state !== 'current')
-      .sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru')),
+    employees: eligible.sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru')),
+    employees_needing_setup: needingSetup,
+    warnings,
+    canonical_fingerprint: currentFingerprint,
   }
 }

@@ -232,7 +232,8 @@ function stageStatic() {
   const geo = read('src/utils/geolocation.js')
 
   assert('onboarding title', onboarding.includes('Настройте приложение для работы'))
-  assert('notifications CTA', onboarding.includes('Разрешить уведомления'))
+  assert('notifications CTA', onboarding.includes('Подключить уведомления'))
+  assert('confirm notification CTA', onboarding.includes('Проверить уведомление'))
   assert('geolocation CTA', onboarding.includes('Разрешить геолокацию'))
   assert('not now CTA', onboarding.includes('Не сейчас'))
   assert('no auto requestPermission in onboarding mount', !/useEffect\([\s\S]*requestPermission/.test(onboarding))

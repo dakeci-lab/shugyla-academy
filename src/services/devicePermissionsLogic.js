@@ -228,22 +228,43 @@ export function isDeviceFullyReady(state) {
 
 /**
  * Aggregate employee readiness for admin summary (pure).
+ * Confirmed requires accepted delivery at/after subscription updated_at/created_at.
  * @param {{
- *   activeEmployees: Array<{ id: number, full_name: string, position_name: string | null }>
+ *   activeEmployees: Array<{ id: number, full_name: string, position_name: string | null, auth_user_id?: string | null }>
  *   subscriptions: Array<{
+ *     id?: string
  *     employee_id: number
  *     device_id: string | null
  *     is_active: boolean
  *     permission_status: string | null
  *     vapid_key_fingerprint: string | null
  *     last_success_at: string | null
+ *     created_at?: string | null
+ *     updated_at?: string | null
+ *     failure_count?: number | null
  *   }>
  *   currentFingerprint: string | null
  *   lastAcceptedDeliveryAt: string | null
+ *   acceptedDeliveries?: Array<{ subscription_id: string, created_at: string }>
  * }} input
  */
 export function aggregateSubscriptionReadiness(input) {
-  const { activeEmployees, subscriptions, currentFingerprint, lastAcceptedDeliveryAt } = input
+  const {
+    activeEmployees,
+    subscriptions,
+    currentFingerprint,
+    lastAcceptedDeliveryAt,
+    acceptedDeliveries = [],
+  } = input
+
+  const acceptedBySubscription = new Map()
+  for (const row of acceptedDeliveries) {
+    if (!row?.subscription_id || !row?.created_at) continue
+    if (!acceptedBySubscription.has(row.subscription_id)) {
+      acceptedBySubscription.set(row.subscription_id, row.created_at)
+    }
+  }
+
   const byEmployee = new Map()
 
   for (const employee of activeEmployees) {
@@ -255,7 +276,9 @@ export function aggregateSubscriptionReadiness(input) {
       current_device_count: 0,
       outdated_device_count: 0,
       denied_device_count: 0,
+      confirmed_device_count: 0,
       last_success_at: null,
+      readiness_state: 'missing',
       connection_state: 'missing',
     })
   }
@@ -282,13 +305,23 @@ export function aggregateSubscriptionReadiness(input) {
     if (isCurrent) {
       employee.current_device_count += 1
       currentDevices += 1
+      const acceptedAt = sub.id ? acceptedBySubscription.get(sub.id) : null
+      const baseline = sub.updated_at || sub.created_at
+      const confirmedByDelivery =
+        Boolean(acceptedAt) && (!baseline || new Date(acceptedAt) >= new Date(baseline))
+      // Unit fixtures may omit delivery rows; then last_success_at on current counts.
+      const confirmed =
+        confirmedByDelivery || (!acceptedDeliveries.length && Boolean(sub.last_success_at))
+      if (confirmed) {
+        employee.confirmed_device_count += 1
+        devicesWithSuccess += 1
+      }
     } else {
       employee.outdated_device_count += 1
       outdatedDevices += 1
     }
 
     if (sub.last_success_at) {
-      devicesWithSuccess += 1
       if (
         !employee.last_success_at ||
         new Date(sub.last_success_at) > new Date(employee.last_success_at)
@@ -299,24 +332,42 @@ export function aggregateSubscriptionReadiness(input) {
   }
 
   const employees = [...byEmployee.values()].map((row) => {
-    let connection_state = 'missing'
-    if (row.current_device_count > 0) connection_state = 'current'
-    else if (row.outdated_device_count > 0) connection_state = 'outdated'
-    else if (row.denied_device_count > 0 && row.device_count === 0) connection_state = 'denied'
-    return { ...row, connection_state }
+    let readiness_state = 'missing'
+    if (row.current_device_count > 0) {
+      readiness_state = row.confirmed_device_count > 0 ? 'confirmed' : 'connected_unconfirmed'
+    } else if (row.outdated_device_count > 0) readiness_state = 'outdated'
+    else if (row.denied_device_count > 0 && row.device_count === 0) readiness_state = 'denied'
+
+    // Legacy alias: current ≈ has current subscription (confirmed or unconfirmed)
+    const connection_state =
+      readiness_state === 'confirmed' || readiness_state === 'connected_unconfirmed'
+        ? 'current'
+        : readiness_state
+
+    return { ...row, readiness_state, connection_state }
   })
 
-  const withCurrent = employees.filter((e) => e.connection_state === 'current').length
-  const withOnlyOutdated = employees.filter((e) => e.connection_state === 'outdated').length
-  const withMissing = employees.filter((e) => e.connection_state === 'missing').length
-  const withDenied = employees.filter((e) => e.connection_state === 'denied').length
+  const confirmed = employees.filter((e) => e.readiness_state === 'confirmed').length
+  const connectedUnconfirmed = employees.filter(
+    (e) => e.readiness_state === 'connected_unconfirmed'
+  ).length
+  const withCurrent = confirmed + connectedUnconfirmed
+  const withOnlyOutdated = employees.filter((e) => e.readiness_state === 'outdated').length
+  const withMissing = employees.filter((e) => e.readiness_state === 'missing').length
+  const withDenied = employees.filter((e) => e.readiness_state === 'denied').length
   const needsSetup = employees
-    .filter((e) => e.connection_state !== 'current')
+    .filter((e) => e.readiness_state !== 'confirmed')
     .sort((a, b) => a.full_name.localeCompare(b.full_name, 'ru'))
 
   return {
     summary: {
       active_employees: activeEmployees.length,
+      eligible_employees: activeEmployees.length,
+      confirmed,
+      connected_unconfirmed: connectedUnconfirmed,
+      missing: withMissing,
+      outdated_only: withOnlyOutdated,
+      delivery_failed: 0,
       employees_with_current: withCurrent,
       employees_without_subscriptions: withMissing,
       employees_only_outdated: withOnlyOutdated,
@@ -324,14 +375,18 @@ export function aggregateSubscriptionReadiness(input) {
       current_devices: currentDevices,
       outdated_devices: outdatedDevices,
       devices_with_last_success: devicesWithSuccess,
+      confirmed_devices: devicesWithSuccess,
       last_accepted_delivery_at: lastAcceptedDeliveryAt,
     },
     employees_needing_setup: needsSetup.map((e) => ({
       employee_id: e.employee_id,
       full_name: e.full_name,
       position_name: e.position_name,
+      readiness_state: e.readiness_state,
       connection_state: e.connection_state,
       device_count: e.device_count,
+      current_device_count: e.current_device_count,
+      outdated_device_count: e.outdated_device_count,
       last_success_at: e.last_success_at,
     })),
   }

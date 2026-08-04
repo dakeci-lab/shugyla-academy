@@ -15,6 +15,8 @@ const ERROR_MESSAGES = {
   summary: 'Не удалось загрузить статистику тестовой отправки',
   readiness: 'Не удалось загрузить сводку готовности сотрудников',
   send: 'Не удалось отправить тестовое уведомление',
+  personalTest: 'Не удалось отправить персональный тест сотруднику',
+  personalCooldown: 'Персональный тест уже отправлялся недавно. Повторите через минуту.',
   cooldown: 'Тестовое уведомление уже отправлялось недавно. Повторите через несколько секунд.',
   noSubscriptions: 'Нет подключённых устройств для отправки уведомления.',
   noCurrentSubscriptions:
@@ -145,6 +147,39 @@ export async function fetchSubscriptionReadiness() {
     }
     if (!navigator.onLine) throw new Error(ERROR_MESSAGES.offline)
     throw error instanceof Error ? error : new Error(ERROR_MESSAGES.readiness)
+  }
+}
+
+export async function sendEmployeePersonalTest(targetEmployeeId, requestId) {
+  try {
+    const data = await invokeAdminNotificationSettings({
+      action: 'send_employee_personal_test',
+      target_employee_id: targetEmployeeId,
+      request_id: requestId,
+    })
+
+    if (!data?.ok) {
+      throw new Error(ERROR_MESSAGES.personalTest)
+    }
+
+    return data
+  } catch (error) {
+    if (error?.errorBody || error?.invokeError) {
+      const code = error.errorBody?.code ?? error.errorBody?.error?.code
+      if (code === 'personal_test_cooldown') throw new Error(ERROR_MESSAGES.personalCooldown)
+      if (code === 'employee_not_eligible' || code === 'employee_not_found') {
+        throw new Error('Сотрудник недоступен для персонального теста')
+      }
+      const message = mapSettingsError(
+        error.errorBody,
+        isGenericInvokeErrorMessage(error.invokeError?.message)
+          ? ERROR_MESSAGES.personalTest
+          : error.invokeError?.message
+      )
+      throw new Error(message)
+    }
+    if (!navigator.onLine) throw new Error(ERROR_MESSAGES.offline)
+    throw error instanceof Error ? error : new Error(ERROR_MESSAGES.personalTest)
   }
 }
 
