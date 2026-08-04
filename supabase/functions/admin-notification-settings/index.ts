@@ -9,6 +9,8 @@ import {
 } from '../_shared/testBroadcastPush.ts'
 import { getSubscriptionReadiness } from '../_shared/subscriptionReadiness.ts'
 import { sendEmployeePersonalTest } from '../_shared/employeePersonalTestPush.ts'
+import { buildAdminEscalationWarnings } from '../_shared/adminEscalationWarnings.ts'
+import { DEFAULT_ESCALATION_SETTINGS } from '../_shared/adminEscalationLogic.ts'
 
 const PERMISSION_MANAGE = 'notifications.manage'
 
@@ -56,6 +58,9 @@ type Action =
   | 'send_test_broadcast'
   | 'get_subscription_readiness'
   | 'send_employee_personal_test'
+  | 'get_escalation_settings'
+  | 'update_escalation_settings'
+  | 'list_time_tracker_violations'
 
 type RuleCode = (typeof TIME_TRACKER_RULE_CODES)[number]
 
@@ -87,6 +92,9 @@ const ALLOWED_KEYS_BY_ACTION: Record<Action, Set<string>> = {
   get_subscription_readiness: new Set(['action']),
   // target_employee_id — not raw employee_id (globally forbidden on this function)
   send_employee_personal_test: new Set(['action', 'target_employee_id', 'request_id']),
+  get_escalation_settings: new Set(['action']),
+  update_escalation_settings: new Set(['action', 'escalation']),
+  list_time_tracker_violations: new Set(['action', 'filter', 'limit']),
 }
 
 function isRuleCode(value: string): value is RuleCode {
@@ -101,7 +109,10 @@ function parseAction(payload: Record<string, unknown>): Action | Response {
     action === 'get_test_broadcast_summary' ||
     action === 'send_test_broadcast' ||
     action === 'get_subscription_readiness' ||
-    action === 'send_employee_personal_test'
+    action === 'send_employee_personal_test' ||
+    action === 'get_escalation_settings' ||
+    action === 'update_escalation_settings' ||
+    action === 'list_time_tracker_violations'
   ) {
     return action
   }
@@ -416,6 +427,123 @@ Deno.serve(async (req) => {
     const requestId = parseUuid(payload.request_id)
     if (requestId instanceof Response) return requestId
     return handleSendEmployeePersonalTest(serviceClient, caller, targetEmployeeId, requestId)
+  }
+
+  if (action === 'get_escalation_settings') {
+    const { data, error } = await serviceClient
+      .from('time_tracker_escalation_settings')
+      .select(
+        'is_enabled, clock_in_delay_minutes, clock_out_delay_minutes, recipient_mode, fallback_employee_ids, push_enabled, in_app_enabled, updated_at'
+      )
+      .eq('id', 1)
+      .maybeSingle()
+    if (error) return adminErrorResponse('internal_error', 500)
+
+    const escalation = data ?? {
+      ...DEFAULT_ESCALATION_SETTINGS,
+      updated_at: null,
+    }
+    const settingsForWarnings = {
+      is_enabled: Boolean(escalation.is_enabled),
+      clock_in_delay_minutes: Number(escalation.clock_in_delay_minutes) || 15,
+      clock_out_delay_minutes: Number(escalation.clock_out_delay_minutes) || 20,
+      recipient_mode:
+        escalation.recipient_mode === 'duty' ? ('duty' as const) : ('duty_with_fallback' as const),
+      fallback_employee_ids: Array.isArray(escalation.fallback_employee_ids)
+        ? escalation.fallback_employee_ids.map(Number)
+        : [],
+      push_enabled: escalation.push_enabled !== false,
+      in_app_enabled: escalation.in_app_enabled !== false,
+    }
+    const warnings = await buildAdminEscalationWarnings(serviceClient, settingsForWarnings)
+    return jsonResponse({ ok: true, escalation, warnings })
+  }
+
+  if (action === 'update_escalation_settings') {
+    const esc = payload.escalation
+    if (!esc || typeof esc !== 'object' || Array.isArray(esc)) {
+      return adminErrorResponse('validation_error', 422)
+    }
+    const row = esc as Record<string, unknown>
+    const clockIn = Number(row.clock_in_delay_minutes)
+    const clockOut = Number(row.clock_out_delay_minutes)
+    if (!Number.isInteger(clockIn) || clockIn < 0 || clockIn > 1440) {
+      return adminErrorResponse('validation_error', 422)
+    }
+    if (!Number.isInteger(clockOut) || clockOut < 0 || clockOut > 1440) {
+      return adminErrorResponse('validation_error', 422)
+    }
+    const mode = row.recipient_mode === 'duty' ? 'duty' : 'duty_with_fallback'
+    const fallback = Array.isArray(row.fallback_employee_ids)
+      ? row.fallback_employee_ids
+          .map((id) => Number(id))
+          .filter((id) => Number.isInteger(id) && id > 0)
+      : []
+
+    const { data, error } = await serviceClient
+      .from('time_tracker_escalation_settings')
+      .upsert({
+        id: 1,
+        is_enabled: row.is_enabled !== false,
+        clock_in_delay_minutes: clockIn,
+        clock_out_delay_minutes: clockOut,
+        recipient_mode: mode,
+        fallback_employee_ids: fallback,
+        push_enabled: row.push_enabled !== false,
+        in_app_enabled: row.in_app_enabled !== false,
+        updated_at: new Date().toISOString(),
+      })
+      .select(
+        'is_enabled, clock_in_delay_minutes, clock_out_delay_minutes, recipient_mode, fallback_employee_ids, push_enabled, in_app_enabled, updated_at'
+      )
+      .single()
+
+    if (error) return adminErrorResponse('internal_error', 500)
+    return jsonResponse({ ok: true, escalation: data })
+  }
+
+  if (action === 'list_time_tracker_violations') {
+    const filter = typeof payload.filter === 'string' ? payload.filter : 'today'
+    const limit = Number.isInteger(payload.limit) ? Math.min(Number(payload.limit), 200) : 50
+    const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Almaty' })
+
+    let query = serviceClient
+      .from('time_tracker_violations')
+      .select(
+        'id, shift_id, employee_id, violation_type, shift_date, planned_at, actual_at, delay_minutes, status, notified_admin_ids, web_push_outcome, employee_push_note, created_at, resolved_at'
+      )
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (filter === 'today') query = query.eq('shift_date', today)
+    else if (filter === 'active') query = query.eq('status', 'active')
+    else if (filter === 'resolved') query = query.eq('status', 'resolved')
+    else if (filter === 'clock_in') query = query.eq('violation_type', 'clock_in')
+    else if (filter === 'clock_out') query = query.eq('violation_type', 'clock_out')
+
+    const { data, error } = await query
+    if (error) return adminErrorResponse('internal_error', 500)
+
+    const employeeIds = [...new Set((data ?? []).map((row) => row.employee_id))]
+    const { data: employees } = employeeIds.length
+      ? await serviceClient
+          .from('academy_users')
+          .select('id, full_name, position')
+          .in('id', employeeIds)
+      : { data: [] }
+
+    const nameById = new Map(
+      (employees ?? []).map((row) => [row.id, { name: row.full_name, position: row.position }])
+    )
+
+    return jsonResponse({
+      ok: true,
+      violations: (data ?? []).map((row) => ({
+        ...row,
+        employee_name: nameById.get(row.employee_id)?.name ?? `Сотрудник #${row.employee_id}`,
+        position_name: nameById.get(row.employee_id)?.position ?? null,
+      })),
+    })
   }
 
   if (action === 'send_test_broadcast') {

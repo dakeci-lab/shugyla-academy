@@ -150,6 +150,55 @@ export async function fetchSubscriptionReadiness() {
   }
 }
 
+export async function fetchEscalationSettings() {
+  try {
+    const data = await invokeAdminNotificationSettings({ action: 'get_escalation_settings' })
+    if (!data?.ok) throw new Error(ERROR_MESSAGES.load)
+    return {
+      escalation: data.escalation,
+      warnings: Array.isArray(data.warnings) ? data.warnings : [],
+    }
+  } catch (error) {
+    if (error?.errorBody || error?.invokeError) {
+      throw new Error(mapSettingsError(error.errorBody, ERROR_MESSAGES.load))
+    }
+    throw error instanceof Error ? error : new Error(ERROR_MESSAGES.load)
+  }
+}
+
+export async function updateEscalationSettings(escalation) {
+  try {
+    const data = await invokeAdminNotificationSettings({
+      action: 'update_escalation_settings',
+      escalation,
+    })
+    if (!data?.ok) throw new Error(ERROR_MESSAGES.save)
+    return data.escalation
+  } catch (error) {
+    if (error?.errorBody || error?.invokeError) {
+      throw new Error(mapSettingsError(error.errorBody, ERROR_MESSAGES.save))
+    }
+    throw error instanceof Error ? error : new Error(ERROR_MESSAGES.save)
+  }
+}
+
+export async function listTimeTrackerViolations(filter = 'today', limit = 50) {
+  try {
+    const data = await invokeAdminNotificationSettings({
+      action: 'list_time_tracker_violations',
+      filter,
+      limit,
+    })
+    if (!data?.ok || !Array.isArray(data.violations)) throw new Error(ERROR_MESSAGES.load)
+    return data.violations
+  } catch (error) {
+    if (error?.errorBody || error?.invokeError) {
+      throw new Error(mapSettingsError(error.errorBody, ERROR_MESSAGES.load))
+    }
+    throw error instanceof Error ? error : new Error(ERROR_MESSAGES.load)
+  }
+}
+
 export async function sendEmployeePersonalTest(targetEmployeeId, requestId) {
   try {
     const data = await invokeAdminNotificationSettings({
