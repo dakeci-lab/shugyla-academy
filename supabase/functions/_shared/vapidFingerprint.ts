@@ -2,21 +2,33 @@
 
 import { createECDH, timingSafeEqual } from 'node:crypto'
 
+/** Normalize public key text: trim whitespace/newlines; keep URL-safe base64. */
+export function normalizeVapidPublicKey(publicKeyBase64url: string | null | undefined): string | null {
+  if (typeof publicKeyBase64url !== 'string') return null
+  const trimmed = publicKeyBase64url.trim().replace(/\s+/g, '')
+  if (!trimmed || !/^[A-Za-z0-9_-]+$/.test(trimmed)) return null
+  return trimmed
+}
+
+/**
+ * Canonical fingerprint: SHA-256 of decoded public key bytes, first 16 lowercase hex chars.
+ * Must stay identical to frontend `computeVapidPublicFingerprint` / scripts/lib/vapid-fingerprint.mjs.
+ */
 export async function fingerprintPublicKeyBase64url(
   publicKeyBase64url: string
 ): Promise<string | null> {
-  const trimmed = publicKeyBase64url?.trim()
-  if (!trimmed || !/^[A-Za-z0-9_-]+$/.test(trimmed)) return null
+  const trimmed = normalizeVapidPublicKey(publicKeyBase64url)
+  if (!trimmed) return null
 
   const bytes = decodeBase64Url(trimmed)
   if (!bytes.length) return null
 
   const digest = await crypto.subtle.digest('SHA-256', bytes)
-  return bufferToHex(new Uint8Array(digest)).slice(0, 16)
+  return bufferToHex(new Uint8Array(digest)).slice(0, 16).toLowerCase()
 }
 
 export async function getCurrentServerVapidFingerprint(): Promise<string | null> {
-  const publicKey = Deno.env.get('VAPID_PUBLIC_KEY')?.trim()
+  const publicKey = normalizeVapidPublicKey(Deno.env.get('VAPID_PUBLIC_KEY'))
   if (!publicKey) return null
   return fingerprintPublicKeyBase64url(publicKey)
 }
@@ -37,35 +49,25 @@ export async function verifyVapidKeyPair(publicKey: string, privateKey: string):
 }
 
 export async function getVapidDiagnostics(): Promise<{
-  serverPublicFingerprint: string | null
-  derivedPublicFingerprint: string | null
-  pairMatches: boolean
   configured: boolean
+  pairMatches: boolean
+  publicKeyFingerprint: string | null
+  subjectValid: boolean
 }> {
-  const publicKey = Deno.env.get('VAPID_PUBLIC_KEY')?.trim() ?? ''
+  const publicKey = normalizeVapidPublicKey(Deno.env.get('VAPID_PUBLIC_KEY')) ?? ''
   const privateKey = Deno.env.get('VAPID_PRIVATE_KEY')?.trim() ?? ''
   const subject = Deno.env.get('VAPID_SUBJECT')?.trim() ?? ''
 
-  const configured = Boolean(publicKey && privateKey && subject)
-  const serverPublicFingerprint = configured
-    ? await fingerprintPublicKeyBase64url(publicKey)
-    : null
+  const subjectValid = subject.startsWith('mailto:') || subject.startsWith('https://')
+  const configured = Boolean(publicKey && privateKey && subjectValid)
+  const publicKeyFingerprint = configured ? await fingerprintPublicKeyBase64url(publicKey) : null
   const pairMatches = configured ? await verifyVapidKeyPair(publicKey, privateKey) : false
 
-  let derivedPublicFingerprint: string | null = null
-  if (configured && pairMatches) {
-    const privRaw = Buffer.from(decodeBase64Url(privateKey))
-    const ecdh = createECDH('prime256v1')
-    ecdh.setPrivateKey(privRaw)
-    const derivedPublic = ecdh.getPublicKey(null, 'uncompressed').toString('base64url')
-    derivedPublicFingerprint = await fingerprintPublicKeyBase64url(derivedPublic)
-  }
-
   return {
-    serverPublicFingerprint,
-    derivedPublicFingerprint,
-    pairMatches,
     configured,
+    pairMatches,
+    publicKeyFingerprint,
+    subjectValid,
   }
 }
 
@@ -74,7 +76,7 @@ export function isCurrentVapidFingerprint(
   current: string | null
 ): boolean {
   if (!current || !stored) return false
-  return stored === current
+  return stored.trim().toLowerCase() === current.trim().toLowerCase()
 }
 
 function decodeBase64Url(value: string): Uint8Array {

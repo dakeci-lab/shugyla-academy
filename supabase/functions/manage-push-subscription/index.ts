@@ -4,7 +4,11 @@ import {
   authorizeAuthenticatedEmployee,
 } from '../_shared/employeeAuthorization.ts'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
-import { getCurrentServerVapidFingerprint } from '../_shared/vapidFingerprint.ts'
+import {
+  getCurrentServerVapidFingerprint,
+  getVapidDiagnostics,
+  isCurrentVapidFingerprint,
+} from '../_shared/vapidFingerprint.ts'
 
 const MAX_ENDPOINT_LENGTH = 2048
 const MAX_KEY_LENGTH = 512
@@ -154,11 +158,16 @@ Deno.serve(async (req) => {
   const authUserId = caller.auth_user_id
 
   if (action === 'status') {
-    const currentVapidFingerprint = await getCurrentServerVapidFingerprint()
+    const [currentVapidFingerprint, vapidHealth] = await Promise.all([
+      getCurrentServerVapidFingerprint(),
+      getVapidDiagnostics(),
+    ])
 
     const { data, error } = await serviceClient
       .from('notification_push_subscriptions')
-      .select('is_active, permission_status, last_used_at, vapid_key_fingerprint')
+      .select(
+        'is_active, permission_status, last_used_at, last_success_at, vapid_key_fingerprint'
+      )
       .eq('employee_id', employeeId)
       .eq('device_id', deviceId)
       .maybeSingle()
@@ -168,9 +177,20 @@ Deno.serve(async (req) => {
       return adminErrorResponse('internal_error', 500)
     }
 
+    const healthExtras = {
+      server_vapid_fingerprint: currentVapidFingerprint,
+      vapid_configured: vapidHealth.configured,
+      vapid_pair_matches: vapidHealth.pairMatches,
+      vapid_subject_valid: vapidHealth.subjectValid,
+    }
+
     if (!data) {
       return subscriptionResponse(false, false, 'default', 0, {
+        registered: false,
         vapid_key_current: false,
+        vapid_key_fingerprint: null,
+        last_success_at: null,
+        ...healthExtras,
       })
     }
 
@@ -180,11 +200,14 @@ Deno.serve(async (req) => {
       active &&
       permission === 'granted' &&
       Boolean(currentVapidFingerprint) &&
-      data.vapid_key_fingerprint === currentVapidFingerprint
+      isCurrentVapidFingerprint(data.vapid_key_fingerprint, currentVapidFingerprint)
 
     return subscriptionResponse(active && permission === 'granted', vapidKeyCurrent, permission, vapidKeyCurrent ? 1 : 0, {
+      registered: true,
       vapid_key_current: vapidKeyCurrent,
       vapid_key_fingerprint: data.vapid_key_fingerprint ?? null,
+      last_success_at: data.last_success_at ?? null,
+      ...healthExtras,
     })
   }
 
@@ -222,6 +245,26 @@ Deno.serve(async (req) => {
     const userAgent = req.headers.get('user-agent')?.slice(0, 512) ?? null
     const now = new Date().toISOString()
     const vapidKeyFingerprint = await getCurrentServerVapidFingerprint()
+    if (!vapidKeyFingerprint) {
+      return adminErrorResponse('web_push_not_configured', 503)
+    }
+
+    // Client may declare the fingerprint of the public key used for pushManager.subscribe.
+    // Backend always stores the server fingerprint and rejects mismatched claims.
+    const claimedFingerprint =
+      typeof payload.client_vapid_fingerprint === 'string'
+        ? payload.client_vapid_fingerprint.trim().toLowerCase()
+        : null
+    if (claimedFingerprint && !isCurrentVapidFingerprint(claimedFingerprint, vapidKeyFingerprint)) {
+      return jsonResponse(
+        {
+          ok: false,
+          code: 'vapid_fingerprint_mismatch',
+          server_vapid_fingerprint: vapidKeyFingerprint,
+        },
+        409
+      )
+    }
 
     const row = {
       employee_id: employeeId,

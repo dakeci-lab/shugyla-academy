@@ -290,16 +290,36 @@ export default function NotificationTestBroadcastSection() {
                 <dd>{labelForServiceWorker(diagnostics?.serviceWorker)}</dd>
               </div>
               <div>
-                <dt>VAPID-ключ подписки</dt>
-                <dd>{labelForVapidKeyStatus(diagnostics?.vapidKeyStatus)}</dd>
+                <dt>Push-подписка</dt>
+                <dd>{diagnostics?.pushSubscription ? 'Подключена' : 'Отсутствует'}</dd>
               </div>
               <div>
                 <dt>Серверная регистрация</dt>
                 <dd>{diagnostics?.serverRegistration ? 'Активна' : 'Не активна'}</dd>
               </div>
               <div>
-                <dt>Push-подписка</dt>
-                <dd>{diagnostics?.pushSubscription ? 'Подключена' : 'Отсутствует'}</dd>
+                <dt>Состояние VAPID</dt>
+                <dd>{labelForVapidKeyStatus(diagnostics?.vapidKeyStatus)}</dd>
+              </div>
+              <div>
+                <dt>Frontend fingerprint</dt>
+                <dd>{diagnostics?.frontendVapidFingerprint || '—'}</dd>
+              </div>
+              <div>
+                <dt>Subscription fingerprint</dt>
+                <dd>{diagnostics?.subscriptionVapidFingerprint || '—'}</dd>
+              </div>
+              <div>
+                <dt>Server fingerprint</dt>
+                <dd>{diagnostics?.serverVapidFingerprint || '—'}</dd>
+              </div>
+              <div>
+                <dt>Последняя успешная доставка</dt>
+                <dd>
+                  {diagnostics?.lastSuccessAt
+                    ? new Date(diagnostics.lastSuccessAt).toLocaleString('ru-RU')
+                    : '—'}
+                </dd>
               </div>
               <div>
                 <dt>Режим приложения</dt>

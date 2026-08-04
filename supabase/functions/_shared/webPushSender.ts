@@ -5,6 +5,7 @@ import {
   extractPushResponseStatus,
   type PushClassification,
 } from './webPushClassification.ts'
+import { normalizeVapidPublicKey } from './vapidFingerprint.ts'
 
 const MAX_PAYLOAD_BYTES = 3800
 const SEND_TIMEOUT_MS = 5_000
@@ -48,7 +49,7 @@ type VapidConfig = {
 let appServerPromise: Promise<webpush.ApplicationServer> | null = null
 
 function readVapidConfig(): VapidConfig | null {
-  const publicKey = Deno.env.get('VAPID_PUBLIC_KEY')?.trim()
+  const publicKey = normalizeVapidPublicKey(Deno.env.get('VAPID_PUBLIC_KEY'))
   const privateKey = Deno.env.get('VAPID_PRIVATE_KEY')?.trim()
   const subject = Deno.env.get('VAPID_SUBJECT')?.trim()
 

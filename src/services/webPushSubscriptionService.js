@@ -53,7 +53,9 @@ export function getOrCreateDeviceId() {
 
 function getVapidPublicKey() {
   const key = import.meta.env.VITE_WEB_PUSH_VAPID_PUBLIC_KEY
-  return typeof key === 'string' && key.trim() ? key.trim() : null
+  if (typeof key !== 'string') return null
+  const normalized = key.trim().replace(/\s+/g, '')
+  return normalized || null
 }
 
 export function urlBase64ToUint8Array(base64String) {
@@ -83,14 +85,16 @@ function subscriptionMatchesVapid(subscription, vapidPublicKey) {
   return subKey.every((byte, index) => byte === expected[index])
 }
 
-async function computeVapidPublicFingerprint(vapidPublicKey) {
+/** Canonical fingerprint — must match backend vapidFingerprint.ts / scripts/lib/vapid-fingerprint.mjs */
+export async function computeVapidPublicFingerprint(vapidPublicKey) {
   if (!vapidPublicKey || !hasWindow() || !window.crypto?.subtle) return null
-  const raw = urlBase64ToUint8Array(vapidPublicKey)
+  const raw = urlBase64ToUint8Array(vapidPublicKey.trim().replace(/\s+/g, ''))
   const digest = await window.crypto.subtle.digest('SHA-256', raw)
   return Array.from(new Uint8Array(digest))
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('')
     .slice(0, 16)
+    .toLowerCase()
 }
 
 function readRegisteredVapidFingerprint() {
@@ -213,10 +217,14 @@ async function createBrowserSubscription(registration, vapidPublicKey) {
 }
 
 async function registerBrowserSubscriptionWithBackend(deviceId, subscription, vapidPublicKey) {
+  const clientFingerprint = vapidPublicKey
+    ? await computeVapidPublicFingerprint(vapidPublicKey)
+    : null
   await invokeManageSubscription({
     action: 'register',
     device_id: deviceId,
     subscription: serializeSubscription(subscription),
+    ...(clientFingerprint ? { client_vapid_fingerprint: clientFingerprint } : {}),
   })
   if (vapidPublicKey) {
     await persistRegisteredVapidFingerprint(vapidPublicKey)
@@ -355,6 +363,10 @@ export async function getDevicePushDiagnostics() {
   const supported = isWebPushSupported()
   const standalone = isPwaStandalone()
   const appBasePath = getAppBasePath()
+  const vapidPublicKey = getVapidPublicKey()
+  const frontendVapidFingerprint = vapidPublicKey
+    ? await computeVapidPublicFingerprint(vapidPublicKey)
+    : null
 
   const base = {
     permission,
@@ -364,8 +376,13 @@ export async function getDevicePushDiagnostics() {
     pushSubscription: false,
     serverRegistration: false,
     scopeMatchesApp: false,
-    vapidConfigured: Boolean(getVapidPublicKey()),
+    vapidConfigured: Boolean(vapidPublicKey),
     vapidKeyStatus: 'unknown',
+    frontendVapidFingerprint,
+    subscriptionVapidFingerprint: null,
+    serverVapidFingerprint: null,
+    lastSuccessAt: null,
+    vapidPairMatches: null,
     needsReconnect: false,
     issue: null,
   }
@@ -407,8 +424,11 @@ export async function getDevicePushDiagnostics() {
 
     let serverRegistration = false
     let vapidKeyStatus = 'unknown'
+    let serverVapidFingerprint = null
+    let subscriptionVapidFingerprint = null
+    let lastSuccessAt = null
+    let vapidPairMatches = null
     const deviceId = getOrCreateDeviceId()
-    const vapidPublicKey = getVapidPublicKey()
     const browserVapidMatches =
       pushSubscription && vapidPublicKey
         ? subscriptionMatchesVapid(browserSub, vapidPublicKey)
@@ -417,15 +437,20 @@ export async function getDevicePushDiagnostics() {
     if (deviceId) {
       try {
         const status = await invokeManageSubscription({ action: 'status', device_id: deviceId })
-        serverRegistration = Boolean(status.subscription?.vapid_key_current)
-        if (status.subscription?.vapid_key_current) {
+        const sub = status.subscription ?? {}
+        serverRegistration = Boolean(sub.vapid_key_current) || Boolean(sub.active && sub.registered)
+        serverVapidFingerprint = sub.server_vapid_fingerprint ?? null
+        subscriptionVapidFingerprint = sub.vapid_key_fingerprint ?? null
+        lastSuccessAt = sub.last_success_at ?? null
+        vapidPairMatches =
+          typeof sub.vapid_pair_matches === 'boolean' ? sub.vapid_pair_matches : null
+
+        if (sub.vapid_key_current && browserVapidMatches) {
           vapidKeyStatus = 'current'
-        } else if (status.subscription?.registered) {
+        } else if (sub.registered || pushSubscription) {
           vapidKeyStatus = 'reconnect_required'
         } else if (browserVapidMatches) {
           vapidKeyStatus = 'current'
-        } else if (pushSubscription) {
-          vapidKeyStatus = 'reconnect_required'
         }
       } catch {
         serverRegistration = false
@@ -437,12 +462,21 @@ export async function getDevicePushDiagnostics() {
       vapidKeyStatus = 'reconnect_required'
     }
 
+    if (
+      frontendVapidFingerprint &&
+      serverVapidFingerprint &&
+      frontendVapidFingerprint !== serverVapidFingerprint
+    ) {
+      vapidKeyStatus = 'reconnect_required'
+    }
+
     const needsReconnect =
       permission === 'granted' &&
       (!pushSubscription ||
         !serverRegistration ||
         vapidKeyStatus === 'reconnect_required' ||
-        !scopeMatchesApp)
+        !scopeMatchesApp ||
+        !browserVapidMatches)
 
     let issue = null
     if (!pushSubscription) issue = 'missing_browser_subscription'
@@ -460,6 +494,11 @@ export async function getDevicePushDiagnostics() {
       vapidKeyStatus,
       scopeMatchesApp,
       vapidConfigured: Boolean(vapidPublicKey),
+      frontendVapidFingerprint,
+      subscriptionVapidFingerprint,
+      serverVapidFingerprint,
+      lastSuccessAt,
+      vapidPairMatches,
       needsReconnect,
       issue,
     }
@@ -1631,11 +1670,22 @@ export async function sendServerTestWebPush() {
     })
   }
 
+  if (data.delivery?.status !== 'accepted') {
+    markPersistedTestSendPermitUsed()
+    throwSendTestFailure({
+      stage: 'invoke',
+      httpStatus: 0,
+      errorCode: data.delivery?.status ? `delivery_${data.delivery.status}` : 'delivery_not_accepted',
+      attempted: true,
+      message: SEND_TEST_ERROR_MESSAGES.generic,
+    })
+  }
+
   clearPersistedSendTestDiagnostic()
   markPersistedTestSendPermitUsed()
 
   return {
     notificationId: data.notification_id,
-    deliveryStatus: data.delivery?.status ?? 'accepted',
+    deliveryStatus: 'accepted',
   }
 }

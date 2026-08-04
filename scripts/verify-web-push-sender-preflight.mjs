@@ -224,9 +224,16 @@ function stageStatic() {
   assert('preflight no persistSendTestRequest', !preflightServiceBlock.includes('persistSendTestRequest'))
   assert('preflight diagnostic storage key', service.includes('shugyla.web_push.last_preflight_diagnostic'))
   assert('send action explicit', service.includes("action: 'send'"))
-  assert('preflight button in UI', ui.includes('Проверить готовность сервера'))
-  assert('preflight requires testReady', ui.includes('!testReady') && ui.includes('handlePreflightServer'))
-  assert('preflight separate from send click', ui.includes('handlePreflightServer') && ui.includes('handleServerTest'))
+  const diagnosticsUi = read('src/components/platform/notifications/PushNotificationDiagnostics.jsx')
+  assert('preflight button in UI', diagnosticsUi.includes('Проверить готовность сервера'))
+  assert(
+    'preflight requires testReady',
+    diagnosticsUi.includes('!testReady') && diagnosticsUi.includes('handlePreflightServer')
+  )
+  assert(
+    'preflight separate from send click',
+    diagnosticsUi.includes('handlePreflightServer') && diagnosticsUi.includes('handleServerTest')
+  )
   assert('no endpoint in preflight response builder', senderFn.includes("{ count: 'exact', head: true }"))
   console.log('')
 }

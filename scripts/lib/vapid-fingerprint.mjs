@@ -4,9 +4,18 @@ import { createHash } from 'crypto'
  * Canonical VAPID public key fingerprint:
  * SHA-256 of decoded base64url raw public key bytes, first 16 hex chars.
  */
+export function normalizeVapidPublicKey(publicKeyBase64url) {
+  if (typeof publicKeyBase64url !== 'string') return null
+  const trimmed = publicKeyBase64url.trim().replace(/\s+/g, '')
+  if (!trimmed || !/^[A-Za-z0-9_-]+$/.test(trimmed)) return null
+  return trimmed
+}
+
 export function canonicalVapidFingerprint(publicKeyBase64url) {
-  const raw = Buffer.from(publicKeyBase64url, 'base64url')
-  return createHash('sha256').update(raw).digest('hex').slice(0, 16)
+  const normalized = normalizeVapidPublicKey(publicKeyBase64url)
+  if (!normalized) throw new Error('invalid_vapid_public_key')
+  const raw = Buffer.from(normalized, 'base64url')
+  return createHash('sha256').update(raw).digest('hex').slice(0, 16).toLowerCase()
 }
 
 /** Legacy: SHA-256 of the base64url string (UTF-8), used by prepare-local-web-push-edge-env.mjs before Step 21C. */
