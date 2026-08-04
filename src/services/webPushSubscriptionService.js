@@ -1406,7 +1406,16 @@ export function resolveConnectionErrorMessage(err) {
 
 export async function connectDeviceNotifications({ reconnect = false } = {}) {
   if (reconnect) {
-    await prepareDeviceForTestSend()
+    // Force a real browser re-subscribe: unsubscribe existing PushSubscription,
+    // then subscribe with the canonical applicationServerKey and re-register.
+    await reconnectDevicePushNotifications()
+    const status = await getDeviceTestSendStatus()
+    if (!status.testReady) {
+      if (status.matchingSubscriptions > 1) {
+        throw new WebPushError('backend_registration_failed', PREPARE_TEST_ERROR_MESSAGES.matching_not_one)
+      }
+      throw new WebPushError('backend_registration_failed', PREPARE_TEST_ERROR_MESSAGES.backend_not_active)
+    }
     return { connected: true }
   }
   await enablePushNotifications()

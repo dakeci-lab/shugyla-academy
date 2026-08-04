@@ -76,6 +76,12 @@ function stageStatic() {
   assert('diagnostics flag helper exported', service.includes('export function isWebPushDiagnosticsEnabled'))
   assert('clear test ui helper exported', service.includes('export function clearTestUiSessionState'))
   assert('connect helper exported', service.includes('export async function connectDeviceNotifications'))
+  assert(
+    'reconnect path force-unsubscribes browser subscription',
+    service.includes('if (reconnect)') &&
+      service.includes('await reconnectDevicePushNotifications()') &&
+      service.includes('await existing.unsubscribe()')
+  )
   console.log('')
 }
 
