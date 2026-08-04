@@ -133,18 +133,19 @@ function buildPayload(notificationId: string, requestId: string) {
 }
 
 function notificationContent() {
+  // notifications.action_url CHECK requires a same-app relative path ("/..."), not absolute https://
   if (isProductionTestEnabled()) {
     return {
       title: 'Shugyla Platform',
       body: 'Тестовое уведомление успешно доставлено',
-      action_url: 'https://dakeci-lab.github.io/shugyla-academy/',
+      action_url: '/platform/profile',
     }
   }
 
   return {
     title: 'Shugyla Platform',
     body: 'Тестовое push-уведомление отправлено сервером',
-    action_url: '/shugyla-academy/platform/profile',
+    action_url: '/platform/profile',
   }
 }
 
