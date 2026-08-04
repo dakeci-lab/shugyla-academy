@@ -1276,6 +1276,7 @@ export const DEVICE_CONNECTION_STATUS = {
   CONNECTED: 'connected',
   RECONNECTION_REQUIRED: 'reconnection_required',
   NOT_CONNECTED: 'not_connected',
+  INSTALL_PWA: 'install_pwa',
   CONNECTING: 'connecting',
   DISCONNECTING: 'disconnecting',
   ERROR: 'error',
@@ -1349,6 +1350,13 @@ export function evaluateDeviceConnectionStatus({
 export async function getDeviceConnectionStatus() {
   if (!isWebPushSupported()) {
     return { status: DEVICE_CONNECTION_STATUS.UNSUPPORTED }
+  }
+
+  const iosLike =
+    /iPad|iPhone|iPod/i.test(navigator.userAgent || '') ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  if (iosLike && !isPwaStandalone()) {
+    return { status: DEVICE_CONNECTION_STATUS.INSTALL_PWA, permission: getNotificationPermission() }
   }
 
   const permission = getNotificationPermission()

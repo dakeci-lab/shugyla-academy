@@ -33,6 +33,7 @@
     "verify:web-push-sender-preflight": "node scripts/verify-web-push-sender-preflight.mjs",
     "verify:web-push-test-permits": "node scripts/verify-web-push-test-permits.mjs",
     "verify:push-notification-settings-ui": "node scripts/verify-push-notification-settings-ui.mjs",
+    "verify:device-permissions-onboarding": "node scripts/verify-device-permissions-onboarding.mjs",
     "verify:production-vapid-rotation": "node scripts/verify-production-vapid-rotation.mjs",
     "verify:production-vapid-alignment": "node scripts/verify-production-vapid-alignment.mjs",
     "verify:frontend-vapid-build": "node scripts/verify-frontend-vapid-build.mjs",

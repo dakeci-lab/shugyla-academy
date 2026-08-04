@@ -78,6 +78,7 @@ function main() {
   assert('broadcast permission gate', broadcastSection.includes('NOTIFICATIONS_MANAGE'))
   assert('broadcast confirmation modal', broadcastSection.includes('Отправить всем'))
   assert('get_test_broadcast_summary action', edgeFn.includes("'get_test_broadcast_summary'"))
+  assert('get_subscription_readiness action', edgeFn.includes("'get_subscription_readiness'"))
   assert('send_test_broadcast action', edgeFn.includes("'send_test_broadcast'"))
   assert('broadcast reuses delivery helper', broadcastShared.includes('deliverNotificationToSubscription'))
   assert('broadcast audit migration', broadcastMigration.includes('notification_test_broadcast_audits'))

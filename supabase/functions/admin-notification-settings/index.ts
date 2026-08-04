@@ -7,6 +7,7 @@ import {
   getTestBroadcastSummary,
   sendTestBroadcast,
 } from '../_shared/testBroadcastPush.ts'
+import { getSubscriptionReadiness } from '../_shared/subscriptionReadiness.ts'
 
 const PERMISSION_MANAGE = 'notifications.manage'
 
@@ -52,6 +53,7 @@ type Action =
   | 'update_settings'
   | 'get_test_broadcast_summary'
   | 'send_test_broadcast'
+  | 'get_subscription_readiness'
 
 type RuleCode = (typeof TIME_TRACKER_RULE_CODES)[number]
 
@@ -80,6 +82,7 @@ const ALLOWED_KEYS_BY_ACTION: Record<Action, Set<string>> = {
   update_settings: new Set(['action', 'settings']),
   get_test_broadcast_summary: new Set(['action']),
   send_test_broadcast: new Set(['action', 'request_id']),
+  get_subscription_readiness: new Set(['action']),
 }
 
 function isRuleCode(value: string): value is RuleCode {
@@ -92,7 +95,8 @@ function parseAction(payload: Record<string, unknown>): Action | Response {
     action === 'get_settings' ||
     action === 'update_settings' ||
     action === 'get_test_broadcast_summary' ||
-    action === 'send_test_broadcast'
+    action === 'send_test_broadcast' ||
+    action === 'get_subscription_readiness'
   ) {
     return action
   }
@@ -226,6 +230,22 @@ async function handleGetTestBroadcastSummary(serviceClient: SupabaseClient): Pro
   }
 }
 
+async function handleGetSubscriptionReadiness(serviceClient: SupabaseClient): Promise<Response> {
+  try {
+    const readiness = await getSubscriptionReadiness(serviceClient)
+    return jsonResponse({
+      ok: true,
+      readiness,
+    })
+  } catch (error) {
+    console.error('Subscription readiness summary failed', {
+      code: (error as { code?: string })?.code,
+      message: (error as Error)?.message,
+    })
+    return adminErrorResponse('internal_error', 500)
+  }
+}
+
 async function handleSendTestBroadcast(
   serviceClient: SupabaseClient,
   caller: { id: number; auth_user_id: string | null },
@@ -338,6 +358,10 @@ Deno.serve(async (req) => {
 
   if (action === 'get_test_broadcast_summary') {
     return handleGetTestBroadcastSummary(serviceClient)
+  }
+
+  if (action === 'get_subscription_readiness') {
+    return handleGetSubscriptionReadiness(serviceClient)
   }
 
   if (action === 'send_test_broadcast') {

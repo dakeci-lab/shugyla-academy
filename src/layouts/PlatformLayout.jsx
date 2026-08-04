@@ -3,6 +3,8 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import PlatformHeaderActions from '../components/platform/PlatformHeaderActions'
 import PlatformMobileHeader from '../components/platform/PlatformMobileHeader'
 import AppInstallBanner from '../components/platform/AppInstallBanner'
+import DeviceSetupBanner from '../components/platform/DeviceSetupBanner'
+import DeviceSetupOnboarding from '../components/platform/DeviceSetupOnboarding'
 import PlatformDesktopNav, {
   PlatformDesktopLogo,
 } from '../components/platform/PlatformDesktopNav'
@@ -10,6 +12,7 @@ import PlatformSidebar from '../components/platform/PlatformSidebar'
 import PullToRefresh from '../components/platform/PullToRefresh'
 import PlatformErrorBoundary from '../components/platform/PlatformErrorBoundary'
 import PlatformSessionGate from '../components/platform/PlatformSessionGate'
+import { DevicePermissionsProvider } from '../context/DevicePermissionsContext'
 import { PullToRefreshProvider } from '../context/PullToRefreshContext'
 import { PlatformPageTitleProvider, usePlatformPageTitleContext } from '../context/PlatformPageTitleContext'
 import { usePlatformData } from '../context/PlatformDataContext'
@@ -168,47 +171,51 @@ function PlatformLayoutShell({ onLogout }) {
         />
       )}
 
-      <PullToRefreshProvider onGlobalRefresh={reload}>
-        <div className="platform-layout__main">
-          <AppInstallBanner />
+      <DevicePermissionsProvider enabled={Boolean(user)}>
+        <PullToRefreshProvider onGlobalRefresh={reload}>
+          <div className="platform-layout__main">
+            <AppInstallBanner />
+            <DeviceSetupBanner onOpenSetup={() => navigate('/platform/profile')} />
 
-          {/* Header stays outside PullToRefresh so it never translates/unmounts. */}
-          <PlatformMobileHeader
-            title={pageTitle}
-            onMenuOpen={() => setDrawerOpen(true)}
-            showBack={showMobileBack}
-            onBack={handleMobileBack}
-            actions={titleContext?.override?.actions ?? null}
-          />
+            {/* Header stays outside PullToRefresh so it never translates/unmounts. */}
+            <PlatformMobileHeader
+              title={pageTitle}
+              onMenuOpen={() => setDrawerOpen(true)}
+              showBack={showMobileBack}
+              onBack={handleMobileBack}
+              actions={titleContext?.override?.actions ?? null}
+            />
 
-          {!isMobile && (
-            <header className="platform-layout__topbar">
-              <PlatformDesktopLogo />
-              <PlatformDesktopNav />
-              <PlatformHeaderActions user={user} onLogout={onLogout} bellVariant="desktop" />
-            </header>
-          )}
+            {!isMobile && (
+              <header className="platform-layout__topbar">
+                <PlatformDesktopLogo />
+                <PlatformDesktopNav />
+                <PlatformHeaderActions user={user} onLogout={onLogout} bellVariant="desktop" />
+              </header>
+            )}
 
-          <PullToRefresh disabled={drawerOpen || drawerDragging} className="platform-layout__refresh">
-            <div className="platform-layout__content">
-              {procurementRealtimeEnabled &&
-              (connectionStatus === 'offline' || connectionStatus === 'reconnecting') ? (
-                <div
-                  className={`platform-layout__sync-banner platform-layout__sync-banner--${connectionStatus}`}
-                  role="status"
-                >
-                  {connectionStatus === 'offline'
-                    ? 'Нет соединения'
-                    : 'Восстанавливаем соединение…'}
-                </div>
-              ) : null}
-              <PlatformErrorBoundary onLogout={onLogout}>
-                <Outlet />
-              </PlatformErrorBoundary>
-            </div>
-          </PullToRefresh>
-        </div>
-      </PullToRefreshProvider>
+            <PullToRefresh disabled={drawerOpen || drawerDragging} className="platform-layout__refresh">
+              <div className="platform-layout__content">
+                {procurementRealtimeEnabled &&
+                (connectionStatus === 'offline' || connectionStatus === 'reconnecting') ? (
+                  <div
+                    className={`platform-layout__sync-banner platform-layout__sync-banner--${connectionStatus}`}
+                    role="status"
+                  >
+                    {connectionStatus === 'offline'
+                      ? 'Нет соединения'
+                      : 'Восстанавливаем соединение…'}
+                  </div>
+                ) : null}
+                <PlatformErrorBoundary onLogout={onLogout}>
+                  <Outlet />
+                </PlatformErrorBoundary>
+              </div>
+            </PullToRefresh>
+          </div>
+        </PullToRefreshProvider>
+        <DeviceSetupOnboarding />
+      </DevicePermissionsProvider>
     </div>
   )
 }

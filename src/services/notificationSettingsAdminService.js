@@ -13,6 +13,7 @@ const ERROR_MESSAGES = {
   load: 'Не удалось загрузить настройки уведомлений',
   save: 'Не удалось сохранить настройки уведомлений',
   summary: 'Не удалось загрузить статистику тестовой отправки',
+  readiness: 'Не удалось загрузить сводку готовности сотрудников',
   send: 'Не удалось отправить тестовое уведомление',
   cooldown: 'Тестовое уведомление уже отправлялось недавно. Повторите через несколько секунд.',
   noSubscriptions: 'Нет подключённых устройств для отправки уведомления.',
@@ -120,6 +121,30 @@ export async function fetchTestBroadcastSummary() {
     }
     if (!navigator.onLine) throw new Error(ERROR_MESSAGES.offline)
     throw error instanceof Error ? error : new Error(ERROR_MESSAGES.summary)
+  }
+}
+
+export async function fetchSubscriptionReadiness() {
+  try {
+    const data = await invokeAdminNotificationSettings({ action: 'get_subscription_readiness' })
+
+    if (!data?.ok || !data.readiness?.summary) {
+      throw new Error(ERROR_MESSAGES.readiness)
+    }
+
+    return data.readiness
+  } catch (error) {
+    if (error?.errorBody || error?.invokeError) {
+      const message = mapSettingsError(
+        error.errorBody,
+        isGenericInvokeErrorMessage(error.invokeError?.message)
+          ? ERROR_MESSAGES.readiness
+          : error.invokeError?.message
+      )
+      throw new Error(message)
+    }
+    if (!navigator.onLine) throw new Error(ERROR_MESSAGES.offline)
+    throw error instanceof Error ? error : new Error(ERROR_MESSAGES.readiness)
   }
 }
 

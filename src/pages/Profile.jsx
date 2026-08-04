@@ -10,6 +10,7 @@ import { validateContactEmail } from '../utils/profileValidation'
 import { LOGIN_PATH } from '../router/authRoutes'
 import ProfileAvatarEditor from '../components/ProfileAvatarEditor'
 import ProfilePasswordModal from '../components/profile/ProfilePasswordModal'
+import PushNotificationSettings from '../components/platform/notifications/PushNotificationSettings'
 import { ChevronRightIcon } from '../components/icons/PlatformIcons'
 import { getEmployeeDocumentsPath } from '../utils/employeeDocuments'
 import './Profile.css'
@@ -149,6 +150,8 @@ export default function Profile() {
           {saving ? 'Сохранение…' : 'Сохранить'}
         </button>
       </form>
+
+      <PushNotificationSettings />
 
       <div className="profile-page__actions">
         <button

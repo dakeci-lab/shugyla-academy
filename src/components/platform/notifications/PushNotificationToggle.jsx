@@ -91,9 +91,11 @@ export default function PushNotificationToggle({ className = '' }) {
   }
 
   const denied = status === DEVICE_CONNECTION_STATUS.DENIED
+  const needsPwa = status === DEVICE_CONNECTION_STATUS.INSTALL_PWA
   const unsupported =
     status === DEVICE_CONNECTION_STATUS.UNSUPPORTED ||
-    status === DEVICE_CONNECTION_STATUS.OFFLINE_MODE
+    status === DEVICE_CONNECTION_STATUS.OFFLINE_MODE ||
+    needsPwa
   const enabled = isPushConnected(status)
   const toggleDisabled =
     busy ||
@@ -103,10 +105,18 @@ export default function PushNotificationToggle({ className = '' }) {
     status === DEVICE_CONNECTION_STATUS.CONNECTING ||
     status === DEVICE_CONNECTION_STATUS.DISCONNECTING
 
+  const title = needsPwa
+    ? 'Для уведомлений установите приложение на главный экран'
+    : denied
+      ? 'Уведомления запрещены в настройках устройства'
+      : enabled
+        ? 'Уведомления включены'
+        : 'Уведомления выключены'
+
   return (
     <label
       className={`push-notification-toggle ${className}`.trim()}
-      title={enabled ? 'Уведомления включены' : 'Уведомления выключены'}
+      title={title}
     >
       <input
         type="checkbox"

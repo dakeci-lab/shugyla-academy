@@ -9,7 +9,6 @@ import {
   CONNECT_SUCCESS_HINT,
   CONNECT_SUCCESS_MESSAGE,
   CONNECTION_ERROR_HINT,
-  CONNECTION_ERROR_MESSAGE,
   DEVICE_CONNECTION_STATUS,
   disablePushNotifications,
   getDeviceConnectionStatus,
@@ -180,6 +179,20 @@ export default function PushNotificationSettings() {
         </div>
       )}
 
+      {status === DEVICE_CONNECTION_STATUS.INSTALL_PWA && (
+        <div className="push-settings__panel push-settings__panel--warning">
+          <p className="push-settings__status-title push-settings__status-title--warning">
+            Установите PWA
+          </p>
+          <p className="push-settings__status-text">
+            Для уведомлений установите приложение на главный экран.
+          </p>
+          <p className="push-settings__status-text push-settings__device-hint">
+            На iPhone: Поделиться → На экран «Домой», затем откройте Shugyla Platform с главного экрана.
+          </p>
+        </div>
+      )}
+
       {status === DEVICE_CONNECTION_STATUS.OFFLINE_MODE && (
         <div className="push-settings__panel">
           <p className="push-settings__status-text">
@@ -191,7 +204,7 @@ export default function PushNotificationSettings() {
       {status === DEVICE_CONNECTION_STATUS.CONNECTED && (
         <div className="push-settings__panel push-settings__panel--success">
           <p className="push-settings__status-title push-settings__status-title--success">
-            Уведомления подключены
+            Подключено
           </p>
           <p className="push-settings__status-text">
             Напоминания о смене будут приходить на это устройство автоматически.
@@ -215,7 +228,7 @@ export default function PushNotificationSettings() {
 
       {status === DEVICE_CONNECTION_STATUS.NOT_CONNECTED && (
         <div className="push-settings__panel">
-          <p className="push-settings__status-title">Уведомления не подключены</p>
+          <p className="push-settings__status-title">Не подключено</p>
           <p className="push-settings__status-text">
             Подключите уведомления, чтобы получать напоминания о своей смене.
           </p>
@@ -225,22 +238,25 @@ export default function PushNotificationSettings() {
       {status === DEVICE_CONNECTION_STATUS.DENIED && (
         <div className="push-settings__panel push-settings__panel--warning">
           <p className="push-settings__status-title push-settings__status-title--warning">
-            Уведомления запрещены в настройках устройства
+            Запрещено устройством
           </p>
           <p className="push-settings__status-text">
-            Разрешите уведомления для Shugyla Platform в настройках телефона, затем вернитесь и повторите
-            подключение.
+            Уведомления запрещены в настройках устройства
           </p>
-          <p className="push-settings__status-text push-settings__device-hint">
-            Откройте Настройки → Уведомления → Shugyla Platform → Разрешить уведомления.
-          </p>
+          <ol className="push-settings__status-text push-settings__device-hint">
+            <li>Откройте «Настройки» iPhone.</li>
+            <li>Перейдите в раздел «Уведомления».</li>
+            <li>Найдите Shugyla Platform.</li>
+            <li>Включите «Допуск уведомлений».</li>
+            <li>Вернитесь в приложение и нажмите «Проверить снова».</li>
+          </ol>
         </div>
       )}
 
       {status === DEVICE_CONNECTION_STATUS.ERROR && (
         <div className="push-settings__panel push-settings__panel--warning">
           <p className="push-settings__status-title push-settings__status-title--warning">
-            {CONNECTION_ERROR_MESSAGE}
+            Ошибка подключения
           </p>
           <p className="push-settings__status-text">{errorMessage || CONNECTION_ERROR_HINT}</p>
         </div>

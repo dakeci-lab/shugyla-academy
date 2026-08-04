@@ -1,9 +1,42 @@
 /** Браузерная геолокация для тайм-трекера */
 
 const MIN_ACCURACY_METERS = 150
+const GEO_PERMISSION_TIMEOUT_MS = 15000
 
 export function isGeolocationSupported() {
   return typeof navigator !== 'undefined' && Boolean(navigator.geolocation)
+}
+
+/**
+ * Query geolocation permission without prompting.
+ * Returns prompt | granted | denied | unsupported | unknown.
+ */
+export async function queryGeolocationPermission() {
+  if (!isGeolocationSupported()) return 'unsupported'
+  if (typeof navigator.permissions?.query !== 'function') return 'unknown'
+
+  try {
+    const result = await navigator.permissions.query({ name: 'geolocation' })
+    const state = result?.state
+    if (state === 'granted' || state === 'denied' || state === 'prompt') return state
+    return 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
+
+/** Request a one-shot position after an explicit user gesture (no background tracking). */
+export async function requestGeolocationPermissionProbe(options = {}) {
+  const position = await getCurrentPosition({
+    enableHighAccuracy: true,
+    timeout: GEO_PERMISSION_TIMEOUT_MS,
+    maximumAge: 0,
+    ...options,
+  })
+  return {
+    permission: 'granted',
+    coords: extractCoords(position),
+  }
 }
 
 export function getCurrentPosition(options = {}) {
