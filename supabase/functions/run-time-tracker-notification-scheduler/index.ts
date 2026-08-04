@@ -6,7 +6,9 @@ import {
   isSchedulerSecretConfigured,
   verifySchedulerRequest,
 } from '../_shared/schedulerRequestAuth.ts'
+import { parseSchedulerRequestBody } from '../_shared/schedulerControlledRun.ts'
 import { runTimeTrackerNotificationScheduler } from '../_shared/timeTrackerNotificationScheduler.ts'
+import { getVapidDiagnostics } from '../_shared/vapidFingerprint.ts'
 
 const PRODUCTION_MARKERS = ['supabase.co', 'cxadzerxndlscwvdaymk']
 const TEST_RUN_AT_HEADER = 'x-shugyla-scheduler-test-run-at'
@@ -30,31 +32,9 @@ function isLocalTestMode(): boolean {
   return isLocalEnvironment()
 }
 
-function validateBody(rawBody: Uint8Array): Response | null {
-  const text = new TextDecoder().decode(rawBody).trim()
-  const effective = text === '' ? '{}' : text
-
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(effective)
-  } catch {
-    return adminErrorResponse('validation_error', 422)
-  }
-
-  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    return adminErrorResponse('validation_error', 422)
-  }
-
-  if (Object.keys(parsed as Record<string, unknown>).length > 0) {
-    return adminErrorResponse('validation_error', 422)
-  }
-
-  return null
-}
-
-function resolveRunAt(req: Request): Response | Date {
+function resolveLocalTestRunAt(req: Request): Response | Date | null {
   const testHeader = req.headers.get(TEST_RUN_AT_HEADER)
-  if (!testHeader) return new Date()
+  if (!testHeader) return null
 
   if (!isLocalTestMode()) {
     return adminErrorResponse('validation_error', 422)
@@ -66,6 +46,15 @@ function resolveRunAt(req: Request): Response | Date {
   }
 
   return parsed
+}
+
+function mapControlledParseError(code: string): Response {
+  if (code === 'malformed_json') return adminErrorResponse('malformed_json', 400)
+  if (code === 'controlled_run_disabled') {
+    return jsonResponse({ ok: false, code: 'controlled_run_disabled' }, 403)
+  }
+  if (code === 'forbidden_field') return adminErrorResponse('forbidden_field', 422)
+  return adminErrorResponse('validation_error', 422)
 }
 
 Deno.serve(async (req) => {
@@ -95,11 +84,10 @@ Deno.serve(async (req) => {
     return adminErrorResponse('unauthorized', 401)
   }
 
-  const bodyError = validateBody(rawBody)
-  if (bodyError) return bodyError
-
-  const runAt = resolveRunAt(req)
-  if (runAt instanceof Response) return runAt
+  const parsedBody = parseSchedulerRequestBody(rawBody)
+  if (parsedBody.mode === 'error') {
+    return mapControlledParseError(parsedBody.code)
+  }
 
   const serviceClient = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
@@ -108,15 +96,53 @@ Deno.serve(async (req) => {
   )
 
   try {
+    if (parsedBody.mode === 'controlled') {
+      const vapid = await getVapidDiagnostics()
+      const result = await runTimeTrackerNotificationScheduler({
+        serviceClient,
+        runAt: parsedBody.run.runAt,
+        dryRun: false,
+        shiftIds: parsedBody.run.shiftIds,
+        employeeIds: parsedBody.run.employeeIds,
+        controlledRunId: parsedBody.run.runId,
+        ruleCodesFilter: parsedBody.run.ruleCodes ?? undefined,
+      })
+
+      return jsonResponse({
+        ok: true,
+        status: result.status,
+        mode: 'controlled',
+        runId: parsedBody.run.runId,
+        runAt: result.runAt,
+        enabledRules: result.enabledRules,
+        shiftIds: parsedBody.run.shiftIds,
+        vapid: {
+          configured: vapid.configured,
+          pair_matches: vapid.pairMatches,
+          public_key_fingerprint: vapid.publicKeyFingerprint,
+          subject_valid: vapid.subjectValid,
+          subject_kind: vapid.subjectKind,
+          public_key_decoded_bytes: vapid.publicKeyDecodedBytes,
+          private_key_decoded_bytes: vapid.privateKeyDecodedBytes,
+          private_key_fingerprint: vapid.privateKeyFingerprint,
+        },
+        result: result.result,
+      })
+    }
+
+    const localTestRunAt = resolveLocalTestRunAt(req)
+    if (localTestRunAt instanceof Response) return localTestRunAt
+
     const result = await runTimeTrackerNotificationScheduler({
       serviceClient,
-      runAt,
+      runAt: localTestRunAt ?? new Date(),
       dryRun: false,
     })
 
     return jsonResponse({
       ok: true,
       status: result.status,
+      mode: 'cron',
       runAt: result.runAt,
       enabledRules: result.enabledRules,
       result: result.result,

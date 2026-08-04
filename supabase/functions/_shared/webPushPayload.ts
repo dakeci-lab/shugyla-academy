@@ -60,6 +60,14 @@ export function buildTestBroadcastPayload(
   })
 }
 
+function toAppRelativeUrl(actionUrl: string | null | undefined): string {
+  const raw = (actionUrl ?? DEFAULT_PLATFORM_URL).trim() || DEFAULT_PLATFORM_URL
+  if (raw.startsWith('/shugyla-academy/')) return raw
+  if (raw === '/shugyla-academy') return `${raw}/`
+  if (raw.startsWith('/')) return `/shugyla-academy${raw}`
+  return DEFAULT_PLATFORM_URL
+}
+
 export function buildTimeTrackerPushPayload(
   notificationId: string,
   requestId: string,
@@ -69,12 +77,14 @@ export function buildTimeTrackerPushPayload(
     action_url?: string | null
   }
 ): Record<string, unknown> {
+  // Keep SW tag short (≤24) so Apple Topic is omitted rather than rejected as BadTopic.
+  const shortId = requestId.replace(/-/g, '').slice(0, 8)
   return buildWebPushPayload({
     title: notification.title,
     body: notification.body,
-    url: notification.action_url ?? DEFAULT_PLATFORM_URL,
+    url: toAppRelativeUrl(notification.action_url),
     type: 'time_tracker',
-    tag: `shugyla-time-tracker-${requestId.replace(/-/g, '').slice(0, 8)}`,
+    tag: `tt-${shortId}`,
     notificationId,
     requestId,
   })

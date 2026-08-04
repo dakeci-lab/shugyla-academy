@@ -25,6 +25,11 @@ export type DeliveryOutcome = {
   classification: PushClassification
 }
 
+function providerResponseJson(reason: string | null | undefined): Record<string, string> | null {
+  if (!reason) return null
+  return { reason: reason.slice(0, 180) }
+}
+
 export type DeliverNotificationInput = {
   serviceClient: SupabaseClient
   notification: NotificationDeliveryRow
@@ -80,6 +85,7 @@ export async function deliverNotificationToSubscription(
     ok: pushResult.ok,
     classification: pushResult.classification,
     provider: pushResult.provider ?? 'unknown',
+    providerReason: pushResult.providerReason ?? null,
   })
 
   if (pushResult.classification === 'accepted') {
@@ -91,6 +97,7 @@ export async function deliverNotificationToSubscription(
         sent_at: now,
         error_code: null,
         error_message: null,
+        provider_response: null,
         failed_at: null,
       })
       .eq('id', delivery.id)
@@ -128,6 +135,7 @@ export async function deliverNotificationToSubscription(
         provider_status_code: pushResult.statusCode,
         error_code: 'subscription_expired',
         error_message: 'Push subscription expired',
+        provider_response: providerResponseJson(pushResult.providerReason),
         failed_at: now,
       })
       .eq('id', delivery.id)
@@ -170,6 +178,7 @@ export async function deliverNotificationToSubscription(
           configErrorCode === 'vapid_rejected'
             ? 'Push provider rejected VAPID credentials'
             : 'Web push configuration error',
+        provider_response: providerResponseJson(pushResult.providerReason),
         failed_at: now,
       })
       .eq('id', delivery.id)
@@ -196,6 +205,7 @@ export async function deliverNotificationToSubscription(
         provider_status_code: pushResult.statusCode,
         error_code: 'provider_unavailable',
         error_message: 'Push provider temporarily unavailable',
+        provider_response: providerResponseJson(pushResult.providerReason),
         failed_at: now,
       })
       .eq('id', delivery.id)
@@ -228,7 +238,8 @@ export async function deliverNotificationToSubscription(
       status: 'failed',
       provider_status_code: pushResult.statusCode,
       error_code: pushResult.classification,
-      error_message: 'Push delivery failed',
+      error_message: pushResult.providerReason?.slice(0, 120) || 'Push delivery failed',
+      provider_response: providerResponseJson(pushResult.providerReason),
       failed_at: now,
     })
     .eq('id', delivery.id)

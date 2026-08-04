@@ -62,11 +62,18 @@ export async function runTimeTrackerNotificationScheduler(params: {
   sender?: WebPushSenderFn
   rulesOverride?: TimeTrackerRule[]
   shiftIds?: string[]
+  employeeIds?: number[]
+  controlledRunId?: string
+  ruleCodesFilter?: string[]
 }): Promise<SchedulerResult> {
   const dryRun = params.dryRun ?? false
   const runAtIso = params.runAt.toISOString()
 
-  const rules = params.rulesOverride ?? (await loadEnabledRules(params.serviceClient))
+  let rules = params.rulesOverride ?? (await loadEnabledRules(params.serviceClient))
+  if (params.ruleCodesFilter?.length) {
+    const allowed = new Set(params.ruleCodesFilter)
+    rules = rules.filter((rule) => allowed.has(rule.code))
+  }
 
   if (!rules.length) {
     return {
@@ -86,6 +93,8 @@ export async function runTimeTrackerNotificationScheduler(params: {
     dryRun,
     sender: params.sender,
     shiftIds: params.shiftIds,
+    employeeIds: params.employeeIds,
+    controlledRunId: params.controlledRunId,
   })
 
   return {

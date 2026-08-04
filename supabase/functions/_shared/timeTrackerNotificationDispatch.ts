@@ -406,6 +406,8 @@ export async function dispatchTimeTrackerNotifications(params: {
   dryRun?: boolean
   sender?: WebPushSenderFn
   shiftIds?: string[]
+  employeeIds?: number[]
+  controlledRunId?: string
 }): Promise<DispatchResult> {
   const dryRun = params.dryRun ?? false
   const sender = params.sender ?? sendWebPush
@@ -424,6 +426,10 @@ export async function dispatchTimeTrackerNotifications(params: {
   if (params.shiftIds?.length) {
     const allowed = new Set(params.shiftIds)
     shifts = shifts.filter((shift) => allowed.has(shift.id))
+  }
+  if (params.employeeIds?.length) {
+    const allowedEmployees = new Set(params.employeeIds)
+    shifts = shifts.filter((shift) => allowedEmployees.has(shift.employee_id))
   }
 
   result.scannedShifts = shifts.length
@@ -488,6 +494,9 @@ export async function dispatchTimeTrackerNotifications(params: {
             rule_code: match.ruleCode,
             attempt: match.attempt,
             scheduled_for: match.scheduledFor.toISOString(),
+            ...(params.controlledRunId
+              ? { controlled_run_id: params.controlledRunId }
+              : {}),
           },
         })
         .select('id, title, body, action_url')
@@ -519,12 +528,29 @@ export async function dispatchTimeTrackerNotifications(params: {
           currentVapidFingerprint &&
           subscription.vapid_key_fingerprint === currentVapidFingerprint
       )
+      const outdatedCount = (subscriptions ?? []).length - deliverableSubscriptions.length
 
       if (!deliverableSubscriptions.length) {
         result.noActiveSubscriptions += 1
         await params.serviceClient
           .from('notifications')
-          .update({ status: 'dispatched' })
+          .update({
+            status: 'dispatched',
+            metadata: {
+              source: 'time_tracker_dispatcher',
+              shift_id: shift.id,
+              rule_code: match.ruleCode,
+              attempt: match.attempt,
+              scheduled_for: match.scheduledFor.toISOString(),
+              web_push_outcome: 'no_current_subscription',
+              web_push_accepted_count: 0,
+              web_push_failed_count: 0,
+              web_push_outdated_skipped: outdatedCount,
+              ...(params.controlledRunId
+                ? { controlled_run_id: params.controlledRunId }
+                : {}),
+            },
+          })
           .eq('id', notification.id)
         continue
       }
@@ -556,6 +582,15 @@ export async function dispatchTimeTrackerNotifications(params: {
       result.pushAccepted += acceptedCount
       result.pushFailed += failedCount
 
+      const webPushOutcome =
+        acceptedCount > 0 && failedCount > 0
+          ? 'partial'
+          : acceptedCount > 0
+            ? 'accepted'
+            : 'failed'
+
+      // notifications.status remains broader than Web Push:
+      // delivered truth for push is notification_deliveries + metadata.web_push_outcome.
       const finalStatus =
         failedCount > 0 && acceptedCount === 0
           ? 'failed'
@@ -563,7 +598,23 @@ export async function dispatchTimeTrackerNotifications(params: {
 
       await params.serviceClient
         .from('notifications')
-        .update({ status: finalStatus })
+        .update({
+          status: finalStatus,
+          metadata: {
+            source: 'time_tracker_dispatcher',
+            shift_id: shift.id,
+            rule_code: match.ruleCode,
+            attempt: match.attempt,
+            scheduled_for: match.scheduledFor.toISOString(),
+            web_push_outcome: webPushOutcome,
+            web_push_accepted_count: acceptedCount,
+            web_push_failed_count: failedCount,
+            web_push_outdated_skipped: outdatedCount,
+            ...(params.controlledRunId
+              ? { controlled_run_id: params.controlledRunId }
+              : {}),
+          },
+        })
         .eq('id', notification.id)
     }
   }

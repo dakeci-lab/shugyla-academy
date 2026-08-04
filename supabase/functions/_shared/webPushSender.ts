@@ -5,7 +5,7 @@ import {
   extractPushResponseStatus,
   type PushClassification,
 } from './webPushClassification.ts'
-import { normalizeVapidPublicKey } from './vapidFingerprint.ts'
+import { normalizeVapidPrivateKey, normalizeVapidPublicKey } from './vapidFingerprint.ts'
 
 const MAX_PAYLOAD_BYTES = 3800
 const SEND_TIMEOUT_MS = 5_000
@@ -25,6 +25,8 @@ export type WebPushSendResult = {
   statusCode: number | null
   classification: PushClassification
   provider?: string
+  /** Safe provider reason (no secrets); truncated Apple/FCM body when available. */
+  providerReason?: string | null
 }
 
 export function resolvePushProvider(endpoint: string): string {
@@ -47,10 +49,11 @@ type VapidConfig = {
 }
 
 let appServerPromise: Promise<webpush.ApplicationServer> | null = null
+let appServerConfigKey: string | null = null
 
 function readVapidConfig(): VapidConfig | null {
   const publicKey = normalizeVapidPublicKey(Deno.env.get('VAPID_PUBLIC_KEY'))
-  const privateKey = Deno.env.get('VAPID_PRIVATE_KEY')?.trim()
+  const privateKey = normalizeVapidPrivateKey(Deno.env.get('VAPID_PRIVATE_KEY'))
   const subject = Deno.env.get('VAPID_SUBJECT')?.trim()
 
   if (!publicKey || !privateKey || !subject) {
@@ -62,6 +65,47 @@ function readVapidConfig(): VapidConfig | null {
   }
 
   return { publicKey, privateKey, subject }
+}
+
+function vapidConfigCacheKey(config: VapidConfig): string {
+  return `${config.publicKey.slice(0, 24)}:${config.privateKey.slice(0, 24)}:${config.subject}`
+}
+
+/** Apple Topic: ASCII printable, max 32 chars. Invalid topics → HTTP 400 BadTopic. */
+function sanitizePushTopic(topic: string | undefined, provider: string): string | undefined {
+  if (!topic) return undefined
+  const trimmed = topic.trim()
+  if (!trimmed) return undefined
+  if (trimmed.length > 32) return undefined
+  if (!/^[\x20-\x7E]+$/.test(trimmed)) return undefined
+  // Prefer omitting topic on Apple unless it is a short stable coalescing key.
+  if (provider === 'apple' && trimmed.length > 24) return undefined
+  return trimmed
+}
+
+function extractProviderReason(error: unknown): string | null {
+  if (!error || typeof error !== 'object') {
+    return typeof error === 'string' ? error.slice(0, 180) : null
+  }
+  const maybe = error as {
+    message?: unknown
+    name?: unknown
+    response?: { statusText?: unknown; body?: unknown }
+  }
+  const parts: string[] = []
+  if (typeof maybe.name === 'string' && maybe.name) parts.push(maybe.name)
+  if (typeof maybe.message === 'string' && maybe.message) parts.push(maybe.message)
+  if (typeof maybe.response?.statusText === 'string' && maybe.response.statusText) {
+    parts.push(maybe.response.statusText)
+  }
+  if (typeof maybe.response?.body === 'string' && maybe.response.body) {
+    parts.push(maybe.response.body.slice(0, 120))
+  }
+  const joined = parts.join(' | ').replace(/[\r\n]+/g, ' ').trim()
+  if (!joined) return null
+  // Never persist key material if a library ever echoes it.
+  if (/p256dh|auth=|vapid|endpoint/i.test(joined)) return joined.slice(0, 40)
+  return joined.slice(0, 180)
 }
 
 function decodeBase64Url(value: string): Uint8Array {
@@ -137,7 +181,9 @@ function mapUrgency(value: WebPushSendInput['urgency']): webpush.Urgency {
 }
 
 async function getApplicationServer(config: VapidConfig): Promise<webpush.ApplicationServer> {
-  if (!appServerPromise) {
+  const cacheKey = vapidConfigCacheKey(config)
+  if (!appServerPromise || appServerConfigKey !== cacheKey) {
+    appServerConfigKey = cacheKey
     const exported = toExportedVapidKeys(config.publicKey, config.privateKey)
     const vapidKeys = await webpush.importVapidKeys(exported)
     appServerPromise = webpush.ApplicationServer.new({
@@ -181,25 +227,25 @@ export async function sendWebPush(input: WebPushSendInput): Promise<WebPushSendR
       },
     })
 
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS)
-
-    try {
-      await subscriber.pushTextMessage(payload, {
-        ttl: input.ttl ?? 180,
-        urgency: mapUrgency(input.urgency),
-        topic: input.topic,
-      })
-      return {
-        ok: true,
-        statusCode: 201,
-        classification: 'accepted',
-        provider,
-      }
-    } finally {
-      clearTimeout(timeout)
+    const topic = sanitizePushTopic(input.topic, provider)
+    const pushPromise = subscriber.pushTextMessage(payload, {
+      ttl: input.ttl ?? 180,
+      urgency: mapUrgency(input.urgency),
+      ...(topic ? { topic } : {}),
+    })
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('web_push_timeout')), SEND_TIMEOUT_MS)
+    })
+    await Promise.race([pushPromise, timeoutPromise])
+    return {
+      ok: true,
+      statusCode: 201,
+      classification: 'accepted',
+      provider,
+      providerReason: null,
     }
   } catch (error) {
+    const providerReason = extractProviderReason(error)
     const responseStatus = extractPushResponseStatus(error)
     if (responseStatus != null) {
       const classification = classifyPushResponseStatus(
@@ -211,6 +257,7 @@ export async function sendWebPush(input: WebPushSendInput): Promise<WebPushSendR
         statusCode: responseStatus,
         classification,
         provider,
+        providerReason,
       }
     }
 
@@ -228,6 +275,7 @@ export async function sendWebPush(input: WebPushSendInput): Promise<WebPushSendR
       statusCode: Number.isFinite(statusCode) ? statusCode : null,
       classification,
       provider,
+      providerReason,
     }
   }
 }
