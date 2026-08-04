@@ -305,8 +305,9 @@ export function aggregateSubscriptionReadiness(input) {
     if (isCurrent) {
       employee.current_device_count += 1
       currentDevices += 1
-      const acceptedAt = sub.id ? acceptedBySubscription.get(sub.id) : null
-      const baseline = sub.updated_at || sub.created_at
+      const acceptedAt =
+        (sub.id ? acceptedBySubscription.get(sub.id) : null) || sub.last_success_at
+      const baseline = sub.created_at
       const confirmedByDelivery =
         Boolean(acceptedAt) && (!baseline || new Date(acceptedAt) >= new Date(baseline))
       // Unit fixtures may omit delivery rows; then last_success_at on current counts.

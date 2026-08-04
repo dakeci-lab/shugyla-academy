@@ -78,14 +78,18 @@ function maxIso(a: string | null, b: string | null): string | null {
   return new Date(a) >= new Date(b) ? a : b
 }
 
-/** Subscription is confirmed when an accepted delivery exists at/after last material update. */
+/**
+ * Subscription is confirmed when an accepted delivery exists at/after created_at.
+ * Do not use updated_at: failure bookkeeping bumps it and would false-unconfirm devices.
+ * Reconnect must clear last_success_at (see manage-push-subscription register update).
+ */
 export function isSubscriptionConfirmed(
   sub: SubscriptionInput,
   acceptedBySubscription: Map<string, string>
 ): boolean {
-  const acceptedAt = acceptedBySubscription.get(sub.id)
+  const acceptedAt = acceptedBySubscription.get(sub.id) ?? sub.last_success_at
   if (!acceptedAt) return false
-  const baseline = sub.updated_at || sub.created_at
+  const baseline = sub.created_at
   if (!baseline) return true
   return new Date(acceptedAt) >= new Date(baseline)
 }

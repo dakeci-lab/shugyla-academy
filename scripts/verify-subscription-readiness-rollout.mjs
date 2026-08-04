@@ -94,9 +94,10 @@ function stageUnit() {
         is_active: true,
         permission_status: 'granted',
         vapid_key_fingerprint: fp,
+        // New row after reconnect: created after old accepted delivery
         created_at: '2026-08-04T20:00:00Z',
         updated_at: '2026-08-04T20:00:00Z',
-        last_success_at: '2026-08-01T00:00:00Z',
+        last_success_at: null,
       },
     ],
     currentFingerprint: fp,
@@ -104,7 +105,7 @@ function stageUnit() {
     acceptedDeliveries: [{ subscription_id: 'sub-3', created_at: '2026-08-01T00:00:00Z' }],
   })
   assert(
-    'old accepted does not confirm reconnected sub',
+    'old accepted before created_at does not confirm',
     staleAccept.summary.connected_unconfirmed === 1
   )
 

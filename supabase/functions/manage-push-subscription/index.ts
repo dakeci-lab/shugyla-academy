@@ -336,6 +336,8 @@ Deno.serve(async (req) => {
           is_active: true,
           revoked_at: null,
           last_used_at: now,
+          last_success_at: null,
+          failure_count: 0,
           vapid_key_fingerprint: vapidKeyFingerprint,
         })
         .eq('id', deviceRow.id)
