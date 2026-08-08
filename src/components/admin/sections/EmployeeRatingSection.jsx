@@ -21,6 +21,8 @@ import EmployeeRatingDetailModal from '../EmployeeRatingDetailModal'
 import RatingScoreBar from '../RatingScoreBar'
 import PlatformPeriodHeader from '../../platform/PlatformPeriodHeader'
 import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
+import LoadingSkeleton from '../../loading/LoadingSkeleton'
+import useDelayedLoading from '../../loading/useDelayedLoading'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
 import '../EmployeeRating.css'
@@ -95,6 +97,7 @@ export default function EmployeeRatingSection() {
   const [ratingsByEmployee, setRatingsByEmployee] = useState(new Map())
   const [loadedEmployees, setLoadedEmployees] = useState(null)
   const [detailEmployee, setDetailEmployee] = useState(null)
+  const showLoadingSkeleton = useDelayedLoading(loading)
 
   const employees = useMemo(() => {
     const base =
@@ -230,7 +233,7 @@ export default function EmployeeRatingSection() {
       )}
 
       {loading ? (
-        <p className="schedule-loading">Загрузка рейтинга…</p>
+        showLoadingSkeleton ? <LoadingSkeleton variant="list" count={5} /> : null
       ) : !error && !hasVisibleRows ? (
         <p className="schedule-empty">Нет сотрудников с достаточными данными за этот период</p>
       ) : !error ? (

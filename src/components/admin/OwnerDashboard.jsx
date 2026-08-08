@@ -21,6 +21,8 @@ import { usePlatformPageRefresh } from '../../context/PullToRefreshContext'
 import PlatformPeriodHeader from '../platform/PlatformPeriodHeader'
 import AdminModal from './AdminModal'
 import CompanyHealthGauge from './CompanyHealthGauge'
+import LoadingSkeleton from '../loading/LoadingSkeleton'
+import useDelayedLoading from '../loading/useDelayedLoading'
 import './admin-shared.css'
 import './OwnerDashboard.css'
 
@@ -263,6 +265,7 @@ export default function OwnerDashboard() {
   const [dayShifts, setDayShifts] = useState([])
   const [teamEmployees, setTeamEmployees] = useState([])
   const [loading, setLoading] = useState(true)
+  const showLoadingSkeleton = useDelayedLoading(loading)
   const [error, setError] = useState('')
   const [now, setNow] = useState(() => new Date())
   const [activeMetric, setActiveMetric] = useState(null)
@@ -407,7 +410,7 @@ export default function OwnerDashboard() {
       )}
 
       {loading ? (
-        <p className="schedule-loading">Загрузка дашборда…</p>
+        showLoadingSkeleton ? <LoadingSkeleton variant="dashboard" count={5} /> : null
       ) : showMetrics ? (
         <section className="owner-dashboard__hero">
           <CompanyHealthGauge score={dailyMetrics?.health ?? 100} size={188} />

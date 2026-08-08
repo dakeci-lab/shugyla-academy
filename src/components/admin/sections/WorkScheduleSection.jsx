@@ -40,6 +40,8 @@ import ScheduleDayTimeline from '../ScheduleDayTimeline'
 import PlatformPeriodHeader from '../../platform/PlatformPeriodHeader'
 import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
 import useMediaQuery, { MOBILE_SCHEDULE_QUERY } from '../../../hooks/useMediaQuery'
+import LoadingSkeleton from '../../loading/LoadingSkeleton'
+import useDelayedLoading from '../../loading/useDelayedLoading'
 import { buildTeamScheduleDaySheetModel } from '../../../utils/teamScheduleMobileUtils'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
@@ -85,6 +87,7 @@ export default function WorkScheduleSection() {
   const [commentPreview, setCommentPreview] = useState(null)
   const [daySheet, setDaySheet] = useState(null)
   const isMobileSchedule = useMediaQuery(MOBILE_SCHEDULE_QUERY)
+  const showLoadingSkeleton = useDelayedLoading(loading)
 
   const weekDates = useMemo(() => buildWeekDates(weekStartKey), [weekStartKey])
   const isCurrentWeek = weekDates.some((date) => toDateKey(date) === todayKey)
@@ -443,7 +446,7 @@ export default function WorkScheduleSection() {
       )}
 
       {loading ? (
-        <div className="schedule-loading">Загрузка графика…</div>
+        showLoadingSkeleton ? <LoadingSkeleton variant="table" count={5} /> : null
       ) : !error && employees.length === 0 ? (
         <p className="schedule-empty">Сотрудники не найдены</p>
       ) : !error && viewMode === 'day' ? (
