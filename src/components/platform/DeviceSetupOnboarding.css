@@ -10,63 +10,26 @@
 }
 
 .device-setup-onboarding__card {
-  width: min(100%, 440px);
-  max-height: min(92vh, 720px);
-  overflow: auto;
+  width: min(100%, 340px);
   border-radius: 16px;
   background: var(--color-white, #fff);
   box-shadow: 0 18px 48px rgba(15, 23, 42, 0.22);
-  padding: 20px 18px 16px;
+  padding: 18px 16px 14px;
 }
 
 .device-setup-onboarding__title {
-  margin: 0 0 8px;
-  font-size: 1.25rem;
+  margin: 0 0 12px;
+  font-size: 1.125rem;
   font-weight: 700;
   color: var(--color-text, #0f172a);
-}
-
-.device-setup-onboarding__lead {
-  margin: 0 0 18px;
-  font-size: 0.9375rem;
-  line-height: 1.45;
-  color: var(--color-text-secondary, #64748b);
-}
-
-.device-setup-onboarding__step {
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 12px;
-  padding: 14px;
-  margin-bottom: 12px;
-}
-
-.device-setup-onboarding__step--done {
-  border-color: #86efac;
-  background: #f0fdf4;
-}
-
-.device-setup-onboarding__step-title {
-  margin: 0 0 6px;
-  font-size: 1rem;
-  font-weight: 650;
-  color: var(--color-text, #0f172a);
-}
-
-.device-setup-onboarding__step-text {
-  margin: 0 0 12px;
-  font-size: 0.875rem;
-  line-height: 1.45;
-  color: var(--color-text-secondary, #64748b);
+  text-align: center;
 }
 
 .device-setup-onboarding__status {
   margin: 0 0 10px;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   font-weight: 600;
-}
-
-.device-setup-onboarding__status--ok {
-  color: #15803d;
+  text-align: center;
 }
 
 .device-setup-onboarding__status--warn {
@@ -75,38 +38,24 @@
 
 .device-setup-onboarding__hint {
   margin: 0 0 12px;
-  padding: 10px 12px;
+  padding: 8px 10px;
   border-radius: 10px;
   background: #fffbeb;
   color: #92400e;
   font-size: 0.8125rem;
-  line-height: 1.45;
-}
-
-.device-setup-onboarding__hint ol {
-  margin: 8px 0 0;
-  padding-left: 18px;
-}
-
-.device-setup-onboarding__hint li + li {
-  margin-top: 4px;
+  line-height: 1.4;
 }
 
 .device-setup-onboarding__actions {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-top: 4px;
 }
 
 .device-setup-onboarding__primary,
 .device-setup-onboarding__secondary {
   width: 100%;
   min-height: 44px;
-}
-
-.device-setup-onboarding__footer {
-  margin-top: 14px;
 }
 
 @media (min-width: 901px) {

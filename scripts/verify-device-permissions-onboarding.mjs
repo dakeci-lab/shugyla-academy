@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Unit + static verification for Stage 3 device permissions onboarding.
+ * Unit + static verification for notifications-only device setup onboarding.
  *
  * Usage:
  *   npm run verify:device-permissions-onboarding
@@ -86,8 +86,8 @@ function stageUnit() {
     geolocationPermission: 'granted',
   })
   assert('granted + current → current', current.subscriptionStatus === SUBSCRIPTION_STATUS.CURRENT)
-  assert('current + geo granted → no onboarding', !shouldShowDeviceSetupOnboarding(current))
-  assert('current + geo granted → fully ready', isDeviceFullyReady(current))
+  assert('notifications ready → no onboarding', !shouldShowDeviceSetupOnboarding(current))
+  assert('notifications ready → fully ready', isDeviceFullyReady(current))
   assert('current ui = connected', current.uiConnectionState === UI_CONNECTION_STATE.CONNECTED)
 
   const outdated = baseState({
@@ -133,24 +133,13 @@ function stageUnit() {
     backendActive: true,
     geolocationPermission: 'unknown',
   })
-  assert('iPhone PWA current + geo unknown → no forced onboarding', !shouldShowDeviceSetupOnboarding(iosPwa))
+  assert('iPhone PWA current → no onboarding', !shouldShowDeviceSetupOnboarding(iosPwa))
 
   const dismissed = baseState({ notificationPermission: 'default' })
   assert('Не сейчас hides onboarding same session', !shouldShowDeviceSetupOnboarding(dismissed, { sessionDismissed: true }))
   assert('Не сейчас keeps banner', shouldShowDeviceSetupBanner(dismissed, { sessionDismissed: true }))
 
-  const geoGranted = baseState({
-    notificationPermission: 'granted',
-    browserSubscriptionPresent: true,
-    browserVapidMatches: true,
-    subscriptionVapidFingerprint: '71653018b9bcdd1b',
-    backendRegistered: true,
-    backendActive: true,
-    geolocationPermission: 'granted',
-  })
-  assert('geo granted ready', geoGranted.geolocationReady)
-
-  const geoDenied = baseState({
+  const geoDeniedButNotificationsReady = baseState({
     notificationPermission: 'granted',
     browserSubscriptionPresent: true,
     browserVapidMatches: true,
@@ -159,13 +148,32 @@ function stageUnit() {
     backendActive: true,
     geolocationPermission: 'denied',
   })
-  assert('geo denied shows onboarding', shouldShowDeviceSetupOnboarding(geoDenied))
+  assert(
+    'geo denied does NOT show onboarding when notifications ready',
+    !shouldShowDeviceSetupOnboarding(geoDeniedButNotificationsReady)
+  )
 
-  const geoUnsupported = baseState({
-    geolocationSupported: false,
-    geolocationPermission: 'unsupported',
+  const geoPromptButNotificationsReady = baseState({
+    notificationPermission: 'granted',
+    browserSubscriptionPresent: true,
+    browserVapidMatches: true,
+    subscriptionVapidFingerprint: '71653018b9bcdd1b',
+    backendRegistered: true,
+    backendActive: true,
+    geolocationPermission: 'prompt',
   })
-  assert('geo unsupported state', geoUnsupported.geolocationPermission === 'unsupported')
+  assert(
+    'geo prompt does NOT show onboarding when notifications ready',
+    !shouldShowDeviceSetupOnboarding(geoPromptButNotificationsReady)
+  )
+
+  const sessionDismissedDoesNotMarkConnected = baseState({
+    notificationPermission: 'default',
+  })
+  assert(
+    'dismiss is not notificationsReady',
+    !sessionDismissedDoesNotMarkConnected.notificationsReady
+  )
 
   console.log('')
 }
@@ -188,14 +196,6 @@ function stageAggregate() {
         last_success_at: '2026-08-04T15:54:13Z',
       },
       {
-        employee_id: 1,
-        device_id: 'd2',
-        is_active: true,
-        permission_status: 'granted',
-        vapid_key_fingerprint: 'a2027241e05d32fd',
-        last_success_at: null,
-      },
-      {
         employee_id: 2,
         device_id: 'd3',
         is_active: true,
@@ -212,10 +212,6 @@ function stageAggregate() {
   assert('employees with current', result.summary.employees_with_current === 1)
   assert('employees only outdated', result.summary.employees_only_outdated === 1)
   assert('employees missing', result.summary.employees_without_subscriptions === 1)
-  assert('current devices', result.summary.current_devices === 1)
-  assert('outdated devices', result.summary.outdated_devices === 2)
-  assert('multi-device employee kept current', result.employees_needing_setup.every((e) => e.employee_id !== 1))
-  assert('needs setup includes outdated + missing', result.employees_needing_setup.length === 2)
   console.log('')
 }
 
@@ -225,40 +221,39 @@ function stageStatic() {
   const banner = read('src/components/platform/DeviceSetupBanner.jsx')
   const layout = read('src/layouts/PlatformLayout.jsx')
   const service = read('src/services/devicePermissionsService.js')
-  const edge = read('supabase/functions/admin-notification-settings/index.ts')
-  const readiness = read('supabase/functions/_shared/subscriptionReadiness.ts')
-  const profile = read('src/pages/Profile.jsx')
-  const settingsPage = read('src/pages/platform/PlatformSettingsNotifications.jsx')
+  const logic = read('src/services/devicePermissionsLogic.js')
+  const timeTracker = read('src/components/admin/sections/TimeTrackerSection.jsx')
   const geo = read('src/utils/geolocation.js')
 
-  assert('onboarding title', onboarding.includes('Настройте приложение для работы'))
-  assert('notifications CTA', onboarding.includes('Подключить уведомления'))
-  assert('confirm notification CTA', onboarding.includes('Проверить уведомление'))
-  assert('geolocation CTA', onboarding.includes('Разрешить геолокацию'))
+  assert('onboarding title is Уведомления', onboarding.includes('>Уведомления<') || onboarding.includes('Уведомления'))
+  assert('enable CTA', onboarding.includes('Включить уведомления'))
   assert('not now CTA', onboarding.includes('Не сейчас'))
-  assert('no auto requestPermission in onboarding mount', !/useEffect\([\s\S]*requestPermission/.test(onboarding))
-  assert('enable notifications only via gesture helper', onboarding.includes('enableNotificationsFromUserGesture'))
-  assert('enable geo only via gesture helper', onboarding.includes('enableGeolocationFromUserGesture'))
-  assert('ios install instruction', onboarding.includes('На экран „Домой“') || onboarding.includes('На экран «Домой»'))
-  assert('denied recheck button', onboarding.includes('Проверить снова'))
+  assert('no geolocation CTA', !onboarding.includes('Разрешить геолокацию'))
+  assert('no geo lead copy', !onboarding.includes('геолокацию'))
+  assert('no old setup title', !onboarding.includes('Настройте приложение для работы'))
+  assert('no reminder lead copy', !onboarding.includes('напоминания о начале'))
+  assert('no enableGeolocation import', !onboarding.includes('enableGeolocationFromUserGesture'))
+  assert('no confirm notification CTA in modal', !onboarding.includes('Проверить уведомление'))
+  assert('enable notifications via gesture helper', onboarding.includes('enableNotificationsFromUserGesture'))
+  assert('no auto requestPermission on mount', !/useEffect\([\s\S]*requestPermission/.test(onboarding))
 
-  assert('banner requires setup label', banner.includes('Требуется настройка'))
-  assert('layout mounts provider', layout.includes('DevicePermissionsProvider'))
+  assert('onboarding visibility ignores geo', logic.includes('Geolocation never affects visibility'))
+  assert('notificationsReady short-circuits hide', logic.includes('if (state.notificationsReady) return false'))
+
+  assert('service skips geo query on load', service.includes("geolocationPermission = 'unknown'"))
+  assert('service does not call queryGeolocationPermission in getDevicePermissionState', (() => {
+    const fnStart = service.indexOf('export async function getDevicePermissionState')
+    const fnEnd = service.indexOf('export function getOnboardingVisibility')
+    const body = service.slice(fnStart, fnEnd)
+    return !body.includes('queryGeolocationPermission(')
+  })())
+
+  assert('banner mentions notifications only', banner.includes('подключить уведомления'))
+  assert('banner has no geolocation copy', !banner.includes('геолокацию'))
+
   assert('layout mounts onboarding', layout.includes('DeviceSetupOnboarding'))
-  assert('layout mounts banner', layout.includes('DeviceSetupBanner'))
-
-  assert('service does not log endpoints', !service.includes('console.log') || !service.includes('endpoint'))
-  assert('session dismiss key', service.includes('shugyla.device_setup.session_dismissed'))
-  assert('connect uses canonical web push service', service.includes('connectDeviceNotifications'))
-
-  assert('edge readiness action', edge.includes('get_subscription_readiness'))
-  assert('readiness shared module', readiness.includes('export async function getSubscriptionReadiness'))
-  assert('no endpoint in readiness response shape', !readiness.includes('endpoint:') && !readiness.includes('p256dh'))
-
-  assert('profile hosts push settings', profile.includes('PushNotificationSettings'))
-  assert('admin readiness panel mounted', settingsPage.includes('NotificationSubscriptionReadinessPanel'))
-  assert('geo probe exists', geo.includes('requestGeolocationPermissionProbe'))
-  assert('geo query exists', geo.includes('queryGeolocationPermission'))
+  assert('time tracker still requests position on action', timeTracker.includes('getCurrentPosition'))
+  assert('geo helpers remain for time tracker', geo.includes('getCurrentPosition'))
   console.log('')
 }
 

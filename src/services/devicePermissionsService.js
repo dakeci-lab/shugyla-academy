@@ -83,7 +83,10 @@ export function clearDeviceSetupSessionDismissed() {
   }
 }
 
-/** Single source of truth for device notification + geolocation readiness. */
+/**
+ * Device notification readiness for onboarding / profile UI.
+ * Does not query or prompt for geolocation — Time Tracker requests location on action.
+ */
 export async function getDevicePermissionState() {
   const standalone = isPwaStandalone()
   const isIosLike = isIosLikeDevice()
@@ -93,8 +96,9 @@ export async function getDevicePermissionState() {
   const notificationSupported = hasWindow() && 'Notification' in window
   const webPushSupported = isWebPushSupported()
   const notificationPermission = getNotificationPermission()
+  // Keep capability flag only; never query/prompt geolocation on app load.
   const geolocationSupported = isGeolocationSupported()
-  const geolocationPermission = await queryGeolocationPermission()
+  const geolocationPermission = 'unknown'
   const vapidPublicKey = getVapidPublicKey()
   const frontendVapidFingerprint = vapidPublicKey
     ? await computeVapidPublicFingerprint(vapidPublicKey)

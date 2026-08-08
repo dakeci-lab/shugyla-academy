@@ -12,7 +12,7 @@ export default function DeviceSetupBanner({ onOpenSetup }) {
       <div className="device-setup-banner__text">
         <strong>Требуется настройка</strong>
         <span>
-          {state.uiConnectionLabel}. Откройте профиль, чтобы подключить уведомления и геолокацию.
+          {state.uiConnectionLabel}. Откройте профиль, чтобы подключить уведомления.
         </span>
       </div>
       <button type="button" className="device-setup-banner__action" onClick={onOpenSetup}>

@@ -185,13 +185,16 @@ function mapUiConnectionState({
 }
 
 /**
- * Full-screen onboarding when device is not ready.
- * Geo `unknown` alone does not force the modal when notifications are already current
- * (avoids re-prompting the Stage-2 admin iPhone without a Permissions API signal).
+ * Notifications-only onboarding modal.
+ * Source of truth: Notification.permission + current Web Push subscription state.
+ * Geolocation never affects visibility (requested only inside Time Tracker).
  */
 export function shouldShowDeviceSetupOnboarding(state, { sessionDismissed = false } = {}) {
   if (sessionDismissed) return false
   if (!state) return false
+
+  // Already connected on this device — never show the modal.
+  if (state.notificationsReady) return false
 
   if (state.needsPwaInstall) return true
   if (state.notificationPermission === 'default') return true
@@ -199,13 +202,6 @@ export function shouldShowDeviceSetupOnboarding(state, { sessionDismissed = fals
   if (state.subscriptionStatus === SUBSCRIPTION_STATUS.MISSING) return true
   if (state.subscriptionStatus === SUBSCRIPTION_STATUS.OUTDATED) return true
   if (state.subscriptionStatus === SUBSCRIPTION_STATUS.ERROR) return true
-
-  if (
-    state.notificationsReady &&
-    (state.geolocationPermission === 'prompt' || state.geolocationPermission === 'denied')
-  ) {
-    return true
-  }
 
   return false
 }
@@ -218,12 +214,7 @@ export function shouldShowDeviceSetupBanner(state, { sessionDismissed = false } 
 
 export function isDeviceFullyReady(state) {
   if (!state) return false
-  return (
-    state.notificationsReady &&
-    state.fingerprintsAligned &&
-    state.geolocationPermission === 'granted' &&
-    !state.needsPwaInstall
-  )
+  return state.notificationsReady && state.fingerprintsAligned && !state.needsPwaInstall
 }
 
 /**
