@@ -37,35 +37,6 @@
   background: var(--color-bg);
 }
 
-.notifications-inbox__skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-}
-
-.notifications-inbox__skeleton-row {
-  height: 64px;
-  border-radius: 12px;
-  background: linear-gradient(
-    90deg,
-    var(--color-bg) 0%,
-    rgba(255, 255, 255, 0.7) 50%,
-    var(--color-bg) 100%
-  );
-  background-size: 200% 100%;
-  animation: notifications-inbox-shimmer 1.2s ease-in-out infinite;
-}
-
-@keyframes notifications-inbox-shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: -100% 0;
-  }
-}
-
 @media (min-width: 901px) {
   .notifications-inbox {
     max-width: 720px;

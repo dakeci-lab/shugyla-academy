@@ -273,59 +273,6 @@
   font-size: 0.95rem;
 }
 
-.time-tracker-card__skeleton {
-  display: flex;
-  flex-direction: column;
-  gap: 0.65rem;
-  padding: 0.25rem 0 0.5rem;
-}
-
-.time-tracker-card__skeleton-line {
-  height: 14px;
-  border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    var(--color-border) 25%,
-    rgba(0, 0, 0, 0.04) 50%,
-    var(--color-border) 75%
-  );
-  background-size: 200% 100%;
-  animation: time-tracker-shimmer 1.2s ease-in-out infinite;
-}
-
-.time-tracker-card__skeleton-line--wide {
-  width: 70%;
-}
-
-.time-tracker-card__skeleton-actions {
-  display: flex;
-  gap: 0.75rem;
-  margin-top: 0.5rem;
-}
-
-.time-tracker-card__skeleton-btn {
-  flex: 1;
-  min-height: 48px;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(
-    90deg,
-    var(--color-border) 25%,
-    rgba(0, 0, 0, 0.04) 50%,
-    var(--color-border) 75%
-  );
-  background-size: 200% 100%;
-  animation: time-tracker-shimmer 1.2s ease-in-out infinite;
-}
-
-@keyframes time-tracker-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
 @media (max-width: 768px) {
   .rating-list {
     border-radius: 10px;

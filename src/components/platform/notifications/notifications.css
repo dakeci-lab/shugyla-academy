@@ -403,35 +403,6 @@
   background: var(--color-bg);
 }
 
-.notification-panel__skeleton {
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.notification-panel__skeleton-row {
-  height: 72px;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(
-    90deg,
-    var(--color-bg) 0%,
-    #e8eee9 50%,
-    var(--color-bg) 100%
-  );
-  background-size: 200% 100%;
-  animation: notification-skeleton 1.2s ease-in-out infinite;
-}
-
-@keyframes notification-skeleton {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
 .platform-header-actions {
   display: flex;
   align-items: center;

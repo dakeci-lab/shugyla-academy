@@ -125,46 +125,6 @@
   padding: 20px 4px;
 }
 
-.team-mgmt__skeleton-stack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 8px;
-}
-
-.team-mgmt__skeleton {
-  border-radius: 12px;
-  background: linear-gradient(
-    90deg,
-    var(--color-border) 25%,
-    #eef2f5 50%,
-    var(--color-border) 75%
-  );
-  background-size: 200% 100%;
-  animation: team-mgmt-shimmer 1.2s linear infinite;
-}
-
-.team-mgmt__skeleton--role {
-  height: 72px;
-}
-
-.team-mgmt__skeleton--header {
-  height: 110px;
-}
-
-.team-mgmt__skeleton--card {
-  height: 140px;
-}
-
-@keyframes team-mgmt-shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: -100% 0;
-  }
-}
-
 .team-roles-workspace {
   display: grid;
   grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);

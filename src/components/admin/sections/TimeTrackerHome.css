@@ -355,63 +355,6 @@
   background: rgba(254, 226, 226, 0.9);
 }
 
-/* Skeleton */
-.tt-home-card--skeleton {
-  align-items: stretch;
-  pointer-events: none;
-}
-
-.tt-home-skeleton {
-  border-radius: 12px;
-  background: linear-gradient(
-    90deg,
-    rgba(226, 232, 240, 0.8) 25%,
-    rgba(241, 245, 249, 0.95) 50%,
-    rgba(226, 232, 240, 0.8) 75%
-  );
-  background-size: 200% 100%;
-  animation: tt-home-shimmer 1.2s ease-in-out infinite;
-}
-
-.tt-home-skeleton--icon {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  margin: 0 auto 1rem;
-}
-
-.tt-home-skeleton--title {
-  height: 28px;
-  width: 65%;
-  margin: 0 auto 1rem;
-}
-
-.tt-home-skeleton--line {
-  height: 52px;
-  width: 100%;
-  margin-bottom: 0.5rem;
-}
-
-.tt-home-skeleton--short {
-  width: 80%;
-}
-
-.tt-home-skeleton--btn {
-  height: 58px;
-  width: 100%;
-  margin-top: 0.75rem;
-  border-radius: 16px;
-}
-
-@keyframes tt-home-shimmer {
-  0% {
-    background-position: 200% 0;
-  }
-  100% {
-    background-position: -200% 0;
-  }
-}
-
 @media (min-width: 769px) {
   .tt-home {
     max-width: 420px;

@@ -173,28 +173,6 @@
   margin-bottom: 12px;
 }
 
-.umag-op-detail__skeleton {
-  display: grid;
-  gap: 10px;
-}
-
-.umag-op-detail__skeleton div {
-  height: 64px;
-  border-radius: 12px;
-  background: linear-gradient(90deg, #f1f5f9, #e2e8f0, #f1f5f9);
-  background-size: 200% 100%;
-  animation: umag-op-detail-shimmer 1.2s ease-in-out infinite;
-}
-
-@keyframes umag-op-detail-shimmer {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: -100% 0;
-  }
-}
-
 .umag-op-detail__error,
 .umag-op-detail__empty {
   padding: 14px 12px;
