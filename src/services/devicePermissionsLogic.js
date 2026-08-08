@@ -25,7 +25,6 @@ export const UI_CONNECTION_STATE = {
   INSTALL_PWA: 'install_pwa',
   ERROR: 'error',
   UNSUPPORTED: 'unsupported',
-  SETUP_REQUIRED: 'setup_required',
 }
 
 export const UI_CONNECTION_LABELS = {
@@ -36,7 +35,6 @@ export const UI_CONNECTION_LABELS = {
   [UI_CONNECTION_STATE.INSTALL_PWA]: 'Установите PWA',
   [UI_CONNECTION_STATE.ERROR]: 'Ошибка подключения',
   [UI_CONNECTION_STATE.UNSUPPORTED]: 'Не поддерживается',
-  [UI_CONNECTION_STATE.SETUP_REQUIRED]: 'Требуется настройка',
 }
 
 /**
