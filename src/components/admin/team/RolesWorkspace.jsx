@@ -15,6 +15,7 @@ import PermissionSearchToolbar from './PermissionSearchToolbar'
 import RoleHeader from './RoleHeader'
 import RolesSidebar from './RolesSidebar'
 import UnsavedChangesBar from './UnsavedChangesBar'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import {
   filterRoles,
   getPermissionIdsForRole,
@@ -366,11 +367,7 @@ export default function RolesWorkspace({
       {showDetail ? (
         <section className="team-roles-detail" aria-label="Разрешения выбранной роли">
           {loading && !selectedRole ? (
-            <div className="team-mgmt__skeleton-stack" aria-hidden="true">
-              <div className="team-mgmt__skeleton team-mgmt__skeleton--header" />
-              <div className="team-mgmt__skeleton team-mgmt__skeleton--card" />
-              <div className="team-mgmt__skeleton team-mgmt__skeleton--card" />
-            </div>
+            <DelayedLoadingSkeleton variant="cards" count={3} />
           ) : (
             <>
               <RoleHeader

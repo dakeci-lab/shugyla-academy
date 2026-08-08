@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '../../context/SessionContext'
 import { canAcceptSimpleDelivery } from '../../config/permissions'
 import { isCloudMode } from '../../lib/dataMode'
@@ -17,6 +17,8 @@ import {
 import { getAllSuppliersSync } from '../../utils/supplierData'
 import { usePlatformData } from '../../context/PlatformDataContext'
 import { toUserErrorMessage } from '../../utils/userErrorMessage'
+import useStableWhenReady from '../../hooks/useStableWhenReady'
+import { DelayedLoadingSkeleton } from '../loading/LoadingSkeleton'
 import {
   acceptSimpleDeliveryOptimistic,
   unacceptSimpleDeliveryOptimistic,
@@ -40,7 +42,7 @@ import './SimpleDeliveryCard.css'
 export default function SimpleReceivingWeekView() {
   const { user } = useSession()
   const { version, notifyChange } = useAdminRefresh()
-  const { ensureModules, reloadProcurement } = usePlatformData()
+  const { ensureModules, reloadProcurement, version: dataVersion } = usePlatformData()
   const {
     weekStartKey,
     selectedDateKey,
@@ -82,17 +84,26 @@ export default function SimpleReceivingWeekView() {
     isCloudMode() &&
     (isPurchasesDataLoading() ||
       isReceivingDataLoading() ||
+      refreshing ||
       !isPurchasesDataReady() ||
       !isReceivingDataReady())
+  const purchasesReady = !isCloudMode() || isPurchasesDataReady()
+  const receivingReady = !isCloudMode() || isReceivingDataReady()
+  const stableOrders = useStableWhenReady(getPurchaseOrdersSync(), purchasesReady)
+  const stableDocuments = useStableWhenReady(getReceivingDocumentsSync(), receivingReady)
+
+  const hasLoadedOnce = useRef(false)
+  if (purchasesReady && receivingReady) hasLoadedOnce.current = true
+  const showInitialSkeleton = modulesLoading && !hasLoadedOnce.current
 
   const allEntries = useMemo(() => {
     return buildMergedReceivingEntries(
-      getPurchaseOrdersSync(),
-      getReceivingDocumentsSync(),
+      stableOrders,
+      stableDocuments,
       getAllSuppliersSync(),
       weekStartKey
     )
-  }, [version, weekStartKey])
+  }, [stableOrders, stableDocuments, version, dataVersion, weekStartKey])
 
   const entriesByDate = useMemo(() => {
     const map = new Map()
@@ -143,7 +154,7 @@ export default function SimpleReceivingWeekView() {
 
     const toggleState = getReceivingChecklistToggleState(
       entry.order,
-      getReceivingDocumentsSync(),
+      stableDocuments,
       isCloudMode()
     )
     if (!toggleState.canToggle) return
@@ -202,8 +213,8 @@ export default function SimpleReceivingWeekView() {
         <p className="simple-receiving-week__empty">
           {toUserErrorMessage(moduleError, 'Не удалось загрузить данные приёмки.')}
         </p>
-      ) : modulesLoading ? (
-        <p className="simple-receiving-week__hint">Загрузка приёмки…</p>
+      ) : showInitialSkeleton ? (
+        <DelayedLoadingSkeleton variant="cards" count={4} />
       ) : !selectedDateKey ? (
         <p className="simple-receiving-week__hint">
           Выберите день недели, чтобы посмотреть поставки.
@@ -222,7 +233,7 @@ export default function SimpleReceivingWeekView() {
               ? { canToggle: false, statusLabel: null, reason: 'expected' }
               : getReceivingChecklistToggleState(
                   entry.order,
-                  getReceivingDocumentsSync(),
+                  stableDocuments,
                   isCloudMode()
                 )
 

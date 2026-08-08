@@ -17,6 +17,7 @@ import {
   uploadEmployeeDocument,
 } from '../../services/employeeDocumentService'
 import { isCloudMode } from '../../lib/dataMode'
+import { DelayedLoadingSkeleton } from '../../components/loading/LoadingSkeleton'
 import './PlatformEmployeeDocuments.css'
 
 function DocumentRow({
@@ -187,7 +188,7 @@ export default function PlatformEmployeeDocuments() {
       />
 
       {loading ? (
-        <div className="employee-docs__loading">Загрузка…</div>
+        <DelayedLoadingSkeleton variant="list" count={4} />
       ) : error ? (
         <div className="employee-docs__error-block">
           <p className="employee-docs__error">{error}</p>

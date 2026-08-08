@@ -20,6 +20,7 @@ import {
 } from '../../services/rbacService'
 import './RolesAccessSection.css'
 import './admin-shared.css'
+import { DelayedLoadingSkeleton } from '../loading/LoadingSkeleton'
 
 const EMPTY_FORM = {
   name: '',
@@ -248,7 +249,7 @@ export default function RolesAccessSection() {
       </div>
 
       {loading ? (
-        <p className="roles-access__hint">Загрузка ролей…</p>
+        <DelayedLoadingSkeleton variant="table" count={4} />
       ) : error ? (
         <div className="roles-access__empty">
           <p className={isMigrationError ? 'roles-access__hint' : 'admin-form__error'}>{error}</p>

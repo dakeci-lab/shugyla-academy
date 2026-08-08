@@ -5,6 +5,7 @@ import {
   fetchEscalationSettings,
   updateEscalationSettings,
 } from '../../services/notificationSettingsAdminService'
+import { DelayedLoadingSkeleton } from '../loading/LoadingSkeleton'
 import '../admin/admin-shared.css'
 
 export default function TimeTrackerEscalationSettingsPanel() {
@@ -93,7 +94,7 @@ export default function TimeTrackerEscalationSettingsPanel() {
       </div>
 
       {!cloudMode && <p>Доступно только в облачном режиме.</p>}
-      {cloudMode && loading && <p role="status">Загрузка…</p>}
+      {cloudMode && loading ? <DelayedLoadingSkeleton variant="cards" count={3} /> : null}
 
       {cloudMode && !loading && warnings.length > 0 && (
         <ul className="notification-readiness-panel__warnings" style={{ marginBottom: 12 }}>

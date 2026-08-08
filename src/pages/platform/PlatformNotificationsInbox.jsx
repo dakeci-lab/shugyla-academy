@@ -6,17 +6,8 @@ import PushNotificationToggle from '../../components/platform/notifications/Push
 import '../../components/platform/notifications/notifications.css'
 import { useNotificationInbox } from '../../context/NotificationInboxContext'
 import { usePlatformPageTitle } from '../../context/PlatformPageTitleContext'
+import { DelayedLoadingSkeleton } from '../../components/loading/LoadingSkeleton'
 import './PlatformNotificationsInbox.css'
-
-function InboxSkeleton() {
-  return (
-    <div className="notifications-inbox__skeleton" aria-hidden="true">
-      <div className="notifications-inbox__skeleton-row" />
-      <div className="notifications-inbox__skeleton-row" />
-      <div className="notifications-inbox__skeleton-row" />
-    </div>
-  )
-}
 
 /** Полноэкранная лента уведомлений (mobile PWA) */
 export default function PlatformNotificationsInbox() {
@@ -78,7 +69,7 @@ export default function PlatformNotificationsInbox() {
       </div>
     )
   } else if (loading && notifications.length === 0) {
-    body = <InboxSkeleton />
+    body = <DelayedLoadingSkeleton variant="list" count={5} />
   } else if (offline && notifications.length === 0) {
     body = (
       <div className="notifications-inbox__state">

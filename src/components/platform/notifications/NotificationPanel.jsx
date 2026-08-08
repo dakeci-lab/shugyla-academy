@@ -7,19 +7,10 @@ import { useNotificationInbox } from '../../../context/NotificationInboxContext'
 import NotificationList from './NotificationList'
 import NotificationEmptyState from './NotificationEmptyState'
 import PushNotificationToggle from './PushNotificationToggle'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './notifications.css'
 
 const MOBILE_QUERY = '(max-width: 900px)'
-
-function PanelSkeleton() {
-  return (
-    <div className="notification-panel__skeleton" aria-hidden="true">
-      <div className="notification-panel__skeleton-row" />
-      <div className="notification-panel__skeleton-row" />
-      <div className="notification-panel__skeleton-row" />
-    </div>
-  )
-}
 
 function PanelContent() {
   const {
@@ -36,7 +27,7 @@ function PanelContent() {
   } = useNotificationInbox()
 
   if (loading && notifications.length === 0) {
-    return <PanelSkeleton />
+    return <DelayedLoadingSkeleton variant="list" count={4} />
   }
 
   if (offline && notifications.length === 0) {

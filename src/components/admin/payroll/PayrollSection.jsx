@@ -23,6 +23,7 @@ import {
   validatePaidAmount,
 } from '../../../utils/salaryPayroll'
 import { SALARY_CALCULATION_TYPE } from '../../../utils/employeeData'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import {
   getEmployeeForAdmin,
   listEmployeesForAdmin,
@@ -771,7 +772,7 @@ export default function PayrollSection() {
       {error && <p className="payroll-section__error">{error}</p>}
 
       {loading ? (
-        <p className="payroll-section__empty">Загрузка…</p>
+        <DelayedLoadingSkeleton variant="table" count={5} />
       ) : error ? null : rows.length === 0 ? (
         <p className="payroll-section__empty">
           {search || filtersActive

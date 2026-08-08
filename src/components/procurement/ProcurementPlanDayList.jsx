@@ -1,6 +1,5 @@
 import { useMemo } from 'react'
 import { getAllSuppliersSync } from '../../utils/supplierData'
-import { getPurchaseOrdersSync } from '../../services/purchaseDataService'
 import {
   buildExpectedDeliveryEntries,
   getReceivingEntryKey,
@@ -15,19 +14,22 @@ export default function ProcurementPlanDayList({
   weekStartKey,
   selectedDateKey,
   version,
+  dataVersion,
+  orders = [],
   canCreate,
   onCreatePurchase,
 }) {
   void version
+  void dataVersion
 
   const dayEntries = useMemo(() => {
     if (!selectedDateKey) return []
     return buildExpectedDeliveryEntries(
       getAllSuppliersSync(),
       weekStartKey,
-      getPurchaseOrdersSync()
+      orders
     ).filter((entry) => entry.dateKey === selectedDateKey)
-  }, [weekStartKey, selectedDateKey, version])
+  }, [weekStartKey, selectedDateKey, orders, version, dataVersion])
 
   if (!selectedDateKey || dayEntries.length === 0) {
     return null

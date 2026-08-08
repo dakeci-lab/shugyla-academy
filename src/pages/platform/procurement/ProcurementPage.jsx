@@ -3,6 +3,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { usePlatformData } from '../../../context/PlatformDataContext'
 import { useToast } from '../../../context/ToastContext'
+import useStableWhenReady from '../../../hooks/useStableWhenReady'
+import { DelayedLoadingSkeleton } from '../../../components/loading/LoadingSkeleton'
 import {
   canViewPurchases,
   canCreatePurchase,
@@ -16,7 +18,10 @@ import {
   isPurchasesDataLoading,
   getPurchasesDataError,
 } from '../../../services/purchaseDataService'
-import { getReceivingDocumentsSync } from '../../../services/receivingDataService'
+import {
+  getReceivingDocumentsSync,
+  isReceivingDataReady,
+} from '../../../services/receivingDataService'
 import { getAllSuppliersSync, getSupplierByIdSync } from '../../../utils/supplierData'
 import {
   createSimplePurchaseOptimistic,
@@ -145,11 +150,25 @@ export default function ProcurementPage() {
     }
   }, [loadError])
 
+  const purchasesReady = !isCloudMode() || isPurchasesDataReady()
+  const receivingReady = !isCloudMode() || isReceivingDataReady()
+  const purchasesLoading =
+    isCloudMode() &&
+    (isPurchasesDataLoading() || procurementRefreshing || !isPurchasesDataReady())
+  const liveOrders = getPurchaseOrdersSync()
+  const stableOrders = useStableWhenReady(liveOrders, purchasesReady)
+  const liveDocuments = getReceivingDocumentsSync()
+  const stableDocuments = useStableWhenReady(liveDocuments, receivingReady)
+
+  const hasLoadedPurchasesOnce = useRef(false)
+  if (purchasesReady) hasLoadedPurchasesOnce.current = true
+  const showInitialSkeleton = purchasesLoading && !hasLoadedPurchasesOnce.current
+
   const simpleOrders = useMemo(() => {
-    return filterSimplePurchases(getPurchaseOrdersSync())
+    return filterSimplePurchases(stableOrders)
       .filter((o) => o.status !== PURCHASE_STATUS.CANCELLED)
       .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
-  }, [version])
+  }, [stableOrders, version, dataVersion])
 
   /** Список закупов выбранного дня — период из фильтра не применяем (дату задаёт навигация по неделе) */
   const dayOrders = useMemo(() => {
@@ -172,14 +191,14 @@ export default function ProcurementPage() {
     const entries = buildExpectedDeliveryEntries(
       getAllSuppliersSync(),
       weekStartKey,
-      getPurchaseOrdersSync()
+      stableOrders
     )
     const counts = {}
     for (const entry of entries) {
       counts[entry.dateKey] = (counts[entry.dateKey] || 0) + 1
     }
     return counts
-  }, [version, weekStartKey])
+  }, [stableOrders, weekStartKey, version, dataVersion])
 
   const countsByDate = useMemo(() => {
     const counts = { ...expectedEntriesByDate }
@@ -194,11 +213,11 @@ export default function ProcurementPage() {
 
   const documentsByPurchaseId = useMemo(() => {
     const map = new Map()
-    getReceivingDocumentsSync().forEach((doc) => {
+    stableDocuments.forEach((doc) => {
       if (doc.purchaseOrderId) map.set(doc.purchaseOrderId, doc)
     })
     return map
-  }, [version])
+  }, [stableDocuments, version, dataVersion])
 
   const filtersActive = hasActivePurchaseFilters(appliedFilters)
   const filterSummary = useMemo(
@@ -372,12 +391,6 @@ export default function ProcurementPage() {
     if (moduleError) {
       return toUserErrorMessage(moduleError, 'Не удалось загрузить закупы с сервера.')
     }
-    if (
-      isCloudMode() &&
-      (isPurchasesDataLoading() || procurementRefreshing || !isPurchasesDataReady())
-    ) {
-      return 'Загрузка закупов…'
-    }
     if (!selectedDateKey) return 'Выберите день недели'
     if (simpleOrders.length === 0) return 'Закупы не созданы'
     if (appliedFilters.supplierId && dayOrders.length === 0) {
@@ -385,8 +398,6 @@ export default function ProcurementPage() {
     }
     return 'На этот день закупок нет'
   }
-
-  void dataVersion
 
   const modalOpen = showCreate || Boolean(editingOrder)
   const emptyMessage = getEmptyMessage()
@@ -499,6 +510,8 @@ export default function ProcurementPage() {
         weekStartKey={weekStartKey}
         selectedDateKey={selectedDateKey}
         version={version}
+        dataVersion={dataVersion}
+        orders={stableOrders}
         canCreate={canCreate}
         onCreatePurchase={openCreate}
       />
@@ -506,7 +519,9 @@ export default function ProcurementPage() {
       <section className="procurement-page__section">
         <h2 className="procurement-page__section-title">Закупки</h2>
 
-        {!selectedDateKey ? (
+        {showInitialSkeleton ? (
+          <DelayedLoadingSkeleton variant="list" count={5} />
+        ) : !selectedDateKey ? (
           <p className="procurement-page__empty">Выберите день недели, чтобы посмотреть закупки.</p>
         ) : (
           <>

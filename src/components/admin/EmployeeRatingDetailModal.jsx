@@ -11,6 +11,7 @@ import {
   getAttendanceSettings,
 } from '../../services/platformDataService'
 import { fetchEmployeeWorkforceBundle } from '../../services/workforceAdminService'
+import { DelayedLoadingSkeleton } from '../loading/LoadingSkeleton'
 import './admin-shared.css'
 
 /**
@@ -92,7 +93,7 @@ export default function EmployeeRatingDetailModal({ employee, year, month, onClo
       }
     >
       {loading ? (
-        <p className="admin-form__hint">Загрузка…</p>
+        <DelayedLoadingSkeleton variant="list" count={4} />
       ) : (
         <>
           <p className="admin-form__hint">

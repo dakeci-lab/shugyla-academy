@@ -1,5 +1,6 @@
 import Can from '../../auth/Can'
 import { PERMISSION_CODES } from '../../../config/permissions'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import RoleFilters from './RoleFilters'
 import RoleListItem from './RoleListItem'
 
@@ -50,11 +51,7 @@ export default function RolesSidebar({
 
       <div className="team-roles-sidebar__list">
         {loading ? (
-          <div className="team-mgmt__skeleton-stack" aria-hidden="true">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <div key={index} className="team-mgmt__skeleton team-mgmt__skeleton--role" />
-            ))}
-          </div>
+          <DelayedLoadingSkeleton variant="list" count={6} />
         ) : filteredRoles.length === 0 ? (
           <div className="team-mgmt__empty">
             {roles.length === 0 ? (

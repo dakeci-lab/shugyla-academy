@@ -33,6 +33,7 @@ import PlatformSearchToolbar, {
   PlatformFilterButton,
   PlatformToolbarActionWrap,
 } from '../../platform/PlatformSearchToolbar'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import CreateReconciliationModal from './CreateReconciliationModal'
 import ReconciliationDetailView from './ReconciliationDetailView'
 import OperationDetailSheet from './OperationDetailSheet'
@@ -405,8 +406,8 @@ function UmagSupplierDetail({
       {canViewRecon ? (
         <section className="umag-settlements__recon-history" aria-label="История сверок">
           <h3 className="umag-settlements__section-title">История сверок</h3>
-          {historyLoading ? (
-            <div className="umag-settlements__empty">Загрузка истории…</div>
+          {historyLoading && history.length === 0 ? (
+            <DelayedLoadingSkeleton variant="table" count={3} />
           ) : historyError ? (
             <div className="umag-settlements__error" role="alert">
               {historyError}
@@ -906,13 +907,9 @@ export default function UmagSettlementsPanel() {
         </div>
       )}
 
-      {loading ? (
-        <div className="umag-settlements__skeleton" aria-busy="true">
-          <div className="umag-settlements__skeleton-row" />
-          <div className="umag-settlements__skeleton-row" />
-          <div className="umag-settlements__skeleton-row" />
-        </div>
-      ) : loadError ? (
+      {loading && rows.length === 0 ? (
+        <DelayedLoadingSkeleton variant="table" count={5} />
+      ) : loadError && rows.length === 0 ? (
         <div className="umag-settlements__error" role="alert">
           {loadError}
         </div>

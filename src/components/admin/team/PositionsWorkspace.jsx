@@ -7,6 +7,7 @@ import {
   restorePosition,
   updatePosition,
 } from '../../../services/positionStructureAdminService'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import PositionActionsMenu from './PositionActionsMenu'
 import PositionFormModal from './PositionFormModal'
 import StructureConfirmModal from './StructureConfirmModal'
@@ -303,11 +304,7 @@ export default function PositionsWorkspace({
       ) : null}
 
       {loading ? (
-        <div className="team-mgmt__skeleton-stack" aria-hidden="true">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="team-mgmt__skeleton team-mgmt__skeleton--card" />
-          ))}
-        </div>
+        <DelayedLoadingSkeleton variant="cards" count={4} />
       ) : sections.length === 0 ? (
         <StructureEmptyState
           title={positions.length === 0 ? 'Должности не найдены' : 'По запросу ничего не найдено'}

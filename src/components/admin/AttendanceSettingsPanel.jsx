@@ -8,6 +8,7 @@ import {
   saveAttendanceSettings,
 } from '../../services/platformDataService'
 import { useSession } from '../../context/SessionContext'
+import { DelayedLoadingSkeleton } from '../loading/LoadingSkeleton'
 import './admin-shared.css'
 
 const EMPTY_LOCATION = {
@@ -109,7 +110,7 @@ export default function AttendanceSettingsPanel() {
     }
   }
 
-  if (loading) return <p className="admin-form__hint">Загрузка настроек…</p>
+  if (loading) return <DelayedLoadingSkeleton variant="cards" count={4} />
 
   return (
     <>

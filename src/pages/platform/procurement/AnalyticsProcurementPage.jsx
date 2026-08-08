@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { usePlatformData } from '../../../context/PlatformDataContext'
@@ -18,6 +18,8 @@ import { isCloudMode } from '../../../lib/dataMode'
 import { filterActivePurchases } from '../../../utils/purchaseData'
 import { isSimpleWorkflow } from '../../../utils/procurementWorkflow'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
+import useStableWhenReady from '../../../hooks/useStableWhenReady'
+import { DelayedLoadingSkeleton } from '../../../components/loading/LoadingSkeleton'
 import AdminModal from '../../../components/admin/AdminModal'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
 import PurchaseStatsCards from '../../../components/procurement/PurchaseStatsCards'
@@ -32,7 +34,7 @@ import './ProcurementPage.css'
 export default function AnalyticsProcurementPage() {
   const { user } = useSession()
   const navigate = useNavigate()
-  const { ensureModules } = usePlatformData()
+  const { ensureModules, version: dataVersion } = usePlatformData()
   const { version, refresh } = useAdminRefresh()
   const [showCreate, setShowCreate] = useState(false)
   const [showImport, setShowImport] = useState(false)
@@ -52,10 +54,15 @@ export default function AnalyticsProcurementPage() {
   }, [ensureModules])
 
   void version
+  void dataVersion
 
+  const purchasesReady = !isCloudMode() || isPurchasesDataReady()
   const purchasesLoading =
     isCloudMode() && (isPurchasesDataLoading() || !isPurchasesDataReady())
-  const allOrders = purchasesLoading ? [] : getPurchaseOrdersSync()
+  const allOrders = useStableWhenReady(getPurchaseOrdersSync(), purchasesReady)
+  const hasLoadedOnce = useRef(false)
+  if (purchasesReady) hasLoadedOnce.current = true
+  const showInitialSkeleton = purchasesLoading && !hasLoadedOnce.current
   const activeOrders = useMemo(
     () => filterActivePurchases(allOrders).filter((o) => !isSimpleWorkflow(o)),
     [allOrders, version]
@@ -132,19 +139,25 @@ export default function AnalyticsProcurementPage() {
         </button>
       </div>
 
-      <PurchaseStatsCards orders={allOrders.filter((o) => !isSimpleWorkflow(o))} />
+      {showInitialSkeleton ? (
+        <DelayedLoadingSkeleton variant="table" count={5} />
+      ) : (
+        <>
+          <PurchaseStatsCards orders={allOrders.filter((o) => !isSimpleWorkflow(o))} />
 
-      {actionError && <p className="admin-form__error">{actionError}</p>}
+          {actionError && <p className="admin-form__error">{actionError}</p>}
 
-      <section className="procurement-page__section">
-        <h2 className="procurement-page__section-title">Активные закупы</h2>
-        <PurchaseTable
-          orders={activeOrders}
-          canEdit={canEdit}
-          onCancel={handleCancel}
-          detailPathPrefix="/platform/procurement/analytics"
-        />
-      </section>
+          <section className="procurement-page__section">
+            <h2 className="procurement-page__section-title">Активные закупы</h2>
+            <PurchaseTable
+              orders={activeOrders}
+              canEdit={canEdit}
+              onCancel={handleCancel}
+              detailPathPrefix="/platform/procurement/analytics"
+            />
+          </section>
+        </>
+      )}
 
       {showCreate && canCreate && (
         <AdminModal

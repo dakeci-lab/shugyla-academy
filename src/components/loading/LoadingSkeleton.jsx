@@ -1,4 +1,5 @@
 import './loading.css'
+import useDelayedLoading from './useDelayedLoading'
 
 export function SkeletonPrimitive({ className = '' }) {
   return <span className={`shugyla-skeleton__primitive ${className}`.trim()} aria-hidden="true" />
@@ -56,4 +57,9 @@ export default function LoadingSkeleton({ variant = 'list', count }) {
       {variant === 'dashboard' ? <CardsSkeleton count={resolvedCount} dashboard /> : null}
     </div>
   )
+}
+
+export function DelayedLoadingSkeleton({ loading = true, delay, ...skeletonProps }) {
+  const visible = useDelayedLoading(loading, delay)
+  return visible ? <LoadingSkeleton {...skeletonProps} /> : null
 }

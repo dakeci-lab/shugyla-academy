@@ -10,6 +10,7 @@ import {
   normalizeOffsetInput,
   validateOffsetMinutes,
 } from '../../utils/notificationRuleSettings'
+import { DelayedLoadingSkeleton } from '../loading/LoadingSkeleton'
 import '../admin/admin-shared.css'
 import './NotificationSettingsPanel.css'
 
@@ -136,7 +137,7 @@ export default function NotificationSettingsPanel() {
     return (
       <section className="admin-panel-card notification-settings-panel">
         <h2 className="admin-panel-card__title">Автоматические уведомления</h2>
-        <p className="admin-panel-card__desc">Загрузка настроек…</p>
+        <DelayedLoadingSkeleton variant="cards" count={3} />
       </section>
     )
   }

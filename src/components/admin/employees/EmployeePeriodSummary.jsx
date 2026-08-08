@@ -3,6 +3,7 @@ import {
   formatWorkedHoursLabel,
   summarizeEmployeePeriod,
 } from '../../../utils/employeePeriodSummary'
+import { SkeletonPrimitive } from '../../loading/LoadingSkeleton'
 import './EmployeePeriodSummary.css'
 
 function StatCard({ label, value, loading }) {
@@ -10,11 +11,7 @@ function StatCard({ label, value, loading }) {
     <div className="employee-period-summary__card">
       <p className="employee-period-summary__label">{label}</p>
       <p className="employee-period-summary__value">
-        {loading ? (
-          <span className="employee-period-summary__skeleton" aria-hidden="true" />
-        ) : (
-          value
-        )}
+        {loading ? <SkeletonPrimitive className="employee-period-summary__skeleton" /> : value}
       </p>
     </div>
   )

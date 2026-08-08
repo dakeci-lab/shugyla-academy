@@ -12,6 +12,7 @@ import {
   deriveSupplyPaymentStatus,
   supplyPaymentStatusLabel,
 } from '../../../services/umagSettlementsService'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './OperationDetailSheet.css'
 
 function formatQtyPrice(item) {
@@ -346,11 +347,7 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
         </label>
 
         {loading ? (
-          <div className="umag-op-detail__skeleton" aria-busy="true">
-            <div />
-            <div />
-            <div />
-          </div>
+          <DelayedLoadingSkeleton variant="list" count={4} />
         ) : error ? (
           <div className="umag-op-detail__error" role="alert">
             {error}

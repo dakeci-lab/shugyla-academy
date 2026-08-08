@@ -30,6 +30,7 @@ import {
 import { getEmployeeDocumentsPath } from '../../../utils/employeeDocuments'
 import Can from '../../auth/Can'
 import EmployeeProfileHeader from '../employees/EmployeeProfileHeader'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import EmployeePeriodSummary from '../employees/EmployeePeriodSummary'
 import EmployeeEditModal from '../employees/EmployeeEditModal'
 import EmployeeScheduleSection from './EmployeeScheduleSection'
@@ -366,9 +367,7 @@ export default function EmployeeProfileSection({ employeeId }) {
   if (employeeLoading && !employee) {
     return (
       <div className="employee-profile-section">
-        <div className="employee-profile-section__loading" role="status">
-          Загрузка карточки сотрудника…
-        </div>
+        <DelayedLoadingSkeleton variant="cards" count={4} />
       </div>
     )
   }

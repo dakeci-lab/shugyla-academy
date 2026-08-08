@@ -7,6 +7,7 @@ import {
   restorePositionGroup,
   updatePositionGroup,
 } from '../../../services/positionStructureAdminService'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import PositionGroupActionsMenu from './PositionGroupActionsMenu'
 import PositionGroupFormModal from './PositionGroupFormModal'
 import StructureConfirmModal from './StructureConfirmModal'
@@ -226,11 +227,7 @@ export default function PositionGroupsWorkspace({
       ) : null}
 
       {loading ? (
-        <div className="team-mgmt__skeleton-stack" aria-hidden="true">
-          {Array.from({ length: 5 }).map((_, index) => (
-            <div key={index} className="team-mgmt__skeleton team-mgmt__skeleton--role" />
-          ))}
-        </div>
+        <DelayedLoadingSkeleton variant="list" count={5} />
       ) : displayGroups.length === 0 ? (
         <StructureEmptyState
           title={groups.length === 0 ? 'Группы не найдены' : 'По запросу ничего не найдено'}

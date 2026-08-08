@@ -7,6 +7,10 @@ import {
   updateSupplier,
   deleteSupplier,
 } from '../../../services/platformDataService'
+import { isCloudMode } from '../../../lib/dataMode'
+import { isModuleReady } from '../../../lib/cloudStore'
+import { usePlatformData } from '../../../context/PlatformDataContext'
+import { DelayedLoadingSkeleton } from '../../../components/loading/LoadingSkeleton'
 import {
   filterSuppliers,
   SUPPLIER_CATALOG_FILTER,
@@ -51,6 +55,7 @@ export function SuppliersListPage() {
   const { user } = useSession()
   const { success: showSuccess, error: showError } = useToast()
   const { version, refresh } = useAdminRefresh()
+  const { version: dataVersion } = usePlatformData()
   const location = useLocation()
   const navigate = useNavigate()
   const filterButtonRef = useRef(null)
@@ -75,15 +80,20 @@ export function SuppliersListPage() {
   const canDelete = canDeleteSuppliers(user)
 
   void version
+  void dataVersion
 
+  const suppliersReady = !isCloudMode() || isModuleReady('suppliers')
   const suppliers = getSuppliers()
+  const hasLoadedOnce = useRef(false)
+  if (suppliersReady) hasLoadedOnce.current = true
+  const showInitialSkeleton = isCloudMode() && !suppliersReady && !hasLoadedOnce.current
   const filtered = useMemo(
     () => filterSuppliers(suppliers, { search, status: appliedStatus }),
-    [suppliers, search, appliedStatus, version]
+    [suppliers, search, appliedStatus, version, dataVersion]
   )
   const filterPreviewCount = useMemo(
     () => filterSuppliers(suppliers, { search, status: draftStatus }).length,
-    [suppliers, search, draftStatus, version]
+    [suppliers, search, draftStatus, version, dataVersion]
   )
   const filtersActive = appliedStatus !== SUPPLIER_LIST_DEFAULT_STATUS
 
@@ -343,7 +353,9 @@ export function SuppliersListPage() {
         </div>
       ) : null}
 
-      {filtered.length === 0 ? (
+      {showInitialSkeleton ? (
+        <DelayedLoadingSkeleton variant="table" count={5} />
+      ) : filtered.length === 0 ? (
         <div className="suppliers-page__empty">{emptyMessage}</div>
       ) : (
         <SupplierTable suppliers={filtered} canEdit={canEdit} onEdit={openEdit} />

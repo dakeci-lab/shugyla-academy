@@ -33,23 +33,10 @@ import {
 } from '../../../services/platformDataService'
 import { useSession } from '../../../context/SessionContext'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import TimeTrackerHomeCard from './TimeTrackerHomeCard'
 import '../admin-shared.css'
 import '../EmployeeRating.css'
-
-function TimeTrackerSkeleton() {
-  return (
-    <div className="time-tracker-card__skeleton" aria-hidden="true">
-      <div className="time-tracker-card__skeleton-line time-tracker-card__skeleton-line--wide" />
-      <div className="time-tracker-card__skeleton-line" />
-      <div className="time-tracker-card__skeleton-line" />
-      <div className="time-tracker-card__skeleton-actions">
-        <div className="time-tracker-card__skeleton-btn" />
-        <div className="time-tracker-card__skeleton-btn" />
-      </div>
-    </div>
-  )
-}
 
 function TimeTrackerLegacyCard({
   isHome,
@@ -77,8 +64,8 @@ function TimeTrackerLegacyCard({
 
       <p className="admin-form__hint time-tracker-card__date">{formatTodayLabel()}</p>
 
-      {loading ? (
-        <TimeTrackerSkeleton />
+      {loading && !shift ? (
+        <DelayedLoadingSkeleton variant="cards" count={3} />
       ) : loadError ? (
         <div className="time-tracker-card__load-error">
           <p>Не удалось загрузить данные смены</p>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useToast } from '../../context/ToastContext'
 import { isCloudMode } from '../../lib/dataMode'
 import { listTimeTrackerViolations } from '../../services/notificationSettingsAdminService'
+import { DelayedLoadingSkeleton } from '../loading/LoadingSkeleton'
 import '../admin/admin-shared.css'
 
 const FILTERS = [
@@ -100,11 +101,13 @@ export default function TimeTrackerViolationsJournal() {
         />
       </div>
 
-      {loading && <p role="status">Загрузка…</p>}
+      {loading && violations.length === 0 ? (
+        <DelayedLoadingSkeleton variant="table" count={4} />
+      ) : null}
 
       {!loading && visible.length === 0 && <p>Записей нет.</p>}
 
-      {!loading && visible.length > 0 && (
+      {visible.length > 0 && (
         <div style={{ overflowX: 'auto' }}>
           <table className="notification-readiness-panel__table">
             <thead>

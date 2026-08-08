@@ -26,6 +26,7 @@ import {
 } from '../../../services/salaryPayrollService'
 import { usePlatformPageTitle } from '../../../context/PlatformPageTitleContext'
 import { useToast } from '../../../context/ToastContext'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import StatusBadge from '../StatusBadge'
 import '../admin-shared.css'
 import './PayrollRecordSection.css'
@@ -325,7 +326,7 @@ export default function PayrollRecordSection() {
   }
 
   if (loading) {
-    return <div className="payroll-record"><p>Загрузка…</p></div>
+    return <div className="payroll-record"><DelayedLoadingSkeleton variant="cards" count={4} /></div>
   }
 
   if (error) {

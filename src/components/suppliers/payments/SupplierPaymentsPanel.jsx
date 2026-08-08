@@ -25,6 +25,7 @@ import {
 } from '../../../services/supplierPaymentObligationsService'
 import { getMonthPeriodKeys } from '../../../services/umagSettlementsService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './SupplierPaymentsPanel.css'
 
 const TABS = [
@@ -384,19 +385,19 @@ export default function SupplierPaymentsPanel() {
           value={summaries?.totalActiveDebt}
           tone="total"
           primary
-          loading={loading}
+          loading={loading && !view}
         />
         <KpiCard
           label="Просрочено"
           value={summaries?.overdue}
           tone="overdue"
-          loading={loading}
+          loading={loading && !view}
         />
         <KpiCard
           label="Сегодня к оплате"
           value={summaries?.dueToday}
           tone="today"
-          loading={loading}
+          loading={loading && !view}
         />
       </div>
 
@@ -430,9 +431,9 @@ export default function SupplierPaymentsPanel() {
           })}
         </div>
 
-        {loading ? (
-          <div className="spo-panel__empty spo-panel__empty--compact">Загрузка…</div>
-        ) : error ? (
+        {loading && !view ? (
+          <DelayedLoadingSkeleton variant="cards" count={4} />
+        ) : error && !view ? (
           <div className="spo-panel__error" role="alert">
             {error}
           </div>

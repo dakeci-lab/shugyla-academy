@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { formatTimeRange, formatTimeValue, SHIFT_RESULT_CODE, SHIFT_STATUS_LABELS } from '../../../utils/shiftData'
 import { formatDurationMinutes } from '../../../utils/attendanceData'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './TimeTrackerHome.css'
 
 function formatHomeDateLabel() {
@@ -95,18 +96,6 @@ function StatusIcon({ variant }) {
   return (
     <div className={`tt-home-status-icon tt-home-status-icon--${variant}`} aria-hidden="true">
       <span className="tt-home-status-icon__emoji">{icons[variant] || 'ℹ️'}</span>
-    </div>
-  )
-}
-
-function HomeSkeleton() {
-  return (
-    <div className="tt-home-card tt-home-card--skeleton" aria-hidden="true">
-      <div className="tt-home-skeleton tt-home-skeleton--icon" />
-      <div className="tt-home-skeleton tt-home-skeleton--title" />
-      <div className="tt-home-skeleton tt-home-skeleton--line" />
-      <div className="tt-home-skeleton tt-home-skeleton--line tt-home-skeleton--short" />
-      <div className="tt-home-skeleton tt-home-skeleton--btn" />
     </div>
   )
 }
@@ -206,8 +195,8 @@ export default function TimeTrackerHomeCard({
         </p>
       )}
 
-      {loading ? (
-        <HomeSkeleton />
+      {loading && !shift ? (
+        <DelayedLoadingSkeleton variant="cards" count={3} />
       ) : loadError ? (
         <div className="tt-home-card tt-home-card--error">
           <StatusIcon variant="idle" />

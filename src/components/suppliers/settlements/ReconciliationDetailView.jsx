@@ -14,6 +14,7 @@ import {
   validateReconciliationFile,
 } from '../../../services/supplierReconciliationService'
 import { formatUmagDateTime, formatUmagMoney } from '../../../services/umagSettlementsService'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './ReconciliationDetailView.css'
 
 function Metric({ label, value, emphasize }) {
@@ -152,7 +153,7 @@ export default function ReconciliationDetailView({
         <button type="button" className="umag-settlements__back" onClick={onBack}>
           ← Назад к поставщику
         </button>
-        <div className="recon-detail__loading">Загрузка сверки…</div>
+        <DelayedLoadingSkeleton variant="cards" count={3} />
       </div>
     )
   }

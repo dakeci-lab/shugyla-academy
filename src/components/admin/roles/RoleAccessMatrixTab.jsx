@@ -14,6 +14,7 @@ import Can from '../../auth/Can'
 import { PERMISSION_CODES } from '../../../config/permissions'
 import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
 import { useRoleEditor } from './useRoleEditor'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import '../RolesAccessSection.css'
 import '../admin-shared.css'
 
@@ -166,7 +167,7 @@ export default function RoleAccessMatrixTab({
   }
 
   if (loading) {
-    return <p className="roles-access__hint">Загрузка…</p>
+    return <DelayedLoadingSkeleton variant="table" count={5} />
   }
 
   if (error) {
@@ -289,7 +290,7 @@ export default function RoleAccessMatrixTab({
 
       <div className="roles-matrix__content">
         {loadingPermissions ? (
-          <p className="roles-access__hint">Загрузка разрешений роли…</p>
+          <DelayedLoadingSkeleton variant="table" count={4} />
         ) : !activeGroup ? (
           <p className="roles-access__hint">Нет разрешений для этого модуля.</p>
         ) : (

@@ -28,6 +28,7 @@ import EmployeeScheduleCalendar from '../EmployeeScheduleCalendar'
 import ShiftDayEditModal from '../ShiftDayEditModal'
 import BulkScheduleModal from '../BulkScheduleModal'
 import PlatformPeriodHeader from '../../platform/PlatformPeriodHeader'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import '../../EmployeeAvatar.css'
 import '../admin-shared.css'
 import '../EmployeeSchedule.css'
@@ -231,7 +232,7 @@ export default function EmployeeScheduleSection({
   }
 
   if (!embedded && loading && !employee) {
-    return <div className="schedule-loading">Загрузка графика…</div>
+    return <DelayedLoadingSkeleton variant="cards" count={3} />
   }
 
   if (!embedded && (employeeMissing || !employee)) {
@@ -315,7 +316,7 @@ export default function EmployeeScheduleSection({
       {error && <p className="admin-form__error">{error}</p>}
 
       {loading ? (
-        <div className="schedule-loading">Загрузка графика…</div>
+        <DelayedLoadingSkeleton variant="table" count={5} />
       ) : (
         <>
           {!hasShifts && (

@@ -81,7 +81,9 @@ function main() {
   assert(
     'procurement empty waits for module ready',
     procurementPage.includes('isPurchasesDataLoading') &&
-      procurementPage.includes('Загрузка закупов')
+      procurementPage.includes('showInitialSkeleton') &&
+      procurementPage.includes('useStableWhenReady') &&
+      !procurementPage.includes('Загрузка закупов')
   )
 
   console.log('Stage 5: Route-scoped realtime + bootstrap hygiene')

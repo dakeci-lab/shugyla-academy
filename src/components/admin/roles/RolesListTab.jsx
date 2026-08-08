@@ -2,6 +2,7 @@ import { useRoleEditor } from './useRoleEditor'
 import Can from '../../auth/Can'
 import { PERMISSION_CODES } from '../../../config/permissions'
 import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
+import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import '../RolesAccessSection.css'
 import '../admin-shared.css'
 
@@ -37,7 +38,7 @@ export default function RolesListTab({
       </div>
 
       {loading ? (
-        <p className="roles-access__hint">Загрузка ролей…</p>
+        <DelayedLoadingSkeleton variant="table" count={4} />
       ) : error ? (
         <div className="roles-access__empty">
           <p className={isMigrationError ? 'roles-access__hint' : 'admin-form__error'}>{error}</p>
