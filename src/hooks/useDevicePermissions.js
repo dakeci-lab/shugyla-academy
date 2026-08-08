@@ -5,7 +5,6 @@ import {
   clearDeviceSetupSessionDismissed,
   dismissDeviceSetupForSession,
   getDevicePermissionState,
-  shouldShowDeviceSetupBanner,
   shouldShowDeviceSetupOnboarding,
   readDeviceSetupSessionDismissed,
 } from '../services/devicePermissionsService'
@@ -59,7 +58,6 @@ export default function useDevicePermissions({ enabled = true } = {}) {
   }, [])
 
   const showOnboarding = shouldShowDeviceSetupOnboarding(state, { sessionDismissed })
-  const showBanner = shouldShowDeviceSetupBanner(state, { sessionDismissed })
 
   return {
     state,
@@ -68,6 +66,5 @@ export default function useDevicePermissions({ enabled = true } = {}) {
     sessionDismissed,
     dismissForSession,
     showOnboarding,
-    showBanner,
   }
 }

@@ -206,12 +206,6 @@ export function shouldShowDeviceSetupOnboarding(state, { sessionDismissed = fals
   return false
 }
 
-export function shouldShowDeviceSetupBanner(state, { sessionDismissed = false } = {}) {
-  if (!sessionDismissed) return false
-  if (!state) return false
-  return shouldShowDeviceSetupOnboarding(state, { sessionDismissed: false })
-}
-
 export function isDeviceFullyReady(state) {
   if (!state) return false
   return state.notificationsReady && state.fingerprintsAligned && !state.needsPwaInstall

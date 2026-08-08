@@ -18,7 +18,6 @@ import {
 import {
   evaluateDevicePermissionState,
   isDeviceFullyReady,
-  shouldShowDeviceSetupBanner,
   shouldShowDeviceSetupOnboarding,
   UI_CONNECTION_LABELS,
   UI_CONNECTION_STATE,
@@ -27,7 +26,6 @@ import {
 export {
   evaluateDevicePermissionState,
   isDeviceFullyReady,
-  shouldShowDeviceSetupBanner,
   shouldShowDeviceSetupOnboarding,
   UI_CONNECTION_LABELS,
   UI_CONNECTION_STATE,
@@ -187,7 +185,6 @@ export function getOnboardingVisibility(state) {
   return {
     sessionDismissed,
     showOnboarding: shouldShowDeviceSetupOnboarding(state, { sessionDismissed }),
-    showBanner: shouldShowDeviceSetupBanner(state, { sessionDismissed }),
     fullyReady: isDeviceFullyReady(state),
   }
 }

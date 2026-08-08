@@ -13,7 +13,6 @@ import {
   aggregateSubscriptionReadiness,
   evaluateDevicePermissionState,
   isDeviceFullyReady,
-  shouldShowDeviceSetupBanner,
   shouldShowDeviceSetupOnboarding,
   SUBSCRIPTION_STATUS,
   UI_CONNECTION_STATE,
@@ -137,7 +136,6 @@ function stageUnit() {
 
   const dismissed = baseState({ notificationPermission: 'default' })
   assert('Не сейчас hides onboarding same session', !shouldShowDeviceSetupOnboarding(dismissed, { sessionDismissed: true }))
-  assert('Не сейчас keeps banner', shouldShowDeviceSetupBanner(dismissed, { sessionDismissed: true }))
 
   const geoDeniedButNotificationsReady = baseState({
     notificationPermission: 'granted',
@@ -218,10 +216,10 @@ function stageAggregate() {
 function stageStatic() {
   console.log('Stage 3: Static wiring')
   const onboarding = read('src/components/platform/DeviceSetupOnboarding.jsx')
-  const banner = read('src/components/platform/DeviceSetupBanner.jsx')
   const layout = read('src/layouts/PlatformLayout.jsx')
   const service = read('src/services/devicePermissionsService.js')
   const logic = read('src/services/devicePermissionsLogic.js')
+  const hook = read('src/hooks/useDevicePermissions.js')
   const timeTracker = read('src/components/admin/sections/TimeTrackerSection.jsx')
   const geo = read('src/utils/geolocation.js')
 
@@ -239,6 +237,7 @@ function stageStatic() {
 
   assert('onboarding visibility ignores geo', logic.includes('Geolocation never affects visibility'))
   assert('notificationsReady short-circuits hide', logic.includes('if (state.notificationsReady) return false'))
+  assert('banner visibility helper removed', !logic.includes('shouldShowDeviceSetupBanner'))
 
   assert('service skips geo query on load', service.includes("geolocationPermission = 'unknown'"))
   assert('service does not call queryGeolocationPermission in getDevicePermissionState', (() => {
@@ -248,10 +247,18 @@ function stageStatic() {
     return !body.includes('queryGeolocationPermission(')
   })())
 
-  assert('banner mentions notifications only', banner.includes('подключить уведомления'))
-  assert('banner has no geolocation copy', !banner.includes('геолокацию'))
+  assert('layout mounts onboarding modal', layout.includes('DeviceSetupOnboarding'))
+  assert('layout does not mount setup banner', !layout.includes('DeviceSetupBanner'))
+  assert('hook does not expose showBanner', !hook.includes('showBanner'))
+  assert(
+    'banner component deleted',
+    !fs.existsSync(path.join(ROOT, 'src/components/platform/DeviceSetupBanner.jsx'))
+  )
+  assert(
+    'banner css deleted',
+    !fs.existsSync(path.join(ROOT, 'src/components/platform/DeviceSetupBanner.css'))
+  )
 
-  assert('layout mounts onboarding', layout.includes('DeviceSetupOnboarding'))
   assert('time tracker still requests position on action', timeTracker.includes('getCurrentPosition'))
   assert('geo helpers remain for time tracker', geo.includes('getCurrentPosition'))
   console.log('')
