@@ -4,6 +4,8 @@ import StatusBadge from '../StatusBadge'
 import IconActionButton from '../IconActionButton'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import { PencilIcon } from '../../icons/PlatformIcons'
+import LoadingSkeleton from '../../loading/LoadingSkeleton'
+import useDelayedLoading from '../../loading/useDelayedLoading'
 import {
   getEmploymentStatusLabel,
   getEmploymentStatusBadgeType,
@@ -59,6 +61,8 @@ export default function EmployeeListTable({
   onClearSearch,
   loading = false,
 }) {
+  const showInitialSkeleton = useDelayedLoading(loading && employees.length === 0)
+
   function openProfile(employee, event) {
     event?.stopPropagation?.()
     onOpen?.(employee)
@@ -72,11 +76,7 @@ export default function EmployeeListTable({
   if (loading && employees.length === 0) {
     return (
       <div className="employee-list" aria-busy="true" aria-live="polite">
-        <div className="employee-list__skeleton">
-          {[0, 1, 2, 3, 4].map((index) => (
-            <div key={index} className="employee-list__skeleton-row" />
-          ))}
-        </div>
+        {showInitialSkeleton ? <LoadingSkeleton variant="list" count={5} /> : null}
       </div>
     )
   }
