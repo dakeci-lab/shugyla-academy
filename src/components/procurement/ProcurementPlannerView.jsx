@@ -314,7 +314,9 @@ export default function ProcurementPlannerView() {
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
   const from = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const to = Math.min(page * PAGE_SIZE, totalCount)
-  const syncTitle = `Синхронизация UMAG · ${formatSyncedAt(snapshot?.syncedAt)}`
+  const syncTitle = syncing
+    ? 'Синхронизация UMAG выполняется'
+    : `Синхронизация UMAG · ${formatSyncedAt(snapshot?.syncedAt)}`
 
   if (!isCloudMode()) {
     return (
@@ -340,8 +342,18 @@ export default function ProcurementPlannerView() {
                 disabled={!canSync || syncing}
                 aria-label={syncTitle}
                 title={syncTitle}
+                aria-busy={syncing || undefined}
               >
-                <RefreshIcon size={20} />
+                <span
+                  className={
+                    syncing
+                      ? 'proc-planner__sync-icon proc-planner__sync-icon--spinning'
+                      : 'proc-planner__sync-icon'
+                  }
+                  aria-hidden="true"
+                >
+                  <RefreshIcon size={20} />
+                </span>
               </PlatformToolbarIconButton>
             </PlatformToolbarActionWrap>
             <PlatformToolbarActionWrap>
