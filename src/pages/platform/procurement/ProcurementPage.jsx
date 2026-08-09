@@ -54,6 +54,7 @@ import SimplePurchaseCardList from '../../../components/procurement/SimplePurcha
 import PurchaseFilterPopover from '../../../components/procurement/PurchaseFilterPopover'
 import WeekScheduleNav from '../../../components/procurement/WeekScheduleNav'
 import ProcurementPlanDayList from '../../../components/procurement/ProcurementPlanDayList'
+import ProcurementPlannerView from '../../../components/procurement/ProcurementPlannerView'
 import { PlusIcon } from '../../../components/icons/PlatformIcons'
 import {
   PlatformFilterButton,
@@ -63,7 +64,7 @@ import '../../../components/admin/admin-shared.css'
 import './ProcurementPage.css'
 import '../../../components/procurement/SimpleDeliveryCard.css'
 
-/** Простая закупка — /platform/procurement */
+/** Закуп: планирование (по умолчанию) + простые заказы — /platform/procurement */
 export default function ProcurementPage() {
   const { user } = useSession()
   const location = useLocation()
@@ -71,6 +72,7 @@ export default function ProcurementPage() {
   const { error: showError } = useToast()
   const { loadError, reloadProcurement, ensureModules, version: dataVersion } = usePlatformData()
   const { version, refresh, notifyChange } = useAdminRefresh()
+  const [mainTab, setMainTab] = useState('planning')
 
   useEffect(() => {
     if (!isCloudMode()) return
@@ -273,6 +275,7 @@ export default function ProcurementPage() {
     if (prefill.expectedDeliveryDate) {
       selectWeekContaining(prefill.expectedDeliveryDate)
     }
+    setMainTab('orders')
     openCreate(prefill)
     navigate(location.pathname, { replace: true, state: null })
   }, [location.state, canCreate, location.pathname, navigate])
@@ -405,6 +408,37 @@ export default function ProcurementPage() {
 
   return (
     <div className="procurement-page">
+      <div className="procurement-page__tabs" role="tablist" aria-label="Разделы закупа">
+        <button
+          type="button"
+          role="tab"
+          className={
+            mainTab === 'planning'
+              ? 'procurement-page__tab is-active'
+              : 'procurement-page__tab'
+          }
+          aria-selected={mainTab === 'planning'}
+          onClick={() => setMainTab('planning')}
+        >
+          Планирование
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={
+            mainTab === 'orders' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
+          }
+          aria-selected={mainTab === 'orders'}
+          onClick={() => setMainTab('orders')}
+        >
+          Заказы
+        </button>
+      </div>
+
+      {mainTab === 'planning' ? (
+        <ProcurementPlannerView />
+      ) : (
+        <>
       <div className="procurement-page__header">
         <div className="procurement-page__header-main">
           {canCreate && (
@@ -557,6 +591,8 @@ export default function ProcurementPage() {
           </>
         )}
       </section>
+        </>
+      )}
 
       {deleteTargetId && (
         <ConfirmDialog

@@ -1,0 +1,758 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSession } from '../../context/SessionContext'
+import { usePlatformData } from '../../context/PlatformDataContext'
+import { useToast } from '../../context/ToastContext'
+import {
+  can,
+  canCreatePurchase,
+  canTransferToReceiving,
+  PERMISSION_CODES,
+} from '../../config/permissions'
+import { isCloudMode } from '../../lib/dataMode'
+import {
+  exportSnapshotItemsCsv,
+  fetchLatestProcurementSnapshot,
+  fetchSnapshotFilterOptions,
+  fetchSnapshotItemsPage,
+  generateProcurementOrders,
+  persistNormDaysForScope,
+  resetItemToRecommendation,
+  syncProcurementPlanning,
+  updateItemFinalOrderQty,
+} from '../../services/procurementPlanningService'
+import AdminModal from '../admin/AdminModal'
+import ConfirmDialog from '../admin/ConfirmDialog'
+import PlatformSearchToolbar, {
+  PlatformFilterButton,
+  PlatformToolbarActionWrap,
+  PlatformToolbarIconButton,
+} from '../platform/PlatformSearchToolbar'
+import TablePagination from './TablePagination'
+import {
+  DownloadIcon,
+  RefreshIcon,
+  RotateCcwIcon,
+  SparklesIcon,
+} from '../icons/PlatformIcons'
+import './ProcurementPlannerView.css'
+
+const PAGE_SIZE = 50
+
+function formatNum(value, digits = 1) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return '—'
+  return n.toLocaleString('ru-KZ', {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: 0,
+  })
+}
+
+function formatSyncedAt(value) {
+  if (!value) return 'нет данных'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return 'нет данных'
+  return d.toLocaleString('ru-KZ', {
+    timeZone: 'Asia/Almaty',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function WeeklySpark({ values }) {
+  const arr = Array.isArray(values) ? values : []
+  return (
+    <div className="proc-planner__weeks" title={arr.map((v) => formatNum(v, 0)).join(' · ')}>
+      {arr.map((v, i) => (
+        <span key={i} className={Number(v) > 0 ? 'is-hot' : ''}>
+          {formatNum(v, 0)}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+export default function ProcurementPlannerView() {
+  const { user } = useSession()
+  const { reloadProcurement } = usePlatformData()
+  const { error: showError, success: showSuccess } = useToast()
+
+  const canEditPlan = can(user, PERMISSION_CODES.PROCUREMENT_EDIT)
+  const canSync = canEditPlan
+  const canGenerate = canCreatePurchase(user) && canTransferToReceiving(user)
+
+  const [snapshot, setSnapshot] = useState(null)
+  const [items, setItems] = useState([])
+  const [totalCount, setTotalCount] = useState(0)
+  const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [filters, setFilters] = useState({
+    categoryName: '',
+    subcategoryName: '',
+    platformSupplierId: '',
+    warningsOnly: false,
+    orderableOnly: false,
+  })
+  const [filterOptions, setFilterOptions] = useState({
+    categories: [],
+    categorySubcategories: [],
+    suppliers: [],
+  })
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [generateOpen, setGenerateOpen] = useState(false)
+  const [deliveryDate, setDeliveryDate] = useState('')
+  const [confirmGenerate, setConfirmGenerate] = useState(false)
+  const filterButtonRef = useRef(null)
+
+  const activeFilterCount = useMemo(() => {
+    let n = 0
+    if (filters.categoryName) n += 1
+    if (filters.subcategoryName) n += 1
+    if (filters.platformSupplierId) n += 1
+    if (filters.warningsOnly) n += 1
+    if (filters.orderableOnly) n += 1
+    return n
+  }, [filters])
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 250)
+    return () => clearTimeout(t)
+  }, [search])
+
+  const loadSnapshotMeta = useCallback(async () => {
+    if (!isCloudMode()) {
+      setSnapshot(null)
+      setLoading(false)
+      return
+    }
+    try {
+      const snap = await fetchLatestProcurementSnapshot()
+      setSnapshot(snap)
+      if (snap?.id) {
+        const opts = await fetchSnapshotFilterOptions(snap.id)
+        setFilterOptions(opts)
+      }
+    } catch (err) {
+      showError(err.message || 'Не удалось загрузить снимок')
+    }
+  }, [showError])
+
+  const loadItems = useCallback(async () => {
+    if (!snapshot?.id || snapshot.status === 'syncing' || snapshot.status === 'failed') {
+      setItems([])
+      setTotalCount(0)
+      setLoading(false)
+      return
+    }
+    setLoading(true)
+    try {
+      const result = await fetchSnapshotItemsPage({
+        snapshotId: snapshot.id,
+        page,
+        pageSize: PAGE_SIZE,
+        search: debouncedSearch,
+        ...filters,
+      })
+      setItems(result.items)
+      setTotalCount(result.totalCount)
+    } catch (err) {
+      showError(err.message || 'Не удалось загрузить позиции')
+    } finally {
+      setLoading(false)
+    }
+  }, [snapshot, page, debouncedSearch, filters, showError])
+
+  useEffect(() => {
+    void loadSnapshotMeta()
+  }, [loadSnapshotMeta])
+
+  useEffect(() => {
+    void loadItems()
+  }, [loadItems])
+
+  useEffect(() => {
+    setPage(1)
+  }, [debouncedSearch, filters, snapshot?.id])
+
+  async function handleSync() {
+    if (!canSync || syncing) return
+    setSyncing(true)
+    try {
+      const result = await syncProcurementPlanning()
+      if (!result.success) {
+        showError(result.message)
+        return
+      }
+      showSuccess(`Синхронизировано: ${result.itemCount} SKU`)
+      await loadSnapshotMeta()
+    } catch (err) {
+      showError(err?.message || 'Не удалось синхронизировать план')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  async function handleNormChange(item, rawValue) {
+    const parsed = Number(rawValue)
+    const days = Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : 0
+    try {
+      await persistNormDaysForScope({
+        snapshotId: snapshot.id,
+        categoryName: item.categoryName,
+        subcategoryName: item.subcategoryName,
+        normDays: days,
+        user,
+        itemId: item.id,
+      })
+      await loadItems()
+    } catch (err) {
+      showError(err.message || 'Не удалось сохранить норму')
+    }
+  }
+
+  async function handleFinalChange(item, rawValue) {
+    try {
+      await updateItemFinalOrderQty(item, rawValue)
+      await loadItems()
+    } catch (err) {
+      showError(err.message || 'Не удалось сохранить заказ')
+    }
+  }
+
+  async function handleReset(item) {
+    try {
+      await resetItemToRecommendation(item)
+      await loadItems()
+    } catch (err) {
+      showError(err.message || 'Не удалось сбросить')
+    }
+  }
+
+  async function handleExport() {
+    if (!snapshot?.id) return
+    try {
+      const rows = await exportSnapshotItemsCsv(snapshot.id, {
+        search: debouncedSearch,
+        ...filters,
+      })
+      const XLSX = await import('xlsx')
+      const sheet = rows.map((r) => ({
+        Товар: r.productName,
+        Штрихкод: r.barcode,
+        Категория: r.categoryName,
+        Подкатегория: r.subcategoryName,
+        Поставщик: r.umagSupplierName,
+        Остаток: r.rawStock,
+        'Ср/день': r.avgDaily,
+        Норма: r.normDays,
+        Рекомендация: r.recommendedQty,
+        Заказ: r.finalOrderQty,
+        W1: r.weeklySales[0],
+        W2: r.weeklySales[1],
+        W3: r.weeklySales[2],
+        W4: r.weeklySales[3],
+        W5: r.weeklySales[4],
+        W6: r.weeklySales[5],
+        W7: r.weeklySales[6],
+        W8: r.weeklySales[7],
+      }))
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.json_to_sheet(sheet)
+      XLSX.utils.book_append_sheet(wb, ws, 'План')
+      const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+      const blob = new Blob([out], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `plan_zakupok_${snapshot.periodTo || 'export'}.xlsx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      showError(err.message || 'Не удалось экспортировать')
+    }
+  }
+
+  async function runGenerate() {
+    if (!canGenerate || !snapshot?.id || !deliveryDate) return
+    setGenerating(true)
+    try {
+      const result = await generateProcurementOrders(snapshot.id, deliveryDate)
+      if (!result.success) {
+        showError(result.message)
+        return
+      }
+      const skipped = result.skippedNoSupplier || 0
+      const msg = result.alreadyGenerated
+        ? `Заказы уже были сформированы (${result.purchaseOrderIds?.length || 0}).`
+        : `Сформировано заказов: ${result.ordersCreated}.`
+      showSuccess(skipped > 0 ? `${msg} Без поставщика: ${skipped}.` : msg)
+      setGenerateOpen(false)
+      setConfirmGenerate(false)
+      await loadSnapshotMeta()
+      await reloadProcurement()
+    } catch (err) {
+      showError(err?.message || 'Не удалось сформировать заказы')
+    } finally {
+      setGenerating(false)
+    }
+  }
+
+  const subcategoryOptions = useMemo(() => {
+    const pairs = filterOptions.categorySubcategories || []
+    if (!filters.categoryName) return pairs
+    return pairs.filter((p) => p.categoryName === filters.categoryName)
+  }, [filterOptions.categorySubcategories, filters.categoryName])
+
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+  const from = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const to = Math.min(page * PAGE_SIZE, totalCount)
+  const syncTitle = `Синхронизация UMAG · ${formatSyncedAt(snapshot?.syncedAt)}`
+
+  if (!isCloudMode()) {
+    return (
+      <p className="proc-planner__empty">Планирование доступно только в облачном режиме.</p>
+    )
+  }
+
+  return (
+    <div className="proc-planner">
+      <PlatformSearchToolbar
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        onClear={() => setSearch('')}
+        showClear
+        placeholder="Товар или штрихкод…"
+        ariaLabel="Поиск по плану закупок"
+        flush
+        actions={
+          <>
+            <PlatformToolbarActionWrap>
+              <PlatformToolbarIconButton
+                onClick={() => void handleSync()}
+                disabled={!canSync || syncing}
+                aria-label={syncTitle}
+                title={syncTitle}
+              >
+                <RefreshIcon size={20} />
+              </PlatformToolbarIconButton>
+            </PlatformToolbarActionWrap>
+            <PlatformToolbarActionWrap>
+              <PlatformFilterButton
+                buttonRef={filterButtonRef}
+                active={activeFilterCount > 0}
+                count={activeFilterCount || null}
+                onClick={() => setFilterOpen((v) => !v)}
+                ariaExpanded={filterOpen}
+                ariaLabel="Фильтры плана"
+                title="Фильтры"
+              />
+              {filterOpen ? (
+                <div className="proc-planner__filter-pop">
+                  <label>
+                    Категория
+                    <select
+                      value={filters.categoryName}
+                      onChange={(e) =>
+                        setFilters((f) => ({
+                          ...f,
+                          categoryName: e.target.value,
+                          subcategoryName: '',
+                        }))
+                      }
+                    >
+                      <option value="">Все</option>
+                      {filterOptions.categories.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Подкатегория
+                    <select
+                      value={filters.subcategoryName}
+                      disabled={!filters.categoryName}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, subcategoryName: e.target.value }))
+                      }
+                    >
+                      <option value="">
+                        {filters.categoryName ? 'Все' : 'Сначала категория'}
+                      </option>
+                      {subcategoryOptions.map((p) => (
+                        <option
+                          key={`${p.categoryName}::${p.subcategoryName}`}
+                          value={p.subcategoryName}
+                        >
+                          {p.subcategoryName}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Поставщик
+                    <select
+                      value={filters.platformSupplierId}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, platformSupplierId: e.target.value }))
+                      }
+                    >
+                      <option value="">Все</option>
+                      {filterOptions.suppliers.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="proc-planner__check">
+                    <input
+                      type="checkbox"
+                      checked={filters.warningsOnly}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, warningsOnly: e.target.checked }))
+                      }
+                    />
+                    Только предупреждения
+                  </label>
+                  <label className="proc-planner__check">
+                    <input
+                      type="checkbox"
+                      checked={filters.orderableOnly}
+                      onChange={(e) =>
+                        setFilters((f) => ({ ...f, orderableOnly: e.target.checked }))
+                      }
+                    />
+                    Только к заказу
+                  </label>
+                  <button
+                    type="button"
+                    className="btn btn--ghost btn--sm"
+                    onClick={() =>
+                      setFilters({
+                        categoryName: '',
+                        subcategoryName: '',
+                        platformSupplierId: '',
+                        warningsOnly: false,
+                        orderableOnly: false,
+                      })
+                    }
+                  >
+                    Сбросить
+                  </button>
+                </div>
+              ) : null}
+            </PlatformToolbarActionWrap>
+            <PlatformToolbarActionWrap>
+              <PlatformToolbarIconButton
+                onClick={() => setGenerateOpen(true)}
+                disabled={!canGenerate || !snapshot || snapshot.status !== 'ready' || generating}
+                aria-label="Сформировать заказы"
+                title="Сформировать заказы"
+                create
+              >
+                <SparklesIcon size={20} />
+              </PlatformToolbarIconButton>
+            </PlatformToolbarActionWrap>
+            <PlatformToolbarActionWrap>
+              <PlatformToolbarIconButton
+                onClick={() => void handleExport()}
+                disabled={!snapshot?.id || snapshot.status === 'syncing'}
+                aria-label="Экспорт плана"
+                title="Экспорт плана"
+              >
+                <DownloadIcon size={20} />
+              </PlatformToolbarIconButton>
+            </PlatformToolbarActionWrap>
+          </>
+        }
+      />
+
+      <div className="proc-planner__meta">
+        {snapshot ? (
+          <>
+            <span>
+              {snapshot.status === 'ready'
+                ? 'Готов'
+                : snapshot.status === 'generated'
+                  ? 'Заказы сформированы'
+                  : snapshot.status === 'syncing'
+                    ? 'Синхронизация…'
+                    : snapshot.status === 'failed'
+                      ? 'Ошибка'
+                      : snapshot.status}
+            </span>
+            <span>{formatSyncedAt(snapshot.syncedAt)}</span>
+            <span>{snapshot.itemCount} SKU</span>
+            {snapshot.negativeStockCount > 0 ? (
+              <span className="proc-planner__warn">{snapshot.negativeStockCount} отриц.</span>
+            ) : null}
+          </>
+        ) : (
+          <span>Нет снимка — нажмите синхронизацию</span>
+        )}
+      </div>
+
+      {snapshot?.status === 'failed' ? (
+        <p className="proc-planner__empty">{snapshot.error || 'Синхронизация не удалась.'}</p>
+      ) : null}
+
+      <div className="proc-planner__desktop">
+        <div className="proc-planner__table-wrap">
+          <table className="proc-planner__table">
+            <thead>
+              <tr>
+                <th>Товар</th>
+                <th>Продажи 8 нед.</th>
+                <th>Остаток</th>
+                <th>Ср/день</th>
+                <th>Норма</th>
+                <th>Рек.</th>
+                <th>Заказ</th>
+                <th>Поставщик</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading ? (
+                <tr>
+                  <td colSpan={8}>Загрузка…</td>
+                </tr>
+              ) : items.length === 0 ? (
+                <tr>
+                  <td colSpan={8}>Нет позиций</td>
+                </tr>
+              ) : (
+                items.map((item) => (
+                  <tr key={item.id}>
+                    <td>
+                      <div className="proc-planner__product">
+                        <strong>{item.productName}</strong>
+                        <span>{item.barcode}</span>
+                        <span className="proc-planner__cat">
+                          {[item.categoryName, item.subcategoryName].filter(Boolean).join(' / ')}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <WeeklySpark values={item.weeklySales} />
+                    </td>
+                    <td>
+                      <span
+                        className={
+                          item.negativeStock ? 'proc-planner__stock is-neg' : 'proc-planner__stock'
+                        }
+                        title={
+                          item.negativeStock
+                            ? 'Отрицательный остаток UMAG — в расчёте как 0'
+                            : undefined
+                        }
+                      >
+                        {formatNum(item.rawStock, 2)}
+                      </span>
+                    </td>
+                    <td>{formatNum(item.avgDaily, 2)}</td>
+                    <td>
+                      <input
+                        className="proc-planner__input"
+                        type="number"
+                        min={0}
+                        step={1}
+                        defaultValue={item.normDays}
+                        key={`norm-${item.id}-${item.normDays}`}
+                        disabled={!canEditPlan || snapshot?.status === 'generated'}
+                        onBlur={(e) => {
+                          if (Number(e.target.value) !== item.normDays) {
+                            void handleNormChange(item, e.target.value)
+                          }
+                        }}
+                        aria-label={`Норма дней для ${item.productName}`}
+                      />
+                    </td>
+                    <td>{formatNum(item.recommendedQty, 0)}</td>
+                    <td>
+                      <div className="proc-planner__final">
+                        <input
+                          className="proc-planner__input"
+                          type="number"
+                          min={0}
+                          step={1}
+                          defaultValue={item.finalOrderQty}
+                          key={`final-${item.id}-${item.finalOrderQty}-${item.manualOverride}`}
+                          disabled={!canEditPlan || snapshot?.status === 'generated'}
+                          onBlur={(e) => {
+                            if (Number(e.target.value) !== item.finalOrderQty) {
+                              void handleFinalChange(item, e.target.value)
+                            }
+                          }}
+                          aria-label={`Заказ для ${item.productName}`}
+                        />
+                        {item.manualOverride ? (
+                          <button
+                            type="button"
+                            className="proc-planner__reset"
+                            title="Сбросить к рекомендации"
+                            aria-label="Сбросить к рекомендации"
+                            disabled={!canEditPlan || snapshot?.status === 'generated'}
+                            onClick={() => void handleReset(item)}
+                          >
+                            <RotateCcwIcon size={14} />
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td>{item.umagSupplierName || '—'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        <TablePagination
+          page={page}
+          totalPages={totalPages}
+          from={from}
+          to={to}
+          totalCount={totalCount}
+          onPageChange={setPage}
+        />
+      </div>
+
+      <div className="proc-planner__mobile">
+        {loading ? (
+          <p className="proc-planner__empty">Загрузка…</p>
+        ) : items.length === 0 ? (
+          <p className="proc-planner__empty">Нет позиций</p>
+        ) : (
+          <ul className="proc-planner__cards">
+            {items.map((item) => (
+              <li key={item.id} className="proc-planner__card">
+                <div className="proc-planner__card-top">
+                  <strong>{item.productName}</strong>
+                  <span>{item.barcode}</span>
+                </div>
+                <WeeklySpark values={item.weeklySales} />
+                <div className="proc-planner__card-grid">
+                  <span>
+                    Остаток{' '}
+                    <b className={item.negativeStock ? 'is-neg' : ''}>
+                      {formatNum(item.rawStock, 2)}
+                    </b>
+                  </span>
+                  <span>
+                    Ср/день <b>{formatNum(item.avgDaily, 2)}</b>
+                  </span>
+                  <label>
+                    Норма
+                    <input
+                      type="number"
+                      min={0}
+                      defaultValue={item.normDays}
+                      key={`m-norm-${item.id}-${item.normDays}`}
+                      disabled={!canEditPlan || snapshot?.status === 'generated'}
+                      onBlur={(e) => {
+                        if (Number(e.target.value) !== item.normDays) {
+                          void handleNormChange(item, e.target.value)
+                        }
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Заказ
+                    <input
+                      type="number"
+                      min={0}
+                      defaultValue={item.finalOrderQty}
+                      key={`m-final-${item.id}-${item.finalOrderQty}`}
+                      disabled={!canEditPlan || snapshot?.status === 'generated'}
+                      onBlur={(e) => {
+                        if (Number(e.target.value) !== item.finalOrderQty) {
+                          void handleFinalChange(item, e.target.value)
+                        }
+                      }}
+                    />
+                  </label>
+                </div>
+                <div className="proc-planner__card-foot">
+                  <span>{item.umagSupplierName || 'Без поставщика'}</span>
+                  <span>рек. {formatNum(item.recommendedQty, 0)}</span>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+        <TablePagination
+          page={page}
+          totalPages={totalPages}
+          from={from}
+          to={to}
+          totalCount={totalCount}
+          onPageChange={setPage}
+        />
+      </div>
+
+      {generateOpen ? (
+        <AdminModal
+          title="Сформировать заказы"
+          onClose={() => {
+            if (!generating) setGenerateOpen(false)
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                className="btn btn--ghost"
+                disabled={generating}
+                onClick={() => setGenerateOpen(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className="btn btn--primary"
+                disabled={generating || !deliveryDate}
+                onClick={() => setConfirmGenerate(true)}
+              >
+                Далее
+              </button>
+            </>
+          }
+        >
+          <label className="admin-form__field">
+            <span>Ожидаемая дата поставки</span>
+            <input
+              type="date"
+              value={deliveryDate}
+              onChange={(e) => setDeliveryDate(e.target.value)}
+              required
+            />
+          </label>
+          <p className="proc-planner__hint">
+            Будут созданы аналитические заказы и карточки приёмки по поставщикам. Позиции без
+            привязанного поставщика будут пропущены.
+          </p>
+        </AdminModal>
+      ) : null}
+
+      {confirmGenerate ? (
+        <ConfirmDialog
+          title="Подтвердить формирование?"
+          message="Создать заказы и документы приёмки по текущему плану?"
+          confirmLabel="Сформировать"
+          confirmVariant="primary"
+          loading={generating}
+          onCancel={() => !generating && setConfirmGenerate(false)}
+          onConfirm={() => void runGenerate()}
+        />
+      ) : null}
+    </div>
+  )
+}

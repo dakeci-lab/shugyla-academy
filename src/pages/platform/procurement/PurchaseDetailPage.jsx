@@ -21,6 +21,10 @@ import {
   calcLineTotal,
   PURCHASE_STATUS,
 } from '../../../utils/purchaseData'
+import {
+  exportPurchaseOrderPdf,
+  exportPurchaseOrderXlsx,
+} from '../../../utils/purchaseOrderExport'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../../../components/admin/AdminModal'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
@@ -32,6 +36,7 @@ import PurchaseItemForm, {
   formToPurchaseItem,
   validatePurchaseItemForm,
 } from '../../../components/procurement/PurchaseItemForm'
+import { DownloadIcon, FileTextIcon } from '../../../components/icons/PlatformIcons'
 import '../../../components/admin/admin-shared.css'
 import './PurchaseDetailPage.css'
 
@@ -48,6 +53,7 @@ export default function PurchaseDetailPage() {
   const [itemForm, setItemForm] = useState(EMPTY_PURCHASE_ITEM_FORM)
   const [itemFormError, setItemFormError] = useState('')
   const [itemSaving, setItemSaving] = useState(false)
+  const [exporting, setExporting] = useState(false)
 
   const canView = canViewPurchases(user)
   const canEdit = canEditPurchase(user)
@@ -161,8 +167,32 @@ export default function PurchaseDetailPage() {
     }
   }
 
-  function handleExport() {
-    window.alert('Экспорт Excel будет доступен после подключения логики.')
+  async function handleExportXlsx() {
+    if (exporting) return
+    setExporting(true)
+    setError('')
+    try {
+      await exportPurchaseOrderXlsx(order)
+      setMessage('Excel-файл скачан.')
+    } catch (err) {
+      setError(err.message || 'Не удалось экспортировать Excel')
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  async function handleExportPdf() {
+    if (exporting) return
+    setExporting(true)
+    setError('')
+    try {
+      await exportPurchaseOrderPdf(order)
+      setMessage('PDF-файл скачан.')
+    } catch (err) {
+      setError(err.message || 'Не удалось экспортировать PDF')
+    } finally {
+      setExporting(false)
+    }
   }
 
   async function handleTransfer() {
@@ -189,7 +219,7 @@ export default function PurchaseDetailPage() {
     try {
       await cancelPurchaseOrder(order.id)
       await refresh()
-      navigate('/platform/procurement/analytics')
+      navigate('/platform/procurement')
     } catch (err) {
       setError(err.message || 'Не удалось отменить закуп')
     }
@@ -198,8 +228,8 @@ export default function PurchaseDetailPage() {
   return (
     <div className="purchase-detail">
       <div className="purchase-detail__back">
-        <Link to="/platform/procurement/analytics" className="purchase-detail__back-link">
-          ← К списку закупов
+        <Link to="/platform/procurement" className="purchase-detail__back-link">
+          ← К закупу
         </Link>
       </div>
 
@@ -209,11 +239,28 @@ export default function PurchaseDetailPage() {
           <PurchaseStatusBadge status={order.status} />
         </div>
         <div className="purchase-detail__actions">
+          <button
+            type="button"
+            className="btn btn--outline purchase-detail__icon-btn"
+            onClick={() => void handleExportXlsx()}
+            disabled={exporting || displayItems.length === 0}
+            aria-label="Экспорт Excel"
+            title="Экспорт Excel"
+          >
+            <DownloadIcon size={18} />
+          </button>
+          <button
+            type="button"
+            className="btn btn--outline purchase-detail__icon-btn"
+            onClick={() => void handleExportPdf()}
+            disabled={exporting || displayItems.length === 0}
+            aria-label="Экспорт PDF"
+            title="Экспорт PDF"
+          >
+            <FileTextIcon size={18} />
+          </button>
           {canEdit && order.status !== 'cancelled' && order.status !== 'received' && (
             <>
-              <button type="button" className="btn btn--outline" onClick={handleExport}>
-                Экспорт Excel
-              </button>
               {canTransfer && !alreadyTransferred && order.status !== 'cancelled' && (
                 <button type="button" className="btn btn--outline" onClick={handleTransfer}>
                   Передать в приёмку

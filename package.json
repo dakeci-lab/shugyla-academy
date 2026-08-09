@@ -56,6 +56,7 @@
     "verify:receiving-row-display": "node scripts/verify-receiving-row-display.mjs",
     "verify:mobile-page-header": "node scripts/verify-mobile-page-header.mjs",
     "verify:procurement-calendar-filter": "node scripts/verify-procurement-calendar-filter.mjs",
+    "verify:procurement-planning-v1": "node scripts/verify-procurement-planning-v1.mjs",
     "verify:modal-scroll-lock": "node scripts/verify-modal-scroll-lock.mjs",
     "verify:mobile-profile": "node scripts/verify-mobile-profile.mjs",
     "verify:employee-documents": "node scripts/verify-employee-documents.mjs",
@@ -120,15 +121,16 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",
+    "pdfmake": "^0.2.20",
     "qrcode": "^1.5.4",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-router-dom": "^7.1.0"
+    "react-router-dom": "^7.1.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",
     "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.0",
-    "xlsx": "^0.18.5"
+    "vite": "^6.0.0"
   }
 }

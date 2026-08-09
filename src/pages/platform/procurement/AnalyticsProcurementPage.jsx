@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { usePlatformData } from '../../../context/PlatformDataContext'
 import {
@@ -25,19 +25,17 @@ import PlatformAccessDenied from '../../../components/platform/PlatformAccessDen
 import PurchaseStatsCards from '../../../components/procurement/PurchaseStatsCards'
 import PurchaseTable from '../../../components/procurement/PurchaseTable'
 import CreatePurchaseForm, { EMPTY_PURCHASE_FORM } from '../../../components/procurement/CreatePurchaseForm'
-import UmagImportModal from '../../../components/procurement/UmagImportModal'
 import PurchaseHistoryModal from '../../../components/procurement/PurchaseHistoryModal'
 import '../../../components/admin/admin-shared.css'
 import './ProcurementPage.css'
 
-/** Аналитическая закупка — /platform/procurement/analytics (будет активирована позже) */
+/** Список аналитических заказов — /platform/procurement/analytics */
 export default function AnalyticsProcurementPage() {
   const { user } = useSession()
   const navigate = useNavigate()
   const { ensureModules, version: dataVersion } = usePlatformData()
   const { version, refresh } = useAdminRefresh()
   const [showCreate, setShowCreate] = useState(false)
-  const [showImport, setShowImport] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [form, setForm] = useState(EMPTY_PURCHASE_FORM)
   const [formError, setFormError] = useState('')
@@ -120,18 +118,14 @@ export default function AnalyticsProcurementPage() {
   return (
     <div className="procurement-page">
       <p className="admin-form__hint">
-        Режим «Аналитическая закупка» — для будущего использования (Umag, SKU, рекомендации).
+        Синхронизация остатков и продаж UMAG — во вкладке «Планирование» раздела{' '}
+        <Link to="/platform/procurement">Закуп</Link>.
       </p>
 
       <div className="procurement-page__actions">
         {canCreate && (
           <button type="button" className="btn btn--primary" onClick={() => setShowCreate(true)}>
             Создать аналитический закуп
-          </button>
-        )}
-        {canEdit && (
-          <button type="button" className="btn btn--outline" onClick={() => setShowImport(true)}>
-            Импорт из Umag
           </button>
         )}
         <button type="button" className="btn btn--ghost" onClick={() => setShowHistory(true)}>
@@ -182,10 +176,6 @@ export default function AnalyticsProcurementPage() {
         >
           <CreatePurchaseForm form={form} onChange={setForm} error={formError} />
         </AdminModal>
-      )}
-
-      {showImport && canEdit && (
-        <UmagImportModal onClose={() => setShowImport(false)} />
       )}
 
       {showHistory && (
