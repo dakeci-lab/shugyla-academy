@@ -20,6 +20,7 @@ import ApplyPage from './pages/Apply'
 import ApplyHubPage from './pages/ApplyHub'
 import CareersPublicLayout from './layouts/CareersPublicLayout'
 import AuthLoadingScreen from './components/AuthLoadingScreen'
+import AppLaunchGate from './components/AppLaunchGate'
 
 /**
  * Internal platform pages — lazy so public /apply does not download HR UI.
@@ -107,6 +108,7 @@ export default function App() {
       <SessionProvider>
         <BrowserRouter basename={getRouterBasename()}>
           <ToastProvider>
+            <AppLaunchGate />
             <Routes>
               {/* Публичные маршруты — без PlatformData / Permission / NotificationInbox */}
               <Route path="/" element={<Navigate to={LOGIN_PATH} replace />} />

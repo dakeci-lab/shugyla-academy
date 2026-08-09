@@ -170,6 +170,53 @@ function main() {
   assert('no tt-home-skeleton CSS', !read('src/components/admin/sections/TimeTrackerHome.css').includes('tt-home-skeleton'))
   assert('no time-tracker-card skeleton CSS', !read('src/components/admin/EmployeeRating.css').includes('time-tracker-card__skeleton'))
 
+  console.log('Stage 6: Unified launch / AuthLoadingScreen')
+  const indexHtml = read('index.html')
+  const authLoading = read('src/components/AuthLoadingScreen.jsx')
+  const authLoadingCss = read('src/components/AuthLoadingScreen.css')
+  const appLaunchGate = read('src/components/AppLaunchGate.jsx')
+  const appJsx = read('src/App.jsx')
+  const platformData = read('src/context/PlatformDataContext.jsx')
+  const protectedRoute = read('src/components/ProtectedRoute.jsx')
+  const sessionGate = read('src/components/platform/PlatformSessionGate.jsx')
+
+  assert('pre-React splash markup in #root', /id="root"[\s\S]*class="app-launch"/.test(indexHtml))
+  assert(
+    'pre-React splash uses real icon asset',
+    indexHtml.includes('/shugyla-academy/icons/icon-192.png') ||
+      indexHtml.includes('/shugyla-academy/icons/icon-512.png'),
+  )
+  assert('critical launch CSS in index.html', indexHtml.includes('.app-launch') && indexHtml.includes('100dvh'))
+  assert('AuthLoadingScreen uses real icon', authLoading.includes('icons/icon-192.png') || authLoading.includes('icons/icon-512.png'))
+  assert('AuthLoadingScreen has role=status', authLoading.includes('role="status"') || authLoading.includes("role='status'"))
+  assert('AuthLoadingScreen has aria-label', authLoading.includes('aria-label'))
+  assert('AuthLoadingScreen has no card markup', !authLoading.includes('platform-data-loading__card'))
+  assert('AuthLoadingScreen has no spinner markup', !authLoading.includes('spinner'))
+  assert('AuthLoadingScreen has no visible brand text', !authLoading.includes('Shugyla Platform'))
+  assert(
+    'AuthLoadingScreen has no visible status text',
+    !authLoading.includes('Проверка авторизации') && !authLoading.includes('Загрузка…'),
+  )
+  assert('launch CSS has exit transition', authLoadingCss.includes('app-launch--exit') && authLoadingCss.includes('opacity'))
+  assert('launch CSS respects reduced motion', authLoadingCss.includes('prefers-reduced-motion'))
+  assert('AppLaunchGate exists', exists('src/components/AppLaunchGate.jsx'))
+  assert('AppLaunchGate uses AuthLoadingScreen', appLaunchGate.includes('AuthLoadingScreen'))
+  assert('AppLaunchGate waits on auth/rbac', appLaunchGate.includes('AUTH_STATUS') && appLaunchGate.includes('rbacReady'))
+  assert('AppLaunchGate exits for public routes', appLaunchGate.includes('isPublicAppPath'))
+  assert('AppLaunchGate keeps login covered through auth restore', appLaunchGate.includes('pathname !== LOGIN_PATH'))
+  assert('AppLaunchGate applies exit then unmounts', appLaunchGate.includes('exiting') && appLaunchGate.includes('gone'))
+  assert('App mounts AppLaunchGate under BrowserRouter', appJsx.includes('<AppLaunchGate'))
+  assert('PlatformSuspense uses AuthLoadingScreen', appJsx.includes('fallback={<AuthLoadingScreen'))
+  assert('ProtectedRoute uses AuthLoadingScreen', protectedRoute.includes('AuthLoadingScreen'))
+  assert('PlatformSessionGate uses AuthLoadingScreen', sessionGate.includes('AuthLoadingScreen'))
+  assert('PlatformDataContext uses shared AuthLoadingScreen', platformData.includes('AuthLoadingScreen'))
+  assert('PlatformDataContext has no DataLoadingScreen', !platformData.includes('DataLoadingScreen'))
+  assert('old platform-data-loading CSS removed', !exists('src/context/PlatformDataContext.css'))
+  assert(
+    'manifest background matches launch bg',
+    read('public/manifest.webmanifest').includes('"background_color": "#f4f6f4"'),
+  )
+
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }
 

@@ -13,7 +13,7 @@ import { getAllModuleLoadStates } from '../lib/cloudStore'
 import { isPublicAppPath } from '../router/authRoutes'
 import { useSession, AUTH_STATUS } from './SessionContext'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
-import './PlatformDataContext.css'
+import AuthLoadingScreen from '../components/AuthLoadingScreen'
 
 const PlatformDataContext = createContext({
   ready: true,
@@ -26,19 +26,6 @@ const PlatformDataContext = createContext({
   ensureModules: async () => {},
   notifyChange: () => {},
 })
-
-function DataLoadingScreen() {
-  return (
-    <div className="platform-data-loading">
-      <div className="platform-data-loading__card">
-        <div className="platform-data-loading__logo" aria-hidden="true">S</div>
-        <h1 className="platform-data-loading__brand">Shugyla Platform</h1>
-        <span className="platform-data-loading__spinner" aria-hidden />
-        <p>Загрузка…</p>
-      </div>
-    </div>
-  )
-}
 
 function classifyDataLoadError(error) {
   const message = error?.message || String(error || '')
@@ -235,7 +222,7 @@ export function PlatformDataProvider({ children }) {
 
   // Auth loading only — never block the shell on background module sync.
   if (cloudMode && authStatus === AUTH_STATUS.LOADING && !isPublicRoute) {
-    return <DataLoadingScreen />
+    return <AuthLoadingScreen />
   }
 
   return (

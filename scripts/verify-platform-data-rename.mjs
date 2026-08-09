@@ -58,11 +58,11 @@ function main() {
 
   console.log('Files')
   assert('PlatformDataContext.jsx exists', exists('src/context/PlatformDataContext.jsx'))
-  assert('PlatformDataContext.css exists', exists('src/context/PlatformDataContext.css'))
   assert('platformDataService.js exists', exists('src/services/platformDataService.js'))
   assert('legacy AcademyDataContext.jsx gone', !exists('src/context/AcademyDataContext.jsx'))
   assert('legacy AcademyDataContext.css gone', !exists('src/context/AcademyDataContext.css'))
   assert('legacy academyDataService.js gone', !exists('src/services/academyDataService.js'))
+  assert('legacy PlatformDataContext.css gone', !exists('src/context/PlatformDataContext.css'))
 
   console.log('\nSymbols')
   const ctx = read('src/context/PlatformDataContext.jsx')
@@ -71,7 +71,7 @@ function main() {
   assert('exports usePlatformData', ctx.includes('export function usePlatformData'))
   assert('defines PlatformDataContext', ctx.includes('const PlatformDataContext = createContext'))
   assert('imports platformDataService', ctx.includes("from '../services/platformDataService'"))
-  assert('imports PlatformDataContext.css', ctx.includes("./PlatformDataContext.css"))
+  assert('uses shared AuthLoadingScreen', ctx.includes('AuthLoadingScreen'))
   assert(
     'App mounts PlatformData via InternalPlatformProviders',
     app.includes('InternalPlatformProviders')

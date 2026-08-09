@@ -1,0 +1,44 @@
+/* Shared launch / auth / Suspense fallback — logo only, no card/text/spinner */
+.app-launch {
+  position: fixed;
+  inset: 0;
+  z-index: 9990;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  margin: 0;
+  padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0)
+    env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+  background: #f4f6f4;
+  opacity: 1;
+  transition: opacity 280ms ease;
+}
+
+.app-launch--gate {
+  z-index: 10000;
+}
+
+.app-launch--exit {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.app-launch__logo {
+  display: block;
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-launch {
+    transition: none;
+  }
+}

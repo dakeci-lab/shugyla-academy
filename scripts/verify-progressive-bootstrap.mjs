@@ -58,9 +58,10 @@ function main() {
     /setReady\(true\)[\s\S]*setLoading\(false\)[\s\S]*initializeData\(/.test(platformCtx)
   )
   assert(
-    'DataLoadingScreen only during AUTH loading',
+    'AuthLoadingScreen only during AUTH loading',
     platformCtx.includes("authStatus === AUTH_STATUS.LOADING") &&
-      platformCtx.includes('DataLoadingScreen')
+      platformCtx.includes('AuthLoadingScreen') &&
+      !platformCtx.includes('DataLoadingScreen')
   )
   assert(
     'no global gate on loading || !ready for all routes',
