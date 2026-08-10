@@ -28,10 +28,10 @@ import PlatformSearchToolbar, {
   PlatformToolbarActionWrap,
   PlatformToolbarIconButton,
 } from '../platform/PlatformSearchToolbar'
+import PlatformSyncButton from '../platform/PlatformSyncButton'
 import TablePagination from './TablePagination'
 import {
   DownloadIcon,
-  RefreshIcon,
   RotateCcwIcon,
   SparklesIcon,
 } from '../icons/PlatformIcons'
@@ -349,24 +349,13 @@ export default function ProcurementPlannerView() {
         actions={
           <>
             <PlatformToolbarActionWrap>
-              <PlatformToolbarIconButton
+              <PlatformSyncButton
                 onClick={() => void handleSync()}
-                disabled={!canSync || syncing}
-                aria-label={syncTitle}
+                syncing={syncing}
+                disabled={!canSync}
                 title={syncTitle}
-                aria-busy={syncing || undefined}
-              >
-                <span
-                  className={
-                    syncing
-                      ? 'proc-planner__sync-icon proc-planner__sync-icon--spinning'
-                      : 'proc-planner__sync-icon'
-                  }
-                  aria-hidden="true"
-                >
-                  <RefreshIcon size={20} />
-                </span>
-              </PlatformToolbarIconButton>
+                aria-label={syncTitle}
+              />
             </PlatformToolbarActionWrap>
             <PlatformToolbarActionWrap>
               <PlatformFilterButton

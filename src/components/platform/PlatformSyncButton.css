@@ -1,0 +1,26 @@
+.platform-sync-button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center;
+}
+
+.platform-sync-button__icon--spinning {
+  animation: platform-sync-spin 0.9s linear infinite;
+}
+
+@keyframes platform-sync-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-sync-button__icon--spinning {
+    animation: none;
+    opacity: 0.72;
+  }
+}

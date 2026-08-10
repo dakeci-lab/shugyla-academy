@@ -33,15 +33,19 @@ import PlatformSearchToolbar, {
   PlatformFilterButton,
   PlatformToolbarActionWrap,
 } from '../../platform/PlatformSearchToolbar'
+import PlatformSyncButton from '../../platform/PlatformSyncButton'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import CreateReconciliationModal from './CreateReconciliationModal'
 import ReconciliationDetailView from './ReconciliationDetailView'
 import OperationDetailSheet from './OperationDetailSheet'
 import SettlementsFilterPopover, {
-  SETTLEMENTS_PERIOD_PRESET,
   getSettlementsPeriodDefaults,
   resolveSettlementsPeriodPreset,
 } from './SettlementsFilterPopover'
+import {
+  describeSettlementsPeriod,
+  isSettlementsFilterActive,
+} from '../../../utils/settlementsPeriod'
 import './UmagSettlementsPanel.css'
 
 function statusLabel(status) {
@@ -57,18 +61,6 @@ function statusLabel(status) {
     default:
       return status
   }
-}
-
-function formatPeriodDateKey(dateKey) {
-  return formatUmagDate(`${dateKey}T12:00:00+05:00`)
-}
-
-function describeSettlementsPeriod(dateFrom, dateTo) {
-  const preset = resolveSettlementsPeriodPreset(dateFrom, dateTo)
-  if (preset === SETTLEMENTS_PERIOD_PRESET.TODAY) return 'Сегодня'
-  if (preset === SETTLEMENTS_PERIOD_PRESET.CURRENT_MONTH) return 'Текущий месяц'
-  if (preset === SETTLEMENTS_PERIOD_PRESET.PREVIOUS_MONTH) return 'Прошлый месяц'
-  return `${formatPeriodDateKey(dateFrom)} — ${formatPeriodDateKey(dateTo)}`
 }
 
 function formatLastUpdated(lastRun) {
@@ -722,9 +714,7 @@ export default function UmagSettlementsPanel() {
     () => describeSettlementsPeriod(dateFrom, dateTo),
     [dateFrom, dateTo]
   )
-  const filterActive =
-    resolveSettlementsPeriodPreset(dateFrom, dateTo) !==
-    SETTLEMENTS_PERIOD_PRESET.CURRENT_MONTH
+  const filterActive = isSettlementsFilterActive(dateFrom, dateTo)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -888,14 +878,15 @@ export default function UmagSettlementsPanel() {
               />
             </PlatformToolbarActionWrap>
             {canSync ? (
-              <button
-                type="button"
-                className="btn btn-primary umag-settlements__sync-btn"
-                onClick={handleSync}
-                disabled={syncing}
-              >
-                {syncing ? 'Синхронизация…' : 'Синхронизировать'}
-              </button>
+              <PlatformToolbarActionWrap>
+                <PlatformSyncButton
+                  onClick={() => void handleSync()}
+                  syncing={syncing}
+                  disabled={!canSync}
+                  title="Синхронизация UMAG"
+                  aria-label="Синхронизация UMAG"
+                />
+              </PlatformToolbarActionWrap>
             ) : null}
           </>
         }

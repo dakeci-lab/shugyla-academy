@@ -25,6 +25,7 @@ import {
 } from '../../../services/supplierPaymentObligationsService'
 import { getMonthPeriodKeys } from '../../../services/umagSettlementsService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
+import PlatformSyncButton from '../../platform/PlatformSyncButton'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './SupplierPaymentsPanel.css'
 
@@ -356,14 +357,13 @@ export default function SupplierPaymentsPanel() {
           </div>
         </div>
         {canSync ? (
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={handleSync}
-            disabled={syncing}
-          >
-            {syncing ? 'Синхронизация…' : 'Синхронизировать'}
-          </button>
+          <PlatformSyncButton
+            onClick={() => void handleSync()}
+            syncing={syncing}
+            disabled={!canSync}
+            title="Синхронизация UMAG"
+            aria-label="Синхронизация UMAG"
+          />
         ) : null}
       </div>
 

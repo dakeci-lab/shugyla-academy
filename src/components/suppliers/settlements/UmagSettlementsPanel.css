@@ -41,11 +41,6 @@
   width: 100%;
 }
 
-.umag-settlements__sync-btn {
-  min-height: 40px;
-  white-space: nowrap;
-}
-
 .umag-settlements__warning,
 .umag-settlements__error {
   padding: 10px 12px;
@@ -729,7 +724,6 @@
     font-size: 13px;
   }
 
-  .umag-settlements__sync-btn,
   .umag-settlements__create-recon {
     flex: 1 1 auto;
   }

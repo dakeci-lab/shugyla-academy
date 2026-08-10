@@ -2,11 +2,16 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import AdminModal from '../../admin/AdminModal'
 import useMediaQuery from '../../../hooks/useMediaQuery'
+import { ChevronLeftIcon, ChevronRightIcon } from '../../icons/PlatformIcons'
 import {
-  getMonthPeriodKeys,
-  getPreviousMonthPeriodKeys,
-  toAqtobeDateKey,
-} from '../../../services/umagSettlementsService'
+  SETTLEMENTS_PERIOD_PRESET,
+  SETTLEMENTS_PERIOD_PRESET_OPTIONS,
+  formatSettlementsPeriodNavigatorLabel,
+  getSettlementsPeriodDates,
+  getSettlementsPeriodDefaults,
+  resolveSettlementsPeriodPreset,
+  shiftSettlementsPeriod,
+} from '../../../utils/settlementsPeriod'
 import './SettlementsFilterPopover.css'
 
 const MOBILE_QUERY = '(max-width: 900px)'
@@ -14,54 +19,20 @@ const POPOVER_WIDTH = 360
 const VIEWPORT_PAD = 16
 const SIDE_OFFSET = 8
 
-export const SETTLEMENTS_PERIOD_PRESET = {
-  TODAY: 'today',
-  CURRENT_MONTH: 'current_month',
-  PREVIOUS_MONTH: 'previous_month',
-  CUSTOM: 'custom',
+export {
+  SETTLEMENTS_PERIOD_PRESET,
+  getSettlementsPeriodDefaults,
+  resolveSettlementsPeriodPreset,
+  getSettlementsPeriodDates,
 }
-
-export function getSettlementsPeriodDefaults() {
-  const current = getMonthPeriodKeys()
-  return {
-    periodPreset: SETTLEMENTS_PERIOD_PRESET.CURRENT_MONTH,
-    dateFrom: current.dateFrom,
-    dateTo: current.dateTo,
-  }
-}
-
-export function resolveSettlementsPeriodPreset(dateFrom, dateTo) {
-  const today = toAqtobeDateKey()
-  const current = getMonthPeriodKeys()
-  const previous = getPreviousMonthPeriodKeys()
-  if (dateFrom === today && dateTo === today) return SETTLEMENTS_PERIOD_PRESET.TODAY
-  if (dateFrom === current.dateFrom && dateTo === current.dateTo) {
-    return SETTLEMENTS_PERIOD_PRESET.CURRENT_MONTH
-  }
-  if (dateFrom === previous.dateFrom && dateTo === previous.dateTo) {
-    return SETTLEMENTS_PERIOD_PRESET.PREVIOUS_MONTH
-  }
-  return SETTLEMENTS_PERIOD_PRESET.CUSTOM
-}
-
-export function getSettlementsPeriodDates(presetId) {
-  if (presetId === SETTLEMENTS_PERIOD_PRESET.TODAY) {
-    const today = toAqtobeDateKey()
-    return { dateFrom: today, dateTo: today }
-  }
-  if (presetId === SETTLEMENTS_PERIOD_PRESET.PREVIOUS_MONTH) {
-    return getPreviousMonthPeriodKeys()
-  }
-  return getMonthPeriodKeys()
-}
-
-const PRESETS = [
-  { id: SETTLEMENTS_PERIOD_PRESET.TODAY, label: 'Сегодня' },
-  { id: SETTLEMENTS_PERIOD_PRESET.CURRENT_MONTH, label: 'Текущий месяц' },
-  { id: SETTLEMENTS_PERIOD_PRESET.PREVIOUS_MONTH, label: 'Прошлый месяц' },
-]
 
 function SettlementsFilterFields({ draft, onChange }) {
+  const navigatorLabel = formatSettlementsPeriodNavigatorLabel(
+    draft.periodPreset,
+    draft.dateFrom,
+    draft.dateTo
+  )
+
   function selectPreset(presetId) {
     const dates = getSettlementsPeriodDates(presetId)
     onChange?.({
@@ -73,10 +44,27 @@ function SettlementsFilterFields({ draft, onChange }) {
   }
 
   function updateDate(field, value) {
+    const next = {
+      ...draft,
+      [field]: value,
+    }
+    next.periodPreset = resolveSettlementsPeriodPreset(next.dateFrom, next.dateTo)
+    onChange?.(next)
+  }
+
+  function shift(direction) {
+    const shifted = shiftSettlementsPeriod(
+      draft.periodPreset,
+      draft.dateFrom,
+      draft.dateTo,
+      direction
+    )
     onChange?.({
       ...draft,
-      periodPreset: SETTLEMENTS_PERIOD_PRESET.CUSTOM,
-      [field]: value,
+      dateFrom: shifted.dateFrom,
+      dateTo: shifted.dateTo,
+      // Keep the selected period type while navigating (UMAG-style), including CUSTOM.
+      periodPreset: draft.periodPreset,
     })
   }
 
@@ -84,20 +72,44 @@ function SettlementsFilterFields({ draft, onChange }) {
     <div className="settlements-filter-popover__section">
       <span className="settlements-filter-popover__label">Период</span>
       <div className="settlements-filter-popover__presets" role="group" aria-label="Быстрый период">
-        {PRESETS.map((preset) => (
-          <button
-            key={preset.id}
-            type="button"
-            className={`settlements-filter-popover__preset${
-              draft.periodPreset === preset.id
-                ? ' settlements-filter-popover__preset--active'
-                : ''
-            }`}
-            onClick={() => selectPreset(preset.id)}
-          >
-            {preset.label}
-          </button>
-        ))}
+        {SETTLEMENTS_PERIOD_PRESET_OPTIONS.map((preset) => {
+          const active = draft.periodPreset === preset.id
+          return (
+            <button
+              key={preset.id}
+              type="button"
+              aria-pressed={active}
+              className={`settlements-filter-popover__preset${
+                active ? ' settlements-filter-popover__preset--active' : ''
+              }`}
+              onClick={() => selectPreset(preset.id)}
+            >
+              {preset.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="settlements-filter-popover__navigator" aria-label="Навигация по периоду">
+        <button
+          type="button"
+          className="settlements-filter-popover__nav-btn"
+          aria-label="Предыдущий период"
+          onClick={() => shift(-1)}
+        >
+          <ChevronLeftIcon size={18} />
+        </button>
+        <div className="settlements-filter-popover__nav-label" aria-live="polite">
+          {navigatorLabel}
+        </div>
+        <button
+          type="button"
+          className="settlements-filter-popover__nav-btn"
+          aria-label="Следующий период"
+          onClick={() => shift(1)}
+        >
+          <ChevronRightIcon size={18} />
+        </button>
       </div>
 
       <span className="settlements-filter-popover__label">Произвольный период</span>
@@ -174,7 +186,6 @@ export default function SettlementsFilterPopover({
     }
 
     updatePosition()
-    // Re-measure after paint so height-based flip is accurate.
     const raf = window.requestAnimationFrame(updatePosition)
     window.addEventListener('resize', updatePosition)
     window.addEventListener('scroll', updatePosition, true)

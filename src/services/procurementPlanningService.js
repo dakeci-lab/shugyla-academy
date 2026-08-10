@@ -3,7 +3,10 @@
  */
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
-import { extractFunctionErrorBody, isGenericInvokeErrorMessage } from '../utils/edgeFunctionErrors'
+import {
+  extractFunctionErrorBody,
+  resolveEdgeFunctionUserMessage,
+} from '../utils/edgeFunctionErrors'
 import {
   calcRecommendedQty,
   DEFAULT_NORM_DAYS,
@@ -73,10 +76,13 @@ function fail(code, message) {
 
 async function mapInvokeFailure(error, data) {
   if (data?.success === false && data?.code) {
-    return fail(
-      data.code,
-      data.message || USER_MESSAGES[data.code] || USER_MESSAGES[PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN]
-    )
+    const code = data.code
+    const message = resolveEdgeFunctionUserMessage({
+      error: null,
+      body: data,
+      fallback: USER_MESSAGES[code] || USER_MESSAGES[PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN],
+    })
+    return fail(code, message)
   }
   if (!error) {
     return fail(PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN)
@@ -89,11 +95,11 @@ async function mapInvokeFailure(error, data) {
       : error?.context?.status === 403
         ? PROCUREMENT_PLANNING_ERROR_CODES.FORBIDDEN
         : PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN)
-  const message =
-    extracted?.message ||
-    (isGenericInvokeErrorMessage(error.message)
-      ? USER_MESSAGES[code] || USER_MESSAGES[PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN]
-      : error.message)
+  const message = resolveEdgeFunctionUserMessage({
+    error,
+    body: extracted,
+    fallback: USER_MESSAGES[code] || USER_MESSAGES[PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN],
+  })
   return fail(code, message)
 }
 

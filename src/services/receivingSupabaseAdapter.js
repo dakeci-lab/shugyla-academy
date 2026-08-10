@@ -9,6 +9,11 @@ import {
   RECEIVING_ITEM_STATUS,
 } from '../utils/receivingData'
 import { PURCHASE_STATUS, PROCUREMENT_WORKFLOW_MODE } from '../utils/purchaseData'
+import {
+  DEFAULT_IN_FILTER_CHUNK_SIZE,
+  DEFAULT_POSTGREST_PAGE_SIZE,
+  fetchAllRowsByIdChunks,
+} from '../utils/chunkArray'
 import { throwUserError, toUserErrorMessage } from '../utils/userErrorMessage'
 import { fetchOrderById } from './purchaseSupabaseAdapter'
 
@@ -154,16 +159,25 @@ export async function fetchReceivingDataCloud() {
   }
 
   const docIds = documents.map((row) => row.id)
-  const itemsResult = await supabase
-    .from('receiving_items')
-    .select('*')
-    .in('receiving_document_id', docIds)
-    .order('created_at', { ascending: true })
-
-  const items = await throwIfError(itemsResult, 'Загрузка позиций приёмки')
+  const items = await fetchAllRowsByIdChunks({
+    ids: docIds,
+    idChunkSize: DEFAULT_IN_FILTER_CHUNK_SIZE,
+    pageSize: DEFAULT_POSTGREST_PAGE_SIZE,
+    overflowMessage: 'Не удалось загрузить позиции приёмки.',
+    fetchPage: ({ idChunk, from, to }) =>
+      supabase
+        .from('receiving_items')
+        .select('*')
+        .in('receiving_document_id', idChunk)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to),
+    onPageResult: (result) =>
+      throwIfError(result, 'Загрузка позиций приёмки', 'Не удалось загрузить позиции приёмки.'),
+  })
 
   const itemsByDoc = new Map()
-  for (const row of items || []) {
+  for (const row of items) {
     if (!itemsByDoc.has(row.receiving_document_id)) {
       itemsByDoc.set(row.receiving_document_id, [])
     }

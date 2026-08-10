@@ -14,6 +14,7 @@ import {
   formatUmagMoney,
   syncUmagSettlements,
 } from '../../../services/umagSettlementsService'
+import PlatformSyncButton from '../../platform/PlatformSyncButton'
 import './CreateReconciliationModal.css'
 
 function parseMoneyInput(raw) {
@@ -213,14 +214,13 @@ export default function CreateReconciliationModal({
               : 'ещё не выполнялась'}
           </span>
           {canSync ? (
-            <button
-              type="button"
-              className="btn btn-secondary recon-create__sync-btn"
-              onClick={handleSync}
-              disabled={syncing}
-            >
-              {syncing ? 'Синхронизация…' : 'Синхронизировать'}
-            </button>
+            <PlatformSyncButton
+              onClick={() => void handleSync()}
+              syncing={syncing}
+              disabled={!canSync}
+              title="Синхронизация UMAG"
+              aria-label="Синхронизация UMAG"
+            />
           ) : null}
         </div>
 

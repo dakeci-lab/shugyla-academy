@@ -4,7 +4,11 @@
  */
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
-import { extractFunctionErrorBody, isGenericInvokeErrorMessage } from '../utils/edgeFunctionErrors'
+import {
+  extractFunctionErrorBody,
+  isGenericInvokeErrorMessage,
+  resolveEdgeFunctionUserMessage,
+} from '../utils/edgeFunctionErrors'
 import {
   LEDGER_EVENT_TYPES,
   attachRunningBalances,
@@ -188,7 +192,12 @@ export async function syncUmagSettlements({ dateFrom, dateTo, syncSuppliers = tr
       if (body && typeof body === 'object') {
         if (body.success === false || body.ok === false) {
           const code = mapErrorCode(body.code)
-          return fail(code, body.message || USER_MESSAGES[code])
+          const message = resolveEdgeFunctionUserMessage({
+            error,
+            body,
+            fallback: USER_MESSAGES[code] || USER_MESSAGES[UMAG_SETTLEMENTS_ERROR_CODES.UNKNOWN],
+          })
+          return fail(code, message)
         }
       }
       const msg = error.message || ''
@@ -198,7 +207,14 @@ export async function syncUmagSettlements({ dateFrom, dateTo, syncSuppliers = tr
       if (/forbidden/i.test(msg)) {
         return fail(UMAG_SETTLEMENTS_ERROR_CODES.FORBIDDEN)
       }
-      return fail(UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NETWORK)
+      return fail(
+        UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NETWORK,
+        resolveEdgeFunctionUserMessage({
+          error,
+          body,
+          fallback: USER_MESSAGES[UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NETWORK],
+        })
+      )
     }
 
     if (data?.success === true) {

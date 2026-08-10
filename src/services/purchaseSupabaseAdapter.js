@@ -7,6 +7,11 @@ import {
   PROCUREMENT_WORKFLOW_MODE,
 } from '../utils/purchaseData'
 
+import {
+  DEFAULT_IN_FILTER_CHUNK_SIZE,
+  DEFAULT_POSTGREST_PAGE_SIZE,
+  fetchAllRowsByIdChunks,
+} from '../utils/chunkArray'
 import { throwUserError, toUserErrorMessage } from '../utils/userErrorMessage'
 
 function throwIfError(result, context, fallback = 'Не удалось сохранить закупку.') {
@@ -253,16 +258,25 @@ export async function fetchPurchasesDataCloud() {
   }
 
   const orderIds = orders.map((row) => row.id)
-  const itemsResult = await supabase
-    .from('purchase_order_items')
-    .select('*')
-    .in('purchase_order_id', orderIds)
-    .order('created_at', { ascending: true })
-
-  const items = await throwIfError(itemsResult, 'Загрузка позиций закупов')
+  const items = await fetchAllRowsByIdChunks({
+    ids: orderIds,
+    idChunkSize: DEFAULT_IN_FILTER_CHUNK_SIZE,
+    pageSize: DEFAULT_POSTGREST_PAGE_SIZE,
+    overflowMessage: 'Не удалось загрузить позиции закупов.',
+    fetchPage: ({ idChunk, from, to }) =>
+      supabase
+        .from('purchase_order_items')
+        .select('*')
+        .in('purchase_order_id', idChunk)
+        .order('created_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, to),
+    onPageResult: (result) =>
+      throwIfError(result, 'Загрузка позиций закупов', 'Не удалось загрузить позиции закупов.'),
+  })
 
   const itemsByOrder = new Map()
-  for (const row of items || []) {
+  for (const row of items) {
     if (!itemsByOrder.has(row.purchase_order_id)) {
       itemsByOrder.set(row.purchase_order_id, [])
     }

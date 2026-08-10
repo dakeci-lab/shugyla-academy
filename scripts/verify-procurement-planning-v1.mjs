@@ -558,6 +558,40 @@ async function stagePlanExportAndPlannerUi() {
   )
   assert('export menu css present', plannerCss.includes('proc-planner__export-menu'))
   assert('supplier filter overflow visible', plannerCss.includes('overflow: visible'))
+
+  const planningSrc = read('src/services/procurementPlanningService.js')
+  const edge = await import(
+    pathToFileURL(path.join(ROOT, 'src/utils/edgeFunctionErrors.js')).href
+  )
+  assert(
+    'planning uses resolveEdgeFunctionUserMessage',
+    planningSrc.includes('resolveEdgeFunctionUserMessage')
+  )
+  assert(
+    'planning no raw Bad Request passthrough branch',
+    !planningSrc.includes('isGenericInvokeErrorMessage(error.message)')
+  )
+  const planningFallback = 'Не удалось выполнить операцию планирования. Повторите попытку.'
+  assert(
+    'Bad Request resolves to Russian planning fallback',
+    edge.resolveEdgeFunctionUserMessage({
+      error: new Error('Bad Request'),
+      body: null,
+      fallback: planningFallback,
+    }) === planningFallback
+  )
+  assert(
+    'structured Russian generate body preserved',
+    edge.resolveEdgeFunctionUserMessage({
+      error: new Error('Bad Request'),
+      body: {
+        success: false,
+        code: 'GENERATE_FAILED',
+        message: 'Не удалось сформировать заказы. Повторите попытку.',
+      },
+      fallback: planningFallback,
+    }) === 'Не удалось сформировать заказы. Повторите попытку.'
+  )
 }
 
 function main() {

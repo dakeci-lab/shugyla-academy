@@ -54,10 +54,6 @@
   color: var(--color-text-secondary, #64748b);
 }
 
-.recon-create__sync-btn {
-  min-height: 38px;
-}
-
 .recon-create__block {
   display: flex;
   flex-direction: column;

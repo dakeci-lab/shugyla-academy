@@ -80,7 +80,8 @@ function main() {
   assert.match(createModal, /Задолженность по акту поставщика/)
   assert.match(createModal, /Возвраты поставщикам/)
   assert.match(createModal, /Возвраты оплаты/)
-  assert.match(createModal, /Синхронизировать/)
+  assert.match(createModal, /PlatformSyncButton/)
+  assert.doesNotMatch(createModal, />Синхронизировать</)
   ok('create modal shows period UMAG snapshot disclaimer')
 
   const catalog = read('src/config/permissionCatalog.js')
