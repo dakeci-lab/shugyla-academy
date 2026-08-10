@@ -52,6 +52,8 @@ const component = fs.readFileSync(path.join(ROOT, 'src/components/procurement/Pr
 const service = fs.readFileSync(path.join(ROOT, 'src/services/procurementNormsService.js'), 'utf8')
 assert('component has accessible accordion', component.includes('aria-expanded={open}') && component.includes('aria-controls={panelId}'))
 assert('component autosaves input', component.includes('AUTO_SAVE_DELAY_MS') && component.includes('onBlur'))
+assert('page loading uses shared skeleton', component.includes('<DelayedLoadingSkeleton variant="list" count={7} />'))
+assert('page loading spinner removed', !component.includes('className="proc-norms__loading"'))
 assert('generated snapshot is read-only', component.includes("snapshot?.status === 'generated'") && component.includes("snapshot?.status === 'ready'"))
 assert('partially generated snapshot stays editable', component.includes("snapshot?.status === 'partially_generated'"))
 assert('norm writes use existing set_norm service path', service.includes('persistNormDaysForScope'))

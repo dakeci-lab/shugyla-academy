@@ -13,6 +13,7 @@ import {
   filterProcurementNormHierarchy,
 } from './procurementNormsModel'
 import PlatformSearchToolbar from '../platform/PlatformSearchToolbar'
+import { DelayedLoadingSkeleton } from '../loading/LoadingSkeleton'
 import { CheckCheckIcon, ChevronDownIcon } from '../icons/PlatformIcons'
 import './ProcurementNormsView.css'
 
@@ -236,9 +237,7 @@ export default function ProcurementNormsView({ snapshot: suppliedSnapshot = null
       />
 
       {loading ? (
-        <div className="proc-norms__loading" role="status" aria-label="Загрузка норм">
-          <TinySpinner />
-        </div>
+        <DelayedLoadingSkeleton variant="list" count={7} />
       ) : !snapshot?.id ? (
         <p className="proc-norms__empty">Синхронизируйте UMAG</p>
       ) : filteredHierarchy.length === 0 ? (

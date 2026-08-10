@@ -35,12 +35,6 @@ import {
   filterSimplePurchases,
 } from '../../../utils/procurementWorkflow'
 import { PURCHASE_STATUS } from '../../../utils/purchaseData'
-import {
-  createDefaultPurchaseFilters,
-  calcPurchaseTotals,
-  hasActivePurchaseFilters,
-} from '../../../utils/purchaseFilter'
-import { formatPurchaseFilterSummary } from '../../../utils/purchaseFilterSummary'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import { useWeekScheduleState } from '../../../hooks/useWeekScheduleState'
 import AdminModal from '../../../components/admin/AdminModal'
@@ -52,16 +46,11 @@ import SimpleCreatePurchaseForm, {
 import SimplePurchaseTable from '../../../components/procurement/SimplePurchaseTable'
 import SimplePurchaseCardList from '../../../components/procurement/SimplePurchaseCardList'
 import PurchaseTable from '../../../components/procurement/PurchaseTable'
-import PurchaseFilterPopover from '../../../components/procurement/PurchaseFilterPopover'
 import WeekScheduleNav from '../../../components/procurement/WeekScheduleNav'
 import ProcurementPlanDayList from '../../../components/procurement/ProcurementPlanDayList'
 import ProcurementPlannerView from '../../../components/procurement/ProcurementPlannerView'
 import ProcurementNormsView from '../../../components/procurement/ProcurementNormsView'
-import { PlusIcon } from '../../../components/icons/PlatformIcons'
-import {
-  PlatformFilterButton,
-  PlatformToolbarActionWrap,
-} from '../../../components/platform/PlatformSearchToolbar'
+import TablePagination from '../../../components/procurement/TablePagination'
 import '../../../components/admin/admin-shared.css'
 import './ProcurementPage.css'
 import '../../../components/procurement/SimpleDeliveryCard.css'
@@ -91,18 +80,16 @@ export default function ProcurementPage() {
     goToday,
     selectWeekContaining,
   } = useWeekScheduleState()
-  const filterButtonRef = useRef(null)
   const [showCreate, setShowCreate] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
   const [form, setForm] = useState(EMPTY_SIMPLE_PURCHASE_FORM)
   const [formError, setFormError] = useState('')
   const [saving, setSaving] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState(null)
-  const [filterOpen, setFilterOpen] = useState(false)
-  const [appliedFilters, setAppliedFilters] = useState(createDefaultPurchaseFilters)
-  const [draftFilters, setDraftFilters] = useState(createDefaultPurchaseFilters)
   const [procurementLoadError, setProcurementLoadError] = useState(null)
   const [procurementRefreshing, setProcurementRefreshing] = useState(false)
+  const [ordersPage, setOrdersPage] = useState(1)
+  const [ordersPageSize, setOrdersPageSize] = useState(25)
 
   const canView = canViewPurchases(user)
   const canCreate = canCreatePurchase(user)
@@ -184,18 +171,30 @@ export default function ProcurementPage() {
   const dayOrders = useMemo(() => {
     if (!selectedDateKey) return []
 
-    let result = activeOrders.filter(
+    const result = activeOrders.filter(
       (order) => order.expectedDeliveryDate === selectedDateKey
     )
-
-    if (appliedFilters.supplierId) {
-      result = result.filter((order) => order.supplierId === appliedFilters.supplierId)
-    }
 
     return result.sort((a, b) =>
       (a.supplierName || '').localeCompare(b.supplierName || '', 'ru')
     )
-  }, [activeOrders, selectedDateKey, appliedFilters.supplierId])
+  }, [activeOrders, selectedDateKey])
+
+  const ordersTotalPages = Math.max(1, Math.ceil(dayOrders.length / ordersPageSize))
+  const visibleDayOrders = useMemo(() => {
+    const start = (ordersPage - 1) * ordersPageSize
+    return dayOrders.slice(start, start + ordersPageSize)
+  }, [dayOrders, ordersPage, ordersPageSize])
+  const ordersFrom = dayOrders.length === 0 ? 0 : (ordersPage - 1) * ordersPageSize + 1
+  const ordersTo = Math.min(ordersPage * ordersPageSize, dayOrders.length)
+
+  useEffect(() => {
+    setOrdersPage(1)
+  }, [selectedDateKey, ordersPageSize])
+
+  useEffect(() => {
+    if (ordersPage > ordersTotalPages) setOrdersPage(ordersTotalPages)
+  }, [ordersPage, ordersTotalPages])
 
   const expectedEntriesByDate = useMemo(() => {
     const entries = buildExpectedDeliveryEntries(
@@ -219,8 +218,6 @@ export default function ProcurementPage() {
     return counts
   }, [activeOrders, expectedEntriesByDate])
 
-  const totals = useMemo(() => calcPurchaseTotals(dayOrders), [dayOrders])
-
   const documentsByPurchaseId = useMemo(() => {
     const map = new Map()
     stableDocuments.forEach((doc) => {
@@ -228,12 +225,6 @@ export default function ProcurementPage() {
     })
     return map
   }, [stableDocuments, version, dataVersion])
-
-  const filtersActive = hasActivePurchaseFilters(appliedFilters)
-  const filterSummary = useMemo(
-    () => formatPurchaseFilterSummary(appliedFilters),
-    [appliedFilters]
-  )
 
   if (!canView) {
     return <PlatformAccessDenied title="Нет доступа к разделу «Закуп»" />
@@ -377,25 +368,6 @@ export default function ProcurementPage() {
     retrySimplePurchaseSync(order.id, user, notifyChange)
   }
 
-  function toggleFilter() {
-    if (!filterOpen) {
-      setDraftFilters({ ...appliedFilters })
-    }
-    setFilterOpen((open) => !open)
-  }
-
-  function applyFilters() {
-    setAppliedFilters({ ...draftFilters })
-    setFilterOpen(false)
-  }
-
-  function resetFilters() {
-    const defaults = createDefaultPurchaseFilters()
-    setDraftFilters(defaults)
-    setAppliedFilters(defaults)
-    setFilterOpen(false)
-  }
-
   function getEmptyMessage() {
     if (procurementLoadError) return procurementLoadError
     const moduleError = getPurchasesDataError()
@@ -404,16 +376,11 @@ export default function ProcurementPage() {
     }
     if (!selectedDateKey) return 'Выберите день недели'
     if (activeOrders.length === 0) return 'Заказы не созданы'
-    if (appliedFilters.supplierId && dayOrders.length === 0) {
-      return 'По выбранному фильтру закупы не найдены'
-    }
     return 'На этот день закупок нет'
   }
 
   const modalOpen = showCreate || Boolean(editingOrder)
   const emptyMessage = getEmptyMessage()
-  const listTotals = dayOrders.length > 0 ? totals : null
-
   return (
     <div className="procurement-page">
       <div className="procurement-page__tabs" role="tablist" aria-label="Разделы закупа">
@@ -460,71 +427,6 @@ export default function ProcurementPage() {
         <ProcurementNormsView />
       ) : (
         <>
-      <div className="procurement-page__header">
-        <div className="procurement-page__header-main">
-          <PlatformToolbarActionWrap>
-            <button
-              type="button"
-              className="btn btn-secondary procurement-page__refresh"
-              onClick={() => {
-                void (async () => {
-                  setProcurementRefreshing(true)
-                  try {
-                    await reloadProcurement()
-                    setProcurementLoadError(null)
-                  } catch (error) {
-                    const message = toUserErrorMessage(
-                      error,
-                      'Не удалось обновить закупы.'
-                    )
-                    setProcurementLoadError(message)
-                    showError(message)
-                  } finally {
-                    setProcurementRefreshing(false)
-                  }
-                })()
-              }}
-              disabled={procurementRefreshing}
-              aria-label="Обновить"
-              title="Обновить"
-            >
-              {procurementRefreshing ? 'Обновление…' : 'Обновить'}
-            </button>
-            <PlatformFilterButton
-              buttonRef={filterButtonRef}
-              active={filtersActive}
-              onClick={toggleFilter}
-              ariaExpanded={filterOpen}
-              ariaLabel="Фильтр"
-              title="Фильтр"
-            />
-            <PurchaseFilterPopover
-              open={filterOpen}
-              draft={draftFilters}
-              onChange={setDraftFilters}
-              onApply={applyFilters}
-              onReset={resetFilters}
-              onClose={() => setFilterOpen(false)}
-              anchorRef={filterButtonRef}
-            />
-          </PlatformToolbarActionWrap>
-        </div>
-
-        {filtersActive && filterSummary.length > 0 && (
-          <div className="procurement-page__mobile-filter-chips">
-            {filterSummary.map((chip) => (
-              <span key={chip} className="procurement-page__mobile-filter-chip">
-                {chip}
-              </span>
-            ))}
-          </div>
-        )}
-
-        <span className="admin-toolbar__info procurement-page__count">
-          {dayOrders.length} {selectedDateKey ? 'за день' : ''}
-        </span>
-      </div>
-
       <WeekScheduleNav
         weekTitle={weekTitle}
         weekDates={weekDates}
@@ -558,8 +460,18 @@ export default function ProcurementPage() {
           <>
             <div className="procurement-list-panel">
               <PurchaseTable
-                orders={dayOrders}
+                orders={visibleDayOrders}
                 canEdit={false}
+              />
+              <TablePagination
+                page={ordersPage}
+                totalPages={ordersTotalPages}
+                from={ordersFrom}
+                to={ordersTo}
+                totalCount={dayOrders.length}
+                onPageChange={setOrdersPage}
+                pageSize={ordersPageSize}
+                onPageSizeChange={setOrdersPageSize}
               />
             </div>
           </>

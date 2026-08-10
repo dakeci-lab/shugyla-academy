@@ -42,7 +42,7 @@ import './ProcurementPlannerView.css'
 
 const TABLE_COL_SPAN = 9
 
-const PAGE_SIZE = 50
+const DEFAULT_PAGE_SIZE = 25
 
 function formatNum(value, digits = 1) {
   const n = Number(value)
@@ -93,6 +93,7 @@ export default function ProcurementPlannerView() {
   const [items, setItems] = useState([])
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filters, setFilters] = useState({
@@ -124,7 +125,6 @@ export default function ProcurementPlannerView() {
     let n = 0
     if (filters.categoryName) n += 1
     if (filters.subcategoryName) n += 1
-    if (filters.platformSupplierId) n += 1
     if (filters.warningsOnly) n += 1
     if (filters.orderableOnly) n += 1
     return n
@@ -165,7 +165,7 @@ export default function ProcurementPlannerView() {
       const result = await fetchSnapshotItemsPage({
         snapshotId: snapshot.id,
         page,
-        pageSize: PAGE_SIZE,
+        pageSize,
         search: debouncedSearch,
         ...filters,
       })
@@ -176,7 +176,7 @@ export default function ProcurementPlannerView() {
     } finally {
       setLoading(false)
     }
-  }, [snapshot, page, debouncedSearch, filters, showError])
+  }, [snapshot, page, pageSize, debouncedSearch, filters, showError])
 
   useEffect(() => {
     void loadSnapshotMeta()
@@ -312,9 +312,9 @@ export default function ProcurementPlannerView() {
   )
   const snapshotEditable = snapshot?.status === 'ready' || snapshot?.status === 'partially_generated'
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
-  const from = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const to = Math.min(page * PAGE_SIZE, totalCount)
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+  const from = totalCount === 0 ? 0 : (page - 1) * pageSize + 1
+  const to = Math.min(page * pageSize, totalCount)
   const syncTitle = syncing
     ? 'Синхронизация UMAG выполняется'
     : `Синхронизация UMAG · ${formatSyncedAt(snapshot?.syncedAt)}`
@@ -337,6 +337,21 @@ export default function ProcurementPlannerView() {
         flush
         actions={
           <>
+            <div className="proc-planner__supplier-quick">
+              <SearchableSupplierSelect
+                suppliers={filterOptions.suppliers}
+                value={filters.platformSupplierId}
+                onChange={(supplierId) =>
+                  setFilters((current) => ({
+                    ...current,
+                    platformSupplierId: supplierId || '',
+                  }))
+                }
+                activeOnly={false}
+                placeholder="Все поставщики"
+                searchPlaceholder="Поиск поставщика…"
+              />
+            </div>
             <PlatformToolbarActionWrap>
               <PlatformSyncButton
                 onClick={() => void handleSync()}
@@ -400,19 +415,6 @@ export default function ProcurementPlannerView() {
                       ))}
                     </select>
                   </label>
-                  <label className="proc-planner__supplier-filter">
-                    Поставщик
-                    <SearchableSupplierSelect
-                      suppliers={filterOptions.suppliers}
-                      value={filters.platformSupplierId}
-                      onChange={(supplierId) =>
-                        setFilters((f) => ({ ...f, platformSupplierId: supplierId || '' }))
-                      }
-                      activeOnly={false}
-                      placeholder="Все"
-                      searchPlaceholder="Поиск поставщика…"
-                    />
-                  </label>
                   <label className="proc-planner__check">
                     <input
                       type="checkbox"
@@ -437,13 +439,13 @@ export default function ProcurementPlannerView() {
                     type="button"
                     className="btn btn--ghost btn--sm"
                     onClick={() =>
-                      setFilters({
+                      setFilters((current) => ({
+                        ...current,
                         categoryName: '',
                         subcategoryName: '',
-                        platformSupplierId: '',
                         warningsOnly: false,
                         orderableOnly: false,
-                      })
+                      }))
                     }
                   >
                     Сбросить
@@ -456,7 +458,7 @@ export default function ProcurementPlannerView() {
                 onClick={() => setGenerateOpen(true)}
                 disabled={!canGenerate || !snapshotEditable || !filters.platformSupplierId || generating}
                 aria-label="Сформировать заказ поставщику"
-                title={filters.platformSupplierId ? 'Сформировать заказ' : 'Выберите поставщика в фильтре'}
+                title={filters.platformSupplierId ? 'Сформировать заказ' : 'Выберите поставщика'}
                 create
               >
                 <SparklesIcon size={20} />
@@ -569,7 +571,7 @@ export default function ProcurementPlannerView() {
                 items.map((item, index) => (
                   <tr key={item.id}>
                     <td className="proc-planner__col-num">
-                      {(page - 1) * PAGE_SIZE + index + 1}
+                      {(page - 1) * pageSize + index + 1}
                     </td>
                     <td>
                       <div className="proc-planner__product">
@@ -645,6 +647,11 @@ export default function ProcurementPlannerView() {
           to={to}
           totalCount={totalCount}
           onPageChange={setPage}
+          pageSize={pageSize}
+          onPageSizeChange={(nextPageSize) => {
+            setPage(1)
+            setPageSize(nextPageSize)
+          }}
         />
       </div>
 
@@ -660,7 +667,7 @@ export default function ProcurementPlannerView() {
                 <div className="proc-planner__card-top">
                   <strong>
                     <span className="proc-planner__row-num" aria-hidden="true">
-                      {(page - 1) * PAGE_SIZE + index + 1}.
+                      {(page - 1) * pageSize + index + 1}.
                     </span>{' '}
                     {item.productName}
                   </strong>
@@ -712,6 +719,11 @@ export default function ProcurementPlannerView() {
           to={to}
           totalCount={totalCount}
           onPageChange={setPage}
+          pageSize={pageSize}
+          onPageSizeChange={(nextPageSize) => {
+            setPage(1)
+            setPageSize(nextPageSize)
+          }}
         />
       </div>
 

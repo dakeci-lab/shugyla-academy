@@ -530,7 +530,7 @@ async function stagePlanExportAndPlannerUi() {
   assert('planner has № column', planner.includes('proc-planner__col-num') && planner.includes('>№<'))
   assert(
     'planner page numbering formula',
-    planner.includes('(page - 1) * PAGE_SIZE + index + 1')
+    planner.includes('(page - 1) * pageSize + index + 1')
   )
   assert('planner mobile row number', planner.includes('proc-planner__row-num'))
   assert('planner export menu aria', planner.includes('aria-haspopup="menu"'))

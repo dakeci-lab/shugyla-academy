@@ -58,14 +58,21 @@
   min-height: 36px;
 }
 
-.proc-planner__supplier-filter {
+.proc-planner__supplier-quick {
   position: relative;
-  z-index: 2;
+  z-index: 3;
+  width: clamp(190px, 22vw, 280px);
+  flex-shrink: 0;
   overflow: visible;
 }
 
-.proc-planner__supplier-filter .searchable-supplier-select__dropdown {
-  z-index: 60;
+.proc-planner__supplier-quick .searchable-supplier-select__trigger {
+  min-height: 44px;
+  border-radius: 12px;
+}
+
+.proc-planner__supplier-quick .searchable-supplier-select__dropdown {
+  z-index: 70;
 }
 
 .proc-planner__export {
@@ -316,6 +323,25 @@
 }
 
 @media (max-width: 900px) {
+  .proc-planner .platform-search-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .proc-planner .platform-search-toolbar__search {
+    flex-basis: 100%;
+  }
+
+  .proc-planner .platform-search-toolbar__actions {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .proc-planner__supplier-quick {
+    flex: 1 1 150px;
+    width: auto;
+    min-width: 0;
+  }
+
   .proc-planner__desktop {
     display: none;
   }
@@ -335,11 +361,11 @@
     overflow: visible;
   }
 
-  .proc-planner__supplier-filter .searchable-supplier-select__dropdown {
+  .proc-planner__supplier-quick .searchable-supplier-select__dropdown {
     max-height: min(42dvh, 280px);
   }
 
-  .proc-planner__supplier-filter .searchable-supplier-select__list {
+  .proc-planner__supplier-quick .searchable-supplier-select__list {
     max-height: min(34dvh, 220px);
   }
 
