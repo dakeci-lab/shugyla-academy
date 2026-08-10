@@ -643,7 +643,7 @@ async function handleGenerate(
     ])
   )
 
-  if ((singularSupplierId || hasSupplierIds) && supplierIds.length === 0) {
+  if (supplierIds.length === 0) {
     return umagErrorResponse(
       'VALIDATION_ERROR',
       'Выберите хотя бы одного поставщика.',
@@ -673,9 +673,7 @@ async function handleGenerate(
     {
       p_snapshot_id: snapshotId,
       p_expected_delivery_date: expectedDeliveryDate,
-      // null preserves the previous contract: generate all remaining suppliers.
-      // A non-empty list generates only the explicitly selected suppliers.
-      p_supplier_ids: supplierIds.length > 0 ? supplierIds : null,
+      p_supplier_ids: supplierIds,
       p_created_by: createdBy,
       p_created_by_name: createdByName || null,
     }
@@ -696,6 +694,13 @@ async function handleGenerate(
     }
     if (msg.includes('snapshot not found')) {
       return umagErrorResponse('SNAPSHOT_NOT_FOUND', 'Снимок не найден.', 404)
+    }
+    if (msg.includes('supplier selection is required')) {
+      return umagErrorResponse(
+        'VALIDATION_ERROR',
+        'Выберите хотя бы одного поставщика.',
+        400
+      )
     }
     return umagErrorResponse(
       'GENERATE_FAILED',

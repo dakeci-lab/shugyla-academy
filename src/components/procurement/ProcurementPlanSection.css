@@ -38,6 +38,21 @@
   background: #eff6ff;
 }
 
+.procurement-plan__index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .procurement-plan__info {
   display: flex;
   flex-direction: column;

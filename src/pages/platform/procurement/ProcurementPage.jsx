@@ -31,7 +31,6 @@ import {
 import { isCloudMode } from '../../../lib/dataMode'
 import { toUserErrorMessage } from '../../../utils/userErrorMessage'
 import {
-  buildExpectedDeliveryEntries,
   filterSimplePurchases,
 } from '../../../utils/procurementWorkflow'
 import { PURCHASE_STATUS } from '../../../utils/purchaseData'
@@ -44,7 +43,6 @@ import SimpleCreatePurchaseForm, {
   EMPTY_SIMPLE_PURCHASE_FORM,
 } from '../../../components/procurement/SimpleCreatePurchaseForm'
 import SimplePurchaseTable from '../../../components/procurement/SimplePurchaseTable'
-import SimplePurchaseCardList from '../../../components/procurement/SimplePurchaseCardList'
 import PurchaseTable from '../../../components/procurement/PurchaseTable'
 import WeekScheduleNav from '../../../components/procurement/WeekScheduleNav'
 import ProcurementPlanDayList from '../../../components/procurement/ProcurementPlanDayList'
@@ -196,27 +194,14 @@ export default function ProcurementPage() {
     if (ordersPage > ordersTotalPages) setOrdersPage(ordersTotalPages)
   }, [ordersPage, ordersTotalPages])
 
-  const expectedEntriesByDate = useMemo(() => {
-    const entries = buildExpectedDeliveryEntries(
-      getAllSuppliersSync(),
-      weekStartKey,
-      stableOrders
-    )
-    const counts = {}
-    for (const entry of entries) {
-      counts[entry.dateKey] = (counts[entry.dateKey] || 0) + 1
-    }
-    return counts
-  }, [stableOrders, weekStartKey, version, dataVersion])
-
   const countsByDate = useMemo(() => {
-    const counts = { ...expectedEntriesByDate }
+    const counts = {}
     for (const order of activeOrders) {
       if (!order.expectedDeliveryDate) continue
       counts[order.expectedDeliveryDate] = (counts[order.expectedDeliveryDate] || 0) + 1
     }
     return counts
-  }, [activeOrders, expectedEntriesByDate])
+  }, [activeOrders])
 
   const documentsByPurchaseId = useMemo(() => {
     const map = new Map()

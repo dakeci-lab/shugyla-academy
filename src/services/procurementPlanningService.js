@@ -206,6 +206,12 @@ export async function generateProcurementOrders(
   if (!snapshotId || !expectedDeliveryDate) {
     return fail(PROCUREMENT_PLANNING_ERROR_CODES.VALIDATION)
   }
+  if (!supplierId && supplierIds.length === 0) {
+    return fail(
+      PROCUREMENT_PLANNING_ERROR_CODES.VALIDATION,
+      'Выберите хотя бы одного поставщика.'
+    )
+  }
 
   try {
     const { data, error } = await supabase.functions.invoke('umag-procurement', {

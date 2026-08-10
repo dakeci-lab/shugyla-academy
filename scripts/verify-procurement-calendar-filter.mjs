@@ -77,6 +77,26 @@ function stageBackdropAndToolbar() {
   assert('norms tab is available', page.includes('ProcurementNormsView'))
   assert('orders use unified table', page.includes('<PurchaseTable'))
   assert('supplier visit plan remains reference-only', page.includes('canCreate={false}'))
+  assert(
+    'order calendar counts only created orders',
+    page.includes('const counts = {}') && !page.includes('const expectedEntriesByDate')
+  )
+  assert(
+    'supplier visits have visible numbering',
+    read('src/components/procurement/ProcurementPlanDayList.jsx').includes('{index + 1}')
+  )
+  assert(
+    'receiving calendar counts receiving documents only',
+    read('src/components/receiving/UnifiedReceivingList.jsx').includes(
+      'countReceivingDocumentsByDate(documents)'
+    )
+  )
+  assert(
+    'created order timestamp is displayed',
+    read('src/components/procurement/PurchaseTable.jsx').includes(
+      'formatPurchaseDateTime(order.createdAt || order.date)'
+    )
+  )
   assert('legacy create styles remain harmless', pageCss.includes('.procurement-page__desktop-create'))
 }
 

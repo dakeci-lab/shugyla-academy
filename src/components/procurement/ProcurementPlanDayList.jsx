@@ -40,11 +40,14 @@ export default function ProcurementPlanDayList({
       <h2 className="procurement-plan__title">{PROCUREMENT_PLAN_LABEL}</h2>
 
       <ul className="procurement-plan__list">
-        {dayEntries.map((entry) => {
+        {dayEntries.map((entry, index) => {
           const supplierName = getReceivingEntrySupplierName(entry)
 
           return (
             <li key={getReceivingEntryKey(entry)} className="procurement-plan__item">
+              <span className="procurement-plan__index" aria-hidden="true">
+                {index + 1}
+              </span>
               <div className="procurement-plan__info">
                 <span className="procurement-plan__supplier">{supplierName}</span>
                 <span className="procurement-plan__status">{PROCUREMENT_PLAN_ITEM_STATUS}</span>

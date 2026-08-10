@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   formatPurchaseAmount,
   formatPurchaseDate,
+  formatPurchaseDateTime,
 } from '../../utils/purchaseData'
 import { PurchaseStatusBadge } from './PurchaseStatsCards'
 import { CloseIcon, EyeIcon } from '../icons/PlatformIcons'
@@ -29,7 +30,7 @@ export default function PurchaseTable({
       <table className="purchase-table admin-table">
         <thead>
           <tr>
-            <th>Дата</th>
+            <th>Создан</th>
             <th>Поставщик</th>
             <th>Товаров</th>
             <th>Сумма</th>
@@ -46,7 +47,7 @@ export default function PurchaseTable({
               className="purchase-table__row"
               onClick={() => navigate(`${detailPathPrefix}/${order.id}`)}
             >
-              <td>{formatPurchaseDate(order.date)}</td>
+              <td>{formatPurchaseDateTime(order.createdAt || order.date)}</td>
               <td>{order.supplierName || '—'}</td>
               <td>{order.itemsCount ?? order.items?.length ?? 0}</td>
               <td>{formatPurchaseAmount(order.totalAmount)}</td>

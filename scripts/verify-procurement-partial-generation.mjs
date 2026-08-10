@@ -6,7 +6,9 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 const MIGRATION = 'supabase/migrations/20260810160315_procurement_partial_supplier_generation.sql'
+const GUARD_MIGRATION = 'supabase/migrations/20260810170350_require_supplier_for_procurement_generation.sql'
 const EDGE = 'supabase/functions/umag-procurement/index.ts'
+const CLIENT = 'src/services/procurementPlanningService.js'
 
 let passed = 0
 
@@ -22,7 +24,9 @@ function assert(label, condition) {
 
 function main() {
   const sql = read(MIGRATION)
+  const guardSql = read(GUARD_MIGRATION)
   const edge = read(EDGE)
+  const client = read(CLIENT)
 
   console.log('Procurement partial supplier generation\n')
 
@@ -80,8 +84,20 @@ function main() {
       )
   )
   assert(
-    'legacy RPC signature delegates to idempotent implementation',
-    /null::uuid\[\][\s\S]*p_created_by[\s\S]*p_created_by_name/.test(sql)
+    'database requires an explicit supplier selection',
+    guardSql.includes("raise exception 'supplier selection is required'")
+  )
+  assert(
+    'legacy all-suppliers RPC is blocked',
+    /Deprecated compatibility RPC[\s\S]*Refuses generation without an explicit supplier/.test(
+      guardSql
+    )
+  )
+  assert(
+    'unguarded implementation is not executable by service role',
+    /revoke all on function public\.generate_procurement_orders_from_snapshot_selected_unsafe\([\s\S]*from public, anon, authenticated, service_role/.test(
+      guardSql
+    )
   )
 
   assert(
@@ -94,7 +110,16 @@ function main() {
   )
   assert(
     'Edge passes supplier selection to RPC',
-    edge.includes('p_supplier_ids: supplierIds.length > 0 ? supplierIds : null')
+    edge.includes('p_supplier_ids: supplierIds,') &&
+      !edge.includes('p_supplier_ids: supplierIds.length > 0 ? supplierIds : null')
+  )
+  assert(
+    'Edge rejects a missing supplier selection',
+    edge.includes('if (supplierIds.length === 0)')
+  )
+  assert(
+    'client rejects a missing supplier selection',
+    client.includes("'Выберите хотя бы одного поставщика.'")
   )
   assert(
     'Edge keeps create and transfer permission checks',
@@ -102,12 +127,12 @@ function main() {
       edge.includes('authz.permissions[PERMISSION_TRANSFER] !== true')
   )
 
-  console.log(`\nPassed ${passed}/16`)
+  console.log(`\nPassed ${passed}/20`)
 }
 
 try {
   main()
 } catch (error) {
-  console.error(`\nFAILED after ${passed}/16: ${error.message}`)
+  console.error(`\nFAILED after ${passed}/20: ${error.message}`)
   process.exit(1)
 }

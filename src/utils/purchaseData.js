@@ -52,6 +52,20 @@ export function formatPurchaseDate(value) {
   return new Date(value).toLocaleDateString('ru-RU')
 }
 
+export function formatPurchaseDateTime(value) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleString('ru-RU', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Almaty',
+  })
+}
+
 export function calcLineTotal(qty, price) {
   return Math.round(Number(qty || 0) * Number(price || 0))
 }
