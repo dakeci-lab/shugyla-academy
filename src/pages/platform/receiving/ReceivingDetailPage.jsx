@@ -1,62 +1,106 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
-import {
-  canViewReceivingDocuments,
-  canReceiveGoods,
-} from '../../../config/permissions'
-import {
-  getReceivingDocumentByIdSync,
-  saveReceivingDocument,
-  completeReceivingDocument,
-} from '../../../services/receivingDataService'
+import { canViewReceivingDocuments } from '../../../config/permissions'
+import { loadReceivingDocumentById } from '../../../services/receivingDataService'
 import { isSimpleWorkflow } from '../../../utils/procurementWorkflow'
-import {
-  formatReceivingDate,
-  normalizeReceivingItem,
-  calcDifferenceQty,
-  RECEIVING_STATUS,
-} from '../../../utils/receivingData'
-import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
+import { formatReceivingDate } from '../../../utils/receivingData'
+import { toUserErrorMessage } from '../../../utils/userErrorMessage'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
+import IconActionButton from '../../../components/admin/IconActionButton'
+import { RotateCcwIcon } from '../../../components/icons/PlatformIcons'
+import { DelayedLoadingSkeleton } from '../../../components/loading/LoadingSkeleton'
 import { ReceivingStatusBadge } from '../../../components/receiving/ReceivingStatsCards'
 import ReceivingItemsTable from '../../../components/receiving/ReceivingItemsTable'
 import '../../../components/admin/admin-shared.css'
 import '../../../components/receiving/ReceivingItemsTable.css'
 import '../procurement/PurchaseDetailPage.css'
 
-/** Детальная страница приёмки — /platform/receiving/:id */
+/** Документ ожидаемой поставки — /platform/receiving/:id */
 export default function ReceivingDetailPage() {
   const { id } = useParams()
   const { user } = useSession()
-  const { version, refresh } = useAdminRefresh()
-  const [saving, setSaving] = useState(false)
-  const [completing, setCompleting] = useState(false)
-  const [message, setMessage] = useState('')
-  const [error, setError] = useState('')
-  const [items, setItems] = useState(null)
-
   const canView = canViewReceivingDocuments(user)
-  const canEdit = canReceiveGoods(user)
+  const [document, setDocument] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
 
-  void version
+  const loadDocument = useCallback(async () => {
+    if (!canView) return
+    setLoading(true)
+    setLoadError('')
+    try {
+      const nextDocument = await loadReceivingDocumentById(id)
+      setDocument(nextDocument)
+    } catch (error) {
+      setDocument(null)
+      setLoadError(
+        toUserErrorMessage(error, 'Не удалось загрузить документ поставки.')
+      )
+    } finally {
+      setLoading(false)
+    }
+  }, [canView, id])
 
-  const document = useMemo(() => getReceivingDocumentByIdSync(id), [id, version])
-  const displayItems = items ?? document?.items ?? []
-  const isFinalized =
-    document?.status === RECEIVING_STATUS.RECEIVED ||
-    document?.status === RECEIVING_STATUS.PARTIALLY_RECEIVED ||
-    document?.status === 'received' ||
-    document?.status === 'partial'
+  useEffect(() => {
+    let active = true
+
+    if (!canView) {
+      setLoading(false)
+      return () => {
+        active = false
+      }
+    }
+
+    setLoading(true)
+    setLoadError('')
+    loadReceivingDocumentById(id)
+      .then((nextDocument) => {
+        if (active) setDocument(nextDocument)
+      })
+      .catch((error) => {
+        if (!active) return
+        setDocument(null)
+        setLoadError(
+          toUserErrorMessage(error, 'Не удалось загрузить документ поставки.')
+        )
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
+  }, [canView, id])
 
   if (!canView) {
     return <PlatformAccessDenied title="Нет доступа к разделу «Приёмка»" />
   }
 
+  if (loading) {
+    return (
+      <div className="purchase-detail" aria-busy="true">
+        <DelayedLoadingSkeleton variant="table" count={6} />
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="purchase-detail receiving-detail__state">
+        <p className="admin-form__error" role="alert">{loadError}</p>
+        <IconActionButton label="Повторить загрузку" onClick={() => void loadDocument()}>
+          <RotateCcwIcon size={18} />
+        </IconActionButton>
+      </div>
+    )
+  }
+
   if (!document) {
     return (
       <div className="purchase-detail">
-        <p className="purchase-detail__not-found">Документ приёмки не найден.</p>
+        <p className="purchase-detail__not-found">Документ не найден.</p>
         <Link to="/platform/receiving" className="btn btn--ghost">
           ← К приёмке
         </Link>
@@ -64,143 +108,62 @@ export default function ReceivingDetailPage() {
     )
   }
 
-  if (isSimpleWorkflow(document)) {
-    return (
-      <div className="purchase-detail">
-        <p className="purchase-detail__not-found">
-          Простая приёмка отображается в недельном графике.
-        </p>
-        <Link to="/platform/receiving" className="btn btn--ghost">
-          ← К приёмке
-        </Link>
-      </div>
-    )
-  }
-
-  function handleItemChange(itemId, patch) {
-    setItems(
-      displayItems.map((item) => {
-        if (item.id !== itemId) return item
-        const next = normalizeReceivingItem({ ...item, ...patch })
-        return {
-          ...next,
-          differenceQty: calcDifferenceQty(next.receivedQty, next.orderedQty),
-        }
-      })
-    )
-  }
-
-  async function handleSave() {
-    if (!canEdit) return
-    setSaving(true)
-    setError('')
-    setMessage('')
-    try {
-      await saveReceivingDocument(document.id, displayItems, user)
-      setItems(null)
-      await refresh()
-      setMessage('Изменения сохранены.')
-    } catch (err) {
-      setError(err.message || 'Не удалось сохранить')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function handleComplete() {
-    if (!canEdit) return
-    if (!window.confirm('Завершить приёмку? Статус документа будет обновлён.')) return
-    setCompleting(true)
-    setError('')
-    setMessage('')
-    try {
-      await completeReceivingDocument(document.id, displayItems, user)
-      setItems(null)
-      await refresh()
-      setMessage('Приёмка завершена.')
-    } catch (err) {
-      setError(err.message || 'Не удалось завершить приёмку')
-    } finally {
-      setCompleting(false)
-    }
-  }
+  const isLegacy = isSimpleWorkflow(document)
+  const displayItems = document.items ?? []
 
   return (
     <div className="purchase-detail">
       <div className="purchase-detail__back">
         <Link to="/platform/receiving" className="purchase-detail__back-link">
-          ← К списку приёмок
+          ← К приёмке
         </Link>
       </div>
 
       <div className="purchase-detail__header">
         <div>
-          <h2 className="purchase-detail__title">{document.supplierName || 'Приёмка'}</h2>
+          <h2 className="purchase-detail__title">{document.supplierName || 'Поставка'}</h2>
           <ReceivingStatusBadge status={document.status} />
         </div>
-        {canEdit && !isFinalized && (
-          <div className="purchase-detail__actions">
-            <button
-              type="button"
-              className="btn btn--primary"
-              disabled={saving || completing}
-              onClick={handleSave}
-            >
-              {saving ? 'Сохранение…' : 'Сохранить приёмку'}
-            </button>
-            <button
-              type="button"
-              className="btn btn--outline"
-              disabled={saving || completing}
-              onClick={handleComplete}
-            >
-              {completing ? 'Завершение…' : 'Завершить приёмку'}
-            </button>
-          </div>
-        )}
       </div>
-
-      {message && <p className="receiving-detail__message">{message}</p>}
-      {error && <p className="admin-form__error">{error}</p>}
 
       <dl className="purchase-detail__meta">
         <div>
-          <dt>Закуп</dt>
-          <dd>
-            {document.purchaseOrderId ? (
+          <dt>Дата</dt>
+          <dd>{formatReceivingDate(document.expectedDeliveryDate)}</dd>
+        </div>
+        <div>
+          <dt>Позиций</dt>
+          <dd>{displayItems.length}</dd>
+        </div>
+        <div>
+          <dt>Заказано</dt>
+          <dd>{Number(document.totalOrderedQty || 0)} шт.</dd>
+        </div>
+        {document.purchaseOrderId ? (
+          <div>
+            <dt>Заказ</dt>
+            <dd>
               <Link
                 to={`/platform/procurement/${document.purchaseOrderId}`}
                 className="receiving-detail__purchase-link"
               >
-                {document.supplierName || 'Открыть закуп'}
+                Открыть
               </Link>
-            ) : (
-              '—'
-            )}
-          </dd>
-        </div>
-        <div>
-          <dt>Ожидаемая дата доставки</dt>
-          <dd>{formatReceivingDate(document.expectedDeliveryDate)}</dd>
-        </div>
-        <div>
-          <dt>Принял</dt>
-          <dd>{document.receivedByName || '—'}</dd>
-        </div>
-        <div className="purchase-detail__meta-wide">
-          <dt>Комментарий</dt>
-          <dd>{document.comment || '—'}</dd>
-        </div>
+            </dd>
+          </div>
+        ) : null}
       </dl>
 
-      <section className="purchase-detail__items">
-        <h3 className="purchase-detail__items-title">Товары</h3>
-        <ReceivingItemsTable
-          items={displayItems}
-          canEdit={canEdit && !isFinalized}
-          onItemChange={handleItemChange}
-        />
-      </section>
+      {isLegacy ? (
+        <p className="receiving-detail__legacy">Старый документ без состава.</p>
+      ) : (
+        <section className="purchase-detail__items">
+          <div className="purchase-detail__items-header">
+            <h3 className="purchase-detail__items-title">Товары</h3>
+          </div>
+          <ReceivingItemsTable items={displayItems} />
+        </section>
+      )}
     </div>
   )
 }

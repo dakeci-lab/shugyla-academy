@@ -55,6 +55,13 @@ export function getReceivingDocumentByIdSync(id) {
   return getReceivingDocumentsSync().find((doc) => doc.id === id) || null
 }
 
+/** Загружает один документ независимо от состояния общего кэша модуля. */
+export async function loadReceivingDocumentById(id) {
+  if (!id) return null
+  if (isCloudMode()) return cloud.fetchDocumentById(id)
+  return local.getLocalReceivingDocumentById(id)
+}
+
 export async function loadReceivingDocuments() {
   if (isCloudMode()) {
     return cloud.fetchReceivingDataCloud()

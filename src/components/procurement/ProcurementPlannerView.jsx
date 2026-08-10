@@ -15,7 +15,6 @@ import {
   fetchSnapshotFilterOptions,
   fetchSnapshotItemsPage,
   generateProcurementOrders,
-  persistNormDaysForScope,
   resetItemToRecommendation,
   syncProcurementPlanning,
   updateItemFinalOrderQty,
@@ -209,24 +208,6 @@ export default function ProcurementPlannerView() {
     }
   }
 
-  async function handleNormChange(item, rawValue) {
-    const parsed = Number(rawValue)
-    const days = Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : 0
-    try {
-      await persistNormDaysForScope({
-        snapshotId: snapshot.id,
-        categoryName: item.categoryName,
-        subcategoryName: item.subcategoryName,
-        normDays: days,
-        user,
-        itemId: item.id,
-      })
-      await loadItems()
-    } catch (err) {
-      showError(err.message || 'Не удалось сохранить норму')
-    }
-  }
-
   async function handleFinalChange(item, rawValue) {
     try {
       await updateItemFinalOrderQty(item, rawValue)
@@ -293,10 +274,12 @@ export default function ProcurementPlannerView() {
   }
 
   async function runGenerate() {
-    if (!canGenerate || !snapshot?.id || !deliveryDate) return
+    if (!canGenerate || !snapshot?.id || !deliveryDate || !filters.platformSupplierId) return
     setGenerating(true)
     try {
-      const result = await generateProcurementOrders(snapshot.id, deliveryDate)
+      const result = await generateProcurementOrders(snapshot.id, deliveryDate, {
+        supplierId: filters.platformSupplierId,
+      })
       if (!result.success) {
         showError(result.message)
         return
@@ -322,6 +305,12 @@ export default function ProcurementPlannerView() {
     if (!filters.categoryName) return pairs
     return pairs.filter((p) => p.categoryName === filters.categoryName)
   }, [filterOptions.categorySubcategories, filters.categoryName])
+
+  const selectedSupplier = useMemo(
+    () => filterOptions.suppliers.find((supplier) => supplier.id === filters.platformSupplierId),
+    [filterOptions.suppliers, filters.platformSupplierId]
+  )
+  const snapshotEditable = snapshot?.status === 'ready' || snapshot?.status === 'partially_generated'
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
   const from = totalCount === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
@@ -465,9 +454,9 @@ export default function ProcurementPlannerView() {
             <PlatformToolbarActionWrap>
               <PlatformToolbarIconButton
                 onClick={() => setGenerateOpen(true)}
-                disabled={!canGenerate || !snapshot || snapshot.status !== 'ready' || generating}
-                aria-label="Сформировать заказы"
-                title="Сформировать заказы"
+                disabled={!canGenerate || !snapshotEditable || !filters.platformSupplierId || generating}
+                aria-label="Сформировать заказ поставщику"
+                title={filters.platformSupplierId ? 'Сформировать заказ' : 'Выберите поставщика в фильтре'}
                 create
               >
                 <SparklesIcon size={20} />
@@ -526,6 +515,8 @@ export default function ProcurementPlannerView() {
             <span>
               {snapshot.status === 'ready'
                 ? 'Готов'
+                : snapshot.status === 'partially_generated'
+                  ? 'Частично сформирован'
                 : snapshot.status === 'generated'
                   ? 'Заказы сформированы'
                   : snapshot.status === 'syncing'
@@ -607,23 +598,7 @@ export default function ProcurementPlannerView() {
                       </span>
                     </td>
                     <td>{formatNum(item.avgDaily, 2)}</td>
-                    <td>
-                      <input
-                        className="proc-planner__input"
-                        type="number"
-                        min={0}
-                        step={1}
-                        defaultValue={item.normDays}
-                        key={`norm-${item.id}-${item.normDays}`}
-                        disabled={!canEditPlan || snapshot?.status === 'generated'}
-                        onBlur={(e) => {
-                          if (Number(e.target.value) !== item.normDays) {
-                            void handleNormChange(item, e.target.value)
-                          }
-                        }}
-                        aria-label={`Норма дней для ${item.productName}`}
-                      />
-                    </td>
+                    <td><span className="proc-planner__norm-value" title="Настраивается во вкладке «Нормы»">{item.normDays}</span></td>
                     <td>{formatNum(item.recommendedQty, 0)}</td>
                     <td>
                       <div className="proc-planner__final">
@@ -634,7 +609,7 @@ export default function ProcurementPlannerView() {
                           step={1}
                           defaultValue={item.finalOrderQty}
                           key={`final-${item.id}-${item.finalOrderQty}-${item.manualOverride}`}
-                          disabled={!canEditPlan || snapshot?.status === 'generated'}
+                          disabled={!canEditPlan || !snapshotEditable || Boolean(item.generatedPurchaseOrderId)}
                           onBlur={(e) => {
                             if (Number(e.target.value) !== item.finalOrderQty) {
                               void handleFinalChange(item, e.target.value)
@@ -648,7 +623,7 @@ export default function ProcurementPlannerView() {
                             className="proc-planner__reset"
                             title="Сбросить к рекомендации"
                             aria-label="Сбросить к рекомендации"
-                            disabled={!canEditPlan || snapshot?.status === 'generated'}
+                            disabled={!canEditPlan || !snapshotEditable || Boolean(item.generatedPurchaseOrderId)}
                             onClick={() => void handleReset(item)}
                           >
                             <RotateCcwIcon size={14} />
@@ -704,18 +679,7 @@ export default function ProcurementPlannerView() {
                   </span>
                   <label>
                     Норма
-                    <input
-                      type="number"
-                      min={0}
-                      defaultValue={item.normDays}
-                      key={`m-norm-${item.id}-${item.normDays}`}
-                      disabled={!canEditPlan || snapshot?.status === 'generated'}
-                      onBlur={(e) => {
-                        if (Number(e.target.value) !== item.normDays) {
-                          void handleNormChange(item, e.target.value)
-                        }
-                      }}
-                    />
+                    <span className="proc-planner__norm-value" title="Настраивается во вкладке «Нормы»">{item.normDays}</span>
                   </label>
                   <label>
                     Заказ
@@ -724,7 +688,7 @@ export default function ProcurementPlannerView() {
                       min={0}
                       defaultValue={item.finalOrderQty}
                       key={`m-final-${item.id}-${item.finalOrderQty}`}
-                      disabled={!canEditPlan || snapshot?.status === 'generated'}
+                      disabled={!canEditPlan || !snapshotEditable || Boolean(item.generatedPurchaseOrderId)}
                       onBlur={(e) => {
                         if (Number(e.target.value) !== item.finalOrderQty) {
                           void handleFinalChange(item, e.target.value)
@@ -753,7 +717,7 @@ export default function ProcurementPlannerView() {
 
       {generateOpen ? (
         <AdminModal
-          title="Сформировать заказы"
+          title="Сформировать заказ"
           onClose={() => {
             if (!generating) setGenerateOpen(false)
           }}
@@ -787,17 +751,14 @@ export default function ProcurementPlannerView() {
               required
             />
           </label>
-          <p className="proc-planner__hint">
-            Будут созданы аналитические заказы и карточки приёмки по поставщикам. Позиции без
-            привязанного поставщика будут пропущены.
-          </p>
+          <p className="proc-planner__hint">{selectedSupplier?.name || 'Поставщик не выбран'}</p>
         </AdminModal>
       ) : null}
 
       {confirmGenerate ? (
         <ConfirmDialog
-          title="Подтвердить формирование?"
-          message="Создать заказы и документы приёмки по текущему плану?"
+          title="Сформировать заказ?"
+          message={selectedSupplier?.name || 'Выбранный поставщик'}
           confirmLabel="Сформировать"
           confirmVariant="primary"
           loading={generating}

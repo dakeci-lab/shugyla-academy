@@ -47,7 +47,7 @@ export const RECEIVING_ENTRY_SOURCE = {
 export const EXPECTED_DELIVERY_LABEL = 'Ожидается'
 
 /** Заголовок блока плана закупок (раздел «Закуп») */
-export const PROCUREMENT_PLAN_LABEL = 'План закупок'
+export const PROCUREMENT_PLAN_LABEL = 'Визиты поставщиков'
 
 /** Статус записи в плане закупок (раздел «Закуп») */
 export const PROCUREMENT_PLAN_ITEM_STATUS = 'К заказу'
@@ -159,7 +159,8 @@ export function buildExpectedDeliveryEntries(suppliers, weekStartKey, orders = [
   if (!activeSuppliers.length) return []
 
   const occupied = new Set()
-  for (const order of filterSimplePurchases(orders)) {
+  for (const order of orders || []) {
+    if (order.status === PURCHASE_STATUS.CANCELLED) continue
     if (!order.expectedDeliveryDate) continue
 
     if (order.supplierId) {

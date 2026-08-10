@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import {
@@ -8,6 +8,7 @@ import {
 } from '../../../config/permissions'
 import {
   getPurchaseOrderByIdSync,
+  getPurchaseOrderById,
   cancelPurchaseOrder,
   transferPurchaseToReceiving,
   addPurchaseOrderItem,
@@ -54,6 +55,8 @@ export default function PurchaseDetailPage() {
   const [itemFormError, setItemFormError] = useState('')
   const [itemSaving, setItemSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [loadedOrder, setLoadedOrder] = useState(null)
+  const [loadingOrder, setLoadingOrder] = useState(true)
 
   const canView = canViewPurchases(user)
   const canEdit = canEditPurchase(user)
@@ -61,13 +64,39 @@ export default function PurchaseDetailPage() {
 
   void version
 
-  const order = useMemo(() => getPurchaseOrderByIdSync(id), [id, version])
+  const cachedOrder = useMemo(() => getPurchaseOrderByIdSync(id), [id, version])
+  const order = cachedOrder || loadedOrder
   const displayItems = order?.items ?? []
   const alreadyTransferred = Boolean(order?.transferredToReceiving || order?.receivingDocumentId)
   const canEditItems = canEdit && order?.status === PURCHASE_STATUS.DRAFT
 
+  useEffect(() => {
+    let cancelled = false
+    setLoadingOrder(true)
+    setLoadedOrder(null)
+
+    void getPurchaseOrderById(id)
+      .then((result) => {
+        if (!cancelled) setLoadedOrder(result)
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err?.message || 'Не удалось загрузить заказ')
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingOrder(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [id, version])
+
   if (!canView) {
     return <PlatformAccessDenied title="Нет доступа к разделу «Закуп»" />
+  }
+
+  if (!order && loadingOrder) {
+    return <div className="purchase-detail"><p>Загрузка…</p></div>
   }
 
   if (!order) {

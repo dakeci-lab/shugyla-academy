@@ -195,7 +195,11 @@ export async function syncProcurementPlanning() {
   }
 }
 
-export async function generateProcurementOrders(snapshotId, expectedDeliveryDate) {
+export async function generateProcurementOrders(
+  snapshotId,
+  expectedDeliveryDate,
+  { supplierId = '', supplierIds = [] } = {}
+) {
   if (!isSupabaseConfigured() || !supabase) {
     return fail(PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN, 'Сервер не настроен')
   }
@@ -209,6 +213,8 @@ export async function generateProcurementOrders(snapshotId, expectedDeliveryDate
         action: 'generate',
         snapshotId,
         expectedDeliveryDate,
+        ...(supplierId ? { supplierId } : {}),
+        ...(supplierIds.length ? { supplierIds } : {}),
       },
     })
     if (error) return mapInvokeFailure(error, data)
@@ -220,8 +226,12 @@ export async function generateProcurementOrders(snapshotId, expectedDeliveryDate
         purchaseOrderIds: data.purchase_order_ids || [],
         receivingDocumentIds: data.receiving_document_ids || [],
         ordersCreated: data.orders_created ?? 0,
+        ordersExisting: data.orders_existing ?? 0,
         skippedNoSupplier: data.skipped_no_supplier ?? 0,
         itemsOrdered: data.items_ordered ?? 0,
+        snapshotStatus: data.snapshot_status,
+        remainingSuppliers: data.remaining_suppliers ?? 0,
+        requestedSupplierIds: data.requested_supplier_ids || [],
       }
     }
     return mapInvokeFailure(null, data)

@@ -4,6 +4,7 @@ import {
   formatPurchaseDate,
 } from '../../utils/purchaseData'
 import { PurchaseStatusBadge } from './PurchaseStatsCards'
+import { CloseIcon, EyeIcon } from '../icons/PlatformIcons'
 import './PurchaseTable.css'
 
 /** Таблица активных закупов */
@@ -18,7 +19,7 @@ export default function PurchaseTable({
   if (!orders.length) {
     return (
       <div className="purchase-table__empty">
-        Нет активных закупов. Создайте новый закуп или импортируйте данные из Umag.
+        Заказов на этот день нет.
       </div>
     )
   }
@@ -57,24 +58,28 @@ export default function PurchaseTable({
               <td className="purchase-table__actions">
                 <button
                   type="button"
-                  className="btn btn--ghost btn--sm"
+                  className="btn btn--ghost btn--sm purchase-table__icon-btn"
                   onClick={(e) => {
                     e.stopPropagation()
                     navigate(`${detailPathPrefix}/${order.id}`)
                   }}
+                  aria-label="Открыть заказ"
+                  title="Открыть заказ"
                 >
-                  Открыть
+                  <EyeIcon size={17} />
                 </button>
                 {canEdit && order.status !== 'cancelled' && order.status !== 'received' && (
                   <button
                     type="button"
-                    className="btn btn--ghost btn--sm"
+                    className="btn btn--ghost btn--sm purchase-table__icon-btn"
                     onClick={(e) => {
                       e.stopPropagation()
                       onCancel?.(order)
                     }}
+                    aria-label="Отменить заказ"
+                    title="Отменить заказ"
                   >
-                    Отменить
+                    <CloseIcon size={17} />
                   </button>
                 )}
               </td>

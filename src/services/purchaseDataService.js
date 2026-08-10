@@ -55,6 +55,13 @@ export function getPurchaseOrderByIdSync(id) {
   return getPurchaseOrdersSync().find((o) => o.id === id) || null
 }
 
+/** Загружает полный закуп по прямой ссылке, даже если общий модуль ещё не успел прогреться. */
+export async function getPurchaseOrderById(id) {
+  if (!id) return null
+  if (isCloudMode()) return cloud.fetchOrderById(id)
+  return getPurchaseOrderByIdSync(id)
+}
+
 export async function loadPurchases() {
   if (isCloudMode()) {
     return cloud.fetchPurchasesDataCloud()

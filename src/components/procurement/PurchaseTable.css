@@ -55,6 +55,15 @@
   flex-wrap: nowrap;
 }
 
+.purchase-table__icon-btn {
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 .purchase-table__empty {
   padding: 40px 24px;
   text-align: center;

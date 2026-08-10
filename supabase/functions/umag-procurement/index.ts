@@ -3,7 +3,8 @@
  *
  * Actions:
  * - sync: create immutable facts snapshot (requires procurement.edit)
- * - generate: create analytics purchase_orders + receiving_documents
+ * - generate: idempotently create analytics purchase_orders + receiving_documents
+ *             for selected, not-yet-generated suppliers
  *             (requires procurement.create AND procurement.transfer)
  *
  * Never writes back to UMAG. Never returns UMAG secrets to the client.
@@ -32,6 +33,9 @@ const INSERT_CHUNK = 400
 const UMAG_FETCH_TIMEOUT_MS = 120_000
 const ALMATY_TZ = 'Asia/Almaty'
 const ALMATY_OFFSET_MS = 5 * 60 * 60 * 1000
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+const MAX_GENERATE_SUPPLIERS = 500
 
 type NormRule = {
   category_name: string
@@ -620,6 +624,47 @@ async function handleGenerate(
     )
   }
 
+  const singularSupplierId = asText(body.supplierId)
+  const hasSupplierIds = body.supplierIds !== undefined && body.supplierIds !== null
+  if (hasSupplierIds && !Array.isArray(body.supplierIds)) {
+    return umagErrorResponse(
+      'VALIDATION_ERROR',
+      'supplierIds должен быть списком идентификаторов поставщиков.',
+      400
+    )
+  }
+
+  const supplierIds = Array.from(
+    new Set([
+      ...(singularSupplierId ? [singularSupplierId] : []),
+      ...((Array.isArray(body.supplierIds) ? body.supplierIds : [])
+        .map((value) => asText(value))
+        .filter(Boolean)),
+    ])
+  )
+
+  if ((singularSupplierId || hasSupplierIds) && supplierIds.length === 0) {
+    return umagErrorResponse(
+      'VALIDATION_ERROR',
+      'Выберите хотя бы одного поставщика.',
+      400
+    )
+  }
+  if (supplierIds.length > MAX_GENERATE_SUPPLIERS) {
+    return umagErrorResponse(
+      'VALIDATION_ERROR',
+      `За один раз можно сформировать не более ${MAX_GENERATE_SUPPLIERS} поставщиков.`,
+      400
+    )
+  }
+  if (supplierIds.some((supplierId) => !UUID_PATTERN.test(supplierId))) {
+    return umagErrorResponse(
+      'VALIDATION_ERROR',
+      'Некорректный идентификатор поставщика.',
+      400
+    )
+  }
+
   const createdBy = String(authz.caller.id)
   const createdByName = await fetchCallerDisplayName(authz.serviceClient, authz.caller.id)
 
@@ -628,6 +673,9 @@ async function handleGenerate(
     {
       p_snapshot_id: snapshotId,
       p_expected_delivery_date: expectedDeliveryDate,
+      // null preserves the previous contract: generate all remaining suppliers.
+      // A non-empty list generates only the explicitly selected suppliers.
+      p_supplier_ids: supplierIds.length > 0 ? supplierIds : null,
       p_created_by: createdBy,
       p_created_by_name: createdByName || null,
     }
@@ -639,10 +687,10 @@ async function handleGenerate(
       code: error.code,
     })
     const msg = error.message || ''
-    if (msg.includes('snapshot must be ready')) {
+    if (msg.includes('snapshot is not available for generation')) {
       return umagErrorResponse(
         'SNAPSHOT_NOT_READY',
-        'Снимок ещё не готов к формированию заказов.',
+        'Снимок сейчас недоступен для формирования заказов.',
         409
       )
     }

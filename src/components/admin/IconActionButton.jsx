@@ -21,6 +21,7 @@ export default function IconActionButton({
       className={`icon-action-btn ${variantClass}`}
       onClick={onClick}
       aria-label={label}
+      title={label}
       data-tooltip={label}
       disabled={disabled}
     >

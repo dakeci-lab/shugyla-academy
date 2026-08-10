@@ -389,8 +389,8 @@ function stageContractFiles() {
   )
   assertFileContains(
     'src/pages/platform/receiving/ReceivingPage.jsx',
-    'AnalyticsReceivingList',
-    'receiving analytics list'
+    'UnifiedReceivingList',
+    'unified receiving list'
   )
 }
 

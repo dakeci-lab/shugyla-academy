@@ -72,12 +72,12 @@ function stageBackdropAndToolbar() {
 
   assert('shared backdrop token', indexCss.includes('--platform-modal-backdrop'))
   assert('admin modal uses backdrop token', adminModalCss.includes('var(--platform-modal-backdrop'))
-  assert('desktop create button exists', page.includes('procurement-page__desktop-create'))
-  assert('desktop create aria-label', page.includes('aria-label="Создать закуп"'))
-  assert('desktop create uses openCreate', page.includes('onClick={() => openCreate()}'))
-  assert('desktop create hidden on mobile', pageCss.includes('.procurement-page__desktop-create'))
-  assert('mobile create hidden on desktop', pageCss.includes('.procurement-page__mobile-create'))
-  assert('no duplicate mobile desktop create on mobile', /max-width:\s*900px[\s\S]*desktop-create[\s\S]*display:\s*none/.test(pageCss))
+  assert('manual create button removed from orders', !page.includes('procurement-page__desktop-create'))
+  assert('planning tab remains entry point', page.includes('ProcurementPlannerView'))
+  assert('norms tab is available', page.includes('ProcurementNormsView'))
+  assert('orders use unified table', page.includes('<PurchaseTable'))
+  assert('supplier visit plan remains reference-only', page.includes('canCreate={false}'))
+  assert('legacy create styles remain harmless', pageCss.includes('.procurement-page__desktop-create'))
 }
 
 function stageScrollLock() {

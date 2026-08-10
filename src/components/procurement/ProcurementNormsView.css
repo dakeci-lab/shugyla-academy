@@ -1,0 +1,206 @@
+.proc-norms {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.proc-norms__readonly {
+  width: 42px;
+  height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary, #667085);
+  border: 1px solid var(--border, #e4e7ec);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+}
+
+.proc-norms__list {
+  overflow: hidden;
+  border: 1px solid var(--border, #e4e7ec);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+}
+
+.proc-norms__category + .proc-norms__category {
+  border-top: 1px solid var(--border, #eef0f3);
+}
+
+.proc-norms__category-row,
+.proc-norms__subcategory {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 0.85rem 0 0.35rem;
+}
+
+.proc-norms__category-toggle {
+  min-width: 0;
+  min-height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.65rem 0.5rem;
+  border: 0;
+  background: transparent;
+  color: var(--text, #101828);
+  text-align: left;
+  cursor: pointer;
+}
+
+.proc-norms__category-toggle strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.proc-norms__chevron {
+  flex: 0 0 auto;
+  display: inline-flex;
+  color: var(--text-secondary, #667085);
+  transition: transform 160ms ease;
+}
+
+.proc-norms__category-toggle[aria-expanded='true'] .proc-norms__chevron {
+  transform: rotate(180deg);
+}
+
+.proc-norms__count {
+  flex: 0 0 auto;
+  min-width: 24px;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: #f2f4f7;
+  color: #667085;
+  font-size: 0.7rem;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.proc-norms__subcategories {
+  background: #fbfcfd;
+  border-top: 1px solid var(--border, #eef0f3);
+}
+
+.proc-norms__subcategory {
+  padding-left: 2.7rem;
+  color: var(--text-secondary, #475467);
+  font-size: 0.8125rem;
+}
+
+.proc-norms__subcategory + .proc-norms__subcategory {
+  border-top: 1px solid #f0f2f5;
+}
+
+.proc-norms__subcategory > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.proc-norms__norm {
+  justify-self: end;
+  position: relative;
+  width: 72px;
+}
+
+.proc-norms__norm input {
+  width: 100%;
+  min-height: 34px;
+  padding: 0.3rem 1.45rem 0.3rem 0.55rem;
+  border: 1px solid var(--border, #d0d5dd);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  color: var(--text, #101828);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.proc-norms__norm.is-inherited input:not(:focus) {
+  color: #667085;
+  background: #f8fafc;
+  border-style: dashed;
+}
+
+.proc-norms__norm input:focus {
+  outline: none;
+  border-color: #25a45a;
+  box-shadow: 0 0 0 3px rgba(37, 164, 90, 0.12);
+}
+
+.proc-norms__norm input:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.proc-norms__save-state {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  width: 15px;
+  height: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.proc-norms__save-state.is-saved { color: #15803d; }
+.proc-norms__save-state.is-error { color: #b42318; }
+
+.proc-norms__spinner {
+  width: 15px;
+  height: 15px;
+  display: inline-block;
+  border: 2px solid rgba(37, 164, 90, 0.2);
+  border-top-color: #25a45a;
+  border-radius: 50%;
+  animation: proc-norms-spin 650ms linear infinite;
+}
+
+.proc-norms__loading {
+  min-height: 180px;
+  display: grid;
+  place-items: center;
+}
+
+.proc-norms__empty {
+  margin: 1.5rem 0;
+  color: var(--text-secondary, #667085);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+@keyframes proc-norms-spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 640px) {
+  .proc-norms__category-row,
+  .proc-norms__subcategory {
+    grid-template-columns: minmax(0, 1fr) 76px;
+    padding-right: 0.55rem;
+  }
+
+  .proc-norms__subcategory {
+    padding-left: 2.25rem;
+  }
+
+  .proc-norms__norm {
+    width: 68px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proc-norms__chevron { transition: none; }
+  .proc-norms__spinner { animation-duration: 1.4s; }
+}

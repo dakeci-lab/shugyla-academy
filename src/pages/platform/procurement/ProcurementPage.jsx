@@ -51,10 +51,12 @@ import SimpleCreatePurchaseForm, {
 } from '../../../components/procurement/SimpleCreatePurchaseForm'
 import SimplePurchaseTable from '../../../components/procurement/SimplePurchaseTable'
 import SimplePurchaseCardList from '../../../components/procurement/SimplePurchaseCardList'
+import PurchaseTable from '../../../components/procurement/PurchaseTable'
 import PurchaseFilterPopover from '../../../components/procurement/PurchaseFilterPopover'
 import WeekScheduleNav from '../../../components/procurement/WeekScheduleNav'
 import ProcurementPlanDayList from '../../../components/procurement/ProcurementPlanDayList'
 import ProcurementPlannerView from '../../../components/procurement/ProcurementPlannerView'
+import ProcurementNormsView from '../../../components/procurement/ProcurementNormsView'
 import { PlusIcon } from '../../../components/icons/PlatformIcons'
 import {
   PlatformFilterButton,
@@ -172,11 +174,17 @@ export default function ProcurementPage() {
       .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   }, [stableOrders, version, dataVersion])
 
+  const activeOrders = useMemo(() => {
+    return stableOrders
+      .filter((order) => order.status !== PURCHASE_STATUS.CANCELLED)
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+  }, [stableOrders, version, dataVersion])
+
   /** Список закупов выбранного дня — период из фильтра не применяем (дату задаёт навигация по неделе) */
   const dayOrders = useMemo(() => {
     if (!selectedDateKey) return []
 
-    let result = simpleOrders.filter(
+    let result = activeOrders.filter(
       (order) => order.expectedDeliveryDate === selectedDateKey
     )
 
@@ -187,7 +195,7 @@ export default function ProcurementPage() {
     return result.sort((a, b) =>
       (a.supplierName || '').localeCompare(b.supplierName || '', 'ru')
     )
-  }, [simpleOrders, selectedDateKey, appliedFilters.supplierId])
+  }, [activeOrders, selectedDateKey, appliedFilters.supplierId])
 
   const expectedEntriesByDate = useMemo(() => {
     const entries = buildExpectedDeliveryEntries(
@@ -204,12 +212,12 @@ export default function ProcurementPage() {
 
   const countsByDate = useMemo(() => {
     const counts = { ...expectedEntriesByDate }
-    for (const order of simpleOrders) {
+    for (const order of activeOrders) {
       if (!order.expectedDeliveryDate) continue
       counts[order.expectedDeliveryDate] = (counts[order.expectedDeliveryDate] || 0) + 1
     }
     return counts
-  }, [simpleOrders, expectedEntriesByDate])
+  }, [activeOrders, expectedEntriesByDate])
 
   const totals = useMemo(() => calcPurchaseTotals(dayOrders), [dayOrders])
 
@@ -395,7 +403,7 @@ export default function ProcurementPage() {
       return toUserErrorMessage(moduleError, 'Не удалось загрузить закупы с сервера.')
     }
     if (!selectedDateKey) return 'Выберите день недели'
-    if (simpleOrders.length === 0) return 'Закупы не созданы'
+    if (activeOrders.length === 0) return 'Заказы не созданы'
     if (appliedFilters.supplierId && dayOrders.length === 0) {
       return 'По выбранному фильтру закупы не найдены'
     }
@@ -426,6 +434,17 @@ export default function ProcurementPage() {
           type="button"
           role="tab"
           className={
+            mainTab === 'norms' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
+          }
+          aria-selected={mainTab === 'norms'}
+          onClick={() => setMainTab('norms')}
+        >
+          Нормы
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={
             mainTab === 'orders' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
           }
           aria-selected={mainTab === 'orders'}
@@ -437,34 +456,12 @@ export default function ProcurementPage() {
 
       {mainTab === 'planning' ? (
         <ProcurementPlannerView />
+      ) : mainTab === 'norms' ? (
+        <ProcurementNormsView />
       ) : (
         <>
       <div className="procurement-page__header">
         <div className="procurement-page__header-main">
-          {canCreate && (
-            <button
-              type="button"
-              className="procurement-page__desktop-create"
-              onClick={() => openCreate()}
-              aria-label="Создать закуп"
-              title="Создать закуп"
-            >
-              <PlusIcon size={18} />
-            </button>
-          )}
-
-          {canCreate && (
-            <button
-              type="button"
-              className="procurement-page__mobile-create"
-              onClick={() => openCreate()}
-              aria-label="Создать закуп"
-              title="Создать закуп"
-            >
-              <PlusIcon size={20} />
-            </button>
-          )}
-
           <PlatformToolbarActionWrap>
             <button
               type="button"
@@ -546,12 +543,12 @@ export default function ProcurementPage() {
         version={version}
         dataVersion={dataVersion}
         orders={stableOrders}
-        canCreate={canCreate}
+        canCreate={false}
         onCreatePurchase={openCreate}
       />
 
       <section className="procurement-page__section">
-        <h2 className="procurement-page__section-title">Закупки</h2>
+        <h2 className="procurement-page__section-title">Заказы</h2>
 
         {showInitialSkeleton ? (
           <DelayedLoadingSkeleton variant="list" count={5} />
@@ -559,33 +556,10 @@ export default function ProcurementPage() {
           <p className="procurement-page__empty">Выберите день недели, чтобы посмотреть закупки.</p>
         ) : (
           <>
-            <div className="procurement-list-panel procurement-list-panel--desktop">
-              <SimplePurchaseTable
+            <div className="procurement-list-panel">
+              <PurchaseTable
                 orders={dayOrders}
-                documentsByPurchaseId={documentsByPurchaseId}
-                showActions={showActions}
-                canEditOrder={(order) => canEditSimplePurchase(user, order)}
-                onOpenEditor={openPurchaseEditor}
-                onDelete={requestDelete}
-                onRetry={handleRetry}
-                totals={listTotals}
-                emptyMessage={emptyMessage}
-              />
-            </div>
-
-            <div className="procurement-list-panel procurement-list-panel--mobile">
-              <SimplePurchaseCardList
-                orders={dayOrders}
-                documentsByPurchaseId={documentsByPurchaseId}
-                showActions={showActions}
-                canEditOrder={(order) => canEditSimplePurchase(user, order)}
-                onOpenEditor={openPurchaseEditor}
-                onDelete={requestDelete}
-                onRetry={handleRetry}
-                totals={listTotals}
-                emptyMessage={emptyMessage}
-                compact
-                hideDate
+                canEdit={false}
               />
             </div>
           </>
