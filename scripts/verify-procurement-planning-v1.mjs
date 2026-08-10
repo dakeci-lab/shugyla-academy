@@ -394,11 +394,128 @@ function stageContractFiles() {
   )
 }
 
+async function stagePlanExportAndPlannerUi() {
+  console.log('Stage 4: Plan export contract + planner UI')
+  const planExport = await import(
+    pathToFileURL(path.join(ROOT, 'src/utils/procurementPlanExport.js')).href
+  )
+  const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
+  const plannerCss = read('src/components/procurement/ProcurementPlannerView.css')
+
+  assert(
+    'PLAN_EXPORT_COLUMNS exact order',
+    JSON.stringify(planExport.PLAN_EXPORT_COLUMNS) ===
+      JSON.stringify(['№', 'Товар', 'Штрихкод', 'Поставщик', 'Заказ'])
+  )
+
+  const mapped = planExport.mapPlanItemsForExport([
+    {
+      productName: 'Молоко',
+      barcode: '012345',
+      umagSupplierName: 'Dairy Co',
+      finalOrderQty: 7,
+      categoryName: 'ignore',
+      rawStock: 99,
+      recommendedQty: 12,
+    },
+    {
+      product_name: 'Хлеб',
+      barcode: 78001,
+      umag_supplier_name: '',
+      final_order_qty: 3,
+    },
+    {
+      productName: 'Сок',
+      barcode: null,
+      finalOrderQty: 0,
+    },
+  ])
+
+  assert('export rows count', mapped.length === 3)
+  assert('numbering starts at 1', mapped[0]['№'] === 1 && mapped[2]['№'] === 3)
+  assert(
+    'exact keys order row 0',
+    JSON.stringify(Object.keys(mapped[0])) ===
+      JSON.stringify(['№', 'Товар', 'Штрихкод', 'Поставщик', 'Заказ'])
+  )
+  assert('barcode kept as string with leading zero', mapped[0].Штрихкод === '012345')
+  assert('numeric barcode coerced to string', mapped[1].Штрихкод === '78001')
+  assert('supplier fallback dash', mapped[1].Поставщик === '—' && mapped[2].Поставщик === '—')
+  assert('supplier name preferred', mapped[0].Поставщик === 'Dairy Co')
+  assert('final order qty mapped', mapped[0].Заказ === 7 && mapped[1].Заказ === 3)
+  assert(
+    'no extra planning columns in mapped row',
+    !('Категория' in mapped[0]) &&
+      !('Остаток' in mapped[0]) &&
+      !('Рекомендация' in mapped[0]) &&
+      !('Норма' in mapped[0])
+  )
+
+  const aoa = planExport.planExportRowsToAoa(mapped)
+  assert('aoa header exact', JSON.stringify(aoa[0]) === JSON.stringify(planExport.PLAN_EXPORT_COLUMNS))
+  assert('aoa barcode string', typeof aoa[1][2] === 'string' && aoa[1][2] === '012345')
+
+  assertFileContains(
+    'src/utils/procurementPlanExport.js',
+    'exportProcurementPlanXlsx',
+    'xlsx plan export'
+  )
+  assertFileContains(
+    'src/utils/procurementPlanExport.js',
+    'exportProcurementPlanPdf',
+    'pdf plan export'
+  )
+  assert(
+    'xlsx forces barcode text cells',
+    read('src/utils/procurementPlanExport.js').includes("cell.z = '@'") ||
+      read('src/utils/procurementPlanExport.js').includes('cell.z = "@"')
+  )
+
+  assert('planner uses SearchableSupplierSelect', planner.includes('SearchableSupplierSelect'))
+  assert('planner activeOnly=false', planner.includes('activeOnly={false}'))
+  assert(
+    'planner keeps platformSupplierId filter key',
+    planner.includes('platformSupplierId') && planner.includes('filterOptions.suppliers')
+  )
+  assert('planner has № column', planner.includes('proc-planner__col-num') && planner.includes('>№<'))
+  assert(
+    'planner page numbering formula',
+    planner.includes('(page - 1) * PAGE_SIZE + index + 1')
+  )
+  assert('planner mobile row number', planner.includes('proc-planner__row-num'))
+  assert('planner export menu aria', planner.includes('aria-haspopup="menu"'))
+  assert('planner export PDF+Excel items', planner.includes('runPlanExport(\'pdf\')') && planner.includes('runPlanExport(\'xlsx\')'))
+  assert(
+    'planner uses shared plan export utils',
+    planner.includes('exportProcurementPlanPdf') && planner.includes('exportProcurementPlanXlsx')
+  )
+  assert(
+    'planner export uses exportSnapshotItemsCsv',
+    planner.includes('exportSnapshotItemsCsv')
+  )
+  assert(
+    'no legacy 18-column inline export',
+    !planner.includes('W1: r.weeklySales') &&
+      !planner.includes("'Ср/день': r.avgDaily") &&
+      !planner.includes('Категория: r.categoryName')
+  )
+  assert(
+    'purchase order export untouched',
+    read('src/utils/purchaseOrderExport.js').includes('exportPurchaseOrderXlsx') &&
+      read('src/pages/platform/procurement/PurchaseDetailPage.jsx').includes(
+        'exportPurchaseOrderPdf'
+      )
+  )
+  assert('export menu css present', plannerCss.includes('proc-planner__export-menu'))
+  assert('supplier filter overflow visible', plannerCss.includes('overflow: visible'))
+}
+
 function main() {
   console.log('verify-procurement-planning-v1\n')
   return stageFormulas()
     .then(() => stageGroupingAndExport())
     .then(() => stageContractFiles())
+    .then(() => stagePlanExportAndPlannerUi())
     .then(() => {
       console.log(`\nPassed ${testsPassed}/${testsRun}`)
     })

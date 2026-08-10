@@ -62,7 +62,7 @@
   right: 0;
   top: calc(100% + 6px);
   z-index: 40;
-  width: min(280px, 92vw);
+  width: min(320px, 92vw);
   padding: 0.875rem;
   display: flex;
   flex-direction: column;
@@ -71,6 +71,7 @@
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 10px;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+  overflow: visible;
 }
 
 .proc-planner__filter-pop label {
@@ -82,6 +83,73 @@
 
 .proc-planner__filter-pop select {
   min-height: 36px;
+}
+
+.proc-planner__supplier-filter {
+  position: relative;
+  z-index: 2;
+  overflow: visible;
+}
+
+.proc-planner__supplier-filter .searchable-supplier-select__dropdown {
+  z-index: 60;
+}
+
+.proc-planner__export {
+  position: relative;
+}
+
+.proc-planner__export-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 50;
+  min-width: 140px;
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  background: var(--surface, #fff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.proc-planner__export-item {
+  display: block;
+  width: 100%;
+  padding: 0.55rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  font-size: 0.875rem;
+  color: var(--text, #111827);
+  cursor: pointer;
+}
+
+.proc-planner__export-item:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.proc-planner__export-item:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.proc-planner__col-num {
+  width: 2.5rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary, #6b7280);
+  white-space: nowrap;
+}
+
+.proc-planner__row-num {
+  color: var(--text-secondary, #6b7280);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
 }
 
 .proc-planner__check {
@@ -100,7 +168,7 @@
 .proc-planner__table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 980px;
+  min-width: 1040px;
   font-size: 0.8125rem;
 }
 
@@ -278,6 +346,21 @@
     left: 0.75rem;
     right: 0.75rem;
     width: auto;
-    top: auto;
+    top: max(4.75rem, calc(env(safe-area-inset-top, 0px) + 3.75rem));
+    bottom: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .proc-planner__supplier-filter .searchable-supplier-select__dropdown {
+    max-height: min(42dvh, 280px);
+  }
+
+  .proc-planner__supplier-filter .searchable-supplier-select__list {
+    max-height: min(34dvh, 220px);
+  }
+
+  .proc-planner__export-menu {
+    right: 0.25rem;
   }
 }

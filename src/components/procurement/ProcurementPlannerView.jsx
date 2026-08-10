@@ -22,6 +22,7 @@ import {
 } from '../../services/procurementPlanningService'
 import AdminModal from '../admin/AdminModal'
 import ConfirmDialog from '../admin/ConfirmDialog'
+import SearchableSupplierSelect from '../suppliers/SearchableSupplierSelect'
 import PlatformSearchToolbar, {
   PlatformFilterButton,
   PlatformToolbarActionWrap,
@@ -34,7 +35,13 @@ import {
   RotateCcwIcon,
   SparklesIcon,
 } from '../icons/PlatformIcons'
+import {
+  exportProcurementPlanPdf,
+  exportProcurementPlanXlsx,
+} from '../../utils/procurementPlanExport'
 import './ProcurementPlannerView.css'
+
+const TABLE_COL_SPAN = 9
 
 const PAGE_SIZE = 50
 
@@ -108,7 +115,11 @@ export default function ProcurementPlannerView() {
   const [generateOpen, setGenerateOpen] = useState(false)
   const [deliveryDate, setDeliveryDate] = useState('')
   const [confirmGenerate, setConfirmGenerate] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const [exporting, setExporting] = useState(false)
   const filterButtonRef = useRef(null)
+  const exportMenuRef = useRef(null)
+  const exportMenuId = 'proc-planner-export-menu'
 
   const activeFilterCount = useMemo(() => {
     let n = 0
@@ -234,49 +245,50 @@ export default function ProcurementPlannerView() {
     }
   }
 
-  async function handleExport() {
-    if (!snapshot?.id) return
+  useEffect(() => {
+    if (!exportMenuOpen) return undefined
+
+    function handlePointerDown(event) {
+      if (!exportMenuRef.current?.contains(event.target)) {
+        setExportMenuOpen(false)
+      }
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') setExportMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [exportMenuOpen])
+
+  async function runPlanExport(format) {
+    if (!snapshot?.id || exporting) return
+    setExporting(true)
+    setExportMenuOpen(false)
     try {
       const rows = await exportSnapshotItemsCsv(snapshot.id, {
         search: debouncedSearch,
         ...filters,
       })
-      const XLSX = await import('xlsx')
-      const sheet = rows.map((r) => ({
-        Товар: r.productName,
-        Штрихкод: r.barcode,
-        Категория: r.categoryName,
-        Подкатегория: r.subcategoryName,
-        Поставщик: r.umagSupplierName,
-        Остаток: r.rawStock,
-        'Ср/день': r.avgDaily,
-        Норма: r.normDays,
-        Рекомендация: r.recommendedQty,
-        Заказ: r.finalOrderQty,
-        W1: r.weeklySales[0],
-        W2: r.weeklySales[1],
-        W3: r.weeklySales[2],
-        W4: r.weeklySales[3],
-        W5: r.weeklySales[4],
-        W6: r.weeklySales[5],
-        W7: r.weeklySales[6],
-        W8: r.weeklySales[7],
-      }))
-      const wb = XLSX.utils.book_new()
-      const ws = XLSX.utils.json_to_sheet(sheet)
-      XLSX.utils.book_append_sheet(wb, ws, 'План')
-      const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
-      const blob = new Blob([out], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `plan_zakupok_${snapshot.periodTo || 'export'}.xlsx`
-      a.click()
-      URL.revokeObjectURL(url)
+      const meta = {
+        periodFrom: snapshot.periodFrom,
+        periodTo: snapshot.periodTo,
+      }
+      if (format === 'pdf') {
+        await exportProcurementPlanPdf(rows, meta)
+      } else {
+        await exportProcurementPlanXlsx(rows, meta)
+      }
+      showSuccess(format === 'pdf' ? 'PDF экспортирован' : 'Excel экспортирован')
     } catch (err) {
       showError(err.message || 'Не удалось экспортировать')
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -410,21 +422,18 @@ export default function ProcurementPlannerView() {
                       ))}
                     </select>
                   </label>
-                  <label>
+                  <label className="proc-planner__supplier-filter">
                     Поставщик
-                    <select
+                    <SearchableSupplierSelect
+                      suppliers={filterOptions.suppliers}
                       value={filters.platformSupplierId}
-                      onChange={(e) =>
-                        setFilters((f) => ({ ...f, platformSupplierId: e.target.value }))
+                      onChange={(supplierId) =>
+                        setFilters((f) => ({ ...f, platformSupplierId: supplierId || '' }))
                       }
-                    >
-                      <option value="">Все</option>
-                      {filterOptions.suppliers.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                    </select>
+                      activeOnly={false}
+                      placeholder="Все"
+                      searchPlaceholder="Поиск поставщика…"
+                    />
                   </label>
                   <label className="proc-planner__check">
                     <input
@@ -476,14 +485,47 @@ export default function ProcurementPlannerView() {
               </PlatformToolbarIconButton>
             </PlatformToolbarActionWrap>
             <PlatformToolbarActionWrap>
-              <PlatformToolbarIconButton
-                onClick={() => void handleExport()}
-                disabled={!snapshot?.id || snapshot.status === 'syncing'}
-                aria-label="Экспорт плана"
-                title="Экспорт плана"
-              >
-                <DownloadIcon size={20} />
-              </PlatformToolbarIconButton>
+              <div className="proc-planner__export" ref={exportMenuRef}>
+                <PlatformToolbarIconButton
+                  onClick={() => setExportMenuOpen((open) => !open)}
+                  disabled={!snapshot?.id || snapshot.status === 'syncing' || exporting}
+                  aria-label="Экспорт плана"
+                  title="Экспорт плана"
+                  aria-haspopup="menu"
+                  aria-expanded={exportMenuOpen}
+                  aria-controls={exportMenuOpen ? exportMenuId : undefined}
+                  aria-busy={exporting || undefined}
+                >
+                  <DownloadIcon size={20} />
+                </PlatformToolbarIconButton>
+                {exportMenuOpen ? (
+                  <div
+                    id={exportMenuId}
+                    className="proc-planner__export-menu"
+                    role="menu"
+                    aria-label="Формат экспорта плана"
+                  >
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="proc-planner__export-item"
+                      disabled={exporting}
+                      onClick={() => void runPlanExport('pdf')}
+                    >
+                      PDF
+                    </button>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="proc-planner__export-item"
+                      disabled={exporting}
+                      onClick={() => void runPlanExport('xlsx')}
+                    >
+                      Excel
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </PlatformToolbarActionWrap>
           </>
         }
@@ -523,6 +565,7 @@ export default function ProcurementPlannerView() {
           <table className="proc-planner__table">
             <thead>
               <tr>
+                <th className="proc-planner__col-num">№</th>
                 <th>Товар</th>
                 <th>Продажи 8 нед.</th>
                 <th>Остаток</th>
@@ -536,15 +579,18 @@ export default function ProcurementPlannerView() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8}>Загрузка…</td>
+                  <td colSpan={TABLE_COL_SPAN}>Загрузка…</td>
                 </tr>
               ) : items.length === 0 ? (
                 <tr>
-                  <td colSpan={8}>Нет позиций</td>
+                  <td colSpan={TABLE_COL_SPAN}>Нет позиций</td>
                 </tr>
               ) : (
-                items.map((item) => (
+                items.map((item, index) => (
                   <tr key={item.id}>
+                    <td className="proc-planner__col-num">
+                      {(page - 1) * PAGE_SIZE + index + 1}
+                    </td>
                     <td>
                       <div className="proc-planner__product">
                         <strong>{item.productName}</strong>
@@ -645,10 +691,15 @@ export default function ProcurementPlannerView() {
           <p className="proc-planner__empty">Нет позиций</p>
         ) : (
           <ul className="proc-planner__cards">
-            {items.map((item) => (
+            {items.map((item, index) => (
               <li key={item.id} className="proc-planner__card">
                 <div className="proc-planner__card-top">
-                  <strong>{item.productName}</strong>
+                  <strong>
+                    <span className="proc-planner__row-num" aria-hidden="true">
+                      {(page - 1) * PAGE_SIZE + index + 1}.
+                    </span>{' '}
+                    {item.productName}
+                  </strong>
                   <span>{item.barcode}</span>
                 </div>
                 <WeeklySpark values={item.weeklySales} />
