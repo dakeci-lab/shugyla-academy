@@ -408,6 +408,26 @@ async function stagePlanExportAndPlannerUi() {
       JSON.stringify(['№', 'Товар', 'Штрихкод', 'Поставщик', 'Заказ'])
   )
 
+  assert('parse rejects numeric 0', planExport.parsePositiveFinalOrderQty({ finalOrderQty: 0 }) == null)
+  assert('parse rejects string 0', planExport.parsePositiveFinalOrderQty({ finalOrderQty: '0' }) == null)
+  assert('parse rejects null/undefined', planExport.parsePositiveFinalOrderQty({}) == null)
+  assert(
+    'parse rejects negative',
+    planExport.parsePositiveFinalOrderQty({ final_order_qty: -1 }) == null
+  )
+  assert(
+    'parse rejects non-numeric',
+    planExport.parsePositiveFinalOrderQty({ finalOrderQty: 'abc' }) == null
+  )
+  assert(
+    'parse keeps positive string qty',
+    planExport.parsePositiveFinalOrderQty({ final_order_qty: '2.5' }) === 2.5
+  )
+  assert(
+    'parse keeps positive number',
+    planExport.parsePositiveFinalOrderQty({ finalOrderQty: 7 }) === 7
+  )
+
   const mapped = planExport.mapPlanItemsForExport([
     {
       productName: 'Молоко',
@@ -419,20 +439,46 @@ async function stagePlanExportAndPlannerUi() {
       recommendedQty: 12,
     },
     {
+      productName: 'Ноль',
+      barcode: '000',
+      finalOrderQty: 0,
+    },
+    {
       product_name: 'Хлеб',
       barcode: 78001,
       umag_supplier_name: '',
-      final_order_qty: 3,
+      final_order_qty: '3',
+    },
+    {
+      productName: 'Строковый ноль',
+      finalOrderQty: '0',
+    },
+    {
+      productName: 'Отрицательный',
+      final_order_qty: -5,
+    },
+    {
+      productName: 'Мусор',
+      finalOrderQty: 'n/a',
     },
     {
       productName: 'Сок',
       barcode: null,
-      finalOrderQty: 0,
+      finalOrderQty: null,
+    },
+    {
+      productName: 'Дробь',
+      barcode: '99',
+      final_order_qty: 1.5,
     },
   ])
 
-  assert('export rows count', mapped.length === 3)
-  assert('numbering starts at 1', mapped[0]['№'] === 1 && mapped[2]['№'] === 3)
+  assert('export excludes zero/invalid rows', mapped.length === 3)
+  assert('dense numbering 1..N', mapped[0]['№'] === 1 && mapped[1]['№'] === 2 && mapped[2]['№'] === 3)
+  assert(
+    'exported product names only positive qty',
+    mapped.map((r) => r.Товар).join('|') === 'Молоко|Хлеб|Дробь'
+  )
   assert(
     'exact keys order row 0',
     JSON.stringify(Object.keys(mapped[0])) ===
@@ -440,9 +486,12 @@ async function stagePlanExportAndPlannerUi() {
   )
   assert('barcode kept as string with leading zero', mapped[0].Штрихкод === '012345')
   assert('numeric barcode coerced to string', mapped[1].Штрихкод === '78001')
-  assert('supplier fallback dash', mapped[1].Поставщик === '—' && mapped[2].Поставщик === '—')
+  assert('supplier fallback dash', mapped[1].Поставщик === '—')
   assert('supplier name preferred', mapped[0].Поставщик === 'Dairy Co')
-  assert('final order qty mapped', mapped[0].Заказ === 7 && mapped[1].Заказ === 3)
+  assert(
+    'final order qty mapped including positive string',
+    mapped[0].Заказ === 7 && mapped[1].Заказ === 3 && mapped[2].Заказ === 1.5
+  )
   assert(
     'no extra planning columns in mapped row',
     !('Категория' in mapped[0]) &&
@@ -454,6 +503,7 @@ async function stagePlanExportAndPlannerUi() {
   const aoa = planExport.planExportRowsToAoa(mapped)
   assert('aoa header exact', JSON.stringify(aoa[0]) === JSON.stringify(planExport.PLAN_EXPORT_COLUMNS))
   assert('aoa barcode string', typeof aoa[1][2] === 'string' && aoa[1][2] === '012345')
+  assert('aoa only positive rows', aoa.length === 4)
 
   assertFileContains(
     'src/utils/procurementPlanExport.js',

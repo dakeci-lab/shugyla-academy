@@ -43,25 +43,40 @@ function supplierNameOf(item) {
   return item?.umagSupplierName || item?.umag_supplier_name || '—'
 }
 
-function finalOrderQtyOf(item) {
-  const n = Number(item?.finalOrderQty ?? item?.final_order_qty ?? 0)
-  return Number.isFinite(n) ? n : 0
+/**
+ * Parse final order qty for export. Returns a finite number > 0, else null.
+ * Accepts camelCase / snake_case and numeric / string values.
+ */
+export function parsePositiveFinalOrderQty(item) {
+  const raw = item?.finalOrderQty ?? item?.final_order_qty
+  if (raw == null || raw === '') return null
+  const n = typeof raw === 'number' ? raw : Number(String(raw).trim())
+  if (!Number.isFinite(n) || n <= 0) return null
+  return n
 }
 
 /**
  * Map snapshot items (any page / full filter set) to the export row contract.
+ * Only rows with final order qty strictly greater than 0 are included;
+ * numbering is dense 1..N after filtering.
  * @param {Array<object>} items
  * @returns {Array<{ '№': number, 'Товар': string, 'Штрихкод': string, 'Поставщик': string, 'Заказ': number }>}
  */
 export function mapPlanItemsForExport(items) {
   const list = Array.isArray(items) ? items : []
-  return list.map((item, index) => ({
-    '№': index + 1,
-    Товар: productNameOf(item),
-    Штрихкод: barcodeOf(item),
-    Поставщик: supplierNameOf(item),
-    Заказ: finalOrderQtyOf(item),
-  }))
+  const rows = []
+  for (const item of list) {
+    const qty = parsePositiveFinalOrderQty(item)
+    if (qty == null) continue
+    rows.push({
+      '№': rows.length + 1,
+      Товар: productNameOf(item),
+      Штрихкод: barcodeOf(item),
+      Поставщик: supplierNameOf(item),
+      Заказ: qty,
+    })
+  }
+  return rows
 }
 
 /** Convert mapped rows to AOA with the fixed header order. */
