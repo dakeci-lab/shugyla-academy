@@ -491,24 +491,114 @@ async function stageDesktopWebOnly() {
   const desktop = await import(
     pathToFileURL(path.join(ROOT, 'src/platform/desktopWebOnly.js')).href
   )
+  const navSource = read('src/platform/platformNav.js')
 
-  assert('procurement id is web-only', webOnlyNav.WEB_ONLY_NAV_IDS.has('procurement'))
+  assert(
+    'procurement-group id is web-only',
+    webOnlyNav.WEB_ONLY_NAV_IDS.has('procurement-group')
+  )
+  assert(
+    'platform nav marks procurement-group webOnly',
+    /id:\s*'procurement-group'[\s\S]*?webOnly:\s*true/.test(navSource)
+  )
+  assert(
+    'group children cover all procurement modules',
+    /id:\s*'procurement-group'[\s\S]*?id:\s*'procurement'[\s\S]*?id:\s*'receiving'[\s\S]*?id:\s*'suppliers'[\s\S]*?id:\s*'settlements'[\s\S]*?id:\s*'supplier-payments'/.test(
+      navSource
+    )
+  )
+
+  const procurementGroupFixture = {
+    id: 'procurement-group',
+    label: 'Закупки',
+    webOnly: true,
+    children: [
+      { id: 'procurement', path: '/platform/procurement', label: 'Закуп' },
+      { id: 'receiving', path: '/platform/receiving', label: 'Приёмка' },
+      { id: 'suppliers', path: '/platform/suppliers', label: 'Поставщики' },
+      { id: 'settlements', path: '/platform/settlements', label: 'Взаиморасчёты' },
+      {
+        id: 'supplier-payments',
+        path: '/platform/supplier-payments',
+        label: 'Оплаты поставщикам',
+      },
+    ],
+  }
 
   const filtered = webOnlyNav.excludeWebOnlyNavItems([
     {
-      id: 'procurement-group',
-      label: 'Закупки',
-      children: [
-        { id: 'procurement', label: 'Закуп', webOnly: true },
-        { id: 'receiving', label: 'Приёмка' },
-        { id: 'suppliers', label: 'Поставщики' },
-      ],
+      id: 'home',
+      label: 'Главная',
+      path: '/platform',
+    },
+    procurementGroupFixture,
+    {
+      id: 'products-group',
+      label: 'Товары',
+      children: [{ id: 'price-tags', label: 'Ценники', webOnly: true }],
     },
   ])
-  assert('group remains after stripping procurement', filtered.length === 1)
+  assert('procurement-group fully removed from nav', !filtered.some((i) => i.id === 'procurement-group'))
+  assert('unrelated groups remain', filtered.some((i) => i.id === 'home'))
   assert(
-    'siblings kept',
-    filtered[0].children.map((c) => c.id).join(',') === 'receiving,suppliers'
+    'empty webOnly product group removed',
+    !filtered.some((i) => i.id === 'products-group')
+  )
+
+  const fixtureNav = [
+    procurementGroupFixture,
+    {
+      id: 'employees',
+      children: [
+        {
+          id: 'employees-payroll',
+          path: '/platform/employees/payroll',
+          webOnly: true,
+        },
+      ],
+    },
+  ]
+  const prefixes = webOnlyNav.collectWebOnlyPathPrefixes(fixtureNav)
+  assert(
+    'desktop helper delegates prefixes',
+    desktop.getDesktopWebOnlyPathPrefixes(fixtureNav).join('|') === prefixes.join('|')
+  )
+  const expectedPrefixes = [
+    '/platform/procurement',
+    '/platform/receiving',
+    '/platform/suppliers',
+    '/platform/settlements',
+    '/platform/supplier-payments',
+  ]
+  for (const prefix of expectedPrefixes) {
+    assert(`prefix includes ${prefix}`, prefixes.includes(prefix))
+  }
+  assert(
+    'payroll leaf prefix also collected',
+    prefixes.includes('/platform/employees/payroll')
+  )
+
+  const nestedRoutes = [
+    '/platform/procurement',
+    '/platform/procurement/analytics',
+    '/platform/procurement/analytics/order-1',
+    '/platform/procurement/order-1',
+    '/platform/receiving',
+    '/platform/receiving/doc-1',
+    '/platform/suppliers',
+    '/platform/suppliers/sup-1',
+    '/platform/settlements',
+    '/platform/supplier-payments',
+  ]
+  for (const route of nestedRoutes) {
+    assert(
+      `path guard matches ${route}`,
+      desktop.isDesktopWebOnlyPath(route, prefixes) === true
+    )
+  }
+  assert(
+    'unrelated path not guarded',
+    desktop.isDesktopWebOnlyPath('/platform/employees', prefixes) === false
   )
 
   assert(
@@ -522,6 +612,23 @@ async function stageDesktopWebOnly() {
   assert(
     'desktop browser allowed',
     desktop.isDesktopWebOnlyBlocked({ isDesktopViewport: true, pwaStandalone: false }) === false
+  )
+
+  const pwaFlags = { isDesktopViewport: true, pwaStandalone: true }
+  const desktopFlags = { isDesktopViewport: true, pwaStandalone: false }
+  for (const prefix of expectedPrefixes) {
+    assert(
+      `dashboard hides ${prefix} on PWA`,
+      desktop.shouldHideDesktopWebOnlyLink(prefix, pwaFlags, prefixes) === true
+    )
+    assert(
+      `dashboard keeps ${prefix} on desktop web`,
+      desktop.shouldHideDesktopWebOnlyLink(prefix, desktopFlags, prefixes) === false
+    )
+  }
+  assert(
+    'dashboard keeps employees on PWA',
+    desktop.shouldHideDesktopWebOnlyLink('/platform/employees', pwaFlags, prefixes) === false
   )
 }
 
@@ -573,15 +680,38 @@ function stageSourceContracts() {
     planner.includes('placeholder="Выберите поставщика"')
   )
   assert('select keeps optional status props', select.includes('renderOptionStatus = null'))
-  assert('nav marks procurement webOnly', /id:\s*'procurement'[\s\S]*webOnly:\s*true/.test(nav))
   assert(
-    'routes wrapped with DesktopWebOnlyRoute',
-    app.includes('DesktopWebOnlyRoute') &&
-      (app.match(/DesktopWebOnlyRoute/g) || []).length >= 4
+    'nav marks procurement-group webOnly',
+    /id:\s*'procurement-group'[\s\S]*webOnly:\s*true/.test(nav)
+  )
+  const guardedSections = [
+    'procurement',
+    'procurement/analytics',
+    'procurement/analytics/:id',
+    'procurement/:id',
+    'receiving',
+    'receiving/:id',
+    'suppliers',
+    'suppliers/:id',
+    'settlements',
+    'supplier-payments',
+  ]
+  for (const section of guardedSections) {
+    const routeBlock = new RegExp(
+      `path="${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[\\s\\S]{0,260}DesktopWebOnlyRoute`
+    )
+    assert(`App guards ${section}`, routeBlock.test(app))
+  }
+  assert(
+    'DesktopWebOnlyRoute wraps all procurement-group routes',
+    (app.match(/DesktopWebOnlyRoute/g) || []).length >= guardedSections.length
   )
   assert(
-    'dashboard hides procurement card on PWA/narrow',
-    dashboard.includes('hideProcurementCard') && dashboard.includes('Активные закупы')
+    'dashboard uses shared web-only link helper',
+    dashboard.includes('shouldHideDesktopWebOnlyLink') &&
+      dashboard.includes('Активные закупы') &&
+      dashboard.includes('/platform/suppliers') &&
+      dashboard.includes('/platform/receiving')
   )
   assert('verify script registered', pkg.includes('verify:procurement-desktop-ux'))
 }

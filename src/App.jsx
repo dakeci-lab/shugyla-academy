@@ -348,7 +348,9 @@ export default function App() {
                   path="receiving"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.RECEIVING}>
-                      <ReceivingPage />
+                      <DesktopWebOnlyRoute>
+                        <ReceivingPage />
+                      </DesktopWebOnlyRoute>
                     </PlatformRoute>
                   }
                 />
@@ -356,7 +358,9 @@ export default function App() {
                   path="receiving/:id"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.RECEIVING}>
-                      <ReceivingDetailPage />
+                      <DesktopWebOnlyRoute>
+                        <ReceivingDetailPage />
+                      </DesktopWebOnlyRoute>
                     </PlatformRoute>
                   }
                 />
@@ -364,7 +368,9 @@ export default function App() {
                   path="suppliers"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIERS}>
-                      <SuppliersPage />
+                      <DesktopWebOnlyRoute>
+                        <SuppliersPage />
+                      </DesktopWebOnlyRoute>
                     </PlatformRoute>
                   }
                 />
@@ -372,7 +378,9 @@ export default function App() {
                   path="suppliers/:id"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIERS}>
-                      <SupplierDetailPage />
+                      <DesktopWebOnlyRoute>
+                        <SupplierDetailPage />
+                      </DesktopWebOnlyRoute>
                     </PlatformRoute>
                   }
                 />
@@ -380,7 +388,9 @@ export default function App() {
                   path="settlements"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SETTLEMENTS}>
-                      <SettlementsPage />
+                      <DesktopWebOnlyRoute>
+                        <SettlementsPage />
+                      </DesktopWebOnlyRoute>
                     </PlatformRoute>
                   }
                 />
@@ -388,7 +398,9 @@ export default function App() {
                   path="supplier-payments"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIER_PAYMENTS}>
-                      <SupplierPaymentsPage />
+                      <DesktopWebOnlyRoute>
+                        <SupplierPaymentsPage />
+                      </DesktopWebOnlyRoute>
                     </PlatformRoute>
                   }
                 />

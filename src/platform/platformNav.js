@@ -85,6 +85,8 @@ export const PLATFORM_NAV = [
     routeKey: ROUTE_KEYS.PROCUREMENT_GROUP,
     title: 'Закупки',
     description: 'Закуп, приёмка, поставщики, взаиморасчёты и оплаты.',
+    /** Desktop browser only — entire group hidden in PWA / viewport ≤900px. */
+    webOnly: true,
     children: [
       {
         id: 'procurement',
@@ -93,7 +95,6 @@ export const PLATFORM_NAV = [
         routeKey: ROUTE_KEYS.PROCUREMENT,
         title: 'Закуп',
         description: 'Формирование заказов поставщикам на основе остатков и продаж.',
-        webOnly: true,
       },
       {
         id: 'receiving',

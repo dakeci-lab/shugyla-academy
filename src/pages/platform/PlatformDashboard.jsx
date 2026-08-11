@@ -9,8 +9,10 @@ import { usePlatformData } from '../../context/PlatformDataContext'
 import useMediaQuery from '../../hooks/useMediaQuery'
 import {
   DESKTOP_WEB_VIEWPORT_QUERY,
-  isDesktopWebOnlyBlocked,
+  getDesktopWebOnlyPathPrefixes,
+  shouldHideDesktopWebOnlyLink,
 } from '../../platform/desktopWebOnly'
+import { PLATFORM_NAV } from '../../platform/platformNav'
 import { isPwaStandalone } from '../../utils/pwaStandalone'
 import '../../components/admin/admin-shared.css'
 import './PlatformDashboard.css'
@@ -25,10 +27,11 @@ export default function PlatformDashboard() {
   const { ensureModules, version } = usePlatformData()
   const cloudMode = isCloudMode()
   const isDesktopViewport = useMediaQuery(DESKTOP_WEB_VIEWPORT_QUERY)
-  const hideProcurementCard = isDesktopWebOnlyBlocked({
+  const surfaceFlags = {
     isDesktopViewport,
     pwaStandalone: isPwaStandalone(),
-  })
+  }
+  const desktopWebOnlyPrefixes = getDesktopWebOnlyPathPrefixes(PLATFORM_NAV)
 
   useEffect(() => {
     if (!cloudMode) return
@@ -72,16 +75,14 @@ export default function PlatformDashboard() {
       to: '/platform/suppliers',
       variant: 'default',
     },
-    !hideProcurementCard
-      ? {
-          icon: '⇄',
-          value: '—',
-          label: 'Активные закупы',
-          hint: 'Откройте раздел закупа',
-          to: '/platform/procurement',
-          variant: 'warning',
-        }
-      : null,
+    {
+      icon: '⇄',
+      value: '—',
+      label: 'Активные закупы',
+      hint: 'Откройте раздел закупа',
+      to: '/platform/procurement',
+      variant: 'warning',
+    },
     {
       icon: '↧',
       value: '—',
@@ -99,7 +100,9 @@ export default function PlatformDashboard() {
       variant: cloudMode ? 'success' : 'warning',
       wide: true,
     },
-  ].filter(Boolean)
+  ].filter(
+    (card) => !shouldHideDesktopWebOnlyLink(card.to, surfaceFlags, desktopWebOnlyPrefixes)
+  )
 
   return (
     <div className="platform-dashboard">
