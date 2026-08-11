@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import {
@@ -30,6 +30,7 @@ import {
   RECEIVING_STARTED_MESSAGE,
 } from '../../../utils/purchaseData'
 import { isReceivingStarted } from '../../../utils/receivingData'
+import { toProcurementUserMessage } from '../../../utils/procurementErrors'
 import {
   exportPurchaseOrderPdf,
   exportPurchaseOrderXlsx,
@@ -45,14 +46,11 @@ import PurchaseItemForm, {
   formToPurchaseItem,
   validatePurchaseItemForm,
 } from '../../../components/procurement/PurchaseItemForm'
-import {
-  DownloadIcon,
-  FileTextIcon,
-  PencilIcon,
-  TrashIcon,
-} from '../../../components/icons/PlatformIcons'
+import { DownloadIcon, PencilIcon, TrashIcon } from '../../../components/icons/PlatformIcons'
 import '../../../components/admin/admin-shared.css'
 import './PurchaseDetailPage.css'
+
+const EXPORT_MENU_ID = 'purchase-detail-export-menu'
 
 /** Детальная страница закупа — /platform/procurement/:id */
 export default function PurchaseDetailPage() {
@@ -71,6 +69,8 @@ export default function PurchaseDetailPage() {
   const [loadingOrder, setLoadingOrder] = useState(true)
   const [loadedReceiving, setLoadedReceiving] = useState(null)
   const [returningToDraft, setReturningToDraft] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const exportMenuRef = useRef(null)
 
   const canView = canViewPurchases(user)
   const canEdit = canEditPurchase(user)
@@ -120,7 +120,7 @@ export default function PurchaseDetailPage() {
         if (!cancelled) setLoadedOrder(result)
       })
       .catch((err) => {
-        if (!cancelled) setError(err?.message || 'Не удалось загрузить заказ')
+        if (!cancelled) setError(toProcurementUserMessage(err, 'Не удалось загрузить заказ.'))
       })
       .finally(() => {
         if (!cancelled) setLoadingOrder(false)
@@ -130,6 +130,26 @@ export default function PurchaseDetailPage() {
       cancelled = true
     }
   }, [id, version])
+
+  // Меню скачивания закрывается по клику вне и по Escape.
+  useEffect(() => {
+    if (!exportMenuOpen) return undefined
+
+    function handlePointerDown(event) {
+      if (!exportMenuRef.current?.contains(event.target)) setExportMenuOpen(false)
+    }
+
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') setExportMenuOpen(false)
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [exportMenuOpen])
 
   // Состояние связанной приёмки: из кэша, иначе одна догрузка по документу.
   useEffect(() => {
@@ -239,7 +259,7 @@ export default function PurchaseDetailPage() {
       closeItemModal()
       await refresh()
     } catch (err) {
-      setItemFormError(err.message || 'Не удалось сохранить товар')
+      setItemFormError(toProcurementUserMessage(err, 'Не удалось сохранить товар.'))
     } finally {
       setItemSaving(false)
     }
@@ -254,19 +274,20 @@ export default function PurchaseDetailPage() {
       await refresh()
       setMessage('Товар удалён.')
     } catch (err) {
-      setError(err.message || 'Не удалось удалить товар')
+      setError(toProcurementUserMessage(err, 'Не удалось удалить товар.'))
     }
   }
 
   async function handleExportXlsx() {
     if (exporting) return
+    setExportMenuOpen(false)
     setExporting(true)
     setError('')
     try {
       await exportPurchaseOrderXlsx(order)
       setMessage('Excel-файл скачан.')
     } catch (err) {
-      setError(err.message || 'Не удалось экспортировать Excel')
+      setError(toProcurementUserMessage(err, 'Не удалось выгрузить Excel.'))
     } finally {
       setExporting(false)
     }
@@ -274,13 +295,14 @@ export default function PurchaseDetailPage() {
 
   async function handleExportPdf() {
     if (exporting) return
+    setExportMenuOpen(false)
     setExporting(true)
     setError('')
     try {
       await exportPurchaseOrderPdf(order)
       setMessage('PDF-файл скачан.')
     } catch (err) {
-      setError(err.message || 'Не удалось экспортировать PDF')
+      setError(toProcurementUserMessage(err, 'Не удалось выгрузить PDF.'))
     } finally {
       setExporting(false)
     }
@@ -299,7 +321,7 @@ export default function PurchaseDetailPage() {
       await refresh()
       setMessage('Закуп передан в приёмку.')
     } catch (err) {
-      setError(err.message || 'Не удалось передать в приёмку')
+      setError(toProcurementUserMessage(err, 'Не удалось передать в приёмку.'))
     }
   }
 
@@ -320,7 +342,7 @@ export default function PurchaseDetailPage() {
       await refresh()
       setMessage('Заказ возвращён в черновик, ожидаемая приёмка снята.')
     } catch (err) {
-      setError(err.message || 'Не удалось вернуть заказ в черновик')
+      setError(toProcurementUserMessage(err, 'Не удалось вернуть заказ в черновик.'))
     } finally {
       setReturningToDraft(false)
     }
@@ -344,7 +366,7 @@ export default function PurchaseDetailPage() {
       await refresh()
       setMessage(draft ? 'Черновик удалён — он в списке отменённых.' : 'Заказ отменён, приёмка снята.')
     } catch (err) {
-      setError(err.message || 'Не удалось отменить заказ')
+      setError(toProcurementUserMessage(err, 'Не удалось отменить заказ.'))
     }
   }
 
@@ -362,26 +384,49 @@ export default function PurchaseDetailPage() {
           <PurchaseStatusBadge status={order.status} />
         </div>
         <div className="purchase-detail__actions">
-          <button
-            type="button"
-            className="btn btn--outline purchase-detail__icon-btn"
-            onClick={() => void handleExportXlsx()}
-            disabled={exporting || displayItems.length === 0}
-            aria-label="Экспорт Excel"
-            title="Экспорт Excel"
-          >
-            <DownloadIcon size={18} />
-          </button>
-          <button
-            type="button"
-            className="btn btn--outline purchase-detail__icon-btn"
-            onClick={() => void handleExportPdf()}
-            disabled={exporting || displayItems.length === 0}
-            aria-label="Экспорт PDF"
-            title="Экспорт PDF"
-          >
-            <FileTextIcon size={18} />
-          </button>
+          <div className="purchase-detail__export" ref={exportMenuRef}>
+            <button
+              type="button"
+              className="btn btn--outline purchase-detail__icon-btn"
+              onClick={() => setExportMenuOpen((open) => !open)}
+              disabled={exporting || displayItems.length === 0}
+              aria-label="Скачать заказ"
+              title="Скачать заказ"
+              aria-haspopup="menu"
+              aria-expanded={exportMenuOpen}
+              aria-controls={exportMenuOpen ? EXPORT_MENU_ID : undefined}
+              aria-busy={exporting || undefined}
+            >
+              <DownloadIcon size={18} />
+            </button>
+            {exportMenuOpen ? (
+              <div
+                id={EXPORT_MENU_ID}
+                className="purchase-detail__export-menu"
+                role="menu"
+                aria-label="Формат файла"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="purchase-detail__export-item"
+                  disabled={exporting}
+                  onClick={() => void handleExportXlsx()}
+                >
+                  Excel
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="purchase-detail__export-item"
+                  disabled={exporting}
+                  onClick={() => void handleExportPdf()}
+                >
+                  PDF
+                </button>
+              </div>
+            ) : null}
+          </div>
           {canReturnToDraft && (
             <button
               type="button"

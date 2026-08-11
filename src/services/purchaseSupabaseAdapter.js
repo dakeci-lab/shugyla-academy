@@ -3,10 +3,8 @@ import {
   normalizePurchaseOrder,
   normalizePurchaseItem,
   calcLineTotal,
-  isPurchaseStatusReturnableToDraft,
   PURCHASE_STATUS,
   PROCUREMENT_WORKFLOW_MODE,
-  RECEIVING_STARTED_MESSAGE,
 } from '../utils/purchaseData'
 
 import {
@@ -15,6 +13,7 @@ import {
   fetchAllRowsByIdChunks,
 } from '../utils/chunkArray'
 import { throwUserError, toUserErrorMessage } from '../utils/userErrorMessage'
+import { toProcurementUserMessage } from '../utils/procurementErrors'
 
 function throwIfError(result, context, fallback = 'Не удалось сохранить закупку.') {
   return throwUserError(result, context, fallback)
@@ -530,57 +529,54 @@ export async function deletePurchaseOrderItemCloud(orderId, itemId) {
 }
 
 /**
- * Отмена закупа.
- * Связанный документ приёмки тоже отменяется — иначе склад продолжает ждать
- * поставку по отменённому заказу.
+ * Смена состояния заказа одной серверной транзакцией.
+ *
+ * Раньше это были две отдельные записи с клиента — сначала документ приёмки,
+ * потом заказ. Между ними заказ и приёмка могли разойтись, а проверка «склад
+ * начал приёмку» читалась отдельно от записи. Теперь блокировка строк,
+ * повторная проверка и обе записи выполняются внутри одной RPC.
+ */
+async function callOrderStateRpc(fnName, orderId, context) {
+  ensureClient()
+  if (!orderId) throw new Error('Заказ не найден')
+
+  const { data, error } = await supabase.rpc(fnName, { p_order_id: orderId })
+  if (error) {
+    console.error(`[${context}]`, error)
+    throw new Error(toProcurementUserMessage(error, 'Не удалось изменить заказ.'))
+  }
+
+  // Возвращаем перечитанный заказ: RPC отдаёт итоговое состояние, а UI работает
+  // с доменной моделью.
+  const updated = await fetchOrderById(orderId)
+  if (!updated) throw new Error('Заказ не найден')
+  return { order: updated, result: data ?? null }
+}
+
+/**
+ * Отмена заказа вместе со связанными документами приёмки.
+ * Без этого склад продолжал ждать поставку по отменённому заказу.
  */
 export async function cancelPurchaseOrderCloud(orderId) {
-  ensureClient()
-
-  const { cancelReceivingByPurchaseIdCloud } = await import('./receivingSupabaseAdapter')
-  await cancelReceivingByPurchaseIdCloud(orderId)
-
-  return updatePurchaseOrderCloud(orderId, { status: PURCHASE_STATUS.CANCELLED })
+  const { order } = await callOrderStateRpc(
+    'procurement_cancel_order',
+    orderId,
+    'Отмена заказа закупа'
+  )
+  return order
 }
 
 /**
  * Возврат заказа в черновик, чтобы закупщик мог поправить количества.
- * Разрешён только пока склад не начал приёмку. Ожидаемая приёмка снимается:
- * документ отменяется, а новый создастся при повторной передаче в приёмку.
+ * Сервер сам откажет, если склад уже начал приёмку.
  */
 export async function returnPurchaseOrderToDraftCloud(orderId) {
-  ensureClient()
-
-  const order = await fetchOrderById(orderId)
-  if (!order) throw new Error(toUserErrorMessage('Закуп не найден', 'Закуп не найден'))
-  if (order.status === PURCHASE_STATUS.DRAFT) return order
-
-  if (!isPurchaseStatusReturnableToDraft(order.status)) {
-    throw new Error(
-      toUserErrorMessage(
-        `Нельзя вернуть в черновик заказ в статусе ${order.status}`,
-        'Этот заказ уже нельзя вернуть в черновик.'
-      )
-    )
-  }
-
-  const { fetchReceivingLockStateByPurchaseIdCloud, cancelReceivingByPurchaseIdCloud } =
-    await import('./receivingSupabaseAdapter')
-
-  // Повторная проверка на свежих данных: между рендером кнопки и кликом
-  // склад мог начать приёмку.
-  const lock = await fetchReceivingLockStateByPurchaseIdCloud(orderId)
-  if (lock.receivingStarted) {
-    throw new Error(toUserErrorMessage(RECEIVING_STARTED_MESSAGE, RECEIVING_STARTED_MESSAGE))
-  }
-
-  await cancelReceivingByPurchaseIdCloud(orderId)
-
-  return updatePurchaseOrderCloud(orderId, {
-    status: PURCHASE_STATUS.DRAFT,
-    transferredToReceiving: false,
-    receivingDocumentId: null,
-  })
+  const { order } = await callOrderStateRpc(
+    'procurement_return_order_to_draft',
+    orderId,
+    'Возврат заказа в черновик'
+  )
+  return order
 }
 
 export function getCloudPurchasesBundleFromOrders(orders) {

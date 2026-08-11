@@ -30,6 +30,8 @@ const PURCHASE_LOCAL = 'src/services/purchaseLocalAdapter.js'
 const PURCHASE_SERVICE = 'src/services/purchaseDataService.js'
 const RECEIVING_CLOUD = 'src/services/receivingSupabaseAdapter.js'
 const RECEIVING_LOCAL = 'src/services/receivingLocalAdapter.js'
+const PLANNER_VIEW = 'src/components/procurement/ProcurementPlannerView.jsx'
+const RPC_MIGRATION = 'supabase/migrations/20260812041000_procurement_order_state_rpc.sql'
 
 let checks = 0
 
@@ -155,23 +157,29 @@ function stageServices() {
   )
 
   // The defect found alongside: cancelling an order left the warehouse waiting.
-  assert(
-    'cloud cancel also cancels the receiving document',
-    /export async function cancelPurchaseOrderCloud[\s\S]{0,600}cancelReceivingByPurchaseIdCloud\(orderId\)/.test(cloud)
-  )
+  // In cloud mode that guarantee now lives in the RPC (see stage 2b).
   assert(
     'local cancel also cancels the receiving document',
     /export async function cancelPurchaseOrder\(orderId\)[\s\S]{0,300}cancelReceivingByPurchaseIdLocal\(orderId\)/.test(local)
   )
 
+  // Atomicity: the cloud path must not write two tables from the client.
   assert(
-    'return re-checks receiving state before writing',
-    /returnPurchaseOrderToDraftCloud[\s\S]{0,1400}fetchReceivingLockStateByPurchaseIdCloud\(orderId\)/.test(cloud),
-    'the warehouse may start receiving between render and click'
+    'cloud transitions go through a single RPC call',
+    /supabase\.rpc\(fnName, \{ p_order_id: orderId \}\)/.test(cloud)
   )
   assert(
-    'return clears the receiving link on the order',
-    /returnPurchaseOrderToDraftCloud[\s\S]{0,1800}transferredToReceiving: false[\s\S]{0,200}receivingDocumentId: null/.test(cloud)
+    'cancel calls procurement_cancel_order',
+    /cancelPurchaseOrderCloud[\s\S]{0,400}'procurement_cancel_order'/.test(cloud)
+  )
+  assert(
+    'return to draft calls procurement_return_order_to_draft',
+    /returnPurchaseOrderToDraftCloud[\s\S]{0,400}'procurement_return_order_to_draft'/.test(cloud)
+  )
+  assert(
+    'the client no longer stitches receiving and order writes together',
+    !/cancelReceivingByPurchaseIdCloud\(orderId\)/.test(cloud),
+    'that sequence could half-apply'
   )
 
   // Soft, not destructive: no delete on the cancel path.
@@ -188,6 +196,98 @@ function stageServices() {
     'both adapters use the shared isReceivingStarted definition',
     receivingCloud.includes('isReceivingStarted') && receivingLocal.includes('isReceivingStarted'),
     'no duplicated ad-hoc status arithmetic'
+  )
+
+  console.log('')
+}
+
+// ---------------------------------------------------------------------------
+// Stage 2b — the RPC migration
+// ---------------------------------------------------------------------------
+
+function stageRpcMigration() {
+  console.log('Stage 2b: Transactional RPC migration')
+
+  const sql = read(RPC_MIGRATION)
+
+  for (const fn of ['procurement_return_order_to_draft', 'procurement_cancel_order']) {
+    const body = sql.slice(
+      sql.indexOf(`create or replace function public.${fn}(`),
+      sql.indexOf(`comment on function public.${fn}(`)
+    )
+    assert(`${fn} is defined`, body.length > 0)
+    assert(`${fn} is security definer`, /security definer/.test(body))
+    assert(`${fn} pins search_path`, /set search_path = ''/.test(body))
+    assert(`${fn} locks the order row`, /from public\.purchase_orders[\s\S]{0,120}for update/.test(body))
+    assert(
+      `${fn} locks live receiving documents`,
+      /from public\.receiving_documents as d[\s\S]{0,200}for update/.test(body)
+    )
+    const receivingLockAt = body.search(/from public\.receiving_documents as d[\s\S]{0,200}for update/)
+    assert(
+      `${fn} re-checks receiving state only after locking`,
+      receivingLockAt >= 0 && receivingLockAt < body.indexOf('into v_receiving_started'),
+      'reading the guard before the lock leaves a race'
+    )
+    assert(
+      `${fn} never touches procurement_snapshots`,
+      !/procurement_snapshot/.test(body)
+    )
+    assert(
+      `${fn} cancels the receiving documents of the order`,
+      /update public\.receiving_documents[\s\S]{0,200}set status = 'cancelled'/.test(body),
+      'otherwise the warehouse keeps waiting'
+    )
+    assert(
+      `${fn} writes the order row too`,
+      /update public\.purchase_orders[\s\S]{0,300}where id = p_order_id/.test(body),
+      'both writes must live in the same transaction'
+    )
+    assert(
+      `${fn} requires procurement.edit`,
+      /perform auth_private\.require_procurement_edit\(\)/.test(body)
+    )
+    assert(
+      `${fn} speaks Russian to the user`,
+      /raise exception '[А-Яа-яЁё]/.test(body),
+      'raw English must never reach the buyer'
+    )
+    assert(
+      `${fn} owner is reset to postgres`,
+      new RegExp(`alter function public\\.${fn}\\(uuid\\) owner to postgres`).test(sql)
+    )
+    assert(
+      `${fn} execute is revoked from public and anon`,
+      new RegExp(`revoke all on function public\\.${fn}\\(uuid\\) from public`).test(sql) &&
+        new RegExp(`revoke all on function public\\.${fn}\\(uuid\\) from anon`).test(sql)
+    )
+    assert(
+      `${fn} execute is granted only to authenticated and service_role`,
+      new RegExp(`grant execute on function public\\.${fn}\\(uuid\\) to authenticated`).test(sql) &&
+        new RegExp(`grant execute on function public\\.${fn}\\(uuid\\) to service_role`).test(sql)
+    )
+  }
+
+  assert(
+    'the permission guard checks an authenticated user',
+    /require_procurement_edit[\s\S]{0,500}auth\.uid\(\) is null/.test(sql)
+  )
+  assert(
+    'the permission guard checks procurement.edit',
+    /current_user_has_permission\('procurement\.edit'\)/.test(sql)
+  )
+  // Comments legitimately mention the table; only real statements matter.
+  const statements = sql
+    .split('\n')
+    .filter((line) => !line.trim().startsWith('--'))
+    .join('\n')
+  assert(
+    'the migration grants no new privilege on procurement_snapshots',
+    !/grant[^;]*procurement_snapshots/i.test(statements)
+  )
+  assert(
+    'the migration touches no snapshot table at all',
+    !/procurement_snapshot/i.test(statements)
   )
 
   console.log('')
@@ -232,12 +332,96 @@ function stageDetailPage() {
       /canCancelOrder =[\s\S]{0,400}status !== PURCHASE_STATUS\.DRAFT/.test(src)
   )
 
-  // Export stays two one-click icons — merging them was rejected.
-  assert('Excel export icon kept', src.includes('aria-label="Экспорт Excel"'))
-  assert('PDF export icon kept', src.includes('aria-label="Экспорт PDF"'))
+  // One download button with a compact menu — owner's requirement.
+  assert('single download button', src.includes('aria-label="Скачать заказ"'))
   assert(
-    'no format-choice dropdown was introduced',
-    !/Скачать[\s\S]{0,80}(выбор|формат)/i.test(src)
+    'the two separate export icons are gone',
+    !src.includes('aria-label="Экспорт Excel"') && !src.includes('aria-label="Экспорт PDF"')
+  )
+  assert('download button opens a menu', /aria-haspopup="menu"/.test(src))
+  assert(
+    'menu offers Excel and PDF',
+    /role="menuitem"[\s\S]{0,200}Excel/.test(src) && /role="menuitem"[\s\S]{0,200}PDF/.test(src)
+  )
+  assert(
+    'menu closes on outside click and Escape',
+    /mousedown/.test(src) && /event\.key === 'Escape'/.test(src)
+  )
+  assert('menu closes once an export starts', /setExportMenuOpen\(false\)/.test(src))
+
+  // No raw error text reaches the buyer.
+  assert(
+    'errors are mapped to Russian',
+    !/err\.message \|\|/.test(src) && src.includes('toProcurementUserMessage')
+  )
+
+  console.log('')
+}
+
+// ---------------------------------------------------------------------------
+// Stage 3b — planner: quantity needs a selected supplier
+// ---------------------------------------------------------------------------
+
+async function stagePlanner() {
+  console.log('Stage 3b: Planning quantity gate')
+
+  const ux = await load('src/utils/procurementPlannerUx.js')
+  const { canEditItemQuantity, QUANTITY_REQUIRES_SUPPLIER_HINT } = ux
+
+  const supplierA = 'aaaaaaaa-0000-4000-8000-000000000001'
+  const supplierB = 'bbbbbbbb-0000-4000-8000-000000000002'
+  const item = { id: 'i1', platform_supplier_id: supplierA }
+  const filterOptions = { suppliers: [{ id: supplierA }, { id: supplierB }] }
+
+  assert(
+    'no supplier selected → quantity is not editable',
+    !canEditItemQuantity(item, { filterOptions, selectedSupplierId: '' })
+  )
+  assert(
+    'supplier selected → its own rows are editable',
+    canEditItemQuantity(item, { filterOptions, selectedSupplierId: supplierA })
+  )
+  assert(
+    'rows of another supplier stay locked',
+    !canEditItemQuantity(item, { filterOptions, selectedSupplierId: supplierB })
+  )
+  assert(
+    'a row already in a generated order stays locked',
+    !canEditItemQuantity(
+      { ...item, generated_purchase_order_id: 'po-1' },
+      { filterOptions, selectedSupplierId: supplierA }
+    )
+  )
+  assert(
+    'a supplier whose order is created is locked',
+    !canEditItemQuantity(item, {
+      filterOptions: { suppliers: [{ id: supplierA, generatedOrderId: 'po-1' }] },
+      selectedSupplierId: supplierA,
+    })
+  )
+  assert('missing item is never editable', !canEditItemQuantity(null, { selectedSupplierId: supplierA }))
+  assert('hint text is Russian', /[А-Яа-яЁё]/.test(QUANTITY_REQUIRES_SUPPLIER_HINT))
+
+  const view = read(PLANNER_VIEW)
+  assert(
+    'the input is replaced by a dash when not editable',
+    /!locked && !canEditQuantity\(item\)/.test(view) && /proc-planner__readonly-qty/.test(view)
+  )
+  assert(
+    'the save handler guards against a stale blur event',
+    /async function handleFinalChange[\s\S]{0,300}if \(!canEditQuantity\(item\)\)[\s\S]{0,300}return/.test(view)
+  )
+  assert(
+    'reset is guarded too',
+    /async function handleReset[\s\S]{0,120}if \(!canEditQuantity\(item\)\) return/.test(view)
+  )
+  assert(
+    'the gate consults the selected supplier filter',
+    /selectedSupplierId: filters\.platformSupplierId/.test(view)
+  )
+  assert(
+    'planner errors are mapped to Russian',
+    !/err\.message \|\|/.test(view) && view.includes('toProcurementUserMessage')
   )
 
   console.log('')
@@ -280,7 +464,9 @@ async function main() {
   console.log('=== Purchase order actions verification ===\n')
   await stageRules()
   stageServices()
+  stageRpcMigration()
   stageDetailPage()
+  await stagePlanner()
   stageListPage()
   console.log(`=== All ${checks} checks passed ===\n`)
 }
