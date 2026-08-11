@@ -8,7 +8,7 @@ import './CareersPublicLayout.css'
  * Public careers shell for /apply and /vacancies.
  * Never shows platform nav, profile, or session identity.
  */
-export default function CareersPublicLayout() {
+export default function CareersPublicLayout({ children }) {
   const { pathname } = useLocation()
   const { t } = useLanguage()
 
@@ -23,7 +23,7 @@ export default function CareersPublicLayout() {
   return (
     <div className="careers-public-layout">
       <CareersHeader />
-      <Outlet />
+      {children || <Outlet />}
     </div>
   )
 }

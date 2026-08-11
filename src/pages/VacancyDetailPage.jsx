@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { fetchPublishedVacanciesForApply } from '../services/publicApplyVacanciesService'
-import { getPublicVacancyDisplay } from '../utils/careersVacancyDisplay'
+import {
+  getPublicVacancyDisplay,
+  getPublicVacancyFacts,
+} from '../utils/careersVacancyDisplay'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
 import { useLanguage } from '../context/LanguageContext'
+import { getCareersHomePath } from '../router/hostSurface'
 import './Apply.css'
 import './ApplyHub.css'
 
 /** Публичная детальная страница вакансии — /vacancies/:slug */
 export default function VacancyDetailPage() {
   const { slug } = useParams()
-  const { t } = useLanguage()
+  const location = useLocation()
+  const { t, lang } = useLanguage()
   const [vacancy, setVacancy] = useState(null)
   const [loadState, setLoadState] = useState('loading')
   const [error, setError] = useState('')
@@ -39,6 +44,8 @@ export default function VacancyDetailPage() {
   }, [load])
 
   const display = getPublicVacancyDisplay(vacancy || {})
+  const facts = getPublicVacancyFacts(vacancy || {}, t, lang)
+  const homePath = `${getCareersHomePath()}${location.search || ''}`
 
   return (
     <div className="apply-page">
@@ -61,7 +68,7 @@ export default function VacancyDetailPage() {
         {loadState === 'loaded' && !vacancy ? (
           <div className="apply-page__closed">
             <h1>{t.careersClosedTitle}</h1>
-            <Link to="/apply" className="btn btn--primary">
+            <Link to={homePath} className="btn btn--primary">
               {t.careersClosedCta}
             </Link>
           </div>
@@ -70,7 +77,7 @@ export default function VacancyDetailPage() {
         {loadState === 'loaded' && vacancy ? (
           <article>
             <p className="apply-page__brand-sub">
-              <Link to="/vacancies">{t.careersBackToVacancies}</Link>
+              <Link to={homePath}>{t.careersBackToVacancies}</Link>
             </p>
             <h1 className="apply-page__vacancy-title">{display.title}</h1>
             {display.positionName ? (
@@ -79,7 +86,23 @@ export default function VacancyDetailPage() {
             {display.description ? (
               <p className="apply-page__vacancy-desc">{display.description}</p>
             ) : null}
-            <Link to={`/apply/${vacancy.slug}`} className="btn btn--primary btn--lg">
+            {facts.length ? (
+              <section className="vacancy-detail__facts" aria-labelledby="vacancy-facts-title">
+                <h2 id="vacancy-facts-title">{t.vacancyFactsTitle}</h2>
+                <dl>
+                  {facts.map((fact) => (
+                    <div key={fact.key}>
+                      <dt>{fact.label}</dt>
+                      <dd>{fact.value}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </section>
+            ) : null}
+            <Link
+              to={`/apply/${encodeURIComponent(vacancy.slug)}${location.search || ''}`}
+              className="btn btn--primary btn--lg"
+            >
               {t.careersApplyCta}
             </Link>
           </article>

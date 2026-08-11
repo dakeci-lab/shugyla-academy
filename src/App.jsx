@@ -18,9 +18,16 @@ import VacanciesPage from './pages/VacanciesPage'
 import VacancyDetailPage from './pages/VacancyDetailPage'
 import ApplyPage from './pages/Apply'
 import ApplyHubPage from './pages/ApplyHub'
+import CorporateHome from './pages/CorporateHome'
 import CareersPublicLayout from './layouts/CareersPublicLayout'
 import AuthLoadingScreen from './components/AuthLoadingScreen'
 import AppLaunchGate from './components/AppLaunchGate'
+import { getHostSurface, HOST_SURFACE } from './router/hostSurface'
+import {
+  CareersExternalRedirect,
+  CareersHomeRedirect,
+  PlatformExternalRedirect,
+} from './router/SurfaceRedirect'
 
 /**
  * Internal platform pages — lazy so public /apply does not download HR UI.
@@ -103,6 +110,20 @@ function PlatformSuspense({ children }) {
 }
 
 export default function App() {
+  const surface = getHostSurface()
+  const careersEnabled =
+    surface === HOST_SURFACE.CAREERS || surface === HOST_SURFACE.COMBINED
+  const internalEnabled =
+    surface === HOST_SURFACE.PLATFORM || surface === HOST_SURFACE.COMBINED
+
+  function internalElement(element) {
+    if (internalEnabled) return element
+    if (surface === HOST_SURFACE.CAREERS) {
+      return <CareersHomeRedirect />
+    }
+    return <PlatformExternalRedirect />
+  }
+
   return (
     <LanguageProvider>
       <SessionProvider>
@@ -111,22 +132,72 @@ export default function App() {
             <AppLaunchGate />
             <Routes>
               {/* Публичные маршруты — без PlatformData / Permission / NotificationInbox */}
-              <Route path="/" element={<Navigate to={LOGIN_PATH} replace />} />
+              <Route
+                path="/"
+                element={
+                  surface === HOST_SURFACE.CAREERS ? (
+                    <CareersPublicLayout>
+                      <ApplyHubPage />
+                    </CareersPublicLayout>
+                  ) : surface === HOST_SURFACE.CORPORATE ? (
+                    <CorporateHome />
+                  ) : (
+                    <Navigate to={LOGIN_PATH} replace />
+                  )
+                }
+              />
               <Route element={<CareersPublicLayout />}>
-                <Route path="/vacancies" element={<VacanciesPage />} />
-                <Route path="/vacancies/:slug" element={<VacancyDetailPage />} />
-                {/* Exact /apply before /apply/:slug so hub is never treated as a slug */}
-                <Route path="/apply" element={<ApplyHubPage />} />
-                <Route path="/apply/:slug" element={<ApplyPage />} />
+                <Route
+                  path="/vacancies"
+                  element={
+                    careersEnabled ? (
+                      <VacanciesPage />
+                    ) : (
+                      <CareersExternalRedirect />
+                    )
+                  }
+                />
+                <Route
+                  path="/vacancies/:slug"
+                  element={
+                    careersEnabled ? (
+                      <VacancyDetailPage />
+                    ) : (
+                      <CareersExternalRedirect route="vacancy" />
+                    )
+                  }
+                />
+                <Route
+                  path="/apply"
+                  element={
+                    surface === HOST_SURFACE.COMBINED ? (
+                      <ApplyHubPage />
+                    ) : surface === HOST_SURFACE.CAREERS ? (
+                      <CareersHomeRedirect />
+                    ) : (
+                      <CareersExternalRedirect />
+                    )
+                  }
+                />
+                <Route
+                  path="/apply/:slug"
+                  element={
+                    careersEnabled ? (
+                      <ApplyPage />
+                    ) : (
+                      <CareersExternalRedirect route="apply" />
+                    )
+                  }
+                />
               </Route>
-              <Route path="/login" element={<Login />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
-              <Route path="/reset-password" element={<ResetPassword />} />
+              <Route path="/login" element={internalElement(<Login />)} />
+              <Route path="/forgot-password" element={internalElement(<ForgotPassword />)} />
+              <Route path="/reset-password" element={internalElement(<ResetPassword />)} />
 
               {/* Shugyla Platform — providers mounted once for all /platform/* */}
               <Route
                 path="/platform"
-                element={
+                element={internalElement(
                   <ProtectedRoute>
                     <InternalPlatformProviders>
                       <PlatformSuspense>
@@ -134,7 +205,7 @@ export default function App() {
                       </PlatformSuspense>
                     </InternalPlatformProviders>
                   </ProtectedRoute>
-                }
+                )}
               >
                 <Route
                   index
@@ -430,7 +501,18 @@ export default function App() {
               <Route path="/standards" element={<Navigate to="/platform/standards" replace />} />
               <Route path="/standards/:slug" element={<LegacyStandardRedirect />} />
 
-              <Route path="*" element={<Navigate to={LOGIN_PATH} replace />} />
+              <Route
+                path="*"
+                element={
+                  surface === HOST_SURFACE.CAREERS ? (
+                    <CareersHomeRedirect />
+                  ) : surface === HOST_SURFACE.CORPORATE ? (
+                    <CorporateHome />
+                  ) : (
+                    <Navigate to={LOGIN_PATH} replace />
+                  )
+                }
+              />
             </Routes>
           </ToastProvider>
         </BrowserRouter>

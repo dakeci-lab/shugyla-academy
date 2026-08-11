@@ -28,7 +28,10 @@
         }
       })()
     </script>
-    <meta name="description" content="Внутренняя платформа Shugyla Market — обучение, товары, закуп и операции магазина" />
+    <meta
+      name="description"
+      content="Внутренняя платформа Shugyla Market — обучение, товары, закуп и операции магазина"
+    />
     <meta name="theme-color" content="#2a9d5c" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -38,6 +41,36 @@
     <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
     <link rel="icon" type="image/png" sizes="192x192" href="%BASE_URL%pwa-icons/icon-192.png" />
     <link rel="apple-touch-icon" href="%BASE_URL%pwa-icons/apple-touch-icon.png" />
+    <script>
+      (function () {
+        var host = String(window.location.hostname || '').toLowerCase()
+        var isCorporate = host === 'shugyla-market.kz' || host === 'www.shugyla-market.kz'
+        var isCareers = host === 'jobs.shugyla-market.kz'
+
+        if (!isCorporate && !isCareers) return
+
+        var description = document.querySelector('meta[name="description"]')
+        var manifest = document.querySelector('link[rel="manifest"]')
+        var mobileCapable = document.querySelector('meta[name="mobile-web-app-capable"]')
+        var appleCapable = document.querySelector('meta[name="apple-mobile-web-app-capable"]')
+        var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]')
+
+        document.title = isCareers ? 'Работа в Shugyla Market' : 'Shugyla Market'
+        if (description) {
+          description.setAttribute(
+            'content',
+            isCareers
+              ? 'Актуальные вакансии Shugyla Market и простая форма отклика.'
+              : 'Официальный сайт Shugyla Market.'
+          )
+        }
+
+        manifest?.remove()
+        mobileCapable?.remove()
+        appleCapable?.remove()
+        appleTitle?.remove()
+      })()
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link

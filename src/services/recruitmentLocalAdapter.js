@@ -49,6 +49,8 @@ export function seedMockRecruitmentIfEmpty() {
 
   const cashierId = genId()
   const sellerId = genId()
+  const cashierPositionId = genId()
+  const sellerPositionId = genId()
 
   const vacancies = [
     {
@@ -56,18 +58,40 @@ export function seedMockRecruitmentIfEmpty() {
       title: 'Кассир',
       slug: 'kassir',
       description: 'Приглашаем кассира в сеть Shugyla Market. Опыт приветствуется.',
+      city: 'Алматы',
+      store_name: 'Shugyla Market',
+      store_address: 'Учебный адрес для локального режима',
+      salary_from: 180000,
+      salary_to: 230000,
+      schedule: '2/2',
+      employment_type: 'full_time',
+      experience_requirement: 'preferred',
       role: 'cashier',
+      position_id: cashierPositionId,
+      position_name_snapshot: 'Кассир',
       status: 'published',
       passing_score: 80,
+      application_form_version: 1,
     },
     {
       id: sellerId,
       title: 'Продавец',
       slug: 'prodavets',
       description: 'Требуется продавец торгового зала с аккуратной выкладкой и сервисом.',
+      city: 'Астана',
+      store_name: 'Shugyla Market',
+      store_address: 'Учебный адрес для локального режима',
+      salary_from: 170000,
+      salary_note: 'Итоговая сумма зависит от графика',
+      schedule: '5/2',
+      employment_type: 'full_time',
+      experience_requirement: 'not_required',
       role: 'seller',
+      position_id: sellerPositionId,
+      position_name_snapshot: 'Продавец',
       status: 'published',
       passing_score: 80,
+      application_form_version: 1,
     },
   ]
 
@@ -129,12 +153,22 @@ function saveVacancies(vacancies) {
       title: v.title,
       slug: v.slug,
       description: v.description,
+      city: v.city || null,
+      store_name: v.storeName || null,
+      store_address: v.storeAddress || null,
+      salary_from: v.salaryFrom ?? null,
+      salary_to: v.salaryTo ?? null,
+      salary_note: v.salaryNote || null,
+      schedule: v.schedule || null,
+      employment_type: v.employmentType || null,
+      experience_requirement: v.experienceRequirement || null,
       role: v.role,
       employee_role: v.employeeRole ?? v.role,
       position_id: v.positionId ?? null,
       position_name_snapshot: v.positionNameSnapshot ?? null,
       status: v.status,
       passing_score: v.passingScore,
+      application_form_version: v.applicationFormVersion || 1,
       created_by: v.createdBy,
     }))
   )
@@ -152,6 +186,10 @@ function saveQuestions(questions) {
       scores: q.scores,
       required: q.required,
       sort_order: q.sortOrder,
+      is_active: q.isActive !== false,
+      field_binding: q.fieldBinding || null,
+      help_text: q.helpText || null,
+      placeholder: q.placeholder || null,
     }))
   )
 }
@@ -337,6 +375,15 @@ export async function duplicateVacancy(sourceVacancyId) {
     employeeRole: source.employeeRole,
     positionId: source.positionId,
     positionNameSnapshot: source.positionNameSnapshot,
+    city: source.city,
+    storeName: source.storeName,
+    storeAddress: source.storeAddress,
+    salaryFrom: source.salaryFrom,
+    salaryTo: source.salaryTo,
+    salaryNote: source.salaryNote,
+    schedule: source.schedule,
+    employmentType: source.employmentType,
+    experienceRequirement: source.experienceRequirement,
     passingScore: source.passingScore,
     status: VACANCY_STATUS.DRAFT,
     slug,
@@ -359,6 +406,10 @@ export async function duplicateVacancy(sourceVacancyId) {
         scores: [...q.scores],
         required: q.required,
         sortOrder: index,
+        isActive: q.isActive,
+        fieldBinding: q.fieldBinding,
+        helpText: q.helpText,
+        placeholder: q.placeholder,
       })
     )
   })

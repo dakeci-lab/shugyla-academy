@@ -1,4 +1,4 @@
-name: Build web.shugyla-market.kz production artifact
+name: Build Shugyla production surfaces artifact
 
 on:
   push:
@@ -31,7 +31,9 @@ jobs:
         run: npm ci
 
       - name: Verify dual-domain deployment
-        run: npm run verify:domain-deployment
+        run: |
+          npm run verify:domain-deployment
+          npm run verify:recruitment-vacancy-public-fields
 
       - name: Resolve VAPID public key
         id: vapid
@@ -56,6 +58,7 @@ jobs:
         run: npm run build
         env:
           APP_BASE_PATH: /
+          VITE_CAREERS_ORIGIN: https://jobs.shugyla-market.kz
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_WEB_PUSH_VAPID_PUBLIC_KEY: ${{ steps.vapid.outputs.public_key }}

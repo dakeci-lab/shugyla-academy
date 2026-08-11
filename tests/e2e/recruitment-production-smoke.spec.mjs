@@ -10,7 +10,13 @@ import { attachConsoleGuard, HR_SOFT_PROBE_ALLOW } from './helpers/consoleGuard.
 import { attachPublicNetworkGuard } from './helpers/publicNetworkGuard.mjs'
 import { createAnonClient } from './helpers/env.mjs'
 import { countGlobalE2eLeftovers, loadState } from './helpers/fixture.mjs'
-import { appUrl, expectNoHorizontalScroll, loginAsHr } from './helpers/ui.mjs'
+import {
+  appUrl,
+  careersUrl,
+  corporateUrl,
+  expectNoHorizontalScroll,
+  loginAsHr,
+} from './helpers/ui.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ARTIFACT_DIR = path.resolve(__dirname, '../../test-results/e2e-recruitment/artifacts')
@@ -65,10 +71,27 @@ test('1. Hub RPC has no E2E leftovers', async () => {
   expect(rows.map((v) => v.slug).sort()).toEqual(expect.arrayContaining(['kassir', 'prodavets']))
 })
 
-test('2. Anonymous /apply careers branding + network', async ({ page }) => {
+test('2. Root, web and jobs surfaces route canonically', async ({ page }) => {
+  await page.goto(corporateUrl('/'), { waitUntil: 'domcontentloaded' })
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/Shugyla Market/i)
+  await expect(page.getByRole('link', { name: /Работа у нас|Біздегі жұмыс/i })).toHaveAttribute(
+    'href',
+    /^https:\/\/jobs\.shugyla-market\.kz\/?$/
+  )
+
+  await page.goto(appUrl('/apply?source=store_qr'), { waitUntil: 'domcontentloaded' })
+  await page.waitForURL((url) => url.hostname === 'jobs.shugyla-market.kz')
+  expect(new URL(page.url()).pathname).toBe('/')
+  expect(new URL(page.url()).searchParams.get('source')).toBe('store_qr')
+
+  await page.goto(careersUrl('/login'), { waitUntil: 'domcontentloaded' })
+  await page.waitForURL((url) => url.hostname === 'jobs.shugyla-market.kz' && url.pathname === '/')
+})
+
+test('3. Anonymous jobs home careers branding + network', async ({ page }) => {
   const guard = attachConsoleGuard(page)
   const net = attachPublicNetworkGuard(page, { mode: 'hub' })
-  await page.goto(appUrl('/apply'), { waitUntil: 'domcontentloaded' })
+  await page.goto(careersUrl('/'), { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('heading', { level: 1 })).toContainText(/Shugyla Market|команды|командасының/i)
   await expect(page.getByText('Кассир')).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText('Продавец')).toBeVisible()
@@ -79,10 +102,10 @@ test('2. Anonymous /apply careers branding + network', async ({ page }) => {
   await page.screenshot({ path: path.join(ARTIFACT_DIR, 'smoke-apply-desktop.png'), fullPage: true })
 })
 
-test('3. Anonymous /apply/kassir form shell', async ({ page }) => {
+test('4. Anonymous /apply/kassir form shell', async ({ page }) => {
   const guard = attachConsoleGuard(page)
   const net = attachPublicNetworkGuard(page, { mode: 'form' })
-  await page.goto(appUrl('/apply/kassir'), { waitUntil: 'domcontentloaded' })
+  await page.goto(careersUrl('/apply/kassir'), { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('button', { name: /Отправить анкету|Сауалнаманы жіберу/i })).toBeVisible({
     timeout: 30_000,
   })
@@ -94,10 +117,10 @@ test('3. Anonymous /apply/kassir form shell', async ({ page }) => {
   await page.screenshot({ path: path.join(ARTIFACT_DIR, 'smoke-apply-kassir-desktop.png'), fullPage: true })
 })
 
-test('4. Authenticated HR still sees public careers shell on /apply', async ({ page }) => {
+test('5. Careers origin stays isolated after platform login', async ({ page }) => {
   const guard = attachConsoleGuard(page, { allow: HR_SOFT_PROBE_ALLOW })
   await loginAsHr(page)
-  await page.goto(appUrl('/apply'), { waitUntil: 'domcontentloaded' })
+  await page.goto(careersUrl('/'), { waitUntil: 'domcontentloaded' })
   await expect(page.getByText('Кассир')).toBeVisible({ timeout: 30_000 })
   await assertPublicShell(page, 'auth-hub')
   const state = loadState()
@@ -112,7 +135,7 @@ test('4. Authenticated HR still sees public careers shell on /apply', async ({ p
   })
 })
 
-test('5. Internal platform header still works', async ({ page }) => {
+test('6. Internal platform header still works', async ({ page }) => {
   const guard = attachConsoleGuard(page, { allow: HR_SOFT_PROBE_ALLOW })
   await loginAsHr(page)
   await expect(page).toHaveURL(/\/platform\/hr\/vacancies/)
@@ -122,7 +145,7 @@ test('5. Internal platform header still works', async ({ page }) => {
   guard.assertClean('internal-hr')
 })
 
-test('6. Mobile public viewports', async ({ browser }) => {
+test('7. Mobile public viewports', async ({ browser }) => {
   for (const vp of [
     { name: '320', width: 320, height: 640 },
     { name: '390', width: 390, height: 844 },
@@ -132,7 +155,7 @@ test('6. Mobile public viewports', async ({ browser }) => {
     const context = await browser.newContext({ viewport: { width: vp.width, height: vp.height } })
     const page = await context.newPage()
     const guard = attachConsoleGuard(page)
-    await page.goto(appUrl('/apply'), { waitUntil: 'domcontentloaded' })
+    await page.goto(careersUrl('/'), { waitUntil: 'domcontentloaded' })
     await expect(page.getByText('Кассир')).toBeVisible({ timeout: 30_000 })
     await assertPublicShell(page, `mobile-hub-${vp.name}`)
     await expectNoHorizontalScroll(page)
@@ -140,7 +163,7 @@ test('6. Mobile public viewports', async ({ browser }) => {
       path: path.join(ARTIFACT_DIR, `smoke-apply-${vp.name}.png`),
       fullPage: true,
     })
-    await page.goto(appUrl('/apply/prodavets'), { waitUntil: 'domcontentloaded' })
+    await page.goto(careersUrl('/apply/prodavets'), { waitUntil: 'domcontentloaded' })
     await expect(page.getByRole('button', { name: /Отправить анкету|Сауалнаманы жіберу/i })).toBeVisible({
       timeout: 30_000,
     })

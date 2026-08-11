@@ -57,6 +57,41 @@
   overflow-wrap: anywhere;
 }
 
+.vacancy-detail__facts {
+  margin: 1.25rem 0;
+  padding: 1rem;
+  border: 1px solid #dce5e0;
+  border-radius: 14px;
+  background: #f8faf9;
+}
+
+.vacancy-detail__facts h2 {
+  margin: 0 0 0.8rem;
+  font-size: 1.05rem;
+}
+
+.vacancy-detail__facts dl {
+  display: grid;
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.vacancy-detail__facts dl > div {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 0.75fr) minmax(0, 1.25fr);
+  gap: 0.75rem;
+}
+
+.vacancy-detail__facts dt {
+  color: #5b6b63;
+}
+
+.vacancy-detail__facts dd {
+  margin: 0;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
 .apply-form__section {
   margin-bottom: 1.25rem;
   padding-top: 1rem;
@@ -135,6 +170,23 @@ textarea.apply-form__control {
   width: 100%;
   min-height: 48px;
   margin-top: 0.5rem;
+}
+
+.careers-consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin: 0.5rem 0 0;
+  padding: 0.85rem;
+  border: 1px solid #cfd8d3;
+  border-radius: 12px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.careers-consent input {
+  margin-top: 0.2rem;
+  flex: 0 0 auto;
 }
 
 .apply-page__success,

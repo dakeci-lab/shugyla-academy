@@ -27,16 +27,24 @@ import ConfirmDialog from '../ConfirmDialog'
 import StatusBadge from '../StatusBadge'
 import IconActionButton from '../IconActionButton'
 import { PencilIcon, TrashIcon, LinkIcon, CopyIcon } from '../../icons/PlatformIcons'
-import { copyApplyLink, EMPTY_VACANCY, STATUS_BADGE } from './recruitmentAdminShared'
+import {
+  copyApplyLink,
+  EMPTY_VACANCY,
+  EMPLOYMENT_TYPE_OPTIONS,
+  EXPERIENCE_REQUIREMENT_OPTIONS,
+  STATUS_BADGE,
+} from './recruitmentAdminShared'
 import ApplyHubQrModal from '../ApplyHubQrModal'
 import VacancyQuestionEditor from '../VacancyQuestionEditor'
 import { getApplyHubUrl } from '../../../utils/recruitmentData'
+import { useLanguage } from '../../../context/LanguageContext'
 import '../admin-shared.css'
 import '../IconActionButton.css'
 import '../RecruitmentSection.css'
 
 /** Управление вакансиями (HR) */
 export default function VacanciesSection() {
+  const { t } = useLanguage()
   const { version, refresh } = useAdminRefresh()
   const [showVacancyForm, setShowVacancyForm] = useState(false)
   const [editVacancyId, setEditVacancyId] = useState(null)
@@ -115,6 +123,15 @@ export default function VacanciesSection() {
     setVacancyForm({
       title: vacancy.title,
       description: vacancy.description || '',
+      city: vacancy.city || '',
+      storeName: vacancy.storeName || '',
+      storeAddress: vacancy.storeAddress || '',
+      salaryFrom: vacancy.salaryFrom ?? '',
+      salaryTo: vacancy.salaryTo ?? '',
+      salaryNote: vacancy.salaryNote || '',
+      schedule: vacancy.schedule || '',
+      employmentType: vacancy.employmentType || '',
+      experienceRequirement: vacancy.experienceRequirement || '',
       positionId: vacancy.positionId || '',
       role: vacancy.role || '',
       employeeRole: vacancy.employeeRole || vacancy.role || '',
@@ -150,6 +167,20 @@ export default function VacanciesSection() {
       setVacancyError('Выберите активную должность из справочника')
       return
     }
+    const salaryFrom =
+      vacancyForm.salaryFrom === '' ? null : Number(vacancyForm.salaryFrom)
+    const salaryTo = vacancyForm.salaryTo === '' ? null : Number(vacancyForm.salaryTo)
+    if (
+      (salaryFrom != null && (!Number.isInteger(salaryFrom) || salaryFrom < 0)) ||
+      (salaryTo != null && (!Number.isInteger(salaryTo) || salaryTo < 0))
+    ) {
+      setVacancyError(t.hrVacancySalaryInvalid)
+      return
+    }
+    if (salaryFrom != null && salaryTo != null && salaryTo < salaryFrom) {
+      setVacancyError(t.hrVacancySalaryRangeInvalid)
+      return
+    }
     if (
       editVacancyId &&
       vacancyForm.status === 'published' &&
@@ -164,6 +195,15 @@ export default function VacanciesSection() {
       const payload = {
         title: vacancyForm.title.trim(),
         description: vacancyForm.description.trim(),
+        city: vacancyForm.city.trim(),
+        storeName: vacancyForm.storeName.trim(),
+        storeAddress: vacancyForm.storeAddress.trim(),
+        salaryFrom,
+        salaryTo,
+        salaryNote: vacancyForm.salaryNote.trim(),
+        schedule: vacancyForm.schedule.trim(),
+        employmentType: vacancyForm.employmentType || null,
+        experienceRequirement: vacancyForm.experienceRequirement || null,
         positionId: vacancyForm.positionId,
         positionNameSnapshot: position?.name || null,
         // Preserve legacy RBAC fields; do not invent from position name.
@@ -207,6 +247,15 @@ export default function VacanciesSection() {
         setVacancyForm({
           title: created.title,
           description: created.description || '',
+          city: created.city || '',
+          storeName: created.storeName || '',
+          storeAddress: created.storeAddress || '',
+          salaryFrom: created.salaryFrom ?? '',
+          salaryTo: created.salaryTo ?? '',
+          salaryNote: created.salaryNote || '',
+          schedule: created.schedule || '',
+          employmentType: created.employmentType || '',
+          experienceRequirement: created.experienceRequirement || '',
           positionId: created.positionId || '',
           role: created.role || '',
           employeeRole: created.employeeRole || created.role || '',
@@ -257,10 +306,10 @@ export default function VacanciesSection() {
             className="btn btn--outline btn--sm"
             onClick={() => {
               navigator.clipboard?.writeText(getApplyHubUrl()).catch(() => {})
-              toastSuccess('Ссылка /apply скопирована')
+              toastSuccess('Ссылка на вакансии скопирована')
             }}
           >
-            Копировать /apply
+            Копировать ссылку на вакансии
           </button>
           <button type="button" className="btn btn--primary btn--sm" onClick={openCreateVacancy}>
             + Создать вакансию
@@ -485,6 +534,140 @@ export default function VacanciesSection() {
                 onChange={(e) => setVacancyForm({ ...vacancyForm, description: e.target.value })}
               />
             </label>
+
+            <div className="admin-form__row">
+              <label className="admin-form__label">
+                {t.vacancyCity}
+                <input
+                  className="admin-form__input"
+                  value={vacancyForm.city}
+                  maxLength={120}
+                  onChange={(e) => setVacancyForm({ ...vacancyForm, city: e.target.value })}
+                />
+              </label>
+
+              <label className="admin-form__label">
+                {t.vacancyStore}
+                <input
+                  className="admin-form__input"
+                  value={vacancyForm.storeName}
+                  maxLength={160}
+                  onChange={(e) =>
+                    setVacancyForm({ ...vacancyForm, storeName: e.target.value })
+                  }
+                />
+              </label>
+            </div>
+
+            <label className="admin-form__label">
+              {t.vacancyAddress}
+              <input
+                className="admin-form__input"
+                value={vacancyForm.storeAddress}
+                maxLength={500}
+                onChange={(e) =>
+                  setVacancyForm({ ...vacancyForm, storeAddress: e.target.value })
+                }
+              />
+            </label>
+
+            <div className="admin-form__row">
+              <label className="admin-form__label">
+                {t.hrVacancySalaryFrom}
+                <input
+                  className="admin-form__input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputMode="numeric"
+                  value={vacancyForm.salaryFrom}
+                  onChange={(e) =>
+                    setVacancyForm({ ...vacancyForm, salaryFrom: e.target.value })
+                  }
+                />
+              </label>
+
+              <label className="admin-form__label">
+                {t.hrVacancySalaryTo}
+                <input
+                  className="admin-form__input"
+                  type="number"
+                  min="0"
+                  step="1"
+                  inputMode="numeric"
+                  value={vacancyForm.salaryTo}
+                  onChange={(e) =>
+                    setVacancyForm({ ...vacancyForm, salaryTo: e.target.value })
+                  }
+                />
+              </label>
+            </div>
+
+            <label className="admin-form__label">
+              {t.hrVacancySalaryNote}
+              <input
+                className="admin-form__input"
+                value={vacancyForm.salaryNote}
+                maxLength={300}
+                onChange={(e) =>
+                  setVacancyForm({ ...vacancyForm, salaryNote: e.target.value })
+                }
+              />
+            </label>
+
+            <label className="admin-form__label">
+              {t.vacancySchedule}
+              <input
+                className="admin-form__input"
+                value={vacancyForm.schedule}
+                maxLength={300}
+                placeholder={t.hrVacancySchedulePlaceholder}
+                onChange={(e) =>
+                  setVacancyForm({ ...vacancyForm, schedule: e.target.value })
+                }
+              />
+            </label>
+
+            <div className="admin-form__row">
+              <label className="admin-form__label">
+                {t.vacancyEmployment}
+                <select
+                  className="admin-form__select"
+                  value={vacancyForm.employmentType}
+                  onChange={(e) =>
+                    setVacancyForm({ ...vacancyForm, employmentType: e.target.value })
+                  }
+                >
+                  <option value="">{t.vacancyNotSpecified}</option>
+                  {EMPLOYMENT_TYPE_OPTIONS.map((value) => (
+                    <option key={value} value={value}>
+                      {t.employmentTypes[value]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="admin-form__label">
+                {t.vacancyExperience}
+                <select
+                  className="admin-form__select"
+                  value={vacancyForm.experienceRequirement}
+                  onChange={(e) =>
+                    setVacancyForm({
+                      ...vacancyForm,
+                      experienceRequirement: e.target.value,
+                    })
+                  }
+                >
+                  <option value="">{t.vacancyNotSpecified}</option>
+                  {EXPERIENCE_REQUIREMENT_OPTIONS.map((value) => (
+                    <option key={value} value={value}>
+                      {t.experienceRequirements[value]}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
 
             <label className="admin-form__label">
               Статус

@@ -7,11 +7,14 @@ import { createClient } from '@supabase/supabase-js'
 
 export const PRODUCTION_REF = 'cxadzerxndlscwvdaymk'
 export const DEFAULT_BASE_URL = 'https://web.shugyla-market.kz'
+export const DEFAULT_CAREERS_BASE_URL = 'https://jobs.shugyla-market.kz'
+export const DEFAULT_CORPORATE_BASE_URL = 'https://shugyla-market.kz'
 export const PRODUCTION_APP_HOSTS = new Set([
   'dakeci-lab.github.io',
   'shugyla-market.kz',
   'www.shugyla-market.kz',
   'web.shugyla-market.kz',
+  'jobs.shugyla-market.kz',
 ])
 
 export function isProductionAppUrl(value) {
@@ -34,6 +37,18 @@ function mask(value) {
 
 export function getBaseUrl() {
   return (process.env.E2E_BASE_URL || DEFAULT_BASE_URL).replace(/\/$/, '')
+}
+
+export function getCareersBaseUrl() {
+  const fallback =
+    (process.env.E2E_SUITE || 'mutating') === 'smoke'
+      ? DEFAULT_CAREERS_BASE_URL
+      : getBaseUrl()
+  return (process.env.E2E_CAREERS_BASE_URL || fallback).replace(/\/$/, '')
+}
+
+export function getCorporateBaseUrl() {
+  return (process.env.E2E_ROOT_BASE_URL || DEFAULT_CORPORATE_BASE_URL).replace(/\/$/, '')
 }
 
 function isLocalUrl(url) {

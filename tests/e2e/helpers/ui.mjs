@@ -1,7 +1,7 @@
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect } from '@playwright/test'
-import { getBaseUrl } from './env.mjs'
+import { getBaseUrl, getCareersBaseUrl, getCorporateBaseUrl } from './env.mjs'
 import { loadState } from './fixture.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -11,6 +11,19 @@ export function appUrl(pathname = '/') {
   const base = getBaseUrl()
   const clean = pathname.startsWith('/') ? pathname : `/${pathname}`
   return `${base}${clean}`
+}
+
+function surfaceUrl(base, pathname = '/') {
+  const clean = pathname.startsWith('/') ? pathname : `/${pathname}`
+  return `${base}${clean}`
+}
+
+export function careersUrl(pathname = '/') {
+  return surfaceUrl(getCareersBaseUrl(), pathname)
+}
+
+export function corporateUrl(pathname = '/') {
+  return surfaceUrl(getCorporateBaseUrl(), pathname)
 }
 
 export async function loginAsHr(page, credentials = {}) {

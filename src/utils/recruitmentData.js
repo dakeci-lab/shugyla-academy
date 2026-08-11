@@ -7,7 +7,7 @@ import {
 import { getLocalRecruitmentBundle } from '../services/recruitmentLocalAdapter'
 import { ROLES, normalizeRoleId } from '../data/roles'
 import { slugify } from './standardsData'
-import { getAppUrl } from '../router/basename'
+import { getCareersUrl } from '../router/hostSurface'
 import { getCandidateAnswerDisplayRows } from './applicationForm'
 
 export const VACANCY_STATUS = {
@@ -141,27 +141,21 @@ export function generateUniqueVacancySlug(title, vacancies, excludeId = null) {
   return `${base}-${counter}`
 }
 
-/** Absolute public URL for the store apply hub (`/apply`). */
+/** Canonical public URL for the careers hub (jobs `/`, local `/apply`). */
 export function getApplyHubUrl(search = '') {
-  const query = String(search || '')
-  const suffix = !query
-    ? ''
-    : query.startsWith('?')
-      ? query
-      : `?${query.replace(/^\?/, '')}`
-  return `${getAppUrl('apply')}${suffix}`
+  return getCareersUrl('', search)
 }
 
 /** Absolute public URL for a vacancy apply form (`/apply/:slug`). */
 export function getApplyUrl(slug, search = '') {
   const safeSlug = String(slug || '').replace(/^\/+|\/+$/g, '')
-  const query = String(search || '')
-  const suffix = !query
-    ? ''
-    : query.startsWith('?')
-      ? query
-      : `?${query.replace(/^\?/, '')}`
-  return `${getAppUrl(`apply/${safeSlug}`)}${suffix}`
+  return getCareersUrl(`apply/${encodeURIComponent(safeSlug)}`, search)
+}
+
+/** Absolute canonical public URL for vacancy details. */
+export function getVacancyUrl(slug, search = '') {
+  const safeSlug = String(slug || '').replace(/^\/+|\/+$/g, '')
+  return getCareersUrl(`vacancies/${encodeURIComponent(safeSlug)}`, search)
 }
 
 export function normalizeVacancy(raw) {
@@ -184,12 +178,30 @@ export function normalizeVacancy(raw) {
     (embedded
       ? Boolean(embedded.archived_at) || embedded.is_active === false
       : null)
+  const salaryFromRaw = raw.salaryFrom ?? raw.salary_from ?? null
+  const salaryToRaw = raw.salaryTo ?? raw.salary_to ?? null
 
   return {
     id: raw.id,
     title: raw.title || '',
     slug: raw.slug || '',
     description: raw.description || '',
+    city: raw.city || '',
+    storeName: raw.storeName ?? raw.store_name ?? '',
+    storeAddress: raw.storeAddress ?? raw.store_address ?? '',
+    salaryFrom:
+      salaryFromRaw === null || salaryFromRaw === '' || !Number.isFinite(Number(salaryFromRaw))
+        ? null
+        : Number(salaryFromRaw),
+    salaryTo:
+      salaryToRaw === null || salaryToRaw === '' || !Number.isFinite(Number(salaryToRaw))
+        ? null
+        : Number(salaryToRaw),
+    salaryNote: raw.salaryNote ?? raw.salary_note ?? '',
+    schedule: raw.schedule || '',
+    employmentType: raw.employmentType ?? raw.employment_type ?? null,
+    experienceRequirement:
+      raw.experienceRequirement ?? raw.experience_requirement ?? null,
     role: raw.role,
     employeeRole: raw.employeeRole ?? raw.employee_role ?? raw.role,
     positionId,

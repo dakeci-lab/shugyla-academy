@@ -32,7 +32,9 @@ jobs:
         run: npm ci
 
       - name: Verify dual-domain deployment
-        run: npm run verify:domain-deployment
+        run: |
+          npm run verify:domain-deployment
+          npm run verify:recruitment-vacancy-public-fields
 
       - name: Resolve VAPID public key
         id: vapid

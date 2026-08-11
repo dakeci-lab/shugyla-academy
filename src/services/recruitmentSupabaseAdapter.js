@@ -18,12 +18,32 @@ async function throwIfError(result, context) {
   return result.data
 }
 
+function nullableText(value) {
+  const normalized = String(value ?? '').trim()
+  return normalized || null
+}
+
+function nullableInteger(value) {
+  if (value === '' || value == null) return null
+  const normalized = Number(value)
+  return Number.isInteger(normalized) ? normalized : null
+}
+
 function rowToVacancy(row) {
   return normalizeVacancy({
     id: row.id,
     title: row.title,
     slug: row.slug,
     description: row.description,
+    city: row.city,
+    storeName: row.store_name,
+    storeAddress: row.store_address,
+    salaryFrom: row.salary_from,
+    salaryTo: row.salary_to,
+    salaryNote: row.salary_note,
+    schedule: row.schedule,
+    employmentType: row.employment_type,
+    experienceRequirement: row.experience_requirement,
     role: row.role,
     employeeRole: row.employee_role,
     positionId: row.position_id,
@@ -156,6 +176,15 @@ export async function createVacancy(data) {
     title: data.title,
     slug,
     description: data.description || '',
+    city: nullableText(data.city),
+    store_name: nullableText(data.storeName),
+    store_address: nullableText(data.storeAddress),
+    salary_from: nullableInteger(data.salaryFrom),
+    salary_to: nullableInteger(data.salaryTo),
+    salary_note: nullableText(data.salaryNote),
+    schedule: nullableText(data.schedule),
+    employment_type: nullableText(data.employmentType),
+    experience_requirement: nullableText(data.experienceRequirement),
     role: data.role ?? null,
     employee_role: data.employeeRole ?? data.role ?? null,
     position_id: data.positionId,
@@ -177,6 +206,33 @@ export async function updateVacancy(vacancyId, updates) {
   if (updates.title != null) patch.title = updates.title
   if (updates.slug != null) patch.slug = updates.slug
   if (updates.description != null) patch.description = updates.description
+  if (Object.prototype.hasOwnProperty.call(updates, 'city')) {
+    patch.city = nullableText(updates.city)
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'storeName')) {
+    patch.store_name = nullableText(updates.storeName)
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'storeAddress')) {
+    patch.store_address = nullableText(updates.storeAddress)
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'salaryFrom')) {
+    patch.salary_from = nullableInteger(updates.salaryFrom)
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'salaryTo')) {
+    patch.salary_to = nullableInteger(updates.salaryTo)
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'salaryNote')) {
+    patch.salary_note = nullableText(updates.salaryNote)
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'schedule')) {
+    patch.schedule = nullableText(updates.schedule)
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'employmentType')) {
+    patch.employment_type = nullableText(updates.employmentType)
+  }
+  if (Object.prototype.hasOwnProperty.call(updates, 'experienceRequirement')) {
+    patch.experience_requirement = nullableText(updates.experienceRequirement)
+  }
   if (updates.role != null) patch.role = updates.role
   if (updates.employeeRole != null) patch.employee_role = updates.employeeRole
   if (updates.positionId != null) {

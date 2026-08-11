@@ -26,6 +26,15 @@ export async function fetchPublishedVacanciesForApply() {
         slug: v.slug,
         description: v.description || null,
         positionName: v.positionName || v.positionNameSnapshot || v.title,
+        city: v.city || null,
+        storeName: v.storeName || null,
+        storeAddress: v.storeAddress || null,
+        salaryFrom: v.salaryFrom ?? null,
+        salaryTo: v.salaryTo ?? null,
+        salaryNote: v.salaryNote || null,
+        schedule: v.schedule || null,
+        employmentType: v.employmentType || null,
+        experienceRequirement: v.experienceRequirement || null,
         createdAt: v.createdAt || null,
       }))
       .sort((a, b) => {
@@ -47,6 +56,15 @@ export async function fetchPublishedVacanciesForApply() {
     slug: row.slug || '',
     description: row.description || null,
     positionName: row.position_name || row.title || '',
+    city: row.city || null,
+    storeName: row.store_name || null,
+    storeAddress: row.store_address || null,
+    salaryFrom: row.salary_from ?? null,
+    salaryTo: row.salary_to ?? null,
+    salaryNote: row.salary_note || null,
+    schedule: row.schedule || null,
+    employmentType: row.employment_type || null,
+    experienceRequirement: row.experience_requirement || null,
     createdAt: row.created_at || null,
   }))
 }

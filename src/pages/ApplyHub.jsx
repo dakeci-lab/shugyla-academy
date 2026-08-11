@@ -1,17 +1,21 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { fetchPublishedVacanciesForApply } from '../services/publicApplyVacanciesService'
-import { getPublicVacancyDisplay } from '../utils/careersVacancyDisplay'
+import {
+  getPublicVacancyDisplay,
+  getPublicVacancyFacts,
+} from '../utils/careersVacancyDisplay'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
 import { useLanguage } from '../context/LanguageContext'
 import './Apply.css'
 import './ApplyHub.css'
 
-/** Единая публичная страница трудоустройства — /apply */
+/** Единственный публичный список вакансий — jobs `/`, local `/apply`. */
 export default function ApplyHubPage() {
   const location = useLocation()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const [vacancies, setVacancies] = useState([])
+  const [selectedCity, setSelectedCity] = useState('')
   const [loadState, setLoadState] = useState('loading')
   const [error, setError] = useState('')
 
@@ -33,10 +37,27 @@ export default function ApplyHubPage() {
     load()
   }, [load])
 
-  function applyPathForSlug(slug) {
-    const search = location.search || ''
-    return `/apply/${encodeURIComponent(slug)}${search}`
-  }
+  const cities = useMemo(() => {
+    const byKey = new Map()
+    vacancies.forEach((vacancy) => {
+      const city = String(vacancy.city || '').trim()
+      if (!city) return
+      const key = city.toLocaleLowerCase(lang === 'kz' ? 'kk-KZ' : 'ru-RU')
+      if (!byKey.has(key)) byKey.set(key, city)
+    })
+    return [...byKey.values()].sort((a, b) =>
+      a.localeCompare(b, lang === 'kz' ? 'kk' : 'ru')
+    )
+  }, [lang, vacancies])
+
+  const visibleVacancies = useMemo(() => {
+    if (!selectedCity) return vacancies
+    return vacancies.filter(
+      (vacancy) =>
+        String(vacancy.city || '').trim().toLocaleLowerCase() ===
+        selectedCity.toLocaleLowerCase()
+    )
+  }, [selectedCity, vacancies])
 
   return (
     <div className="apply-hub-page">
@@ -53,6 +74,24 @@ export default function ApplyHubPage() {
             {t.careersOpenTitle}
           </h2>
           <p className="apply-hub-page__section-lead">{t.careersOpenLead}</p>
+
+          {cities.length > 1 ? (
+            <label className="apply-hub-page__filter">
+              <span>{t.careersCityFilter}</span>
+              <select
+                className="apply-hub-page__filter-control"
+                value={selectedCity}
+                onChange={(event) => setSelectedCity(event.target.value)}
+              >
+                <option value="">{t.careersAllCities}</option>
+                {cities.map((city) => (
+                  <option key={city} value={city}>
+                    {city}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           {loadState === 'loading' && (
             <div className="apply-hub-page__state" aria-busy="true" aria-live="polite">
@@ -79,10 +118,11 @@ export default function ApplyHubPage() {
             </div>
           )}
 
-          {loadState === 'loaded' && vacancies.length > 0 && (
+          {loadState === 'loaded' && visibleVacancies.length > 0 && (
             <ul className="apply-hub-page__list">
-              {vacancies.map((vacancy) => {
+              {visibleVacancies.map((vacancy) => {
                 const display = getPublicVacancyDisplay(vacancy)
+                const facts = getPublicVacancyFacts(vacancy, t, lang, { compact: true })
                 return (
                   <li key={vacancy.id} className="apply-hub-card">
                     <div className="apply-hub-card__body">
@@ -90,15 +130,22 @@ export default function ApplyHubPage() {
                       {display.positionName ? (
                         <p className="apply-hub-card__position">{display.positionName}</p>
                       ) : null}
-                      {display.description ? (
-                        <p className="apply-hub-card__desc">{display.description}</p>
+                      {facts.length ? (
+                        <dl className="apply-hub-card__facts">
+                          {facts.map((fact) => (
+                            <div key={fact.key} className="apply-hub-card__fact">
+                              <dt>{fact.label}</dt>
+                              <dd>{fact.value}</dd>
+                            </div>
+                          ))}
+                        </dl>
                       ) : null}
                     </div>
                     <Link
                       className="btn btn--primary apply-hub-card__cta"
-                      to={applyPathForSlug(vacancy.slug)}
+                      to={`/vacancies/${encodeURIComponent(vacancy.slug)}${location.search || ''}`}
                     >
-                      {t.careersApplyCta}
+                      {t.careersDetailsCta}
                     </Link>
                   </li>
                 )

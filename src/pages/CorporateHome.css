@@ -1,0 +1,80 @@
+.corporate-home {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 4.5rem 1rem 2rem;
+  position: relative;
+}
+
+.corporate-home__language {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+}
+
+.corporate-home__card {
+  width: min(100%, 34rem);
+  padding: 2rem 1.5rem;
+  border: 1px solid rgba(20, 32, 26, 0.1);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 12px 36px rgba(20, 32, 26, 0.05);
+  text-align: center;
+}
+
+.corporate-home__mark {
+  width: 3.25rem;
+  height: 3.25rem;
+  margin: 0 auto 0.8rem;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  background: #15803d;
+  color: #fff;
+  font-size: 1.35rem;
+  font-weight: 700;
+}
+
+.corporate-home__brand {
+  margin: 0 0 0.5rem;
+  color: #15803d;
+  font-weight: 700;
+}
+
+.corporate-home__title {
+  margin: 0;
+  font-size: clamp(1.5rem, 7vw, 2.25rem);
+  line-height: 1.2;
+}
+
+.corporate-home__text {
+  margin: 1rem auto 0.4rem;
+  max-width: 27rem;
+  color: #5b6b63;
+  line-height: 1.5;
+}
+
+.corporate-home__contact {
+  display: inline-block;
+  color: #166534;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.corporate-home__jobs {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 1.5rem;
+}
+
+@media (min-width: 520px) {
+  .corporate-home__card {
+    padding: 2.5rem;
+  }
+
+  .corporate-home__jobs {
+    width: auto;
+    min-width: 12rem;
+  }
+}

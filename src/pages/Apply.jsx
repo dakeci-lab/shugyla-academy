@@ -13,6 +13,7 @@ import { getPublicVacancyDisplay } from '../utils/careersVacancyDisplay'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
 import { useLanguage } from '../context/LanguageContext'
 import DynamicApplicationForm from '../components/apply/DynamicApplicationForm'
+import { getCareersHomePath } from '../router/hostSurface'
 import '../components/admin/admin-shared.css'
 import '../components/CandidateAvatar.css'
 import './Apply.css'
@@ -30,7 +31,7 @@ export default function ApplyPage() {
   const { slug } = useParams()
   const location = useLocation()
   const { t } = useLanguage()
-  const hubPath = `/apply${location.search || ''}`
+  const hubPath = `${getCareersHomePath()}${location.search || ''}`
 
   const [loadState, setLoadState] = useState('loading')
   const [vacancy, setVacancy] = useState(null)
@@ -48,6 +49,7 @@ export default function ApplyPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
+  const [consentGiven, setConsentGiven] = useState(false)
 
   const hasUnknownType = useMemo(
     () => (questions || []).some((q) => !APPLICATION_QUESTION_TYPES.includes(q.questionType)),
@@ -75,6 +77,7 @@ export default function ApplyPage() {
     setLoadState('loading')
     setError('')
     setSubmitted(false)
+    setConsentGiven(false)
 
     fetchPublicVacancyApplicationForm(slug)
       .then((form) => {
@@ -284,6 +287,10 @@ export default function ApplyPage() {
       setError('Анкета содержит неизвестный тип вопроса. Обновите страницу.')
       return
     }
+    if (!consentGiven) {
+      setError(t.careersConsentRequired)
+      return
+    }
     if (!validateClient()) {
       setError('Заполните обязательные поля')
       return
@@ -364,12 +371,28 @@ export default function ApplyPage() {
             />
           </section>
 
+          <label className="careers-consent">
+            <input
+              type="checkbox"
+              checked={consentGiven}
+              required
+              disabled={submitting || photoUploading}
+              onChange={(event) => {
+                setConsentGiven(event.target.checked)
+                if (event.target.checked && error === t.careersConsentRequired) {
+                  setError('')
+                }
+              }}
+            />
+            <span>{t.careersConsent} *</span>
+          </label>
+
           {error && <p className="careers-apply-form__error">{error}</p>}
 
           <button
             type="submit"
             className="btn btn--primary careers-apply-form__submit"
-            disabled={submitting || photoUploading || hasUnknownType}
+            disabled={submitting || photoUploading || hasUnknownType || !consentGiven}
           >
             {photoUploading
               ? t.careersPhotoUploading

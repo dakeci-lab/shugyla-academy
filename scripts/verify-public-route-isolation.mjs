@@ -71,10 +71,10 @@ assert(
     !apply.includes('usePlatformData')
 )
 assert(
-  'VacanciesPage uses public list service',
-  vacanciesPage.includes('fetchPublishedVacanciesForApply') &&
-    !vacanciesPage.includes('platformDataService') &&
-    !vacanciesPage.includes('getPublishedVacancies')
+  'VacanciesPage is redirect-only compatibility alias',
+  vacanciesPage.includes('CareersHomeRedirect') &&
+    !vacanciesPage.includes('fetchPublishedVacanciesForApply') &&
+    !vacanciesPage.includes('platformDataService')
 )
 assert(
   'VacancyDetailPage uses public list service',

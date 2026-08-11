@@ -53,7 +53,11 @@ assert('smoke suite is non-destructive', smoke.includes('Does not create/publish
 assert('package smoke/mutating scripts', pkg.includes('test:e2e:recruitment:smoke') && pkg.includes('test:e2e:recruitment:mutating'))
 assert('default npm e2e is smoke', pkg.includes('"test:e2e:recruitment": "E2E_SUITE=smoke'))
 assert('prod workflow uses smoke', prodWorkflow.includes('E2E_SUITE: smoke'))
-assert('staging workflow refuses production URL', stagingWorkflow.includes('Refusing mutating suite against production'))
+assert(
+  'staging workflow refuses production URL',
+  stagingWorkflow.includes('Refusing mutating suite against a production app URL') &&
+    stagingWorkflow.includes('jobs\\.')
+)
 
 const failed = checks.filter((c) => !c.ok)
 if (failed.length) {

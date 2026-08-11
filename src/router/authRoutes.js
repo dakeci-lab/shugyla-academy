@@ -3,6 +3,7 @@ export const LOGIN_PATH = '/login'
 
 /** Публичные маршруты — не блокировать загрузкой academy data */
 export const PUBLIC_AUTH_PATHS = [
+  '/',
   LOGIN_PATH,
   '/vacancies',
   '/apply',
