@@ -706,6 +706,24 @@ export function isItemQuantityLocked(item, filterOptions) {
   return isSupplierOrderCreated(summary)
 }
 
+export const QUANTITY_REQUIRES_SUPPLIER_HINT = 'Выберите поставщика, чтобы задать количество'
+
+/**
+ * Количество можно править только когда в фильтре выбран поставщик и товар
+ * принадлежит именно ему.
+ *
+ * Без выбранного поставщика правка бессмысленна и опасна: заказ формируется
+ * по одному поставщику, а сохранение из общего списка уходит в снимок,
+ * который потом никто не отправит. Плюс это защита от «залипшего» события
+ * blur: пока пользователь менял фильтр, input мог остаться в старом состоянии.
+ */
+export function canEditItemQuantity(item, { filterOptions, selectedSupplierId } = {}) {
+  if (!item) return false
+  if (!selectedSupplierId) return false
+  if (supplierIdOf(item) !== selectedSupplierId) return false
+  return !isItemQuantityLocked(item, filterOptions)
+}
+
 export function getLockedQuantityHint(item, filterOptions) {
   const summary = findSupplierSummary(filterOptions, supplierIdOf(item))
   const orderId = generatedIdOf(item) || summary?.generatedOrderId || null

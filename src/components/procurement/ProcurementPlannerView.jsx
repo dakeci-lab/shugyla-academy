@@ -62,10 +62,13 @@ import {
   getSyncTooltip,
   hasFailedSaves,
   isItemQuantityLocked,
+  canEditItemQuantity,
+  QUANTITY_REQUIRES_SUPPLIER_HINT,
   isSupplierInTodaySchedule,
   isSupplierOrderCreated,
   listTodaysScheduledSuppliers,
 } from '../../utils/procurementPlannerUx'
+import { toProcurementUserMessage } from '../../utils/procurementErrors'
 import './ProcurementPlannerView.css'
 
 const TABLE_COL_SPAN = 9
@@ -231,7 +234,7 @@ export default function ProcurementPlannerView() {
         })
       } catch (err) {
         if (!getCachedFilterOptions(snapshotId)?.options) {
-          showError(err.message || 'Не удалось загрузить фильтры')
+          showError(toProcurementUserMessage(err, 'Не удалось загрузить фильтры.'))
         }
       } finally {
         setFilterOptionsLoading(false)
@@ -256,7 +259,7 @@ export default function ProcurementPlannerView() {
         setFilterOptionsLoading(false)
       }
     } catch (err) {
-      showError(err.message || 'Не удалось загрузить снимок')
+      showError(toProcurementUserMessage(err, 'Не удалось загрузить снимок.'))
     }
   }, [applyFilterOptions, loadFilterOptions, showError])
 
@@ -279,7 +282,7 @@ export default function ProcurementPlannerView() {
       setItems(result.items)
       setTotalCount(result.totalCount)
     } catch (err) {
-      showError(err.message || 'Не удалось загрузить позиции')
+      showError(toProcurementUserMessage(err, 'Не удалось загрузить позиции.'))
     } finally {
       setLoading(false)
     }
@@ -358,7 +361,32 @@ export default function ProcurementPlannerView() {
     }
   }
 
+  /** Единственный источник правды о доступности правки количества. */
+  function canEditQuantity(item) {
+    return (
+      canEditPlan &&
+      snapshotEditable &&
+      canEditItemQuantity(item, {
+        filterOptions,
+        selectedSupplierId: filters.platformSupplierId,
+      })
+    )
+  }
+
   async function handleFinalChange(item, rawValue) {
+    // Guard: сюда может прийти «залипшее» событие blur от input, который уже
+    // не должен существовать — например, пользователь снял фильтр поставщика,
+    // а браузер только теперь отдал blur. Без поставщика не сохраняем ничего.
+    if (!canEditQuantity(item)) {
+      if (import.meta.env.DEV) {
+        console.warn('[Planner] stale qty save ignored', {
+          itemId: item?.id,
+          selectedSupplierId: filters.platformSupplierId,
+        })
+      }
+      return
+    }
+
     beginPendingSave(item.id)
     try {
       const updated = await updateItemFinalOrderQty(item, rawValue)
@@ -371,11 +399,13 @@ export default function ProcurementPlannerView() {
       endPendingSave(item.id, true)
     } catch (err) {
       endPendingSave(item.id, false)
-      showError(err.message || 'Не удалось сохранить заказ')
+      showError(toProcurementUserMessage(err, 'Не удалось сохранить количество.'))
     }
   }
 
   async function handleReset(item) {
+    if (!canEditQuantity(item)) return
+
     beginPendingSave(item.id)
     try {
       const updated = await resetItemToRecommendation(item)
@@ -388,7 +418,7 @@ export default function ProcurementPlannerView() {
       endPendingSave(item.id, true)
     } catch (err) {
       endPendingSave(item.id, false)
-      showError(err.message || 'Не удалось сбросить')
+      showError(toProcurementUserMessage(err, 'Не удалось сбросить количество.'))
     }
   }
 
@@ -459,7 +489,7 @@ export default function ProcurementPlannerView() {
       }
       showSuccess(format === 'pdf' ? 'PDF экспортирован' : 'Excel экспортирован')
     } catch (err) {
-      showError(err.message || 'Не удалось экспортировать')
+      showError(toProcurementUserMessage(err, 'Не удалось выгрузить файл.'))
     } finally {
       setExporting(false)
     }
@@ -635,6 +665,21 @@ export default function ProcurementPlannerView() {
 
   function renderQtyCell(item, mobile = false) {
     const locked = isItemQuantityLocked(item, filterOptions)
+    if (!locked && !canEditQuantity(item)) {
+      // Поставщик не выбран (или строка принадлежит другому) — поля ввода нет вовсе,
+      // чтобы нельзя было отправить правку, которая никуда не попадёт.
+      return (
+        <div className="proc-planner__final proc-planner__final--readonly">
+          <span
+            className="proc-planner__readonly-qty"
+            title={QUANTITY_REQUIRES_SUPPLIER_HINT}
+            aria-label={`${QUANTITY_REQUIRES_SUPPLIER_HINT}: ${item.productName}`}
+          >
+            —
+          </span>
+        </div>
+      )
+    }
     if (locked) {
       const hint = getLockedQuantityHint(item, filterOptions)
       return (

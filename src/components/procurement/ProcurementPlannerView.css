@@ -180,6 +180,16 @@
   font-weight: 600;
 }
 
+.proc-planner__final--readonly {
+  justify-content: flex-start;
+}
+
+.proc-planner__readonly-qty {
+  font-variant-numeric: tabular-nums;
+  color: #9ca3af;
+  cursor: help;
+}
+
 .proc-planner__in-order {
   font-size: 0.7rem;
   font-weight: 600;
