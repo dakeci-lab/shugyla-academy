@@ -179,6 +179,45 @@ function stageStatic() {
     offenders.join(', ')
   )
 
+  // A security definer function runs as postgres. Prove this one cannot be used
+  // as a lever: it only reads a status and raises, it writes nothing anywhere.
+  const body = sql.slice(sql.indexOf('as $$'), sql.indexOf('$$;'))
+  const lowered = body.toLowerCase()
+
+  assert('guard uses no dynamic SQL', !/\bexecute\s+/.test(lowered), 'execute in a definer body is an injection surface')
+  assert('guard inserts nothing', !/\binsert\s+into\b/.test(lowered))
+  assert('guard deletes nothing', !/\bdelete\s+from\b/.test(lowered))
+  assert(
+    'guard writes only to the row being validated',
+    !/\bupdate\s+public\./.test(lowered),
+    'a BEFORE trigger must only touch NEW'
+  )
+  assert(
+    'guard reads only the parent snapshot',
+    (lowered.match(/from\s+public\.\w+/g) || []).every((match) =>
+      match.includes('procurement_snapshots')
+    )
+  )
+
+  // Column grants must stay narrow: the planning columns and nothing else.
+  const planningMigration = read('supabase/migrations/20260809072915_procurement_planning_v1.sql')
+  const grantBlock = planningMigration.match(
+    /grant update \(([^)]*)\)\s*on table public\.procurement_snapshot_items to authenticated/i
+  )
+  assert('column-level UPDATE grant on snapshot items exists', Boolean(grantBlock))
+
+  const grantedColumns = (grantBlock?.[1] || '')
+    .split(',')
+    .map((column) => column.trim())
+    .filter(Boolean)
+    .sort()
+
+  assert(
+    'authenticated may update only final_order_qty, manual_override, updated_at',
+    grantedColumns.join(',') === 'final_order_qty,manual_override,updated_at',
+    grantedColumns.join(',') || '(none)'
+  )
+
   console.log('')
 }
 
@@ -243,6 +282,20 @@ function stageIntrospection() {
     'authenticated holds SELECT only on procurement_snapshots',
     grants === 'SELECT',
     `grants=${grants || 'none'}`
+  )
+
+  const updatableColumns = scalar(`
+    select coalesce(string_agg(column_name, ',' order by column_name), '')
+    from information_schema.column_privileges
+    where table_schema = 'public'
+      and table_name = 'procurement_snapshot_items'
+      and grantee = 'authenticated'
+      and privilege_type = 'UPDATE';
+  `)
+  assert(
+    'column grants on snapshot items stayed narrow',
+    updatableColumns === 'final_order_qty,manual_override,updated_at',
+    updatableColumns || '(none)'
   )
 
   const trigger = scalar(`
@@ -335,6 +388,60 @@ function stageBehaviour() {
     /fact columns are immutable|permission denied|violates row-level security/i.test(facts.stderr),
     facts.stderr || '(no error text)'
   )
+
+  // Column grants: norm_days is a planning field the guard allows in principle,
+  // but authenticated was never granted it. The grant must still win.
+  const normDays = asBuyer(
+    `update public.procurement_snapshot_items set norm_days = 21 where id = '${state.itemId}'`,
+    { expectFailure: true, label: 'norm_days edit' }
+  )
+  assert(
+    'a column outside the grant list cannot be updated',
+    /permission denied|violates row-level security/i.test(normDays.stderr),
+    normDays.stderr || '(no error text)'
+  )
+
+  // Linkage to a generated order is not the user's field either.
+  const linkage = asBuyer(
+    `update public.procurement_snapshot_items set generated_purchase_order_id = null where id = '${state.itemId}'`,
+    { expectFailure: true, label: 'generated order linkage edit' }
+  )
+  assert(
+    'the generated-order link cannot be touched by a user',
+    /permission denied|violates row-level security|immutable/i.test(linkage.stderr),
+    linkage.stderr || '(no error text)'
+  )
+
+  // Rows already pulled into an order are closed for editing by RLS.
+  psql(`
+    insert into public.purchase_orders (number, supplier_name, status, purchase_date)
+    values ('GUARD-${state.runId}', 'Guard fixture supplier', 'draft', current_date);
+  `)
+  const orderId = scalar(
+    `select id from public.purchase_orders where number = 'GUARD-${state.runId}';`
+  )
+  psql(`
+    update public.procurement_snapshot_items
+       set generated_purchase_order_id = '${orderId}'
+     where id = '${state.itemId}';
+  `)
+
+  const generated = asBuyer(
+    `update public.procurement_snapshot_items set final_order_qty = 40 where id = '${state.itemId}'`,
+    { expectFailure: true, label: 'edit of a row already in an order' }
+  )
+  assert(
+    'rows already placed in an order are read-only for the user',
+    /violates row-level security|immutable|permission denied/i.test(generated.stderr),
+    generated.stderr || '(no error text)'
+  )
+
+  psql(`
+    update public.procurement_snapshot_items
+       set generated_purchase_order_id = null
+     where id = '${state.itemId}';
+  `)
+  psql(`delete from public.purchase_orders where id = '${orderId}';`)
 
   // Guard invariant 2: planning fields are frozen outside a working snapshot.
   psql(`update public.procurement_snapshots set status = 'generated' where id = '${state.snapshotId}';`)
