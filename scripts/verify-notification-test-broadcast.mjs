@@ -56,7 +56,7 @@ function main() {
   assert('fixed broadcast title', shared.includes('Тестовое уведомление Shugyla Platform'))
   assert('fixed broadcast body', shared.includes('push-уведомления работают корректно'))
   assert('test_broadcast payload type', shared.includes('webPushPayload') || read('supabase/functions/_shared/webPushPayload.ts').includes("'test_broadcast'"))
-  assert('shugyla-academy base url', shared.includes('/shugyla-academy/platform/settings/notifications'))
+  assert('scope-relative app url', shared.includes('/platform/settings/notifications'))
   assert('endpoint dedupe', shared.includes('dedupeSubscriptionsByEndpoint'))
   assert('vapid fingerprint migration', fs.existsSync(path.join(ROOT, 'supabase/migrations/20260718230000_push_subscription_vapid_fingerprint.sql')))
   assert('summary counts outdated subscriptions', shared.includes('outdated_subscriptions'))

@@ -87,7 +87,7 @@ function stagePushSafety() {
   const delivery = read('supabase/functions/_shared/notificationDelivery.ts')
 
   assert('TT tag stays short', payload.includes('tag: `tt-${shortId}`'))
-  assert('TT url prefixes app base', payload.includes('/shugyla-academy'))
+  assert('TT url is Service Worker scope-relative', payload.includes("DEFAULT_PLATFORM_URL = '/platform'"))
   assert('VAPID verify uses Web Crypto', vapid.includes("crypto.subtle.importKey"))
   assert('no Deno createECDH import', !vapid.includes("from 'node:crypto'"))
   assert('Apple long topic omitted', sender.includes("provider === 'apple' && trimmed.length > 24"))

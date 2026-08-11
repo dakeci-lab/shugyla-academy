@@ -174,15 +174,16 @@ function stageStaticRouting() {
   )
 
   const dispatch = read('supabase/functions/_shared/timeTrackerNotificationDispatch.ts')
-  assert('push fallback uses /platform', dispatch.includes("'/shugyla-academy/platform'"))
-  assert('push fallback not legacy tracker', !dispatch.includes("'/shugyla-academy/platform/time-tracker'"))
+  const payload = read('supabase/functions/_shared/webPushPayload.ts')
+  assert('push fallback uses /platform', payload.includes("DEFAULT_PLATFORM_URL = '/platform'"))
+  assert('push fallback not legacy tracker', !payload.includes("DEFAULT_PLATFORM_URL = '/platform/time-tracker'"))
   console.log('')
 }
 
 function stageServiceWorkerNormalization() {
   console.log('Stage 4: Service worker')
   const sw = read('public/sw.js')
-  assert('cache bumped to v2', sw.includes('shugyla-academy-shell-v2'))
+  assert('cache bumped to v6', sw.includes('shugyla-academy-shell-v6'))
   assert('normalizeNotificationDestination exists', sw.includes('function normalizeNotificationDestination'))
   assert('legacy tracker normalized', sw.includes('/platform/time-tracker'))
   assert('notificationclick uses normalization', /notificationclick[\s\S]*normalizeNotificationDestination/.test(sw))

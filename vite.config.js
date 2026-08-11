@@ -3,19 +3,41 @@ import react from '@vitejs/plugin-react'
 import { copyFileSync, writeFileSync } from 'fs'
 import { resolve } from 'path'
 
-export default defineConfig({
-  // Базовый путь для GitHub Pages: https://dakeci-lab.github.io/shugyla-academy/
-  base: '/shugyla-academy/',
-  plugins: [
-    react(),
-    // GitHub Pages: 404.html и .nojekyll для SPA-маршрутизации
-    {
-      name: 'gh-pages',
-      closeBundle() {
-        const dist = resolve(__dirname, 'dist')
-        copyFileSync(resolve(dist, 'index.html'), resolve(dist, '404.html'))
-        writeFileSync(resolve(dist, '.nojekyll'), '')
+function normalizeBasePath(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return '/'
+
+  let normalized = raw.startsWith('/') ? raw : `/${raw}`
+  normalized = normalized.replace(/\/{2,}/g, '/')
+  if (!normalized.endsWith('/')) normalized = `${normalized}/`
+
+  return normalized
+}
+
+export default defineConfig(({ command }) => {
+  // GitHub Pages remains the safe fallback. The PS.kz build passes APP_BASE_PATH=/.
+  const defaultBasePath = command === 'serve' ? '/' : '/shugyla-academy/'
+  const base = normalizeBasePath(process.env.APP_BASE_PATH || defaultBasePath)
+
+  return {
+    base,
+    plugins: [
+      react(),
+      {
+        name: 'static-spa-output',
+        closeBundle() {
+          const dist = resolve(__dirname, 'dist')
+          copyFileSync(resolve(dist, 'index.html'), resolve(dist, '404.html'))
+          writeFileSync(resolve(dist, '.nojekyll'), '')
+          writeFileSync(
+            resolve(dist, 'version.json'),
+            `${JSON.stringify({
+              commit: process.env.GITHUB_SHA || 'local',
+              base,
+            }, null, 2)}\n`
+          )
+        },
       },
-    },
-  ],
+    ],
+  }
 })

@@ -11,9 +11,11 @@ export type WebPushPayloadInput = {
   requestId?: string | null
 }
 
-const DEFAULT_ICON = '/shugyla-academy/icons/icon-192.png'
-const DEFAULT_BADGE = '/shugyla-academy/icons/icon-192.png'
-const DEFAULT_PLATFORM_URL = '/shugyla-academy/platform'
+// App-relative paths are resolved by the Service Worker against its own scope.
+// This keeps existing GitHub Pages subscriptions and the new root-domain PWA compatible.
+const DEFAULT_ICON = '/icons/icon-192.png'
+const DEFAULT_BADGE = '/icons/icon-192.png'
+const DEFAULT_PLATFORM_URL = '/platform'
 
 export function getDefaultPlatformUrl(): string {
   return DEFAULT_PLATFORM_URL
@@ -51,7 +53,7 @@ export function buildTestBroadcastPayload(
   return buildWebPushPayload({
     title: 'Тестовое уведомление Shugyla Platform',
     body: 'Если вы видите это сообщение, push-уведомления работают корректно.',
-    url: '/shugyla-academy/platform/settings/notifications',
+    url: '/platform/settings/notifications',
     type: 'test_broadcast',
     tag: `test-broadcast-${broadcastId.replace(/-/g, '').slice(0, 8)}`,
     notificationId,
@@ -62,9 +64,9 @@ export function buildTestBroadcastPayload(
 
 function toAppRelativeUrl(actionUrl: string | null | undefined): string {
   const raw = (actionUrl ?? DEFAULT_PLATFORM_URL).trim() || DEFAULT_PLATFORM_URL
-  if (raw.startsWith('/shugyla-academy/')) return raw
-  if (raw === '/shugyla-academy') return `${raw}/`
-  if (raw.startsWith('/')) return `/shugyla-academy${raw}`
+  if (raw.startsWith('/shugyla-academy/')) return raw.slice('/shugyla-academy'.length)
+  if (raw === '/shugyla-academy') return '/'
+  if (raw.startsWith('/')) return raw
   return DEFAULT_PLATFORM_URL
 }
 

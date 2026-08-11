@@ -31,7 +31,7 @@ function buildPayload(notificationId: string, requestId: string): Record<string,
   return buildWebPushPayload({
     title: EMPLOYEE_PERSONAL_TEST_TITLE,
     body: EMPLOYEE_PERSONAL_TEST_BODY,
-    url: '/shugyla-academy/platform/time-tracker',
+    url: EMPLOYEE_PERSONAL_TEST_ACTION_URL,
     type: 'employee_personal_test',
     tag: `emp-test-${requestId.replace(/-/g, '').slice(0, 8)}`,
     notificationId,

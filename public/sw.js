@@ -1,7 +1,8 @@
 /* Shugyla Academy — service worker (PWA shell + push) */
 
-const BASE = '/shugyla-academy/'
-const CACHE_NAME = 'shugyla-academy-shell-v5'
+const SCOPE_URL = new URL(self.registration.scope)
+const BASE = SCOPE_URL.pathname.endsWith('/') ? SCOPE_URL.pathname : `${SCOPE_URL.pathname}/`
+const CACHE_NAME = 'shugyla-academy-shell-v6'
 const SHELL_CACHE_PREFIX = 'shugyla-academy-shell-'
 const CANONICAL_PLATFORM_PATH = `${BASE.replace(/\/$/, '')}/platform`
 
@@ -20,6 +21,11 @@ function isSupabaseOrExternal(url) {
 
 function isHashedAsset(pathname) {
   return pathname.includes('/assets/')
+}
+
+function isInsideScopePath(pathname) {
+  const basePath = BASE.replace(/\/$/, '')
+  return !basePath || pathname === basePath || pathname.startsWith(`${basePath}/`)
 }
 
 function isHtmlResponse(response) {
@@ -114,20 +120,26 @@ function normalizeNotificationDestination(rawUrl) {
     const pathname = url.pathname.replace(/\/+$/, '') || '/'
     const suffix = `${url.search}${url.hash}`
 
-    const legacyPatterns = [
-      `${basePath}/platform/time-tracker`,
-      '/platform/time-tracker',
-    ]
+    const internalPath = pathname.startsWith('/shugyla-academy/')
+      ? pathname.slice('/shugyla-academy'.length)
+      : pathname
 
-    if (legacyPatterns.some((legacy) => pathname === legacy || pathname.startsWith(`${legacy}/`))) {
+    if (
+      internalPath === '/platform/time-tracker' ||
+      internalPath.startsWith('/platform/time-tracker/')
+    ) {
       return `${origin}${CANONICAL_PLATFORM_PATH}${suffix}`
     }
 
-    if (pathname === `${basePath}/platform` || pathname === '/platform') {
-      return `${origin}${CANONICAL_PLATFORM_PATH}${suffix}`
+    if (internalPath === '/platform' || internalPath.startsWith('/platform/')) {
+      return `${origin}${basePath}${internalPath}${suffix}`
     }
 
-    if (!pathname.startsWith(basePath)) return fallback
+    if (pathname === '/' || pathname === '/shugyla-academy') {
+      return `${origin}${BASE}${suffix}`
+    }
+
+    if (basePath && !pathname.startsWith(`${basePath}/`) && pathname !== basePath) return fallback
     return url.href
   } catch {
     return fallback
@@ -173,8 +185,7 @@ self.addEventListener('fetch', (event) => {
 
   if (isSupabaseOrExternal(url)) return
 
-  const basePath = BASE.replace(/\/$/, '')
-  if (!url.pathname.startsWith(basePath)) return
+  if (!isInsideScopePath(url.pathname)) return
 
   if (request.mode === 'navigate') {
     event.respondWith(handleNavigate(request))
@@ -192,7 +203,8 @@ function resolveAssetUrl(relativePath) {
   const normalized = String(relativePath || '').trim()
   if (!normalized) return `${self.location.origin}${BASE}icons/icon-192.png`
   if (/^https?:\/\//i.test(normalized)) return normalized
-  const path = normalized.startsWith('/') ? normalized : `${BASE}${normalized.replace(/^\/+/, '')}`
+  const withoutLegacyBase = normalized.replace(/^\/shugyla-academy\//, '')
+  const path = `${BASE}${withoutLegacyBase.replace(/^\/+/, '')}`
   return new URL(path, self.location.origin).href
 }
 
@@ -200,8 +212,8 @@ function normalizePushPayload(event) {
   const fallback = {
     title: 'Shugyla Platform',
     body: 'У вас новое уведомление',
-    icon: resolveAssetUrl(`${BASE}icons/icon-192.png`),
-    badge: resolveAssetUrl(`${BASE}icons/icon-192.png`),
+    icon: resolveAssetUrl('icons/icon-192.png'),
+    badge: resolveAssetUrl('icons/icon-192.png'),
     tag: 'shugyla-notification',
     data: {
       url: normalizeNotificationDestination(`${CANONICAL_PLATFORM_PATH}`),
@@ -289,7 +301,9 @@ function normalizePushPayload(event) {
 async function notifyOpenClients(payload) {
   const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
   for (const client of clients) {
-    if (!client.url.includes(BASE.replace(/\/$/, ''))) continue
+    const clientUrl = new URL(client.url)
+    if (clientUrl.origin !== self.location.origin) continue
+    if (!isInsideScopePath(clientUrl.pathname)) continue
     client.postMessage({
       type: 'PUSH_NOTIFICATION_SHOWN',
       notification_id: payload.data?.notification_id ?? null,
@@ -322,8 +336,8 @@ async function handlePushEvent(event) {
 
     await self.registration.showNotification('Shugyla Platform', {
       body: payload.body || 'У вас новое уведомление',
-      icon: resolveAssetUrl(`${BASE}icons/icon-192.png`),
-      badge: resolveAssetUrl(`${BASE}icons/icon-192.png`),
+      icon: resolveAssetUrl('icons/icon-192.png'),
+      badge: resolveAssetUrl('icons/icon-192.png'),
       tag: payload.tag || 'shugyla-notification-fallback',
       data: payload.data,
       renotify: false,
@@ -338,7 +352,9 @@ self.addEventListener('push', (event) => {
 async function focusOrOpenClient(targetUrl) {
   const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
   for (const client of clients) {
-    if (!client.url.includes(BASE.replace(/\/$/, ''))) continue
+    const clientUrl = new URL(client.url)
+    if (clientUrl.origin !== self.location.origin) continue
+    if (!isInsideScopePath(clientUrl.pathname)) continue
     await client.focus()
     if ('navigate' in client) {
       try {

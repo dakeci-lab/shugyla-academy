@@ -167,18 +167,19 @@ function stageSupabaseClient() {
 }
 
 function stageGhPagesPwa() {
-  console.log('Stage 6: GitHub Pages / PWA base path')
+  console.log('Stage 6: Dual deployment / PWA base path')
   const vite = read('vite.config.js')
   const manifest = read('public/manifest.webmanifest')
   const sw = read('public/sw.js')
   const index = read('index.html')
   const basename = read('src/router/basename.js')
 
-  assert('Vite base is /shugyla-academy/', vite.includes("base: '/shugyla-academy/'"))
-  assert('manifest start_url uses base', manifest.includes('"/shugyla-academy/"'))
-  assert('manifest scope uses base', manifest.includes('"/shugyla-academy/"'))
-  assert('service worker scope uses base', sw.includes("const BASE = '/shugyla-academy/'"))
-  assert('index.html manifest href uses base', index.includes('/shugyla-academy/manifest.webmanifest'))
+  assert('Vite accepts deployment base', vite.includes('APP_BASE_PATH'))
+  assert('Vite keeps Pages fallback base', vite.includes("'/shugyla-academy/'"))
+  assert('manifest start_url is relative', manifest.includes('"start_url": "./"'))
+  assert('manifest scope is relative', manifest.includes('"scope": "./"'))
+  assert('service worker derives registration scope', sw.includes('self.registration.scope'))
+  assert('index.html manifest uses Vite base', index.includes('%BASE_URL%manifest.webmanifest'))
   assert('router basename reads import.meta.env.BASE_URL', basename.includes('import.meta.env.BASE_URL'))
   console.log('')
 }

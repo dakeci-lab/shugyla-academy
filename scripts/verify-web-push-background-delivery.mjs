@@ -59,7 +59,7 @@ function main() {
   assert('absolute icon urls', sw.includes('resolveAssetUrl'))
   assert('postMessage is secondary only', sw.includes('notifyOpenClients'))
   assert('notificationclick uses base path', sw.includes('normalizeNotificationDestination'))
-  assert('sw cache v5', sw.includes('shugyla-academy-shell-v5'))
+  assert('sw cache v6', sw.includes('shugyla-academy-shell-v6'))
 
   console.log('Stage 2: Unified server payload')
 
@@ -90,7 +90,7 @@ function main() {
   console.log('Stage 5: Admin diagnostics UI')
 
   assert('device status block', section.includes('Это устройство'))
-  assert('vapid key status label', section.includes('VAPID-ключ подписки'))
+  assert('vapid key status label', section.includes('Состояние VAPID'))
   assert('reconnect button', section.includes('Переподключить уведомления'))
   assert('no endpoint in UI', !section.includes('endpoint'))
 

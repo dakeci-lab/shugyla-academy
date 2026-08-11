@@ -1,44 +1,45 @@
-name: Deploy to GitHub Pages
+name: Build PS.kz production artifact
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: ps-production-artifact
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+
     steps:
-      - name: Checkout
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
+
+      - name: Verify dual-domain deployment
+        run: npm run verify:domain-deployment
 
       - name: Resolve VAPID public key
         id: vapid
         run: |
           if [ -f config/production-vapid-public.key ]; then
             KEY="$(tr -d '\n' < config/production-vapid-public.key)"
-            echo "configured=true" >> "$GITHUB_OUTPUT"
             echo "public_key=$KEY" >> "$GITHUB_OUTPUT"
           else
-            echo "configured=false" >> "$GITHUB_OUTPUT"
             echo "public_key=" >> "$GITHUB_OUTPUT"
           fi
 
@@ -51,29 +52,34 @@ jobs:
             echo "enabled=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Build
+      - name: Build root-domain artifact
         run: npm run build
         env:
+          APP_BASE_PATH: /
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
           VITE_WEB_PUSH_VAPID_PUBLIC_KEY: ${{ steps.vapid.outputs.public_key }}
           VITE_WEB_PUSH_PRODUCTION_E2E_TEST: ${{ steps.web_push_e2e.outputs.enabled == 'true' && 'true' || '' }}
 
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
+      - name: Verify production artifact
+        run: |
+          test -f dist/index.html
+          test -f dist/404.html
+          test -f dist/.htaccess
+          test -f dist/sw.js
+          test -f dist/version.json
+          grep -q '"base": "/"' dist/version.json
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish artifact branch for Plesk
+        working-directory: dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b ps-production
+          git add -A
+          git commit -m "Deploy ${GITHUB_SHA}"
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin ps-production

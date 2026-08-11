@@ -1,6 +1,6 @@
 /** Единый basename для React Router и абсолютных URL (Vite `base`) */
 
-/** Production: `/shugyla-academy/`, localhost dev: `/` */
+/** GitHub Pages: `/shugyla-academy/`; PS.kz and localhost: `/`. */
 export function getAppBasePath() {
   let raw = import.meta.env.BASE_URL || '/'
   if (!raw.startsWith('/')) raw = `/${raw}`

@@ -1,14 +1,18 @@
 import { setupE2eFixture, loadState, saveState, createTestRunId } from './helpers/fixture.mjs'
-import { resolveServiceRoleKey, getSupabaseUrl, getBaseUrl } from './helpers/env.mjs'
+import {
+  resolveServiceRoleKey,
+  getSupabaseUrl,
+  getBaseUrl,
+  isProductionAppUrl,
+} from './helpers/env.mjs'
 
 function assertSuiteAllowed() {
   const suite = process.env.E2E_SUITE || 'mutating'
   const base = getBaseUrl()
-  const isProductionPages = /dakeci-lab\.github\.io\/shugyla-academy/i.test(base)
-  if (suite === 'mutating' && isProductionPages && process.env.E2E_ALLOW_PRODUCTION_MUTATING !== '1') {
+  if (suite === 'mutating' && isProductionAppUrl(base) && process.env.E2E_ALLOW_PRODUCTION_MUTATING !== '1') {
     throw new Error(
       [
-        'Mutating recruitment E2E is blocked against production Pages.',
+        'Mutating recruitment E2E is blocked against a production app URL.',
         'Use E2E_SUITE=smoke for production, or point E2E_BASE_URL/E2E_SUPABASE_* at staging.',
         'Override only with E2E_ALLOW_PRODUCTION_MUTATING=1 (not for routine CI).',
       ].join(' ')

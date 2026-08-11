@@ -77,7 +77,8 @@ function main() {
   const service = read('src/services/webPushSubscriptionService.js')
   const adminService = read('src/services/notificationSettingsAdminService.js')
   const section = read('src/components/admin/NotificationTestBroadcastSection.jsx')
-  const deploy = read('.github/workflows/deploy.yml')
+  const pagesDeploy = read('.github/workflows/main.yml')
+  const psDeploy = read('.github/workflows/deploy-ps-production.yml')
 
   console.log('Stage 1: Schema and fingerprint storage')
   assert('migration adds vapid_key_fingerprint', migration.includes('vapid_key_fingerprint'))
@@ -102,7 +103,7 @@ function main() {
   assert('summary exposes will_send', broadcast.includes('will_send'))
   assert('admin formats outdated message', adminService.includes('Требуют переподключения'))
   assert('modal blocks when all outdated', section.includes('Все зарегистрированные устройства требуют переподключения'))
-  assert('device vapid key label', section.includes('VAPID-ключ подписки'))
+  assert('device vapid key label', section.includes('Состояние VAPID'))
 
   console.log('Stage 5: Error classification')
   assert('403 maps to vapid_rejected', delivery.includes("'vapid_rejected'"))
@@ -111,7 +112,8 @@ function main() {
   assert('send-test returns vapid_rejected', sendTest.includes("'vapid_rejected'"))
 
   console.log('Stage 6: Frontend/server public key sources')
-  assert('deploy reads production public key file', deploy.includes('config/production-vapid-public.key'))
+  assert('Pages deploy reads production public key file', pagesDeploy.includes('config/production-vapid-public.key'))
+  assert('PS deploy reads production public key file', psDeploy.includes('config/production-vapid-public.key'))
   assert('frontend uses vite public env', service.includes('VITE_WEB_PUSH_VAPID_PUBLIC_KEY'))
   assert('edge fingerprint helper exists', fingerprint.includes('getCurrentServerVapidFingerprint'))
 

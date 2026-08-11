@@ -61,7 +61,7 @@ function issueMessage(issue) {
     case 'ios_not_standalone':
       return 'На iPhone системные push работают только в установленном PWA'
     case 'scope_mismatch':
-      return 'Service Worker зарегистрирован вне /shugyla-academy/'
+      return 'Системный модуль уведомлений зарегистрирован вне адреса приложения'
     case 'permission_denied':
       return 'Разрешите уведомления в настройках устройства'
     default:

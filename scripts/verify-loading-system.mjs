@@ -183,8 +183,8 @@ function main() {
   assert('pre-React splash markup in #root', /id="root"[\s\S]*class="app-launch"/.test(indexHtml))
   assert(
     'pre-React splash uses real icon asset',
-    indexHtml.includes('/shugyla-academy/icons/icon-192.png') ||
-      indexHtml.includes('/shugyla-academy/icons/icon-512.png'),
+    indexHtml.includes('%BASE_URL%icons/icon-192.png') ||
+      indexHtml.includes('%BASE_URL%icons/icon-512.png'),
   )
   assert('critical launch CSS in index.html', indexHtml.includes('.app-launch') && indexHtml.includes('100dvh'))
   assert('AuthLoadingScreen uses real icon', authLoading.includes('icons/icon-192.png') || authLoading.includes('icons/icon-512.png'))

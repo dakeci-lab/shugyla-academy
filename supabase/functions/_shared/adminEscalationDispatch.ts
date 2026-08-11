@@ -483,7 +483,7 @@ export async function dispatchAdminEscalations(params: {
             buildWebPushPayload({
               title,
               body,
-              url: `/shugyla-academy${actionUrl}`,
+              url: actionUrl,
               type: match.eventCode,
               tag: `esc-${reqId.replace(/-/g, '').slice(0, 8)}`,
               notificationId,

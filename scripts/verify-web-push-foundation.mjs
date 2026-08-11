@@ -339,7 +339,7 @@ function stageServiceWorkerStatic() {
   assert('clients.matchAll used', sw.includes('clients.matchAll'))
   assert('openWindow used', sw.includes('openWindow'))
   assert('no VAPID private in SW', !sw.includes('VAPID_PRIVATE_KEY'))
-  assert('base path preserved', sw.includes('/shugyla-academy/'))
+  assert('base path derived from registration scope', sw.includes('self.registration.scope'))
 
   console.log('')
 }

@@ -123,8 +123,10 @@ function stageGitAndConfig() {
   })
   assert('private key name absent from tracked src/dist/public/config values', !gitPrivate.stdout.includes('='))
 
-  const deploy = read('.github/workflows/deploy.yml')
-  assert('deploy reads production public key file', deploy.includes('config/production-vapid-public.key'))
+  const pagesDeploy = read('.github/workflows/main.yml')
+  const psDeploy = read('.github/workflows/deploy-ps-production.yml')
+  assert('Pages deploy reads production public key file', pagesDeploy.includes('config/production-vapid-public.key'))
+  assert('PS deploy reads production public key file', psDeploy.includes('config/production-vapid-public.key'))
   console.log('')
 }
 

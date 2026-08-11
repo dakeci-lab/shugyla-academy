@@ -120,7 +120,7 @@ function buildPayload(notificationId: string, requestId: string) {
     return buildWebPushPayload({
       title: 'Shugyla Platform',
       body: 'Тестовое уведомление успешно доставлено',
-      url: '/shugyla-academy/',
+      url: '/',
       type: 'web_push_test',
       tag: 'production-web-push-e2e',
       notificationId,
@@ -131,7 +131,7 @@ function buildPayload(notificationId: string, requestId: string) {
   return buildWebPushPayload({
     title: 'Shugyla Platform',
     body: 'Тестовое push-уведомление отправлено сервером',
-    url: '/shugyla-academy/platform/profile',
+    url: '/platform/profile',
     type: 'web_push_test',
     tag: `shugyla-server-test-${requestId.replace(/-/g, '').slice(0, 8)}`,
     notificationId,
@@ -705,7 +705,7 @@ async function handleSendConnectionConfirm(
         buildWebPushPayload({
           title,
           body,
-          url: '/shugyla-academy/platform/time-tracker',
+          url: '/platform/time-tracker',
           type: 'connection_confirm',
           tag: `confirm-${reqId.replace(/-/g, '').slice(0, 8)}`,
           notificationId,

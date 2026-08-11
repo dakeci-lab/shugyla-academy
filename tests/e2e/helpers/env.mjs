@@ -7,6 +7,24 @@ import { createClient } from '@supabase/supabase-js'
 
 export const PRODUCTION_REF = 'cxadzerxndlscwvdaymk'
 export const DEFAULT_BASE_URL = 'https://dakeci-lab.github.io/shugyla-academy'
+export const PRODUCTION_APP_HOSTS = new Set([
+  'dakeci-lab.github.io',
+  'shugyla-market.kz',
+  'www.shugyla-market.kz',
+])
+
+export function isProductionAppUrl(value) {
+  try {
+    const url = new URL(String(value || ''))
+    if (!PRODUCTION_APP_HOSTS.has(url.hostname.toLowerCase())) return false
+    if (url.hostname.toLowerCase() === 'dakeci-lab.github.io') {
+      return url.pathname === '/shugyla-academy' || url.pathname.startsWith('/shugyla-academy/')
+    }
+    return true
+  } catch {
+    return false
+  }
+}
 
 function mask(value) {
   if (!value) return ''

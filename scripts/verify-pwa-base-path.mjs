@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Verification for GitHub Pages base path, PWA URLs, and logout/login routing.
+ * Verification for dual deployment base paths, PWA URLs, and logout/login routing.
  *
  * Usage:
  *   npm run verify:pwa-base-path
@@ -57,12 +57,15 @@ function main() {
   const appInstallBanner = read('src/components/platform/AppInstallBanner.jsx')
   const authService = read('src/services/authService.js')
 
-  const productionOrigin = 'https://dakeci-lab.github.io'
-  const productionBase = '/shugyla-academy/'
+  const fallbackOrigin = 'https://dakeci-lab.github.io'
+  const fallbackBase = '/shugyla-academy/'
+  const productionOrigin = 'https://shugyla-market.kz'
+  const productionBase = '/'
 
   console.log('Stage 1: Vite and router base')
 
-  assert('vite base is /shugyla-academy/', viteConfig.includes("base: '/shugyla-academy/'"))
+  assert('vite supports APP_BASE_PATH', viteConfig.includes('process.env.APP_BASE_PATH'))
+  assert('vite keeps GitHub Pages fallback base', viteConfig.includes("'/shugyla-academy/'"))
   assert('basename exports getAppBasePath', basename.includes('export function getAppBasePath'))
   assert('basename exports getAppUrl', basename.includes('export function getAppUrl'))
   assert('basename exports isInsideAppBase', basename.includes('export function isInsideAppBase'))
@@ -71,8 +74,8 @@ function main() {
 
   console.log('Stage 2: Manifest and SW scope')
 
-  assert('manifest start_url inside app base', manifest.includes('"/shugyla-academy/"'))
-  assert('manifest scope inside app base', manifest.includes('"scope": "/shugyla-academy/"'))
+  assert('manifest start_url is scope-relative', manifest.includes('"start_url": "./"'))
+  assert('manifest scope is relative', manifest.includes('"scope": "./"'))
   assert('manifest display standalone', manifest.includes('"display": "standalone"'))
   assert('SW registers via getAppUrl', registerSw.includes('getAppUrl('))
   assert('SW scope via getAppBasePath', registerSw.includes('getAppBasePath()'))
@@ -81,7 +84,7 @@ function main() {
   console.log('Stage 3: Hardcoded root URL regressions')
 
   assert('error boundary does not assign /login at domain root', !errorBoundary.includes("assign(LOGIN_PATH)"))
-  assert('error boundary does not replace('/')', !errorBoundary.match(/replace\(['"]\/['"]\)/))
+  assert("error boundary does not replace('/')", !errorBoundary.match(/replace\(['"]\/['"]\)/))
   assert('recovery does not assign origin only', !recovery.includes('location.origin'))
   assert('recovery uses getRecoveryTargetUrl', recovery.includes('getRecoveryTargetUrl'))
   assert('recovery redirects outside base on load', recovery.includes('isInsideAppBase'))
@@ -97,23 +100,23 @@ function main() {
 
   assert(
     'production logout url',
-    buildAppUrl('login', productionOrigin, productionBase) === `${productionOrigin}/shugyla-academy/login`
+    buildAppUrl('login', productionOrigin, productionBase) === `${productionOrigin}/login`
   )
   assert(
     'production home url',
-    buildAppUrl('', productionOrigin, productionBase) === `${productionOrigin}/shugyla-academy/`
+    buildAppUrl('', productionOrigin, productionBase) === `${productionOrigin}/`
   )
   assert(
     'production recovery from wrong root',
-    buildAppUrl('', productionOrigin, productionBase) === `${productionOrigin}/shugyla-academy/`
+    buildAppUrl('', productionOrigin, productionBase) === `${productionOrigin}/`
   )
   assert(
     'inside app base for platform route',
-    isInsideAppBase('/shugyla-academy/platform', productionOrigin, productionBase)
+    isInsideAppBase('/platform', productionOrigin, productionBase)
   )
   assert(
-    'outside app base for domain root',
-    !isInsideAppBase('/', productionOrigin, productionBase)
+    'GitHub Pages fallback platform url',
+    buildAppUrl('platform', fallbackOrigin, fallbackBase) === `${fallbackOrigin}/shugyla-academy/platform`
   )
   assert(
     'localhost stays at root',

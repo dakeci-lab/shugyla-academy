@@ -58,7 +58,7 @@ export function isActiveEmployeeStatus(status: string | null | undefined): boole
 }
 
 export function getTestBroadcastAppUrl(): string {
-  return '/shugyla-academy/platform/settings/notifications'
+  return '/platform/settings/notifications'
 }
 
 export { buildTestBroadcastPayload }
