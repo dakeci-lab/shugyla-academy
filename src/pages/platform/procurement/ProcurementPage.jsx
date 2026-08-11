@@ -86,6 +86,7 @@ export default function ProcurementPage() {
   const [procurementRefreshing, setProcurementRefreshing] = useState(false)
   const [ordersPage, setOrdersPage] = useState(1)
   const [ordersPageSize, setOrdersPageSize] = useState(25)
+  const [showCancelled, setShowCancelled] = useState(false)
 
   const canView = canViewPurchases(user)
   const canCreate = canCreatePurchase(user)
@@ -163,18 +164,35 @@ export default function ProcurementPage() {
       .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
   }, [stableOrders, version, dataVersion])
 
+  /**
+   * Отменённые заказы не удаляются — они доступны через фильтр «Отменённые».
+   * В календарных счётчиках и в рабочем списке их по-прежнему нет.
+   */
+  const cancelledOrders = useMemo(() => {
+    return stableOrders
+      .filter((order) => order.status === PURCHASE_STATUS.CANCELLED)
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+  }, [stableOrders, version, dataVersion])
+
   /** Список закупов выбранного дня — период из фильтра не применяем (дату задаёт навигация по неделе) */
   const dayOrders = useMemo(() => {
     if (!selectedDateKey) return []
 
-    const result = activeOrders.filter(
-      (order) => order.expectedDeliveryDate === selectedDateKey
-    )
+    const source = showCancelled ? cancelledOrders : activeOrders
+    const result = source.filter((order) => order.expectedDeliveryDate === selectedDateKey)
 
     return result.sort((a, b) =>
       (a.supplierName || '').localeCompare(b.supplierName || '', 'ru')
     )
-  }, [activeOrders, selectedDateKey])
+  }, [activeOrders, cancelledOrders, showCancelled, selectedDateKey])
+
+  const dayCancelledCount = useMemo(
+    () =>
+      selectedDateKey
+        ? cancelledOrders.filter((order) => order.expectedDeliveryDate === selectedDateKey).length
+        : 0,
+    [cancelledOrders, selectedDateKey]
+  )
 
   const ordersTotalPages = Math.max(1, Math.ceil(dayOrders.length / ordersPageSize))
   const visibleDayOrders = useMemo(() => {
@@ -186,7 +204,7 @@ export default function ProcurementPage() {
 
   useEffect(() => {
     setOrdersPage(1)
-  }, [selectedDateKey, ordersPageSize])
+  }, [selectedDateKey, ordersPageSize, showCancelled])
 
   useEffect(() => {
     if (ordersPage > ordersTotalPages) setOrdersPage(ordersTotalPages)
@@ -423,7 +441,31 @@ export default function ProcurementPage() {
       />
 
       <section className="procurement-page__section">
-        <h2 className="procurement-page__section-title">Заказы</h2>
+        <div className="procurement-page__section-head">
+          <h2 className="procurement-page__section-title">Заказы</h2>
+          <div
+            className="procurement-page__status-filter"
+            role="group"
+            aria-label="Фильтр заказов по статусу"
+          >
+            <button
+              type="button"
+              className={`btn btn--sm ${showCancelled ? 'btn--ghost' : 'btn--outline'}`}
+              onClick={() => setShowCancelled(false)}
+              aria-pressed={!showCancelled}
+            >
+              Активные
+            </button>
+            <button
+              type="button"
+              className={`btn btn--sm ${showCancelled ? 'btn--outline' : 'btn--ghost'}`}
+              onClick={() => setShowCancelled(true)}
+              aria-pressed={showCancelled}
+            >
+              Отменённые{dayCancelledCount > 0 ? ` (${dayCancelledCount})` : ''}
+            </button>
+          </div>
+        </div>
 
         {showInitialSkeleton ? (
           <DelayedLoadingSkeleton variant="list" count={5} />

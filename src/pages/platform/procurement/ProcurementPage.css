@@ -158,6 +158,24 @@
   color: #111827;
 }
 
+.procurement-page__section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.procurement-page__section-head .procurement-page__section-title {
+  margin-bottom: 12px;
+}
+
+.procurement-page__status-filter {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
 .procurement-list-panel {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);

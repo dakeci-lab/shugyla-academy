@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import {
   canViewPurchases,
@@ -10,18 +10,26 @@ import {
   getPurchaseOrderByIdSync,
   getPurchaseOrderById,
   cancelPurchaseOrder,
+  returnPurchaseOrderToDraft,
   transferPurchaseToReceiving,
   addPurchaseOrderItem,
   updatePurchaseOrderItem,
   deletePurchaseOrderItem,
 } from '../../../services/purchaseDataService'
+import {
+  getReceivingDocumentByIdSync,
+  loadReceivingDocumentById,
+} from '../../../services/receivingDataService'
 import { isSimpleWorkflow } from '../../../utils/procurementWorkflow'
 import {
   formatPurchaseDate,
   formatPurchaseAmount,
   calcLineTotal,
+  canReturnPurchaseToDraft,
   PURCHASE_STATUS,
+  RECEIVING_STARTED_MESSAGE,
 } from '../../../utils/purchaseData'
+import { isReceivingStarted } from '../../../utils/receivingData'
 import {
   exportPurchaseOrderPdf,
   exportPurchaseOrderXlsx,
@@ -37,14 +45,18 @@ import PurchaseItemForm, {
   formToPurchaseItem,
   validatePurchaseItemForm,
 } from '../../../components/procurement/PurchaseItemForm'
-import { DownloadIcon, FileTextIcon } from '../../../components/icons/PlatformIcons'
+import {
+  DownloadIcon,
+  FileTextIcon,
+  PencilIcon,
+  TrashIcon,
+} from '../../../components/icons/PlatformIcons'
 import '../../../components/admin/admin-shared.css'
 import './PurchaseDetailPage.css'
 
 /** Детальная страница закупа — /platform/procurement/:id */
 export default function PurchaseDetailPage() {
   const { id } = useParams()
-  const navigate = useNavigate()
   const { user } = useSession()
   const { version, refresh } = useAdminRefresh()
   const [message, setMessage] = useState('')
@@ -57,6 +69,8 @@ export default function PurchaseDetailPage() {
   const [exporting, setExporting] = useState(false)
   const [loadedOrder, setLoadedOrder] = useState(null)
   const [loadingOrder, setLoadingOrder] = useState(true)
+  const [loadedReceiving, setLoadedReceiving] = useState(null)
+  const [returningToDraft, setReturningToDraft] = useState(false)
 
   const canView = canViewPurchases(user)
   const canEdit = canEditPurchase(user)
@@ -69,6 +83,32 @@ export default function PurchaseDetailPage() {
   const displayItems = order?.items ?? []
   const alreadyTransferred = Boolean(order?.transferredToReceiving || order?.receivingDocumentId)
   const canEditItems = canEdit && order?.status === PURCHASE_STATUS.DRAFT
+
+  const receivingDocId = order?.receivingDocumentId || null
+  const cachedReceiving = useMemo(
+    () => (receivingDocId ? getReceivingDocumentByIdSync(receivingDocId) : null),
+    [receivingDocId, version]
+  )
+  const linkedReceiving = cachedReceiving || loadedReceiving
+  const receivingStarted = isReceivingStarted(linkedReceiving)
+
+  // Кнопка «Редактировать» показывается, только пока склад не тронул приёмку.
+  // Сервис перепроверяет это же условие на свежих данных перед записью.
+  const canReturnToDraft = canEdit && canReturnPurchaseToDraft(order, { receivingStarted })
+  // Приёмка уже началась: ни правки, ни отмены. Подсказка объясняет пустое место
+  // там, где закупщик привык видеть кнопки.
+  const editingBlockedByReceiving =
+    canEdit &&
+    receivingStarted &&
+    order?.status !== PURCHASE_STATUS.CANCELLED &&
+    order?.status !== PURCHASE_STATUS.RECEIVED
+  const canCancelOrder =
+    canEdit &&
+    order?.status !== PURCHASE_STATUS.CANCELLED &&
+    order?.status !== PURCHASE_STATUS.RECEIVED &&
+    order?.status !== PURCHASE_STATUS.DRAFT &&
+    !receivingStarted
+  const canDiscardDraft = canEdit && order?.status === PURCHASE_STATUS.DRAFT
 
   useEffect(() => {
     let cancelled = false
@@ -90,6 +130,28 @@ export default function PurchaseDetailPage() {
       cancelled = true
     }
   }, [id, version])
+
+  // Состояние связанной приёмки: из кэша, иначе одна догрузка по документу.
+  useEffect(() => {
+    if (!receivingDocId || cachedReceiving) {
+      setLoadedReceiving(null)
+      return undefined
+    }
+
+    let cancelled = false
+    void loadReceivingDocumentById(receivingDocId)
+      .then((result) => {
+        if (!cancelled) setLoadedReceiving(result)
+      })
+      .catch(() => {
+        // Недоступность документа приёмки не должна ломать карточку заказа:
+        // запись всё равно перепроверяется в сервисе.
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [receivingDocId, cachedReceiving, version])
 
   if (!canView) {
     return <PlatformAccessDenied title="Нет доступа к разделу «Закуп»" />
@@ -241,16 +303,48 @@ export default function PurchaseDetailPage() {
     }
   }
 
-  async function handleCancel() {
-    if (!canEdit) return
-    if (!window.confirm(`Отменить закуп «${order.supplierName || 'без названия'}»?`)) return
+  async function handleReturnToDraft() {
+    if (!canReturnToDraft || returningToDraft) return
+    if (
+      !window.confirm(
+        'Вернуть заказ в черновик? Ожидаемая приёмка будет снята — склад перестанет ждать поставку, пока вы не передадите заказ снова.'
+      )
+    ) {
+      return
+    }
     setError('')
+    setMessage('')
+    setReturningToDraft(true)
+    try {
+      await returnPurchaseOrderToDraft(order.id)
+      await refresh()
+      setMessage('Заказ возвращён в черновик, ожидаемая приёмка снята.')
+    } catch (err) {
+      setError(err.message || 'Не удалось вернуть заказ в черновик')
+    } finally {
+      setReturningToDraft(false)
+    }
+  }
+
+  /**
+   * Отмена заказа и мягкое удаление черновика — одно и то же действие:
+   * запись остаётся в базе, из рабочего списка уходит.
+   * Страница остаётся открытой, чтобы было видно: заказ не исчез.
+   */
+  async function handleCancel({ draft = false } = {}) {
+    if (!canEdit) return
+    const question = draft
+      ? `Удалить черновик «${order.supplierName || 'без названия'}»? Он останется в истории как отменённый.`
+      : `Отменить заказ «${order.supplierName || 'без названия'}»? Ожидаемая приёмка тоже будет отменена.`
+    if (!window.confirm(question)) return
+    setError('')
+    setMessage('')
     try {
       await cancelPurchaseOrder(order.id)
       await refresh()
-      navigate('/platform/procurement')
+      setMessage(draft ? 'Черновик удалён — он в списке отменённых.' : 'Заказ отменён, приёмка снята.')
     } catch (err) {
-      setError(err.message || 'Не удалось отменить закуп')
+      setError(err.message || 'Не удалось отменить заказ')
     }
   }
 
@@ -288,20 +382,49 @@ export default function PurchaseDetailPage() {
           >
             <FileTextIcon size={18} />
           </button>
-          {canEdit && order.status !== 'cancelled' && order.status !== 'received' && (
-            <>
-              {canTransfer && !alreadyTransferred && order.status !== 'cancelled' && (
-                <button type="button" className="btn btn--outline" onClick={handleTransfer}>
-                  Передать в приёмку
-                </button>
-              )}
-              <button type="button" className="btn btn--ghost" onClick={handleCancel}>
-                Отменить
+          {canReturnToDraft && (
+            <button
+              type="button"
+              className="btn btn--outline purchase-detail__icon-btn"
+              onClick={() => void handleReturnToDraft()}
+              disabled={returningToDraft}
+              aria-label="Редактировать заказ"
+              title="Редактировать: вернуть в черновик"
+            >
+              <PencilIcon size={18} />
+            </button>
+          )}
+          {canEdit &&
+            canTransfer &&
+            !alreadyTransferred &&
+            order.status !== PURCHASE_STATUS.CANCELLED &&
+            order.status !== PURCHASE_STATUS.RECEIVED && (
+              <button type="button" className="btn btn--outline" onClick={handleTransfer}>
+                Передать в приёмку
               </button>
-            </>
+            )}
+          {canCancelOrder && (
+            <button type="button" className="btn btn--ghost" onClick={() => void handleCancel()}>
+              Отменить заказ
+            </button>
+          )}
+          {canDiscardDraft && (
+            <button
+              type="button"
+              className="btn btn--ghost purchase-detail__icon-btn"
+              onClick={() => void handleCancel({ draft: true })}
+              aria-label="Удалить черновик"
+              title="Удалить черновик"
+            >
+              <TrashIcon size={18} />
+            </button>
           )}
         </div>
       </div>
+
+      {editingBlockedByReceiving && (
+        <p className="purchase-detail__hint">{RECEIVING_STARTED_MESSAGE}</p>
+      )}
 
       {message && <p className="purchase-detail__message">{message}</p>}
       {error && <p className="admin-form__error">{error}</p>}

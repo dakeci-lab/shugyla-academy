@@ -4,6 +4,7 @@ import {
   calcReceivingTotals,
   calcDifferenceQty,
   resolveReceivingCompleteStatus,
+  isReceivingStarted,
   RECEIVING_STATUS,
   RECEIVING_ITEM_STATUS,
 } from '../utils/receivingData'
@@ -252,6 +253,41 @@ export function deleteReceivingByPurchaseIdLocal(purchaseOrderId) {
     (item) => !docIds.includes(item.receivingDocumentId ?? item.receiving_document_id)
   )
   writeItems(allItems)
+}
+
+/**
+ * Тронул ли склад приёмку по этому закупу.
+ * Приёмка считается начатой, если документ вышел из «Ожидает приёмки»
+ * или в него уже что-то принято.
+ */
+export function getReceivingLockStateByPurchaseIdLocal(purchaseOrderId) {
+  const documents = readDocuments().filter(
+    (doc) =>
+      (doc.purchaseOrderId ?? doc.purchase_order_id) === purchaseOrderId &&
+      doc.status !== RECEIVING_STATUS.CANCELLED
+  )
+
+  return {
+    documentIds: documents.map((doc) => doc.id),
+    receivingStarted: documents.some(isReceivingStarted),
+  }
+}
+
+/** Мягкая отмена документов приёмки по закупу: данные остаются, склад их больше не ждёт */
+export function cancelReceivingByPurchaseIdLocal(purchaseOrderId) {
+  const documents = readDocuments()
+  const now = new Date().toISOString()
+  let cancelled = 0
+
+  const next = documents.map((doc) => {
+    const belongs = (doc.purchaseOrderId ?? doc.purchase_order_id) === purchaseOrderId
+    if (!belongs || doc.status === RECEIVING_STATUS.CANCELLED) return doc
+    cancelled += 1
+    return { ...doc, status: RECEIVING_STATUS.CANCELLED, updated_at: now }
+  })
+
+  if (cancelled > 0) writeDocuments(next)
+  return cancelled
 }
 
 /** Гарантирует наличие документа приёмки в localStorage (для чек-листа) */

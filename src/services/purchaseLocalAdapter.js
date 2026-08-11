@@ -1,9 +1,11 @@
 import {
   normalizePurchaseOrder,
   normalizePurchaseItem,
+  isPurchaseStatusReturnableToDraft,
   PURCHASE_STATUS,
   calcOrderTotal,
   PROCUREMENT_WORKFLOW_MODE,
+  RECEIVING_STARTED_MESSAGE,
 } from '../utils/purchaseData'
 import { SYNC_STATUS } from '../utils/syncStatus'
 import { isCloudMode } from '../lib/dataMode'
@@ -12,6 +14,8 @@ import {
   createSimpleReceivingFromPurchaseLocal,
   syncSimpleReceivingFromPurchaseLocal,
   deleteReceivingByPurchaseIdLocal,
+  cancelReceivingByPurchaseIdLocal,
+  getReceivingLockStateByPurchaseIdLocal,
   getLocalReceivingDocumentById,
 } from './receivingLocalAdapter'
 
@@ -329,7 +333,33 @@ export async function updatePurchaseOrder(orderId, updates) {
 }
 
 export async function cancelPurchaseOrder(orderId) {
+  cancelReceivingByPurchaseIdLocal(orderId)
   await updatePurchaseOrder(orderId, { status: PURCHASE_STATUS.CANCELLED })
+}
+
+/** Возврат заказа в черновик, пока склад не начал приёмку */
+export async function returnPurchaseOrderToDraft(orderId) {
+  const orders = readOrders()
+  const idx = orders.findIndex((o) => o.id === orderId)
+  if (idx < 0) throw new Error('Закуп не найден')
+
+  const current = normalizePurchaseOrder(orders[idx])
+  if (current.status === PURCHASE_STATUS.DRAFT) return current
+
+  if (!isPurchaseStatusReturnableToDraft(current.status)) {
+    throw new Error('Этот заказ уже нельзя вернуть в черновик.')
+  }
+
+  const lock = getReceivingLockStateByPurchaseIdLocal(orderId)
+  if (lock.receivingStarted) throw new Error(RECEIVING_STARTED_MESSAGE)
+
+  cancelReceivingByPurchaseIdLocal(orderId)
+
+  return updatePurchaseOrder(orderId, {
+    status: PURCHASE_STATUS.DRAFT,
+    transferredToReceiving: false,
+    receivingDocumentId: null,
+  })
 }
 
 export async function addPurchaseOrderItem(orderId, item) {

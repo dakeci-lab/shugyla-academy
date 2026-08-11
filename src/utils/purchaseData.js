@@ -42,6 +42,31 @@ export const ACTIVE_PURCHASE_STATUSES = [
   PURCHASE_STATUS.PARTIALLY_RECEIVED,
 ]
 
+/**
+ * Статусы, из которых закуп можно вернуть в черновик.
+ * Заказы из планирования создаются сразу в awaiting_receiving, поэтому именно
+ * этот статус — основной случай. Частично или полностью принятый заказ править
+ * нельзя: цифры закупщика и приёмщика разойдутся.
+ */
+export const RETURNABLE_TO_DRAFT_STATUSES = [
+  PURCHASE_STATUS.FORMED,
+  PURCHASE_STATUS.SENT,
+  PURCHASE_STATUS.AWAITING_RECEIVING,
+]
+
+export const RECEIVING_STARTED_MESSAGE = 'Склад начал приёмку — заказ изменить нельзя.'
+
+export function isPurchaseStatusReturnableToDraft(status) {
+  return RETURNABLE_TO_DRAFT_STATUSES.includes(status)
+}
+
+/** Можно ли вернуть заказ в черновик: по статусу заказа и состоянию приёмки */
+export function canReturnPurchaseToDraft(order, { receivingStarted = false } = {}) {
+  if (!order) return false
+  if (receivingStarted) return false
+  return isPurchaseStatusReturnableToDraft(order.status)
+}
+
 export function formatPurchaseAmount(amount) {
   if (amount == null || Number.isNaN(amount)) return '—'
   return `${Number(amount).toLocaleString('ru-RU')} ₸`

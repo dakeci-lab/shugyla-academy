@@ -5,6 +5,7 @@ import {
   calcReceivingTotals,
   calcDifferenceQty,
   resolveReceivingCompleteStatus,
+  isReceivingStarted,
   RECEIVING_STATUS,
   RECEIVING_ITEM_STATUS,
 } from '../utils/receivingData'
@@ -549,6 +550,56 @@ export async function syncSimpleReceivingFromPurchaseCloud(order) {
       .eq('id', docId),
     'Синхронизация документа приёмки'
   )
+}
+
+/**
+ * Тронул ли склад приёмку по этому закупу.
+ * Приёмка считается начатой, если документ вышел из «Ожидает приёмки»
+ * или в него уже что-то принято.
+ */
+export async function fetchReceivingLockStateByPurchaseIdCloud(purchaseOrderId) {
+  ensureClient()
+
+  const result = await supabase
+    .from('receiving_documents')
+    .select('id, status, total_received_qty')
+    .eq('purchase_order_id', purchaseOrderId)
+
+  const rows = await throwIfError(result, 'Проверка документов приёмки')
+  const active = (rows || []).filter((row) => row.status !== RECEIVING_STATUS.CANCELLED)
+
+  return {
+    documentIds: active.map((row) => row.id),
+    receivingStarted: active.some(isReceivingStarted),
+  }
+}
+
+/** Мягкая отмена документов приёмки по закупу: данные остаются, склад их больше не ждёт */
+export async function cancelReceivingByPurchaseIdCloud(purchaseOrderId) {
+  ensureClient()
+
+  const result = await supabase
+    .from('receiving_documents')
+    .select('id')
+    .eq('purchase_order_id', purchaseOrderId)
+    .neq('status', RECEIVING_STATUS.CANCELLED)
+
+  const rows = await throwIfError(result, 'Поиск документов приёмки')
+  const docIds = (rows || []).map((row) => row.id)
+  if (docIds.length === 0) return 0
+
+  await throwIfError(
+    await supabase
+      .from('receiving_documents')
+      .update({
+        status: RECEIVING_STATUS.CANCELLED,
+        updated_at: new Date().toISOString(),
+      })
+      .in('id', docIds),
+    'Отмена документов приёмки'
+  )
+
+  return docIds.length
 }
 
 export async function deleteReceivingByPurchaseIdCloud(purchaseOrderId) {

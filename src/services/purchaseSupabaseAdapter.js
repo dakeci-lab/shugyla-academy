@@ -3,8 +3,10 @@ import {
   normalizePurchaseOrder,
   normalizePurchaseItem,
   calcLineTotal,
+  isPurchaseStatusReturnableToDraft,
   PURCHASE_STATUS,
   PROCUREMENT_WORKFLOW_MODE,
+  RECEIVING_STARTED_MESSAGE,
 } from '../utils/purchaseData'
 
 import {
@@ -527,8 +529,58 @@ export async function deletePurchaseOrderItemCloud(orderId, itemId) {
   await recalcOrderTotals(orderId)
 }
 
+/**
+ * Отмена закупа.
+ * Связанный документ приёмки тоже отменяется — иначе склад продолжает ждать
+ * поставку по отменённому заказу.
+ */
 export async function cancelPurchaseOrderCloud(orderId) {
+  ensureClient()
+
+  const { cancelReceivingByPurchaseIdCloud } = await import('./receivingSupabaseAdapter')
+  await cancelReceivingByPurchaseIdCloud(orderId)
+
   return updatePurchaseOrderCloud(orderId, { status: PURCHASE_STATUS.CANCELLED })
+}
+
+/**
+ * Возврат заказа в черновик, чтобы закупщик мог поправить количества.
+ * Разрешён только пока склад не начал приёмку. Ожидаемая приёмка снимается:
+ * документ отменяется, а новый создастся при повторной передаче в приёмку.
+ */
+export async function returnPurchaseOrderToDraftCloud(orderId) {
+  ensureClient()
+
+  const order = await fetchOrderById(orderId)
+  if (!order) throw new Error(toUserErrorMessage('Закуп не найден', 'Закуп не найден'))
+  if (order.status === PURCHASE_STATUS.DRAFT) return order
+
+  if (!isPurchaseStatusReturnableToDraft(order.status)) {
+    throw new Error(
+      toUserErrorMessage(
+        `Нельзя вернуть в черновик заказ в статусе ${order.status}`,
+        'Этот заказ уже нельзя вернуть в черновик.'
+      )
+    )
+  }
+
+  const { fetchReceivingLockStateByPurchaseIdCloud, cancelReceivingByPurchaseIdCloud } =
+    await import('./receivingSupabaseAdapter')
+
+  // Повторная проверка на свежих данных: между рендером кнопки и кликом
+  // склад мог начать приёмку.
+  const lock = await fetchReceivingLockStateByPurchaseIdCloud(orderId)
+  if (lock.receivingStarted) {
+    throw new Error(toUserErrorMessage(RECEIVING_STARTED_MESSAGE, RECEIVING_STARTED_MESSAGE))
+  }
+
+  await cancelReceivingByPurchaseIdCloud(orderId)
+
+  return updatePurchaseOrderCloud(orderId, {
+    status: PURCHASE_STATUS.DRAFT,
+    transferredToReceiving: false,
+    receivingDocumentId: null,
+  })
 }
 
 export function getCloudPurchasesBundleFromOrders(orders) {

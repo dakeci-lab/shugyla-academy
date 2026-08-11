@@ -94,6 +94,19 @@ export async function cancelPurchaseOrder(orderId) {
   await afterPurchaseMutation()
 }
 
+/**
+ * Возврат заказа в черновик для правки количеств.
+ * Ожидаемая приёмка при этом снимается — новый документ создастся при
+ * повторной передаче в приёмку.
+ */
+export async function returnPurchaseOrderToDraft(orderId) {
+  const result = isCloudMode()
+    ? await cloud.returnPurchaseOrderToDraftCloud(orderId)
+    : await local.returnPurchaseOrderToDraft(orderId)
+  await afterPurchaseMutation()
+  return result
+}
+
 export async function deletePurchaseOrder(orderId) {
   if (isCloudMode()) {
     await cloud.deletePurchaseOrderCloud(orderId)

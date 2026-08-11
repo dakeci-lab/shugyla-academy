@@ -91,6 +91,18 @@ export function normalizeReceivingItem(raw) {
   }
 }
 
+/**
+ * Начал ли склад приёмку по документу.
+ * Единственное определение на весь проект — им пользуются и UI, и адаптеры.
+ * Принимает как доменную модель, так и сырую строку БД.
+ */
+export function isReceivingStarted(doc) {
+  if (!doc) return false
+  if (doc.status === RECEIVING_STATUS.CANCELLED) return false
+  const received = Number(doc.totalReceivedQty ?? doc.total_received_qty ?? 0)
+  return doc.status !== RECEIVING_STATUS.AWAITING_RECEIVING || received > 0
+}
+
 export function normalizeReceivingDocument(raw, items = []) {
   if (!raw) return null
   const normalizedItems = (items.length ? items : raw.items || []).map(normalizeReceivingItem)
