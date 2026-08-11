@@ -58,6 +58,8 @@
     "verify:mobile-page-header": "node scripts/verify-mobile-page-header.mjs",
     "verify:procurement-calendar-filter": "node scripts/verify-procurement-calendar-filter.mjs",
     "verify:procurement-planning-v1": "node scripts/verify-procurement-planning-v1.mjs",
+    "verify:procurement-snapshot-guard-static": "node scripts/verify-procurement-snapshot-guard.mjs --static-only",
+    "supabase:local:verify-procurement-snapshot-guard": "node scripts/verify-procurement-snapshot-guard.mjs",
     "verify:procurement-partial-generation": "node scripts/verify-procurement-partial-generation.mjs",
     "verify:procurement-norms-ui": "node scripts/verify-procurement-norms-ui.mjs",
     "verify:procurement-pagination-ux": "node scripts/verify-procurement-pagination-ux.mjs",
