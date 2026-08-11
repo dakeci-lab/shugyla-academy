@@ -2,16 +2,16 @@
 
 const SCOPE_URL = new URL(self.registration.scope)
 const BASE = SCOPE_URL.pathname.endsWith('/') ? SCOPE_URL.pathname : `${SCOPE_URL.pathname}/`
-const CACHE_NAME = 'shugyla-academy-shell-v6'
+const CACHE_NAME = 'shugyla-academy-shell-v7'
 const SHELL_CACHE_PREFIX = 'shugyla-academy-shell-'
 const CANONICAL_PLATFORM_PATH = `${BASE.replace(/\/$/, '')}/platform`
 
 const SHELL_URLS = [
   `${BASE}offline.html`,
   `${BASE}manifest.webmanifest`,
-  `${BASE}icons/icon-192.png`,
-  `${BASE}icons/icon-512.png`,
-  `${BASE}icons/apple-touch-icon.png`,
+  `${BASE}pwa-icons/icon-192.png`,
+  `${BASE}pwa-icons/icon-512.png`,
+  `${BASE}pwa-icons/apple-touch-icon.png`,
 ]
 
 function isSupabaseOrExternal(url) {
@@ -201,7 +201,7 @@ function resolveSafeNotificationUrl(rawUrl) {
 
 function resolveAssetUrl(relativePath) {
   const normalized = String(relativePath || '').trim()
-  if (!normalized) return `${self.location.origin}${BASE}icons/icon-192.png`
+  if (!normalized) return `${self.location.origin}${BASE}pwa-icons/icon-192.png`
   if (/^https?:\/\//i.test(normalized)) return normalized
   const withoutLegacyBase = normalized.replace(/^\/shugyla-academy\//, '')
   const path = `${BASE}${withoutLegacyBase.replace(/^\/+/, '')}`
@@ -212,8 +212,8 @@ function normalizePushPayload(event) {
   const fallback = {
     title: 'Shugyla Platform',
     body: 'У вас новое уведомление',
-    icon: resolveAssetUrl('icons/icon-192.png'),
-    badge: resolveAssetUrl('icons/icon-192.png'),
+    icon: resolveAssetUrl('pwa-icons/icon-192.png'),
+    badge: resolveAssetUrl('pwa-icons/icon-192.png'),
     tag: 'shugyla-notification',
     data: {
       url: normalizeNotificationDestination(`${CANONICAL_PLATFORM_PATH}`),
@@ -336,8 +336,8 @@ async function handlePushEvent(event) {
 
     await self.registration.showNotification('Shugyla Platform', {
       body: payload.body || 'У вас новое уведомление',
-      icon: resolveAssetUrl('icons/icon-192.png'),
-      badge: resolveAssetUrl('icons/icon-192.png'),
+      icon: resolveAssetUrl('pwa-icons/icon-192.png'),
+      badge: resolveAssetUrl('pwa-icons/icon-192.png'),
       tag: payload.tag || 'shugyla-notification-fallback',
       data: payload.data,
       renotify: false,

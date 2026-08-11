@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { copyFileSync, writeFileSync } from 'fs'
+import { copyFileSync, cpSync, writeFileSync } from 'fs'
 import { resolve } from 'path'
 
 function normalizeBasePath(value) {
@@ -27,6 +27,10 @@ export default defineConfig(({ command }) => {
         name: 'static-spa-output',
         closeBundle() {
           const dist = resolve(__dirname, 'dist')
+          // `/icons/` is reserved by Apache on some Plesk hosts. Publish the
+          // PWA assets under a neutral path while keeping the legacy copy for
+          // the GitHub Pages fallback and already-installed clients.
+          cpSync(resolve(dist, 'icons'), resolve(dist, 'pwa-icons'), { recursive: true })
           copyFileSync(resolve(dist, 'index.html'), resolve(dist, '404.html'))
           writeFileSync(resolve(dist, '.nojekyll'), '')
           writeFileSync(

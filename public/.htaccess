@@ -1,5 +1,9 @@
 Options -MultiViews
 
+<IfModule mod_mime.c>
+  AddType application/manifest+json .webmanifest
+</IfModule>
+
 RewriteEngine On
 RewriteCond %{HTTP_HOST} ^www\.shugyla-market\.kz$ [NC]
 RewriteRule ^ https://shugyla-market.kz%{REQUEST_URI} [R=301,L]

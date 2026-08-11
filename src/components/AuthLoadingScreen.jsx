@@ -1,6 +1,6 @@
 import './AuthLoadingScreen.css'
 
-const LOGO_SRC = `${import.meta.env.BASE_URL}icons/icon-192.png`
+const LOGO_SRC = `${import.meta.env.BASE_URL}pwa-icons/icon-192.png`
 
 /**
  * Logo-only fullscreen loading surface.

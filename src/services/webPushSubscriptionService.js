@@ -693,8 +693,8 @@ export async function showDevelopmentTestNotification() {
   const base = import.meta.env.BASE_URL
   await registration.showNotification('Shugyla Platform', {
     body: 'Тестовое локальное уведомление',
-    icon: `${base}icons/icon-192.png`,
-    badge: `${base}icons/icon-192.png`,
+    icon: `${base}pwa-icons/icon-192.png`,
+    badge: `${base}pwa-icons/icon-192.png`,
     tag: 'shugyla-dev-test',
     data: {
       url: `${base}platform/profile`,
