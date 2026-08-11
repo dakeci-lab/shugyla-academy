@@ -92,7 +92,9 @@ test('3. Anonymous jobs home careers branding + network', async ({ page }) => {
   const guard = attachConsoleGuard(page)
   const net = attachPublicNetworkGuard(page, { mode: 'hub' })
   await page.goto(careersUrl('/'), { waitUntil: 'domcontentloaded' })
-  await expect(page.getByRole('heading', { level: 1 })).toContainText(/Shugyla Market|команды|командасының/i)
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(
+    /Работа рядом с домом|Shugyla Market|команды|командасының/i
+  )
   await expect(page.getByText('Кассир')).toBeVisible({ timeout: 30_000 })
   await expect(page.getByText('Продавец')).toBeVisible()
   await assertPublicShell(page, 'anon-hub')
