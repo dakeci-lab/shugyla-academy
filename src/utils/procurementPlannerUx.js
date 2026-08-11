@@ -257,20 +257,220 @@ export function applyItemDeltaToFilterOptions(filterOptions, oldItem, newItem) {
   }
 }
 
-/** Aggregate progress copy from supplier-level counters. */
+const APP_TZ_WEEKDAY_SHORT_TO_ID = Object.freeze({
+  Sun: 'sun',
+  Mon: 'mon',
+  Tue: 'tue',
+  Wed: 'wed',
+  Thu: 'thu',
+  Fri: 'fri',
+  Sat: 'sat',
+})
+
+/** Weekday id (sun..sat) for a date in Asia/Almaty (or injected timeZone). */
+export function getAppTimezoneWeekdayId(date = new Date(), timeZone = 'Asia/Almaty') {
+  const short = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    weekday: 'short',
+  }).format(date)
+  return APP_TZ_WEEKDAY_SHORT_TO_ID[short] || null
+}
+
+/** Normalize supplier name for legacy id↔name matching. */
+export function normalizeSupplierMatchName(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+}
+
+/**
+ * Unique active suppliers scheduled for today (deliveryWeekdays).
+ * Same source semantics as «Визиты поставщиков».
+ * @param {Array<object>} suppliers
+ * @param {{ now?: Date, weekdayId?: string|null, timeZone?: string }} [options]
+ */
+export function listTodaysScheduledSuppliers(
+  suppliers,
+  { now = new Date(), weekdayId = null, timeZone = 'Asia/Almaty' } = {}
+) {
+  const dayId = weekdayId || getAppTimezoneWeekdayId(now, timeZone)
+  if (!dayId) return []
+
+  const seen = new Set()
+  const result = []
+  for (const supplier of suppliers || []) {
+    if (!supplier?.id || seen.has(supplier.id)) continue
+    if (supplier.status !== 'active') continue
+    if (
+      !Array.isArray(supplier.deliveryWeekdays) ||
+      !supplier.deliveryWeekdays.includes(dayId)
+    ) {
+      continue
+    }
+    seen.add(supplier.id)
+    result.push(supplier)
+  }
+  return result
+}
+
+function buildSnapshotSupplierLookups(snapshotSuppliers) {
+  const byId = new Map()
+  const byName = new Map()
+  for (const summary of snapshotSuppliers || []) {
+    if (summary?.id) byId.set(summary.id, summary)
+    const name = normalizeSupplierMatchName(summary?.name)
+    if (name && !byName.has(name)) byName.set(name, summary)
+  }
+  return { byId, byName }
+}
+
+function findSnapshotSummaryForSupplier(supplier, lookups) {
+  if (!supplier) return null
+  if (supplier.id && lookups.byId.has(supplier.id)) {
+    return lookups.byId.get(supplier.id)
+  }
+  const name = normalizeSupplierMatchName(supplier.name)
+  if (name && lookups.byName.has(name)) return lookups.byName.get(name)
+  return null
+}
+
+function isSnapshotSupplierScheduled(summary, scheduledIds, scheduledNames) {
+  if (summary?.id && scheduledIds.has(summary.id)) return true
+  const name = normalizeSupplierMatchName(summary?.name)
+  return Boolean(name && scheduledNames.has(name))
+}
+
+function mergeSupplierSelectRow(base, summary) {
+  const id = base?.id || summary?.id
+  const name = base?.name || summary?.name || id || ''
+  const merged = {
+    ...(summary || emptySupplierSummary(id, name)),
+    id,
+    name,
+    status: base?.status || 'active',
+  }
+  if (base && Object.prototype.hasOwnProperty.call(base, 'linkedToUmag')) {
+    merged.linkedToUmag = base.linkedToUmag
+  }
+  if (base && Object.prototype.hasOwnProperty.call(base, 'isUmagActive')) {
+    merged.isUmagActive = base.isUmagActive
+  }
+  return merged
+}
+
+function sortSupplierSelectRows(rows) {
+  return [...rows].sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+}
+
+/**
+ * Build supplier rows for the planner selector.
+ * - today: scheduled active visits (even without snapshot rows)
+ * - all: active catalog enriched with snapshot + leftover snapshot-only legacy rows
+ */
+export function buildPlannerSupplierSelectOptions({
+  scope = 'today',
+  scheduledSuppliers = [],
+  catalogSuppliers = [],
+  snapshotSuppliers = [],
+} = {}) {
+  const lookups = buildSnapshotSupplierLookups(snapshotSuppliers)
+
+  if (scope === 'today') {
+    return sortSupplierSelectRows(
+      (scheduledSuppliers || [])
+        .filter((supplier) => supplier?.id)
+        .map((supplier) =>
+          mergeSupplierSelectRow(supplier, findSnapshotSummaryForSupplier(supplier, lookups))
+        )
+    )
+  }
+
+  const rows = []
+  const seenIds = new Set()
+  const seenNames = new Set()
+  const consumedSummaryIds = new Set()
+
+  for (const supplier of catalogSuppliers || []) {
+    if (!supplier?.id || supplier.isMerged) continue
+    if (supplier.status !== 'active') continue
+    if (seenIds.has(supplier.id)) continue
+    const summary = findSnapshotSummaryForSupplier(supplier, lookups)
+    if (summary?.id) consumedSummaryIds.add(summary.id)
+    const row = mergeSupplierSelectRow(supplier, summary)
+    seenIds.add(row.id)
+    const nameKey = normalizeSupplierMatchName(row.name)
+    if (nameKey) seenNames.add(nameKey)
+    rows.push(row)
+  }
+
+  for (const summary of snapshotSuppliers || []) {
+    if (!summary?.id || consumedSummaryIds.has(summary.id) || seenIds.has(summary.id)) continue
+    const nameKey = normalizeSupplierMatchName(summary.name)
+    if (nameKey && seenNames.has(nameKey)) continue
+    seenIds.add(summary.id)
+    if (nameKey) seenNames.add(nameKey)
+    rows.push(mergeSupplierSelectRow({ id: summary.id, name: summary.name, status: 'active' }, summary))
+  }
+
+  return sortSupplierSelectRows(rows)
+}
+
+/** Whether a selected supplier id belongs to today's scheduled visits. */
+export function isSupplierInTodaySchedule(
+  supplierId,
+  scheduledSuppliers = [],
+  snapshotSuppliers = []
+) {
+  if (!supplierId) return false
+  if ((scheduledSuppliers || []).some((supplier) => supplier?.id === supplierId)) return true
+
+  const summary = (snapshotSuppliers || []).find((row) => row?.id === supplierId)
+  if (!summary) return false
+  const nameKey = normalizeSupplierMatchName(summary.name)
+  if (!nameKey) return false
+  return (scheduledSuppliers || []).some(
+    (supplier) => normalizeSupplierMatchName(supplier?.name) === nameKey
+  )
+}
+
+/**
+ * Progress for today's scheduled visits vs snapshot supplier summaries.
+ * Snapshot suppliers outside today's schedule are not in the denominator.
+ */
 export function formatOrdersProgress({
-  generatedSupplierCount = 0,
-  pendingSupplierCount = 0,
+  scheduledSuppliers = [],
+  snapshotSuppliers = [],
   unassignedOrderableCount = 0,
   inconsistentSupplierCount = 0,
 } = {}) {
-  const total = generatedSupplierCount + pendingSupplierCount
-  const remaining = pendingSupplierCount
-  const createdLabel =
-    total === 0
-      ? 'Заказов пока нет'
-      : `Создано ${generatedSupplierCount} из ${total} заказов`
-  const remainingLabel = remaining > 0 ? `Осталось ${remaining}` : null
+  const scheduled = Array.isArray(scheduledSuppliers) ? scheduledSuppliers : []
+  const scheduledTotal = scheduled.length
+  const lookups = buildSnapshotSupplierLookups(snapshotSuppliers)
+
+  const scheduledIds = new Set()
+  const scheduledNames = new Set()
+  let createdToday = 0
+
+  for (const supplier of scheduled) {
+    if (supplier?.id) scheduledIds.add(supplier.id)
+    const name = normalizeSupplierMatchName(supplier?.name)
+    if (name) scheduledNames.add(name)
+
+    const summary = findSnapshotSummaryForSupplier(supplier, lookups)
+    if (summary && isSupplierOrderCreated(summary)) createdToday += 1
+  }
+
+  let unscheduledCount = 0
+  for (const summary of snapshotSuppliers || []) {
+    const status = summary?.planningStatus || getSupplierPlanningStatus(summary)
+    if (status !== 'created' && status !== 'draft') continue
+    if (!isSnapshotSupplierScheduled(summary, scheduledIds, scheduledNames)) {
+      unscheduledCount += 1
+    }
+  }
+
+  const remaining = Math.max(0, scheduledTotal - createdToday)
   const unassignedLabel =
     unassignedOrderableCount > 0
       ? `Без поставщика: ${unassignedOrderableCount} позиций`
@@ -279,19 +479,40 @@ export function formatOrdersProgress({
     inconsistentSupplierCount > 0
       ? `Расхождение: ${inconsistentSupplierCount}`
       : null
+  const unscheduledLabel =
+    unscheduledCount > 0 ? `Вне графика: ${unscheduledCount}` : null
+
+  if (scheduledTotal === 0) {
+    return {
+      createdLabel: 'На сегодня визиты не запланированы',
+      remainingLabel: null,
+      unscheduledLabel,
+      unassignedLabel,
+      inconsistentLabel,
+      allDone: false,
+      total: 0,
+      remaining: 0,
+      createdToday: 0,
+      unscheduledCount,
+    }
+  }
+
   const allDone =
-    total > 0 &&
     remaining === 0 &&
     unassignedOrderableCount === 0 &&
     inconsistentSupplierCount === 0
+
   return {
-    createdLabel,
-    remainingLabel,
+    createdLabel: `Сегодня: создано ${createdToday} из ${scheduledTotal}`,
+    remainingLabel: remaining > 0 ? `Осталось ${remaining}` : null,
+    unscheduledLabel,
     unassignedLabel,
     inconsistentLabel,
     allDone,
-    total,
+    total: scheduledTotal,
     remaining,
+    createdToday,
+    unscheduledCount,
   }
 }
 
@@ -397,11 +618,11 @@ export function getExportTooltip({
   orderCreated = false,
 } = {}) {
   if (disabledReason) return disabledReason
-  return orderCreated ? 'Скачать заказ: PDF или Excel' : 'Скачать черновик: PDF или Excel'
+  return orderCreated ? 'Скачать заказ: PDF или Excel' : 'Скачать план: PDF или Excel'
 }
 
 export function getExportMenuLabel(orderCreated = false) {
-  return orderCreated ? 'Скачать заказ' : 'Скачать черновик'
+  return orderCreated ? 'Скачать заказ' : 'Скачать план'
 }
 
 export const EMPTY_SUPPLIER_EXPORT_MESSAGE = 'Нет позиций заказа для выгрузки'

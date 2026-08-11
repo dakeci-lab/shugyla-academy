@@ -45,7 +45,6 @@ import SimpleCreatePurchaseForm, {
 import SimplePurchaseTable from '../../../components/procurement/SimplePurchaseTable'
 import PurchaseTable from '../../../components/procurement/PurchaseTable'
 import WeekScheduleNav from '../../../components/procurement/WeekScheduleNav'
-import ProcurementPlanDayList from '../../../components/procurement/ProcurementPlanDayList'
 import ProcurementPlannerView from '../../../components/procurement/ProcurementPlannerView'
 import ProcurementNormsView from '../../../components/procurement/ProcurementNormsView'
 import TablePagination from '../../../components/procurement/TablePagination'
@@ -68,7 +67,6 @@ export default function ProcurementPage() {
     void ensureModules(['suppliers', 'procurement', 'receiving'])
   }, [ensureModules])
   const {
-    weekStartKey,
     selectedDateKey,
     setSelectedDateKey,
     weekDates,
@@ -422,16 +420,6 @@ export default function ProcurementPage() {
         onNextWeek={() => changeWeek(1)}
         onToday={goToday}
         onSelectDate={setSelectedDateKey}
-      />
-
-      <ProcurementPlanDayList
-        weekStartKey={weekStartKey}
-        selectedDateKey={selectedDateKey}
-        version={version}
-        dataVersion={dataVersion}
-        orders={stableOrders}
-        canCreate={false}
-        onCreatePurchase={openCreate}
       />
 
       <section className="procurement-page__section">

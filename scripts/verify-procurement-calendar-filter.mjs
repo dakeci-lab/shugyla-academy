@@ -76,14 +76,13 @@ function stageBackdropAndToolbar() {
   assert('planning tab remains entry point', page.includes('ProcurementPlannerView'))
   assert('norms tab is available', page.includes('ProcurementNormsView'))
   assert('orders use unified table', page.includes('<PurchaseTable'))
-  assert('supplier visit plan remains reference-only', page.includes('canCreate={false}'))
+  assert(
+    'Orders tab no plan visit list',
+    !page.includes('ProcurementPlanDayList') && !page.includes('Визиты поставщиков')
+  )
   assert(
     'order calendar counts only created orders',
     page.includes('const counts = {}') && !page.includes('const expectedEntriesByDate')
-  )
-  assert(
-    'supplier visits have visible numbering',
-    read('src/components/procurement/ProcurementPlanDayList.jsx').includes('{index + 1}')
   )
   assert(
     'receiving calendar counts receiving documents only',

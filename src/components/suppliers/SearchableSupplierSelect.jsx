@@ -16,6 +16,10 @@ import './SearchableSupplierSelect.css'
  * @param {(supplierId: string, supplier: object|null) => void} props.onChange
  * @param {(supplier: object) => React.ReactNode} [props.renderOptionLabel] — optional full option content
  * @param {(supplier: object) => React.ReactNode} [props.renderOptionStatus] — optional status accessory
+ * @param {boolean} [props.loading] — show loading empty-state instead of «not found»
+ * @param {string} [props.loadingLabel]
+ * @param {string} [props.emptyLabel]
+ * @param {React.ReactNode} [props.dropdownHeader] — optional content above the search field
  */
 export default function SearchableSupplierSelect({
   suppliers: suppliersProp,
@@ -29,6 +33,10 @@ export default function SearchableSupplierSelect({
   activeOnly = true,
   renderOptionLabel = null,
   renderOptionStatus = null,
+  loading = false,
+  loadingLabel = 'Загрузка поставщиков…',
+  emptyLabel = 'Поставщики не найдены',
+  dropdownHeader = null,
 }) {
   const autoId = useId()
   const controlId = idProp || autoId
@@ -74,10 +82,10 @@ export default function SearchableSupplierSelect({
   }, [])
 
   const open = useCallback(() => {
-    if (disabled) return
+    if (disabled || loading) return
     setIsOpen(true)
     setHighlightedIndex(-1)
-  }, [disabled])
+  }, [disabled, loading])
 
   const selectSupplier = useCallback(
     (supplier) => {
@@ -113,7 +121,7 @@ export default function SearchableSupplierSelect({
   }, [highlightedIndex, isOpen])
 
   function handleTriggerKeyDown(event) {
-    if (disabled) return
+    if (disabled || loading) return
 
     switch (event.key) {
       case 'ArrowDown':
@@ -203,10 +211,12 @@ export default function SearchableSupplierSelect({
   const displayValue = selectedSupplier?.name || placeholder
   const hasSelection = Boolean(selectedSupplier)
 
+  const controlDisabled = disabled || loading
+
   return (
     <div
       ref={rootRef}
-      className={`searchable-supplier-select${isOpen ? ' searchable-supplier-select--open' : ''}${disabled ? ' searchable-supplier-select--disabled' : ''}`}
+      className={`searchable-supplier-select${isOpen ? ' searchable-supplier-select--open' : ''}${controlDisabled ? ' searchable-supplier-select--disabled' : ''}`}
     >
       <button
         ref={triggerRef}
@@ -215,7 +225,8 @@ export default function SearchableSupplierSelect({
         className="searchable-supplier-select__trigger"
         onClick={handleTriggerClick}
         onKeyDown={handleTriggerKeyDown}
-        disabled={disabled}
+        disabled={controlDisabled}
+        aria-busy={loading || undefined}
         aria-haspopup="listbox"
         aria-expanded={isOpen}
         aria-controls={isOpen ? listboxId : undefined}
@@ -237,6 +248,10 @@ export default function SearchableSupplierSelect({
           onMouseDown={handleDropdownClick}
           onClick={handleDropdownClick}
         >
+          {dropdownHeader ? (
+            <div className="searchable-supplier-select__header">{dropdownHeader}</div>
+          ) : null}
+
           <div className="searchable-supplier-select__search">
             <SearchIcon size={16} />
             <input
@@ -265,7 +280,7 @@ export default function SearchableSupplierSelect({
           >
             {filteredSuppliers.length === 0 ? (
               <li className="searchable-supplier-select__empty" role="presentation">
-                Поставщики не найдены
+                {loading ? loadingLabel : emptyLabel}
               </li>
             ) : (
               filteredSuppliers.map((supplier, index) => {

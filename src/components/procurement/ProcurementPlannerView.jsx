@@ -20,6 +20,10 @@ import {
   syncProcurementPlanning,
   updateItemFinalOrderQty,
 } from '../../services/procurementPlanningService'
+import {
+  getCachedFilterOptions,
+  setCachedFilterOptions,
+} from '../../services/procurementFilterOptionsCache.js'
 import AdminModal from '../admin/AdminModal'
 import ConfirmDialog from '../admin/ConfirmDialog'
 import SearchableSupplierSelect from '../suppliers/SearchableSupplierSelect'
@@ -39,11 +43,12 @@ import {
   exportProcurementPlanPdf,
   exportProcurementPlanXlsx,
 } from '../../utils/procurementPlanExport'
+import { getAllSuppliersSync } from '../../utils/supplierData'
 import {
-  SUPPLIER_PLANNING_STATUS_LABELS,
   EMPTY_SUPPLIER_EXPORT_MESSAGE,
   applyItemDeltaToFilterOptions,
   applySaveResultToFailedIds,
+  buildPlannerSupplierSelectOptions,
   filterItemsForSupplierPlanExport,
   formatOrdersProgress,
   getCreateOrderDisabledReason,
@@ -57,7 +62,9 @@ import {
   getSyncTooltip,
   hasFailedSaves,
   isItemQuantityLocked,
+  isSupplierInTodaySchedule,
   isSupplierOrderCreated,
+  listTodaysScheduledSuppliers,
 } from '../../utils/procurementPlannerUx'
 import './ProcurementPlannerView.css'
 
@@ -123,8 +130,9 @@ function PlannerTooltipButton({ tooltip, className = '', children, ...rest }) {
 
 export default function ProcurementPlannerView() {
   const { user } = useSession()
-  const { reloadProcurement } = usePlatformData()
+  const { reloadProcurement, version: dataVersion } = usePlatformData()
   const { error: showError, success: showSuccess } = useToast()
+  void dataVersion
 
   const canEditPlan = can(user, PERMISSION_CODES.PROCUREMENT_EDIT)
   const canSync = canEditPlan
@@ -145,6 +153,9 @@ export default function ProcurementPlannerView() {
     orderableOnly: false,
   })
   const [filterOptions, setFilterOptions] = useState(EMPTY_FILTER_OPTIONS)
+  const [filterOptionsLoading, setFilterOptionsLoading] = useState(false)
+  const [filterOptionsSnapshotId, setFilterOptionsSnapshotId] = useState('')
+  const [supplierScope, setSupplierScope] = useState('today')
   const [filterOpen, setFilterOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -185,7 +196,51 @@ export default function ProcurementPlannerView() {
     []
   )
 
-  const loadSnapshotMeta = useCallback(async () => {
+  const applyFilterOptions = useCallback((snapshotId, options) => {
+    setFilterOptions(options || EMPTY_FILTER_OPTIONS)
+    setFilterOptionsSnapshotId(snapshotId || '')
+  }, [])
+
+  const loadFilterOptions = useCallback(
+    async (snapshotId, { forceRefresh = false } = {}) => {
+      if (!snapshotId) {
+        applyFilterOptions('', EMPTY_FILTER_OPTIONS)
+        setFilterOptionsLoading(false)
+        return
+      }
+
+      const cached = getCachedFilterOptions(snapshotId)
+      if (cached?.options) {
+        applyFilterOptions(snapshotId, cached.options)
+        setFilterOptionsLoading(false)
+      } else {
+        setFilterOptionsLoading(true)
+      }
+
+      try {
+        await fetchSnapshotFilterOptions(snapshotId, {
+          forceRefresh,
+          onCached: (cachedOptions) => {
+            applyFilterOptions(snapshotId, cachedOptions)
+            setFilterOptionsLoading(false)
+          },
+          onFresh: (freshOptions) => {
+            applyFilterOptions(snapshotId, freshOptions)
+            setFilterOptionsLoading(false)
+          },
+        })
+      } catch (err) {
+        if (!getCachedFilterOptions(snapshotId)?.options) {
+          showError(err.message || 'Не удалось загрузить фильтры')
+        }
+      } finally {
+        setFilterOptionsLoading(false)
+      }
+    },
+    [applyFilterOptions, showError]
+  )
+
+  const loadSnapshotMeta = useCallback(async ({ forceFilterRefresh = false } = {}) => {
     if (!isCloudMode()) {
       setSnapshot(null)
       setLoading(false)
@@ -195,15 +250,15 @@ export default function ProcurementPlannerView() {
       const snap = await fetchLatestProcurementSnapshot()
       setSnapshot(snap)
       if (snap?.id) {
-        const opts = await fetchSnapshotFilterOptions(snap.id)
-        setFilterOptions(opts)
+        await loadFilterOptions(snap.id, { forceRefresh: forceFilterRefresh })
       } else {
-        setFilterOptions(EMPTY_FILTER_OPTIONS)
+        applyFilterOptions('', EMPTY_FILTER_OPTIONS)
+        setFilterOptionsLoading(false)
       }
     } catch (err) {
       showError(err.message || 'Не удалось загрузить снимок')
     }
-  }, [showError])
+  }, [applyFilterOptions, loadFilterOptions, showError])
 
   const loadItems = useCallback(async () => {
     if (!snapshot?.id || snapshot.status === 'syncing' || snapshot.status === 'failed') {
@@ -261,7 +316,7 @@ export default function ProcurementPlannerView() {
         return
       }
       showSuccess(`Синхронизировано: ${result.itemCount} SKU`)
-      await loadSnapshotMeta()
+      await loadSnapshotMeta({ forceFilterRefresh: true })
       await loadItems()
     } catch (err) {
       showError(err?.message || 'Не удалось синхронизировать план')
@@ -307,7 +362,11 @@ export default function ProcurementPlannerView() {
     beginPendingSave(item.id)
     try {
       const updated = await updateItemFinalOrderQty(item, rawValue)
-      setFilterOptions((prev) => applyItemDeltaToFilterOptions(prev, item, updated))
+      setFilterOptions((prev) => {
+        const next = applyItemDeltaToFilterOptions(prev, item, updated)
+        if (snapshot?.id) setCachedFilterOptions(snapshot.id, next)
+        return next
+      })
       await loadItems()
       endPendingSave(item.id, true)
     } catch (err) {
@@ -320,7 +379,11 @@ export default function ProcurementPlannerView() {
     beginPendingSave(item.id)
     try {
       const updated = await resetItemToRecommendation(item)
-      setFilterOptions((prev) => applyItemDeltaToFilterOptions(prev, item, updated))
+      setFilterOptions((prev) => {
+        const next = applyItemDeltaToFilterOptions(prev, item, updated)
+        if (snapshot?.id) setCachedFilterOptions(snapshot.id, next)
+        return next
+      })
       await loadItems()
       endPendingSave(item.id, true)
     } catch (err) {
@@ -356,11 +419,6 @@ export default function ProcurementPlannerView() {
     return pairs.filter((p) => p.categoryName === filters.categoryName)
   }, [filterOptions.categorySubcategories, filters.categoryName])
 
-  const selectedSupplier = useMemo(
-    () => filterOptions.suppliers.find((supplier) => supplier.id === filters.platformSupplierId),
-    [filterOptions.suppliers, filters.platformSupplierId]
-  )
-  const selectedSupplierSummary = selectedSupplier || null
   const snapshotEditable = snapshot?.status === 'ready' || snapshot?.status === 'partially_generated'
 
   async function runPlanExport(format) {
@@ -444,7 +502,7 @@ export default function ProcurementPlannerView() {
       })
       setGenerateOpen(false)
       setConfirmGenerate(false)
-      await loadSnapshotMeta()
+      await loadSnapshotMeta({ forceFilterRefresh: true })
       await loadItems()
       await reloadProcurement()
     } catch (err) {
@@ -454,16 +512,61 @@ export default function ProcurementPlannerView() {
     }
   }
 
+  const scheduledTodaysSuppliers = useMemo(
+    () => listTodaysScheduledSuppliers(getAllSuppliersSync()),
+    [dataVersion]
+  )
+
   const ordersProgress = useMemo(
     () =>
       formatOrdersProgress({
-        generatedSupplierCount: filterOptions.generatedSupplierCount || 0,
-        pendingSupplierCount: filterOptions.pendingSupplierCount || 0,
+        scheduledSuppliers: scheduledTodaysSuppliers,
+        snapshotSuppliers: filterOptions.suppliers || [],
         unassignedOrderableCount: filterOptions.unassignedOrderableCount || 0,
         inconsistentSupplierCount: filterOptions.inconsistentSupplierCount || 0,
       }),
-    [filterOptions]
+    [filterOptions, scheduledTodaysSuppliers]
   )
+
+  const supplierSelectOptions = useMemo(
+    () =>
+      buildPlannerSupplierSelectOptions({
+        scope: supplierScope,
+        scheduledSuppliers: scheduledTodaysSuppliers,
+        catalogSuppliers: getAllSuppliersSync(),
+        snapshotSuppliers: filterOptions.suppliers || [],
+      }),
+    [supplierScope, scheduledTodaysSuppliers, filterOptions.suppliers, dataVersion]
+  )
+
+  const selectedSupplier = useMemo(() => {
+    const selectedId = filters.platformSupplierId
+    if (!selectedId) return null
+    return (
+      supplierSelectOptions.find((supplier) => supplier.id === selectedId) ||
+      filterOptions.suppliers.find((supplier) => supplier.id === selectedId) ||
+      null
+    )
+  }, [filters.platformSupplierId, supplierSelectOptions, filterOptions.suppliers])
+  const selectedSupplierSummary = selectedSupplier || null
+
+  function handleSupplierScopeChange(nextScope) {
+    setSupplierScope(nextScope)
+    if (nextScope !== 'today') return
+    if (
+      filters.platformSupplierId &&
+      !isSupplierInTodaySchedule(
+        filters.platformSupplierId,
+        scheduledTodaysSuppliers,
+        filterOptions.suppliers || []
+      )
+    ) {
+      setFilters((current) => ({
+        ...current,
+        platformSupplierId: '',
+      }))
+    }
+  }
 
   const workflow = useMemo(
     () =>
@@ -526,16 +629,9 @@ export default function ProcurementPlannerView() {
           ? 'Ошибка сохранения'
           : null
 
-  function renderSupplierStatus(supplier) {
-    const status = supplier.planningStatus || 'empty'
-    return (
-      <span
-        className={`proc-planner__supplier-status proc-planner__supplier-status--${status}`}
-      >
-        {SUPPLIER_PLANNING_STATUS_LABELS[status] || status}
-      </span>
-    )
-  }
+  const supplierSelectLoading =
+    Boolean(snapshot?.id) &&
+    (filterOptionsLoading || filterOptionsSnapshotId !== snapshot.id)
 
   function renderQtyCell(item, mobile = false) {
     const locked = isItemQuantityLocked(item, filterOptions)
@@ -612,7 +708,7 @@ export default function ProcurementPlannerView() {
           <>
             <div className="proc-planner__supplier-quick">
               <SearchableSupplierSelect
-                suppliers={filterOptions.suppliers}
+                suppliers={supplierSelectOptions}
                 value={filters.platformSupplierId}
                 onChange={(supplierId) =>
                   setFilters((current) => ({
@@ -621,9 +717,44 @@ export default function ProcurementPlannerView() {
                   }))
                 }
                 activeOnly={false}
-                placeholder="Выберите поставщика"
+                placeholder={
+                  supplierSelectLoading && supplierSelectOptions.length === 0
+                    ? 'Загрузка поставщиков…'
+                    : 'Выберите поставщика'
+                }
                 searchPlaceholder="Поиск поставщика…"
-                renderOptionStatus={renderSupplierStatus}
+                loading={supplierSelectLoading && supplierSelectOptions.length === 0}
+                loadingLabel="Загрузка поставщиков…"
+                emptyLabel={
+                  supplierScope === 'today'
+                    ? 'На сегодня визитов нет'
+                    : 'Поставщики не найдены'
+                }
+                disabled={supplierSelectLoading}
+                dropdownHeader={
+                  <div
+                    className="proc-planner__supplier-scope"
+                    role="group"
+                    aria-label="Область списка поставщиков"
+                  >
+                    <button
+                      type="button"
+                      className={`proc-planner__supplier-scope-btn${supplierScope === 'today' ? ' is-active' : ''}`}
+                      aria-pressed={supplierScope === 'today'}
+                      onClick={() => handleSupplierScopeChange('today')}
+                    >
+                      {`Сегодня · ${scheduledTodaysSuppliers.length}`}
+                    </button>
+                    <button
+                      type="button"
+                      className={`proc-planner__supplier-scope-btn${supplierScope === 'all' ? ' is-active' : ''}`}
+                      aria-pressed={supplierScope === 'all'}
+                      onClick={() => handleSupplierScopeChange('all')}
+                    >
+                      Все
+                    </button>
+                  </div>
+                }
               />
             </div>
             <PlatformToolbarActionWrap>
@@ -858,11 +989,7 @@ export default function ProcurementPlannerView() {
             </div>
             <div className="proc-planner__meta-block">
               <span className="proc-planner__meta-label">Поставщик</span>
-              <span>
-                {selectedSupplier
-                  ? `${selectedSupplier.name} · ${SUPPLIER_PLANNING_STATUS_LABELS[selectedSupplier.planningStatus] || '—'}`
-                  : 'Не выбран'}
-              </span>
+              <span>{selectedSupplier ? selectedSupplier.name : 'Не выбран'}</span>
             </div>
             <div className="proc-planner__meta-block">
               <span className="proc-planner__meta-label">Прогресс заказов</span>
@@ -871,6 +998,9 @@ export default function ProcurementPlannerView() {
                 <span>{ordersProgress.remainingLabel}</span>
               ) : null}
               {ordersProgress.allDone ? <span>Все заказы созданы</span> : null}
+              {ordersProgress.unscheduledLabel ? (
+                <span className="proc-planner__warn">{ordersProgress.unscheduledLabel}</span>
+              ) : null}
               {ordersProgress.unassignedLabel ? (
                 <span className="proc-planner__warn">{ordersProgress.unassignedLabel}</span>
               ) : null}

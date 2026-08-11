@@ -329,10 +329,11 @@ function stageContractFiles() {
     'sanitizePlanningSearch',
     'search sanitizer'
   )
-  assertFileContains(
-    'src/services/procurementPlanningService.js',
-    'categorySubcategories',
-    'category/subcategory pairs'
+  assert(
+    'category/subcategory pairs',
+    read('src/utils/procurementPlannerUx.js').includes('categorySubcategories') &&
+      read('src/services/procurementFilterOptionsCache.js').includes('categorySubcategories') &&
+      read('src/services/procurementPlanningService.js').includes('finalizeSnapshotFilterOptions')
   )
   assert(
     'normalizeItem uses parseNormDays',
@@ -346,9 +347,12 @@ function stageContractFiles() {
   )
   assert(
     'filter options order by id before range',
-    /fetchSnapshotFilterOptions[\s\S]*\.order\('id'[\s\S]*\.range\(/.test(
+    /scanSnapshotFilterOptions[\s\S]*\.order\('id'[\s\S]*\.range\(/.test(
       read('src/services/procurementPlanningService.js')
-    )
+    ) &&
+      read('src/services/procurementPlanningService.js').includes(
+        'loadSnapshotFilterOptionsCached'
+      )
   )
   assertFileContains(
     'src/pages/platform/procurement/ProcurementPage.jsx',

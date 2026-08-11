@@ -135,16 +135,153 @@ async function stageSummariesAndWorkflow() {
       ux.isSupplierInconsistent(s4)
   )
 
-  const progress = ux.formatOrdersProgress(options)
-  assert('progress uses created X of Y', progress.createdLabel === 'Создано 2 из 3 заказов')
-  assert('remaining N shown', progress.remainingLabel === 'Осталось 1')
+  const scheduledSeven = Array.from({ length: 7 }, (_, index) => ({
+    id: `sched-${index + 1}`,
+    name: `Visit ${index + 1}`,
+    status: 'active',
+    deliveryWeekdays: ['mon'],
+  }))
+  const snapshotForToday = [
+    {
+      id: 'sched-1',
+      name: 'Visit 1',
+      planningStatus: 'created',
+      generatedOrderId: 'po-1',
+      generatedPositions: 1,
+      pendingPositions: 0,
+    },
+    {
+      id: 'sched-2',
+      name: 'Visit 2',
+      planningStatus: 'created',
+      generatedOrderId: 'po-2',
+      generatedPositions: 1,
+      pendingPositions: 0,
+    },
+    {
+      id: 'outside-draft',
+      name: 'Outside Draft',
+      planningStatus: 'draft',
+      pendingPositions: 2,
+      generatedPositions: 0,
+    },
+    {
+      id: 'outside-created',
+      name: 'Outside Created',
+      planningStatus: 'created',
+      generatedOrderId: 'po-x',
+      generatedPositions: 1,
+      pendingPositions: 0,
+    },
+    {
+      id: 'outside-empty',
+      name: 'Outside Empty',
+      planningStatus: 'empty',
+      pendingPositions: 0,
+      generatedPositions: 0,
+    },
+  ]
+  const progress = ux.formatOrdersProgress({
+    scheduledSuppliers: scheduledSeven,
+    snapshotSuppliers: snapshotForToday,
+    unassignedOrderableCount: 1,
+    inconsistentSupplierCount: 1,
+  })
+  assert(
+    'today progress uses scheduled denominator',
+    progress.createdLabel === 'Сегодня: создано 2 из 7'
+  )
+  assert('remaining N from schedule', progress.remainingLabel === 'Осталось 5')
+  assert(
+    'unscheduled created/draft counted',
+    progress.unscheduledLabel === 'Вне графика: 2'
+  )
   assert('unassigned warning present', progress.unassignedLabel.includes('Без поставщика: 1'))
   assert('inconsistent warning present', progress.inconsistentLabel === 'Расхождение: 1')
   assert('allDone false while unassigned remain', progress.allDone === false)
+  assert(
+    'unscheduled snapshot suppliers ignored in denominator',
+    progress.total === 7 && progress.createdToday === 2
+  )
+
+  const noVisits = ux.formatOrdersProgress({
+    scheduledSuppliers: [],
+    snapshotSuppliers: snapshotForToday,
+    unassignedOrderableCount: 0,
+    inconsistentSupplierCount: 0,
+  })
+  assert(
+    'zero visits label',
+    noVisits.createdLabel === 'На сегодня визиты не запланированы'
+  )
+  assert(
+    'zero visits marks all draft/created as unscheduled',
+    noVisits.unscheduledLabel === 'Вне графика: 4'
+  )
+
+  const nameFallbackProgress = ux.formatOrdersProgress({
+    scheduledSuppliers: [
+      {
+        id: 'new-platform-id',
+        name: 'Legacy Supplier',
+        status: 'active',
+        deliveryWeekdays: ['mon'],
+      },
+    ],
+    snapshotSuppliers: [
+      {
+        id: 'old-snapshot-id',
+        name: 'Legacy Supplier',
+        planningStatus: 'created',
+        generatedOrderId: 'po-legacy',
+        generatedPositions: 1,
+        pendingPositions: 0,
+      },
+    ],
+  })
+  assert(
+    'name fallback matches created order',
+    nameFallbackProgress.createdLabel === 'Сегодня: создано 1 из 1' &&
+      nameFallbackProgress.remainingLabel == null
+  )
+
+  const inactiveExcluded = ux.listTodaysScheduledSuppliers(
+    [
+      {
+        id: 'active-1',
+        name: 'Active',
+        status: 'active',
+        deliveryWeekdays: ['mon'],
+      },
+      {
+        id: 'inactive-1',
+        name: 'Inactive',
+        status: 'inactive',
+        deliveryWeekdays: ['mon'],
+      },
+      {
+        id: 'archived-1',
+        name: 'Archived',
+        status: 'archived',
+        deliveryWeekdays: ['mon'],
+      },
+      {
+        id: 'other-day',
+        name: 'Tuesday',
+        status: 'active',
+        deliveryWeekdays: ['tue'],
+      },
+    ],
+    { weekdayId: 'mon' }
+  )
+  assert(
+    'inactive excluded from today schedule',
+    inactiveExcluded.length === 1 && inactiveExcluded[0].id === 'active-1'
+  )
 
   const doneProgress = ux.formatOrdersProgress({
-    generatedSupplierCount: 2,
-    pendingSupplierCount: 0,
+    scheduledSuppliers: scheduledSeven.slice(0, 2),
+    snapshotSuppliers: snapshotForToday.slice(0, 2),
     unassignedOrderableCount: 0,
     inconsistentSupplierCount: 0,
   })
@@ -152,8 +289,8 @@ async function stageSummariesAndWorkflow() {
   assert(
     'allDone false with inconsistent only',
     ux.formatOrdersProgress({
-      generatedSupplierCount: 1,
-      pendingSupplierCount: 0,
+      scheduledSuppliers: scheduledSeven.slice(0, 2),
+      snapshotSuppliers: snapshotForToday.slice(0, 2),
       unassignedOrderableCount: 0,
       inconsistentSupplierCount: 1,
     }).allDone === false
@@ -292,8 +429,12 @@ async function stageSummariesAndWorkflow() {
     ux.getExportTooltip({ orderCreated: true }) === 'Скачать заказ: PDF или Excel'
   )
   assert(
-    'export menu draft label',
-    ux.getExportMenuLabel(false) === 'Скачать черновик'
+    'export menu plan label',
+    ux.getExportMenuLabel(false) === 'Скачать план'
+  )
+  assert(
+    'export tooltip plan label',
+    ux.getExportTooltip({ orderCreated: false }) === 'Скачать план: PDF или Excel'
   )
   assert(
     'sync blocked while pending save',
@@ -400,6 +541,292 @@ async function stageSummariesAndWorkflow() {
     'empty created export message constant',
     typeof ux.EMPTY_SUPPLIER_EXPORT_MESSAGE === 'string' &&
       ux.EMPTY_SUPPLIER_EXPORT_MESSAGE.length > 0
+  )
+}
+
+async function stageFilterOptionsCache() {
+  console.log('Stage 2b: filter options SWR cache')
+  const cache = await import(
+    pathToFileURL(path.join(ROOT, 'src/services/procurementFilterOptionsCache.js')).href
+  )
+  const ux = await import(
+    pathToFileURL(path.join(ROOT, 'src/utils/procurementPlannerUx.js')).href
+  )
+
+  cache.resetFilterOptionsCacheForTests()
+  const storage = cache.createMemoryStorage()
+  const sampleOptions = {
+    categories: ['A'],
+    categorySubcategories: [{ categoryName: 'A', subcategoryName: 'a' }],
+    suppliers: [{ id: 's1', name: 'Агро', planningStatus: 'draft' }],
+    generatedSupplierCount: 0,
+    pendingSupplierCount: 1,
+    inconsistentSupplierCount: 0,
+    unassignedOrderableCount: 0,
+  }
+
+  let scanCount = 0
+  const scan = async () => {
+    scanCount += 1
+    return {
+      ...sampleOptions,
+      suppliers: [{ id: 's1', name: `Агро-${scanCount}`, planningStatus: 'draft' }],
+      pendingSupplierCount: scanCount,
+    }
+  }
+
+  const now = Date.now()
+  cache.setCachedFilterOptions('snap-1', sampleOptions, { storage, now })
+  const hit = cache.getCachedFilterOptions('snap-1', { storage, now })
+  assert('cache hit returns options without scan', hit?.options?.suppliers?.[0]?.id === 's1')
+
+  scanCount = 0
+  const fresh = await cache.loadSnapshotFilterOptionsCached('snap-1', scan, {
+    storage,
+    now,
+    forceRefresh: false,
+  })
+  assert('fresh cache no scan', fresh.fromCache === true && fresh.refreshPromise == null)
+  assert('fresh cache keeps options', fresh.options.suppliers[0].name === 'Агро')
+  assert('fresh cache scan count zero', scanCount === 0)
+
+  const staleNow = now + cache.FILTER_OPTIONS_REVALIDATE_AFTER_MS + 1000
+  scanCount = 0
+  const swr = await cache.loadSnapshotFilterOptionsCached('snap-1', scan, {
+    storage,
+    now: staleNow,
+    forceRefresh: false,
+  })
+  assert('stale cache background scan', swr.fromCache === true && Boolean(swr.refreshPromise))
+  assert('stale serves cache immediately', swr.options.suppliers[0].name === 'Агро')
+  const refreshed = await swr.refreshPromise
+  assert(
+    'background refresh updates cache',
+    refreshed.suppliers[0].name === 'Агро-1' &&
+      cache.getCachedFilterOptions('snap-1', { storage, now: staleNow })?.options?.suppliers?.[0]
+        ?.name === 'Агро-1'
+  )
+
+  scanCount = 0
+  const forced = await cache.loadSnapshotFilterOptionsCached('snap-1', scan, {
+    storage,
+    now: staleNow,
+    forceRefresh: true,
+  })
+  assert(
+    'forced refresh updates cache',
+    forced.fromCache === false &&
+      forced.options.suppliers[0].name === 'Агро-1' &&
+      cache.getCachedFilterOptions('snap-1', { storage, now: Date.now() })?.options?.suppliers?.[0]
+        ?.name === 'Агро-1'
+  )
+
+  storage.setItem(cache.FILTER_OPTIONS_STORAGE_KEY, '{not-json')
+  assert(
+    'invalid storage ignored',
+    cache.getCachedFilterOptions('snap-missing', { storage }) == null
+  )
+
+  cache.resetFilterOptionsCacheForTests()
+  cache.setCachedFilterOptions(
+    'snap-expired',
+    sampleOptions,
+    { storage, now: Date.now() - cache.FILTER_OPTIONS_CACHE_TTL_MS - 1000 }
+  )
+  cache.resetFilterOptionsCacheForTests()
+  assert(
+    'stale storage ignored',
+    cache.getCachedFilterOptions('snap-expired', {
+      storage,
+      now: Date.now(),
+    }) == null
+  )
+
+  cache.resetFilterOptionsCacheForTests()
+  scanCount = 0
+  let resolveScan
+  const slowScan = () =>
+    new Promise((resolve) => {
+      scanCount += 1
+      resolveScan = () => resolve(sampleOptions)
+    })
+  const first = cache.revalidateSnapshotFilterOptions('snap-dedupe', slowScan, { storage })
+  const second = cache.revalidateSnapshotFilterOptions('snap-dedupe', slowScan, { storage })
+  assert('in-flight dedupe shares promise', first === second)
+  assert('in-flight dedupe single scan', scanCount === 1)
+  resolveScan()
+  await first
+
+  cache.resetFilterOptionsCacheForTests()
+  scanCount = 0
+  let resolveRefresh
+  const delayedScan = () =>
+    new Promise((resolve) => {
+      scanCount += 1
+      resolveRefresh = () =>
+        resolve({
+          ...sampleOptions,
+          suppliers: [{ id: 's1', name: 'Updated', planningStatus: 'created' }],
+        })
+    })
+  const keepCachedAt = Date.now() - cache.FILTER_OPTIONS_REVALIDATE_AFTER_MS - 1000
+  cache.setCachedFilterOptions('snap-keep', sampleOptions, {
+    storage,
+    now: keepCachedAt,
+  })
+  const keep = await cache.loadSnapshotFilterOptionsCached('snap-keep', delayedScan, {
+    storage,
+    now: Date.now(),
+    forceRefresh: false,
+  })
+  assert(
+    'cached list preserved during revalidation',
+    keep.options.suppliers[0].name === 'Агро' && scanCount === 1
+  )
+  resolveRefresh()
+  await keep.refreshPromise
+  assert(
+    'revalidation replaces cache after completion',
+    cache.getCachedFilterOptions('snap-keep', { storage })?.options?.suppliers?.[0]?.name ===
+      'Updated'
+  )
+
+  cache.resetFilterOptionsCacheForTests()
+  const deltaStorage = cache.createMemoryStorage()
+  const baseForDelta = {
+    ...sampleOptions,
+    suppliers: [
+      {
+        id: 's1',
+        name: 'Агро',
+        planningStatus: 'draft',
+        orderablePositions: 1,
+        totalQty: 1,
+        pendingPositions: 1,
+        generatedPositions: 0,
+        generatedOrderId: null,
+      },
+    ],
+  }
+  cache.setCachedFilterOptions('snap-delta', baseForDelta, {
+    storage: deltaStorage,
+    now: Date.now(),
+  })
+  const deltaNext = ux.applyItemDeltaToFilterOptions(
+    baseForDelta,
+    {
+      id: 'sku-1',
+      platformSupplierId: 's1',
+      umagSupplierName: 'Агро',
+      finalOrderQty: 1,
+      generatedPurchaseOrderId: null,
+    },
+    {
+      id: 'sku-1',
+      platformSupplierId: 's1',
+      umagSupplierName: 'Агро',
+      finalOrderQty: 4,
+      generatedPurchaseOrderId: null,
+    }
+  )
+  cache.setCachedFilterOptions('snap-delta', deltaNext, {
+    storage: deltaStorage,
+    now: Date.now(),
+  })
+  cache.resetFilterOptionsCacheForTests()
+  const persistedDelta = cache.getCachedFilterOptions('snap-delta', { storage: deltaStorage })
+  assert(
+    'local delta persisted',
+    persistedDelta?.options?.suppliers?.[0]?.totalQty === 4 &&
+      persistedDelta?.options?.suppliers?.[0]?.planningStatus === 'draft'
+  )
+
+  const selectSrc = read('src/components/suppliers/SearchableSupplierSelect.jsx')
+  assert(
+    'cold loading text',
+    selectSrc.includes("loadingLabel = 'Загрузка поставщиков…'") &&
+      selectSrc.includes('{loading ? loadingLabel : emptyLabel}')
+  )
+}
+
+async function stageSupplierScopeOptions() {
+  console.log('Stage 2c: Today/All supplier selector scope')
+  const ux = await import(
+    pathToFileURL(path.join(ROOT, 'src/utils/procurementPlannerUx.js')).href
+  )
+
+  const scheduled = [
+    { id: 'sched-1', name: 'Сегодняшний', status: 'active', deliveryWeekdays: ['mon'] },
+    { id: 'sched-empty', name: 'Без строк', status: 'active', deliveryWeekdays: ['mon'] },
+  ]
+  const catalog = [
+    ...scheduled,
+    { id: 'other-1', name: 'Другой день', status: 'active', deliveryWeekdays: ['tue'] },
+    { id: 'inactive-1', name: 'Неактивный', status: 'inactive', deliveryWeekdays: ['mon'] },
+  ]
+  const snapshotSuppliers = [
+    {
+      id: 'sched-1',
+      name: 'Сегодняшний',
+      planningStatus: 'draft',
+      orderablePositions: 2,
+      totalQty: 5,
+      pendingPositions: 2,
+      generatedPositions: 0,
+      generatedOrderId: null,
+    },
+    {
+      id: 'legacy-1',
+      name: 'Legacy Snapshot',
+      planningStatus: 'draft',
+      orderablePositions: 1,
+      totalQty: 3,
+      pendingPositions: 1,
+      generatedPositions: 0,
+      generatedOrderId: null,
+    },
+  ]
+
+  const today = ux.buildPlannerSupplierSelectOptions({
+    scope: 'today',
+    scheduledSuppliers: scheduled,
+    catalogSuppliers: catalog,
+    snapshotSuppliers,
+  })
+  assert('default Today options', today.length === 2)
+  assert(
+    'N count matches scheduled',
+    today.length === scheduled.length && today.some((row) => row.id === 'sched-empty')
+  )
+  assert(
+    'planned missing snapshot visible',
+    today.some((row) => row.id === 'sched-empty' && row.name === 'Без строк')
+  )
+
+  const all = ux.buildPlannerSupplierSelectOptions({
+    scope: 'all',
+    scheduledSuppliers: scheduled,
+    catalogSuppliers: catalog,
+    snapshotSuppliers,
+  })
+  assert(
+    'All union',
+    all.some((row) => row.id === 'sched-1') &&
+      all.some((row) => row.id === 'other-1') &&
+      all.some((row) => row.id === 'sched-empty')
+  )
+  assert(
+    'legacy visible in All',
+    all.some((row) => row.id === 'legacy-1' && row.name === 'Legacy Snapshot')
+  )
+  assert(
+    'inactive excluded from All',
+    !all.some((row) => row.id === 'inactive-1')
+  )
+  assert(
+    'scope switch clears hidden selection',
+    ux.isSupplierInTodaySchedule('other-1', scheduled, snapshotSuppliers) === false &&
+      ux.isSupplierInTodaySchedule('sched-1', scheduled, snapshotSuppliers) === true
   )
 }
 
@@ -636,6 +1063,7 @@ function stageSourceContracts() {
   console.log('Stage 4: source contracts')
   const service = read('src/services/procurementPlanningService.js')
   const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
+  const page = read('src/pages/platform/procurement/ProcurementPage.jsx')
   const nav = read('src/platform/platformNav.js')
   const app = read('src/App.jsx')
   const dashboard = read('src/pages/platform/PlatformDashboard.jsx')
@@ -658,6 +1086,13 @@ function stageSourceContracts() {
     !planner.includes('Частично сформирован')
   )
   assert('planner shows created X of Y', planner.includes('ordersProgress.createdLabel'))
+  assert(
+    'planner today progress uses schedule helpers',
+    planner.includes('listTodaysScheduledSuppliers') &&
+      planner.includes('getAllSuppliersSync') &&
+      planner.includes('dataVersion')
+  )
+  assert('planner shows unscheduled warning', planner.includes('ordersProgress.unscheduledLabel'))
   assert('planner workflow strip', planner.includes('proc-planner__workflow'))
   assert('pending save ref guard', planner.includes('pendingSaveCountRef'))
   assert('failed save ids ref', planner.includes('failedSaveIdsRef'))
@@ -674,12 +1109,43 @@ function stageSourceContracts() {
       planner.includes('EMPTY_SUPPLIER_EXPORT_MESSAGE')
   )
   assert('custom tip wrap', planner.includes('proc-planner__tip-wrap'))
-  assert('supplier status renderer', planner.includes('renderOptionStatus'))
   assert(
-    'selector placeholder asks to choose supplier',
-    planner.includes('placeholder="Выберите поставщика"')
+    'no visible planning badges in planner dropdown',
+    !planner.includes('renderOptionStatus') &&
+      !planner.includes('renderSupplierStatus') &&
+      !planner.includes('SUPPLIER_PLANNING_STATUS_LABELS')
   )
-  assert('select keeps optional status props', select.includes('renderOptionStatus = null'))
+  assert(
+    'selector uses loading state for cold miss',
+    planner.includes('Загрузка поставщиков…') &&
+      planner.includes('filterOptionsLoading') &&
+      planner.includes('getCachedFilterOptions')
+  )
+  assert(
+    'select supports loading/empty labels',
+    select.includes('loadingLabel') &&
+      select.includes('Загрузка поставщиков…') &&
+      select.includes('emptyLabel')
+  )
+  assert(
+    'select supports dropdownHeader',
+    select.includes('dropdownHeader') && select.includes('searchable-supplier-select__header')
+  )
+  assert(
+    'planner defaults Today supplier scope',
+    planner.includes("useState('today')") &&
+      planner.includes('buildPlannerSupplierSelectOptions') &&
+      planner.includes('Сегодня ·') &&
+      planner.includes('На сегодня визитов нет')
+  )
+  assert(
+    'planner persists local filter delta to cache',
+    planner.includes('setCachedFilterOptions(snapshot.id, next)')
+  )
+  assert(
+    'Orders tab no plan list',
+    !page.includes('ProcurementPlanDayList') && !page.includes('Визиты поставщиков')
+  )
   assert(
     'nav marks procurement-group webOnly',
     /id:\s*'procurement-group'[\s\S]*webOnly:\s*true/.test(nav)
@@ -720,6 +1186,8 @@ async function main() {
   console.log('Procurement desktop UX\n')
   await stageSummariesAndWorkflow()
   await stageDeltaAndSaveErrors()
+  await stageFilterOptionsCache()
+  await stageSupplierScopeOptions()
   await stageDesktopWebOnly()
   stageSourceContracts()
   console.log(`\nPassed ${testsPassed}/${testsRun}`)

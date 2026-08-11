@@ -78,6 +78,10 @@
   overflow: hidden;
 }
 
+.searchable-supplier-select__header {
+  padding: 8px 10px 0;
+}
+
 .searchable-supplier-select__search {
   display: flex;
   align-items: center;

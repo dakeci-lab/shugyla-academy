@@ -17,6 +17,11 @@ import {
   createSnapshotFilterAccumulator,
   finalizeSnapshotFilterOptions,
 } from '../utils/procurementPlannerUx'
+import {
+  createEmptyFilterOptions,
+  loadSnapshotFilterOptionsCached,
+  revalidateSnapshotFilterOptions,
+} from './procurementFilterOptionsCache.js'
 
 /** Strip PostgREST .or / filter metacharacters from free-text search. */
 export function sanitizePlanningSearch(value) {
@@ -330,18 +335,10 @@ export async function fetchSnapshotItemsPage({
   }
 }
 
-export async function fetchSnapshotFilterOptions(snapshotId) {
+/** Full paginated scan of snapshot filter aggregates (no cache). */
+export async function scanSnapshotFilterOptions(snapshotId) {
   ensureClient()
-  if (!snapshotId) {
-    return {
-      categories: [],
-      categorySubcategories: [],
-      suppliers: [],
-      generatedSupplierCount: 0,
-      pendingSupplierCount: 0,
-      unassignedOrderableCount: 0,
-    }
-  }
+  if (!snapshotId) return createEmptyFilterOptions()
 
   const pageSize = 1000
   const state = createSnapshotFilterAccumulator()
@@ -363,6 +360,52 @@ export async function fetchSnapshotFilterOptions(snapshotId) {
   }
 
   return finalizeSnapshotFilterOptions(state)
+}
+
+/**
+ * Filter options for a snapshot with freshness tiers (fresh / SWR / forced).
+ */
+export async function fetchSnapshotFilterOptions(
+  snapshotId,
+  {
+    forceRefresh = false,
+    onCached = null,
+    onFresh = null,
+    scan = scanSnapshotFilterOptions,
+  } = {}
+) {
+  if (!snapshotId) return createEmptyFilterOptions()
+
+  const result = await loadSnapshotFilterOptionsCached(snapshotId, scan, {
+    forceRefresh,
+    onCached,
+  })
+
+  if (result.fromCache && result.refreshPromise) {
+    void result.refreshPromise
+      .then((fresh) => {
+        onFresh?.(fresh)
+      })
+      .catch(() => {})
+    return result.options
+  }
+
+  if (result.fromCache) {
+    // Fresh cache (< REVALIDATE_AFTER): already delivered via onCached, no scan.
+    return result.options
+  }
+
+  onFresh?.(result.options)
+  return result.options
+}
+
+/** Force a fresh scan and cache write (sync/generate). */
+export async function revalidateSnapshotFilterOptionsCache(
+  snapshotId,
+  { scan = scanSnapshotFilterOptions } = {}
+) {
+  if (!snapshotId) return createEmptyFilterOptions()
+  return revalidateSnapshotFilterOptions(snapshotId, scan)
 }
 
 /** Direct client UPDATE is limited to final qty / override (column grants). */
