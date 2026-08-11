@@ -384,23 +384,23 @@ export default function ProcurementPage() {
           type="button"
           role="tab"
           className={
-            mainTab === 'norms' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
-          }
-          aria-selected={mainTab === 'norms'}
-          onClick={() => setMainTab('norms')}
-        >
-          Нормы
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className={
             mainTab === 'orders' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
           }
           aria-selected={mainTab === 'orders'}
           onClick={() => setMainTab('orders')}
         >
           Заказы
+        </button>
+        <button
+          type="button"
+          role="tab"
+          className={
+            mainTab === 'norms' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
+          }
+          aria-selected={mainTab === 'norms'}
+          onClick={() => setMainTab('norms')}
+        >
+          Нормы
         </button>
       </div>
 

@@ -1094,6 +1094,15 @@ function stageSourceContracts() {
   )
   assert('planner shows unscheduled warning', planner.includes('ordersProgress.unscheduledLabel'))
   assert('planner workflow strip', planner.includes('proc-planner__workflow'))
+  assert(
+    'planner meta has two equal cards',
+    planner.includes('Снимок UMAG') &&
+      planner.includes('Прогресс заказов') &&
+      !planner.includes('meta-label">Поставщик') &&
+      read('src/components/procurement/ProcurementPlannerView.css').includes(
+        'grid-template-columns: repeat(2, minmax(0, 1fr))'
+      )
+  )
   assert('pending save ref guard', planner.includes('pendingSaveCountRef'))
   assert('failed save ids ref', planner.includes('failedSaveIdsRef'))
   assert('delta summary update on blur', planner.includes('applyItemDeltaToFilterOptions'))
@@ -1145,6 +1154,10 @@ function stageSourceContracts() {
   assert(
     'Orders tab no plan list',
     !page.includes('ProcurementPlanDayList') && !page.includes('Визиты поставщиков')
+  )
+  assert(
+    'procurement tabs order Planning → Orders → Norms',
+    /role="tablist"[\s\S]*Планирование[\s\S]*Заказы[\s\S]*Нормы/.test(page)
   )
   assert(
     'nav marks procurement-group webOnly',

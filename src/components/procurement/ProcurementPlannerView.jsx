@@ -981,23 +981,21 @@ export default function ProcurementPlannerView() {
                   : snapshot.status === 'failed'
                     ? 'Ошибка синхронизации'
                     : `Обновлён ${formatSyncedAt(snapshot.syncedAt)}`}
+                {` · ${snapshot.itemCount} SKU`}
+                {snapshot.negativeStockCount > 0 ? (
+                  <span className="proc-planner__warn">
+                    {` · ${snapshot.negativeStockCount} отриц.`}
+                  </span>
+                ) : null}
               </span>
-              <span>{snapshot.itemCount} SKU</span>
-              {snapshot.negativeStockCount > 0 ? (
-                <span className="proc-planner__warn">{snapshot.negativeStockCount} отриц.</span>
-              ) : null}
-            </div>
-            <div className="proc-planner__meta-block">
-              <span className="proc-planner__meta-label">Поставщик</span>
-              <span>{selectedSupplier ? selectedSupplier.name : 'Не выбран'}</span>
             </div>
             <div className="proc-planner__meta-block">
               <span className="proc-planner__meta-label">Прогресс заказов</span>
-              <span>{ordersProgress.createdLabel}</span>
-              {ordersProgress.remainingLabel ? (
-                <span>{ordersProgress.remainingLabel}</span>
-              ) : null}
-              {ordersProgress.allDone ? <span>Все заказы созданы</span> : null}
+              <span>
+                {ordersProgress.createdLabel}
+                {ordersProgress.remainingLabel ? ` · ${ordersProgress.remainingLabel}` : ''}
+                {ordersProgress.allDone ? ' · Все заказы созданы' : ''}
+              </span>
               {ordersProgress.unscheduledLabel ? (
                 <span className="proc-planner__warn">{ordersProgress.unscheduledLabel}</span>
               ) : null}

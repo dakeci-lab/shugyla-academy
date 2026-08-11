@@ -364,6 +364,12 @@ function stageContractFiles() {
     'Заказы',
     'orders tab'
   )
+  assert(
+    'procurement tabs order Planning → Orders → Norms',
+    /role="tablist"[\s\S]*Планирование[\s\S]*Заказы[\s\S]*Нормы/.test(
+      read('src/pages/platform/procurement/ProcurementPage.jsx')
+    )
+  )
   assertFileContains(
     'src/utils/purchaseOrderExport.js',
     'exportPurchaseOrderPdf',
