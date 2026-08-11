@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { TOAST_TYPES } from '../../services/notificationService'
 import './ToastContainer.css'
 
@@ -25,6 +26,29 @@ function ToastItem({ toast, onDismiss }) {
     return () => window.clearTimeout(timer)
   }, [toast.id, toast.duration, onDismiss])
 
+  const action = toast.action
+  const actionNode =
+    action?.label && action?.to ? (
+      <Link
+        to={action.to}
+        className="platform-toast__action"
+        onClick={() => onDismiss(toast.id)}
+      >
+        {action.label}
+      </Link>
+    ) : action?.label && typeof action?.onClick === 'function' ? (
+      <button
+        type="button"
+        className="platform-toast__action"
+        onClick={() => {
+          action.onClick()
+          onDismiss(toast.id)
+        }}
+      >
+        {action.label}
+      </button>
+    ) : null
+
   return (
     <div
       className={`platform-toast platform-toast--${toast.type}`}
@@ -33,7 +57,10 @@ function ToastItem({ toast, onDismiss }) {
       <span className="platform-toast__icon" aria-hidden="true">
         {TYPE_ICONS[toast.type] || '•'}
       </span>
-      <p className="platform-toast__message">{toast.message}</p>
+      <div className="platform-toast__body">
+        <p className="platform-toast__message">{toast.message}</p>
+        {actionNode}
+      </div>
       <button
         type="button"
         className="platform-toast__close"

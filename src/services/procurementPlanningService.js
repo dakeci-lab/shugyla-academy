@@ -12,6 +12,11 @@ import {
   DEFAULT_NORM_DAYS,
   parseNormDays,
 } from '../utils/procurementPlanningMath'
+import {
+  accumulateSnapshotFilterRow,
+  createSnapshotFilterAccumulator,
+  finalizeSnapshotFilterOptions,
+} from '../utils/procurementPlannerUx'
 
 /** Strip PostgREST .or / filter metacharacters from free-text search. */
 export function sanitizePlanningSearch(value) {
@@ -328,55 +333,36 @@ export async function fetchSnapshotItemsPage({
 export async function fetchSnapshotFilterOptions(snapshotId) {
   ensureClient()
   if (!snapshotId) {
-    return { categories: [], categorySubcategories: [], suppliers: [] }
+    return {
+      categories: [],
+      categorySubcategories: [],
+      suppliers: [],
+      generatedSupplierCount: 0,
+      pendingSupplierCount: 0,
+      unassignedOrderableCount: 0,
+    }
   }
 
   const pageSize = 1000
-  const categories = new Set()
-  const pairs = new Set()
-  const suppliers = new Map()
+  const state = createSnapshotFilterAccumulator()
 
   for (let from = 0; from < 100_000; from += pageSize) {
     const { data, error } = await supabase
       .from('procurement_snapshot_items')
-      .select('category_name, subcategory_name, platform_supplier_id, umag_supplier_name')
+      .select(
+        'category_name, subcategory_name, platform_supplier_id, umag_supplier_name, final_order_qty, generated_purchase_order_id'
+      )
       .eq('snapshot_id', snapshotId)
       .order('id', { ascending: true })
       .range(from, from + pageSize - 1)
     if (error) throw new Error(error.message || 'Не удалось загрузить фильтры')
     for (const row of data || []) {
-      const cat = row.category_name || ''
-      const sub = row.subcategory_name || ''
-      if (cat) categories.add(cat)
-      if (cat && sub) pairs.add(`${cat}\u0000${sub}`)
-      if (row.platform_supplier_id) {
-        suppliers.set(
-          row.platform_supplier_id,
-          row.umag_supplier_name || row.platform_supplier_id
-        )
-      }
+      accumulateSnapshotFilterRow(row, state)
     }
     if (!data || data.length < pageSize) break
   }
 
-  const categorySubcategories = [...pairs]
-    .map((key) => {
-      const [categoryName, subcategoryName] = key.split('\u0000')
-      return { categoryName, subcategoryName }
-    })
-    .sort((a, b) => {
-      const catCmp = a.categoryName.localeCompare(b.categoryName, 'ru')
-      if (catCmp !== 0) return catCmp
-      return a.subcategoryName.localeCompare(b.subcategoryName, 'ru')
-    })
-
-  return {
-    categories: [...categories].sort((a, b) => a.localeCompare(b, 'ru')),
-    categorySubcategories,
-    suppliers: [...suppliers.entries()]
-      .map(([id, name]) => ({ id, name }))
-      .sort((a, b) => a.name.localeCompare(b.name, 'ru')),
-  }
+  return finalizeSnapshotFilterOptions(state)
 }
 
 /** Direct client UPDATE is limited to final qty / override (column grants). */

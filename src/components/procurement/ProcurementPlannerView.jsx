@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext'
 import { usePlatformData } from '../../context/PlatformDataContext'
 import { useToast } from '../../context/ToastContext'
@@ -31,18 +32,48 @@ import PlatformSyncButton from '../platform/PlatformSyncButton'
 import TablePagination from './TablePagination'
 import {
   DownloadIcon,
+  FileTextIcon,
   RotateCcwIcon,
-  SparklesIcon,
 } from '../icons/PlatformIcons'
 import {
   exportProcurementPlanPdf,
   exportProcurementPlanXlsx,
 } from '../../utils/procurementPlanExport'
+import {
+  SUPPLIER_PLANNING_STATUS_LABELS,
+  EMPTY_SUPPLIER_EXPORT_MESSAGE,
+  applyItemDeltaToFilterOptions,
+  applySaveResultToFailedIds,
+  filterItemsForSupplierPlanExport,
+  formatOrdersProgress,
+  getCreateOrderDisabledReason,
+  getCreateOrderTooltip,
+  getExportDisabledReason,
+  getExportMenuLabel,
+  getExportTooltip,
+  getLockedQuantityHint,
+  getSupplierWorkflowStatus,
+  getSyncDisabledReason,
+  getSyncTooltip,
+  hasFailedSaves,
+  isItemQuantityLocked,
+  isSupplierOrderCreated,
+} from '../../utils/procurementPlannerUx'
 import './ProcurementPlannerView.css'
 
 const TABLE_COL_SPAN = 9
 
 const DEFAULT_PAGE_SIZE = 25
+
+const EMPTY_FILTER_OPTIONS = {
+  categories: [],
+  categorySubcategories: [],
+  suppliers: [],
+  generatedSupplierCount: 0,
+  pendingSupplierCount: 0,
+  inconsistentSupplierCount: 0,
+  unassignedOrderableCount: 0,
+}
 
 function formatNum(value, digits = 1) {
   const n = Number(value)
@@ -80,6 +111,16 @@ function WeeklySpark({ values }) {
   )
 }
 
+function PlannerTooltipButton({ tooltip, className = '', children, ...rest }) {
+  return (
+    <span className="proc-planner__tip-wrap" data-tooltip={tooltip}>
+      <button type="button" className={className} title={tooltip} {...rest}>
+        {children}
+      </button>
+    </span>
+  )
+}
+
 export default function ProcurementPlannerView() {
   const { user } = useSession()
   const { reloadProcurement } = usePlatformData()
@@ -103,11 +144,7 @@ export default function ProcurementPlannerView() {
     warningsOnly: false,
     orderableOnly: false,
   })
-  const [filterOptions, setFilterOptions] = useState({
-    categories: [],
-    categorySubcategories: [],
-    suppliers: [],
-  })
+  const [filterOptions, setFilterOptions] = useState(EMPTY_FILTER_OPTIONS)
   const [filterOpen, setFilterOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -117,8 +154,14 @@ export default function ProcurementPlannerView() {
   const [confirmGenerate, setConfirmGenerate] = useState(false)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
+  const [saveStatus, setSaveStatus] = useState('idle')
+  const [pendingSaveCount, setPendingSaveCount] = useState(0)
+  const [hasSaveError, setHasSaveError] = useState(false)
   const filterButtonRef = useRef(null)
   const exportMenuRef = useRef(null)
+  const pendingSaveCountRef = useRef(0)
+  const failedSaveIdsRef = useRef(new Set())
+  const saveStatusTimerRef = useRef(null)
   const exportMenuId = 'proc-planner-export-menu'
 
   const activeFilterCount = useMemo(() => {
@@ -135,6 +178,13 @@ export default function ProcurementPlannerView() {
     return () => clearTimeout(t)
   }, [search])
 
+  useEffect(
+    () => () => {
+      if (saveStatusTimerRef.current) window.clearTimeout(saveStatusTimerRef.current)
+    },
+    []
+  )
+
   const loadSnapshotMeta = useCallback(async () => {
     if (!isCloudMode()) {
       setSnapshot(null)
@@ -147,6 +197,8 @@ export default function ProcurementPlannerView() {
       if (snap?.id) {
         const opts = await fetchSnapshotFilterOptions(snap.id)
         setFilterOptions(opts)
+      } else {
+        setFilterOptions(EMPTY_FILTER_OPTIONS)
       }
     } catch (err) {
       showError(err.message || 'Не удалось загрузить снимок')
@@ -191,7 +243,16 @@ export default function ProcurementPlannerView() {
   }, [debouncedSearch, filters, snapshot?.id])
 
   async function handleSync() {
-    if (!canSync || syncing) return
+    if (
+      getSyncDisabledReason({
+        canSync,
+        syncing,
+        pendingSaveCount: pendingSaveCountRef.current,
+        hasSaveError: hasFailedSaves(failedSaveIdsRef.current),
+      })
+    ) {
+      return
+    }
     setSyncing(true)
     try {
       const result = await syncProcurementPlanning()
@@ -201,6 +262,7 @@ export default function ProcurementPlannerView() {
       }
       showSuccess(`Синхронизировано: ${result.itemCount} SKU`)
       await loadSnapshotMeta()
+      await loadItems()
     } catch (err) {
       showError(err?.message || 'Не удалось синхронизировать план')
     } finally {
@@ -208,20 +270,61 @@ export default function ProcurementPlannerView() {
     }
   }
 
+  function beginPendingSave(_itemId) {
+    pendingSaveCountRef.current += 1
+    setPendingSaveCount(pendingSaveCountRef.current)
+    setSaveStatus('saving')
+    if (saveStatusTimerRef.current) {
+      window.clearTimeout(saveStatusTimerRef.current)
+      saveStatusTimerRef.current = null
+    }
+  }
+
+  function endPendingSave(itemId, ok) {
+    pendingSaveCountRef.current = Math.max(0, pendingSaveCountRef.current - 1)
+    setPendingSaveCount(pendingSaveCountRef.current)
+    failedSaveIdsRef.current = applySaveResultToFailedIds(
+      failedSaveIdsRef.current,
+      itemId,
+      ok
+    )
+    const failed = hasFailedSaves(failedSaveIdsRef.current)
+    setHasSaveError(failed)
+    if (failed) {
+      setSaveStatus('error')
+      return
+    }
+    if (pendingSaveCountRef.current === 0) {
+      setSaveStatus('saved')
+      saveStatusTimerRef.current = window.setTimeout(() => {
+        setSaveStatus((current) => (current === 'saved' ? 'idle' : current))
+        saveStatusTimerRef.current = null
+      }, 1600)
+    }
+  }
+
   async function handleFinalChange(item, rawValue) {
+    beginPendingSave(item.id)
     try {
-      await updateItemFinalOrderQty(item, rawValue)
+      const updated = await updateItemFinalOrderQty(item, rawValue)
+      setFilterOptions((prev) => applyItemDeltaToFilterOptions(prev, item, updated))
       await loadItems()
+      endPendingSave(item.id, true)
     } catch (err) {
+      endPendingSave(item.id, false)
       showError(err.message || 'Не удалось сохранить заказ')
     }
   }
 
   async function handleReset(item) {
+    beginPendingSave(item.id)
     try {
-      await resetItemToRecommendation(item)
+      const updated = await resetItemToRecommendation(item)
+      setFilterOptions((prev) => applyItemDeltaToFilterOptions(prev, item, updated))
       await loadItems()
+      endPendingSave(item.id, true)
     } catch (err) {
+      endPendingSave(item.id, false)
       showError(err.message || 'Не удалось сбросить')
     }
   }
@@ -247,18 +350,49 @@ export default function ProcurementPlannerView() {
     }
   }, [exportMenuOpen])
 
+  const subcategoryOptions = useMemo(() => {
+    const pairs = filterOptions.categorySubcategories || []
+    if (!filters.categoryName) return pairs
+    return pairs.filter((p) => p.categoryName === filters.categoryName)
+  }, [filterOptions.categorySubcategories, filters.categoryName])
+
+  const selectedSupplier = useMemo(
+    () => filterOptions.suppliers.find((supplier) => supplier.id === filters.platformSupplierId),
+    [filterOptions.suppliers, filters.platformSupplierId]
+  )
+  const selectedSupplierSummary = selectedSupplier || null
+  const snapshotEditable = snapshot?.status === 'ready' || snapshot?.status === 'partially_generated'
+
   async function runPlanExport(format) {
-    if (!snapshot?.id || exporting) return
+    if (
+      getExportDisabledReason({
+        snapshotId: snapshot?.id || '',
+        snapshotStatus: snapshot?.status || '',
+        supplierId: filters.platformSupplierId,
+        exporting,
+        pendingSaveCount: pendingSaveCountRef.current,
+        hasSaveError: hasFailedSaves(failedSaveIdsRef.current),
+        summary: selectedSupplierSummary,
+      })
+    ) {
+      return
+    }
     setExporting(true)
     setExportMenuOpen(false)
     try {
-      const rows = await exportSnapshotItemsCsv(snapshot.id, {
-        search: debouncedSearch,
-        ...filters,
+      const fetched = await exportSnapshotItemsCsv(snapshot.id, {
+        platformSupplierId: filters.platformSupplierId,
+        orderableOnly: true,
       })
+      const rows = filterItemsForSupplierPlanExport(fetched, selectedSupplierSummary)
+      if (rows.length === 0) {
+        showError(EMPTY_SUPPLIER_EXPORT_MESSAGE)
+        return
+      }
       const meta = {
         periodFrom: snapshot.periodFrom,
         periodTo: snapshot.periodTo,
+        supplierName: selectedSupplier?.name || '',
       }
       if (format === 'pdf') {
         await exportProcurementPlanPdf(rows, meta)
@@ -274,7 +408,19 @@ export default function ProcurementPlannerView() {
   }
 
   async function runGenerate() {
-    if (!canGenerate || !snapshot?.id || !deliveryDate || !filters.platformSupplierId) return
+    const livePending = pendingSaveCountRef.current
+    const blocked = getCreateOrderDisabledReason({
+      canGenerate,
+      snapshotEditable,
+      supplierId: filters.platformSupplierId,
+      summary: selectedSupplierSummary,
+      pendingSaveCount: livePending,
+      hasSaveError,
+      generating,
+      supplierName: selectedSupplier?.name || '',
+    })
+    if (blocked || !snapshot?.id || !deliveryDate) return
+
     setGenerating(true)
     try {
       const result = await generateProcurementOrders(snapshot.id, deliveryDate, {
@@ -284,14 +430,22 @@ export default function ProcurementPlannerView() {
         showError(result.message)
         return
       }
-      const skipped = result.skippedNoSupplier || 0
+      const orderId = result.purchaseOrderIds?.[0] || null
+      const itemsOrdered = result.itemsOrdered ?? 0
+      const supplierLabel = selectedSupplier?.name || 'поставщик'
       const msg = result.alreadyGenerated
-        ? `Заказы уже были сформированы (${result.purchaseOrderIds?.length || 0}).`
-        : `Сформировано заказов: ${result.ordersCreated}.`
-      showSuccess(skipped > 0 ? `${msg} Без поставщика: ${skipped}.` : msg)
+        ? `Заказ для «${supplierLabel}» уже был создан.`
+        : `Заказ для «${supplierLabel}» создан · ${itemsOrdered || selectedSupplierSummary?.pendingPositions || 0} позиций`
+      showSuccess(msg, {
+        duration: 6000,
+        action: orderId
+          ? { label: 'Открыть заказ', to: `/platform/procurement/${orderId}` }
+          : null,
+      })
       setGenerateOpen(false)
       setConfirmGenerate(false)
       await loadSnapshotMeta()
+      await loadItems()
       await reloadProcurement()
     } catch (err) {
       showError(err?.message || 'Не удалось сформировать заказы')
@@ -300,24 +454,143 @@ export default function ProcurementPlannerView() {
     }
   }
 
-  const subcategoryOptions = useMemo(() => {
-    const pairs = filterOptions.categorySubcategories || []
-    if (!filters.categoryName) return pairs
-    return pairs.filter((p) => p.categoryName === filters.categoryName)
-  }, [filterOptions.categorySubcategories, filters.categoryName])
-
-  const selectedSupplier = useMemo(
-    () => filterOptions.suppliers.find((supplier) => supplier.id === filters.platformSupplierId),
-    [filterOptions.suppliers, filters.platformSupplierId]
+  const ordersProgress = useMemo(
+    () =>
+      formatOrdersProgress({
+        generatedSupplierCount: filterOptions.generatedSupplierCount || 0,
+        pendingSupplierCount: filterOptions.pendingSupplierCount || 0,
+        unassignedOrderableCount: filterOptions.unassignedOrderableCount || 0,
+        inconsistentSupplierCount: filterOptions.inconsistentSupplierCount || 0,
+      }),
+    [filterOptions]
   )
-  const snapshotEditable = snapshot?.status === 'ready' || snapshot?.status === 'partially_generated'
+
+  const workflow = useMemo(
+    () =>
+      getSupplierWorkflowStatus({
+        supplierId: filters.platformSupplierId,
+        summary: selectedSupplierSummary,
+      }),
+    [filters.platformSupplierId, selectedSupplierSummary]
+  )
+
+  const createDisabledReason = getCreateOrderDisabledReason({
+    canGenerate,
+    snapshotEditable,
+    supplierId: filters.platformSupplierId,
+    summary: selectedSupplierSummary,
+    pendingSaveCount,
+    hasSaveError,
+    generating,
+  })
+  const createTooltip = getCreateOrderTooltip({
+    disabledReason: createDisabledReason,
+    supplierName: selectedSupplier?.name || '',
+  })
+  const orderCreatedForSupplier = isSupplierOrderCreated(selectedSupplierSummary)
+  const exportDisabledReason = getExportDisabledReason({
+    snapshotId: snapshot?.id || '',
+    snapshotStatus: snapshot?.status || '',
+    supplierId: filters.platformSupplierId,
+    exporting,
+    pendingSaveCount,
+    hasSaveError,
+    summary: selectedSupplierSummary,
+  })
+  const exportTooltip = getExportTooltip({
+    disabledReason: exportDisabledReason,
+    orderCreated: orderCreatedForSupplier,
+  })
+  const exportMenuLabel = getExportMenuLabel(orderCreatedForSupplier)
+  const syncDisabledReason = getSyncDisabledReason({
+    canSync,
+    syncing,
+    pendingSaveCount,
+    hasSaveError,
+  })
+  const syncTooltip = getSyncTooltip({ disabledReason: syncDisabledReason })
+  const syncAria = syncing
+    ? 'Синхронизация UMAG выполняется'
+    : `${syncTooltip}. Обновлено: ${formatSyncedAt(snapshot?.syncedAt)}`
 
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
   const from = totalCount === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, totalCount)
-  const syncTitle = syncing
-    ? 'Синхронизация UMAG выполняется'
-    : `Синхронизация UMAG · ${formatSyncedAt(snapshot?.syncedAt)}`
+
+  const saveStatusLabel =
+    saveStatus === 'saving'
+      ? 'Сохраняется…'
+      : saveStatus === 'saved'
+        ? 'Сохранено'
+        : saveStatus === 'error'
+          ? 'Ошибка сохранения'
+          : null
+
+  function renderSupplierStatus(supplier) {
+    const status = supplier.planningStatus || 'empty'
+    return (
+      <span
+        className={`proc-planner__supplier-status proc-planner__supplier-status--${status}`}
+      >
+        {SUPPLIER_PLANNING_STATUS_LABELS[status] || status}
+      </span>
+    )
+  }
+
+  function renderQtyCell(item, mobile = false) {
+    const locked = isItemQuantityLocked(item, filterOptions)
+    if (locked) {
+      const hint = getLockedQuantityHint(item, filterOptions)
+      return (
+        <div className="proc-planner__final proc-planner__final--locked">
+          <span className="proc-planner__locked-qty">{formatNum(item.finalOrderQty, 0)}</span>
+          {hint.orderId ? (
+            <Link
+              to={`/platform/procurement/${hint.orderId}`}
+              className="proc-planner__in-order"
+              title={hint.label}
+            >
+              {hint.label}
+            </Link>
+          ) : (
+            <span className="proc-planner__in-order">{hint.label}</span>
+          )}
+        </div>
+      )
+    }
+
+    return (
+      <div className="proc-planner__final">
+        <input
+          className={mobile ? undefined : 'proc-planner__input'}
+          type="number"
+          min={0}
+          step={1}
+          defaultValue={item.finalOrderQty}
+          key={`${mobile ? 'm-' : ''}final-${item.id}-${item.finalOrderQty}-${item.manualOverride}`}
+          disabled={!canEditPlan || !snapshotEditable}
+          onBlur={(e) => {
+            if (Number(e.target.value) !== item.finalOrderQty) {
+              void handleFinalChange(item, e.target.value)
+            }
+          }}
+          aria-label={`Заказ для ${item.productName}`}
+        />
+        {item.manualOverride ? (
+          <button
+            type="button"
+            className="proc-planner__reset"
+            title="Сбросить к рекомендации"
+            aria-label="Сбросить к рекомендации"
+            disabled={!canEditPlan || !snapshotEditable}
+            onClick={() => void handleReset(item)}
+          >
+            <RotateCcwIcon size={14} />
+          </button>
+        ) : null}
+      </div>
+    )
+  }
 
   if (!isCloudMode()) {
     return (
@@ -348,29 +621,37 @@ export default function ProcurementPlannerView() {
                   }))
                 }
                 activeOnly={false}
-                placeholder="Все поставщики"
+                placeholder="Выберите поставщика"
                 searchPlaceholder="Поиск поставщика…"
+                renderOptionStatus={renderSupplierStatus}
               />
             </div>
             <PlatformToolbarActionWrap>
-              <PlatformSyncButton
-                onClick={() => void handleSync()}
-                syncing={syncing}
-                disabled={!canSync}
-                title={syncTitle}
-                aria-label={syncTitle}
-              />
+              <span className="proc-planner__tip-wrap" data-tooltip={syncTooltip}>
+                <PlatformSyncButton
+                  onClick={() => void handleSync()}
+                  syncing={syncing}
+                  disabled={Boolean(syncDisabledReason)}
+                  title={syncTooltip}
+                  aria-label={syncAria}
+                />
+              </span>
             </PlatformToolbarActionWrap>
             <PlatformToolbarActionWrap>
-              <PlatformFilterButton
-                buttonRef={filterButtonRef}
-                active={activeFilterCount > 0}
-                count={activeFilterCount || null}
-                onClick={() => setFilterOpen((v) => !v)}
-                ariaExpanded={filterOpen}
-                ariaLabel="Фильтры плана"
-                title="Фильтры"
-              />
+              <span
+                className="proc-planner__tip-wrap"
+                data-tooltip="Дополнительные фильтры"
+              >
+                <PlatformFilterButton
+                  buttonRef={filterButtonRef}
+                  active={activeFilterCount > 0}
+                  count={activeFilterCount || null}
+                  onClick={() => setFilterOpen((v) => !v)}
+                  ariaExpanded={filterOpen}
+                  ariaLabel="Дополнительные фильтры"
+                  title="Дополнительные фильтры"
+                />
+              </span>
               {filterOpen ? (
                 <div className="proc-planner__filter-pop">
                   <label>
@@ -454,37 +735,59 @@ export default function ProcurementPlannerView() {
               ) : null}
             </PlatformToolbarActionWrap>
             <PlatformToolbarActionWrap>
-              <PlatformToolbarIconButton
-                onClick={() => setGenerateOpen(true)}
-                disabled={!canGenerate || !snapshotEditable || !filters.platformSupplierId || generating}
-                aria-label="Сформировать заказ поставщику"
-                title={filters.platformSupplierId ? 'Сформировать заказ' : 'Выберите поставщика'}
-                create
+              <PlannerTooltipButton
+                className="proc-planner__create-btn"
+                tooltip={createTooltip}
+                onClick={() => {
+                  if (
+                    getCreateOrderDisabledReason({
+                      canGenerate,
+                      snapshotEditable,
+                      supplierId: filters.platformSupplierId,
+                      summary: selectedSupplierSummary,
+                      pendingSaveCount: pendingSaveCountRef.current,
+                      hasSaveError,
+                      generating,
+                    })
+                  ) {
+                    return
+                  }
+                  setGenerateOpen(true)
+                }}
+                disabled={Boolean(createDisabledReason)}
+                aria-label={createTooltip}
               >
-                <SparklesIcon size={20} />
-              </PlatformToolbarIconButton>
+                <FileTextIcon size={18} />
+                <span>Создать заказ</span>
+              </PlannerTooltipButton>
             </PlatformToolbarActionWrap>
             <PlatformToolbarActionWrap>
               <div className="proc-planner__export" ref={exportMenuRef}>
-                <PlatformToolbarIconButton
-                  onClick={() => setExportMenuOpen((open) => !open)}
-                  disabled={!snapshot?.id || snapshot.status === 'syncing' || exporting}
-                  aria-label="Экспорт плана"
-                  title="Экспорт плана"
-                  aria-haspopup="menu"
-                  aria-expanded={exportMenuOpen}
-                  aria-controls={exportMenuOpen ? exportMenuId : undefined}
-                  aria-busy={exporting || undefined}
-                >
-                  <DownloadIcon size={20} />
-                </PlatformToolbarIconButton>
+                <span className="proc-planner__tip-wrap" data-tooltip={exportTooltip}>
+                  <PlatformToolbarIconButton
+                    onClick={() => {
+                      if (exportDisabledReason) return
+                      setExportMenuOpen((open) => !open)
+                    }}
+                    disabled={Boolean(exportDisabledReason)}
+                    aria-label={exportTooltip}
+                    title={exportTooltip}
+                    aria-haspopup="menu"
+                    aria-expanded={exportMenuOpen}
+                    aria-controls={exportMenuOpen ? exportMenuId : undefined}
+                    aria-busy={exporting || undefined}
+                  >
+                    <DownloadIcon size={20} />
+                  </PlatformToolbarIconButton>
+                </span>
                 {exportMenuOpen ? (
                   <div
                     id={exportMenuId}
                     className="proc-planner__export-menu"
                     role="menu"
-                    aria-label="Формат экспорта плана"
+                    aria-label={exportMenuLabel}
                   >
+                    <div className="proc-planner__export-heading">{exportMenuLabel}</div>
                     <button
                       type="button"
                       role="menuitem"
@@ -511,30 +814,76 @@ export default function ProcurementPlannerView() {
         }
       />
 
+      <div className="proc-planner__workflow" aria-live="polite">
+        <span className={`proc-planner__workflow-step is-${workflow.step}`}>
+          {workflow.label}
+        </span>
+        {workflow.step === 'created' && workflow.orderId ? (
+          <Link
+            to={`/platform/procurement/${workflow.orderId}`}
+            className="proc-planner__workflow-link"
+          >
+            Открыть заказ
+          </Link>
+        ) : null}
+        {workflow.inconsistent ? (
+          <span className="proc-planner__warn">Есть позиции вне заказа</span>
+        ) : null}
+        {saveStatusLabel ? (
+          <span
+            className={`proc-planner__save-status is-${saveStatus}`}
+            role="status"
+          >
+            {saveStatusLabel}
+          </span>
+        ) : null}
+      </div>
+
       <div className="proc-planner__meta">
         {snapshot ? (
           <>
-            <span>
-              {snapshot.status === 'ready'
-                ? 'Готов'
-                : snapshot.status === 'partially_generated'
-                  ? 'Частично сформирован'
-                : snapshot.status === 'generated'
-                  ? 'Заказы сформированы'
-                  : snapshot.status === 'syncing'
-                    ? 'Синхронизация…'
-                    : snapshot.status === 'failed'
-                      ? 'Ошибка'
-                      : snapshot.status}
-            </span>
-            <span>{formatSyncedAt(snapshot.syncedAt)}</span>
-            <span>{snapshot.itemCount} SKU</span>
-            {snapshot.negativeStockCount > 0 ? (
-              <span className="proc-planner__warn">{snapshot.negativeStockCount} отриц.</span>
-            ) : null}
+            <div className="proc-planner__meta-block">
+              <span className="proc-planner__meta-label">Снимок UMAG</span>
+              <span>
+                {snapshot.status === 'syncing'
+                  ? 'Синхронизация…'
+                  : snapshot.status === 'failed'
+                    ? 'Ошибка синхронизации'
+                    : `Обновлён ${formatSyncedAt(snapshot.syncedAt)}`}
+              </span>
+              <span>{snapshot.itemCount} SKU</span>
+              {snapshot.negativeStockCount > 0 ? (
+                <span className="proc-planner__warn">{snapshot.negativeStockCount} отриц.</span>
+              ) : null}
+            </div>
+            <div className="proc-planner__meta-block">
+              <span className="proc-planner__meta-label">Поставщик</span>
+              <span>
+                {selectedSupplier
+                  ? `${selectedSupplier.name} · ${SUPPLIER_PLANNING_STATUS_LABELS[selectedSupplier.planningStatus] || '—'}`
+                  : 'Не выбран'}
+              </span>
+            </div>
+            <div className="proc-planner__meta-block">
+              <span className="proc-planner__meta-label">Прогресс заказов</span>
+              <span>{ordersProgress.createdLabel}</span>
+              {ordersProgress.remainingLabel ? (
+                <span>{ordersProgress.remainingLabel}</span>
+              ) : null}
+              {ordersProgress.allDone ? <span>Все заказы созданы</span> : null}
+              {ordersProgress.unassignedLabel ? (
+                <span className="proc-planner__warn">{ordersProgress.unassignedLabel}</span>
+              ) : null}
+              {ordersProgress.inconsistentLabel ? (
+                <span className="proc-planner__warn">{ordersProgress.inconsistentLabel}</span>
+              ) : null}
+            </div>
           </>
         ) : (
-          <span>Нет снимка — нажмите синхронизацию</span>
+          <div className="proc-planner__meta-block">
+            <span className="proc-planner__meta-label">Снимок UMAG</span>
+            <span>Нет снимка — нажмите синхронизацию</span>
+          </div>
         )}
       </div>
 
@@ -600,39 +949,16 @@ export default function ProcurementPlannerView() {
                       </span>
                     </td>
                     <td>{formatNum(item.avgDaily, 2)}</td>
-                    <td><span className="proc-planner__norm-value" title="Настраивается во вкладке «Нормы»">{item.normDays}</span></td>
-                    <td>{formatNum(item.recommendedQty, 0)}</td>
                     <td>
-                      <div className="proc-planner__final">
-                        <input
-                          className="proc-planner__input"
-                          type="number"
-                          min={0}
-                          step={1}
-                          defaultValue={item.finalOrderQty}
-                          key={`final-${item.id}-${item.finalOrderQty}-${item.manualOverride}`}
-                          disabled={!canEditPlan || !snapshotEditable || Boolean(item.generatedPurchaseOrderId)}
-                          onBlur={(e) => {
-                            if (Number(e.target.value) !== item.finalOrderQty) {
-                              void handleFinalChange(item, e.target.value)
-                            }
-                          }}
-                          aria-label={`Заказ для ${item.productName}`}
-                        />
-                        {item.manualOverride ? (
-                          <button
-                            type="button"
-                            className="proc-planner__reset"
-                            title="Сбросить к рекомендации"
-                            aria-label="Сбросить к рекомендации"
-                            disabled={!canEditPlan || !snapshotEditable || Boolean(item.generatedPurchaseOrderId)}
-                            onClick={() => void handleReset(item)}
-                          >
-                            <RotateCcwIcon size={14} />
-                          </button>
-                        ) : null}
-                      </div>
+                      <span
+                        className="proc-planner__norm-value"
+                        title="Настраивается во вкладке «Нормы»"
+                      >
+                        {item.normDays}
+                      </span>
                     </td>
+                    <td>{formatNum(item.recommendedQty, 0)}</td>
+                    <td>{renderQtyCell(item)}</td>
                     <td>{item.umagSupplierName || '—'}</td>
                   </tr>
                 ))
@@ -686,22 +1012,16 @@ export default function ProcurementPlannerView() {
                   </span>
                   <label>
                     Норма
-                    <span className="proc-planner__norm-value" title="Настраивается во вкладке «Нормы»">{item.normDays}</span>
+                    <span
+                      className="proc-planner__norm-value"
+                      title="Настраивается во вкладке «Нормы»"
+                    >
+                      {item.normDays}
+                    </span>
                   </label>
                   <label>
                     Заказ
-                    <input
-                      type="number"
-                      min={0}
-                      defaultValue={item.finalOrderQty}
-                      key={`m-final-${item.id}-${item.finalOrderQty}`}
-                      disabled={!canEditPlan || !snapshotEditable || Boolean(item.generatedPurchaseOrderId)}
-                      onBlur={(e) => {
-                        if (Number(e.target.value) !== item.finalOrderQty) {
-                          void handleFinalChange(item, e.target.value)
-                        }
-                      }}
-                    />
+                    {renderQtyCell(item, true)}
                   </label>
                 </div>
                 <div className="proc-planner__card-foot">
@@ -729,7 +1049,7 @@ export default function ProcurementPlannerView() {
 
       {generateOpen ? (
         <AdminModal
-          title="Сформировать заказ"
+          title="Создать заказ"
           onClose={() => {
             if (!generating) setGenerateOpen(false)
           }}
@@ -746,7 +1066,21 @@ export default function ProcurementPlannerView() {
               <button
                 type="button"
                 className="btn btn--primary"
-                disabled={generating || !deliveryDate}
+                disabled={
+                  generating ||
+                  !deliveryDate ||
+                  Boolean(
+                    getCreateOrderDisabledReason({
+                      canGenerate,
+                      snapshotEditable,
+                      supplierId: filters.platformSupplierId,
+                      summary: selectedSupplierSummary,
+                      pendingSaveCount: pendingSaveCountRef.current,
+                      hasSaveError,
+                      generating,
+                    })
+                  )
+                }
                 onClick={() => setConfirmGenerate(true)}
               >
                 Далее
@@ -769,9 +1103,9 @@ export default function ProcurementPlannerView() {
 
       {confirmGenerate ? (
         <ConfirmDialog
-          title="Сформировать заказ?"
+          title="Создать заказ?"
           message={selectedSupplier?.name || 'Выбранный поставщик'}
-          confirmLabel="Сформировать"
+          confirmLabel="Создать заказ"
           confirmVariant="primary"
           loading={generating}
           onCancel={() => !generating && setConfirmGenerate(false)}

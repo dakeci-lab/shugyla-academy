@@ -7,6 +7,7 @@ import { ToastProvider } from './context/ToastContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import InternalPlatformProviders from './components/platform/InternalPlatformProviders'
 import PlatformRoute from './components/platform/PlatformRoute'
+import DesktopWebOnlyRoute from './components/platform/DesktopWebOnlyRoute'
 import PlatformNotFound from './components/platform/PlatformNotFound'
 import HrPlatformRoute from './components/platform/HrPlatformRoute'
 import { LOGIN_PATH } from './router/authRoutes'
@@ -307,7 +308,9 @@ export default function App() {
                   path="procurement"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <ProcurementPage />
+                      <DesktopWebOnlyRoute>
+                        <ProcurementPage />
+                      </DesktopWebOnlyRoute>
                     </PlatformRoute>
                   }
                 />
@@ -315,7 +318,9 @@ export default function App() {
                   path="procurement/analytics"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <AnalyticsProcurementPage />
+                      <DesktopWebOnlyRoute>
+                        <AnalyticsProcurementPage />
+                      </DesktopWebOnlyRoute>
                     </PlatformRoute>
                   }
                 />
@@ -323,7 +328,9 @@ export default function App() {
                   path="procurement/analytics/:id"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <PurchaseDetailPage />
+                      <DesktopWebOnlyRoute>
+                        <PurchaseDetailPage />
+                      </DesktopWebOnlyRoute>
                     </PlatformRoute>
                   }
                 />
@@ -331,7 +338,9 @@ export default function App() {
                   path="procurement/:id"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <PurchaseDetailPage />
+                      <DesktopWebOnlyRoute>
+                        <PurchaseDetailPage />
+                      </DesktopWebOnlyRoute>
                     </PlatformRoute>
                   }
                 />

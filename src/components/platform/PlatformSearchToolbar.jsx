@@ -116,6 +116,7 @@ export function PlatformFilterButton({
   ariaLabel = 'Фильтр',
   title = 'Фильтр',
   ariaExpanded,
+  ...rest
 }) {
   return (
     <PlatformToolbarIconButton
@@ -127,6 +128,7 @@ export function PlatformFilterButton({
       aria-label={ariaLabel}
       title={title}
       aria-expanded={ariaExpanded}
+      {...rest}
     >
       <FilterIcon size={20} />
     </PlatformToolbarIconButton>

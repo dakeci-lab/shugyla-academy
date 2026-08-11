@@ -5,17 +5,189 @@
   min-width: 0;
 }
 
-.proc-planner__meta {
+.proc-planner__tip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.proc-planner__tip-wrap[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  font-size: 11px;
+  line-height: 1.3;
+  white-space: normal;
+  text-align: center;
+  max-width: min(280px, 70vw);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+  z-index: 60;
+}
+
+.proc-planner__tip-wrap[data-tooltip]:hover::after,
+.proc-planner__tip-wrap[data-tooltip]:focus-within::after {
+  opacity: 1;
+}
+
+.proc-planner__create-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  min-height: 44px;
+  padding: 0 0.9rem;
+  border: 1px solid var(--color-primary, #059669);
+  border-radius: 12px;
+  background: var(--color-primary, #059669);
+  color: #fff;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.proc-planner__create-btn:hover:not(:disabled) {
+  filter: brightness(0.96);
+}
+
+.proc-planner__create-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #059669);
+  outline-offset: 2px;
+}
+
+.proc-planner__create-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.proc-planner__workflow {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem 1.25rem;
+  align-items: center;
+  gap: 0.55rem 0.9rem;
+  min-height: 1.5rem;
   font-size: 0.8125rem;
   color: var(--text-secondary, #5c6370);
+}
+
+.proc-planner__workflow-step {
+  font-weight: 600;
+  color: var(--text, #111827);
+}
+
+.proc-planner__workflow-step.is-created {
+  color: #047857;
+}
+
+.proc-planner__workflow-link {
+  font-weight: 600;
+  color: #047857;
+  text-decoration: underline;
+}
+
+.proc-planner__save-status {
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.proc-planner__save-status.is-saving {
+  color: #6b7280;
+}
+
+.proc-planner__save-status.is-saved {
+  color: #047857;
+}
+
+.proc-planner__save-status.is-error {
+  color: #b42318;
+}
+
+.proc-planner__meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem 1rem;
+  font-size: 0.8125rem;
+  color: var(--text-secondary, #5c6370);
+}
+
+.proc-planner__meta-block {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--border, #eef0f3);
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.proc-planner__meta-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.proc-planner__meta-block > span:not(.proc-planner__meta-label) {
+  color: var(--text, #111827);
 }
 
 .proc-planner__warn {
   color: #b42318;
   font-weight: 600;
+}
+
+.proc-planner__supplier-status--created {
+  color: #047857;
+}
+
+.proc-planner__supplier-status--draft {
+  color: #b54708;
+}
+
+.proc-planner__supplier-status--empty {
+  color: #6b7280;
+}
+
+.proc-planner__export-heading {
+  padding: 0.35rem 0.75rem 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.proc-planner__final--locked {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+
+.proc-planner__locked-qty {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.proc-planner__in-order {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #047857;
+  text-decoration: none;
+}
+
+a.proc-planner__in-order:hover {
+  text-decoration: underline;
 }
 
 .proc-planner__empty {
@@ -323,6 +495,23 @@
 }
 
 @media (max-width: 900px) {
+  .proc-planner__meta {
+    grid-template-columns: 1fr;
+  }
+
+  .proc-planner__save-status {
+    margin-left: 0;
+  }
+
+  .proc-planner__create-btn span {
+    display: none;
+  }
+
+  .proc-planner__create-btn {
+    width: 44px;
+    padding: 0;
+  }
+
   .proc-planner .platform-search-toolbar {
     flex-wrap: wrap;
   }

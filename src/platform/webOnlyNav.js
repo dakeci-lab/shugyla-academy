@@ -7,6 +7,7 @@ export const WEB_ONLY_NAV_IDS = new Set([
   'employees-payroll',
   'price-tags',
   'price-checker',
+  'procurement',
 ])
 
 /** Strip web-only entries from a filtered platform nav tree. */

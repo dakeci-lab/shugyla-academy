@@ -20,8 +20,8 @@ export function ToastProvider({ children }) {
     setToasts((prev) => prev.filter((toast) => toast.id !== id))
   }, [])
 
-  const addToast = useCallback(({ id, type, message, duration = 3500 }) => {
-    setToasts((prev) => [...prev, { id, type, message, duration }])
+  const addToast = useCallback(({ id, type, message, duration = 3500, action = null }) => {
+    setToasts((prev) => [...prev, { id, type, message, duration, action }])
   }, [])
 
   useEffect(() => {
@@ -30,25 +30,43 @@ export function ToastProvider({ children }) {
   }, [addToast])
 
   const showToast = useCallback(
-    ({ type = TOAST_TYPES.SUCCESS, message, duration }) => {
+    ({ type = TOAST_TYPES.SUCCESS, message, duration, action = null }) => {
       const id = crypto.randomUUID()
-      addToast({ id, type, message, duration })
+      addToast({ id, type, message, duration, action })
       return id
     },
     [addToast]
   )
 
+  const normalizeToastOptions = useCallback((durationOrOptions) => {
+    if (typeof durationOrOptions === 'number') return { duration: durationOrOptions }
+    if (durationOrOptions && typeof durationOrOptions === 'object') return durationOrOptions
+    return {}
+  }, [])
+
   const value = useMemo(
     () => ({
       showToast,
-      success: (message, duration) =>
-        showToast({ type: TOAST_TYPES.SUCCESS, message, duration }),
-      warning: (message, duration) =>
-        showToast({ type: TOAST_TYPES.WARNING, message, duration }),
-      error: (message, duration) =>
-        showToast({ type: TOAST_TYPES.ERROR, message, duration }),
+      success: (message, durationOrOptions) =>
+        showToast({
+          type: TOAST_TYPES.SUCCESS,
+          message,
+          ...normalizeToastOptions(durationOrOptions),
+        }),
+      warning: (message, durationOrOptions) =>
+        showToast({
+          type: TOAST_TYPES.WARNING,
+          message,
+          ...normalizeToastOptions(durationOrOptions),
+        }),
+      error: (message, durationOrOptions) =>
+        showToast({
+          type: TOAST_TYPES.ERROR,
+          message,
+          ...normalizeToastOptions(durationOrOptions),
+        }),
     }),
-    [showToast]
+    [normalizeToastOptions, showToast]
   )
 
   return (

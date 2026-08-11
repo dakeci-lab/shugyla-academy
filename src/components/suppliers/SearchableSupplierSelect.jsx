@@ -14,6 +14,8 @@ import './SearchableSupplierSelect.css'
  * @param {Array} [props.suppliers] — массив поставщиков (по умолчанию getSuppliers())
  * @param {string} [props.value] — id выбранного поставщика
  * @param {(supplierId: string, supplier: object|null) => void} props.onChange
+ * @param {(supplier: object) => React.ReactNode} [props.renderOptionLabel] — optional full option content
+ * @param {(supplier: object) => React.ReactNode} [props.renderOptionStatus] — optional status accessory
  */
 export default function SearchableSupplierSelect({
   suppliers: suppliersProp,
@@ -25,6 +27,8 @@ export default function SearchableSupplierSelect({
   required = false,
   id: idProp,
   activeOnly = true,
+  renderOptionLabel = null,
+  renderOptionStatus = null,
 }) {
   const autoId = useId()
   const controlId = idProp || autoId
@@ -267,6 +271,10 @@ export default function SearchableSupplierSelect({
               filteredSuppliers.map((supplier, index) => {
                 const isSelected = supplier.id === value
                 const isHighlighted = index === highlightedIndex
+                const statusNode = renderOptionStatus?.(supplier) ?? null
+                const labelNode = renderOptionLabel?.(supplier) ?? (
+                  <span className="searchable-supplier-select__option-name">{supplier.name}</span>
+                )
 
                 return (
                   <li key={supplier.id} role="presentation">
@@ -278,7 +286,14 @@ export default function SearchableSupplierSelect({
                       onMouseEnter={() => setHighlightedIndex(index)}
                       onMouseDown={(event) => handleOptionPointerDown(event, supplier)}
                     >
-                      {supplier.name}
+                      <span className="searchable-supplier-select__option-main">
+                        {labelNode}
+                        {statusNode ? (
+                          <span className="searchable-supplier-select__option-status">
+                            {statusNode}
+                          </span>
+                        ) : null}
+                      </span>
                     </button>
                   </li>
                 )
