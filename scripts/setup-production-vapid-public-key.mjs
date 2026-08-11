@@ -20,7 +20,7 @@ import { canonicalVapidFingerprint } from './lib/vapid-fingerprint.mjs'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
 const PRODUCTION_REF = 'cxadzerxndlscwvdaymk'
-const VAPID_SUBJECT = 'https://shugyla-market.kz/'
+const VAPID_SUBJECT = 'https://web.shugyla-market.kz/'
 const PUBLIC_KEY_FILE = path.join(ROOT, 'config/production-vapid-public.key')
 const DEFAULT_BACKUP_PATH = path.join(os.homedir(), '.shugyla-platform', 'secrets', 'production-vapid.env')
 

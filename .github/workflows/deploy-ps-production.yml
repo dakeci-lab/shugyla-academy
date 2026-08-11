@@ -1,4 +1,4 @@
-name: Build PS.kz production artifact
+name: Build web.shugyla-market.kz production artifact
 
 on:
   push:

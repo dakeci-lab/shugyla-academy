@@ -29,7 +29,7 @@ jobs:
             echo "Staging base URL is required"
             exit 1
           fi
-          if echo "${{ inputs.base_url }}" | grep -Eqi 'dakeci-lab.github.io/shugyla-academy|(^|//)(www\.)?shugyla-market.kz([/:]|$)'; then
+          if echo "${{ inputs.base_url }}" | grep -Eqi 'dakeci-lab.github.io/shugyla-academy|(^|//)(www\.|web\.)?shugyla-market.kz([/:]|$)'; then
             echo "Refusing mutating suite against a production app URL"
             exit 1
           fi

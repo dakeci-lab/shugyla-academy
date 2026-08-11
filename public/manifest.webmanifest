@@ -2,6 +2,7 @@
   "name": "Shugyla Platform",
   "short_name": "Shugyla",
   "description": "Внутренняя платформа Shugyla Market",
+  "id": "./",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

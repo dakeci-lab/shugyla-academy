@@ -64,13 +64,17 @@ assert('GitHub Pages build keeps subpath', pagesWorkflow.includes('APP_BASE_PATH
 assert('PS.kz build targets domain root', psWorkflow.includes('APP_BASE_PATH: /'))
 assert('PS.kz artifact is isolated on its own branch', psWorkflow.includes('ps-production'))
 assert('old production URL is protected from mutating E2E', e2eEnvironment.includes('dakeci-lab.github.io'))
-assert('new production URL is protected from mutating E2E', e2eEnvironment.includes('shugyla-market.kz'))
+assert('web production URL is protected from mutating E2E', e2eEnvironment.includes('web.shugyla-market.kz'))
 assert(
   'old production route is detected at runtime',
   isProductionAppUrl('https://dakeci-lab.github.io/shugyla-academy/apply')
 )
 assert(
-  'new production route is detected at runtime',
+  'web production route is detected at runtime',
+  isProductionAppUrl('https://web.shugyla-market.kz/platform')
+)
+assert(
+  'transition root route remains protected at runtime',
   isProductionAppUrl('https://shugyla-market.kz/platform')
 )
 assert(
@@ -78,14 +82,14 @@ assert(
   !isProductionAppUrl('https://staging.example.kz/platform')
 )
 
-const normalizeRootNotification = loadNotificationNormalizer('https://shugyla-market.kz/')
+const normalizeWebNotification = loadNotificationNormalizer('https://web.shugyla-market.kz/')
 const normalizeFallbackNotification = loadNotificationNormalizer(
   'https://dakeci-lab.github.io/shugyla-academy/'
 )
 
 assert(
-  'root-domain push keeps an internal route',
-  normalizeRootNotification('/platform/profile') === 'https://shugyla-market.kz/platform/profile'
+  'web-domain push keeps an internal route',
+  normalizeWebNotification('/platform/profile') === 'https://web.shugyla-market.kz/platform/profile'
 )
 assert(
   'fallback push prefixes the GitHub Pages scope',
@@ -94,13 +98,13 @@ assert(
 )
 assert(
   'legacy tracker push becomes canonical on the new domain',
-  normalizeRootNotification('/shugyla-academy/platform/time-tracker') ===
-    'https://shugyla-market.kz/platform'
+  normalizeWebNotification('/shugyla-academy/platform/time-tracker') ===
+    'https://web.shugyla-market.kz/platform'
 )
 assert(
   'external push destination is rejected',
-  normalizeRootNotification('https://example.com/platform/profile') ===
-    'https://shugyla-market.kz/platform'
+  normalizeWebNotification('https://example.com/platform/profile') ===
+    'https://web.shugyla-market.kz/platform'
 )
 
 console.log(`\nVerification completed (${passed}/${passed} tests, exit 0)\n`)

@@ -17,7 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
 const PUBLIC_KEY_FILE = path.join(ROOT, 'config/production-vapid-public.key')
 const PRODUCTION_REF = 'cxadzerxndlscwvdaymk'
-const EXPECTED_SUBJECT = 'https://shugyla-market.kz/'
+const EXPECTED_SUBJECT = 'https://web.shugyla-market.kz/'
 
 let passed = 0
 let failed = 0

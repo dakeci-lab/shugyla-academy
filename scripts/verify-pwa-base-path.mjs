@@ -59,7 +59,7 @@ function main() {
 
   const fallbackOrigin = 'https://dakeci-lab.github.io'
   const fallbackBase = '/shugyla-academy/'
-  const productionOrigin = 'https://shugyla-market.kz'
+  const productionOrigin = 'https://web.shugyla-market.kz'
   const productionBase = '/'
 
   console.log('Stage 1: Vite and router base')
