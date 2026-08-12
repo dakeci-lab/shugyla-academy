@@ -284,6 +284,25 @@ function stageIntrospection() {
     `grants=${grants || 'none'}`
   )
 
+  // A definer function must not be callable as an RPC: the trigger fires it
+  // without needing EXECUTE, so nobody else should hold that privilege.
+  const directExecute = scalar(`
+    select coalesce(string_agg(role_name, ',' order by role_name), '')
+    from (
+      select unnest(array['anon', 'authenticated', 'service_role']) as role_name
+    ) roles
+    where has_function_privilege(
+      role_name,
+      'public.${GUARD_FN}()',
+      'EXECUTE'
+    );
+  `)
+  assert(
+    'the guard cannot be invoked directly by API roles',
+    directExecute === '',
+    `execute still granted to: ${directExecute}`
+  )
+
   const updatableColumns = scalar(`
     select coalesce(string_agg(column_name, ',' order by column_name), '')
     from information_schema.column_privileges
