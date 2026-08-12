@@ -21,6 +21,7 @@ import {
   getCandidateById,
 } from '../../../services/platformDataService'
 import { transferCandidatePhotoToEmployee } from '../../../services/candidatePhotoService'
+import { resetEmployeePasswordAsAdmin } from '../../../services/employeeAdminService'
 import { getRoleLabel } from '../../../data/roles'
 import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
 import {
@@ -84,6 +85,9 @@ export default function EmployeeEditModal({
   const [catalogError, setCatalogError] = useState('')
   const [roleConfirmOpen, setRoleConfirmOpen] = useState(false)
   const [pendingSaveEvent, setPendingSaveEvent] = useState(null)
+  const [passwordResetConfirmOpen, setPasswordResetConfirmOpen] = useState(false)
+  const [passwordResetting, setPasswordResetting] = useState(false)
+  const [temporaryPassword, setTemporaryPassword] = useState('')
 
   useEffect(() => {
     setForm(
@@ -95,6 +99,9 @@ export default function EmployeeEditModal({
     setAvatarRevision(0)
     setRoleConfirmOpen(false)
     setPendingSaveEvent(null)
+    setPasswordResetConfirmOpen(false)
+    setPasswordResetting(false)
+    setTemporaryPassword('')
   }, [employee, initialForm, sourceCandidateId])
 
   useEffect(() => {
@@ -141,6 +148,16 @@ export default function EmployeeEditModal({
 
   const canViewPositions = can(sessionUser, PERMISSION_CODES.POSITIONS_VIEW)
   const canManagePositions = can(sessionUser, PERMISSION_CODES.POSITIONS_MANAGE)
+
+  const canResetPassword = Boolean(
+    cloudMode &&
+      editId &&
+      employee &&
+      !editingSelf &&
+      isActiveStaffEmployee(employee) &&
+      employee.authLinked === true &&
+      can(sessionUser, PERMISSION_CODES.EMPLOYEES_MANAGE_ROLES)
+  )
 
   const loadCatalog = async ({ force = false } = {}) => {
     if (!cloudMode) {
@@ -219,7 +236,7 @@ export default function EmployeeEditModal({
   }
 
   async function performSave() {
-    if (submitting || deactivating || activating) return
+    if (submitting || passwordResetting || deactivating || activating) return
 
     if (!editId && cloudMode) {
       const passwordError = validateEmployeeTemporaryPassword(form.password)
@@ -365,7 +382,7 @@ export default function EmployeeEditModal({
 
   async function handleSave(event) {
     event.preventDefault()
-    if (submitting || deactivating || activating) return
+    if (submitting || passwordResetting || deactivating || activating) return
 
     if (roleChanged()) {
       setPendingSaveEvent(event)
@@ -373,6 +390,43 @@ export default function EmployeeEditModal({
       return
     }
     await performSave()
+  }
+
+  function handleClose() {
+    if (submitting || passwordResetting) return
+    setPasswordResetConfirmOpen(false)
+    setTemporaryPassword('')
+    onClose?.()
+  }
+
+  async function handlePasswordResetConfirm() {
+    if (!canResetPassword || passwordResetting) return
+
+    setPasswordResetting(true)
+    setFormError('')
+    setTemporaryPassword('')
+    try {
+      const result = await resetEmployeePasswordAsAdmin(editId)
+      setTemporaryPassword(result.temporaryPassword)
+      setPasswordResetConfirmOpen(false)
+      showSuccess('Временный пароль создан. Передайте его сотруднику безопасным способом.')
+    } catch (err) {
+      const message = err?.message || 'Не удалось сбросить пароль сотрудника'
+      setFormError(message)
+      showError(message)
+    } finally {
+      setPasswordResetting(false)
+    }
+  }
+
+  async function handleTemporaryPasswordCopy() {
+    if (!temporaryPassword) return
+    try {
+      await navigator.clipboard.writeText(temporaryPassword)
+      showSuccess('Временный пароль скопирован')
+    } catch {
+      showError('Не удалось скопировать пароль. Выделите и скопируйте его вручную.')
+    }
   }
 
   const saveLabel = submitting
@@ -404,7 +458,7 @@ export default function EmployeeEditModal({
     <>
       <AdminModal
         title={editId ? 'Редактировать сотрудника' : 'Добавить сотрудника'}
-        onClose={submitting ? () => {} : onClose}
+        onClose={submitting || passwordResetting ? () => {} : handleClose}
         wide
         footer={
           <div className="employees-modal-footer">
@@ -413,7 +467,7 @@ export default function EmployeeEditModal({
                 <button
                   type="button"
                   className="btn employees-modal-footer__status-action employees-modal-footer__status-action--danger"
-                  disabled={submitting || deactivating || activating}
+                  disabled={submitting || passwordResetting || deactivating || activating}
                   onClick={() => onRequestDeactivate(employee)}
                 >
                   Уволить сотрудника
@@ -425,7 +479,7 @@ export default function EmployeeEditModal({
                 <button
                   type="button"
                   className="btn employees-modal-footer__status-action employees-modal-footer__status-action--success"
-                  disabled={submitting || deactivating || activating}
+                  disabled={submitting || passwordResetting || deactivating || activating}
                   onClick={() => onRequestActivate(employee)}
                 >
                   Восстановить сотрудника
@@ -436,8 +490,8 @@ export default function EmployeeEditModal({
               <button
                 type="button"
                 className="btn btn--outline"
-                onClick={onClose}
-                disabled={submitting}
+                onClick={handleClose}
+                disabled={submitting || passwordResetting}
               >
                 Отмена
               </button>
@@ -445,7 +499,7 @@ export default function EmployeeEditModal({
                 type="submit"
                 className="btn btn--primary"
                 form="employee-form"
-                disabled={submitting || deactivating || activating}
+                disabled={submitting || passwordResetting || deactivating || activating}
                 aria-busy={submitting}
               >
                 {saveLabel}
@@ -801,6 +855,21 @@ export default function EmployeeEditModal({
                 </span>
               )}
             </label>
+            {canResetPassword && (
+              <div className="employee-password-reset">
+                <button
+                  type="button"
+                  className="btn btn--outline"
+                  onClick={() => setPasswordResetConfirmOpen(true)}
+                  disabled={submitting || passwordResetting}
+                >
+                  {passwordResetting ? 'Сброс пароля…' : 'Сбросить пароль'}
+                </button>
+                <span className="admin-form__hint">
+                  Система создаст новый временный пароль и покажет его только один раз.
+                </span>
+              </div>
+            )}
             {!editId && (
               <label className="admin-form__label">
                 {cloudMode ? 'Временный пароль *' : 'Пароль *'}
@@ -836,6 +905,32 @@ export default function EmployeeEditModal({
             )}
           </div>
 
+          {temporaryPassword && (
+            <div className="employee-password-result" role="status">
+              <strong>Новый временный пароль</strong>
+              <div className="employee-password-result__value">
+                <input
+                  className="admin-form__input"
+                  value={temporaryPassword}
+                  readOnly
+                  aria-label="Новый временный пароль"
+                  autoComplete="off"
+                />
+                <button
+                  type="button"
+                  className="btn btn--outline"
+                  onClick={handleTemporaryPasswordCopy}
+                >
+                  Скопировать пароль
+                </button>
+              </div>
+              <span className="admin-form__hint">
+                Передайте пароль сотруднику безопасным способом. После входа сотрудник должен
+                изменить его в настройках профиля. После закрытия окна пароль больше не покажется.
+              </span>
+            </div>
+          )}
+
           {formError && (
             <p className="admin-form__error" role="alert" id="employee-form-error">
               {formError}
@@ -860,6 +955,21 @@ export default function EmployeeEditModal({
             if (submitting) return
             performSave(pendingSaveEvent)
           }}
+        />
+      )}
+
+      {passwordResetConfirmOpen && (
+        <ConfirmDialog
+          title="Сбросить пароль сотрудника?"
+          message="Текущий пароль сразу перестанет работать. Новый временный пароль будет показан только один раз после сброса."
+          confirmLabel="Сбросить пароль"
+          confirmVariant="danger"
+          loading={passwordResetting}
+          onCancel={() => {
+            if (passwordResetting) return
+            setPasswordResetConfirmOpen(false)
+          }}
+          onConfirm={handlePasswordResetConfirm}
         />
       )}
     </>

@@ -86,6 +86,7 @@
     "verify:employees-list": "node scripts/verify-employees-list.mjs",
     "verify:loading-system": "node scripts/verify-loading-system.mjs",
     "verify:employee-create-fix": "node scripts/verify-employee-create-fix.mjs",
+    "verify:admin-password-reset": "node scripts/verify-admin-password-reset.mjs",
     "verify:app-bootstrap": "node scripts/verify-app-bootstrap.mjs",
     "verify:progressive-bootstrap": "node scripts/verify-progressive-bootstrap.mjs",
     "verify:request-deduplication": "node scripts/verify-request-deduplication.mjs",

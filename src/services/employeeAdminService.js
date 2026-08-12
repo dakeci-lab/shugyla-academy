@@ -25,6 +25,11 @@ const ERROR_MESSAGES = {
   unauthorized: 'Сессия завершена. Войдите повторно',
   listDefault: 'Не удалось загрузить сотрудников. Проверьте подключение и повторите попытку.',
   updateDefault: 'Не удалось сохранить изменения',
+  resetForbidden: 'У вас нет прав для сброса пароля сотрудника',
+  resetInactive: 'Нельзя сбросить пароль неактивного сотрудника',
+  resetUnlinked: 'Учётная запись сотрудника не связана с системой входа',
+  resetSelf: 'Свой пароль измените в настройках профиля',
+  resetDefault: 'Не удалось сбросить пароль сотрудника',
 }
 
 function clampAdminListPageSize(pageSize, fallback = ADMIN_LIST_DEFAULT_PAGE_SIZE) {
@@ -368,4 +373,61 @@ export async function updateEmployeeAsAdmin(employeeId, changes) {
   }
 
   return serverEmployeeToUi(data.employee)
+}
+
+/**
+ * Cloud-only: replace another active employee's Auth password with a server-generated
+ * temporary password. The credential is returned by the Edge Function once and is
+ * never persisted by this service.
+ */
+export async function resetEmployeePasswordAsAdmin(employeeId) {
+  await ensureCloudSession()
+
+  const normalizedId = Number(employeeId)
+  if (!Number.isInteger(normalizedId) || normalizedId <= 0) {
+    throw new EmployeeAdminError(ERROR_MESSAGES.notFound, 'employee_not_found')
+  }
+
+  const { data, error } = await supabase.functions.invoke('admin-reset-employee-password', {
+    body: { employee_id: normalizedId },
+  })
+
+  if (error) {
+    const errorBody = await extractFunctionErrorBody(error)
+    const code = errorBody?.code ?? errorBody?.error?.code
+    const message = (() => {
+      if (code === 'forbidden' || code === 'inactive_caller') return ERROR_MESSAGES.resetForbidden
+      if (code === 'unauthorized') return ERROR_MESSAGES.unauthorized
+      if (code === 'employee_not_found') return ERROR_MESSAGES.notFound
+      if (code === 'employee_inactive') return ERROR_MESSAGES.resetInactive
+      if (code === 'auth_not_linked') return ERROR_MESSAGES.resetUnlinked
+      if (code === 'self_reset_forbidden') return ERROR_MESSAGES.resetSelf
+      if (
+        code === 'validation_error' ||
+        code === 'malformed_json' ||
+        code === 'forbidden_field' ||
+        code === 'method_not_allowed'
+      ) {
+        return ERROR_MESSAGES.validation
+      }
+      return isGenericInvokeErrorMessage(error.message)
+        ? ERROR_MESSAGES.resetDefault
+        : error.message || ERROR_MESSAGES.resetDefault
+    })()
+    throw new EmployeeAdminError(message, code || 'internal_error')
+  }
+
+  if (
+    !data?.ok ||
+    Number(data.employee_id) !== normalizedId ||
+    typeof data.temporary_password !== 'string' ||
+    !data.temporary_password
+  ) {
+    throw new EmployeeAdminError(ERROR_MESSAGES.resetDefault, 'internal_error')
+  }
+
+  return {
+    employeeId: normalizedId,
+    temporaryPassword: data.temporary_password,
+  }
 }
