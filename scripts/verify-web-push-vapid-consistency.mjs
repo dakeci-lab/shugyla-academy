@@ -77,7 +77,7 @@ function main() {
   const service = read('src/services/webPushSubscriptionService.js')
   const adminService = read('src/services/notificationSettingsAdminService.js')
   const section = read('src/components/admin/NotificationTestBroadcastSection.jsx')
-  const pagesDeploy = read('.github/workflows/main.yml')
+  const legacyPagesWorkflow = path.join(ROOT, '.github/workflows/main.yml')
   const psDeploy = read('.github/workflows/deploy-ps-production.yml')
 
   console.log('Stage 1: Schema and fingerprint storage')
@@ -112,7 +112,7 @@ function main() {
   assert('send-test returns vapid_rejected', sendTest.includes("'vapid_rejected'"))
 
   console.log('Stage 6: Frontend/server public key sources')
-  assert('Pages deploy reads production public key file', pagesDeploy.includes('config/production-vapid-public.key'))
+  assert('legacy GitHub Pages workflow stays removed', !fs.existsSync(legacyPagesWorkflow))
   assert('PS deploy reads production public key file', psDeploy.includes('config/production-vapid-public.key'))
   assert('frontend uses vite public env', service.includes('VITE_WEB_PUSH_VAPID_PUBLIC_KEY'))
   assert('edge fingerprint helper exists', fingerprint.includes('getCurrentServerVapidFingerprint'))

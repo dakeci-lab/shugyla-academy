@@ -25,7 +25,7 @@ const index = read('index.html')
 const manifest = read('public/manifest.webmanifest')
 const serviceWorker = read('public/sw.js')
 const htaccess = read('public/.htaccess')
-const pagesWorkflow = read('.github/workflows/main.yml')
+const legacyPagesWorkflow = path.join(ROOT, '.github/workflows/main.yml')
 const psWorkflow = read('.github/workflows/deploy-ps-production.yml')
 const e2eEnvironment = read('tests/e2e/helpers/env.mjs')
 const hostSurface = read('src/router/hostSurface.js')
@@ -109,7 +109,7 @@ assert(
   'QR keeps store source on canonical hub',
   qrModal.includes("getApplyHubUrl('?source=store_qr')")
 )
-assert('GitHub Pages build keeps subpath', pagesWorkflow.includes('APP_BASE_PATH: /shugyla-academy/'))
+assert('legacy GitHub Pages workflow stays removed', !fs.existsSync(legacyPagesWorkflow))
 assert('PS.kz build targets domain root', psWorkflow.includes('APP_BASE_PATH: /'))
 assert(
   'Plesk build pins canonical careers origin',
