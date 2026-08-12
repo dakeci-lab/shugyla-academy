@@ -81,6 +81,9 @@ function stagePriceCheckerRuntimeGone() {
   const webOnlyNav = read('src/platform/webOnlyNav.js')
   assert('no price-checker in web-only nav ids', !webOnlyNav.includes("'price-checker'"))
 
+  const platformAccess = read('src/platform/platformAccess.js')
+  assert('no PRICE_CHECKER reference in platformAccess compat shim', !platformAccess.includes('PRICE_CHECKER'))
+
   console.log('')
 }
 
