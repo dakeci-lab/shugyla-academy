@@ -13,7 +13,6 @@ import {
   shouldHideDesktopWebOnlyLink,
 } from '../../platform/desktopWebOnly'
 import { PLATFORM_NAV } from '../../platform/platformNav'
-import { isPwaStandalone } from '../../utils/pwaStandalone'
 import '../../components/admin/admin-shared.css'
 import './PlatformDashboard.css'
 
@@ -27,10 +26,7 @@ export default function PlatformDashboard() {
   const { ensureModules, version } = usePlatformData()
   const cloudMode = isCloudMode()
   const isDesktopViewport = useMediaQuery(DESKTOP_WEB_VIEWPORT_QUERY)
-  const surfaceFlags = {
-    isDesktopViewport,
-    pwaStandalone: isPwaStandalone(),
-  }
+  const surfaceFlags = { isDesktopViewport }
   const desktopWebOnlyPrefixes = getDesktopWebOnlyPathPrefixes(PLATFORM_NAV)
 
   useEffect(() => {

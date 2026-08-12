@@ -5,6 +5,11 @@ import {
   groupPermissionsByModule,
 } from '../../../config/permissionCatalog'
 import {
+  describeRoleNameConflict,
+  findRoleByName,
+  isRoleNameUniqueViolation,
+} from '../../../utils/roleNameConflict'
+import {
   createRole,
   duplicateRole,
   getRolePermissionIds,
@@ -99,6 +104,16 @@ export function useRoleEditor({ roles, permissions, onSaved }) {
       return
     }
 
+    // Раньше при совпадении названия код молча получал суффикс _2, и в списке
+    // появлялась вторая роль с тем же именем. Теперь это ошибка с объяснением.
+    const nameConflict = findRoleByName(roles, form.name, {
+      exceptRoleId: editorMode === 'edit' ? selectedRoleId : null,
+    })
+    if (nameConflict) {
+      setError(describeRoleNameConflict(nameConflict))
+      return
+    }
+
     setSaving(true)
     setError('')
     try {
@@ -144,7 +159,11 @@ export function useRoleEditor({ roles, permissions, onSaved }) {
       setEditorOpen(false)
       toastSuccess('Роль сохранена')
     } catch (err) {
-      const message = err.message || 'Не удалось сохранить роль'
+      // Уникальность имени защищена ещё и в базе: если два админа создают роль
+      // одновременно, ошибка придёт оттуда — показываем тот же понятный текст.
+      const message = isRoleNameUniqueViolation(err)
+        ? `Роль с названием «${form.name.trim()}» уже существует. Выберите другое название.`
+        : err.message || 'Не удалось сохранить роль'
       setError(message)
       toastError(message)
     } finally {

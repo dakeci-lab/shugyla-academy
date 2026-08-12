@@ -59,6 +59,7 @@
     "verify:procurement-calendar-filter": "node scripts/verify-procurement-calendar-filter.mjs",
     "verify:procurement-planning-v1": "node scripts/verify-procurement-planning-v1.mjs",
     "verify:procurement-order-actions": "node scripts/verify-procurement-order-actions.mjs",
+    "verify:roles-and-desktop-visibility": "node scripts/verify-roles-and-desktop-visibility.mjs",
     "verify:procurement-snapshot-guard-static": "node scripts/verify-procurement-snapshot-guard.mjs --static-only",
     "supabase:local:verify-procurement-snapshot-guard": "node scripts/verify-procurement-snapshot-guard.mjs",
     "verify:procurement-partial-generation": "node scripts/verify-procurement-partial-generation.mjs",

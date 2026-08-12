@@ -1,6 +1,5 @@
 import { useCallback, useRef, useState } from 'react'
 import useMediaQuery from '../../../hooks/useMediaQuery'
-import { isPwaStandalone } from '../../../utils/pwaStandalone'
 import PriceCheckerForm from '../../../components/products/price-checker/PriceCheckerForm'
 import PriceCheckerResult from '../../../components/products/price-checker/PriceCheckerResult'
 import PriceCheckerHistory from '../../../components/products/price-checker/PriceCheckerHistory'
@@ -26,8 +25,7 @@ function newHistoryId() {
 /** Admin WEB-only UMAG barcode price lookup prototype. */
 export default function PriceCheckerPage() {
   const isDesktopViewport = useMediaQuery(DESKTOP_QUERY)
-  const pwaStandalone = isPwaStandalone()
-  const webOnlyBlocked = !isDesktopViewport || pwaStandalone
+  const webOnlyBlocked = !isDesktopViewport
 
   const [barcode, setBarcode] = useState('')
   const [status, setStatus] = useState('idle')
