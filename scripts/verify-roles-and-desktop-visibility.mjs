@@ -3,8 +3,9 @@
  * Verification for two fixes:
  *   1. desktop-only modules are gated by viewport width only (launch mode
  *      no longer hides «Закупки» / «Товары» on a full-size screen);
- *   2. roles cannot share a display name any more, and the four employee-less
- *      duplicates are removed by migration.
+ *   2. roles cannot share a display name any more, and the four leftover
+ *      duplicate/junk roles are removed by migration — including the two
+ *      terminated demo assignments that had to be detached first.
  *
  * Usage:
  *   npm run verify:roles-and-desktop-visibility
@@ -27,7 +28,7 @@ const TOP_NAV = 'src/components/platform/PlatformDesktopNav.jsx'
 const DASHBOARD = 'src/pages/platform/PlatformDashboard.jsx'
 const PRICE_CHECKER = 'src/pages/platform/products/PriceCheckerPage.jsx'
 const ROLE_EDITOR = 'src/components/admin/roles/useRoleEditor.jsx'
-const MIGRATION = 'supabase/migrations/20260812052000_roles_dedupe_and_unique_name.sql'
+const MIGRATION = 'supabase/migrations/20260812060000_roles_dedupe_and_unique_name.sql'
 const ACCESS_MIGRATION =
   'supabase/migrations/20260812061500_finance_cleanup_trainee_and_accountant_access.sql'
 
@@ -161,7 +162,10 @@ function stageMigration() {
       !/u\.status = 'active'/.test(sql),
     'the audit query only counted active employees'
   )
-  assert('preflight refuses when an employee is attached', /raise exception[\s\S]{0,120}still has/.test(sql))
+  assert(
+    'preflight refuses when any other employee is attached',
+    /still has % employee\(s\) of any status/.test(sql)
+  )
   assert('the unique index is created', /create unique index if not exists roles_name_norm_uidx/.test(sql))
   assert(
     'the index normalizes the name',
@@ -172,7 +176,27 @@ function stageMigration() {
     /duplicate role name\(s\) remain/.test(sql),
     'creating the index would fail anyway — better to say why'
   )
-  assert('no employee row is modified', !/update public\.academy_users/i.test(sql))
+
+  // One terminated demo record blocked the cleanup. Detaching it is allowed;
+  // reaching any other employee is not.
+  assert(
+    'the demo assignment is detached by id, name, status and current role together',
+    /update public\.academy_users[\s\S]{0,400}u\.id = 17[\s\S]{0,300}'Тест RBAC'[\s\S]{0,300}'terminated'[\s\S]{0,300}'testovaya_rol_rbac'/.test(sql),
+    'a partial match could hit somebody else'
+  )
+  assert(
+    'the detach only clears role_id',
+    /update public\.academy_users[\s\S]{0,120}set role_id = null/.test(sql)
+  )
+  assert(
+    'no employee row is ever deleted',
+    !/delete\s+from\s+public\.academy_users/i.test(sql),
+    'history stays even when the role goes'
+  )
+  assert(
+    'the only employee write targets that one id',
+    (sql.match(/update public\.academy_users/gi) || []).length === 1
+  )
 
   console.log('')
 }
@@ -217,7 +241,7 @@ async function stageFinanceAndAccountant() {
   assert('migration deletes the trainee role', /delete from public\.roles where code = 'trainee'/.test(sql))
   assert(
     'trainee deletion is guarded by an employee count',
-    /role trainee has % employee\(s\)/.test(sql)
+    /role trainee still has % employee\(s\) of any status/.test(sql)
   )
   for (const code of [
     'payroll.view',
@@ -235,7 +259,29 @@ async function stageFinanceAndAccountant() {
     'a typo must not silently grant less'
   )
   assert('accountant grant is verified afterwards', /Postcheck failed: accountant has/.test(sql))
-  assert('no employee row is modified', !/update public\.academy_users/i.test(sql))
+
+  assert(
+    'the trainee demo assignment is detached by id, name, status and current role together',
+    /update public\.academy_users[\s\S]{0,400}u\.id = 6[\s\S]{0,300}'Алина Жумабаева'[\s\S]{0,300}'terminated'[\s\S]{0,300}'trainee'/.test(sql),
+    'a partial match could hit somebody else'
+  )
+  assert(
+    'the trainee detach only clears role_id',
+    /update public\.academy_users[\s\S]{0,120}set role_id = null/.test(sql)
+  )
+  assert(
+    'no employee row is ever deleted',
+    !/delete\s+from\s+public\.academy_users/i.test(sql),
+    'a terminated employee keeps their record'
+  )
+  assert(
+    'the only employee write targets that one id',
+    (sql.match(/update public\.academy_users/gi) || []).length === 1
+  )
+  assert(
+    'any other trainee assignment still stops the migration',
+    /role trainee still has % employee\(s\) of any status/.test(sql)
+  )
 
   // Every code the accountant gets must exist in the catalog, or the migration
   // would fail on production instead of here.

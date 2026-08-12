@@ -13,12 +13,21 @@
 -- (finansist, finansist_2) without a word to the user.
 --
 -- This migration:
---   1. deletes the four roles that carry no employees at all (any status);
---   2. adds a unique index on the normalized display name, so the next attempt
+--   1. detaches ONE precisely identified demo assignment (see below);
+--   2. deletes the four roles that then carry no employees at all, any status;
+--   3. adds a unique index on the normalized display name, so the next attempt
 --      fails loudly instead of producing name_2.
 --
--- Employees are not touched. Preflight refuses if any target role turns out to
--- have an employee — including deactivated ones, which the audit query missed.
+-- About employee rows. One leftover demo record still points at the test role:
+-- academy_users id 17, «Тест RBAC», status terminated, role testovaya_rol_rbac.
+-- Its role_id is set to null so the role can go. The employee row itself stays —
+-- history is not ours to erase. The UPDATE matches id, full name, status AND the
+-- current role at once, so it cannot touch anybody else even by accident.
+--
+-- Every other assignment blocks this migration: the preflight below counts
+-- employees of ANY status for each target role and raises. Deactivated and
+-- terminated people count — the audit query that listed only active employees is
+-- exactly how the id 17 record was missed in the first place.
 -- ---------------------------------------------------------------------------
 
 select pg_advisory_xact_lock(202608120520);
@@ -29,8 +38,25 @@ declare
   v_code text;
   v_employees integer;
   v_remaining_duplicates integer;
+  v_detached integer;
 begin
-  -- 1. Fail closed: never delete a role somebody still sits on.
+  -- 0. The single known demo assignment, matched on every field at once:
+  --    id, full name, terminated status and the exact current role. Anything
+  --    that does not match all four is left alone and will trip the preflight.
+  update public.academy_users u
+     set role_id = null
+   where u.id = 17
+     and u.full_name = 'Тест RBAC'
+     and u.status = 'terminated'
+     and u.role_id = (
+       select r.id from public.roles r where r.code = 'testovaya_rol_rbac'
+     );
+
+  get diagnostics v_detached = row_count;
+  raise notice 'Detached demo assignments from testovaya_rol_rbac: %', v_detached;
+
+  -- 1. Fail closed: never delete a role somebody still sits on. Counts every
+  --    status, so a terminated or deactivated person is enough to stop this.
   foreach v_code in array v_targets loop
     select count(*) into v_employees
     from public.academy_users u
@@ -39,13 +65,14 @@ begin
 
     if v_employees > 0 then
       raise exception
-        'Preflight failed: role % still has % employee(s) (including inactive)',
+        'Preflight failed: role % still has % employee(s) of any status — resolve them by hand',
         v_code, v_employees;
     end if;
   end loop;
 
   -- 2. Delete. role_permissions cascade; academy_users.role_id is ON DELETE SET NULL
-  --    but cannot fire here because the preflight above proved there are no rows.
+  --    but cannot fire here because the preflight above proved there are no rows
+  --    left pointing at these roles.
   delete from public.roles where code = any(v_targets);
 
   -- 3. Nothing may be left sharing a normalized name, otherwise the index below
