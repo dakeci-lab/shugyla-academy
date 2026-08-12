@@ -18,8 +18,6 @@ import { createEmployeeWithAuth } from './employeeProvisioningService'
 import { updateEmployeeAsAdmin } from './employeeAdminService'
 import * as supabaseAdapter from './supabaseDataAdapter'
 import * as localAdapter from './localDataAdapter'
-import * as standardsLocalAdapter from './standardsLocalAdapter'
-import * as standardsSupabaseAdapter from './standardsSupabaseAdapter'
 import { markDevPerf, logDevPerf } from '../utils/devPerf'
 import * as recruitmentLocalAdapter from './recruitmentLocalAdapter'
 import * as recruitmentSupabaseAdapter from './recruitmentSupabaseAdapter'
@@ -29,16 +27,6 @@ import * as shiftLocalAdapter from './shiftLocalAdapter'
 import * as shiftSupabaseAdapter from './shiftSupabaseAdapter'
 import * as attendanceLocalAdapter from './attendanceLocalAdapter'
 import * as attendanceSupabaseAdapter from './attendanceSupabaseAdapter'
-import {
-  getAllStandardCategoriesSync,
-  getAllStandardArticlesSync,
-  getStandardArticleByIdSync,
-  getStandardArticleBySlugSync,
-  getPublishedStandardArticlesForUserSync,
-  getUserStandardReadsSync,
-  getStandardArticleReadStatsSync,
-  generateUniqueSlug,
-} from '../utils/standardsData'
 import {
   getAllVacanciesSync,
   getPublishedVacanciesSync,
@@ -78,10 +66,6 @@ function getAdapter() {
   return isCloudMode() ? supabaseAdapter : localAdapter
 }
 
-function getStandardsAdapter() {
-  return isCloudMode() ? standardsSupabaseAdapter : standardsLocalAdapter
-}
-
 function getRecruitmentAdapter() {
   return isCloudMode() ? recruitmentSupabaseAdapter : recruitmentLocalAdapter
 }
@@ -107,7 +91,7 @@ let backgroundPrefetchScheduled = false
 let onModulesChanged = null
 
 /** Prefetched after shell; procurement/receiving stay route-triggered. */
-const BACKGROUND_MODULES = ['standards', 'recruitment', 'suppliers']
+const BACKGROUND_MODULES = ['recruitment', 'suppliers']
 
 function notifyModulesChanged() {
   if (typeof onModulesChanged === 'function') {
@@ -137,9 +121,6 @@ export function getRouteCriticalModules(pathname = '') {
   }
   if (path.includes('/platform/suppliers')) {
     return ['suppliers']
-  }
-  if (path.includes('/platform/standards') || path.includes('/standards')) {
-    return ['standards']
   }
   // Internal HR only — never match public /vacancies or /apply.
   if (path.includes('/platform/hr') || path.includes('/platform/recruitment')) {
@@ -199,12 +180,6 @@ async function loadModule(moduleName) {
   switch (moduleName) {
     case 'employees': {
       await ensureEmployeesCore()
-      return
-    }
-    case 'standards': {
-      const data = await supabaseAdapter.fetchStandardsModuleData()
-      patchCloudStore(data)
-      markModuleReady('standards')
       return
     }
     case 'recruitment': {
@@ -366,9 +341,6 @@ function applyFullFetchResult(data) {
   patchCloudStore(storeData)
 
   markModuleReady('employees')
-
-  if (failures.standards) markModuleError('standards', failures.standards)
-  else markModuleReady('standards')
 
   if (failures.recruitment) markModuleError('recruitment', failures.recruitment)
   else markModuleReady('recruitment')
@@ -626,126 +598,6 @@ export async function migrateLocalDataToCloud() {
   await supabaseAdapter.upsertMigrationBatch(snapshot)
   await refreshData()
   return snapshot.counts
-}
-
-// --- Standards (sync reads) ---
-
-export function getStandardCategories() {
-  return getAllStandardCategoriesSync()
-}
-
-export function getStandardArticles() {
-  return getAllStandardArticlesSync()
-}
-
-export function getStandardArticleById(articleId) {
-  return getStandardArticleByIdSync(articleId)
-}
-
-export function getStandardArticleBySlug(slug) {
-  return getStandardArticleBySlugSync(slug)
-}
-
-export function getPublishedStandardArticlesForUser(user) {
-  return getPublishedStandardArticlesForUserSync(user)
-}
-
-export function getUserStandardReads(userId) {
-  return getUserStandardReadsSync(userId)
-}
-
-export function getStandardArticleReadStats(articleId) {
-  return getStandardArticleReadStatsSync(articleId)
-}
-
-// --- Standards (async mutations) ---
-
-export async function createStandardCategory(categoryData) {
-  if (!categoryData.title?.trim()) throw new Error('Укажите название категории')
-  const id = await getStandardsAdapter().createStandardCategory(categoryData)
-  if (isCloudMode()) await refreshData()
-  return id
-}
-
-export async function updateStandardCategory(categoryId, updates) {
-  if (updates.title != null && !updates.title.trim()) {
-    throw new Error('Укажите название категории')
-  }
-  await getStandardsAdapter().updateStandardCategory(categoryId, updates)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function archiveStandardCategory(categoryId) {
-  await getStandardsAdapter().archiveStandardCategory(categoryId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function deleteStandardCategory(categoryId) {
-  await getStandardsAdapter().deleteStandardCategory(categoryId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function reorderStandardCategories(orderedCategoryIds) {
-  await getStandardsAdapter().reorderStandardCategories(orderedCategoryIds)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function createStandardArticle(articleData) {
-  if (!articleData.title?.trim()) throw new Error('Укажите название статьи')
-  if (!articleData.content?.trim()) throw new Error('Укажите содержание статьи')
-
-  const articles = getAllStandardArticlesSync()
-  const slug = articleData.slug || generateUniqueSlug(articleData.title, articles)
-
-  const id = await getStandardsAdapter().createStandardArticle({
-    ...articleData,
-    slug,
-  })
-  if (isCloudMode()) await refreshData()
-  return id
-}
-
-export async function updateStandardArticle(articleId, updates) {
-  if (updates.title != null && !updates.title.trim()) {
-    throw new Error('Укажите название статьи')
-  }
-  if (updates.content != null && !updates.content.trim()) {
-    throw new Error('Укажите содержание статьи')
-  }
-  await getStandardsAdapter().updateStandardArticle(articleId, updates)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function publishStandardArticle(articleId) {
-  await getStandardsAdapter().publishStandardArticle(articleId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function unpublishStandardArticle(articleId) {
-  await getStandardsAdapter().unpublishStandardArticle(articleId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function archiveStandardArticle(articleId) {
-  await getStandardsAdapter().archiveStandardArticle(articleId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function deleteStandardArticle(articleId) {
-  await getStandardsAdapter().deleteStandardArticle(articleId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function markStandardArticleRead(articleId, userId) {
-  const result = await getStandardsAdapter().markStandardArticleRead(articleId, userId)
-  if (isCloudMode()) await refreshData()
-  return result
-}
-
-export async function acknowledgeStandardArticle(articleId, userId) {
-  const result = await getStandardsAdapter().acknowledgeStandardArticle(articleId, userId)
-  if (isCloudMode()) await refreshData()
-  return result
 }
 
 // --- Recruitment (sync reads) ---

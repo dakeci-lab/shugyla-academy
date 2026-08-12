@@ -38,10 +38,6 @@ export const ROUTE_KEYS = {
   SUPPLIER_PAYMENTS: 'supplier_payments',
   PRODUCTS_GROUP: 'products_group',
   PRICE_TAGS: 'price_tags',
-  PRICE_CHECKER: 'price_checker',
-  STANDARDS_GROUP: 'standards_group',
-  STANDARDS: 'standards',
-  STANDARDS_MANAGE: 'standards_manage',
   SETTINGS: 'settings',
   SETTINGS_GENERAL: 'settings_general',
   SETTINGS_ROLES: 'settings_roles',
@@ -102,10 +98,6 @@ const ROUTE_ACCESS = {
     ROLE_IDS.RECEIVER,
     ROLE_IDS.FLOOR_ADMIN,
   ],
-  [ROUTE_KEYS.PRICE_CHECKER]: [ROLE_IDS.ADMIN],
-  [ROUTE_KEYS.STANDARDS_GROUP]: ALL_PLATFORM_ROLES,
-  [ROUTE_KEYS.STANDARDS]: ALL_PLATFORM_ROLES,
-  [ROUTE_KEYS.STANDARDS_MANAGE]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SETTINGS]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SETTINGS_GENERAL]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SETTINGS_ROLES]: [ROLE_IDS.ADMIN],
@@ -127,7 +119,6 @@ export function resolveUserRole(user) {
 
 const MINIMAL_SAFE_PERMISSIONS = [
   PERMISSION_CODES.DASHBOARD_VIEW,
-  PERMISSION_CODES.STANDARDS_VIEW,
 ]
 
 function toKnownPermissionSet(codes) {
@@ -239,9 +230,6 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.SETTLEMENTS]: [P.UMAG_SETTLEMENTS_VIEW],
     [ROUTE_KEYS.SUPPLIER_PAYMENTS]: [P.SUPPLIER_PAYMENTS_VIEW],
     [ROUTE_KEYS.PRICE_TAGS]: [P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE],
-    [ROUTE_KEYS.PRICE_CHECKER]: [P.PRICE_CHECKER_VIEW],
-    [ROUTE_KEYS.STANDARDS]: [P.STANDARDS_VIEW],
-    [ROUTE_KEYS.STANDARDS_MANAGE]: [P.STANDARDS_MANAGE],
     [ROUTE_KEYS.SETTINGS]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],
     [ROUTE_KEYS.SETTINGS_GENERAL]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],
     [ROUTE_KEYS.SETTINGS_ROLES]: [P.ROLES_VIEW, P.ROLES_EDIT, P.ROLES_ASSIGN_PERMISSIONS],
@@ -451,10 +439,6 @@ export function canViewEmployeeRating(user) {
   return can(user, PERMISSION_CODES.RATING_VIEW)
 }
 
-export function canViewPriceChecker(user) {
-  return canAccessRoute(user, ROUTE_KEYS.PRICE_CHECKER)
-}
-
 export function canCreateEmployees(user) {
   return can(user, PERMISSION_CODES.EMPLOYEES_CREATE)
 }
@@ -465,10 +449,6 @@ export function canManageSettings(user) {
 
 export function canManageNotifications(user) {
   return can(user, PERMISSION_CODES.NOTIFICATIONS_MANAGE)
-}
-
-export function canManageStandards(user) {
-  return can(user, PERMISSION_CODES.STANDARDS_MANAGE)
 }
 
 export function canManageRoles(user) {

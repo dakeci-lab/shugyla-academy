@@ -36,9 +36,6 @@ export const PERMISSION_CODES = {
   RECRUITMENT_INVITE_CANDIDATE: 'recruitment.invite_candidate',
   RECRUITMENT_HIRE_CANDIDATE: 'recruitment.hire_candidate',
 
-  STANDARDS_VIEW: 'standards.view',
-  STANDARDS_MANAGE: 'standards.manage',
-
   PROCUREMENT_VIEW: 'procurement.view',
   PROCUREMENT_CREATE: 'procurement.create',
   PROCUREMENT_EDIT: 'procurement.edit',
@@ -65,8 +62,6 @@ export const PERMISSION_CODES = {
 
   PRICE_TAGS_VIEW: 'price_tags.view',
   PRICE_TAGS_MANAGE: 'price_tags.manage',
-
-  PRICE_CHECKER_VIEW: 'products.price_checker.view',
 
   PAYROLL_VIEW: 'payroll.view',
   PAYROLL_CALCULATE: 'payroll.calculate',
@@ -109,14 +104,12 @@ export const PERMISSION_MODULES = {
   attendance: 'Тайм-трекер',
   rating: 'Рейтинг',
   recruitment: 'HR',
-  standards: 'База стандартов',
   procurement: 'Закупки',
   receiving: 'Приёмка',
   suppliers: 'Поставщики',
   umag: 'UMAG',
   supplier_payments: 'Оплаты поставщикам',
   price_tags: 'Ценники',
-  products: 'Товары',
   payroll: 'Зарплата',
   positions: 'Организационная структура',
   settings: 'Настройки',
@@ -137,8 +130,6 @@ export const RBAC_MATRIX_MODULES = [
   'umag',
   'supplier_payments',
   'price_tags',
-  'products',
-  'standards',
   'positions',
   'settings',
   'roles',
@@ -203,8 +194,6 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.RECRUITMENT_MANAGE_CANDIDATES, name: 'Управление кандидатами', module: 'recruitment', sortOrder: 72 },
   { code: PERMISSION_CODES.RECRUITMENT_INVITE_CANDIDATE, name: 'Приглашение кандидата', module: 'recruitment', sortOrder: 73 },
   { code: PERMISSION_CODES.RECRUITMENT_HIRE_CANDIDATE, name: 'Приём кандидата', module: 'recruitment', sortOrder: 74 },
-  { code: PERMISSION_CODES.STANDARDS_VIEW, name: 'Стандарты', module: 'standards', sortOrder: 90 },
-  { code: PERMISSION_CODES.STANDARDS_MANAGE, name: 'Редактирование стандартов', module: 'standards', sortOrder: 91 },
   { code: PERMISSION_CODES.PROCUREMENT_VIEW, name: 'Просмотр закупок', module: 'procurement', sortOrder: 100 },
   { code: PERMISSION_CODES.PROCUREMENT_CREATE, name: 'Создание закупки', module: 'procurement', sortOrder: 101 },
   { code: PERMISSION_CODES.PROCUREMENT_EDIT, name: 'Редактирование закупки', module: 'procurement', sortOrder: 102 },
@@ -226,7 +215,6 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.SUPPLIER_PAYMENTS_MANAGE, name: 'Управление календарём оплат поставщикам', module: 'supplier_payments', sortOrder: 191 },
   { code: PERMISSION_CODES.PRICE_TAGS_VIEW, name: 'Просмотр ценников', module: 'price_tags', sortOrder: 130 },
   { code: PERMISSION_CODES.PRICE_TAGS_MANAGE, name: 'Управление ценниками', module: 'price_tags', sortOrder: 131 },
-  { code: PERMISSION_CODES.PRICE_CHECKER_VIEW, name: 'Прайс-чекер', module: 'products', sortOrder: 135 },
   { code: PERMISSION_CODES.PAYROLL_VIEW, name: 'Просмотр зарплат', module: 'payroll', sortOrder: 140 },
   { code: PERMISSION_CODES.PAYROLL_CALCULATE, name: 'Расчёт зарплаты', module: 'payroll', sortOrder: 141 },
   { code: PERMISSION_CODES.PAYROLL_MANAGE_SETTINGS, name: 'Настройки зарплаты', module: 'payroll', sortOrder: 142 },
@@ -279,27 +267,24 @@ export const RBAC_DEFAULT_ROLE_PERMISSIONS = {
     P.RECEIVING_VIEW, P.RECEIVING_MANAGE,
     P.SUPPLIERS_VIEW, P.SUPPLIERS_CREATE, P.SUPPLIERS_EDIT, P.SUPPLIERS_DELETE,
     P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE,
-    P.STANDARDS_VIEW,
   ],
   receiver: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
     P.SCHEDULE_VIEW_OWN, P.RATING_VIEW,
     P.RECEIVING_VIEW, P.RECEIVING_MANAGE, P.PRICE_TAGS_VIEW,
-    P.STANDARDS_VIEW,
   ],
   floor_admin: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
     P.SCHEDULE_VIEW_OWN, P.SCHEDULE_VIEW_TEAM, P.SCHEDULE_EDIT, P.RATING_VIEW,
     P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE,
-    P.STANDARDS_VIEW,
   ],
   cashier: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN, P.RATING_VIEW, P.STANDARDS_VIEW,
+    P.SCHEDULE_VIEW_OWN, P.RATING_VIEW,
   ],
   seller: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN, P.RATING_VIEW, P.STANDARDS_VIEW,
+    P.SCHEDULE_VIEW_OWN, P.RATING_VIEW,
   ],
 }
 

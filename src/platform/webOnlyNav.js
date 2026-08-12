@@ -6,7 +6,6 @@
 export const WEB_ONLY_NAV_IDS = new Set([
   'employees-payroll',
   'price-tags',
-  'price-checker',
   /** Entire «Закупки» group: procurement, receiving, suppliers, settlements, payments. */
   'procurement-group',
 ])

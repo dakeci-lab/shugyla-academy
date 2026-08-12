@@ -122,10 +122,6 @@ function main() {
     read('src/pages/platform/procurement/ProcurementPage.jsx').includes('usePlatformData'),
   )
   assert(
-    'Standards page uses usePlatformData',
-    read('src/pages/Standards.jsx').includes('usePlatformData'),
-  )
-  assert(
     'PlatformLayout uses usePlatformData',
     read('src/layouts/PlatformLayout.jsx').includes('usePlatformData'),
   )
@@ -137,11 +133,10 @@ function main() {
       read('src/services/supabaseDataAdapter.js').includes('academy_users'),
   )
   assert('academy redirect preserved', app.includes('path="/academy"') || app.includes('path="academy/*"'))
-  assert('standards.view still in catalog', read('src/config/permissionCatalog.js').includes('standards.view'))
+  assert('standards.view removed from catalog', !read('src/config/permissionCatalog.js').includes('standards.view'))
   assert(
-    'standards tables not renamed away',
-    read('src/services/standardsSupabaseAdapter.js').includes('academy_standard') ||
-      exists('src/services/standardsSupabaseAdapter.js'),
+    'standards module fully removed, not renamed',
+    !exists('src/services/standardsSupabaseAdapter.js') && !exists('src/services/standardsLocalAdapter.js'),
   )
 
   console.log('\nNo compatibility aliases')

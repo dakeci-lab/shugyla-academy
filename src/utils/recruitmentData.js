@@ -6,7 +6,7 @@ import {
 } from '../lib/cloudStore'
 import { getLocalRecruitmentBundle } from '../services/recruitmentLocalAdapter'
 import { ROLES, normalizeRoleId } from '../data/roles'
-import { slugify } from './standardsData'
+import { slugify } from './slugify'
 import { getCareersUrl } from '../router/hostSurface'
 import { getCandidateAnswerDisplayRows } from './applicationForm'
 

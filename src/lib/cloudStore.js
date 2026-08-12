@@ -10,7 +10,6 @@ export const MODULE_STATUS = {
 /** Logical cloud data modules (bootstrap / route readiness). */
 export const CLOUD_MODULES = [
   'employees',
-  'standards',
   'recruitment',
   'suppliers',
   'procurement',
@@ -20,9 +19,6 @@ export const CLOUD_MODULES = [
 const emptyStore = {
   loaded: false,
   employees: [],
-  standardCategories: [],
-  standardArticles: [],
-  standardArticleReads: [],
   vacancies: [],
   candidateQuestions: [],
   candidates: [],
@@ -114,13 +110,6 @@ export function patchCloudStore(patch) {
     ensureCloudStoreReady()
   }
   if (patch.employees !== undefined) store.employees = patch.employees
-  if (patch.standardCategories !== undefined) {
-    store.standardCategories = patch.standardCategories
-  }
-  if (patch.standardArticles !== undefined) store.standardArticles = patch.standardArticles
-  if (patch.standardArticleReads !== undefined) {
-    store.standardArticleReads = patch.standardArticleReads
-  }
   if (patch.vacancies !== undefined) store.vacancies = patch.vacancies
   if (patch.candidateQuestions !== undefined) {
     store.candidateQuestions = patch.candidateQuestions
@@ -137,9 +126,6 @@ export function setCloudStore(data) {
   store = {
     loaded: true,
     employees: data.employees || [],
-    standardCategories: data.standardCategories || [],
-    standardArticles: data.standardArticles || [],
-    standardArticleReads: data.standardArticleReads || [],
     vacancies: data.vacancies || [],
     candidateQuestions: data.candidateQuestions || [],
     candidates: data.candidates || [],
@@ -164,18 +150,6 @@ function readWhenReady(moduleName, value) {
 
 export function getCloudEmployees() {
   return readWhenReady('employees', store.employees)
-}
-
-export function getCloudStandardCategories() {
-  return readWhenReady('standards', store.standardCategories)
-}
-
-export function getCloudStandardArticles() {
-  return readWhenReady('standards', store.standardArticles)
-}
-
-export function getCloudStandardArticleReads() {
-  return readWhenReady('standards', store.standardArticleReads)
 }
 
 export function getCloudVacancies() {

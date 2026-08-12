@@ -98,16 +98,6 @@ export async function fetchCoreEmployeeData() {
   return { employees }
 }
 
-export async function fetchStandardsModuleData() {
-  const { fetchStandardsData } = await import('./standardsSupabaseAdapter')
-  const data = await fetchStandardsData()
-  return {
-    standardCategories: data.categories,
-    standardArticles: data.articles,
-    standardArticleReads: data.reads,
-  }
-}
-
 export async function fetchRecruitmentModuleData() {
   const { fetchRecruitmentData } = await import('./recruitmentSupabaseAdapter')
   const data = await fetchRecruitmentData()
@@ -144,23 +134,17 @@ export async function fetchAllData() {
   const { employees } = await fetchCoreEmployeeData()
 
   const [
-    standardsResult,
     recruitmentResult,
     suppliersResult,
     purchasesResult,
     receivingResult,
   ] = await Promise.allSettled([
-    fetchStandardsModuleData(),
     fetchRecruitmentModuleData(),
     fetchSuppliersModuleData(),
     fetchPurchasesModuleData(),
     fetchReceivingModuleData(),
   ])
 
-  const standards =
-    standardsResult.status === 'fulfilled'
-      ? standardsResult.value
-      : { standardCategories: [], standardArticles: [], standardArticleReads: [] }
   const recruitment =
     recruitmentResult.status === 'fulfilled'
       ? recruitmentResult.value
@@ -184,13 +168,11 @@ export async function fetchAllData() {
 
   return {
     employees,
-    ...standards,
     ...recruitment,
     ...suppliers,
     ...purchases,
     ...receiving,
     _moduleFailures: {
-      standards: standardsResult.status === 'rejected' ? standardsResult.reason : null,
       recruitment: recruitmentResult.status === 'rejected' ? recruitmentResult.reason : null,
       suppliers: suppliersResult.status === 'rejected' ? suppliersResult.reason : null,
       procurement: purchasesResult.status === 'rejected' ? purchasesResult.reason : null,
