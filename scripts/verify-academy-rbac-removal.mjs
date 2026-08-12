@@ -78,18 +78,18 @@ function main() {
     'catalog has no academy module entries',
     !PERMISSION_CATALOG.some((item) => item.module === 'academy' || String(item.code).startsWith('academy.')),
   )
-  assert('standards.view present', PERMISSION_CODES.STANDARDS_VIEW === 'standards.view')
-  assert('standards.manage present', PERMISSION_CODES.STANDARDS_MANAGE === 'standards.manage')
-  assert('standards module label present', PERMISSION_MODULES.standards === 'База стандартов')
+  assert('no standards.view code', !('STANDARDS_VIEW' in PERMISSION_CODES))
+  assert('no standards.manage code', !('STANDARDS_MANAGE' in PERMISSION_CODES))
+  assert('no standards module label', !Object.prototype.hasOwnProperty.call(PERMISSION_MODULES, 'standards'))
   assert('no academy module label', !Object.prototype.hasOwnProperty.call(PERMISSION_MODULES, 'academy'))
   assert('RBAC matrix has no academy', !RBAC_MATRIX_MODULES.includes('academy'))
-  assert('getRbacMatrixModules has standards', getRbacMatrixModules().includes('standards'))
+  assert('getRbacMatrixModules has no standards', !getRbacMatrixModules().includes('standards'))
   assert('getRbacMatrixModules has no academy', !getRbacMatrixModules().includes('academy'))
 
   console.log('\nUnknown permission handling')
   assert('academy.view is unknown', !isKnownPermissionCode('academy.view'))
   assert('academy.manage is unknown', !isKnownPermissionCode('academy.manage'))
-  assert('standards.view is known', isKnownPermissionCode('standards.view'))
+  assert('standards.view is unknown', !isKnownPermissionCode('standards.view'))
   assert(
     'resolvePermissionCode does not revive academy.manage',
     resolvePermissionCode('academy.manage') === 'academy.manage',
@@ -110,10 +110,10 @@ function main() {
   assert('no ROUTE_KEYS.ACADEMY', !permissionsSrc.includes("ACADEMY: 'academy'"))
   assert('no ROUTE_KEYS.ACADEMY_GROUP', !permissionsSrc.includes("ACADEMY_GROUP: 'academy_group'"))
   assert('no ROUTE_KEYS.ACADEMY_MANAGE', !permissionsSrc.includes("ACADEMY_MANAGE: 'academy_manage'"))
-  assert('STANDARDS route key present', permissionsSrc.includes("STANDARDS: 'standards'"))
+  assert('no ROUTE_KEYS.STANDARDS', !permissionsSrc.includes("STANDARDS: 'standards'"))
   assert(
-    'STANDARDS_MANAGE route key present',
-    permissionsSrc.includes("STANDARDS_MANAGE: 'standards_manage'"),
+    'no ROUTE_KEYS.STANDARDS_MANAGE',
+    !permissionsSrc.includes("STANDARDS_MANAGE: 'standards_manage'"),
   )
   assert('no academy-group filter', !permissionsSrc.includes('academy-group'))
   assert('no canManageAcademy helper', !permissionsSrc.includes('canManageAcademy'))
@@ -169,11 +169,11 @@ function main() {
     !read('src/App.jsx').includes('AcademyDataProvider'),
   )
 
-  console.log('\nStandards surface kept')
-  assert('PlatformStandards route file or import in App', app.includes('standards') && app.includes('ROUTE_KEYS.STANDARDS'))
+  console.log('\nStandards surface removed')
+  assert('no ROUTE_KEYS.STANDARDS reference in App', !app.includes('ROUTE_KEYS.STANDARDS'))
   assert(
-    'standards permissions in default buyer seed',
-    read('src/config/permissionCatalog.js').includes('STANDARDS_VIEW'),
+    'no standards permission in permission catalog',
+    !read('src/config/permissionCatalog.js').includes('STANDARDS_VIEW'),
   )
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)

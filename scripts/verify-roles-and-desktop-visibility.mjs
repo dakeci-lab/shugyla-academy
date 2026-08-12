@@ -26,7 +26,6 @@ const GATE = 'src/platform/desktopWebOnly.js'
 const ROUTE = 'src/components/platform/DesktopWebOnlyRoute.jsx'
 const TOP_NAV = 'src/components/platform/PlatformDesktopNav.jsx'
 const DASHBOARD = 'src/pages/platform/PlatformDashboard.jsx'
-const PRICE_CHECKER = 'src/pages/platform/products/PriceCheckerPage.jsx'
 const ROLE_EDITOR = 'src/components/admin/roles/useRoleEditor.jsx'
 const MIGRATION = 'supabase/migrations/20260812085658_roles_dedupe_and_unique_name.sql'
 const ACCESS_MIGRATION =
@@ -79,7 +78,7 @@ async function stageVisibilityRule() {
     shouldHideDesktopWebOnlyLink('/platform/procurement', { isDesktopViewport: false }, prefixes)
   )
 
-  const sources = [read(GATE), read(TOP_NAV), read(DASHBOARD), read(PRICE_CHECKER)]
+  const sources = [read(GATE), read(TOP_NAV), read(DASHBOARD)]
   assert(
     'no surface decides visibility by standalone mode',
     sources.every((src) => !src.includes('isPwaStandalone')),
