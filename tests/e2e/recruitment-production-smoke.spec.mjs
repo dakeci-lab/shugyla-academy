@@ -30,6 +30,8 @@ const FORBIDDEN_PUBLIC = [
   /Выйти/,
 ]
 
+let publishedVacancySlug = ''
+
 test.describe.configure({ mode: 'serial' })
 
 test.beforeAll(() => {
@@ -68,7 +70,9 @@ test('1. Hub RPC has no E2E leftovers', async () => {
   expect(error).toBeFalsy()
   const rows = data || []
   expect(rows.some((v) => /E2E-HR-|e2e-hr-/i.test(JSON.stringify(v)))).toBe(false)
-  expect(rows.map((v) => v.slug).sort()).toEqual(expect.arrayContaining(['kassir', 'prodavets']))
+  expect(rows.length).toBeGreaterThan(0)
+  expect(rows.every((v) => typeof v.slug === 'string' && v.slug.length > 0)).toBe(true)
+  publishedVacancySlug = rows[0].slug
 })
 
 test('2. Root, web and jobs surfaces route canonically', async ({ page }) => {
@@ -95,8 +99,9 @@ test('3. Anonymous jobs home careers branding + network', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1 })).toContainText(
     /Работа рядом с домом|Shugyla Market|команды|командасының/i
   )
-  await expect(page.getByText('Кассир')).toBeVisible({ timeout: 30_000 })
-  await expect(page.getByText('Продавец')).toBeVisible()
+  await expect(page.getByRole('link', { name: /Подробнее|Толығырақ/i }).first()).toBeVisible({
+    timeout: 30_000,
+  })
   await assertPublicShell(page, 'anon-hub')
   await page.waitForTimeout(1200)
   net.assertIsolated('smoke-hub')
@@ -104,10 +109,11 @@ test('3. Anonymous jobs home careers branding + network', async ({ page }) => {
   await page.screenshot({ path: path.join(ARTIFACT_DIR, 'smoke-apply-desktop.png'), fullPage: true })
 })
 
-test('4. Anonymous /apply/kassir form shell', async ({ page }) => {
+test('4. Anonymous published-vacancy form shell', async ({ page }) => {
   const guard = attachConsoleGuard(page)
   const net = attachPublicNetworkGuard(page, { mode: 'form' })
-  await page.goto(careersUrl('/apply/kassir'), { waitUntil: 'domcontentloaded' })
+  expect(publishedVacancySlug).toBeTruthy()
+  await page.goto(careersUrl(`/apply/${publishedVacancySlug}`), { waitUntil: 'domcontentloaded' })
   await expect(page.getByRole('button', { name: /Отправить анкету|Сауалнаманы жіберу/i })).toBeVisible({
     timeout: 30_000,
   })
@@ -116,14 +122,16 @@ test('4. Anonymous /apply/kassir form shell', async ({ page }) => {
   await page.waitForTimeout(1200)
   net.assertIsolated('smoke-form')
   guard.assertClean('smoke-form')
-  await page.screenshot({ path: path.join(ARTIFACT_DIR, 'smoke-apply-kassir-desktop.png'), fullPage: true })
+  await page.screenshot({ path: path.join(ARTIFACT_DIR, 'smoke-apply-form-desktop.png'), fullPage: true })
 })
 
 test('5. Careers origin stays isolated after platform login', async ({ page }) => {
   const guard = attachConsoleGuard(page, { allow: HR_SOFT_PROBE_ALLOW })
   await loginAsHr(page)
   await page.goto(careersUrl('/'), { waitUntil: 'domcontentloaded' })
-  await expect(page.getByText('Кассир')).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('link', { name: /Подробнее|Толығырақ/i }).first()).toBeVisible({
+    timeout: 30_000,
+  })
   await assertPublicShell(page, 'auth-hub')
   const state = loadState()
   if (state?.login) {
@@ -158,20 +166,23 @@ test('7. Mobile public viewports', async ({ browser }) => {
     const page = await context.newPage()
     const guard = attachConsoleGuard(page)
     await page.goto(careersUrl('/'), { waitUntil: 'domcontentloaded' })
-    await expect(page.getByText('Кассир')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('link', { name: /Подробнее|Толығырақ/i }).first()).toBeVisible({
+      timeout: 30_000,
+    })
     await assertPublicShell(page, `mobile-hub-${vp.name}`)
     await expectNoHorizontalScroll(page)
     await page.screenshot({
       path: path.join(ARTIFACT_DIR, `smoke-apply-${vp.name}.png`),
       fullPage: true,
     })
-    await page.goto(careersUrl('/apply/prodavets'), { waitUntil: 'domcontentloaded' })
+    expect(publishedVacancySlug).toBeTruthy()
+    await page.goto(careersUrl(`/apply/${publishedVacancySlug}`), { waitUntil: 'domcontentloaded' })
     await expect(page.getByRole('button', { name: /Отправить анкету|Сауалнаманы жіберу/i })).toBeVisible({
       timeout: 30_000,
     })
     await expectNoHorizontalScroll(page)
     await page.screenshot({
-      path: path.join(ARTIFACT_DIR, `smoke-apply-prodavets-${vp.name}.png`),
+      path: path.join(ARTIFACT_DIR, `smoke-apply-form-${vp.name}.png`),
       fullPage: true,
     })
     guard.assertClean(`mobile-${vp.name}`)

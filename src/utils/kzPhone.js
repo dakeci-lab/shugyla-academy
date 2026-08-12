@@ -48,9 +48,28 @@ export function groupKzPhoneTail(tailDigits) {
 /**
  * Extracts a clean 9-digit tail from raw user input, tolerating pasted full
  * numbers (with +7/8/77 prefixes) by stripping the recognizable prefix.
+ *
+ * `previousTail` is the tail already committed before this change. When it's
+ * already complete (9 digits) and the new input is just that same prefix
+ * with extra characters tacked on — an accidental extra keystroke, not a
+ * fresh paste — the extras are ignored and the completed number is kept
+ * as-is, instead of being reshaped/shifted as if it were a new full-number paste.
  */
-export function extractKzPhoneTail(rawInput) {
-  let digits = String(rawInput || '').replace(/[^0-9]/g, '')
+export function extractKzPhoneTail(rawInput, previousTail = '') {
+  const rawDigits = String(rawInput || '').replace(/[^0-9]/g, '')
+  const prevDigits = String(previousTail || '')
+    .replace(/[^0-9]/g, '')
+    .slice(0, KZ_PHONE_TAIL_LENGTH)
+
+  if (
+    prevDigits.length === KZ_PHONE_TAIL_LENGTH &&
+    rawDigits.length > KZ_PHONE_TAIL_LENGTH &&
+    rawDigits.slice(0, KZ_PHONE_TAIL_LENGTH) === prevDigits
+  ) {
+    return prevDigits
+  }
+
+  let digits = rawDigits
 
   // Same length-based reshaping as normalizeKzMobilePhone, so a pasted
   // "8 7XX XXX XX XX" or bare "7XX XXX XX XX" lines up on the same 2-digit

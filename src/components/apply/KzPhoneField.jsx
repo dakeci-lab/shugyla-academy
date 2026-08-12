@@ -7,7 +7,7 @@ import './KzPhoneField.css'
  */
 export default function KzPhoneField({ id, value, onChange, disabled, required, error }) {
   function handleChange(e) {
-    onChange(extractKzPhoneTail(e.target.value))
+    onChange(extractKzPhoneTail(e.target.value, value))
   }
 
   return (

@@ -82,6 +82,33 @@ async function stagePhoneNormalization() {
   )
   assert('typing digits one at a time is not mangled', extractKzPhoneTail('7') === '7')
   assert('tail is capped at 9 digits', extractKzPhoneTail('1234567890123').length === 9)
+
+  // Regression: typing an extra digit past a completed tail used to shift
+  // the whole number instead of being ignored (e.g. "012345678" + "9" typed
+  // at the end became "123456789" — the leading digit silently dropped).
+  const completedTail = '012345678'
+  assert(
+    'an extra digit typed after a completed tail is ignored, tail unchanged',
+    extractKzPhoneTail(`${completedTail}9`, completedTail) === completedTail
+  )
+  assert(
+    'several extra digits typed after a completed tail are still ignored',
+    extractKzPhoneTail(`${completedTail}9876`, completedTail) === completedTail
+  )
+  assert(
+    'a completed tail edited in the middle (not a pure append) is not silently kept — falls through to reshape',
+    extractKzPhoneTail('912345678', completedTail) !== completedTail
+  )
+
+  // Full-number paste support must be unaffected by the previousTail param,
+  // both from an empty field and from a field that already has a partial tail.
+  assert('pasting a full "+7 7XX..." number from an empty field still works', extractKzPhoneTail('+77012345678', '') === '012345678')
+  assert('pasting a full "8 7XX..." number from an empty field still works', extractKzPhoneTail('87012345678', '') === '012345678')
+  assert('pasting a bare national number from an empty field still works', extractKzPhoneTail('7012345678', '') === '012345678')
+  assert(
+    'pasting a full number over a partial (incomplete) tail still reshapes correctly',
+    extractKzPhoneTail('+77019998877', '0123') === '019998877'
+  )
 }
 
 // ---------------------------------------------------------------------------
