@@ -46,8 +46,7 @@
 - **Закуп (procurement)**: планирование по нормам, генерация заказов по поставщикам, аналитика, экспорт
 - **Приёмка (receiving)**: приход товара, сверка
 - **Поставщики**: справочник (сеян из UMAG), взаиморасчёты (settlements), платёжные обязательства
-- **Товары**: прайс-чекер (UMAG), ценники (price-tags)
-- **Стандарты**: база знаний / регламенты с отслеживанием прочтения
+- **Товары**: ценники (price-tags)
 - **Уведомления**: in-app inbox + Web Push, диспетчер тайм-трекера, эскалации админам
 - **Настройки**: общие, роли (RBAC), уведомления
 
@@ -74,7 +73,7 @@ UMAG-интеграция (креды UMAG **никогда** не уходят 
 
 - `umag-sync` — поставщики, поставки, возвраты, платежи по документам
 - `umag-procurement` — планирование закупа
-- `umag-price-check`, `umag-operation-details`, `umag-probe-payments` (*незакоммичена*)
+- `umag-operation-details`, `umag-probe-payments` (*незакоммичена*)
 
 Админ/персонал: `admin-create-employee`, `admin-list-employees`, `admin-update-employee`,
 `admin-manage-employee-schedule`, `admin-team-workforce-data`, `admin-notification-settings`,

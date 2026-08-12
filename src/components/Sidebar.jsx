@@ -5,7 +5,6 @@ import './Sidebar.css'
 export const ADMIN_MENU_ITEMS = [
   { id: 'overview', label: 'Обзор', icon: '◉' },
   { id: 'employees', label: 'Сотрудники', icon: '◎' },
-  { id: 'standards', label: 'Стандарты', icon: '◫' },
   { id: 'recruitment', label: 'Найм', icon: '◑' },
 ]
 

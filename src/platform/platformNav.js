@@ -135,8 +135,8 @@ export const PLATFORM_NAV = [
     label: 'Товары',
     routeKey: ROUTE_KEYS.PRODUCTS_GROUP,
     title: 'Товары',
-    description: 'Ценники и проверка цен по штрих-коду.',
-    pathPrefixes: ['/platform/products', '/platform/price-tags'],
+    description: 'Ценники товаров.',
+    pathPrefixes: ['/platform/price-tags'],
     children: [
       {
         id: 'price-tags',
@@ -146,44 +146,6 @@ export const PLATFORM_NAV = [
         title: 'Печать ценников',
         description: 'Генератор и печать ценников (только WEB).',
         webOnly: true,
-      },
-      {
-        id: 'price-checker',
-        path: '/platform/products/price-checker',
-        label: 'Прайс-чекер',
-        routeKey: ROUTE_KEYS.PRICE_CHECKER,
-        title: 'Прайс-чекер',
-        description: 'Проверка актуальной цены товара по штрих-коду (только WEB).',
-        webOnly: true,
-      },
-    ],
-  },
-  {
-    id: 'standards-group',
-    label: 'База стандартов',
-    icon: '📚',
-    routeKey: ROUTE_KEYS.STANDARDS_GROUP,
-    title: 'База стандартов',
-    description: 'База знаний Shugyla Market — правила и регламенты работы.',
-    pathPrefixes: ['/platform/standards'],
-    children: [
-      {
-        id: 'standards-list',
-        path: '/platform/standards',
-        label: 'Стандарты',
-        standardsReadActive: true,
-        routeKey: ROUTE_KEYS.STANDARDS,
-        title: 'Стандарты',
-        description: 'Опубликованные стандарты компании для ознакомления.',
-      },
-      {
-        id: 'standards-manage',
-        path: '/platform/standards/manage',
-        label: 'Управление стандартами',
-        end: true,
-        routeKey: ROUTE_KEYS.STANDARDS_MANAGE,
-        title: 'Управление стандартами',
-        description: 'Создание, редактирование и архивация стандартов.',
       },
     ],
   },
@@ -259,11 +221,6 @@ export function isPathInGroup(pathname, group) {
 export function isNavItemActive(pathname, item) {
   if (!item?.path) return false
 
-  if (item.standardsReadActive) {
-    if (!pathname.startsWith('/platform/standards')) return false
-    return !pathname.startsWith('/platform/standards/manage')
-  }
-
   if (item.end) {
     return pathname === item.path
   }
@@ -277,8 +234,6 @@ export function getAutoExpandedGroupIds(pathname, navItems = PLATFORM_NAV) {
     .map((item) => item.id)
 }
 
-import { getStandardsSection } from './standardsNav'
-
 export function getPlatformSection(pathname) {
   if (pathname === '/platform/notifications' || pathname.startsWith('/platform/notifications/')) {
     return NOTIFICATIONS_SECTION
@@ -287,9 +242,6 @@ export function getPlatformSection(pathname) {
   if (pathname === '/platform/profile' || pathname.startsWith('/platform/profile/')) {
     return PROFILE_SECTION
   }
-
-  const standardsSection = getStandardsSection(pathname)
-  if (standardsSection) return standardsSection
 
   const flat = flattenNav()
 

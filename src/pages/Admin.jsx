@@ -5,7 +5,6 @@ import { LOGIN_PATH } from '../router/authRoutes'
 import AdminLayout from '../layouts/AdminLayout'
 import OverviewSection from '../components/admin/sections/OverviewSection'
 import EmployeesSection from '../components/admin/sections/EmployeesSection'
-import StandardsSection from '../components/admin/sections/StandardsSection'
 import RecruitmentSection from '../components/admin/sections/RecruitmentSection'
 
 /** Контент активного раздела (legacy shell; Academy Learning UI removed). */
@@ -15,8 +14,6 @@ function AdminContent({ activeTab }) {
       return <OverviewSection />
     case 'employees':
       return <EmployeesSection />
-    case 'standards':
-      return <StandardsSection />
     case 'recruitment':
       return <RecruitmentSection />
     default:

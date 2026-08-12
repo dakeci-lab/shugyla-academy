@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { getRouterBasename } from './router/basename'
 import { LanguageProvider } from './context/LanguageContext'
 import { SessionProvider } from './context/SessionContext'
@@ -35,7 +35,6 @@ import {
  */
 const PlatformLayout = lazy(() => import('./layouts/PlatformLayout'))
 const Profile = lazy(() => import('./pages/Profile'))
-const StandardsPage = lazy(() => import('./pages/Standards'))
 const PlatformIndex = lazy(() => import('./pages/platform/PlatformIndex'))
 const PlatformSettings = lazy(() => import('./pages/platform/PlatformSettings'))
 const PlatformSettingsGeneral = lazy(() => import('./pages/platform/PlatformSettingsGeneral'))
@@ -68,9 +67,6 @@ const PlatformPayrollRecord = lazy(() => import('./pages/platform/PlatformPayrol
 const PlatformTimeTracker = lazy(() => import('./pages/platform/PlatformTimeTracker'))
 const PlatformHrVacancies = lazy(() => import('./pages/platform/PlatformHrVacancies'))
 const PlatformHrCandidates = lazy(() => import('./pages/platform/PlatformHrCandidates'))
-const PlatformStandardsManage = lazy(
-  () => import('./pages/platform/PlatformStandardsManage')
-)
 const SuppliersPage = lazy(() =>
   import('./pages/platform/suppliers/SuppliersPage').then((m) => ({ default: m.default }))
 )
@@ -95,16 +91,10 @@ const ReceivingDetailPage = lazy(
   () => import('./pages/platform/receiving/ReceivingDetailPage')
 )
 const PriceTagsPage = lazy(() => import('./pages/platform/price-tags/PriceTagsPage'))
-const PriceCheckerPage = lazy(() => import('./pages/platform/products/PriceCheckerPage'))
 
 /**
  * Маршрутизация Shugyla Platform
  */
-
-function LegacyStandardRedirect() {
-  const { slug } = useParams()
-  return <Navigate to={`/platform/standards/${slug}`} replace />
-}
 
 function PlatformSuspense({ children }) {
   return <Suspense fallback={<AuthLoadingScreen />}>{children}</Suspense>
@@ -412,40 +402,6 @@ export default function App() {
                     </PlatformRoute>
                   }
                 />
-                <Route
-                  path="products/price-checker"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.PRICE_CHECKER}>
-                      <PriceCheckerPage />
-                    </PlatformRoute>
-                  }
-                />
-
-                <Route
-                  path="standards"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.STANDARDS}>
-                      <StandardsPage embedded basePath="/platform/standards" />
-                    </PlatformRoute>
-                  }
-                />
-                <Route
-                  path="standards/manage"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.STANDARDS_MANAGE}>
-                      <PlatformStandardsManage />
-                    </PlatformRoute>
-                  }
-                />
-                <Route
-                  path="standards/:slug"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.STANDARDS}>
-                      <StandardsPage embedded basePath="/platform/standards" />
-                    </PlatformRoute>
-                  }
-                />
-
                 <Route path="academy/*" element={<Navigate to="/platform" replace />} />
                 <Route path="courses/:id" element={<Navigate to="/platform" replace />} />
 
@@ -491,10 +447,6 @@ export default function App() {
               <Route path="/admin/courses" element={<Navigate to="/platform" replace />} />
               <Route path="/admin/routes" element={<Navigate to="/platform" replace />} />
               <Route
-                path="/admin/standards"
-                element={<Navigate to="/platform/standards/manage" replace />}
-              />
-              <Route
                 path="/admin/hiring"
                 element={<Navigate to="/platform/hr/vacancies" replace />}
               />
@@ -519,8 +471,6 @@ export default function App() {
               <Route path="/admin/progress" element={<Navigate to="/platform" replace />} />
               <Route path="/courses/:id" element={<Navigate to="/platform" replace />} />
               <Route path="/course/:id" element={<Navigate to="/platform" replace />} />
-              <Route path="/standards" element={<Navigate to="/platform/standards" replace />} />
-              <Route path="/standards/:slug" element={<LegacyStandardRedirect />} />
 
               <Route
                 path="*"
