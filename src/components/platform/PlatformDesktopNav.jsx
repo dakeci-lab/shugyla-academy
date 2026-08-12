@@ -3,8 +3,6 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext'
 import { PLATFORM_NAV, isNavItemActive, isPathInGroup } from '../../platform/platformNav'
 import { filterPlatformNav } from '../../platform/platformAccess'
-import { excludeWebOnlyNavItems } from '../../platform/webOnlyNav'
-import { isPwaStandalone } from '../../utils/pwaStandalone'
 import './PlatformDesktopNav.css'
 
 const CLOSE_DELAY_MS = 160
@@ -61,9 +59,10 @@ export default function PlatformDesktopNav() {
   const { user } = useSession()
   const { pathname } = useLocation()
   const navItems = useMemo(() => {
-    const filtered = filterPlatformNav(PLATFORM_NAV, user)
-    // Installed PWA (even on wide screens) must not expose WEB-only modules.
-    return isPwaStandalone() ? excludeWebOnlyNavItems(filtered) : filtered
+    // Верхнее меню рисуется только на широкой раскладке, поэтому desktop-only
+    // разделы здесь не прячем: способ запуска (браузер или установленное
+    // приложение) значения не имеет.
+    return filterPlatformNav(PLATFORM_NAV, user)
   }, [user])
 
   const rootRef = useRef(null)

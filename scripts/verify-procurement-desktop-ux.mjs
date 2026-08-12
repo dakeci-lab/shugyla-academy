@@ -1028,9 +1028,12 @@ async function stageDesktopWebOnly() {
     desktop.isDesktopWebOnlyPath('/platform/employees', prefixes) === false
   )
 
+  // Expectation flipped deliberately: launch mode no longer hides anything.
+  // Hiding «Закупки» in an installed app on a full-size screen was
+  // indistinguishable from a bug for the person using it.
   assert(
-    'PWA blocked',
-    desktop.isDesktopWebOnlyBlocked({ isDesktopViewport: true, pwaStandalone: true }) === true
+    'installed app on a wide screen is NOT blocked',
+    desktop.isDesktopWebOnlyBlocked({ isDesktopViewport: true, pwaStandalone: true }) === false
   )
   assert(
     'narrow viewport blocked',
@@ -1041,21 +1044,31 @@ async function stageDesktopWebOnly() {
     desktop.isDesktopWebOnlyBlocked({ isDesktopViewport: true, pwaStandalone: false }) === false
   )
 
-  const pwaFlags = { isDesktopViewport: true, pwaStandalone: true }
-  const desktopFlags = { isDesktopViewport: true, pwaStandalone: false }
+  // Width decides, launch mode does not: an installed app on a wide screen keeps
+  // its tiles, a phone hides them.
+  const narrowFlags = { isDesktopViewport: false }
+  const wideFlags = { isDesktopViewport: true }
   for (const prefix of expectedPrefixes) {
     assert(
-      `dashboard hides ${prefix} on PWA`,
-      desktop.shouldHideDesktopWebOnlyLink(prefix, pwaFlags, prefixes) === true
+      `dashboard hides ${prefix} on a narrow screen`,
+      desktop.shouldHideDesktopWebOnlyLink(prefix, narrowFlags, prefixes) === true
     )
     assert(
-      `dashboard keeps ${prefix} on desktop web`,
-      desktop.shouldHideDesktopWebOnlyLink(prefix, desktopFlags, prefixes) === false
+      `dashboard keeps ${prefix} on a wide screen`,
+      desktop.shouldHideDesktopWebOnlyLink(prefix, wideFlags, prefixes) === false
+    )
+    assert(
+      `dashboard keeps ${prefix} in an installed app on a wide screen`,
+      desktop.shouldHideDesktopWebOnlyLink(
+        prefix,
+        { isDesktopViewport: true, pwaStandalone: true },
+        prefixes
+      ) === false
     )
   }
   assert(
     'dashboard keeps employees on PWA',
-    desktop.shouldHideDesktopWebOnlyLink('/platform/employees', pwaFlags, prefixes) === false
+    desktop.shouldHideDesktopWebOnlyLink('/platform/employees', narrowFlags, prefixes) === false
   )
 }
 

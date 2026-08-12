@@ -1,0 +1,24 @@
+.desktop-web-only {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 480px;
+  margin: 24px auto;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 12px);
+}
+
+.desktop-web-only__title {
+  margin: 0;
+  font-size: 1.0625rem;
+  font-weight: 600;
+}
+
+.desktop-web-only__text {
+  margin: 0;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
