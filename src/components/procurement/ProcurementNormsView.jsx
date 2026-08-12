@@ -8,6 +8,11 @@ import {
   saveProcurementSubcategoryNorm,
 } from '../../services/procurementNormsService'
 import {
+  getCachedProcurementNormsModel,
+  getLatestCachedProcurementNormsModel,
+  setCachedProcurementNormsModel,
+} from '../../services/procurementNormsCache'
+import {
   applyCategoryNormToHierarchy,
   applySubcategoryNormToHierarchy,
   filterProcurementNormHierarchy,
@@ -138,11 +143,18 @@ function readonlyMessage(snapshot, canEdit) {
 export default function ProcurementNormsView({ snapshot: suppliedSnapshot = null, onNormSaved }) {
   const { user } = useSession()
   const { error: showError } = useToast()
-  const [snapshot, setSnapshot] = useState(suppliedSnapshot)
-  const [hierarchy, setHierarchy] = useState([])
+  const initialCacheRef = useRef(undefined)
+  if (initialCacheRef.current === undefined) {
+    initialCacheRef.current = suppliedSnapshot?.id
+      ? getCachedProcurementNormsModel(suppliedSnapshot.id)?.model || null
+      : getLatestCachedProcurementNormsModel()?.model || null
+  }
+  const initialModel = initialCacheRef.current
+  const [snapshot, setSnapshot] = useState(suppliedSnapshot || initialModel?.snapshot || null)
+  const [hierarchy, setHierarchy] = useState(initialModel?.hierarchy || [])
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(() => new Set())
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(!initialModel)
 
   const canEditNorms = can(user, PERMISSION_CODES.PROCUREMENT_EDIT)
   const editable =
@@ -156,15 +168,29 @@ export default function ProcurementNormsView({ snapshot: suppliedSnapshot = null
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
-    loadProcurementNormsModel({ snapshot: suppliedSnapshot })
+    let hasVisibleModel = Boolean(initialCacheRef.current)
+
+    const applyModel = (model) => {
+      if (cancelled || !model) return
+      hasVisibleModel = true
+      setSnapshot(model.snapshot)
+      setHierarchy(model.hierarchy)
+      setLoading(false)
+    }
+
+    if (!hasVisibleModel) setLoading(true)
+    loadProcurementNormsModel({
+      snapshot: suppliedSnapshot,
+      onCached: applyModel,
+      onFresh: applyModel,
+    })
       .then((model) => {
-        if (cancelled) return
-        setSnapshot(model.snapshot)
-        setHierarchy(model.hierarchy)
+        applyModel(model)
       })
       .catch((err) => {
-        if (!cancelled) showError(err.message || 'Не удалось загрузить нормы')
+        if (!cancelled && !hasVisibleModel) {
+          showError(err.message || 'Не удалось загрузить нормы')
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -178,7 +204,11 @@ export default function ProcurementNormsView({ snapshot: suppliedSnapshot = null
     async (categoryName, normDays) => {
       try {
         await saveProcurementCategoryNorm({ snapshotId: snapshot.id, categoryName, normDays })
-        setHierarchy((current) => applyCategoryNormToHierarchy(current, categoryName, normDays))
+        setHierarchy((current) => {
+          const next = applyCategoryNormToHierarchy(current, categoryName, normDays)
+          setCachedProcurementNormsModel({ snapshot, hierarchy: next })
+          return next
+        })
         onNormSaved?.({ scope: 'category', categoryName, normDays })
       } catch (err) {
         showError(err.message || 'Не удалось сохранить норму')
@@ -197,9 +227,16 @@ export default function ProcurementNormsView({ snapshot: suppliedSnapshot = null
           subcategoryName,
           normDays,
         })
-        setHierarchy((current) =>
-          applySubcategoryNormToHierarchy(current, categoryName, subcategoryName, normDays)
-        )
+        setHierarchy((current) => {
+          const next = applySubcategoryNormToHierarchy(
+            current,
+            categoryName,
+            subcategoryName,
+            normDays
+          )
+          setCachedProcurementNormsModel({ snapshot, hierarchy: next })
+          return next
+        })
         onNormSaved?.({ scope: 'subcategory', categoryName, subcategoryName, normDays })
       } catch (err) {
         showError(err.message || 'Не удалось сохранить норму')

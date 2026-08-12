@@ -76,8 +76,15 @@ function main() {
   assert('empty state uses load error message', page.includes('if (procurementLoadError) return procurementLoadError'))
   assert('does not treat load error as empty catalog only', page.includes('procurementLoadError'))
   assert('empty state waits for module loading', page.includes('isPurchasesDataLoading'))
-  assert('empty state shows loading copy', page.includes('Загрузка закупов'))
-  assert('manual refresh button present', page.includes('Обновить'))
+  assert(
+    'initial load uses the shared loading skeleton',
+    page.includes('showInitialSkeleton') && page.includes('DelayedLoadingSkeleton')
+  )
+  const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
+  assert(
+    'planning tab keeps an explicit UMAG sync control',
+    page.includes('<ProcurementPlannerView') && planner.includes('<PlatformSyncButton')
+  )
 
   console.log('Stage 4b: Realtime without aggressive polling')
   const realtime = read('src/services/procurementRealtimeService.js')
@@ -96,6 +103,16 @@ function main() {
   assert('channel cleanup', realtime.includes('removeChannel'))
   assert('hook uses realtime service', realtimeHook.includes('subscribeProcurementRealtime'))
   assert('layout enables realtime on procurement routes', layout.includes('useProcurementRealtime'))
+  assert('layout still passes procurementRealtimeEnabled', layout.includes('useProcurementRealtime(procurementRealtimeEnabled)'))
+  assert('hook still tracks connectionStatus internally', realtimeHook.includes('connectionStatus'))
+
+  console.log('Stage 4c: Connection banner removed, realtime kept')
+  const layoutCss = read('src/layouts/PlatformLayout.css')
+  assert('no offline banner copy', !layout.includes('Нет соединения'))
+  assert('no reconnecting banner copy', !layout.includes('Восстанавливаем соединение'))
+  assert('no sync-banner element in layout JSX', !layout.includes('platform-layout__sync-banner'))
+  assert('no sync-banner CSS rules', !layoutCss.includes('platform-layout__sync-banner'))
+  assert('layout no longer destructures connectionStatus from the hook', !layout.includes('const { connectionStatus }'))
   const itemPub = read('supabase/migrations/20260728220000_procurement_realtime_item_tables.sql')
   assert('item tables publication migration', itemPub.includes('purchase_order_items'))
   assert('receiving_items publication migration', itemPub.includes('receiving_items'))

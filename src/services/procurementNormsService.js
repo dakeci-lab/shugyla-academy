@@ -4,6 +4,11 @@ import {
   persistNormDaysForScope,
 } from './procurementPlanningService'
 import { buildProcurementNormHierarchy } from '../components/procurement/procurementNormsModel'
+import {
+  getCachedProcurementNormsModel,
+  getLatestCachedProcurementNormsModel,
+  loadProcurementNormsModelCached,
+} from './procurementNormsCache'
 
 function ensureClient() {
   if (!isSupabaseConfigured() || !supabase) throw new Error('Сервер не настроен')
@@ -23,27 +28,14 @@ export async function fetchProcurementNormTaxonomy(snapshotId) {
   ensureClient()
   if (!snapshotId) return []
 
-  const pageSize = 1000
-  const pairs = new Map()
-
-  for (let from = 0; from < 100_000; from += pageSize) {
-    const { data, error } = await supabase
-      .from('procurement_snapshot_items')
-      .select('category_name, subcategory_name')
-      .eq('snapshot_id', snapshotId)
-      .order('id', { ascending: true })
-      .range(from, from + pageSize - 1)
-
-    if (error) throw new Error(error.message || 'Не удалось загрузить категории')
-    for (const row of data || []) {
-      const categoryName = row.category_name || ''
-      const subcategoryName = row.subcategory_name || ''
-      pairs.set(`${categoryName}\u0000${subcategoryName}`, { categoryName, subcategoryName })
-    }
-    if (!data || data.length < pageSize) break
-  }
-
-  return [...pairs.values()]
+  const { data, error } = await supabase.rpc('get_procurement_norm_taxonomy', {
+    p_snapshot_id: snapshotId,
+  })
+  if (error) throw new Error(error.message || 'Не удалось загрузить категории')
+  return (data || []).map((row) => ({
+    categoryName: row.category_name || '',
+    subcategoryName: row.subcategory_name || '',
+  }))
 }
 
 export async function fetchProcurementNormRules({ categoryName } = {}) {
@@ -61,21 +53,47 @@ export async function fetchProcurementNormRules({ categoryName } = {}) {
   return (data || []).map(normalizeRule)
 }
 
-export async function loadProcurementNormsModel({ snapshot: suppliedSnapshot = null } = {}) {
-  const snapshot = suppliedSnapshot || (await fetchLatestProcurementSnapshot())
-  if (!snapshot?.id || snapshot.status === 'syncing' || snapshot.status === 'failed') {
-    return { snapshot, hierarchy: [] }
-  }
-
+async function fetchFreshProcurementNormsModel(snapshot) {
   const [taxonomy, rules] = await Promise.all([
     fetchProcurementNormTaxonomy(snapshot.id),
     fetchProcurementNormRules(),
   ])
-
   return {
     snapshot,
     hierarchy: buildProcurementNormHierarchy({ taxonomy, rules }),
   }
+}
+
+export async function loadProcurementNormsModel({
+  snapshot: suppliedSnapshot = null,
+  forceRefresh = false,
+  onCached = null,
+  onFresh = null,
+} = {}) {
+  const seed = suppliedSnapshot?.id
+    ? getCachedProcurementNormsModel(suppliedSnapshot.id)
+    : getLatestCachedProcurementNormsModel()
+  if (seed?.model) onCached?.(seed.model)
+
+  const snapshot = suppliedSnapshot || (await fetchLatestProcurementSnapshot())
+  if (!snapshot?.id || snapshot.status === 'syncing' || snapshot.status === 'failed') {
+    const empty = { snapshot, hierarchy: [] }
+    onFresh?.(empty)
+    return empty
+  }
+
+  const result = await loadProcurementNormsModelCached(
+    snapshot.id,
+    () => fetchFreshProcurementNormsModel(snapshot),
+    { forceRefresh, onCached }
+  )
+
+  if (result.refreshPromise) {
+    void result.refreshPromise.then((fresh) => onFresh?.(fresh)).catch(() => {})
+  } else if (!result.fromCache) {
+    onFresh?.(result.model)
+  }
+  return result.model
 }
 
 export async function saveProcurementSubcategoryNorm({

@@ -24,6 +24,7 @@ import {
   getCachedFilterOptions,
   setCachedFilterOptions,
 } from '../../services/procurementFilterOptionsCache.js'
+import { invalidateProcurementNormsCache } from '../../services/procurementNormsCache'
 import AdminModal from '../admin/AdminModal'
 import ConfirmDialog from '../admin/ConfirmDialog'
 import SearchableSupplierSelect from '../suppliers/SearchableSupplierSelect'
@@ -56,7 +57,9 @@ import {
   getExportDisabledReason,
   getExportMenuLabel,
   getExportTooltip,
+  getFirstEditableItemId,
   getLockedQuantityHint,
+  getNextEditableItemId,
   getSupplierWorkflowStatus,
   getSyncDisabledReason,
   getSyncTooltip,
@@ -177,6 +180,18 @@ export default function ProcurementPlannerView() {
   const failedSaveIdsRef = useRef(new Set())
   const saveStatusTimerRef = useRef(null)
   const exportMenuId = 'proc-planner-export-menu'
+  /** Item ids with an in-flight qty/reset save — blocks duplicate saves (Enter+blur race, rapid Enter). */
+  const savingItemIdsRef = useRef(new Set())
+  /**
+   * Last known-committed final_order_qty per item id, refreshed from the server on every
+   * loadItems() and after every successful save. Guards against a stale onBlur closure
+   * (bound to the pre-save `item`) re-saving a value that Enter's onKeyDown already committed —
+   * the input remounts (key includes finalOrderQty) after a save, but a lingering blur from the
+   * old node would otherwise compare against the old, now-outdated item.finalOrderQty.
+   */
+  const lastCommittedQtyRef = useRef(new Map())
+  /** Set to 'firstEditable' when Enter advances to the next page; consumed once items settle. */
+  const pendingFocusRef = useRef(null)
 
   const activeFilterCount = useMemo(() => {
     let n = 0
@@ -267,6 +282,7 @@ export default function ProcurementPlannerView() {
     if (!snapshot?.id || snapshot.status === 'syncing' || snapshot.status === 'failed') {
       setItems([])
       setTotalCount(0)
+      lastCommittedQtyRef.current = new Map()
       setLoading(false)
       return
     }
@@ -281,6 +297,9 @@ export default function ProcurementPlannerView() {
       })
       setItems(result.items)
       setTotalCount(result.totalCount)
+      lastCommittedQtyRef.current = new Map(
+        (result.items || []).map((it) => [it.id, it.finalOrderQty])
+      )
     } catch (err) {
       showError(toProcurementUserMessage(err, 'Не удалось загрузить позиции.'))
     } finally {
@@ -319,6 +338,7 @@ export default function ProcurementPlannerView() {
         return
       }
       showSuccess(`Синхронизировано: ${result.itemCount} SKU`)
+      invalidateProcurementNormsCache()
       await loadSnapshotMeta({ forceFilterRefresh: true })
       await loadItems()
     } catch (err) {
@@ -373,7 +393,17 @@ export default function ProcurementPlannerView() {
     )
   }
 
-  async function handleFinalChange(item, rawValue) {
+  /** Patch one row in place from a save response — no full-table reload/scroll/focus loss. */
+  function applySavedItem(updated) {
+    lastCommittedQtyRef.current.set(updated.id, updated.finalOrderQty)
+    setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)))
+  }
+
+  /**
+   * Single commit path for both blur-save and Enter-save.
+   * Returns { ok, changed } — ok=false means "do not advance focus" (stale/in-flight/error).
+   */
+  async function commitQuantity(item, rawValue) {
     // Guard: сюда может прийти «залипшее» событие blur от input, который уже
     // не должен существовать — например, пользователь снял фильтр поставщика,
     // а браузер только теперь отдал blur. Без поставщика не сохраняем ничего.
@@ -384,43 +414,107 @@ export default function ProcurementPlannerView() {
           selectedSupplierId: filters.platformSupplierId,
         })
       }
-      return
+      return { ok: false, changed: false, reason: 'stale' }
     }
 
+    const knownQty = lastCommittedQtyRef.current.has(item.id)
+      ? lastCommittedQtyRef.current.get(item.id)
+      : item.finalOrderQty
+    if (Number(rawValue) === knownQty) {
+      return { ok: true, changed: false }
+    }
+
+    // Guard: Enter already started a save for this row and hasn't resolved yet —
+    // a trailing blur (or a very fast repeated Enter) must not fire a second save.
+    if (savingItemIdsRef.current.has(item.id)) {
+      return { ok: false, changed: true, reason: 'in_flight' }
+    }
+
+    savingItemIdsRef.current.add(item.id)
     beginPendingSave(item.id)
     try {
       const updated = await updateItemFinalOrderQty(item, rawValue)
+      applySavedItem(updated)
       setFilterOptions((prev) => {
         const next = applyItemDeltaToFilterOptions(prev, item, updated)
         if (snapshot?.id) setCachedFilterOptions(snapshot.id, next)
         return next
       })
-      await loadItems()
       endPendingSave(item.id, true)
+      return { ok: true, changed: true, updated }
     } catch (err) {
       endPendingSave(item.id, false)
       showError(toProcurementUserMessage(err, 'Не удалось сохранить количество.'))
+      return { ok: false, changed: true, reason: 'error' }
+    } finally {
+      savingItemIdsRef.current.delete(item.id)
     }
   }
 
   async function handleReset(item) {
     if (!canEditQuantity(item)) return
+    if (savingItemIdsRef.current.has(item.id)) return
 
+    savingItemIdsRef.current.add(item.id)
     beginPendingSave(item.id)
     try {
       const updated = await resetItemToRecommendation(item)
+      applySavedItem(updated)
       setFilterOptions((prev) => {
         const next = applyItemDeltaToFilterOptions(prev, item, updated)
         if (snapshot?.id) setCachedFilterOptions(snapshot.id, next)
         return next
       })
-      await loadItems()
       endPendingSave(item.id, true)
     } catch (err) {
       endPendingSave(item.id, false)
       showError(toProcurementUserMessage(err, 'Не удалось сбросить количество.'))
+    } finally {
+      savingItemIdsRef.current.delete(item.id)
     }
   }
+
+  /** Visible (not CSS-hidden by the desktop/mobile breakpoint) editable qty inputs, in DOM order. */
+  function findVisibleQtyInputs() {
+    return Array.from(document.querySelectorAll('[data-qty-input]')).filter(
+      (node) => node.offsetParent !== null
+    )
+  }
+
+  function focusQtyInputForItem(itemId) {
+    const target = findVisibleQtyInputs().find((node) => node.dataset.qtyInput === String(itemId))
+    if (!target) return false
+    target.focus()
+    target.select()
+    return true
+  }
+
+  /** Enter in a qty input: commit once (if changed), then move to the next editable SKU. */
+  async function handleQtyEnter(item, inputEl) {
+    const result = await commitQuantity(item, inputEl.value)
+    if (!result.ok) return // stale/in-flight/error — do not advance focus
+
+    const nextId = getNextEditableItemId(items, item.id, canEditQuantity)
+    if (nextId) {
+      focusQtyInputForItem(nextId)
+      return
+    }
+    if (page < totalPages) {
+      pendingFocusRef.current = 'firstEditable'
+      setPage((p) => p + 1)
+    }
+    // Last editable SKU on the last page — stay put, no wraparound.
+  }
+
+  // After Enter advances to a next page, focus the first editable qty input once it renders.
+  useEffect(() => {
+    if (loading) return
+    if (pendingFocusRef.current !== 'firstEditable') return
+    pendingFocusRef.current = null
+    const id = getFirstEditableItemId(items, canEditQuantity)
+    if (id) focusQtyInputForItem(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- canEditQuantity closes over per-render state intentionally; deps below are what should re-trigger this
+  }, [loading, items])
 
   useEffect(() => {
     if (!exportMenuOpen) return undefined
@@ -710,10 +804,13 @@ export default function ProcurementPlannerView() {
           defaultValue={item.finalOrderQty}
           key={`${mobile ? 'm-' : ''}final-${item.id}-${item.finalOrderQty}-${item.manualOverride}`}
           disabled={!canEditPlan || !snapshotEditable}
-          onBlur={(e) => {
-            if (Number(e.target.value) !== item.finalOrderQty) {
-              void handleFinalChange(item, e.target.value)
-            }
+          data-qty-input={item.id}
+          onBlur={(e) => void commitQuantity(item, e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key !== 'Enter') return
+            e.preventDefault()
+            if (e.repeat) return
+            void handleQtyEnter(item, e.target)
           }}
           aria-label={`Заказ для ${item.productName}`}
         />

@@ -542,6 +542,24 @@ async function stageSummariesAndWorkflow() {
     typeof ux.EMPTY_SUPPLIER_EXPORT_MESSAGE === 'string' &&
       ux.EMPTY_SUPPLIER_EXPORT_MESSAGE.length > 0
   )
+
+  const navigationRows = [
+    { id: 'q1', editable: true },
+    { id: 'q2', editable: false },
+    { id: 'q3', editable: true },
+  ]
+  assert(
+    'Enter navigation skips non-editable rows',
+    ux.getNextEditableItemId(navigationRows, 'q1', (row) => row.editable) === 'q3'
+  )
+  assert(
+    'Enter navigation stops at the last editable row',
+    ux.getNextEditableItemId(navigationRows, 'q3', (row) => row.editable) == null
+  )
+  assert(
+    'next page navigation can find its first editable row',
+    ux.getFirstEditableItemId(navigationRows, (row) => row.editable) === 'q1'
+  )
 }
 
 async function stageFilterOptionsCache() {
@@ -1119,6 +1137,43 @@ function stageSourceContracts() {
   assert('pending save ref guard', planner.includes('pendingSaveCountRef'))
   assert('failed save ids ref', planner.includes('failedSaveIdsRef'))
   assert('delta summary update on blur', planner.includes('applyItemDeltaToFilterOptions'))
+  assert(
+    'individual quantity save patches only its row',
+    planner.includes('function applySavedItem(updated)') &&
+      planner.includes('it.id === updated.id ? updated : it')
+  )
+  const quantityCommitBlock = planner.match(
+    /async function commitQuantity[\s\S]*?async function handleReset/
+  )?.[0] || ''
+  const resetBlock = planner.match(/async function handleReset[\s\S]*?function findVisibleQtyInputs/)?.[0] || ''
+  assert('individual quantity save does not reload the table', !quantityCommitBlock.includes('loadItems('))
+  assert(
+    'individual quantity save block is actually inspected',
+    quantityCommitBlock.includes('updateItemFinalOrderQty') &&
+      quantityCommitBlock.includes('applySavedItem(updated)')
+  )
+  assert('reset-to-recommendation does not reload the table', !resetBlock.includes('loadItems('))
+  assert(
+    'Enter advances to next editable SKU and across pages',
+    planner.includes('getNextEditableItemId') &&
+      planner.includes("pendingFocusRef.current = 'firstEditable'") &&
+      planner.includes('getFirstEditableItemId')
+  )
+  assert(
+    'failed or duplicate save never advances focus',
+    planner.includes('savingItemIdsRef.current.has(item.id)') &&
+      planner.includes('if (!result.ok) return') &&
+      planner.includes('if (e.repeat) return')
+  )
+  assert(
+    'blur and Enter share one commit path',
+    planner.includes('onBlur={(e) => void commitQuantity(item, e.target.value)}') &&
+      planner.includes('void handleQtyEnter(item, e.target)')
+  )
+  assert(
+    'UMAG sync invalidates norms cache',
+    planner.includes('invalidateProcurementNormsCache()')
+  )
   assert(
     'blur does not full-reload filter options',
     !/handleFinalChange[\s\S]{0,400}loadSnapshotMeta\(/.test(planner)

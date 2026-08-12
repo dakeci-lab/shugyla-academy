@@ -108,26 +108,6 @@
   min-width: 0;
 }
 
-.platform-layout__sync-banner {
-  margin: 0 0 12px;
-  padding: 8px 12px;
-  border-radius: 10px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.platform-layout__sync-banner--offline {
-  background: #fef2f2;
-  color: #991b1b;
-  border: 1px solid #fecaca;
-}
-
-.platform-layout__sync-banner--reconnecting {
-  background: #fffbeb;
-  color: #92400e;
-  border: 1px solid #fde68a;
-}
-
 @media (max-width: 900px) {
   .platform-layout__overlay {
     display: block;

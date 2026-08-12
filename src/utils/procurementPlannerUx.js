@@ -733,4 +733,26 @@ export function getLockedQuantityHint(item, filterOptions) {
   return { label: 'Заказ поставщику создан', orderId }
 }
 
+/**
+ * Id of the next item after `fromId` (in list order) whose `isEditable`
+ * predicate returns true, or null when there is none on this page.
+ * Pure — used to drive Enter-to-next-quantity-input navigation.
+ */
+export function getNextEditableItemId(items, fromId, isEditable) {
+  const list = Array.isArray(items) ? items : []
+  const idx = list.findIndex((it) => it?.id === fromId)
+  if (idx === -1) return null
+  for (let i = idx + 1; i < list.length; i += 1) {
+    if (isEditable(list[i])) return list[i].id
+  }
+  return null
+}
+
+/** Id of the first item whose `isEditable` predicate returns true, or null. */
+export function getFirstEditableItemId(items, isEditable) {
+  const list = Array.isArray(items) ? items : []
+  const found = list.find((it) => isEditable(it))
+  return found ? found.id : null
+}
+
 export { positiveQty }

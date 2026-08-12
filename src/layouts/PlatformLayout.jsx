@@ -40,7 +40,8 @@ function PlatformLayoutShell({ onLogout }) {
       pathname.includes('/platform/receiving')
     )
   }, [user, pathname])
-  const { connectionStatus } = useProcurementRealtime(procurementRealtimeEnabled)
+  // Subscription/refresh side effects stay active; connection status no longer renders a banner.
+  useProcurementRealtime(procurementRealtimeEnabled)
   const navigate = useNavigate()
   const titleContext = usePlatformPageTitleContext()
   const section = useMemo(() => getPlatformSection(pathname), [pathname])
@@ -194,17 +195,6 @@ function PlatformLayoutShell({ onLogout }) {
 
             <PullToRefresh disabled={drawerOpen || drawerDragging} className="platform-layout__refresh">
               <div className="platform-layout__content">
-                {procurementRealtimeEnabled &&
-                (connectionStatus === 'offline' || connectionStatus === 'reconnecting') ? (
-                  <div
-                    className={`platform-layout__sync-banner platform-layout__sync-banner--${connectionStatus}`}
-                    role="status"
-                  >
-                    {connectionStatus === 'offline'
-                      ? 'Нет соединения'
-                      : 'Восстанавливаем соединение…'}
-                  </div>
-                ) : null}
                 <PlatformErrorBoundary onLogout={onLogout}>
                   <Outlet />
                 </PlatformErrorBoundary>
