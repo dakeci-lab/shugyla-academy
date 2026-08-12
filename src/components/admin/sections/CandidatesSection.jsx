@@ -21,7 +21,6 @@ import {
   createDefaultCandidateFilters,
   filterCandidates,
   groupCandidatesByPerson,
-  countPeopleByVisibleStatus,
   buildPersonApplicationCounts,
 } from '../../../utils/candidateListUtils'
 import { useDebouncedValue } from '../../../hooks/useDebouncedValue'
@@ -31,7 +30,6 @@ import CandidatesTable from '../../hr/CandidatesTable'
 import CandidateMobileCard from '../../hr/CandidateMobileCard'
 import EmptyCandidatesState from '../../hr/EmptyCandidatesState'
 import CandidateDetailsModal from '../../hr/candidate-details/CandidateDetailsModal'
-import StatCard from '../StatCard'
 import TablePagination from '../../procurement/TablePagination'
 import '../admin-shared.css'
 import '../RecruitmentSection.css'
@@ -60,8 +58,6 @@ export default function CandidatesSection() {
   const vacancies = getVacancies()
   const candidates = getCandidates()
 
-  const statusCounts = useMemo(() => countPeopleByVisibleStatus(candidates), [candidates])
-  const uniquePeopleCount = useMemo(() => groupCandidatesByPerson(candidates).length, [candidates])
   // Total applications per person across the whole system, independent of
   // the currently applied filters (a status/vacancy filter must not make a
   // person's application count look smaller than it really is).
@@ -191,12 +187,6 @@ export default function CandidatesSection() {
         </p>
       )}
 
-      <div className="admin-stats-grid admin-stats-grid--candidates">
-        <StatCard icon="🧑" value={uniquePeopleCount} label="Уникальных кандидатов" />
-        <StatCard icon="📄" value={candidates.length} label="Всего заявок" />
-        <StatCard icon="🆕" value={statusCounts.new} label="Новых" />
-      </div>
-
       <CandidatesToolbar
         searchInput={searchInput}
         onSearchInputChange={setSearchInput}
@@ -212,7 +202,6 @@ export default function CandidatesSection() {
         draftResultCount={draftResultCount}
         statusValue={appliedFilters.status}
         onStatusChange={(status) => setAppliedFilters((prev) => ({ ...prev, status }))}
-        statusCounts={statusCounts}
       />
 
       {candidates.length === 0 ? (

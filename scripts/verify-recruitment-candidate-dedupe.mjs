@@ -455,14 +455,21 @@ function stageUi() {
   assert('pagination page/pageSize state exists', /const \[page, setPage\] = useState\(1\)/.test(section) && /const \[pageSize, setPageSize\] = useState\(/.test(section))
   assert('pagination resets to page 1 when filters/search/page size change', /setPage\(1\)[\s\S]{0,80}\[appliedFilters, debouncedSearch, pageSize\]/.test(section))
   assert('status control is wired as an always-visible primary control, not a popover filter', section.includes('statusValue={appliedFilters.status}') && section.includes('onStatusChange='))
-  assert('summary counters (unique people + total applications) rendered', section.includes('uniquePeopleCount') && /candidates\.length/.test(section))
+  assert('large candidate summary cards are removed', !section.includes('<StatCard') && !section.includes('Уникальных кандидатов') && !section.includes('Всего заявок'))
 
   const toolbar = read('src/components/hr/CandidatesToolbar.jsx')
   assert('CandidatesToolbar renders the segmented status control', toolbar.includes('<CandidateStatusSegmentedControl'))
+  assert('visible Найдено result row is removed', !toolbar.includes('Найдено:') && !toolbar.includes('candidates-toolbar__meta'))
 
   const segmented = read('src/components/hr/CandidateStatusSegmentedControl.jsx')
   assert('segmented control has no "all statuses" option', !segmented.includes('Все статусы') && !/value === ['"]all['"]/.test(segmented))
   assert('segmented control maps exactly the 5 visible statuses', segmented.includes('CANDIDATE_STATUS_VISIBLE_ORDER.map'))
+  assert('status navigation uses tab semantics', segmented.includes('role="tablist"') && segmented.includes('role="tab"') && segmented.includes('aria-selected={active}'))
+  assert('status tabs render no numeric count badges', !segmented.includes('candidate-status-toggle__count') && !segmented.includes('counts?.[status]'))
+
+  const segmentedCss = read('src/components/hr/CandidateStatusSegmentedControl.css')
+  assert('status navigation matches flat procurement tabs', segmentedCss.includes('border-bottom: 1px solid') && segmentedCss.includes('border-bottom: 2px solid transparent') && segmentedCss.includes('border-bottom-color: var(--color-primary'))
+  assert('status navigation has no pill styling', !segmentedCss.includes('border-radius: 999px') && !segmentedCss.includes('background: var(--color-primary'))
 
   const filterFields = read('src/components/hr/CandidateFiltersFields.jsx')
   assert('status select removed from the collapsible filter popover/sheet', !filterFields.includes('Статус') && !filterFields.includes('Все статусы'))

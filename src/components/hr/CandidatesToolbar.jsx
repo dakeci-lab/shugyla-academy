@@ -50,7 +50,6 @@ export default function CandidatesToolbar({
   draftResultCount,
   statusValue,
   onStatusChange,
-  statusCounts,
 }) {
   const filterButtonRef = useRef(null)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -88,17 +87,9 @@ export default function CandidatesToolbar({
     setFilterOpen(false)
   }
 
-  // Status is always an active filter now, so the list is never "everything
-  // unfiltered" — always show the concrete result count.
-  const countLabel = `Найдено: ${resultCount}`
-
   return (
     <div className="candidates-page">
-      <CandidateStatusSegmentedControl
-        value={statusValue}
-        onChange={onStatusChange}
-        counts={statusCounts}
-      />
+      <CandidateStatusSegmentedControl value={statusValue} onChange={onStatusChange} />
 
       <PlatformSearchToolbar
         value={searchInput}
@@ -120,6 +111,15 @@ export default function CandidatesToolbar({
               }
               title="Фильтр"
             />
+            {showReset && (
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm candidates-toolbar__reset"
+                onClick={resetAll}
+              >
+                Сбросить
+              </button>
+            )}
             {!isMobile && (
               <CandidateFiltersPopover
                 open={filterOpen}
@@ -135,19 +135,6 @@ export default function CandidatesToolbar({
           </PlatformToolbarActionWrap>
         }
       />
-
-      <div className="candidates-toolbar__meta">
-        <p className="candidates-toolbar__count">{countLabel}</p>
-        {showReset && (
-          <button
-            type="button"
-            className="btn btn--ghost btn--sm candidates-toolbar__reset"
-            onClick={resetAll}
-          >
-            Сбросить
-          </button>
-        )}
-      </div>
 
       <CandidateFilterChips filters={appliedFilters} vacancies={vacancies} onChange={onRemoveChip} />
 
