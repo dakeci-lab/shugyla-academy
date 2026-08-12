@@ -28,9 +28,9 @@ const TOP_NAV = 'src/components/platform/PlatformDesktopNav.jsx'
 const DASHBOARD = 'src/pages/platform/PlatformDashboard.jsx'
 const PRICE_CHECKER = 'src/pages/platform/products/PriceCheckerPage.jsx'
 const ROLE_EDITOR = 'src/components/admin/roles/useRoleEditor.jsx'
-const MIGRATION = 'supabase/migrations/20260812060000_roles_dedupe_and_unique_name.sql'
+const MIGRATION = 'supabase/migrations/20260812085658_roles_dedupe_and_unique_name.sql'
 const ACCESS_MIGRATION =
-  'supabase/migrations/20260812061500_finance_cleanup_trainee_and_accountant_access.sql'
+  'supabase/migrations/20260812085722_finance_cleanup_trainee_and_accountant_access.sql'
 
 let checks = 0
 
