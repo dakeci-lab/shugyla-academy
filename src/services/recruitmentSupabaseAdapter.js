@@ -81,6 +81,9 @@ function rowToCandidate(row) {
   return normalizeCandidate({
     id: row.id,
     vacancyId: row.vacancy_id,
+    personId: row.person_id,
+    submissionKey: row.submission_key,
+    isCurrentApplication: row.is_current_application,
     firstName: row.first_name,
     lastName: row.last_name,
     fullName: row.full_name,
@@ -337,6 +340,7 @@ export async function submitCandidateApplication(applicationData) {
     p_answers: { answers: applicationData.answers || {} },
     p_form_version: Number(applicationData.formVersion) || 1,
     p_photo_upload_id: applicationData.photoUploadId || null,
+    p_submission_key: applicationData.submissionKey || null,
   })
 
   if (error) {
@@ -349,6 +353,7 @@ export async function submitCandidateApplication(applicationData) {
   return {
     ok: true,
     candidateId: data?.candidate_id,
+    duplicate: Boolean(data?.duplicate),
     message:
       data?.message ||
       'Анкета успешно отправлена. Мы свяжемся с вами после рассмотрения.',

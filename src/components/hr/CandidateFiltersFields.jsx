@@ -1,7 +1,3 @@
-import {
-  CANDIDATE_STATUS_LABELS,
-  CANDIDATE_STATUS_FILTER_OPTIONS,
-} from '../../utils/recruitmentData'
 import { AGE_SORT } from '../../utils/candidateListUtils'
 
 const AGE_SORT_OPTIONS = [
@@ -34,22 +30,6 @@ export default function CandidateFiltersFields({
           {vacancies.map((vacancy) => (
             <option key={vacancy.id} value={vacancy.id}>
               {vacancy.title}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="admin-form__label">
-        Статус
-        <select
-          className="admin-form__select"
-          value={draft.status}
-          onChange={(e) => patch({ status: e.target.value })}
-        >
-          <option value="all">Все статусы</option>
-          {CANDIDATE_STATUS_FILTER_OPTIONS.map((id) => (
-            <option key={id} value={id}>
-              {CANDIDATE_STATUS_LABELS[id]}
             </option>
           ))}
         </select>

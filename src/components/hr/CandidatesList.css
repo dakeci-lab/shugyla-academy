@@ -199,6 +199,18 @@
   white-space: nowrap;
 }
 
+.candidates-table__application-count {
+  flex: 0 0 auto;
+  min-width: 1.25rem;
+  padding: 0 0.35rem;
+  border-radius: 999px;
+  background: var(--color-primary-light, #d1fae5);
+  color: var(--color-primary-dark, #047857);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+}
+
 .candidates-table__score {
   display: inline-flex;
   align-items: center;
@@ -263,6 +275,13 @@
   color: var(--color-text-secondary, #64748b);
 }
 
+.candidate-mobile-card__date {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+}
+
 .candidate-mobile-card__main {
   display: flex;
   align-items: center;
@@ -280,6 +299,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.candidate-mobile-card__application-count {
+  flex: 0 0 auto;
+  min-width: 1.25rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--color-primary-light, #d1fae5);
+  color: var(--color-primary-dark, #047857);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-align: center;
 }
 
 .candidate-mobile-card__facts {

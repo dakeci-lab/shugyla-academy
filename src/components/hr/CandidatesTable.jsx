@@ -23,6 +23,7 @@ function getSortAriaLabel(ageSort) {
 /** Таблица кандидатов (десктоп / планшет) */
 export default function CandidatesTable({
   candidates,
+  rowNumberOffset = 0,
   ageSort,
   onAgeSortChange,
   onOpenCandidate,
@@ -45,6 +46,7 @@ export default function CandidatesTable({
           <thead>
             <tr>
               <th className="candidates-table__col-index">№</th>
+              <th className="candidates-table__col-date">Дата заявки</th>
               <th className="candidates-table__col-candidate">Кандидат</th>
               <th className="candidates-table__col-vacancy">Вакансия</th>
               <th className="candidates-table__col-age">
@@ -61,7 +63,6 @@ export default function CandidatesTable({
               </th>
               <th className="candidates-table__col-experience">Опыт</th>
               <th className="candidates-table__col-status">Статус</th>
-              <th className="candidates-table__col-date">Дата</th>
             </tr>
           </thead>
           <tbody>
@@ -91,7 +92,10 @@ export default function CandidatesTable({
                   }}
                   aria-label={`Открыть карточку: ${candidate.fullName}`}
                 >
-                  <td className="candidates-table__col-index">{index + 1}</td>
+                  <td className="candidates-table__col-index">{rowNumberOffset + index + 1}</td>
+                  <td className="candidates-table__col-date">
+                    {formatRecruitmentDate(candidate.submittedAt)}
+                  </td>
                   <td className="candidates-table__col-candidate">
                     <div className="candidates-table__candidate">
                       <CandidateAvatar
@@ -100,6 +104,14 @@ export default function CandidatesTable({
                         size="sm"
                       />
                       <span className="candidates-table__candidate-name">{candidate.fullName}</span>
+                      {candidate.applicationCount > 1 && (
+                        <span
+                          className="candidates-table__application-count"
+                          title={`Заявок этого кандидата: ${candidate.applicationCount}`}
+                        >
+                          {candidate.applicationCount}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="candidates-table__col-vacancy" title={vacancyTitle}>
@@ -111,9 +123,6 @@ export default function CandidatesTable({
                   </td>
                   <td className="candidates-table__col-status">
                     <CandidateStatusBadge status={candidate.status} />
-                  </td>
-                  <td className="candidates-table__col-date">
-                    {formatRecruitmentDate(candidate.submittedAt)}
                   </td>
                 </tr>
               )

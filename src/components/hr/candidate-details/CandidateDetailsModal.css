@@ -110,6 +110,56 @@
   color: var(--color-text, #111827);
 }
 
+/* Person application history */
+.candidate-person-history {
+  padding: 12px 16px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 12px;
+  background: #f9fafb;
+}
+
+.candidate-person-history__list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.candidate-person-history__row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.candidate-person-history__row:hover {
+  border-color: var(--color-primary, #2a9d5c);
+}
+
+.candidate-person-history__vacancy {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 500;
+}
+
+.candidate-person-history__date {
+  flex: 0 0 auto;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.8125rem;
+}
+
 /* Summary card */
 .candidate-summary-card {
   display: grid;

@@ -28,6 +28,8 @@ export async function submitPublicCandidateApplication(applicationData) {
     }
   }
 
+  if (!applicationData.submissionKey) throw new Error('Не удалось подготовить отправку. Обновите страницу.')
+
   const { photoFile: _photoFile, vacancySlug: _slug, ...rest } = applicationData
   const adapter = isCloudMode() ? recruitmentSupabaseAdapter : recruitmentLocalAdapter
 

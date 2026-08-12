@@ -329,6 +329,12 @@ export function mapApplicationFormRpcError(error) {
     return 'Вакансия недоступна или закрыта'
   }
   if (message.includes('answer_required')) return 'Заполните обязательные поля'
+  if (message.includes('phone_invalid_kz')) {
+    return 'Введите номер в формате +7 7XX XXX XX XX (мобильный, Казахстан).'
+  }
+  if (message.includes('submission_key_conflict')) {
+    return 'Не удалось отправить анкету. Обновите страницу и заполните её заново.'
+  }
   if (message.includes('answer_invalid')) return 'Проверьте ответы в анкете'
   if (message.includes('unknown_question')) return 'Анкета устарела. Обновите страницу.'
   if (message.includes('invalid_option')) return 'Выбран недопустимый вариант ответа'

@@ -1,6 +1,7 @@
 import {
   CANDIDATE_STATUS,
-  CANDIDATE_STATUS_LABELS,
+  CANDIDATE_STATUS_VISIBLE_ORDER,
+  getCandidateVisibleStatusBucket,
 } from './recruitmentData'
 
 export const AGE_SORT = {
@@ -11,7 +12,7 @@ export const AGE_SORT = {
 
 export const DEFAULT_CANDIDATE_FILTERS = {
   vacancyId: 'all',
-  status: 'all',
+  status: CANDIDATE_STATUS.NEW,
   ageMin: '',
   ageMax: '',
   ageSort: AGE_SORT.DEFAULT,
@@ -55,13 +56,8 @@ export function filterCandidates(candidates, filters, searchQuery = '') {
       return false
     }
 
-    if (filters.status !== 'all') {
-      const status = candidate.status
-      if (filters.status === CANDIDATE_STATUS.QUESTIONABLE) {
-        if (status !== 'questionable' && status !== 'maybe') return false
-      } else if (status !== filters.status) {
-        return false
-      }
+    if (filters.status && filters.status !== 'all') {
+      if (getCandidateVisibleStatusBucket(candidate.status) !== filters.status) return false
     }
 
     if (!matchesAgeFilter(candidate, filters.ageMin, filters.ageMax)) return false
@@ -109,17 +105,86 @@ export function cycleAgeSort(current) {
   return AGE_SORT.DEFAULT
 }
 
+/** Status is the always-visible primary control, not counted as a "secondary" filter. */
 export function countActiveCandidateFilters(filters) {
   let count = 0
   if (filters.vacancyId !== 'all') count += 1
-  if (filters.status !== 'all') count += 1
   if (filters.ageMin !== '' && filters.ageMin != null) count += 1
   if (filters.ageMax !== '' && filters.ageMax != null) count += 1
   return count
 }
 
+/** Per-visible-status counts among the given candidates (ignoring the status filter itself). */
+export function countCandidatesByVisibleStatus(candidates) {
+  const counts = {}
+  for (const status of CANDIDATE_STATUS_VISIBLE_ORDER) counts[status] = 0
+  for (const c of candidates || []) {
+    const bucket = getCandidateVisibleStatusBucket(c.status)
+    counts[bucket] = (counts[bucket] || 0) + 1
+  }
+  return counts
+}
+
 export function hasActiveCandidateFilters(filters) {
   return countActiveCandidateFilters(filters) > 0
+}
+
+function newest(list) {
+  return list.reduce(
+    (latest, c) =>
+      !latest || new Date(c.submittedAt || 0) > new Date(latest.submittedAt || 0) ? c : latest,
+    list[0]
+  )
+}
+
+/**
+ * A person can have multiple "current" applications at once (one per
+ * vacancy they applied to), so pick the newest among those; only fall back
+ * to the newest overall when the group has no current application at all.
+ */
+function pickRepresentativeApplication(group) {
+  const currentOnes = group.filter((c) => c.isCurrentApplication)
+  return newest(currentOnes.length > 0 ? currentOnes : group)
+}
+
+/**
+ * Groups applications by person into one representative row each — the
+ * current application if the group has one, else the newest — with the
+ * group's other applications kept for the detail-view history. Candidates
+ * without a person_id (not backfilled yet) each get their own single-row group.
+ */
+export function groupCandidatesByPerson(candidates, ageSort = AGE_SORT.DEFAULT) {
+  const groups = new Map()
+  for (const c of candidates || []) {
+    const key = c.personId || `unlinked:${c.id}`
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key).push(c)
+  }
+
+  const rows = []
+  for (const group of groups.values()) {
+    const representative = pickRepresentativeApplication(group)
+    rows.push({
+      candidate: representative,
+      applicationCount: group.length,
+      otherApplications: group.filter((c) => c.id !== representative.id),
+    })
+  }
+
+  const sortedRepresentatives = sortCandidates(rows.map((r) => r.candidate), ageSort)
+  const rowByCandidateId = new Map(rows.map((r) => [r.candidate.id, r]))
+  return sortedRepresentatives.map((c) => rowByCandidateId.get(c.id))
+}
+
+/** Per-visible-status counts by unique person (one bucket per representative application). */
+export function countPeopleByVisibleStatus(candidates) {
+  const counts = {}
+  for (const status of CANDIDATE_STATUS_VISIBLE_ORDER) counts[status] = 0
+  for (const row of groupCandidatesByPerson(candidates)) {
+    const bucket = getCandidateVisibleStatusBucket(row.candidate.status)
+    counts[bucket] = (counts[bucket] || 0) + 1
+  }
+  return counts
 }
 
 export function buildCandidateFilterChips(filters, vacancies = []) {
@@ -130,13 +195,6 @@ export function buildCandidateFilterChips(filters, vacancies = []) {
     chips.push({
       id: 'vacancy',
       label: vacancy?.title || 'Вакансия',
-    })
-  }
-
-  if (filters.status !== 'all') {
-    chips.push({
-      id: 'status',
-      label: CANDIDATE_STATUS_LABELS[filters.status] || filters.status,
     })
   }
 
@@ -162,10 +220,27 @@ export function buildCandidateFilterChips(filters, vacancies = []) {
   return chips
 }
 
+/** Map of personId -> number of applications, for the "N заявок" indicator. */
+export function buildPersonApplicationCounts(candidates) {
+  const counts = new Map()
+  for (const c of candidates || []) {
+    if (!c.personId) continue
+    counts.set(c.personId, (counts.get(c.personId) || 0) + 1)
+  }
+  return counts
+}
+
+/** Other applications by the same person (any vacancy), newest first, excluding the given one. */
+export function getOtherApplicationsForPerson(candidates, candidate) {
+  if (!candidate?.personId) return []
+  return (candidates || [])
+    .filter((c) => c.personId === candidate.personId && c.id !== candidate.id)
+    .sort((a, b) => new Date(b.submittedAt || 0) - new Date(a.submittedAt || 0))
+}
+
 export function removeCandidateFilterChip(filters, chipId) {
   const next = { ...filters }
   if (chipId === 'vacancy') next.vacancyId = 'all'
-  if (chipId === 'status') next.status = 'all'
   if (chipId === 'age' || chipId === 'ageMin' || chipId === 'ageMax') {
     next.ageMin = ''
     next.ageMax = ''

@@ -7,7 +7,7 @@ import '../CandidateAvatar.css'
 import './CandidatesList.css'
 
 /** Мобильная карточка кандидата */
-export default function CandidateMobileCard({ candidate, index, onOpen }) {
+export default function CandidateMobileCard({ candidate, index, applicationCount = 1, onOpen }) {
   const vacancy = getVacancyById(candidate.vacancyId)
   const positionLabel = vacancy ? getVacancyPositionLabel(vacancy) : null
   const vacancyTitle = vacancy
@@ -26,12 +26,23 @@ export default function CandidateMobileCard({ candidate, index, onOpen }) {
     >
       <div className="candidate-mobile-card__head">
         <span className="candidate-mobile-card__index">№ {index + 1}</span>
+        <span className="candidate-mobile-card__date">
+          {formatRecruitmentDate(candidate.submittedAt)}
+        </span>
         <CandidateStatusBadge status={candidate.status} />
       </div>
 
       <div className="candidate-mobile-card__main">
         <CandidateAvatar fullName={candidate.fullName} photoUrl={candidate.photoUrl} size="sm" />
         <span className="candidate-mobile-card__name">{candidate.fullName}</span>
+        {applicationCount > 1 && (
+          <span
+            className="candidate-mobile-card__application-count"
+            title={`Заявок этого кандидата: ${applicationCount}`}
+          >
+            {applicationCount}
+          </span>
+        )}
       </div>
 
       <dl className="candidate-mobile-card__facts">
@@ -46,10 +57,6 @@ export default function CandidateMobileCard({ candidate, index, onOpen }) {
         <div className="candidate-mobile-card__fact candidate-mobile-card__fact--wide">
           <dt>Опыт</dt>
           <dd title={experience !== '—' ? experience : undefined}>{experience}</dd>
-        </div>
-        <div className="candidate-mobile-card__fact">
-          <dt>Дата</dt>
-          <dd>{formatRecruitmentDate(candidate.submittedAt)}</dd>
         </div>
       </dl>
     </button>

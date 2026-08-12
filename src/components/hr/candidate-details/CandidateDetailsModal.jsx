@@ -169,6 +169,37 @@ function CandidateAnswersSection({ answerBreakdown, questionsCount }) {
   )
 }
 
+function CandidatePersonHistory({ applications, onSelect }) {
+  if (!applications?.length) return null
+
+  return (
+    <section className="candidate-person-history" aria-label="Другие заявки этого кандидата">
+      <h3 className="candidate-section-title">
+        Другие заявки этого кандидата ({applications.length})
+      </h3>
+      <ul className="candidate-person-history__list">
+        {applications.map((app) => (
+          <li key={app.id} className="candidate-person-history__item">
+            <button
+              type="button"
+              className="candidate-person-history__row"
+              onClick={() => onSelect?.(app.id)}
+            >
+              <span className="candidate-person-history__vacancy">
+                {app.vacancyTitle || 'Без вакансии'}
+              </span>
+              <CandidateStatusBadge status={app.status} />
+              <span className="candidate-person-history__date">
+                {formatRecruitmentDate(app.submittedAt)}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
 function CandidateAdminNotes({ initialNotes, onSave }) {
   const [notes, setNotes] = useState(initialNotes || '')
   const [saveState, setSaveState] = useState('idle')
@@ -289,7 +320,6 @@ function CandidateActionsFooter({
   onInvite,
   onReject,
   onInterviewPassed,
-  onToTrainee,
   onCreateEmployee,
   onRestoreToNew,
 }) {
@@ -346,16 +376,6 @@ function CandidateActionsFooter({
                   {loadingAction === 'interviewPassed' ? 'Обработка…' : 'Собеседование пройдено'}
                 </button>
               )}
-              {actions.toTrainee && (
-                <button
-                  type="button"
-                  className="btn btn--primary candidate-modal-footer__btn candidate-modal-footer__btn--main"
-                  onClick={onToTrainee}
-                  disabled={Boolean(loadingAction)}
-                >
-                  {loadingAction === 'toTrainee' ? 'Обработка…' : 'Перевести в стажёры'}
-                </button>
-              )}
               {actions.createEmployee && (
                 <button
                   type="button"
@@ -387,8 +407,9 @@ export default function CandidateDetailsModal({
   onReCopyInvitation,
   onRestoreToNew,
   onInterviewPassed,
-  onToTrainee,
   onCreateEmployee,
+  otherApplications = [],
+  onSelectOtherApplication,
 }) {
   const photoTriggerRef = useRef(null)
   const [previewPhoto, setPreviewPhoto] = useState(null)
@@ -494,6 +515,11 @@ export default function CandidateDetailsModal({
               }}
             />
 
+            <CandidatePersonHistory
+              applications={otherApplications}
+              onSelect={onSelectOtherApplication}
+            />
+
             <section className="candidate-main-info">
               <h3 className="candidate-section-title">Основная информация</h3>
               <div className="candidate-main-info__grid">
@@ -538,7 +564,6 @@ export default function CandidateDetailsModal({
             onInvite={onInvite}
             onReject={() => setRejectConfirmOpen(true)}
             onInterviewPassed={() => runAction('interviewPassed', onInterviewPassed)}
-            onToTrainee={() => runAction('toTrainee', onToTrainee)}
             onCreateEmployee={onCreateEmployee}
             onRestoreToNew={() => setRestoreConfirmOpen(true)}
           />

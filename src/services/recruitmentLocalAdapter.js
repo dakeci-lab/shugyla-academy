@@ -9,6 +9,7 @@ import {
   VACANCY_STATUS,
   CANDIDATE_STATUS,
 } from '../utils/recruitmentData'
+import { normalizeKzMobilePhone } from '../utils/kzPhone'
 
 function assertVacancyQuestionsEditable(vacancyId) {
   const vacancy = getVacancyByIdSync(vacancyId)
@@ -21,6 +22,7 @@ const STORAGE_KEYS = {
   VACANCIES: 'shugyla_vacancies',
   QUESTIONS: 'shugyla_candidate_questions',
   CANDIDATES: 'shugyla_candidates',
+  PEOPLE: 'shugyla_people',
 }
 
 function readJson(key, fallback) {
@@ -34,6 +36,78 @@ function writeJson(key, value) {
 
 function genId() {
   return crypto.randomUUID()
+}
+
+function readPeople() {
+  return readJson(STORAGE_KEYS.PEOPLE, [])
+}
+
+function savePeople(people) {
+  writeJson(STORAGE_KEYS.PEOPLE, people)
+}
+
+/** Exact canonical phone match only — mirrors academy_people. Never merges by name/age/city. */
+function findOrCreatePersonId(canonicalPhone, firstName, lastName, fullName) {
+  const people = readPeople()
+  const existing = people.find((p) => p.phoneCanonical === canonicalPhone)
+  if (existing) return existing.id
+
+  const person = {
+    id: genId(),
+    phoneCanonical: canonicalPhone,
+    phoneDisplay: canonicalPhone,
+    firstName: firstName || null,
+    lastName: lastName || null,
+    fullName: fullName || null,
+    createdAt: new Date().toISOString(),
+  }
+  people.push(person)
+  savePeople(people)
+  return person.id
+}
+
+/** Mirrors public.candidate_status_progress_rank(): furthest-along = highest, rejected = lowest. */
+const STATUS_PROGRESS_RANK = {
+  hired: 6,
+  trainee: 5,
+  intern: 5,
+  interview_passed: 4,
+  invited: 3,
+  suitable: 2,
+  questionable: 2,
+  maybe: 2,
+  new: 1,
+  rejected: 0,
+}
+
+function statusProgressRank(status) {
+  return STATUS_PROGRESS_RANK[status] ?? 1
+}
+
+/**
+ * Mirrors academy_candidates_maintain_current_trg: at most one
+ * isCurrentApplication=true per (personId, vacancyId), chosen by furthest
+ * status progress then most recent submission. Called after insert and
+ * after any status change so HR actions (reject/restore/hire) keep it correct.
+ */
+function recomputeCurrentApplication(candidates, personId, vacancyId) {
+  if (!personId || !vacancyId) return candidates
+  const group = candidates.filter((c) => c.personId === personId && c.vacancyId === vacancyId)
+  if (group.length === 0) return candidates
+
+  const winner = group.reduce((best, c) => {
+    if (!best) return c
+    const rankDiff = statusProgressRank(c.status) - statusProgressRank(best.status)
+    if (rankDiff !== 0) return rankDiff > 0 ? c : best
+    const dateDiff = new Date(c.submittedAt || 0) - new Date(best.submittedAt || 0)
+    if (dateDiff !== 0) return dateDiff > 0 ? c : best
+    return c.id > best.id ? c : best
+  }, null)
+
+  return candidates.map((c) => {
+    if (c.personId !== personId || c.vacancyId !== vacancyId) return c
+    return { ...c, isCurrentApplication: c.id === winner.id }
+  })
 }
 
 function attachCounts(vacancies, questions, candidates) {
@@ -200,6 +274,9 @@ function saveCandidates(candidates) {
     candidates.map((c) => ({
       id: c.id,
       vacancy_id: c.vacancyId,
+      person_id: c.personId ?? null,
+      submission_key: c.submissionKey ?? null,
+      is_current_application: c.isCurrentApplication !== false,
       first_name: c.firstName,
       last_name: c.lastName,
       full_name: c.fullName,
@@ -462,6 +539,24 @@ export async function reorderCandidateQuestions(vacancyId, orderedQuestionIds) {
 
 export async function submitCandidateApplication(applicationData) {
   const bundle = getLocalRecruitmentBundle()
+
+  // Idempotent replay: this exact browser submission already succeeded.
+  const submissionKey = applicationData.submissionKey || null
+  if (submissionKey) {
+    const existingByKey = bundle.candidates.find((c) => c.submissionKey === submissionKey)
+    if (existingByKey) {
+      if (existingByKey.vacancyId !== applicationData.vacancyId) {
+        throw new Error('submission_key_conflict')
+      }
+      return {
+        ok: true,
+        candidateId: existingByKey.id,
+        duplicate: true,
+        message: 'Анкета уже была отправлена ранее. Мы свяжемся с вами после рассмотрения.',
+      }
+    }
+  }
+
   const vacancy = bundle.vacancies.find((v) => v.id === applicationData.vacancyId)
   if (!vacancy) throw new Error('Вакансия не найдена')
   if (vacancy.status !== VACANCY_STATUS.PUBLISHED) {
@@ -511,13 +606,54 @@ export async function submitCandidateApplication(applicationData) {
 
   if (!fields.firstName || !fields.phone) throw new Error('Заполните обязательные поля')
 
+  const canonicalPhone = normalizeKzMobilePhone(fields.phone)
+  if (!canonicalPhone) {
+    throw new Error('Введите номер в формате +7 7XX XXX XX XX (мобильный, Казахстан).')
+  }
+
+  const fullName = `${fields.firstName} ${fields.lastName || ''}`.trim()
+  const personId = findOrCreatePersonId(canonicalPhone, fields.firstName, fields.lastName || null, fullName)
+
+  // Retroactively link any legacy candidates (submitted before person-linking
+  // existed) that share this canonical phone, so the current-application
+  // check below can see them instead of missing a real duplicate.
+  const legacyVacancyIds = new Set()
+  bundle.candidates = bundle.candidates.map((c) => {
+    if (c.personId) return c
+    if (normalizeKzMobilePhone(c.phone) === canonicalPhone) {
+      legacyVacancyIds.add(c.vacancyId)
+      return { ...c, personId }
+    }
+    return c
+  })
+  legacyVacancyIds.forEach((vId) => {
+    bundle.candidates = recomputeCurrentApplication(bundle.candidates, personId, vId)
+  })
+
+  // Same person + same vacancy + current non-rejected application already
+  // exists -> return it as-is, never insert a duplicate or touch its data.
+  const existingCurrent = bundle.candidates.find(
+    (c) => c.personId === personId && c.vacancyId === vacancy.id && c.isCurrentApplication && c.status !== CANDIDATE_STATUS.REJECTED
+  )
+  if (existingCurrent) {
+    return {
+      ok: true,
+      candidateId: existingCurrent.id,
+      duplicate: true,
+      message: 'Вы уже откликались на эту вакансию. Мы свяжемся с вами после рассмотрения.',
+    }
+  }
+
   const candidate = normalizeCandidate({
     id: genId(),
     vacancyId: vacancy.id,
+    personId,
+    submissionKey,
+    isCurrentApplication: false, // recomputeCurrentApplication resolves the group below
     firstName: fields.firstName,
     lastName: fields.lastName || '',
-    fullName: `${fields.firstName} ${fields.lastName || ''}`.trim(),
-    phone: fields.phone,
+    fullName,
+    phone: canonicalPhone,
     age: fields.age ?? null,
     city: fields.city || '',
     experience: fields.experience || '',
@@ -542,11 +678,13 @@ export async function submitCandidateApplication(applicationData) {
   })
 
   bundle.candidates.unshift(candidate)
+  bundle.candidates = recomputeCurrentApplication(bundle.candidates, personId, vacancy.id)
   saveCandidates(bundle.candidates)
 
   return {
     ok: true,
     candidateId: candidate.id,
+    duplicate: false,
     message: 'Анкета успешно отправлена. Мы свяжемся с вами после рассмотрения.',
   }
 }
@@ -556,6 +694,12 @@ export async function updateCandidate(candidateId, updates) {
   const idx = bundle.candidates.findIndex((c) => c.id === candidateId)
   if (idx < 0) throw new Error('Кандидат не найден')
   bundle.candidates[idx] = normalizeCandidate({ ...bundle.candidates[idx], ...updates })
+
+  if (updates.status != null) {
+    const { personId, vacancyId } = bundle.candidates[idx]
+    bundle.candidates = recomputeCurrentApplication(bundle.candidates, personId, vacancyId)
+  }
+
   saveCandidates(bundle.candidates)
 }
 

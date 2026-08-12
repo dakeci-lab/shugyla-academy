@@ -92,12 +92,15 @@ export function getCandidateDetailActions(candidate) {
     invite: false,
     reject: false,
     interviewPassed: false,
-    toTrainee: false,
     createEmployee: false,
     restoreToNew: false,
   }
 
   if (!candidate || isCandidateEmployeeCreated(candidate)) return actions
+
+  // A historical (superseded) application is read-only: only the current
+  // application per person+vacancy should drive HR status actions.
+  if (candidate.isCurrentApplication === false) return actions
 
   const status = normalizeCandidateStatus(candidate.status)
 
@@ -114,9 +117,10 @@ export function getCandidateDetailActions(candidate) {
     actions.invite = true
   } else if (status === CANDIDATE_STATUS.INVITED) {
     actions.interviewPassed = true
-  } else if (status === CANDIDATE_STATUS.INTERVIEW_PASSED) {
-    actions.toTrainee = true
   }
+  // interview_passed no longer offers "to trainee" — trainee/intern are
+  // retired as a selectable workflow stage; eligible candidates go straight
+  // to "Создать сотрудника" (canCreateEmployeeForCandidate below).
 
   if (canCreateEmployeeForCandidate(candidate)) {
     actions.createEmployee = true

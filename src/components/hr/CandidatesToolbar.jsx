@@ -6,11 +6,11 @@ import PlatformSearchToolbar, {
 import CandidateFiltersPopover from './CandidateFiltersPopover'
 import CandidateFiltersSheet from './CandidateFiltersSheet'
 import CandidateFilterChips from './CandidateFilterChips'
+import CandidateStatusSegmentedControl from './CandidateStatusSegmentedControl'
 import {
   AGE_SORT,
   countActiveCandidateFilters,
   createDefaultCandidateFilters,
-  formatCandidatesCount,
   hasActiveCandidateFilters,
 } from '../../utils/candidateListUtils'
 import './CandidatesList.css'
@@ -48,7 +48,9 @@ export default function CandidatesToolbar({
   vacancies,
   resultCount,
   draftResultCount,
-  totalCount,
+  statusValue,
+  onStatusChange,
+  statusCounts,
 }) {
   const filterButtonRef = useRef(null)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -61,10 +63,12 @@ export default function CandidatesToolbar({
 
   const activeFilterCount = countActiveCandidateFilters(appliedFilters)
   const filtersActive = hasActiveCandidateFilters(appliedFilters)
+  const defaultStatus = createDefaultCandidateFilters().status
   const showReset =
     searchInput.trim() ||
     filtersActive ||
-    appliedFilters.ageSort !== AGE_SORT.DEFAULT
+    appliedFilters.ageSort !== AGE_SORT.DEFAULT ||
+    appliedFilters.status !== defaultStatus
 
   function toggleFilters() {
     if (!filterOpen) {
@@ -84,13 +88,18 @@ export default function CandidatesToolbar({
     setFilterOpen(false)
   }
 
-  const countLabel =
-    searchInput.trim() || filtersActive || appliedFilters.ageSort !== AGE_SORT.DEFAULT
-      ? `Найдено: ${resultCount}`
-      : formatCandidatesCount(totalCount)
+  // Status is always an active filter now, so the list is never "everything
+  // unfiltered" — always show the concrete result count.
+  const countLabel = `Найдено: ${resultCount}`
 
   return (
     <div className="candidates-page">
+      <CandidateStatusSegmentedControl
+        value={statusValue}
+        onChange={onStatusChange}
+        counts={statusCounts}
+      />
+
       <PlatformSearchToolbar
         value={searchInput}
         onChange={(event) => onSearchInputChange(event.target.value)}

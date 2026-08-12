@@ -280,6 +280,9 @@ export function normalizeCandidate(raw) {
   return {
     id: raw.id,
     vacancyId: raw.vacancyId ?? raw.vacancy_id ?? null,
+    personId: raw.personId ?? raw.person_id ?? null,
+    submissionKey: raw.submissionKey ?? raw.submission_key ?? null,
+    isCurrentApplication: raw.isCurrentApplication ?? raw.is_current_application ?? true,
     firstName,
     lastName,
     fullName,
@@ -402,16 +405,42 @@ export function getCandidateAnswerBreakdown(candidate, questions) {
   }))
 }
 
-export const CANDIDATE_STATUS_FILTER_OPTIONS = [
+/**
+ * The only statuses HR can filter/select going forward. Order matches the
+ * always-visible segmented control on the Candidates screen.
+ */
+export const CANDIDATE_STATUS_VISIBLE_ORDER = [
   CANDIDATE_STATUS.NEW,
-  CANDIDATE_STATUS.SUITABLE,
-  CANDIDATE_STATUS.QUESTIONABLE,
   CANDIDATE_STATUS.REJECTED,
   CANDIDATE_STATUS.INVITED,
   CANDIDATE_STATUS.INTERVIEW_PASSED,
-  CANDIDATE_STATUS.TRAINEE,
   CANDIDATE_STATUS.HIRED,
 ]
+
+/** @deprecated use CANDIDATE_STATUS_VISIBLE_ORDER */
+export const CANDIDATE_STATUS_FILTER_OPTIONS = CANDIDATE_STATUS_VISIBLE_ORDER
+
+/**
+ * Legacy statuses (suitable/questionable/maybe/intern/trainee) are retained
+ * in the database untouched — this maps each to the nearest visible bucket
+ * so old candidates stay reachable through the trimmed filter/segmented
+ * control instead of disappearing. suitable/questionable/maybe -> "Новый"
+ * (still awaiting a decision); intern/trainee -> "Собеседование пройдено"
+ * (nearest retained pre-hire stage).
+ */
+export const CANDIDATE_STATUS_LEGACY_VISIBILITY = {
+  suitable: CANDIDATE_STATUS.NEW,
+  questionable: CANDIDATE_STATUS.NEW,
+  maybe: CANDIDATE_STATUS.NEW,
+  intern: CANDIDATE_STATUS.INTERVIEW_PASSED,
+  trainee: CANDIDATE_STATUS.INTERVIEW_PASSED,
+}
+
+/** Which of the 5 visible status buckets a candidate (incl. legacy status) falls under. */
+export function getCandidateVisibleStatusBucket(status) {
+  if (CANDIDATE_STATUS_VISIBLE_ORDER.includes(status)) return status
+  return CANDIDATE_STATUS_LEGACY_VISIBILITY[status] || CANDIDATE_STATUS.NEW
+}
 
 export function getVacancyEmployeeRole(vacancy) {
   if (!vacancy) return null

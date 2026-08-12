@@ -1,6 +1,7 @@
 import {
   ALLOWED_CANDIDATE_PHOTO_TYPES,
 } from '../../services/candidatePhotoService'
+import KzPhoneField from './KzPhoneField'
 
 /**
  * Renders vacancy application questions dynamically.
@@ -140,6 +141,20 @@ export default function DynamicApplicationForm({
                   })}
                 </div>
               </fieldset>
+            ) : q.questionType === 'phone' || q.fieldBinding === 'phone' ? (
+              <>
+                <label className="apply-form__label" htmlFor={id}>
+                  {labelText}
+                </label>
+                <KzPhoneField
+                  id={id}
+                  value={values[q.id]}
+                  onChange={(tail) => onChange(q.id, tail)}
+                  disabled={disabled}
+                  required={q.required}
+                  error={err}
+                />
+              </>
             ) : !['short_text', 'phone', 'number', 'date'].includes(q.questionType) ? (
               <p className="careers-apply-form__error" role="alert">
                 Неизвестный тип вопроса. Обновите страницу или обратитесь в магазин.
@@ -157,17 +172,9 @@ export default function DynamicApplicationForm({
                       ? 'number'
                       : q.questionType === 'date'
                         ? 'date'
-                        : q.questionType === 'phone'
-                          ? 'tel'
-                          : 'text'
+                        : 'text'
                   }
-                  inputMode={
-                    q.questionType === 'phone'
-                      ? 'tel'
-                      : q.questionType === 'number'
-                        ? 'numeric'
-                        : undefined
-                  }
+                  inputMode={q.questionType === 'number' ? 'numeric' : undefined}
                   value={values[q.id] ?? ''}
                   placeholder={q.placeholder || undefined}
                   required={q.required}

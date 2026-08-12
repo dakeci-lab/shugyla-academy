@@ -1,0 +1,43 @@
+.kz-phone-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid #cfd8d3;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.kz-phone-field:focus-within {
+  outline: 2px solid rgba(21, 128, 61, 0.35);
+  outline-offset: 1px;
+  border-color: #15803d;
+}
+
+.kz-phone-field--invalid {
+  border-color: #dc2626;
+}
+
+.kz-phone-field__prefix {
+  flex: 0 0 auto;
+  font: inherit;
+  font-weight: 600;
+  color: #14201a;
+  white-space: nowrap;
+}
+
+.kz-phone-field__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.35;
+}
+
+.kz-phone-field__input:focus {
+  outline: none;
+}

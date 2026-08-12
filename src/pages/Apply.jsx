@@ -11,6 +11,11 @@ import { isCloudMode } from '../lib/dataMode'
 import { APPLICATION_QUESTION_TYPES, mapApplicationFormRpcError } from '../utils/applicationForm'
 import { getPublicVacancyDisplay } from '../utils/careersVacancyDisplay'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
+import { kzPhoneTailToDisplay, validateKzPhoneTail } from '../utils/kzPhone'
+import {
+  getOrCreateApplicationSubmissionKey,
+  clearApplicationSubmissionKey,
+} from '../utils/applicationSubmissionKey'
 import { useLanguage } from '../context/LanguageContext'
 import DynamicApplicationForm from '../components/apply/DynamicApplicationForm'
 import { getCareersHomePath } from '../router/hostSurface'
@@ -266,6 +271,9 @@ export default function ApplyPage() {
         if (isCloudMode() ? !photoUploadId : !photoFile) {
           nextErrors[q.id] = 'Загрузите фотографию'
         }
+      } else if (q.questionType === 'phone' || q.fieldBinding === 'phone') {
+        const phoneError = validateKzPhoneTail(value)
+        if (phoneError) nextErrors[q.id] = phoneError
       } else if (q.questionType === 'multi_choice') {
         if (!Array.isArray(value) || value.length === 0) nextErrors[q.id] = 'Выберите вариант'
       } else if (q.questionType === 'yes_no') {
@@ -305,8 +313,13 @@ export default function ApplyPage() {
       const answers = {}
       for (const q of questions) {
         if (q.questionType === 'photo') continue
-        answers[q.id] = values[q.id]
+        answers[q.id] =
+          q.questionType === 'phone' || q.fieldBinding === 'phone'
+            ? kzPhoneTailToDisplay(values[q.id])
+            : values[q.id]
       }
+
+      const submissionKey = getOrCreateApplicationSubmissionKey(vacancy.id)
 
       const result = await submitPublicCandidateApplication({
         vacancyId: vacancy.id,
@@ -315,7 +328,10 @@ export default function ApplyPage() {
         answers,
         photoUploadId: photoQuestionId ? photoUploadId : null,
         photoFile: null,
+        submissionKey,
       })
+
+      clearApplicationSubmissionKey(vacancy.id)
 
       setSuccessMessage(
         result.message ||
