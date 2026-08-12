@@ -72,9 +72,6 @@ export const PERMISSION_CODES = {
   PAYROLL_CALCULATE: 'payroll.calculate',
   PAYROLL_MANAGE_SETTINGS: 'payroll.manage_settings',
 
-  FINANCE_VIEW: 'finance.view',
-  FINANCE_MANAGE: 'finance.manage',
-
   SETTINGS_VIEW: 'settings.view',
   SETTINGS_MANAGE: 'settings.manage',
   NOTIFICATIONS_MANAGE: 'notifications.manage',
@@ -121,7 +118,6 @@ export const PERMISSION_MODULES = {
   price_tags: 'Ценники',
   products: 'Товары',
   payroll: 'Зарплата',
-  finance: 'Финансы',
   positions: 'Организационная структура',
   settings: 'Настройки',
 }
@@ -133,6 +129,7 @@ export const RBAC_MATRIX_MODULES = [
   'schedule',
   'attendance',
   'rating',
+  'payroll',
   'recruitment',
   'procurement',
   'receiving',
@@ -233,8 +230,6 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.PAYROLL_VIEW, name: 'Просмотр зарплат', module: 'payroll', sortOrder: 140 },
   { code: PERMISSION_CODES.PAYROLL_CALCULATE, name: 'Расчёт зарплаты', module: 'payroll', sortOrder: 141 },
   { code: PERMISSION_CODES.PAYROLL_MANAGE_SETTINGS, name: 'Настройки зарплаты', module: 'payroll', sortOrder: 142 },
-  { code: PERMISSION_CODES.FINANCE_VIEW, name: 'Просмотр финансов', module: 'finance', sortOrder: 150 },
-  { code: PERMISSION_CODES.FINANCE_MANAGE, name: 'Управление финансами', module: 'finance', sortOrder: 151 },
   {
     code: PERMISSION_CODES.POSITIONS_VIEW,
     name: 'Просмотр организационной структуры',

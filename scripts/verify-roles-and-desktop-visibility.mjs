@@ -28,6 +28,8 @@ const DASHBOARD = 'src/pages/platform/PlatformDashboard.jsx'
 const PRICE_CHECKER = 'src/pages/platform/products/PriceCheckerPage.jsx'
 const ROLE_EDITOR = 'src/components/admin/roles/useRoleEditor.jsx'
 const MIGRATION = 'supabase/migrations/20260812052000_roles_dedupe_and_unique_name.sql'
+const ACCESS_MIGRATION =
+  'supabase/migrations/20260812061500_finance_cleanup_trainee_and_accountant_access.sql'
 
 let checks = 0
 
@@ -175,11 +177,87 @@ function stageMigration() {
   console.log('')
 }
 
+async function stageFinanceAndAccountant() {
+  console.log('Stage 4: Finance removal, trainee, accountant access')
+
+  const catalog = await load('src/config/permissionCatalog.js')
+  const { PERMISSION_CODES, PERMISSION_CATALOG, PERMISSION_MODULES, RBAC_MATRIX_MODULES } = catalog
+
+  assert('finance codes are gone', !('FINANCE_VIEW' in PERMISSION_CODES) && !('FINANCE_MANAGE' in PERMISSION_CODES))
+  assert(
+    'no catalog entry belongs to the finance module',
+    PERMISSION_CATALOG.every((entry) => entry.module !== 'finance')
+  )
+  assert('the finance module label is gone', !('finance' in PERMISSION_MODULES))
+  assert(
+    'no finance code survives anywhere in the catalog',
+    !PERMISSION_CATALOG.some((entry) => String(entry.code).startsWith('finance.'))
+  )
+
+  // Payroll rights were ungrantable through the UI: the module was missing from
+  // the matrix, which is why the accountant had to be fixed by migration.
+  assert('payroll is now part of the access matrix', RBAC_MATRIX_MODULES.includes('payroll'))
+  assert('finance is not in the matrix', !RBAC_MATRIX_MODULES.includes('finance'))
+  assert(
+    'every matrix module has at least one permission',
+    RBAC_MATRIX_MODULES.every((module) =>
+      PERMISSION_CATALOG.some((entry) => entry.module === module)
+    )
+  )
+
+  const permissionsSrc = read('src/config/permissions.js')
+  assert(
+    'payroll route no longer accepts finance.view',
+    /EMPLOYEES_PAYROLL\]: \[P\.PAYROLL_VIEW\]/.test(permissionsSrc)
+  )
+  assert('no finance code left in access rules', !/FINANCE_/.test(permissionsSrc))
+
+  const sql = read(ACCESS_MIGRATION)
+  assert('migration drops both finance permissions', /'finance\.view', 'finance\.manage'/.test(sql))
+  assert('migration deletes the trainee role', /delete from public\.roles where code = 'trainee'/.test(sql))
+  assert(
+    'trainee deletion is guarded by an employee count',
+    /role trainee has % employee\(s\)/.test(sql)
+  )
+  for (const code of [
+    'payroll.view',
+    'payroll.calculate',
+    'umag.settlements.view',
+    'umag.reconciliations.view',
+    'supplier_payments.view',
+    'supplier_payments.manage',
+  ]) {
+    assert(`accountant receives ${code}`, sql.includes(`'${code}'`))
+  }
+  assert(
+    'unknown permission codes abort the migration',
+    /unknown permission code\(s\)/.test(sql),
+    'a typo must not silently grant less'
+  )
+  assert('accountant grant is verified afterwards', /Postcheck failed: accountant has/.test(sql))
+  assert('no employee row is modified', !/update public\.academy_users/i.test(sql))
+
+  // Every code the accountant gets must exist in the catalog, or the migration
+  // would fail on production instead of here.
+  const catalogCodes = new Set(PERMISSION_CATALOG.map((entry) => entry.code))
+  const granted = [...sql.matchAll(/'([a-z_]+(?:\.[a-z_]+)+)'/g)]
+    .map((match) => match[1])
+    .filter((code) => !code.startsWith('finance.') && code.includes('.'))
+  assert(
+    'granted codes all exist in the catalog',
+    granted.every((code) => catalogCodes.has(code)),
+    granted.filter((code) => !catalogCodes.has(code)).join(', ')
+  )
+
+  console.log('')
+}
+
 async function main() {
   console.log('=== Roles and desktop visibility verification ===\n')
   await stageVisibilityRule()
   await stageRoleNames()
   stageMigration()
+  await stageFinanceAndAccountant()
   console.log(`=== All ${checks} checks passed ===\n`)
 }
 
