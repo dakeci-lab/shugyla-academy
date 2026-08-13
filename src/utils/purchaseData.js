@@ -136,6 +136,7 @@ export function normalizePurchaseItem(raw) {
     purchaseOrderId: raw.purchaseOrderId ?? raw.purchase_order_id ?? null,
     productName: raw.productName ?? raw.product_name ?? '',
     barcode: raw.barcode ?? '',
+    unit: raw.unit ?? raw.measure ?? '',
     supplierId: raw.supplierId ?? raw.supplier_id ?? null,
     supplierName: raw.supplierName ?? raw.supplier_name ?? '',
     stock: raw.stock ?? raw.stockQty ?? raw.stock_qty ?? 0,

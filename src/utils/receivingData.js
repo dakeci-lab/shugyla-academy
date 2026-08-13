@@ -13,19 +13,19 @@ export const RECEIVING_STATUS = {
 export const RECEIVING_STATUS_LABELS = {
   awaiting_receiving: 'Ожидает приёмки',
   awaiting: 'Ожидает приёмки',
-  in_progress: 'На приёмке',
-  partially_received: 'Частично принят',
-  partial: 'Частично принят',
+  in_progress: 'Черновик',
+  partially_received: 'Принят',
+  partial: 'Принят',
   received: 'Принят',
   cancelled: 'Отменён',
 }
 
 export const RECEIVING_STATUS_BADGE = {
-  awaiting_receiving: 'warning',
-  awaiting: 'warning',
-  in_progress: 'info',
-  partially_received: 'warning',
-  partial: 'warning',
+  awaiting_receiving: 'progress',
+  awaiting: 'progress',
+  in_progress: 'draft',
+  partially_received: 'done',
+  partial: 'done',
   received: 'done',
   cancelled: 'idle',
 }
@@ -59,30 +59,84 @@ export function calcReceivingTotals(items) {
   const normalized = (items || []).map(normalizeReceivingItem)
   const totalOrderedQty = normalized.reduce((sum, item) => sum + Number(item.orderedQty || 0), 0)
   const totalReceivedQty = normalized.reduce((sum, item) => sum + Number(item.receivedQty || 0), 0)
+  const totalOrderedAmount = normalized.reduce(
+    (sum, item) => sum + Number(item.orderedQty || 0) * Number(item.orderedPurchasePrice || 0),
+    0
+  )
+  const totalReceivedAmount = normalized.reduce(
+    (sum, item) => sum + Number(item.receivedQty || 0) * Number(item.actualPurchasePrice || 0),
+    0
+  )
   return {
     totalOrderedQty,
     totalReceivedQty,
     totalDifferenceQty: totalReceivedQty - totalOrderedQty,
+    totalOrderedAmount,
+    totalReceivedAmount,
+    totalAmountDifference: totalReceivedAmount - totalOrderedAmount,
   }
+}
+
+function normalizeStringArray(value) {
+  if (!Array.isArray(value)) return []
+  return value.map((item) => String(item || '').trim()).filter(Boolean)
+}
+
+export function isTemporaryReceivingPhotoUrl(value) {
+  return /^(?:https?:|blob:)/i.test(String(value || '').trim())
+}
+
+export function normalizeReceivingPhotoPaths(value) {
+  return normalizeStringArray(value).filter((path) => !isTemporaryReceivingPhotoUrl(path))
+}
+
+function normalizePhotoMetadata(value) {
+  if (!Array.isArray(value)) return []
+  return value.filter((item) => item && typeof item === 'object' && !Array.isArray(item))
 }
 
 export function normalizeReceivingItem(raw) {
   if (!raw) return null
   const orderedQty = raw.orderedQty ?? raw.ordered_qty ?? 0
   const receivedQty = raw.receivedQty ?? raw.received_qty ?? 0
+  const orderedPurchasePrice =
+    raw.orderedPurchasePrice ?? raw.ordered_purchase_price ?? raw.purchasePrice ?? raw.purchase_price ?? 0
+  const actualPurchasePrice =
+    raw.actualPurchasePrice ?? raw.actual_purchase_price ?? orderedPurchasePrice
+  const photoPaths = normalizeReceivingPhotoPaths(
+    raw.photoPaths ?? raw.photo_paths ?? raw.photo_urls
+  )
+  const hasDisplayPhotoUrls = raw.photoUrls != null
   return {
     id: raw.id,
     receivingDocumentId: raw.receivingDocumentId ?? raw.receiving_document_id ?? null,
     purchaseOrderItemId: raw.purchaseOrderItemId ?? raw.purchase_order_item_id ?? null,
     productName: raw.productName ?? raw.product_name ?? '',
     barcode: raw.barcode ?? '',
+    unit: raw.unit ?? raw.measure ?? '',
     orderedQty,
     receivedQty,
     differenceQty:
       raw.differenceQty ??
       raw.difference_qty ??
       calcDifferenceQty(receivedQty, orderedQty),
-    purchasePrice: raw.purchasePrice ?? raw.purchase_price ?? 0,
+    // purchasePrice remains as a backwards-compatible alias for the ordered
+    // price snapshot. New receiving screens must edit actualPurchasePrice.
+    purchasePrice: orderedPurchasePrice,
+    orderedPurchasePrice,
+    actualPurchasePrice,
+    priceDifference: Number(actualPurchasePrice || 0) - Number(orderedPurchasePrice || 0),
+    isOutsideOrder: Boolean(raw.isOutsideOrder ?? raw.is_outside_order),
+    discrepancyReasonCode:
+      raw.discrepancyReasonCode ?? raw.discrepancy_reason_code ?? null,
+    discrepancyReason:
+      raw.discrepancyReason ?? raw.discrepancy_reason ??
+      raw.discrepancyReasonCode ?? raw.discrepancy_reason_code ?? '',
+    // photoPaths are the durable private Storage keys persisted in photo_urls.
+    // photoUrls may contain short-lived signed URLs attached only for display.
+    photoPaths,
+    photoUrls: normalizeStringArray(hasDisplayPhotoUrls ? raw.photoUrls : photoPaths),
+    photoMetadata: normalizePhotoMetadata(raw.photoMetadata ?? raw.photo_metadata),
     status: raw.status ?? RECEIVING_ITEM_STATUS.PENDING,
     comment: raw.comment ?? '',
     sortOrder: raw.sortOrder ?? raw.sort_order ?? 0,
@@ -120,13 +174,25 @@ export function normalizeReceivingDocument(raw, items = []) {
     createdByName: raw.createdByName ?? raw.created_by_name ?? '',
     receivedBy: raw.receivedBy ?? raw.received_by ?? null,
     receivedByName: raw.receivedByName ?? raw.received_by_name ?? null,
+    supplierInvoiceNumbers: normalizeStringArray(
+      raw.supplierInvoiceNumbers ?? raw.supplier_invoice_numbers
+    ),
     comment: raw.comment ?? '',
     totalOrderedQty: raw.totalOrderedQty ?? raw.total_ordered_qty ?? totals.totalOrderedQty,
     totalReceivedQty: raw.totalReceivedQty ?? raw.total_received_qty ?? totals.totalReceivedQty,
     totalDifferenceQty:
       raw.totalDifferenceQty ?? raw.total_difference_qty ?? totals.totalDifferenceQty,
     totalAmount: raw.totalAmount ?? raw.total_amount ?? 0,
+    totalReceivedAmount:
+      raw.totalReceivedAmount ?? raw.total_received_amount ?? totals.totalReceivedAmount,
     itemsCount: raw.itemsCount ?? raw.items_count ?? normalizedItems.length,
+    version: Number(raw.version ?? 1),
+    startedAt: raw.startedAt ?? raw.started_at ?? null,
+    completedAt: raw.completedAt ?? raw.completed_at ?? null,
+    exportVersion: Number(raw.exportVersion ?? raw.export_version ?? 0),
+    lastExportedAt: raw.lastExportedAt ?? raw.last_exported_at ?? null,
+    lastExportedBy: raw.lastExportedBy ?? raw.last_exported_by ?? null,
+    lastExportFilename: raw.lastExportFilename ?? raw.last_export_filename ?? null,
     workflowMode: getWorkflowMode(raw),
     items: normalizedItems,
     createdAt: raw.createdAt ?? raw.created_at ?? null,
@@ -152,10 +218,9 @@ export function countReceivingByStatus(documents) {
 }
 
 export function resolveReceivingCompleteStatus(items) {
-  const normalized = (items || []).map(normalizeReceivingItem)
-  if (normalized.length === 0) return RECEIVING_STATUS.RECEIVED
-  const allMatch = normalized.every(
-    (item) => Number(item.receivedQty) === Number(item.orderedQty)
-  )
-  return allMatch ? RECEIVING_STATUS.RECEIVED : RECEIVING_STATUS.PARTIALLY_RECEIVED
+  // Completion describes the workflow state, not whether quantities matched.
+  // All discrepancies remain on item lines and the completed document is still
+  // fully received as a process.
+  void items
+  return RECEIVING_STATUS.RECEIVED
 }

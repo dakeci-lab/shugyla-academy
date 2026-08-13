@@ -1,54 +1,79 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useSession } from '../../context/SessionContext'
-import { canAcceptSimpleDelivery } from '../../config/permissions'
-import {
-  acceptSimpleDelivery,
-  unacceptSimpleDelivery,
-} from '../../services/receivingDataService'
-import { useAdminRefresh } from '../../hooks/useAdminRefresh'
 import { useWeekScheduleState } from '../../hooks/useWeekScheduleState'
 import { isSimpleWorkflow } from '../../utils/procurementWorkflow'
-import {
-  formatReceivingDate,
-  RECEIVING_STATUS,
-} from '../../utils/receivingData'
+import { RECEIVING_STATUS } from '../../utils/receivingData'
 import {
   countReceivingDocumentsByDate,
   filterReceivingDocuments,
-  RECEIVING_LIST_STATUS,
 } from '../../utils/receivingList'
-import { toUserErrorMessage } from '../../utils/userErrorMessage'
-import PlatformSearchToolbar from '../platform/PlatformSearchToolbar'
-import IconActionButton from '../admin/IconActionButton'
-import {
-  CheckCheckIcon,
-  EyeIcon,
-  FileTextIcon,
-  RotateCcwIcon,
-} from '../icons/PlatformIcons'
-import WeekScheduleNav from '../procurement/WeekScheduleNav'
 import { ReceivingStatusBadge } from './ReceivingStatsCards'
+import ReceivingMonthCalendar from './ReceivingMonthCalendar'
 import './UnifiedReceivingList.css'
 
-export default function UnifiedReceivingList({ documents = [] }) {
-  const { user } = useSession()
-  const { notifyChange } = useAdminRefresh()
-  const {
-    selectedDateKey,
-    setSelectedDateKey,
-    weekDates,
-    weekTitle,
-    todayKey,
-    changeWeek,
-    goToday,
-  } = useWeekScheduleState()
-  const [supplierQuery, setSupplierQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState(RECEIVING_LIST_STATUS.ALL)
-  const [updatingId, setUpdatingId] = useState(null)
-  const [actionError, setActionError] = useState('')
+function CalendarGlyph({ size = 19 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <rect x="3" y="5" width="18" height="16" rx="2" />
+      <path d="M16 3v4M8 3v4M3 10h18" />
+    </svg>
+  )
+}
 
-  const canAccept = canAcceptSimpleDelivery(user)
+function parseDateKey(value) {
+  const date = new Date(`${value}T12:00:00`)
+  return Number.isNaN(date.getTime()) ? new Date() : date
+}
+
+function formatSelectedDate(dateKey, todayKey) {
+  const label = new Intl.DateTimeFormat('ru-RU', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  }).format(parseDateKey(dateKey))
+  const capitalized = label.charAt(0).toLocaleUpperCase('ru-RU') + label.slice(1)
+  return dateKey === todayKey ? `Сегодня, ${capitalized.replace(/^\S+[,]?\s*/, '')}` : capitalized
+}
+
+function getDocumentActionLabel(status, canManage) {
+  if (!canManage) return 'Открыть'
+  if (status === RECEIVING_STATUS.AWAITING_RECEIVING || status === 'awaiting') {
+    return 'Принять'
+  }
+  if (status === RECEIVING_STATUS.IN_PROGRESS) return 'Продолжить'
+  return 'Открыть'
+}
+
+function formatSupplyCount(count) {
+  const modulo100 = Math.abs(count) % 100
+  const modulo10 = modulo100 % 10
+  if (modulo100 >= 11 && modulo100 <= 19) return `${count} поставок`
+  if (modulo10 === 1) return `${count} поставка`
+  if (modulo10 >= 2 && modulo10 <= 4) return `${count} поставки`
+  return `${count} поставок`
+}
+
+function formatMoney(value) {
+  return `${Number(value || 0).toLocaleString('ru-RU', {
+    maximumFractionDigits: 2,
+  })} ₸`
+}
+
+export default function UnifiedReceivingList({ documents = [], canManage = false }) {
+  const { selectedDateKey, setSelectedDateKey, todayKey } = useWeekScheduleState()
+  const [calendarOpen, setCalendarOpen] = useState(false)
+  const calendarButtonRef = useRef(null)
+
   const countsByDate = useMemo(
     () => countReceivingDocumentsByDate(documents),
     [documents]
@@ -57,96 +82,52 @@ export default function UnifiedReceivingList({ documents = [] }) {
     () =>
       filterReceivingDocuments(documents, {
         dateKey: selectedDateKey,
-        status: statusFilter,
-        supplierQuery,
       }),
-    [documents, selectedDateKey, statusFilter, supplierQuery]
+    [documents, selectedDateKey]
   )
-
-  async function handleLegacyStatus(document) {
-    if (!canAccept || !document?.id || updatingId) return
-
-    const isReceived = document.status === RECEIVING_STATUS.RECEIVED
-    setUpdatingId(document.id)
-    setActionError('')
-    try {
-      if (isReceived) {
-        await unacceptSimpleDelivery(document.id)
-      } else {
-        await acceptSimpleDelivery(document.id, user)
-      }
-      notifyChange()
-    } catch (error) {
-      setActionError(
-        toUserErrorMessage(error, 'Не удалось изменить статус поставки.')
-      )
-    } finally {
-      setUpdatingId(null)
-    }
-  }
+  const selectedDateCount = countsByDate[selectedDateKey] || 0
 
   return (
-    <section className="unified-receiving" aria-label="Ожидаемые поставки">
-      <WeekScheduleNav
-        weekTitle={weekTitle}
-        weekDates={weekDates}
-        selectedDateKey={selectedDateKey}
-        todayKey={todayKey}
-        countsByDate={countsByDate}
-        onPrevWeek={() => changeWeek(-1)}
-        onNextWeek={() => changeWeek(1)}
-        onToday={goToday}
-        onSelectDate={setSelectedDateKey}
-      />
-
-      <PlatformSearchToolbar
-        value={supplierQuery}
-        onChange={(event) => setSupplierQuery(event.target.value)}
-        onClear={() => setSupplierQuery('')}
-        showClear
-        placeholder="Поставщик…"
-        ariaLabel="Поиск поставщика"
-        actions={
-          <select
-            className="unified-receiving__status-filter"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value)}
-            aria-label="Статус поставки"
-            title="Статус поставки"
-          >
-            <option value={RECEIVING_LIST_STATUS.ALL}>Все</option>
-            <option value={RECEIVING_LIST_STATUS.OPEN}>Ожидают</option>
-            <option value={RECEIVING_LIST_STATUS.RECEIVED}>Приняты</option>
-            <option value={RECEIVING_LIST_STATUS.CANCELLED}>Отменены</option>
-          </select>
-        }
-      />
-
-      {actionError ? (
-        <p className="unified-receiving__error" role="alert">
-          {actionError}
-        </p>
-      ) : null}
+    <section className="unified-receiving" aria-label="Поставки">
+      <div className="unified-receiving__date-bar">
+        <div>
+          <span className="unified-receiving__date-label">Выбранная дата</span>
+          <strong className="unified-receiving__date-value">
+            {formatSelectedDate(selectedDateKey, todayKey)}
+          </strong>
+          <span className="unified-receiving__date-count">
+            {formatSupplyCount(selectedDateCount)}
+          </span>
+        </div>
+        <button
+          ref={calendarButtonRef}
+          type="button"
+          className="unified-receiving__calendar-button"
+          onClick={() => setCalendarOpen(true)}
+          aria-label="Открыть календарь поставок"
+          title="Календарь поставок"
+        >
+          <CalendarGlyph />
+          <span>Календарь</span>
+        </button>
+      </div>
 
       {visibleDocuments.length === 0 ? (
         <p className="unified-receiving__empty">Поставок нет.</p>
       ) : (
         <ul className="unified-receiving__list" role="list">
-          {visibleDocuments.map((document) => {
+          {visibleDocuments.map((document, index) => {
             const isLegacy = isSimpleWorkflow(document)
             const itemsCount = document.itemsCount ?? document.items?.length ?? 0
-            const isReceived = document.status === RECEIVING_STATUS.RECEIVED
-            const actionLabel = isReceived
-              ? `Вернуть в ожидание: ${document.supplierName || 'поставка'}`
-              : `Принять поставку: ${document.supplierName || 'поставка'}`
+            const actionLabel = getDocumentActionLabel(document.status, canManage)
 
             return (
               <li key={document.id}>
                 <article
                   className={`unified-receiving-card${isLegacy ? ' unified-receiving-card--legacy' : ''}`}
                 >
-                  <div className="unified-receiving-card__icon" aria-hidden="true">
-                    <FileTextIcon size={19} />
+                  <div className="unified-receiving-card__number" aria-hidden="true">
+                    {index + 1}
                   </div>
 
                   <div className="unified-receiving-card__content">
@@ -154,14 +135,13 @@ export default function UnifiedReceivingList({ documents = [] }) {
                       {document.supplierName || 'Поставщик'}
                     </strong>
                     <div className="unified-receiving-card__meta">
-                      <span>{formatReceivingDate(document.expectedDeliveryDate)}</span>
                       {isLegacy ? (
                         <span title="Старый документ без товарных позиций">Без состава</span>
                       ) : (
                         <span>{itemsCount} поз.</span>
                       )}
-                      {!isLegacy && Number(document.totalOrderedQty) > 0 ? (
-                        <span>{Number(document.totalOrderedQty)} шт.</span>
+                      {!isLegacy && Number(document.totalAmount) > 0 ? (
+                        <span>{formatMoney(document.totalAmount)}</span>
                       ) : null}
                     </div>
                   </div>
@@ -171,31 +151,13 @@ export default function UnifiedReceivingList({ documents = [] }) {
                   </div>
 
                   <div className="unified-receiving-card__actions">
-                    {isLegacy ? (
-                      canAccept && document.status !== RECEIVING_STATUS.CANCELLED ? (
-                        <IconActionButton
-                          label={actionLabel}
-                          variant={isReceived ? 'neutral' : 'primary'}
-                          disabled={updatingId === document.id}
-                          onClick={() => void handleLegacyStatus(document)}
-                        >
-                          {isReceived ? (
-                            <RotateCcwIcon size={18} />
-                          ) : (
-                            <CheckCheckIcon size={18} />
-                          )}
-                        </IconActionButton>
-                      ) : null
-                    ) : (
-                      <Link
-                        to={`/platform/receiving/${document.id}`}
-                        className="unified-receiving-card__open"
-                        aria-label={`Открыть поставку: ${document.supplierName || 'поставщик'}`}
-                        title="Открыть документ"
-                      >
-                        <EyeIcon size={18} />
-                      </Link>
-                    )}
+                    <Link
+                      to={`/platform/receiving/${document.id}`}
+                      className={`unified-receiving-card__open${actionLabel === 'Принять' ? ' is-primary' : ''}`}
+                      aria-label={`${actionLabel}: ${document.supplierName || 'поставщик'}`}
+                    >
+                      {actionLabel}
+                    </Link>
                   </div>
                 </article>
               </li>
@@ -203,6 +165,17 @@ export default function UnifiedReceivingList({ documents = [] }) {
           })}
         </ul>
       )}
+
+      {calendarOpen ? (
+        <ReceivingMonthCalendar
+          selectedDateKey={selectedDateKey}
+          todayKey={todayKey}
+          countsByDate={countsByDate}
+          onSelectDate={setSelectedDateKey}
+          onClose={() => setCalendarOpen(false)}
+          returnFocusRef={calendarButtonRef}
+        />
+      ) : null}
     </section>
   )
 }

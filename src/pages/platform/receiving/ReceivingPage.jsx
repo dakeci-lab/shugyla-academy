@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useSession } from '../../../context/SessionContext'
 import { usePlatformData } from '../../../context/PlatformDataContext'
-import { canViewReceivingDocuments } from '../../../config/permissions'
+import { canReceiveGoods, canViewReceivingDocuments } from '../../../config/permissions'
 import {
   getReceivingDataError,
   getReceivingDocumentsSync,
@@ -22,6 +22,7 @@ export default function ReceivingPage() {
   const { user } = useSession()
   const { ensureModules, version: dataVersion } = usePlatformData()
   const canView = canViewReceivingDocuments(user)
+  const canManage = canReceiveGoods(user)
 
   void dataVersion
 
@@ -50,7 +51,7 @@ export default function ReceivingPage() {
       ) : receivingLoading && !hasLoadedOnce.current ? (
         <DelayedLoadingSkeleton variant="cards" count={5} />
       ) : (
-        <UnifiedReceivingList documents={stableDocuments} />
+        <UnifiedReceivingList documents={stableDocuments} canManage={canManage} />
       )}
     </div>
   )

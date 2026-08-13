@@ -63,7 +63,7 @@ const MIGRATED = [
   ['src/pages/platform/PlatformNotificationsInbox.jsx', 'list'],
   ['src/pages/platform/procurement/ProcurementPage.jsx', 'list'],
   ['src/pages/platform/procurement/AnalyticsProcurementPage.jsx', 'table'],
-  ['src/components/procurement/SimpleReceivingWeekView.jsx', 'cards'],
+  ['src/pages/platform/receiving/ReceivingPage.jsx', 'cards'],
   ['src/pages/platform/suppliers/SuppliersPage.jsx', 'table'],
   ['src/components/admin/sections/TimeTrackerSection.jsx', 'cards'],
   ['src/components/admin/sections/TimeTrackerHomeCard.jsx', 'cards'],
@@ -82,7 +82,7 @@ const MIGRATED = [
 
 const FORBIDDEN_TEXT_BY_FILE = {
   'src/pages/platform/procurement/ProcurementPage.jsx': ['Загрузка закупов…'],
-  'src/components/procurement/SimpleReceivingWeekView.jsx': ['Загрузка приёмки…'],
+  'src/pages/platform/receiving/ReceivingPage.jsx': ['Загрузка приёмки…'],
   'src/components/admin/NotificationSettingsPanel.jsx': ['Загрузка настроек…'],
   'src/components/admin/AttendanceSettingsPanel.jsx': ['Загрузка настроек…'],
   'src/components/admin/roles/RolesListTab.jsx': ['Загрузка ролей…'],
@@ -151,12 +151,12 @@ function main() {
 
   console.log('Stage 4: Procurement / receiving refresh safety')
   const procurement = read('src/pages/platform/procurement/ProcurementPage.jsx')
-  const receiving = read('src/components/procurement/SimpleReceivingWeekView.jsx')
+  const receiving = read('src/pages/platform/receiving/ReceivingPage.jsx')
   const analytics = read('src/pages/platform/procurement/AnalyticsProcurementPage.jsx')
   assert('Procurement uses useStableWhenReady', procurement.includes('useStableWhenReady'))
   assert('Procurement initial skeleton gated', procurement.includes('showInitialSkeleton'))
   assert('Receiving uses useStableWhenReady', receiving.includes('useStableWhenReady'))
-  assert('Receiving initial skeleton gated', receiving.includes('showInitialSkeleton'))
+  assert('Receiving initial skeleton gated after first load', receiving.includes('hasLoadedOnce.current'))
   assert('Analytics uses useStableWhenReady', analytics.includes('useStableWhenReady'))
   assert(
     'Analytics does not wipe with purchasesLoading ? []',

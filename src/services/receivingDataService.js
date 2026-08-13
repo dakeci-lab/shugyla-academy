@@ -69,6 +69,14 @@ export async function loadReceivingDocuments() {
   return local.fetchReceivingDataLocal()
 }
 
+export async function startReceivingDocument(documentId, options = {}) {
+  const result = isCloudMode()
+    ? await cloud.startReceivingDocumentCloud(documentId, options)
+    : await local.startReceivingDocumentLocal(documentId, options)
+  await afterReceivingMutation()
+  return result
+}
+
 export async function transferFromPurchase(orderId, user) {
   const result = isCloudMode()
     ? await cloud.transferFromPurchaseCloud(orderId, user)
@@ -77,18 +85,33 @@ export async function transferFromPurchase(orderId, user) {
   return result
 }
 
-export async function saveReceivingDocument(documentId, items, user) {
+export async function saveReceivingDocument(documentId, items, user, options = {}) {
   const result = isCloudMode()
-    ? await cloud.saveReceivingDocumentCloud(documentId, items, user)
-    : await local.saveReceivingDocumentLocal(documentId, items, user)
+    ? await cloud.saveReceivingDocumentCloud(documentId, items, user, options)
+    : await local.saveReceivingDocumentLocal(documentId, items, user, options)
   await afterReceivingMutation()
   return result
 }
 
-export async function completeReceivingDocument(documentId, items, user) {
+/** Upload pending discrepancy photos and return items with durable references. */
+export async function uploadReceivingItemPhotos(documentId, items) {
+  return isCloudMode()
+    ? cloud.uploadReceivingItemPhotosCloud(documentId, items)
+    : local.uploadReceivingItemPhotosLocal(documentId, items)
+}
+
+export async function completeReceivingDocument(documentId, items, user, options = {}) {
   const result = isCloudMode()
-    ? await cloud.completeReceivingDocumentCloud(documentId, items, user)
-    : await local.completeReceivingDocumentLocal(documentId, items, user)
+    ? await cloud.completeReceivingDocumentCloud(documentId, items, user, options)
+    : await local.completeReceivingDocumentLocal(documentId, items, user, options)
+  await afterReceivingMutation()
+  return result
+}
+
+export async function recordReceivingUmagExport(documentId, metadata = {}) {
+  const result = isCloudMode()
+    ? await cloud.recordReceivingUmagExportCloud(documentId, metadata)
+    : await local.recordReceivingUmagExportLocal(documentId, metadata)
   await afterReceivingMutation()
   return result
 }

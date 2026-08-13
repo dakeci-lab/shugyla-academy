@@ -9,10 +9,12 @@ import {
   RECEIVING_ITEM_STATUS,
 } from '../utils/receivingData'
 import { PURCHASE_STATUS, PROCUREMENT_WORKFLOW_MODE } from '../utils/purchaseData'
+import { readReceivingPhotoAsDataUrl, validateReceivingPhotoFile } from './receivingPhotoUtils'
 
 const DOCUMENTS_KEY = 'shugyla_receiving_documents'
 const ITEMS_KEY = 'shugyla_receiving_items'
 const ORDERS_KEY = 'shugyla_purchase_orders'
+const EXPORTS_KEY = 'shugyla_receiving_umag_exports'
 
 function readDocuments() {
   const data = localStorage.getItem(DOCUMENTS_KEY)
@@ -39,6 +41,28 @@ function readPurchaseOrders() {
 
 function writePurchaseOrders(orders) {
   localStorage.setItem(ORDERS_KEY, JSON.stringify(orders))
+}
+
+function readExports() {
+  const data = localStorage.getItem(EXPORTS_KEY)
+  return data ? JSON.parse(data) : []
+}
+
+function writeExports(exports) {
+  localStorage.setItem(EXPORTS_KEY, JSON.stringify(exports))
+}
+
+function normalizeInvoiceNumbers(value) {
+  return Array.isArray(value)
+    ? value.map((item) => String(item || '').trim()).filter(Boolean)
+    : []
+}
+
+function assertExpectedVersion(document, expectedVersion) {
+  if (expectedVersion == null) return
+  if (Number(document.version ?? 1) !== Number(expectedVersion)) {
+    throw new Error('Приёмка была изменена другим сотрудником. Обновите страницу.')
+  }
 }
 
 function genId() {
@@ -120,10 +144,12 @@ export async function transferFromPurchaseLocal(orderId, user) {
       purchaseOrderItemId: item.id,
       productName: item.productName ?? item.product_name ?? '',
       barcode: item.barcode ?? '',
+      unit: item.unit ?? item.measure ?? '',
       orderedQty: item.orderQty ?? item.orderedQty ?? item.ordered_qty ?? 0,
       receivedQty: 0,
       differenceQty: calcDifferenceQty(0, item.orderQty ?? item.orderedQty ?? item.ordered_qty ?? 0),
       purchasePrice: item.purchasePrice ?? item.purchase_price ?? 0,
+      actualPurchasePrice: item.purchasePrice ?? item.purchase_price ?? 0,
       status: RECEIVING_ITEM_STATUS.PENDING,
       comment: item.comment ?? '',
       sortOrder: index,
@@ -416,10 +442,61 @@ export async function unacceptSimpleDeliveryLocal(documentId) {
   return getLocalReceivingDocumentById(documentId)
 }
 
-export async function saveReceivingDocumentLocal(documentId, items, user) {
+export async function startReceivingDocumentLocal(documentId, { expectedVersion = null } = {}) {
   const documents = readDocuments()
   const docIdx = documents.findIndex((doc) => doc.id === documentId)
   if (docIdx < 0) throw new Error('Документ приёмки не найден')
+
+  const doc = documents[docIdx]
+  assertExpectedVersion(doc, expectedVersion)
+  if (doc.status === RECEIVING_STATUS.CANCELLED) {
+    throw new Error('Отменённую приёмку начать нельзя')
+  }
+  if (doc.status !== RECEIVING_STATUS.AWAITING_RECEIVING && doc.status !== 'awaiting') {
+    return getLocalReceivingDocumentById(documentId)
+  }
+
+  const now = new Date().toISOString()
+  const allItems = readItems()
+  const nextItems = allItems.map((raw) => {
+    if ((raw.receivingDocumentId ?? raw.receiving_document_id) !== documentId) return raw
+    const item = normalizeReceivingItem(raw)
+    return normalizeReceivingItem({
+      ...item,
+      receivedQty: item.orderedQty,
+      actualPurchasePrice: item.orderedPurchasePrice,
+      differenceQty: 0,
+      status: RECEIVING_ITEM_STATUS.RECEIVED,
+      updated_at: now,
+    })
+  })
+  writeItems(nextItems)
+
+  const documentItems = nextItems
+    .filter((item) => (item.receivingDocumentId ?? item.receiving_document_id) === documentId)
+    .map(normalizeReceivingItem)
+  const totals = calcReceivingTotals(documentItems)
+  documents[docIdx] = {
+    ...doc,
+    status: RECEIVING_STATUS.IN_PROGRESS,
+    startedAt: doc.startedAt ?? doc.started_at ?? now,
+    started_at: doc.startedAt ?? doc.started_at ?? now,
+    totalOrderedQty: totals.totalOrderedQty,
+    totalReceivedQty: totals.totalReceivedQty,
+    totalDifferenceQty: totals.totalDifferenceQty,
+    totalReceivedAmount: totals.totalReceivedAmount,
+    version: Number(doc.version ?? 1) + 1,
+    updated_at: now,
+  }
+  writeDocuments(documents)
+  return getLocalReceivingDocumentById(documentId)
+}
+
+export async function saveReceivingDocumentLocal(documentId, items, user, options = {}) {
+  const documents = readDocuments()
+  const docIdx = documents.findIndex((doc) => doc.id === documentId)
+  if (docIdx < 0) throw new Error('Документ приёмки не найден')
+  assertExpectedVersion(documents[docIdx], options.expectedVersion)
 
   const normalizedItems = (items || []).map(normalizeReceivingItem)
   const totals = calcReceivingTotals(normalizedItems)
@@ -442,22 +519,22 @@ export async function saveReceivingDocumentLocal(documentId, items, user) {
   allItems.push(...updatedItems)
   writeItems(allItems)
 
-  let nextStatus = documents[docIdx].status
-  if (
-    nextStatus === RECEIVING_STATUS.AWAITING_RECEIVING ||
-    nextStatus === 'awaiting'
-  ) {
-    if (totals.totalReceivedQty > 0) {
-      nextStatus = RECEIVING_STATUS.IN_PROGRESS
-    }
-  }
-
   documents[docIdx] = {
     ...documents[docIdx],
-    status: nextStatus,
+    status: RECEIVING_STATUS.IN_PROGRESS,
     totalOrderedQty: totals.totalOrderedQty,
     totalReceivedQty: totals.totalReceivedQty,
     totalDifferenceQty: totals.totalDifferenceQty,
+    totalReceivedAmount: totals.totalReceivedAmount,
+    supplierInvoiceNumbers: normalizeInvoiceNumbers(
+      options.invoiceNumbers ?? options.supplierInvoiceNumbers ?? options.supplier_invoice_numbers ??
+      documents[docIdx].supplierInvoiceNumbers ?? documents[docIdx].supplier_invoice_numbers
+    ),
+    startedAt: documents[docIdx].startedAt ?? documents[docIdx].started_at ?? now,
+    started_at: documents[docIdx].startedAt ?? documents[docIdx].started_at ?? now,
+    completedAt: null,
+    completed_at: null,
+    version: Number(documents[docIdx].version ?? 1) + 1,
     receivedBy: user?.login || user?.id || documents[docIdx].receivedBy || null,
     receivedByName: user?.name || documents[docIdx].receivedByName || null,
     updated_at: now,
@@ -467,10 +544,51 @@ export async function saveReceivingDocumentLocal(documentId, items, user) {
   return getLocalReceivingDocumentById(documentId)
 }
 
-export async function completeReceivingDocumentLocal(documentId, items, user) {
+export async function uploadReceivingItemPhotosLocal(documentId, items) {
+  void documentId
+  const result = []
+
+  for (const item of items || []) {
+    const pendingFiles = Array.from(item.pendingPhotoFiles || [])
+    if (pendingFiles.length === 0) {
+      result.push(item)
+      continue
+    }
+
+    const existingPhotos = item.photoPaths ?? item.photoUrls ?? item.photo_urls ?? []
+    const existingMetadata = item.photoMetadata ?? item.photo_metadata ?? []
+    const nextPhotos = [...existingPhotos]
+    const nextMetadata = [...existingMetadata]
+
+    for (const file of pendingFiles) {
+      const { contentType, size } = validateReceivingPhotoFile(file)
+      const dataUrl = await readReceivingPhotoAsDataUrl(file)
+      nextPhotos.push(dataUrl)
+      nextMetadata.push({
+        fileName: file.name || null,
+        contentType,
+        size,
+        storedLocally: true,
+      })
+    }
+
+    result.push({
+      ...item,
+      photoPaths: nextPhotos,
+      photoUrls: nextPhotos,
+      photoMetadata: nextMetadata,
+      pendingPhotoFiles: [],
+    })
+  }
+
+  return result
+}
+
+export async function completeReceivingDocumentLocal(documentId, items, user, options = {}) {
   const documents = readDocuments()
   const docIdx = documents.findIndex((doc) => doc.id === documentId)
   if (docIdx < 0) throw new Error('Документ приёмки не найден')
+  assertExpectedVersion(documents[docIdx], options.expectedVersion)
 
   const normalizedItems = (items || []).map(normalizeReceivingItem)
   const totals = calcReceivingTotals(normalizedItems)
@@ -508,6 +626,16 @@ export async function completeReceivingDocumentLocal(documentId, items, user) {
     totalOrderedQty: totals.totalOrderedQty,
     totalReceivedQty: totals.totalReceivedQty,
     totalDifferenceQty: totals.totalDifferenceQty,
+    totalReceivedAmount: totals.totalReceivedAmount,
+    supplierInvoiceNumbers: normalizeInvoiceNumbers(
+      options.invoiceNumbers ?? options.supplierInvoiceNumbers ?? options.supplier_invoice_numbers ??
+      doc.supplierInvoiceNumbers ?? doc.supplier_invoice_numbers
+    ),
+    startedAt: doc.startedAt ?? doc.started_at ?? now,
+    started_at: doc.startedAt ?? doc.started_at ?? now,
+    completedAt: now,
+    completed_at: now,
+    version: Number(doc.version ?? 1) + 1,
     receivedBy: user?.login || user?.id || doc.receivedBy || null,
     receivedByName: user?.name || doc.receivedByName || null,
     updated_at: now,
@@ -519,13 +647,9 @@ export async function completeReceivingDocumentLocal(documentId, items, user) {
     const purchases = readPurchaseOrders()
     const orderIdx = purchases.findIndex((o) => o.id === purchaseOrderId)
     if (orderIdx >= 0) {
-      const purchaseStatus =
-        finalStatus === RECEIVING_STATUS.RECEIVED
-          ? PURCHASE_STATUS.RECEIVED
-          : PURCHASE_STATUS.PARTIALLY_RECEIVED
       purchases[orderIdx] = {
         ...purchases[orderIdx],
-        status: purchaseStatus,
+        status: PURCHASE_STATUS.RECEIVED,
         updated_at: now,
       }
       writePurchaseOrders(purchases)
@@ -533,4 +657,54 @@ export async function completeReceivingDocumentLocal(documentId, items, user) {
   }
 
   return getLocalReceivingDocumentById(documentId)
+}
+
+export async function recordReceivingUmagExportLocal(documentId, metadata = {}) {
+  const documents = readDocuments()
+  const docIdx = documents.findIndex((doc) => doc.id === documentId)
+  if (docIdx < 0) throw new Error('Документ приёмки не найден')
+  const doc = normalizeReceivingDocument(documents[docIdx])
+  assertExpectedVersion(doc, metadata.expectedVersion)
+  if (
+    metadata.expectedExportVersion != null &&
+    Number(metadata.expectedExportVersion) !== Number(doc.exportVersion || 0)
+  ) {
+    throw new Error('История выгрузки была изменена. Сформируйте файл заново.')
+  }
+  if (doc.status !== RECEIVING_STATUS.RECEIVED || !doc.completedAt) {
+    throw new Error('Выгрузка доступна только для завершённой приёмки')
+  }
+  if (!String(metadata.fileName || '').trim()) throw new Error('Не указано имя файла выгрузки')
+  if (Number(metadata.rowCount || 0) <= 0) throw new Error('В приёмке нет строк для выгрузки в UMAG')
+
+  const now = new Date().toISOString()
+  const exportVersion = Number(doc.exportVersion || 0) + 1
+  const entry = {
+    id: genId(),
+    receivingDocumentId: documentId,
+    documentVersion: doc.version,
+    exportVersion,
+    fileName: String(metadata.fileName).trim(),
+    rowCount: Number(metadata.rowCount || 0),
+    totalQuantity: Number(metadata.totalQuantity || 0),
+    totalAmount: Number(metadata.totalAmount || 0),
+    umagComment: metadata.umagComment || '',
+    generatedAt: now,
+  }
+  const exports = readExports()
+  exports.push(entry)
+  writeExports(exports)
+
+  documents[docIdx] = {
+    ...documents[docIdx],
+    exportVersion,
+    export_version: exportVersion,
+    lastExportedAt: now,
+    last_exported_at: now,
+    lastExportFilename: entry.fileName,
+    last_export_filename: entry.fileName,
+    updated_at: now,
+  }
+  writeDocuments(documents)
+  return entry
 }

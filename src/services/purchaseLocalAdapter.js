@@ -46,6 +46,7 @@ function seedIfEmpty() {
       id: genId(),
       productName: 'Молоко 3.2% 1л',
       barcode: '4870201234567',
+      unit: 'шт.',
       stock: 24,
       salesPerDay: 8.5,
       recommendation: 40,
@@ -57,6 +58,7 @@ function seedIfEmpty() {
       id: genId(),
       productName: 'Кефир 1% 900мл',
       barcode: '4870201234568',
+      unit: 'шт.',
       stock: 12,
       salesPerDay: 5.2,
       recommendation: 25,
@@ -68,6 +70,7 @@ function seedIfEmpty() {
       id: genId(),
       productName: 'Сметана 20% 400г',
       barcode: '4870201234569',
+      unit: 'шт.',
       stock: 8,
       salesPerDay: 3.1,
       recommendation: 18,
@@ -82,6 +85,7 @@ function seedIfEmpty() {
       id: genId(),
       productName: 'Рис круглый 1кг',
       barcode: '4870202234567',
+      unit: 'шт.',
       stock: 45,
       salesPerDay: 2.1,
       recommendation: 10,
@@ -93,6 +97,7 @@ function seedIfEmpty() {
       id: genId(),
       productName: 'Гречка 900г',
       barcode: '4870202234568',
+      unit: 'шт.',
       stock: 30,
       salesPerDay: 1.8,
       recommendation: 8,
@@ -413,4 +418,3 @@ export async function deletePurchaseOrderItem(orderId, itemId) {
 
   await updatePurchaseOrder(orderId, { items })
 }
-

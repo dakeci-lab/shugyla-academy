@@ -4,7 +4,6 @@ import {
   normalizeReceivingItem,
   calcReceivingTotals,
   calcDifferenceQty,
-  resolveReceivingCompleteStatus,
   isReceivingStarted,
   RECEIVING_STATUS,
   RECEIVING_ITEM_STATUS,
@@ -17,6 +16,13 @@ import {
 } from '../utils/chunkArray'
 import { throwUserError, toUserErrorMessage } from '../utils/userErrorMessage'
 import { fetchOrderById } from './purchaseSupabaseAdapter'
+import {
+  buildReceivingPhotoPath,
+  normalizeReceivingPhotoStoragePaths,
+  RECEIVING_PHOTO_BUCKET,
+  RECEIVING_PHOTO_SIGNED_URL_TTL_SECONDS,
+  validateReceivingPhotoFile,
+} from './receivingPhotoUtils'
 
 function throwIfError(result, context, fallback = 'Не удалось сохранить данные.') {
   return throwUserError(result, context, fallback)
@@ -33,20 +39,29 @@ function rowToItem(row) {
     purchase_order_item_id: row.purchase_order_item_id,
     product_name: row.product_name,
     barcode: row.barcode,
+    unit: row.unit,
     ordered_qty: row.ordered_qty,
     received_qty: row.received_qty,
     difference_qty: row.difference_qty,
     purchase_price: row.purchase_price,
+    actual_purchase_price: row.actual_purchase_price,
+    is_outside_order: row.is_outside_order,
+    discrepancy_reason: row.discrepancy_reason,
+    discrepancy_reason_code: row.discrepancy_reason_code,
+    photo_paths: row.photo_urls,
+    photo_metadata: row.photo_metadata,
     status: row.status,
     comment: row.comment,
+    sort_order: row.sort_order,
     created_at: row.created_at,
     updated_at: row.updated_at,
   })
 }
 
 function itemToRow(item, documentId) {
-  const orderedQty = item.orderedQty ?? item.ordered_qty ?? 0
-  const receivedQty = item.receivedQty ?? item.received_qty ?? 0
+  const normalized = normalizeReceivingItem(item)
+  const orderedQty = normalized.orderedQty
+  const receivedQty = normalized.receivedQty
   const now = new Date().toISOString()
 
   const row = {
@@ -55,12 +70,26 @@ function itemToRow(item, documentId) {
     purchase_order_item_id: item.purchaseOrderItemId ?? item.purchase_order_item_id ?? null,
     product_name: item.productName ?? item.product_name ?? '',
     barcode: item.barcode ?? '',
+    unit: item.unit ?? item.measure ?? '',
     ordered_qty: orderedQty,
     received_qty: receivedQty,
     difference_qty: calcDifferenceQty(receivedQty, orderedQty),
     purchase_price: item.purchasePrice ?? item.purchase_price ?? 0,
+    actual_purchase_price:
+      item.actualPurchasePrice ??
+      item.actual_purchase_price ??
+      item.purchasePrice ??
+      item.purchase_price ??
+      0,
+    is_outside_order: Boolean(item.isOutsideOrder ?? item.is_outside_order),
+    discrepancy_reason: item.discrepancyReason ?? item.discrepancy_reason ?? null,
+    discrepancy_reason_code:
+      item.discrepancyReasonCode ?? item.discrepancy_reason_code ?? null,
+    photo_urls: normalizeReceivingPhotoStoragePaths(normalized.photoPaths),
+    photo_metadata: item.photoMetadata ?? item.photo_metadata ?? [],
     status: item.status ?? RECEIVING_ITEM_STATUS.PENDING,
     comment: item.comment ?? '',
+    sort_order: item.sortOrder ?? item.sort_order ?? 0,
     updated_at: now,
   }
 
@@ -84,11 +113,20 @@ function rowToDocument(row, items = []) {
       created_by_name: row.created_by_name,
       received_by: row.received_by,
       received_by_name: row.received_by_name,
+      supplier_invoice_numbers: row.supplier_invoice_numbers,
       comment: row.comment,
       total_ordered_qty: row.total_ordered_qty,
       total_received_qty: row.total_received_qty,
       total_difference_qty: row.total_difference_qty,
       total_amount: row.total_amount,
+      total_received_amount: row.total_received_amount,
+      version: row.version,
+      started_at: row.started_at,
+      completed_at: row.completed_at,
+      export_version: row.export_version,
+      last_exported_at: row.last_exported_at,
+      last_exported_by: row.last_exported_by,
+      last_export_filename: row.last_export_filename,
       workflow_mode: row.workflow_mode,
       created_at: row.created_at,
       updated_at: row.updated_at,
@@ -108,11 +146,15 @@ function documentToRow(doc, extras = {}) {
     created_by_name: doc.createdByName ?? doc.created_by_name ?? null,
     received_by: doc.receivedBy ?? doc.received_by ?? null,
     received_by_name: doc.receivedByName ?? doc.received_by_name ?? null,
+    supplier_invoice_numbers:
+      doc.supplierInvoiceNumbers ?? doc.supplier_invoice_numbers ?? [],
     comment: (doc.comment ?? '').trim(),
     total_ordered_qty: doc.totalOrderedQty ?? doc.total_ordered_qty ?? 0,
     total_received_qty: doc.totalReceivedQty ?? doc.total_received_qty ?? 0,
     total_difference_qty: doc.totalDifferenceQty ?? doc.total_difference_qty ?? 0,
     total_amount: doc.totalAmount ?? doc.total_amount ?? 0,
+    total_received_amount:
+      doc.totalReceivedAmount ?? doc.total_received_amount ?? 0,
     workflow_mode: doc.workflowMode ?? PROCUREMENT_WORKFLOW_MODE.ANALYTICS,
   }
 
@@ -123,7 +165,7 @@ function documentToRow(doc, extras = {}) {
   return row
 }
 
-async function fetchDocumentById(documentId) {
+async function fetchDocumentById(documentId, { attachPhotoUrls = true } = {}) {
   ensureClient()
 
   const docResult = await supabase
@@ -142,8 +184,30 @@ async function fetchDocumentById(documentId) {
     .order('created_at', { ascending: true })
 
   const items = await throwIfError(itemsResult, 'Загрузка позиций приёмки')
+  const normalizedItems = (items || []).map(rowToItem)
+  const paths = [...new Set(normalizedItems.flatMap((item) => item.photoPaths || []).filter(Boolean))]
+  let signedUrlsByPath = new Map()
 
-  return rowToDocument(docRow, items || [])
+  if (attachPhotoUrls && paths.length > 0) {
+    const signedResult = await supabase.storage
+      .from(RECEIVING_PHOTO_BUCKET)
+      .createSignedUrls(paths, RECEIVING_PHOTO_SIGNED_URL_TTL_SECONDS)
+    const signedRows = await throwIfError(signedResult, 'Загрузка фотографий расхождений')
+    signedUrlsByPath = new Map(
+      (signedRows || [])
+        .filter((row) => row?.path && row?.signedUrl)
+        .map((row) => [row.path, row.signedUrl])
+    )
+  }
+
+  const document = rowToDocument(docRow, items || [])
+  return {
+    ...document,
+    items: document.items.map((item) => ({
+      ...item,
+      photoUrls: (item.photoPaths || []).map((path) => signedUrlsByPath.get(path)).filter(Boolean),
+    })),
+  }
 }
 
 export async function fetchReceivingDataCloud() {
@@ -245,10 +309,12 @@ export async function transferFromPurchaseCloud(orderId, user) {
           purchaseOrderItemId: item.id,
           productName: item.productName,
           barcode: item.barcode,
+          unit: item.unit,
           orderedQty: item.orderQty,
           receivedQty: 0,
           differenceQty: calcDifferenceQty(0, item.orderQty),
           purchasePrice: item.purchasePrice,
+          actualPurchasePrice: item.purchasePrice,
           status: RECEIVING_ITEM_STATUS.PENDING,
           comment: item.comment,
           created_at: now,
@@ -311,108 +377,165 @@ async function syncReceivingItems(documentId, items) {
   }
 }
 
-export async function saveReceivingDocumentCloud(documentId, items, user) {
-  ensureClient()
-
-  const current = await fetchDocumentById(documentId)
-  if (!current) throw new Error('Документ приёмки не найден')
-
-  const normalizedItems = (items || []).map(normalizeReceivingItem)
-  const totals = calcReceivingTotals(normalizedItems)
-  const now = new Date().toISOString()
-
-  let nextStatus = current.status
-  if (
-    nextStatus === RECEIVING_STATUS.AWAITING_RECEIVING ||
-    nextStatus === 'awaiting'
-  ) {
-    if (totals.totalReceivedQty > 0) {
-      nextStatus = RECEIVING_STATUS.IN_PROGRESS
-    }
+function itemToRpcPayload(item) {
+  const normalized = normalizeReceivingItem(item)
+  return {
+    id: normalized.id || null,
+    received_qty: normalized.receivedQty,
+    actual_purchase_price: normalized.actualPurchasePrice,
+    barcode: normalized.barcode,
+    discrepancy_reason_code: normalized.discrepancyReasonCode,
+    discrepancy_reason: normalized.discrepancyReason,
+    comment: normalized.comment,
+    photo_urls: normalizeReceivingPhotoStoragePaths(normalized.photoPaths),
+    photo_metadata: normalized.photoMetadata,
+    sort_order: normalized.sortOrder,
   }
+}
 
-  await syncReceivingItems(documentId, normalizedItems)
+export async function uploadReceivingItemPhotosCloud(documentId, items) {
+  ensureClient()
+  const uploadedPaths = []
 
-  await throwIfError(
-    await supabase
-      .from('receiving_documents')
-      .update({
-        status: nextStatus,
-        total_ordered_qty: totals.totalOrderedQty,
-        total_received_qty: totals.totalReceivedQty,
-        total_difference_qty: totals.totalDifferenceQty,
-        received_by: user?.login || user?.id || current.receivedBy || null,
-        received_by_name: user?.name || current.receivedByName || null,
-        updated_at: now,
+  try {
+    const result = []
+    for (const item of items || []) {
+      const pendingFiles = Array.from(item.pendingPhotoFiles || [])
+      if (pendingFiles.length === 0) {
+        result.push(item)
+        continue
+      }
+
+      const itemId = item.id || crypto.randomUUID()
+      const existingPaths = normalizeReceivingPhotoStoragePaths(
+        item.photoPaths ?? item.photo_paths ?? []
+      )
+      const existingMetadata = item.photoMetadata ?? item.photo_metadata ?? []
+      const nextPaths = [...existingPaths]
+      const nextMetadata = [...existingMetadata]
+
+      for (const file of pendingFiles) {
+        const { extension, contentType, size } = validateReceivingPhotoFile(file)
+        const path = buildReceivingPhotoPath(documentId, itemId, extension)
+        const uploadResult = await supabase.storage
+          .from(RECEIVING_PHOTO_BUCKET)
+          .upload(path, file, { contentType, upsert: false })
+        await throwIfError(uploadResult, `Загрузка фото «${file.name || 'без имени'}»`)
+        uploadedPaths.push(path)
+        nextPaths.push(path)
+        nextMetadata.push({
+          path,
+          fileName: file.name || null,
+          contentType,
+          size,
+          uploadedAt: new Date().toISOString(),
+        })
+      }
+
+      result.push({
+        ...item,
+        id: itemId,
+        photoPaths: nextPaths,
+        photoUrls: nextPaths,
+        photoMetadata: nextMetadata,
+        pendingPhotoFiles: [],
       })
-      .eq('id', documentId),
-    'Сохранение документа приёмки'
-  )
+    }
+    return result
+  } catch (error) {
+    if (uploadedPaths.length > 0) {
+      await supabase.storage.from(RECEIVING_PHOTO_BUCKET).remove(uploadedPaths).catch(() => {})
+    }
+    throw error
+  }
+}
 
+async function mutateReceivingViaRpc({
+  rpcName,
+  documentId,
+  items,
+  current,
+  options = {},
+}) {
+  const expectedVersion = options.expectedVersion ?? current.version ?? null
+  const invoiceNumbers =
+    options.invoiceNumbers ??
+    options.supplierInvoiceNumbers ??
+    options.supplier_invoice_numbers ??
+    current.supplierInvoiceNumbers ??
+    []
+  await throwIfError(
+    await supabase.rpc(rpcName, {
+      p_document_id: documentId,
+      p_expected_version: expectedVersion,
+      p_invoice_numbers: invoiceNumbers,
+      p_items: (items || []).map(itemToRpcPayload),
+    }),
+    rpcName === 'receiving_complete_v1' ? 'Завершение документа приёмки' : 'Сохранение документа приёмки'
+  )
   return fetchDocumentById(documentId)
 }
 
-export async function completeReceivingDocumentCloud(documentId, items, user) {
+export async function startReceivingDocumentCloud(documentId, { expectedVersion = null } = {}) {
   ensureClient()
+  await throwIfError(
+    await supabase.rpc('receiving_start_v1', {
+      p_document_id: documentId,
+      p_expected_version: expectedVersion,
+    }),
+    'Начало приёмки'
+  )
+  return fetchDocumentById(documentId)
+}
 
-  const current = await fetchDocumentById(documentId)
+export async function saveReceivingDocumentCloud(documentId, items, user, options = {}) {
+  ensureClient()
+  void user
+
+  const current = await fetchDocumentById(documentId, { attachPhotoUrls: false })
+  if (!current) throw new Error('Документ приёмки не найден')
+  return mutateReceivingViaRpc({
+    rpcName: 'receiving_save_v1',
+    documentId,
+    items,
+    current,
+    options,
+  })
+}
+
+export async function completeReceivingDocumentCloud(documentId, items, user, options = {}) {
+  ensureClient()
+  void user
+
+  const current = await fetchDocumentById(documentId, { attachPhotoUrls: false })
+  if (!current) throw new Error('Документ приёмки не найден')
+  return mutateReceivingViaRpc({
+    rpcName: 'receiving_complete_v1',
+    documentId,
+    items,
+    current,
+    options,
+  })
+}
+
+export async function recordReceivingUmagExportCloud(documentId, metadata = {}) {
+  ensureClient()
+  const current = await fetchDocumentById(documentId, { attachPhotoUrls: false })
   if (!current) throw new Error('Документ приёмки не найден')
 
-  const normalizedItems = (items || []).map((item) => {
-    const received = Number(item.receivedQty)
-    const ordered = Number(item.orderedQty)
-    let itemStatus = RECEIVING_ITEM_STATUS.PENDING
-    if (received === ordered) itemStatus = RECEIVING_ITEM_STATUS.RECEIVED
-    else if (received > 0) itemStatus = RECEIVING_ITEM_STATUS.PARTIAL
-
-    return normalizeReceivingItem({
-      ...item,
-      status: itemStatus,
-      differenceQty: calcDifferenceQty(received, ordered),
-    })
-  })
-
-  const totals = calcReceivingTotals(normalizedItems)
-  const finalStatus = resolveReceivingCompleteStatus(normalizedItems)
-  const now = new Date().toISOString()
-
-  await syncReceivingItems(documentId, normalizedItems)
-
-  await throwIfError(
-    await supabase
-      .from('receiving_documents')
-      .update({
-        status: finalStatus,
-        total_ordered_qty: totals.totalOrderedQty,
-        total_received_qty: totals.totalReceivedQty,
-        total_difference_qty: totals.totalDifferenceQty,
-        received_by: user?.login || user?.id || current.receivedBy || null,
-        received_by_name: user?.name || current.receivedByName || null,
-        updated_at: now,
-      })
-      .eq('id', documentId),
-    'Завершение документа приёмки'
+  return throwIfError(
+    await supabase.rpc('receiving_record_umag_export_v1', {
+      p_document_id: documentId,
+      p_expected_version: metadata.expectedVersion ?? current.version,
+      p_expected_export_version: metadata.expectedExportVersion ?? current.exportVersion,
+      p_file_name: metadata.fileName,
+      p_row_count: metadata.rowCount ?? 0,
+      p_total_quantity: metadata.totalQuantity ?? 0,
+      p_total_amount: metadata.totalAmount ?? 0,
+      p_umag_comment: metadata.umagComment ?? '',
+    }),
+    'Сохранение истории выгрузки UMAG'
   )
-
-  if (current.purchaseOrderId) {
-    const purchaseStatus =
-      finalStatus === RECEIVING_STATUS.RECEIVED
-        ? PURCHASE_STATUS.RECEIVED
-        : PURCHASE_STATUS.PARTIALLY_RECEIVED
-
-    await throwIfError(
-      await supabase
-        .from('purchase_orders')
-        .update({
-          status: purchaseStatus,
-          updated_at: now,
-        })
-        .eq('id', current.purchaseOrderId),
-      'Обновление связанного закупа'
-    )
-  }
-
-  return fetchDocumentById(documentId)
 }
 
 export async function syncSimpleReceivingDocumentCloud(document, order) {

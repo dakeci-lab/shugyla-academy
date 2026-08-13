@@ -62,8 +62,23 @@ function stageFilterModal() {
   assert('no 100vw popover width', !popoverCss.includes('100vw'))
 }
 
+function stageReceivingMonthCalendar() {
+  console.log('Stage 3: Compact receiving month calendar')
+
+  const list = read('src/components/receiving/UnifiedReceivingList.jsx')
+  const calendar = read('src/components/receiving/ReceivingMonthCalendar.jsx')
+  const css = read('src/components/receiving/UnifiedReceivingList.css')
+
+  assert('receiving no longer renders permanent week navigation', !list.includes('WeekScheduleNav'))
+  assert('receiving no longer renders supplier search', !list.includes('PlatformSearchToolbar'))
+  assert('receiving opens a dedicated month modal', list.includes('ReceivingMonthCalendar') && calendar.includes('AdminModal'))
+  assert('month grid has seven equal columns', /receiving-calendar__grid[\s\S]*grid-template-columns:\s*repeat\(7/.test(css))
+  assert('calendar counts are rendered per date', calendar.includes('countsByDate[dateKey]'))
+  assert('calendar focus returns to trigger', calendar.includes('returnFocusRef={returnFocusRef}'))
+}
+
 function stageBackdropAndToolbar() {
-  console.log('Stage 3: Backdrop and toolbar')
+  console.log('Stage 4: Backdrop and toolbar')
 
   const indexCss = read('src/index.css')
   const adminModalCss = read('src/components/admin/AdminModal.css')
@@ -100,7 +115,7 @@ function stageBackdropAndToolbar() {
 }
 
 function stageScrollLock() {
-  console.log('Stage 4: Scroll lock')
+  console.log('Stage 5: Scroll lock')
 
   const adminModal = read('src/components/admin/AdminModal.jsx')
   assert('admin modal scroll lock', adminModal.includes('lockModalScroll'))
@@ -111,6 +126,7 @@ function main() {
   console.log('=== Procurement calendar & filter verification ===\n')
   stageWeekGrid()
   stageFilterModal()
+  stageReceivingMonthCalendar()
   stageBackdropAndToolbar()
   stageScrollLock()
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
