@@ -48,6 +48,7 @@ export const PROCUREMENT_PLANNING_ERROR_CODES = {
   SNAPSHOT_NOT_READY: 'SNAPSHOT_NOT_READY',
   SNAPSHOT_NOT_FOUND: 'SNAPSHOT_NOT_FOUND',
   GENERATE_FAILED: 'GENERATE_FAILED',
+  ATTEMPT_CONFLICT: 'ATTEMPT_CONFLICT',
   SYNC_FAILED: 'SYNC_FAILED',
   UNKNOWN: 'UNKNOWN',
 }
@@ -70,6 +71,8 @@ const USER_MESSAGES = {
   [PROCUREMENT_PLANNING_ERROR_CODES.SNAPSHOT_NOT_FOUND]: 'Снимок не найден.',
   [PROCUREMENT_PLANNING_ERROR_CODES.GENERATE_FAILED]:
     'Не удалось сформировать заказы. Повторите попытку.',
+  [PROCUREMENT_PLANNING_ERROR_CODES.ATTEMPT_CONFLICT]:
+    'Эта попытка уже использовалась с другим составом заказа. Создайте новую попытку.',
   [PROCUREMENT_PLANNING_ERROR_CODES.SYNC_FAILED]:
     'Не удалось синхронизировать остатки и продажи.',
   [PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN]:
@@ -174,6 +177,161 @@ function normalizeItem(row) {
   }
 }
 
+const COUNTED_ORDER_STATUSES = new Set([
+  'draft',
+  'formed',
+  'sent',
+  'awaiting_receiving',
+  'partially_received',
+  'received',
+])
+
+function normalizeHistoryRow(row) {
+  const order = row.purchase_orders || {}
+  const status = order.status || ''
+  return {
+    id: row.id,
+    purchaseOrderId: row.purchase_order_id || order.id,
+    barcode: row.barcode || '',
+    productName: row.product_name || '',
+    orderedQty: finiteNumber(row.ordered_qty, 0),
+    purchasePrice: finiteNumber(row.purchase_price, 0),
+    totalAmount: finiteNumber(row.total_amount, 0),
+    createdAt: row.created_at,
+    status,
+    supplierId: order.supplier_id || null,
+    supplierName: order.supplier_name || '',
+    attemptKey: order.attempt_key || null,
+    expectedDeliveryDate: order.expected_delivery_date || null,
+    countsAsOrdered: COUNTED_ORDER_STATUSES.has(status),
+  }
+}
+
+/**
+ * Order journal for one SKU inside a snapshot.
+ * Cancelled rows are returned with countsAsOrdered=false so the UI can show
+ * history separately from "already ordered" totals.
+ */
+export async function fetchSnapshotSkuOrderHistory(snapshotId, barcode) {
+  ensureClient()
+  if (!snapshotId || !barcode) return []
+
+  const { data, error } = await supabase
+    .from('purchase_order_items')
+    .select(
+      [
+        'id, purchase_order_id, barcode, product_name, ordered_qty, purchase_price, total_amount, created_at',
+        'purchase_orders!inner(id, status, supplier_id, supplier_name, workflow_mode, source_snapshot_id, attempt_key, expected_delivery_date)',
+      ].join(', ')
+    )
+    .eq('barcode', barcode)
+    .eq('purchase_orders.source_snapshot_id', snapshotId)
+    .eq('purchase_orders.workflow_mode', 'analytics')
+    .order('created_at', { ascending: false })
+
+  if (error) throw new Error(error.message || 'Не удалось загрузить историю заказов')
+  return (data || []).map(normalizeHistoryRow)
+}
+
+/**
+ * Fold purchase_order_items rows into per-barcode { qty, documents }.
+ * Cancelled (and any status outside COUNTED_ORDER_STATUSES) are ignored.
+ */
+export function foldCountedSkuOrderAggregates(rows) {
+  const totals = new Map()
+  for (const row of rows || []) {
+    const status = row?.status || row?.purchase_orders?.status || ''
+    if (!COUNTED_ORDER_STATUSES.has(status)) continue
+    const barcode = String(row?.barcode || '').trim()
+    if (!barcode) continue
+    let agg = totals.get(barcode)
+    if (!agg) {
+      agg = { qty: 0, orderIds: new Set() }
+      totals.set(barcode, agg)
+    }
+    agg.qty += finiteNumber(row.ordered_qty ?? row.orderedQty, 0)
+    const orderId = row.purchase_order_id || row.purchaseOrderId
+    if (orderId) agg.orderIds.add(orderId)
+  }
+  const result = new Map()
+  for (const [barcode, agg] of totals) {
+    result.set(barcode, { qty: agg.qty, documents: agg.orderIds.size })
+  }
+  return result
+}
+
+function attachSkuOrderAggregates(items, aggregates) {
+  return (items || []).map((item) => {
+    if (!item) return item
+    const agg = aggregates.get(item.barcode) || { qty: 0, documents: 0 }
+    return {
+      ...item,
+      orderedQtyTotal: agg.qty,
+      orderedDocumentCount: agg.documents,
+      ordered_qty_total: agg.qty,
+      ordered_document_count: agg.documents,
+    }
+  })
+}
+
+/**
+ * One batched history query for the barcodes on the current page.
+ * Cancelled orders are excluded; draft/active/received count.
+ */
+export async function fetchSnapshotSkuOrderAggregates(snapshotId, barcodes) {
+  ensureClient()
+  const unique = [
+    ...new Set((barcodes || []).map((b) => String(b || '').trim()).filter(Boolean)),
+  ]
+  if (!snapshotId || unique.length === 0) return new Map()
+
+  const rows = []
+  const chunkSize = 100
+  for (let i = 0; i < unique.length; i += chunkSize) {
+    const chunk = unique.slice(i, i + chunkSize)
+    const { data, error } = await supabase
+      .from('purchase_order_items')
+      .select(
+        [
+          'barcode, ordered_qty, purchase_order_id',
+          'purchase_orders!inner(id, status, workflow_mode, source_snapshot_id)',
+        ].join(', ')
+      )
+      .in('barcode', chunk)
+      .eq('purchase_orders.source_snapshot_id', snapshotId)
+      .eq('purchase_orders.workflow_mode', 'analytics')
+      .neq('purchase_orders.status', 'cancelled')
+
+    if (error) throw new Error(error.message || 'Не удалось загрузить историю заказов')
+    rows.push(...(data || []))
+  }
+
+  return foldCountedSkuOrderAggregates(rows)
+}
+
+/**
+ * Barcode + qty for the selected supplier's next order (full snapshot, not one page).
+ * Used to compute the attempt fingerprint from the same set the RPC will consume.
+ */
+export async function fetchSnapshotAttemptItems(snapshotId, supplierId) {
+  ensureClient()
+  if (!snapshotId || !supplierId) return []
+
+  const { data, error } = await supabase
+    .from('procurement_snapshot_items')
+    .select('barcode, final_order_qty')
+    .eq('snapshot_id', snapshotId)
+    .eq('platform_supplier_id', supplierId)
+    .gt('final_order_qty', 0)
+    .order('barcode', { ascending: true })
+
+  if (error) throw new Error(error.message || 'Не удалось загрузить состав заказа')
+  return (data || []).map((row) => ({
+    barcode: row.barcode || '',
+    qty: finiteNumber(row.final_order_qty, 0),
+  }))
+}
+
 export async function syncProcurementPlanning() {
   if (!isSupabaseConfigured() || !supabase) {
     return fail(PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN, 'Сервер не настроен')
@@ -208,7 +366,7 @@ export async function syncProcurementPlanning() {
 export async function generateProcurementOrders(
   snapshotId,
   expectedDeliveryDate,
-  { supplierId = '', supplierIds = [] } = {}
+  { supplierId = '', supplierIds = [], attemptKey = '', payloadFingerprint = '' } = {}
 ) {
   if (!isSupabaseConfigured() || !supabase) {
     return fail(PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN, 'Сервер не настроен')
@@ -222,6 +380,12 @@ export async function generateProcurementOrders(
       'Выберите хотя бы одного поставщика.'
     )
   }
+  if (attemptKey && !payloadFingerprint) {
+    return fail(
+      PROCUREMENT_PLANNING_ERROR_CODES.VALIDATION,
+      'Повторное формирование требует отпечаток состава заказа.'
+    )
+  }
 
   try {
     const { data, error } = await supabase.functions.invoke('umag-procurement', {
@@ -231,6 +395,7 @@ export async function generateProcurementOrders(
         expectedDeliveryDate,
         ...(supplierId ? { supplierId } : {}),
         ...(supplierIds.length ? { supplierIds } : {}),
+        ...(attemptKey ? { attemptKey, payloadFingerprint } : {}),
       },
     })
     if (error) return mapInvokeFailure(error, data)
@@ -238,6 +403,8 @@ export async function generateProcurementOrders(
       return {
         success: true,
         alreadyGenerated: Boolean(data.already_generated),
+        idempotentReplay: Boolean(data.idempotent_replay),
+        nothingToOrder: Boolean(data.nothing_to_order),
         snapshotId: data.snapshot_id || snapshotId,
         purchaseOrderIds: data.purchase_order_ids || [],
         receivingDocumentIds: data.receiving_document_ids || [],
@@ -248,6 +415,8 @@ export async function generateProcurementOrders(
         snapshotStatus: data.snapshot_status,
         remainingSuppliers: data.remaining_suppliers ?? 0,
         requestedSupplierIds: data.requested_supplier_ids || [],
+        attemptKey: data.attempt_key || attemptKey || null,
+        payloadFingerprint: data.payload_fingerprint || payloadFingerprint || null,
       }
     }
     return mapInvokeFailure(null, data)
@@ -296,6 +465,7 @@ export async function fetchSnapshotItemsPage({
   platformSupplierId = '',
   warningsOnly = false,
   orderableOnly = false,
+  unassignedOnly = false,
 } = {}) {
   ensureClient()
   if (!snapshotId) return { items: [], totalCount: 0, page, pageSize }
@@ -315,6 +485,7 @@ export async function fetchSnapshotItemsPage({
   if (categoryName) query = query.eq('category_name', categoryName)
   if (subcategoryName) query = query.eq('subcategory_name', subcategoryName)
   if (platformSupplierId) query = query.eq('platform_supplier_id', platformSupplierId)
+  if (unassignedOnly) query = query.is('platform_supplier_id', null)
   if (warningsOnly) query = query.eq('negative_stock', true)
   if (orderableOnly) query = query.gt('final_order_qty', 0)
 
@@ -327,8 +498,14 @@ export async function fetchSnapshotItemsPage({
   const { data, error, count } = await query
   if (error) throw new Error(error.message || 'Не удалось загрузить позиции')
 
+  const items = (data || []).map(normalizeItem)
+  const aggregates = await fetchSnapshotSkuOrderAggregates(
+    snapshotId,
+    items.map((item) => item?.barcode)
+  )
+
   return {
-    items: (data || []).map(normalizeItem),
+    items: attachSkuOrderAggregates(items, aggregates),
     totalCount: count ?? 0,
     page,
     pageSize,

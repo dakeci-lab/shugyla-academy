@@ -2,6 +2,8 @@
  * Pure UX helpers for the procurement planner (summaries, workflow, guards).
  */
 
+import { computeAttemptPayloadFingerprint } from './procurementAttemptFingerprint.js'
+
 function finiteNumber(value, fallback = 0) {
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
@@ -27,13 +29,49 @@ function supplierNameOf(row, fallbackId = '') {
   return row?.umag_supplier_name || row?.umagSupplierName || fallbackId || ''
 }
 
-/** True when the supplier already has a purchase order for this snapshot revision. */
+/**
+ * Russian plural form for a count.
+ * @param {number} count
+ * @param {[string, string, string]} forms [1, 2–4, 5–20]
+ */
+export function pluralizeRu(count, forms) {
+  const list = Array.isArray(forms) ? forms : []
+  const n = Math.abs(Math.trunc(finiteNumber(count, 0)))
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return list[0] ?? ''
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return list[1] ?? list[0] ?? ''
+  return list[2] ?? list[1] ?? list[0] ?? ''
+}
+
+const DOCUMENT_FORMS = ['документ', 'документа', 'документов']
+const POSITION_FORMS = ['позиция', 'позиции', 'позиций']
+
+/**
+ * True when at least one purchase order already exists for this supplier in the
+ * current snapshot revision.
+ *
+ * NB: this is *history*, not a lock. Repeat orders to the same supplier are allowed,
+ * so no control may be disabled just because this returns true.
+ */
 export function isSupplierOrderCreated(summary) {
   return Boolean(summary?.generatedOrderId) || (summary?.generatedPositions || 0) > 0
 }
 
-/** Generated order exists but leftover pending qty remains (server will skip second create). */
+/**
+ * Positions that were expected to land in a generated order but did not
+ * (partial or failed generation).
+ *
+ * Prefers the explicit backend aggregate `inconsistentPositions` when the summary
+ * carries it, and falls back to the legacy derivation (an order exists AND pending
+ * qty remains). Once repeat orders are live, a fresh draft for an already-served
+ * supplier is a normal state rather than a discrepancy — only the backend aggregate
+ * can tell those two apart, hence the preference.
+ */
 export function isSupplierInconsistent(summary) {
+  if (summary && summary.inconsistentPositions != null) {
+    return finiteNumber(summary.inconsistentPositions, 0) > 0
+  }
   return isSupplierOrderCreated(summary) && (summary?.pendingPositions || 0) > 0
 }
 
@@ -56,6 +94,8 @@ function emptySupplierSummary(id, name = '') {
     orderablePositions: 0,
     totalQty: 0,
     pendingPositions: 0,
+    /** Qty of the pending positions only — what the *next* order would contain. */
+    pendingQty: 0,
     generatedPositions: 0,
     generatedOrderId: null,
   }
@@ -102,6 +142,7 @@ export function accumulateSnapshotFilterRow(row, state) {
     if (!summary.generatedOrderId) summary.generatedOrderId = generatedId
   } else {
     summary.pendingPositions += 1
+    summary.pendingQty += qty
   }
 }
 
@@ -231,6 +272,10 @@ function applyContribution(options, contribution, sign) {
     }
   } else {
     summary.pendingPositions = Math.max(0, (summary.pendingPositions || 0) + delta)
+    summary.pendingQty = Math.max(
+      0,
+      finiteNumber(summary.pendingQty, 0) + delta * contribution.qty
+    )
   }
 }
 
@@ -335,12 +380,6 @@ function findSnapshotSummaryForSupplier(supplier, lookups) {
   return null
 }
 
-function isSnapshotSupplierScheduled(summary, scheduledIds, scheduledNames) {
-  if (summary?.id && scheduledIds.has(summary.id)) return true
-  const name = normalizeSupplierMatchName(summary?.name)
-  return Boolean(name && scheduledNames.has(name))
-}
-
 function mergeSupplierSelectRow(base, summary) {
   const id = base?.id || summary?.id
   const name = base?.name || summary?.name || id || ''
@@ -434,128 +473,103 @@ export function isSupplierInTodaySchedule(
   )
 }
 
+function formatQtyLabel(value) {
+  const qty = finiteNumber(value, 0)
+  return Number.isInteger(qty) ? String(qty) : String(Math.round(qty * 100) / 100)
+}
+
 /**
- * Progress for today's scheduled visits vs snapshot supplier summaries.
- * Snapshot suppliers outside today's schedule are not in the denominator.
+ * Positions of the selected supplier that are ready to go into the *next* order,
+ * i.e. rows carrying a positive qty.
+ *
+ * Deliberately based on `orderablePositions` rather than `pendingPositions`:
+ * a supplier that already received an order may be ordered again, and on the legacy
+ * backend contract (qty is kept on the row and only tagged with a generated order id)
+ * `pendingPositions` collapses to 0 right after the first order and would block
+ * every repeat.
  */
-export function formatOrdersProgress({
-  scheduledSuppliers = [],
-  snapshotSuppliers = [],
-  unassignedOrderableCount = 0,
-  inconsistentSupplierCount = 0,
-} = {}) {
-  const scheduled = Array.isArray(scheduledSuppliers) ? scheduledSuppliers : []
-  const scheduledTotal = scheduled.length
-  const lookups = buildSnapshotSupplierLookups(snapshotSuppliers)
+export function getNextOrderPositions(summary) {
+  return Math.max(0, Math.round(finiteNumber(summary?.orderablePositions, 0)))
+}
 
-  const scheduledIds = new Set()
-  const scheduledNames = new Set()
-  let createdToday = 0
+/**
+ * Positions that are drafted but not yet in any order — what the workflow line calls
+ * «Черновик».
+ *
+ * For a supplier without an order this is simply every positive-qty row. Once an order
+ * exists, only the rows that are not tagged with an order id are a new draft, so the
+ * strip does not claim a draft for quantities that have already been sent.
+ */
+export function getDraftPositions(summary) {
+  if (!isSupplierOrderCreated(summary)) return getNextOrderPositions(summary)
+  return Math.max(0, Math.round(finiteNumber(summary?.pendingPositions, 0)))
+}
 
-  for (const supplier of scheduled) {
-    if (supplier?.id) scheduledIds.add(supplier.id)
-    const name = normalizeSupplierMatchName(supplier?.name)
-    if (name) scheduledNames.add(name)
-
-    const summary = findSnapshotSummaryForSupplier(supplier, lookups)
-    if (summary && isSupplierOrderCreated(summary)) createdToday += 1
-  }
-
-  let unscheduledCount = 0
-  for (const summary of snapshotSuppliers || []) {
-    const status = summary?.planningStatus || getSupplierPlanningStatus(summary)
-    if (status !== 'created' && status !== 'draft') continue
-    if (!isSnapshotSupplierScheduled(summary, scheduledIds, scheduledNames)) {
-      unscheduledCount += 1
-    }
-  }
-
-  const remaining = Math.max(0, scheduledTotal - createdToday)
-  const unassignedLabel =
-    unassignedOrderableCount > 0
-      ? `Без поставщика: ${unassignedOrderableCount} позиций`
-      : null
-  const inconsistentLabel =
-    inconsistentSupplierCount > 0
-      ? `Расхождение: ${inconsistentSupplierCount}`
-      : null
-  const unscheduledLabel =
-    unscheduledCount > 0 ? `Вне графика: ${unscheduledCount}` : null
-
-  if (scheduledTotal === 0) {
-    return {
-      createdLabel: 'На сегодня визиты не запланированы',
-      remainingLabel: null,
-      unscheduledLabel,
-      unassignedLabel,
-      inconsistentLabel,
-      allDone: false,
-      total: 0,
-      remaining: 0,
-      createdToday: 0,
-      unscheduledCount,
-    }
-  }
-
-  const allDone =
-    remaining === 0 &&
-    unassignedOrderableCount === 0 &&
-    inconsistentSupplierCount === 0
-
-  return {
-    createdLabel: `Сегодня: создано ${createdToday} из ${scheduledTotal}`,
-    remainingLabel: remaining > 0 ? `Осталось ${remaining}` : null,
-    unscheduledLabel,
-    unassignedLabel,
-    inconsistentLabel,
-    allDone,
-    total: scheduledTotal,
-    remaining,
-    createdToday,
-    unscheduledCount,
-  }
+/**
+ * Qty behind getDraftPositions, or null when it cannot be known.
+ *
+ * `pendingQty` is a newer field on the supplier summary; a summary restored from an
+ * older cached bundle simply does not carry it. In that case the strip drops the qty
+ * from the label rather than printing a number it cannot back up.
+ */
+export function getDraftQty(summary) {
+  if (!isSupplierOrderCreated(summary)) return finiteNumber(summary?.totalQty, 0)
+  if (summary?.pendingQty == null) return null
+  return finiteNumber(summary.pendingQty, 0)
 }
 
 /**
  * Compact workflow strip for the selected supplier.
- * @returns {{ step: string, label: string, orderId?: string|null, inconsistent?: boolean }}
+ *
+ * Returns `label: null` when there is nothing worth a line of screen — the supplier
+ * placeholder in the toolbar already says «Выберите поставщика», so the planner does
+ * not repeat it as a separate step.
+ *
+ * @returns {{ step: string, label: string|null, orderId?: string|null, historyLabel?: string|null }}
  */
 export function getSupplierWorkflowStatus({
   supplierId = '',
   summary = null,
 } = {}) {
   if (!supplierId) {
-    return { step: 'select_supplier', label: '1. Выберите поставщика' }
+    return { step: 'select_supplier', label: null, orderId: null, historyLabel: null }
   }
 
-  const pending = summary?.pendingPositions || 0
-  const orderable = summary?.orderablePositions || 0
+  const draft = getDraftPositions(summary)
   const orderId = summary?.generatedOrderId || null
+  const ordered = isSupplierOrderCreated(summary)
+  const orderedPositions = Math.max(0, Math.round(finiteNumber(summary?.generatedPositions, 0)))
+  const historyLabel = ordered
+    ? `Уже заказано: ${orderedPositions} ${pluralizeRu(orderedPositions, POSITION_FORMS)}`
+    : null
 
-  if (isSupplierOrderCreated(summary)) {
+  if (draft === 0) {
     return {
-      step: 'created',
-      label: 'Заказ создан',
-      orderId,
-      inconsistent: pending > 0,
+      step: ordered ? 'ordered' : 'enter_qty',
+      label: ordered ? 'Заказ отправлен · можно заказать ещё' : 'Укажите количество',
+      orderId: ordered ? orderId : null,
+      historyLabel: null,
     }
   }
 
-  if (orderable === 0) {
-    return { step: 'enter_qty', label: '2. Укажите количество' }
-  }
+  const draftQty = getDraftQty(summary)
+  const qtyPart = draftQty == null ? '' : ` · ${formatQtyLabel(draftQty)} шт.`
 
-  const qty = finiteNumber(summary?.totalQty, 0)
-  const qtyLabel = Number.isInteger(qty) ? String(qty) : String(Math.round(qty * 100) / 100)
   return {
     step: 'draft',
-    label: `Черновик · ${orderable} позиций · ${qtyLabel} шт.`,
-    orderId: null,
+    label: `Черновик · ${draft} ${pluralizeRu(draft, POSITION_FORMS)}${qtyPart}`,
+    orderId: ordered ? orderId : null,
+    historyLabel,
   }
 }
 
 /**
  * Reason why create is disabled, or null when enabled.
+ *
+ * Only real blockers belong here: permissions, a snapshot that cannot be written to,
+ * an in-flight save/generation, and the absence of a positive qty. An existing order
+ * for the same supplier is explicitly NOT a blocker — repeat orders are a supported
+ * flow and the server decides whether a second document is created.
  */
 export function getCreateOrderDisabledReason({
   canGenerate = false,
@@ -572,8 +586,7 @@ export function getCreateOrderDisabledReason({
   if (generating) return 'Создание заказа выполняется…'
   if (pendingSaveCount > 0) return 'Дождитесь сохранения количества'
   if (hasSaveError) return 'Исправьте ошибку сохранения количества'
-  if (isSupplierOrderCreated(summary)) return 'Заказ для этого поставщика уже создан'
-  if ((summary?.pendingPositions || 0) === 0) {
+  if (getNextOrderPositions(summary) === 0) {
     return 'Укажите количество больше 0 хотя бы для одной позиции'
   }
   return null
@@ -621,6 +634,15 @@ export function getExportTooltip({
   return orderCreated ? 'Скачать заказ: PDF или Excel' : 'Скачать план: PDF или Excel'
 }
 
+/**
+ * True when the export would contain an already created order rather than a fresh plan.
+ * A supplier with an order *and* new positive-qty rows is preparing a repeat order,
+ * so the export is a plan again.
+ */
+export function isSupplierPlanExportOrder(summary) {
+  return isSupplierOrderCreated(summary) && (summary?.pendingPositions || 0) === 0
+}
+
 export function getExportMenuLabel(orderCreated = false) {
   return orderCreated ? 'Скачать заказ' : 'Скачать план'
 }
@@ -629,28 +651,34 @@ export const EMPTY_SUPPLIER_EXPORT_MESSAGE = 'Нет позиций заказа
 
 /**
  * Filter snapshot items for supplier-scoped PDF/Excel export.
- * - created: only rows linked to summary.generatedOrderId (or any generated rows if id missing)
- * - draft/empty: positive pending rows only (qty > 0 and not yet in an order)
+ *
+ * Draft first: whenever the supplier has positive-qty rows that are not yet in an
+ * order, those rows *are* the export — that is what the user is about to send, even
+ * if an earlier order already exists (repeat order). Only when there is no draft left
+ * does the export fall back to the rows of the last generated order.
+ *
  * @param {Array<object>} items
  * @param {object|null} summary
  * @returns {Array<object>}
  */
 export function filterItemsForSupplierPlanExport(items, summary) {
   const list = Array.isArray(items) ? items : []
-  const orderCreated = isSupplierOrderCreated(summary)
-  const orderId = summary?.generatedOrderId || null
   const supplierId = summary?.id || null
 
-  return list.filter((item) => {
+  const scoped = list.filter((item) => {
     if (qtyOf(item) <= 0) return false
     if (supplierId && supplierIdOf(item) !== supplierId) return false
+    return true
+  })
+
+  const draft = scoped.filter((item) => !generatedIdOf(item))
+  if (draft.length > 0) return draft
+
+  const orderId = summary?.generatedOrderId || null
+  return scoped.filter((item) => {
     const generatedId = generatedIdOf(item)
-    if (orderCreated) {
-      if (!generatedId) return false
-      if (orderId) return generatedId === orderId
-      return true
-    }
-    return !generatedId
+    if (!generatedId) return false
+    return orderId ? generatedId === orderId : true
   })
 }
 
@@ -700,12 +728,6 @@ export function findSupplierSummary(filterOptions, supplierId) {
   return (filterOptions?.suppliers || []).find((s) => s.id === supplierId) || null
 }
 
-export function isItemQuantityLocked(item, filterOptions) {
-  if (generatedIdOf(item)) return true
-  const summary = findSupplierSummary(filterOptions, supplierIdOf(item))
-  return isSupplierOrderCreated(summary)
-}
-
 export const QUANTITY_REQUIRES_SUPPLIER_HINT = 'Выберите поставщика, чтобы задать количество'
 
 /**
@@ -716,21 +738,82 @@ export const QUANTITY_REQUIRES_SUPPLIER_HINT = 'Выберите поставщ�
  * по одному поставщику, а сохранение из общего списка уходит в снимок,
  * который потом никто не отправит. Плюс это защита от «залипшего» события
  * blur: пока пользователь менял фильтр, input мог остаться в старом состоянии.
+ *
+ * Уже созданный заказ (по строке или по поставщику) больше НЕ блокирует правку:
+ * повторный заказ тому же поставщику — штатный сценарий. Всё, что относится к
+ * прошлым заказам, показывается как история (см. getItemOrderHistory).
  */
-export function canEditItemQuantity(item, { filterOptions, selectedSupplierId } = {}) {
+export function canEditItemQuantity(item, { selectedSupplierId } = {}) {
   if (!item) return false
   if (!selectedSupplierId) return false
-  if (supplierIdOf(item) !== selectedSupplierId) return false
-  return !isItemQuantityLocked(item, filterOptions)
+  return supplierIdOf(item) === selectedSupplierId
 }
 
-export function getLockedQuantityHint(item, filterOptions) {
-  const summary = findSupplierSummary(filterOptions, supplierIdOf(item))
-  const orderId = generatedIdOf(item) || summary?.generatedOrderId || null
-  if (generatedIdOf(item)) {
-    return { label: 'Уже в заказе', orderId }
+/** Qty stays writable after the first order: generated is a working snapshot, not a lock. */
+export function isSnapshotQuantityEditable(status) {
+  return status === 'ready' || status === 'partially_generated' || status === 'generated'
+}
+
+function firstFinite(...values) {
+  for (const value of values) {
+    if (value == null) continue
+    const n = Number(value)
+    if (Number.isFinite(n)) return n
   }
-  return { label: 'Заказ поставщику создан', orderId }
+  return null
+}
+
+/**
+ * Already-ordered history for one snapshot row.
+ *
+ * Prefers the backend aggregates when the row carries them:
+ *   ordered_qty_total / orderedQtyTotal          — total qty already ordered for this SKU
+ *   ordered_document_count / orderedDocumentCount — how many purchase orders contain it
+ *
+ * Falls back to what the legacy row can prove on its own: a
+ * `generated_purchase_order_id` is a last-order pointer, so it proves one
+ * document. It does *not* prove qty — after a successful generate the current
+ * `final_order_qty` is the next draft (often 0) and must not be shown as history.
+ *
+ * @returns {{ qty: number, documents: number, orderId: string|null, source: 'aggregate'|'fallback' }}
+ */
+export function getItemOrderHistory(item) {
+  const orderId = generatedIdOf(item)
+  const aggregateQty = firstFinite(item?.ordered_qty_total, item?.orderedQtyTotal)
+  const aggregateDocuments = firstFinite(
+    item?.ordered_document_count,
+    item?.orderedDocumentCount
+  )
+
+  if (aggregateQty != null || aggregateDocuments != null) {
+    const qty = Math.max(0, aggregateQty ?? 0)
+    const documents = Math.max(
+      0,
+      Math.round(aggregateDocuments ?? (qty > 0 ? 1 : 0))
+    )
+    return { qty, documents, orderId: orderId || null, source: 'aggregate' }
+  }
+
+  if (!orderId) return { qty: 0, documents: 0, orderId: null, source: 'fallback' }
+  return { qty: 0, documents: 1, orderId, source: 'fallback' }
+}
+
+/** «Заказано · 2 документа», or null when there is no history to show. */
+export function formatOrderHistoryLabel(history) {
+  const documents = Math.max(0, Math.round(finiteNumber(history?.documents, 0)))
+  if (documents <= 0) return null
+  return `Заказано · ${documents} ${pluralizeRu(documents, DOCUMENT_FORMS)}`
+}
+
+/** Full-sentence title for the history line. */
+export function formatOrderHistoryTitle(history) {
+  const documents = Math.max(0, Math.round(finiteNumber(history?.documents, 0)))
+  if (documents <= 0) return null
+  const qty = finiteNumber(history?.qty, 0)
+  if (qty > 0) {
+    return `Ранее заказано: ${formatQtyLabel(qty)} шт. в ${documents} ${pluralizeRu(documents, DOCUMENT_FORMS)}`
+  }
+  return formatOrderHistoryLabel(history)
 }
 
 /**
@@ -746,6 +829,192 @@ export function getNextEditableItemId(items, fromId, isEditable) {
     if (isEditable(list[i])) return list[i].id
   }
   return null
+}
+
+/* -------------------------------------------------------------------------- */
+/* Compact planner header (snapshot line + action chips next to the page tabs)  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One-line UMAG snapshot summary for the header strip.
+ * Pure: the caller formats `syncedAtLabel` (timezone-aware) and passes it in.
+ *
+ * @returns {{ text: string, warnText: string|null, title: string }}
+ */
+export function buildSnapshotHeadline({
+  hasSnapshot = false,
+  status = '',
+  syncedAtLabel = '',
+  itemCount = 0,
+  negativeStockCount = 0,
+} = {}) {
+  if (!hasSnapshot) {
+    return {
+      text: 'Нет снимка',
+      warnText: null,
+      title: 'Снимок UMAG ещё не создан — запустите синхронизацию',
+    }
+  }
+  if (status === 'syncing') {
+    return {
+      text: 'Синхронизация…',
+      warnText: null,
+      title: 'Снимок UMAG: синхронизация выполняется',
+    }
+  }
+  if (status === 'failed') {
+    return {
+      text: 'Ошибка синхронизации',
+      warnText: null,
+      title: 'Снимок UMAG: последняя синхронизация не удалась',
+    }
+  }
+
+  const items = Math.max(0, Math.round(finiteNumber(itemCount, 0)))
+  const negative = Math.max(0, Math.round(finiteNumber(negativeStockCount, 0)))
+  const negativeTitle =
+    negative > 0
+      ? ` · ${negative} ${pluralizeRu(negative, POSITION_FORMS)} с отрицательным остатком`
+      : ''
+
+  return {
+    text: `${syncedAtLabel} · ${items} SKU`,
+    warnText: negative > 0 ? `${negative} отриц.` : null,
+    title: `Снимок UMAG · Обновлён ${syncedAtLabel} · ${items} SKU${negativeTitle}`,
+  }
+}
+
+/**
+ * Compact action chips for the header strip. Only non-zero counters produce a chip —
+ * nothing is rendered when the plan is clean.
+ *
+ * @returns {Array<{ id: string, label: string, count: number, title: string,
+ *                   supplierIds?: string[] }>}
+ */
+export function getPlannerAlertChips({
+  unassignedOrderableCount = 0,
+  suppliers = [],
+} = {}) {
+  const chips = []
+
+  const unassigned = Math.max(0, Math.round(finiteNumber(unassignedOrderableCount, 0)))
+  if (unassigned > 0) {
+    chips.push({
+      id: 'unassigned',
+      label: 'Без поставщика',
+      count: unassigned,
+      title: `${unassigned} ${pluralizeRu(unassigned, POSITION_FORMS)} с количеством к заказу без поставщика — показать их`,
+    })
+  }
+
+  const inconsistent = (suppliers || []).filter((summary) => isSupplierInconsistent(summary))
+  if (inconsistent.length > 0) {
+    chips.push({
+      id: 'inconsistent',
+      label: 'Расхождения',
+      count: inconsistent.length,
+      supplierIds: inconsistent.map((summary) => summary.id).filter(Boolean),
+      title: `Заказ создан, но остались позиции вне заказа: ${inconsistent
+        .map((summary) => summary.name || summary.id)
+        .join(', ')}`,
+    })
+  }
+
+  return chips
+}
+
+/* -------------------------------------------------------------------------- */
+/* Idempotency: one attempt key per submission                                  */
+/* -------------------------------------------------------------------------- */
+
+const ATTEMPT_KEY_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+
+/** RFC 4122 v4 UUID, with graceful degradation on old WebViews. */
+export function defaultGenerateAttemptKey() {
+  const webCrypto = globalThis.crypto
+  if (typeof webCrypto?.randomUUID === 'function') return webCrypto.randomUUID()
+
+  const bytes = new Uint8Array(16)
+  if (typeof webCrypto?.getRandomValues === 'function') {
+    webCrypto.getRandomValues(bytes)
+  } else {
+    for (let i = 0; i < 16; i += 1) bytes[i] = Math.floor(Math.random() * 256)
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = [...bytes].map((b) => b.toString(16).padStart(2, '0'))
+  return `${hex.slice(0, 4).join('')}-${hex.slice(4, 6).join('')}-${hex
+    .slice(6, 8)
+    .join('')}-${hex.slice(8, 10).join('')}-${hex.slice(10, 16).join('')}`
+}
+
+export function isValidAttemptKey(value) {
+  return typeof value === 'string' && ATTEMPT_KEY_RE.test(value)
+}
+
+export const ORDER_ATTEMPT_OUTCOME = Object.freeze({
+  /** Server accepted the submission (created or reported an existing order). */
+  SUCCESS: 'success',
+  /** Server answered with a definitive refusal — a new submission needs a new key. */
+  REJECTED: 'rejected',
+  /** No definitive answer (network/timeout/unknown) — a retry must reuse the key. */
+  RETRYABLE: 'retryable',
+})
+
+/**
+ * Error codes for which the server may still have created the order, so a retry has
+ * to carry the same attempt key for the backend to deduplicate it.
+ */
+const RETRYABLE_GENERATE_CODES = new Set([
+  'UMAG_NETWORK_ERROR',
+  'UMAG_TIMEOUT',
+  'GENERATE_FAILED',
+  'UNKNOWN',
+])
+
+/** Map a generate result / thrown error onto an attempt outcome. */
+export function classifyGenerateOutcome({ result = null, error = null } = {}) {
+  if (error) return ORDER_ATTEMPT_OUTCOME.RETRYABLE
+  if (!result) return ORDER_ATTEMPT_OUTCOME.RETRYABLE
+  if (result.success === true) return ORDER_ATTEMPT_OUTCOME.SUCCESS
+  return RETRYABLE_GENERATE_CODES.has(result.code)
+    ? ORDER_ATTEMPT_OUTCOME.RETRYABLE
+    : ORDER_ATTEMPT_OUTCOME.REJECTED
+}
+
+/**
+ * Attempt-key lifecycle for order generation.
+ *
+ * - `begin(payload)` mints a key + fingerprint from the exact submit payload and
+ *   returns the *same* pair while the attempt is unresolved.
+ * - `settle(outcome)` clears both on SUCCESS/REJECTED and keeps them on RETRYABLE.
+ * - `reset()` drops the pair when the user consciously abandons the submission.
+ */
+export function createOrderAttemptTracker(generateKey = defaultGenerateAttemptKey) {
+  let current = null
+  return {
+    begin(payload) {
+      if (!current) {
+        current = {
+          key: generateKey(),
+          fingerprint: computeAttemptPayloadFingerprint(payload || {}),
+        }
+      }
+      return current
+    },
+    peek() {
+      return current
+    },
+    settle(outcome) {
+      if (outcome !== ORDER_ATTEMPT_OUTCOME.RETRYABLE) current = null
+      return current
+    },
+    reset() {
+      current = null
+      return null
+    },
+  }
 }
 
 /** Id of the first item whose `isEditable` predicate returns true, or null. */

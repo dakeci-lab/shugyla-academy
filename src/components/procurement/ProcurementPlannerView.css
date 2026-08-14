@@ -69,14 +69,117 @@
   filter: none;
 }
 
+/* -------------------------------------------------------------------------- */
+/* Компактная строка статуса рядом с вкладками (портал в procurement-page)      */
+/* -------------------------------------------------------------------------- */
+
+.proc-planner__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.6rem;
+  min-width: 0;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--text-secondary, #5c6370);
+}
+
+.proc-planner__snapshot {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.proc-planner__snapshot-label {
+  flex: none;
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #6b7280;
+}
+
+.proc-planner__snapshot-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text, #111827);
+  font-variant-numeric: tabular-nums;
+}
+
+.proc-planner__snapshot-warn {
+  flex: none;
+  color: #b42318;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.proc-planner__chips {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  min-width: 0;
+}
+
+.proc-planner__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-height: 26px;
+  padding: 0 0.45rem;
+  border: 1px solid #f3c2bc;
+  border-radius: 999px;
+  background: #fef3f2;
+  color: #912018;
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.proc-planner__chip:hover {
+  background: #fee4e2;
+}
+
+.proc-planner__chip:focus-visible {
+  outline: 2px solid #b42318;
+  outline-offset: 2px;
+}
+
+.proc-planner__chip-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15rem;
+  padding: 0.1rem 0.25rem;
+  border-radius: 999px;
+  background: #fee4e2;
+  color: #912018;
+  font-variant-numeric: tabular-nums;
+}
+
+.proc-planner__chip:hover .proc-planner__chip-count {
+  background: #fecdca;
+}
+
 .proc-planner__workflow {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 0.55rem 0.9rem;
-  min-height: 1.5rem;
   font-size: 0.8125rem;
   color: var(--text-secondary, #5c6370);
+}
+
+/* Нечего показать — строка не занимает вертикальный ритм. */
+.proc-planner__workflow:empty {
+  display: none;
 }
 
 .proc-planner__workflow-step {
@@ -84,8 +187,12 @@
   color: var(--text, #111827);
 }
 
-.proc-planner__workflow-step.is-created {
+.proc-planner__workflow-step.is-ordered {
   color: #047857;
+}
+
+.proc-planner__workflow-history {
+  color: var(--text-secondary, #6b7280);
 }
 
 .proc-planner__workflow-link {
@@ -109,38 +216,6 @@
 
 .proc-planner__save-status.is-error {
   color: #b42318;
-}
-
-.proc-planner__meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.45rem 0.75rem;
-  font-size: 0.78rem;
-  line-height: 1.35;
-  color: var(--text-secondary, #5c6370);
-}
-
-.proc-planner__meta-block {
-  display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
-  min-width: 0;
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--border, #eef0f3);
-  border-radius: 8px;
-  background: #fafbfc;
-}
-
-.proc-planner__meta-label {
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: #6b7280;
-}
-
-.proc-planner__meta-block > span:not(.proc-planner__meta-label) {
-  color: var(--text, #111827);
 }
 
 .proc-planner__warn {
@@ -167,38 +242,6 @@
   letter-spacing: 0.02em;
   text-transform: uppercase;
   color: #6b7280;
-}
-
-.proc-planner__final--locked {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.15rem;
-}
-
-.proc-planner__locked-qty {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-}
-
-.proc-planner__final--readonly {
-  justify-content: flex-start;
-}
-
-.proc-planner__readonly-qty {
-  font-variant-numeric: tabular-nums;
-  color: #9ca3af;
-  cursor: help;
-}
-
-.proc-planner__in-order {
-  font-size: 0.7rem;
-  font-weight: 600;
-  color: #047857;
-  text-decoration: none;
-}
-
-a.proc-planner__in-order:hover {
-  text-decoration: underline;
 }
 
 .proc-planner__empty {
@@ -448,10 +491,51 @@ a.proc-planner__in-order:hover {
   font-variant-numeric: tabular-nums;
 }
 
+/*
+ * Столбец «Заказ». Единое левое выравнивание заголовка и содержимого и стабильный
+ * порядок строк: сначала значение (или поле ввода), затем история заказов.
+ *
+ * Раньше `.proc-planner__final--locked` объявлялся ВЫШЕ `.proc-planner__final`,
+ * поэтому `align-items: center` из базового класса перекрывал `flex-start`
+ * модификатора, и число оказывалось по центру над подписью. Теперь модификаторы
+ * идут строго после базы.
+ */
 .proc-planner__final {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  min-width: 0;
+  text-align: left;
+}
+
+.proc-planner__final-input {
   display: inline-flex;
   align-items: center;
   gap: 0.25rem;
+}
+
+.proc-planner__qty-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text, #111827);
+}
+
+.proc-planner__qty-value.is-empty {
+  font-weight: 400;
+  color: #9ca3af;
+  cursor: help;
+}
+
+.proc-planner__qty-history {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #047857;
+  text-decoration: none;
+}
+
+a.proc-planner__qty-history:hover {
+  text-decoration: underline;
 }
 
 .proc-planner__reset {
@@ -535,8 +619,8 @@ a.proc-planner__in-order:hover {
 }
 
 @media (max-width: 900px) {
-  .proc-planner__meta {
-    grid-template-columns: 1fr;
+  .proc-planner__topbar {
+    justify-content: flex-start;
   }
 
   .proc-planner__save-status {

@@ -260,6 +260,10 @@ export function getReceivingChecklistToggleState(order, documents, cloudMode = f
     return { canToggle: false, reason: 'missing', statusLabel: null }
   }
 
+  if (!isSimpleWorkflow(order)) {
+    return { canToggle: false, reason: 'analytics', statusLabel: null }
+  }
+
   if (!cloudMode) {
     return { canToggle: true, reason: 'ready', statusLabel: null }
   }

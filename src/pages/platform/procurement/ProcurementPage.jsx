@@ -61,6 +61,11 @@ export default function ProcurementPage() {
   const { loadError, reloadProcurement, ensureModules, version: dataVersion } = usePlatformData()
   const { version, refresh, notifyChange } = useAdminRefresh()
   const [mainTab, setMainTab] = useState('planning')
+  /**
+   * Portal target for the planner header strip, kept in state (not a ref) so the
+   * planner re-renders once the node exists.
+   */
+  const [tabsAsideEl, setTabsAsideEl] = useState(null)
 
   useEffect(() => {
     if (!isCloudMode()) return
@@ -384,46 +389,54 @@ export default function ProcurementPage() {
   const emptyMessage = getEmptyMessage()
   return (
     <div className="procurement-page">
-      <div className="procurement-page__tabs" role="tablist" aria-label="Разделы закупа">
-        <button
-          type="button"
-          role="tab"
-          className={
-            mainTab === 'planning'
-              ? 'procurement-page__tab is-active'
-              : 'procurement-page__tab'
-          }
-          aria-selected={mainTab === 'planning'}
-          onClick={() => setMainTab('planning')}
-        >
-          Планирование
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className={
-            mainTab === 'orders' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
-          }
-          aria-selected={mainTab === 'orders'}
-          onClick={() => setMainTab('orders')}
-        >
-          Заказы
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className={
-            mainTab === 'norms' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
-          }
-          aria-selected={mainTab === 'norms'}
-          onClick={() => setMainTab('norms')}
-        >
-          Нормы
-        </button>
+      <div className="procurement-page__tabs-row">
+        <div className="procurement-page__tabs" role="tablist" aria-label="Разделы закупа">
+          <button
+            type="button"
+            role="tab"
+            className={
+              mainTab === 'planning'
+                ? 'procurement-page__tab is-active'
+                : 'procurement-page__tab'
+            }
+            aria-selected={mainTab === 'planning'}
+            onClick={() => setMainTab('planning')}
+          >
+            Планирование
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className={
+              mainTab === 'orders' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
+            }
+            aria-selected={mainTab === 'orders'}
+            onClick={() => setMainTab('orders')}
+          >
+            Заказы
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className={
+              mainTab === 'norms' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
+            }
+            aria-selected={mainTab === 'norms'}
+            onClick={() => setMainTab('norms')}
+          >
+            Нормы
+          </button>
+        </div>
+        {/*
+          Slot to the right of the tabs. The planner portals its compact UMAG snapshot
+          line and its action chips in here, so the top row carries the status instead
+          of a separate block above the table. Stays empty (and hidden) on other tabs.
+        */}
+        <div className="procurement-page__tabs-aside" ref={setTabsAsideEl} />
       </div>
 
       {mainTab === 'planning' ? (
-        <ProcurementPlannerView />
+        <ProcurementPlannerView headerSlot={tabsAsideEl} />
       ) : mainTab === 'norms' ? (
         <ProcurementNormsView />
       ) : (

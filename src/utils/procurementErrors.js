@@ -22,11 +22,24 @@ const RULES = [
   {
     test: /planning fields editable only|working snapshot|status is ready/i,
     message:
-      'Этот снимок больше не рабочий: по нему уже сформированы заказы. Обновите снимок, чтобы менять количества.',
+      'Этот снимок сейчас нельзя править. Дождитесь готовности или обновите снимок из UMAG.',
   },
   {
     test: /generated order rows are immutable|generated_purchase_order_id is immutable/i,
     message: 'По этому товару заказ уже создан — количество в нём изменить нельзя.',
+  },
+  {
+    test: /attempt_key payload conflict/i,
+    message:
+      'Эта попытка уже использовалась с другим составом заказа. Создайте новую попытку.',
+  },
+  {
+    test: /attempt_key requires a single supplier/i,
+    message: 'Повторное формирование с ключом попытки возможно только для одного поставщика.',
+  },
+  {
+    test: /cannot create an order without items/i,
+    message: 'Нельзя сформировать заказ без позиций. Укажите количество и повторите.',
   },
   {
     test: /permission denied for table procurement_snapshot/i,

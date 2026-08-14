@@ -431,13 +431,15 @@ function stageBehaviour() {
     linkage.stderr || '(no error text)'
   )
 
-  // Rows already pulled into an order are closed for editing by RLS.
+  // Repeat-order contract (20260814134910): generated_purchase_order_id is a
+  // last-order pointer, not a write lock. The buyer must be able to enter the
+  // next quantity after an order was created.
   psql(`
-    insert into public.purchase_orders (number, supplier_name, status, purchase_date)
-    values ('GUARD-${state.runId}', 'Guard fixture supplier', 'draft', current_date);
+    insert into public.purchase_orders (supplier_name, status, purchase_date, workflow_mode)
+    values ('GUARD-${state.runId}', 'draft', current_date, 'simple');
   `)
   const orderId = scalar(
-    `select id from public.purchase_orders where number = 'GUARD-${state.runId}';`
+    `select id from public.purchase_orders where supplier_name = 'GUARD-${state.runId}' order by created_at desc limit 1;`
   )
   psql(`
     update public.procurement_snapshot_items
@@ -445,14 +447,17 @@ function stageBehaviour() {
      where id = '${state.itemId}';
   `)
 
-  const generated = asBuyer(
+  asBuyer(
     `update public.procurement_snapshot_items set final_order_qty = 40 where id = '${state.itemId}'`,
-    { expectFailure: true, label: 'edit of a row already in an order' }
+    { label: 'edit qty on a row that already has order history' }
+  )
+  const afterHistory = scalar(
+    `select final_order_qty::numeric(14,0)::text from public.procurement_snapshot_items where id = '${state.itemId}';`
   )
   assert(
-    'rows already placed in an order are read-only for the user',
-    /violates row-level security|immutable|permission denied/i.test(generated.stderr),
-    generated.stderr || '(no error text)'
+    'rows with previous orders stay editable for the next quantity',
+    afterHistory === '40',
+    `final_order_qty=${afterHistory}`
   )
 
   psql(`
@@ -462,18 +467,36 @@ function stageBehaviour() {
   `)
   psql(`delete from public.purchase_orders where id = '${orderId}';`)
 
-  // Guard invariant 2: planning fields are frozen outside a working snapshot.
+  // A generated snapshot remains a working planning document: the buyer can
+  // type the next quantity after current qty was reset to 0.
   psql(`update public.procurement_snapshots set status = 'generated' where id = '${state.snapshotId}';`)
-  const frozen = asBuyer(
+  asBuyer(
     `update public.procurement_snapshot_items set final_order_qty = 31 where id = '${state.itemId}'`,
-    { expectFailure: true, label: 'edit on a non-working snapshot' }
+    { label: 'edit on a generated snapshot' }
+  )
+  const generatedQty = scalar(
+    `select final_order_qty::numeric(14,0)::text from public.procurement_snapshot_items where id = '${state.itemId}';`
   )
   assert(
-    'planning fields are frozen once the snapshot is no longer working',
+    'planning qty stays editable after the snapshot is generated',
+    generatedQty === '31',
+    `final_order_qty=${generatedQty}`
+  )
+
+  psql(`update public.procurement_snapshots set status = 'failed' where id = '${state.snapshotId}';`)
+  const frozen = asBuyer(
+    `update public.procurement_snapshot_items set final_order_qty = 99 where id = '${state.itemId}'`,
+    { expectFailure: true, label: 'edit on a failed snapshot' }
+  )
+  assert(
+    'planning fields stay frozen outside a working snapshot',
     /working snapshot|status is ready|violates row-level security|permission denied/i.test(frozen.stderr),
     frozen.stderr || '(no error text)'
   )
   psql(`update public.procurement_snapshots set status = 'ready' where id = '${state.snapshotId}';`)
+  psql(
+    `update public.procurement_snapshot_items set final_order_qty = 25, manual_override = true where id = '${state.itemId}';`
+  )
 
   const unchanged = scalar(
     `select final_order_qty::numeric(14,0)::text from public.procurement_snapshot_items where id = '${state.itemId}';`

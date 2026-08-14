@@ -8,7 +8,7 @@ import {
   RECEIVING_STATUS,
   RECEIVING_ITEM_STATUS,
 } from '../utils/receivingData'
-import { PURCHASE_STATUS, PROCUREMENT_WORKFLOW_MODE } from '../utils/purchaseData'
+import { PURCHASE_STATUS, PROCUREMENT_WORKFLOW_MODE, isSimpleWorkflow, ANALYTICS_DIRECT_WRITE_MESSAGE } from '../utils/purchaseData'
 import { readReceivingPhotoAsDataUrl, validateReceivingPhotoFile } from './receivingPhotoUtils'
 
 const DOCUMENTS_KEY = 'shugyla_receiving_documents'
@@ -266,6 +266,10 @@ export function syncSimpleReceivingFromPurchaseLocal(order) {
 }
 
 export function deleteReceivingByPurchaseIdLocal(purchaseOrderId) {
+  const orders = readPurchaseOrders()
+  const order = orders.find((item) => item.id === purchaseOrderId)
+  if (order && !isSimpleWorkflow(order)) throw new Error(ANALYTICS_DIRECT_WRITE_MESSAGE)
+
   const documents = readDocuments()
   const docIds = documents
     .filter((doc) => (doc.purchaseOrderId ?? doc.purchase_order_id) === purchaseOrderId)
@@ -380,6 +384,7 @@ export async function acceptSimpleDeliveryLocal(documentId, user) {
   if (docIdx < 0) throw new Error('Документ приёмки не найден')
 
   const doc = documents[docIdx]
+  if (!isSimpleWorkflow(doc)) throw new Error(ANALYTICS_DIRECT_WRITE_MESSAGE)
   const now = new Date().toISOString()
 
   documents[docIdx] = {
@@ -414,6 +419,7 @@ export async function unacceptSimpleDeliveryLocal(documentId) {
   if (docIdx < 0) throw new Error('Документ приёмки не найден')
 
   const doc = documents[docIdx]
+  if (!isSimpleWorkflow(doc)) throw new Error(ANALYTICS_DIRECT_WRITE_MESSAGE)
   const now = new Date().toISOString()
 
   documents[docIdx] = {

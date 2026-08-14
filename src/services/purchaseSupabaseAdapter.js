@@ -5,6 +5,8 @@ import {
   calcLineTotal,
   PURCHASE_STATUS,
   PROCUREMENT_WORKFLOW_MODE,
+  ANALYTICS_DIRECT_WRITE_MESSAGE,
+  isSimpleWorkflow,
 } from '../utils/purchaseData'
 
 import {
@@ -452,6 +454,9 @@ export async function createSimplePurchaseCloud(data, user) {
 /** Удаление закупа (каскадно удалит позиции) */
 export async function deletePurchaseOrderCloud(orderId) {
   ensureClient()
+  const order = await fetchOrderById(orderId)
+  if (!order) throw new Error('Закуп не найден')
+  if (!isSimpleWorkflow(order)) throw new Error(ANALYTICS_DIRECT_WRITE_MESSAGE)
 
   const { deleteReceivingByPurchaseIdCloud } = await import('./receivingSupabaseAdapter')
   await deleteReceivingByPurchaseIdCloud(orderId)

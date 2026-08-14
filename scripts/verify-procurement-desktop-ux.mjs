@@ -135,116 +135,6 @@ async function stageSummariesAndWorkflow() {
       ux.isSupplierInconsistent(s4)
   )
 
-  const scheduledSeven = Array.from({ length: 7 }, (_, index) => ({
-    id: `sched-${index + 1}`,
-    name: `Visit ${index + 1}`,
-    status: 'active',
-    deliveryWeekdays: ['mon'],
-  }))
-  const snapshotForToday = [
-    {
-      id: 'sched-1',
-      name: 'Visit 1',
-      planningStatus: 'created',
-      generatedOrderId: 'po-1',
-      generatedPositions: 1,
-      pendingPositions: 0,
-    },
-    {
-      id: 'sched-2',
-      name: 'Visit 2',
-      planningStatus: 'created',
-      generatedOrderId: 'po-2',
-      generatedPositions: 1,
-      pendingPositions: 0,
-    },
-    {
-      id: 'outside-draft',
-      name: 'Outside Draft',
-      planningStatus: 'draft',
-      pendingPositions: 2,
-      generatedPositions: 0,
-    },
-    {
-      id: 'outside-created',
-      name: 'Outside Created',
-      planningStatus: 'created',
-      generatedOrderId: 'po-x',
-      generatedPositions: 1,
-      pendingPositions: 0,
-    },
-    {
-      id: 'outside-empty',
-      name: 'Outside Empty',
-      planningStatus: 'empty',
-      pendingPositions: 0,
-      generatedPositions: 0,
-    },
-  ]
-  const progress = ux.formatOrdersProgress({
-    scheduledSuppliers: scheduledSeven,
-    snapshotSuppliers: snapshotForToday,
-    unassignedOrderableCount: 1,
-    inconsistentSupplierCount: 1,
-  })
-  assert(
-    'today progress uses scheduled denominator',
-    progress.createdLabel === 'Сегодня: создано 2 из 7'
-  )
-  assert('remaining N from schedule', progress.remainingLabel === 'Осталось 5')
-  assert(
-    'unscheduled created/draft counted',
-    progress.unscheduledLabel === 'Вне графика: 2'
-  )
-  assert('unassigned warning present', progress.unassignedLabel.includes('Без поставщика: 1'))
-  assert('inconsistent warning present', progress.inconsistentLabel === 'Расхождение: 1')
-  assert('allDone false while unassigned remain', progress.allDone === false)
-  assert(
-    'unscheduled snapshot suppliers ignored in denominator',
-    progress.total === 7 && progress.createdToday === 2
-  )
-
-  const noVisits = ux.formatOrdersProgress({
-    scheduledSuppliers: [],
-    snapshotSuppliers: snapshotForToday,
-    unassignedOrderableCount: 0,
-    inconsistentSupplierCount: 0,
-  })
-  assert(
-    'zero visits label',
-    noVisits.createdLabel === 'На сегодня визиты не запланированы'
-  )
-  assert(
-    'zero visits marks all draft/created as unscheduled',
-    noVisits.unscheduledLabel === 'Вне графика: 4'
-  )
-
-  const nameFallbackProgress = ux.formatOrdersProgress({
-    scheduledSuppliers: [
-      {
-        id: 'new-platform-id',
-        name: 'Legacy Supplier',
-        status: 'active',
-        deliveryWeekdays: ['mon'],
-      },
-    ],
-    snapshotSuppliers: [
-      {
-        id: 'old-snapshot-id',
-        name: 'Legacy Supplier',
-        planningStatus: 'created',
-        generatedOrderId: 'po-legacy',
-        generatedPositions: 1,
-        pendingPositions: 0,
-      },
-    ],
-  })
-  assert(
-    'name fallback matches created order',
-    nameFallbackProgress.createdLabel === 'Сегодня: создано 1 из 1' &&
-      nameFallbackProgress.remainingLabel == null
-  )
-
   const inactiveExcluded = ux.listTodaysScheduledSuppliers(
     [
       {
@@ -279,43 +169,37 @@ async function stageSummariesAndWorkflow() {
     inactiveExcluded.length === 1 && inactiveExcluded[0].id === 'active-1'
   )
 
-  const doneProgress = ux.formatOrdersProgress({
-    scheduledSuppliers: scheduledSeven.slice(0, 2),
-    snapshotSuppliers: snapshotForToday.slice(0, 2),
-    unassignedOrderableCount: 0,
-    inconsistentSupplierCount: 0,
-  })
-  assert('allDone true only without unassigned/inconsistent', doneProgress.allDone === true)
   assert(
-    'allDone false with inconsistent only',
-    ux.formatOrdersProgress({
-      scheduledSuppliers: scheduledSeven.slice(0, 2),
-      snapshotSuppliers: snapshotForToday.slice(0, 2),
-      unassignedOrderableCount: 0,
-      inconsistentSupplierCount: 1,
-    }).allDone === false
-  )
-
-  assert(
-    'workflow select supplier',
-    ux.getSupplierWorkflowStatus({ supplierId: '' }).step === 'select_supplier'
+    'workflow renders no step line without a supplier',
+    ux.getSupplierWorkflowStatus({ supplierId: '' }).step === 'select_supplier' &&
+      ux.getSupplierWorkflowStatus({ supplierId: '' }).label === null
   )
   assert(
-    'workflow enter qty',
-    ux.getSupplierWorkflowStatus({ supplierId: 's3', summary: s3 }).step === 'enter_qty'
+    'workflow enter qty drops the step numbering',
+    ux.getSupplierWorkflowStatus({ supplierId: 's3', summary: s3 }).step === 'enter_qty' &&
+      ux.getSupplierWorkflowStatus({ supplierId: 's3', summary: s3 }).label ===
+        'Укажите количество'
   )
   assert(
     'workflow draft',
-    ux.getSupplierWorkflowStatus({ supplierId: 's1', summary: s1 }).label.includes('Черновик · 2 позиций')
+    ux
+      .getSupplierWorkflowStatus({ supplierId: 's1', summary: s1 })
+      .label.includes('Черновик · 2 позиции')
   )
   assert(
-    'workflow created',
-    ux.getSupplierWorkflowStatus({ supplierId: 's2', summary: s2 }).step === 'created' &&
-      ux.getSupplierWorkflowStatus({ supplierId: 's2', summary: s2 }).orderId === 'po-2'
+    'workflow after an order invites the next one',
+    ux.getSupplierWorkflowStatus({ supplierId: 's2', summary: s2 }).step === 'ordered' &&
+      ux.getSupplierWorkflowStatus({ supplierId: 's2', summary: s2 }).orderId === 'po-2' &&
+      ux
+        .getSupplierWorkflowStatus({ supplierId: 's2', summary: s2 })
+        .label.includes('можно заказать ещё')
   )
   assert(
-    'workflow created marks inconsistent leftover',
-    ux.getSupplierWorkflowStatus({ supplierId: 's4', summary: s4 }).inconsistent === true
+    'workflow shows past orders as history next to a fresh draft',
+    ux.getSupplierWorkflowStatus({ supplierId: 's4', summary: s4 }).step === 'draft' &&
+      ux
+        .getSupplierWorkflowStatus({ supplierId: 's4', summary: s4 })
+        .historyLabel.startsWith('Уже заказано:')
   )
 
   assert(
@@ -347,22 +231,46 @@ async function stageSummariesAndWorkflow() {
     }) === 'Исправьте ошибку сохранения количества'
   )
   assert(
-    'create blocked when already created',
+    'an existing order never blocks the next one',
     ux.getCreateOrderDisabledReason({
       canGenerate: true,
       snapshotEditable: true,
       supplierId: 's2',
       summary: s2,
-    }) === 'Заказ для этого поставщика уже создан'
+    }) == null
   )
   assert(
-    'create blocked for inconsistent created supplier',
+    'a missing qty is the only qty-related blocker left',
+    ux.getCreateOrderDisabledReason({
+      canGenerate: true,
+      snapshotEditable: true,
+      supplierId: 's2',
+      summary: { ...s2, orderablePositions: 0 },
+    }) === 'Укажите количество больше 0 хотя бы для одной позиции'
+  )
+  assert(
+    'repeat order allowed for a supplier that already has one',
     ux.getCreateOrderDisabledReason({
       canGenerate: true,
       snapshotEditable: true,
       supplierId: 's4',
       summary: s4,
-    }) === 'Заказ для этого поставщика уже создан'
+    }) == null
+  )
+  assert(
+    'repeat order stays allowed when the legacy backend keeps qty on ordered rows',
+    ux.getCreateOrderDisabledReason({
+      canGenerate: true,
+      snapshotEditable: true,
+      supplierId: 's-legacy',
+      summary: {
+        id: 's-legacy',
+        orderablePositions: 3,
+        pendingPositions: 0,
+        generatedPositions: 3,
+        generatedOrderId: 'po-legacy',
+      },
+    }) == null
   )
   assert(
     'create allowed for draft with qty',
@@ -474,17 +382,39 @@ async function stageSummariesAndWorkflow() {
     generatedPurchaseOrderId: 'po-2',
   }
   assert(
-    'zero qty row locked when supplier order exists',
-    ux.isItemQuantityLocked(zeroQtyOnCreated, options) === true
+    'a row of the selected supplier stays editable after its order exists',
+    ux.canEditItemQuantity(inOrderItem, { selectedSupplierId: 's2' }) === true
   )
   assert(
-    'locked hint for leftover rows',
-    ux.getLockedQuantityHint(zeroQtyOnCreated, options).label === 'Заказ поставщику создан' &&
-      ux.getLockedQuantityHint(zeroQtyOnCreated, options).orderId === 'po-2'
+    'a row with no history renders a dash, not an order hint',
+    ux.getItemOrderHistory(zeroQtyOnCreated).documents === 0 &&
+      ux.formatOrderHistoryLabel(ux.getItemOrderHistory(zeroQtyOnCreated)) === null
   )
   assert(
-    'locked hint for generated row',
-    ux.getLockedQuantityHint(inOrderItem, options).label === 'Уже в заказе'
+    'legacy row history falls back to exactly one document',
+    ux.getItemOrderHistory(inOrderItem).documents === 1 &&
+      ux.getItemOrderHistory(inOrderItem).qty === 0 &&
+      ux.getItemOrderHistory(inOrderItem).orderId === 'po-2' &&
+      ux.getItemOrderHistory(inOrderItem).source === 'fallback'
+  )
+  assert(
+    'aggregate history fields win over the legacy single order id',
+    ux.getItemOrderHistory({
+      ...inOrderItem,
+      ordered_qty_total: 30,
+      ordered_document_count: 3,
+    }).documents === 3 &&
+      ux.getItemOrderHistory({
+        ...inOrderItem,
+        ordered_qty_total: 30,
+        ordered_document_count: 3,
+      }).qty === 30
+  )
+  assert(
+    'history label is pluralised',
+    ux.formatOrderHistoryLabel({ documents: 1 }) === 'Заказано · 1 документ' &&
+      ux.formatOrderHistoryLabel({ documents: 2 }) === 'Заказано · 2 документа' &&
+      ux.formatOrderHistoryLabel({ documents: 5 }) === 'Заказано · 5 документов'
   )
 
   const exportRows = [
@@ -524,12 +454,28 @@ async function stageSummariesAndWorkflow() {
       productName: 'Draft B',
     },
   ]
-  const createdExport = ux.filterItemsForSupplierPlanExport(exportRows, s4)
+  // s4 already has po-4 and a fresh positive row: the export follows what is about to
+  // be ordered, not the document that was already sent.
+  const repeatExport = ux.filterItemsForSupplierPlanExport(exportRows, s4)
   assert(
-    'created export excludes pending leftovers',
-    createdExport.length === 1 &&
-      createdExport[0].id === 'e1' &&
-      createdExport[0].generatedPurchaseOrderId === 'po-4'
+    'export follows the fresh draft of a supplier that already has an order',
+    repeatExport.length === 1 && repeatExport[0].id === 'e2'
+  )
+  assert(
+    'export menu still says «заказ» only when nothing new is drafted',
+    ux.isSupplierPlanExportOrder(s4) === false &&
+      ux.isSupplierPlanExportOrder(s2) === true &&
+      ux.getExportMenuLabel(ux.isSupplierPlanExportOrder(s2)) === 'Скачать заказ'
+  )
+  const createdOnlyExport = ux.filterItemsForSupplierPlanExport(
+    exportRows.filter((row) => row.id !== 'e2'),
+    s4
+  )
+  assert(
+    'without a draft the export falls back to the generated order rows',
+    createdOnlyExport.length === 1 &&
+      createdOnlyExport[0].id === 'e1' &&
+      createdOnlyExport[0].generatedPurchaseOrderId === 'po-4'
   )
   const draftExport = ux.filterItemsForSupplierPlanExport(exportRows, s1)
   assert(
@@ -1156,22 +1102,33 @@ function stageSourceContracts() {
     'ambiguous partial label removed',
     !planner.includes('Частично сформирован')
   )
-  assert('planner shows created X of Y', planner.includes('ordersProgress.createdLabel'))
   assert(
-    'planner today progress uses schedule helpers',
+    'planner still scopes the supplier list by today schedule',
     planner.includes('listTodaysScheduledSuppliers') &&
       planner.includes('getAllSuppliersSync') &&
       planner.includes('dataVersion')
   )
-  assert('planner shows unscheduled warning', planner.includes('ordersProgress.unscheduledLabel'))
   assert('planner workflow strip', planner.includes('proc-planner__workflow'))
   assert(
-    'planner meta has two equal cards',
-    planner.includes('Снимок UMAG') &&
-      planner.includes('Прогресс заказов') &&
-      !planner.includes('meta-label">Поставщик') &&
-      read('src/components/procurement/ProcurementPlannerView.css').includes(
-        'grid-template-columns: repeat(2, minmax(0, 1fr))'
+    'the bulky orders-progress block is gone together with its computation',
+    !planner.includes('Прогресс заказов') &&
+      !planner.includes('ordersProgress') &&
+      !planner.includes('formatOrdersProgress') &&
+      !read('src/utils/procurementPlannerUx.js').includes(
+        'export function formatOrdersProgress'
+      ) &&
+      !planner.includes('proc-planner__meta')
+  )
+  assert(
+    'snapshot line and chips live in the tabs row, not in a card above the table',
+    planner.includes('createPortal') &&
+      planner.includes('headerSlot') &&
+      planner.includes('proc-planner__topbar') &&
+      read('src/pages/platform/procurement/ProcurementPage.jsx').includes(
+        'procurement-page__tabs-aside'
+      ) &&
+      read('src/pages/platform/procurement/ProcurementPage.jsx').includes(
+        '<ProcurementPlannerView headerSlot={tabsAsideEl} />'
       )
   )
   assert('pending save ref guard', planner.includes('pendingSaveCountRef'))

@@ -88,7 +88,7 @@ async function stageRules() {
     !isPurchaseStatusReturnableToDraft(PURCHASE_STATUS.DRAFT)
   )
 
-  const order = { status: PURCHASE_STATUS.AWAITING_RECEIVING }
+  const order = { status: PURCHASE_STATUS.AWAITING_RECEIVING, workflowMode: 'simple' }
   assert(
     'return allowed while the warehouse has not started',
     canReturnPurchaseToDraft(order, { receivingStarted: false })
@@ -98,6 +98,13 @@ async function stageRules() {
     !canReturnPurchaseToDraft(order, { receivingStarted: true })
   )
   assert('missing order is never returnable', !canReturnPurchaseToDraft(null))
+  assert(
+    'analytics orders cannot be returned to draft',
+    !canReturnPurchaseToDraft(
+      { status: PURCHASE_STATUS.AWAITING_RECEIVING, workflowMode: 'analytics' },
+      { receivingStarted: false }
+    )
+  )
 
   // isReceivingStarted is the single definition shared by UI and adapters.
   assert(
@@ -385,16 +392,17 @@ async function stagePlanner() {
     'rows of another supplier stay locked',
     !canEditItemQuantity(item, { filterOptions, selectedSupplierId: supplierB })
   )
+  // Повторный заказ тому же поставщику разрешён: прошлый заказ больше не блокирует ввод.
   assert(
-    'a row already in a generated order stays locked',
-    !canEditItemQuantity(
+    'a row already in a generated order stays editable for the next order',
+    canEditItemQuantity(
       { ...item, generated_purchase_order_id: 'po-1' },
       { filterOptions, selectedSupplierId: supplierA }
     )
   )
   assert(
-    'a supplier whose order is created is locked',
-    !canEditItemQuantity(item, {
+    'a supplier whose order is created can be ordered again',
+    canEditItemQuantity(item, {
       filterOptions: { suppliers: [{ id: supplierA, generatedOrderId: 'po-1' }] },
       selectedSupplierId: supplierA,
     })
@@ -405,11 +413,15 @@ async function stagePlanner() {
   const view = read(PLANNER_VIEW)
   assert(
     'the input is replaced by a dash when not editable',
-    /!locked && !canEditQuantity\(item\)/.test(view) && /proc-planner__readonly-qty/.test(view)
+    /!canEditQuantity\(item\)/.test(view) && /proc-planner__qty-value is-empty/.test(view)
   )
+  // Раньше проверялось имя handleFinalChange — обработчик давно называется
+  // commitQuantity, из-за чего проверка была «красной» ещё до этой задачи.
   assert(
     'the save handler guards against a stale blur event',
-    /async function handleFinalChange[\s\S]{0,300}if \(!canEditQuantity\(item\)\)[\s\S]{0,300}return/.test(view)
+    /async function commitQuantity[\s\S]{0,600}if \(!canEditQuantity\(item\)\)[\s\S]{0,400}return \{ ok: false/.test(
+      view
+    )
   )
   assert(
     'reset is guarded too',

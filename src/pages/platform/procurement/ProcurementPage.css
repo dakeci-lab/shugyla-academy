@@ -6,11 +6,48 @@
   box-sizing: border-box;
 }
 
+/*
+ * Верхняя строка: вкладки слева, компактный статус планировщика справа.
+ * Подчёркивание перенесено на строку целиком, чтобы правая часть жила на той же линии.
+ */
+.procurement-page__tabs-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.25rem 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  min-width: 0;
+}
+
 .procurement-page__tabs {
   display: flex;
   gap: 0.25rem;
-  margin-bottom: 0.85rem;
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.procurement-page__tabs-aside {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex: 1 1 17rem;
+  gap: 0.4rem;
+  min-width: 0;
+  padding-bottom: 0.4rem;
+}
+
+/* Другие вкладки ничего сюда не портируют — строка не должна занимать высоту. */
+.procurement-page__tabs-aside:empty {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  .procurement-page__tabs-aside {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    padding: 0 0 0.45rem;
+  }
 }
 
 .procurement-page__tab {

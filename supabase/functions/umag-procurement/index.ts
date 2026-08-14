@@ -3,8 +3,9 @@
  *
  * Actions:
  * - sync: create immutable facts snapshot (requires procurement.edit)
- * - generate: idempotently create analytics purchase_orders + receiving_documents
- *             for selected, not-yet-generated suppliers
+ * - generate: create analytics purchase_orders + receiving_documents from current
+ *             snapshot qty. Same attempt_key is idempotent; a new key creates a
+ *             new order after the buyer enters qty again.
  *             (requires procurement.create AND procurement.transfer)
  *
  * Never writes back to UMAG. Never returns UMAG secrets to the client.
@@ -665,6 +666,45 @@ async function handleGenerate(
     )
   }
 
+  const attemptKey = asText(body.attemptKey || body.attempt_key)
+  if (attemptKey && !UUID_PATTERN.test(attemptKey)) {
+    return umagErrorResponse(
+      'VALIDATION_ERROR',
+      'Некорректный идентификатор попытки формирования заказа.',
+      400
+    )
+  }
+  if (attemptKey && supplierIds.length !== 1) {
+    return umagErrorResponse(
+      'VALIDATION_ERROR',
+      'Повторное формирование с ключом попытки возможно только для одного поставщика.',
+      400
+    )
+  }
+
+  const payloadFingerprintRaw = asText(
+    body.payloadFingerprint || body.payload_fingerprint
+  )
+  const payloadFingerprint = payloadFingerprintRaw ? payloadFingerprintRaw.trim() : ''
+  if (attemptKey && !payloadFingerprint) {
+    return umagErrorResponse(
+      'VALIDATION_ERROR',
+      'Повторное формирование требует отпечаток состава заказа.',
+      400
+    )
+  }
+  if (
+    payloadFingerprint &&
+    (!payloadFingerprint.startsWith('shugyla.procurement.attempt.fp.v1\n') ||
+      payloadFingerprint.length > 100_000)
+  ) {
+    return umagErrorResponse(
+      'VALIDATION_ERROR',
+      'Некорректный отпечаток содержимого попытки.',
+      400
+    )
+  }
+
   const createdBy = String(authz.caller.id)
   const createdByName = await fetchCallerDisplayName(authz.serviceClient, authz.caller.id)
 
@@ -676,6 +716,8 @@ async function handleGenerate(
       p_supplier_ids: supplierIds,
       p_created_by: createdBy,
       p_created_by_name: createdByName || null,
+      p_attempt_key: attemptKey || null,
+      p_payload_fingerprint: payloadFingerprint || null,
     }
   )
 
@@ -700,6 +742,34 @@ async function handleGenerate(
         'VALIDATION_ERROR',
         'Выберите хотя бы одного поставщика.',
         400
+      )
+    }
+    if (msg.includes('attempt_key requires a single supplier')) {
+      return umagErrorResponse(
+        'VALIDATION_ERROR',
+        'Повторное формирование с ключом попытки возможно только для одного поставщика.',
+        400
+      )
+    }
+    if (msg.includes('attempt_key requires payload fingerprint')) {
+      return umagErrorResponse(
+        'VALIDATION_ERROR',
+        'Повторное формирование требует отпечаток состава заказа.',
+        400
+      )
+    }
+    if (msg.includes('attempt_key payload conflict')) {
+      return umagErrorResponse(
+        'ATTEMPT_CONFLICT',
+        'Эта попытка уже использовалась с другим составом заказа. Создайте новую попытку.',
+        409
+      )
+    }
+    if (msg.includes('cannot create an order without items')) {
+      return umagErrorResponse(
+        'GENERATE_FAILED',
+        'Нельзя сформировать заказ без позиций. Укажите количество и повторите.',
+        409
       )
     }
     return umagErrorResponse(

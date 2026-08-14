@@ -8,7 +8,12 @@ import {
   RECEIVING_STATUS,
   RECEIVING_ITEM_STATUS,
 } from '../utils/receivingData'
-import { PURCHASE_STATUS, PROCUREMENT_WORKFLOW_MODE } from '../utils/purchaseData'
+import {
+  ANALYTICS_DIRECT_WRITE_MESSAGE,
+  PURCHASE_STATUS,
+  PROCUREMENT_WORKFLOW_MODE,
+  isSimpleWorkflow,
+} from '../utils/purchaseData'
 import {
   DEFAULT_IN_FILTER_CHUNK_SIZE,
   DEFAULT_POSTGREST_PAGE_SIZE,
@@ -26,6 +31,21 @@ import {
 
 function throwIfError(result, context, fallback = 'Не удалось сохранить данные.') {
   return throwUserError(result, context, fallback)
+}
+
+function refuseAnalyticsDirectWrite(entity) {
+  if (isSimpleWorkflow(entity)) return
+  throw new Error(ANALYTICS_DIRECT_WRITE_MESSAGE)
+}
+
+async function fetchPurchaseWorkflow(purchaseOrderId) {
+  if (!purchaseOrderId) return null
+  const result = await supabase
+    .from('purchase_orders')
+    .select('id, workflow_mode')
+    .eq('id', purchaseOrderId)
+    .maybeSingle()
+  return throwIfError(result, 'Проверка типа закупа')
 }
 
 function ensureClient() {
@@ -700,15 +720,21 @@ export async function fetchReceivingLockStateByPurchaseIdCloud(purchaseOrderId) 
 /** Мягкая отмена документов приёмки по закупу: данные остаются, склад их больше не ждёт */
 export async function cancelReceivingByPurchaseIdCloud(purchaseOrderId) {
   ensureClient()
+  const order = await fetchPurchaseWorkflow(purchaseOrderId)
+  if (order) refuseAnalyticsDirectWrite(order)
 
   const result = await supabase
     .from('receiving_documents')
-    .select('id')
+    .select('id, workflow_mode')
     .eq('purchase_order_id', purchaseOrderId)
     .neq('status', RECEIVING_STATUS.CANCELLED)
 
   const rows = await throwIfError(result, 'Поиск документов приёмки')
-  const docIds = (rows || []).map((row) => row.id)
+  const docIds = []
+  for (const row of rows || []) {
+    refuseAnalyticsDirectWrite(row)
+    docIds.push(row.id)
+  }
   if (docIds.length === 0) return 0
 
   await throwIfError(
@@ -727,14 +753,20 @@ export async function cancelReceivingByPurchaseIdCloud(purchaseOrderId) {
 
 export async function deleteReceivingByPurchaseIdCloud(purchaseOrderId) {
   ensureClient()
+  const order = await fetchPurchaseWorkflow(purchaseOrderId)
+  if (order) refuseAnalyticsDirectWrite(order)
 
   const docsResult = await supabase
     .from('receiving_documents')
-    .select('id')
+    .select('id, workflow_mode')
     .eq('purchase_order_id', purchaseOrderId)
 
   const docRows = await throwIfError(docsResult, 'Поиск документов приёмки')
-  const docIds = (docRows || []).map((row) => row.id)
+  const docIds = []
+  for (const row of docRows || []) {
+    refuseAnalyticsDirectWrite(row)
+    docIds.push(row.id)
+  }
   if (docIds.length === 0) return
 
   await throwIfError(
@@ -753,6 +785,7 @@ export async function acceptSimpleDeliveryCloud(documentId, user) {
 
   const current = await fetchDocumentById(documentId)
   if (!current) throw new Error('Документ приёмки не найден')
+  refuseAnalyticsDirectWrite(current)
 
   const now = new Date().toISOString()
 
@@ -790,6 +823,7 @@ export async function unacceptSimpleDeliveryCloud(documentId) {
 
   const current = await fetchDocumentById(documentId)
   if (!current) throw new Error('Документ приёмки не найден')
+  refuseAnalyticsDirectWrite(current)
 
   const now = new Date().toISOString()
 

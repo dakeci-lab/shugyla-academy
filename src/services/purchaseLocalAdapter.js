@@ -6,6 +6,9 @@ import {
   calcOrderTotal,
   PROCUREMENT_WORKFLOW_MODE,
   RECEIVING_STARTED_MESSAGE,
+  ANALYTICS_DIRECT_WRITE_MESSAGE,
+  ANALYTICS_RETURN_TO_DRAFT_MESSAGE,
+  isSimpleWorkflow,
 } from '../utils/purchaseData'
 import { SYNC_STATUS } from '../utils/syncStatus'
 import { isCloudMode } from '../lib/dataMode'
@@ -291,6 +294,7 @@ export function deletePurchaseOrderSync(orderId) {
   const orders = readOrders()
   const order = orders.find((o) => o.id === orderId)
   if (!order) throw new Error('Закуп не найден')
+  if (!isSimpleWorkflow(order)) throw new Error(ANALYTICS_DIRECT_WRITE_MESSAGE)
 
   deleteReceivingByPurchaseIdLocal(orderId)
   writeOrders(orders.filter((o) => o.id !== orderId))
@@ -350,6 +354,7 @@ export async function returnPurchaseOrderToDraft(orderId) {
 
   const current = normalizePurchaseOrder(orders[idx])
   if (current.status === PURCHASE_STATUS.DRAFT) return current
+  if (!isSimpleWorkflow(current)) throw new Error(ANALYTICS_RETURN_TO_DRAFT_MESSAGE)
 
   if (!isPurchaseStatusReturnableToDraft(current.status)) {
     throw new Error('Этот заказ уже нельзя вернуть в черновик.')

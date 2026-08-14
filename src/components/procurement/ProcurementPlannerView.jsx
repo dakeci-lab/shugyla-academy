@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext'
 import { usePlatformData } from '../../context/PlatformDataContext'
@@ -15,6 +16,7 @@ import {
   fetchLatestProcurementSnapshot,
   fetchSnapshotFilterOptions,
   fetchSnapshotItemsPage,
+  fetchSnapshotAttemptItems,
   generateProcurementOrders,
   resetItemToRecommendation,
   syncProcurementPlanning,
@@ -47,28 +49,34 @@ import {
 import { getAllSuppliersSync } from '../../utils/supplierData'
 import {
   EMPTY_SUPPLIER_EXPORT_MESSAGE,
+  ORDER_ATTEMPT_OUTCOME,
   applyItemDeltaToFilterOptions,
   applySaveResultToFailedIds,
   buildPlannerSupplierSelectOptions,
+  buildSnapshotHeadline,
+  classifyGenerateOutcome,
+  createOrderAttemptTracker,
   filterItemsForSupplierPlanExport,
-  formatOrdersProgress,
+  formatOrderHistoryLabel,
+  formatOrderHistoryTitle,
   getCreateOrderDisabledReason,
   getCreateOrderTooltip,
   getExportDisabledReason,
   getExportMenuLabel,
   getExportTooltip,
   getFirstEditableItemId,
-  getLockedQuantityHint,
+  getItemOrderHistory,
   getNextEditableItemId,
+  getPlannerAlertChips,
   getSupplierWorkflowStatus,
   getSyncDisabledReason,
   getSyncTooltip,
   hasFailedSaves,
-  isItemQuantityLocked,
   canEditItemQuantity,
+  isSnapshotQuantityEditable,
   QUANTITY_REQUIRES_SUPPLIER_HINT,
   isSupplierInTodaySchedule,
-  isSupplierOrderCreated,
+  isSupplierPlanExportOrder,
   listTodaysScheduledSuppliers,
 } from '../../utils/procurementPlannerUx'
 import { toProcurementUserMessage } from '../../utils/procurementErrors'
@@ -134,10 +142,16 @@ function PlannerTooltipButton({ tooltip, className = '', children, ...rest }) {
   )
 }
 
-export default function ProcurementPlannerView() {
+/**
+ * @param {{ headerSlot?: HTMLElement|null }} props
+ *   headerSlot — DOM node next to the page tabs where the compact snapshot line and
+ *   the action chips are portalled. Falls back to an inline strip when absent, so the
+ *   component stays usable on its own.
+ */
+export default function ProcurementPlannerView({ headerSlot = null }) {
   const { user } = useSession()
   const { reloadProcurement, version: dataVersion } = usePlatformData()
-  const { error: showError, success: showSuccess } = useToast()
+  const { error: showError, success: showSuccess, warning: showWarning } = useToast()
   void dataVersion
 
   const canEditPlan = can(user, PERMISSION_CODES.PROCUREMENT_EDIT)
@@ -157,6 +171,15 @@ export default function ProcurementPlannerView() {
     platformSupplierId: '',
     warningsOnly: false,
     orderableOnly: false,
+    /**
+     * Rows with a positive qty and no platform supplier.
+     *
+     * Forward-compatible: `fetchSnapshotItemsPage` destructures the filters it knows,
+     * so today the flag is inert and the «Без поставщика» chip lands on the wider
+     * «только к заказу» superset. It starts filtering exactly as soon as the service
+     * honours it (see the contract note in docs/ and in the chip title).
+     */
+    unassignedOnly: false,
   })
   const [filterOptions, setFilterOptions] = useState(EMPTY_FILTER_OPTIONS)
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(false)
@@ -192,6 +215,18 @@ export default function ProcurementPlannerView() {
   const lastCommittedQtyRef = useRef(new Map())
   /** Set to 'firstEditable' when Enter advances to the next page; consumed once items settle. */
   const pendingFocusRef = useRef(null)
+  /**
+   * One attempt key per submission, reused by a technical retry so the backend can
+   * deduplicate it; a new deliberate submit after a result mints a new one.
+   */
+  const orderAttemptRef = useRef(null)
+  if (!orderAttemptRef.current) orderAttemptRef.current = createOrderAttemptTracker()
+  /**
+   * Bumped after every successful order. Part of the qty input `key`, so the field is
+   * remounted and ready for the next order even when the server returns the same
+   * `final_order_qty` for a row that has just been ordered.
+   */
+  const [generationEpoch, setGenerationEpoch] = useState(0)
 
   const activeFilterCount = useMemo(() => {
     let n = 0
@@ -199,6 +234,7 @@ export default function ProcurementPlannerView() {
     if (filters.subcategoryName) n += 1
     if (filters.warningsOnly) n += 1
     if (filters.orderableOnly) n += 1
+    if (filters.unassignedOnly) n += 1
     return n
   }, [filters])
 
@@ -319,6 +355,15 @@ export default function ProcurementPlannerView() {
     setPage(1)
   }, [debouncedSearch, filters, snapshot?.id])
 
+  /**
+   * An attempt key is bound to the payload it was minted for. As soon as any part of
+   * that payload changes, the pending attempt is void and the next submit must mint a
+   * new key — otherwise a retry would deduplicate against a different request.
+   */
+  useEffect(() => {
+    orderAttemptRef.current.reset()
+  }, [deliveryDate, filters.platformSupplierId, snapshot?.id])
+
   async function handleSync() {
     if (
       getSyncDisabledReason({
@@ -381,13 +426,16 @@ export default function ProcurementPlannerView() {
     }
   }
 
-  /** Единственный источник правды о доступности правки количества. */
+  /**
+   * Единственный источник правды о доступности правки количества.
+   * Блокируют только реальные причины: права и состояние снимка. Ранее созданный
+   * заказ — не причина: повторный заказ тому же поставщику разрешён.
+   */
   function canEditQuantity(item) {
     return (
       canEditPlan &&
       snapshotEditable &&
       canEditItemQuantity(item, {
-        filterOptions,
         selectedSupplierId: filters.platformSupplierId,
       })
     )
@@ -543,7 +591,7 @@ export default function ProcurementPlannerView() {
     return pairs.filter((p) => p.categoryName === filters.categoryName)
   }, [filterOptions.categorySubcategories, filters.categoryName])
 
-  const snapshotEditable = snapshot?.status === 'ready' || snapshot?.status === 'partially_generated'
+  const snapshotEditable = isSnapshotQuantityEditable(snapshot?.status)
 
   async function runPlanExport(format) {
     if (
@@ -589,6 +637,13 @@ export default function ProcurementPlannerView() {
     }
   }
 
+  /** User consciously abandoned the submission — the next one starts a new attempt. */
+  function cancelOrderAttempt() {
+    orderAttemptRef.current.reset()
+    setGenerateOpen(false)
+    setConfirmGenerate(false)
+  }
+
   async function runGenerate() {
     const livePending = pendingSaveCountRef.current
     const blocked = getCreateOrderDisabledReason({
@@ -599,38 +654,83 @@ export default function ProcurementPlannerView() {
       pendingSaveCount: livePending,
       hasSaveError,
       generating,
-      supplierName: selectedSupplier?.name || '',
     })
     if (blocked || !snapshot?.id || !deliveryDate) return
 
     setGenerating(true)
+    let result = null
+    let thrown = null
     try {
-      const result = await generateProcurementOrders(snapshot.id, deliveryDate, {
+      const pending = orderAttemptRef.current.peek()
+      const attemptItems = pending
+        ? []
+        : await fetchSnapshotAttemptItems(snapshot.id, filters.platformSupplierId)
+      const attempt = orderAttemptRef.current.begin({
+        snapshotId: snapshot.id,
         supplierId: filters.platformSupplierId,
+        expectedDeliveryDate: deliveryDate,
+        items: attemptItems,
       })
-      if (!result.success) {
-        showError(result.message)
+      result = await generateProcurementOrders(snapshot.id, deliveryDate, {
+        supplierId: filters.platformSupplierId,
+        attemptKey: attempt.key,
+        payloadFingerprint: attempt.fingerprint,
+      })
+    } catch (err) {
+      thrown = err
+    }
+
+    const outcome = classifyGenerateOutcome({ result, error: thrown })
+    orderAttemptRef.current.settle(outcome)
+
+    try {
+      if (thrown || !result?.success) {
+        const message =
+          thrown?.message || result?.message || 'Не удалось сформировать заказы'
+        showError(
+          outcome === ORDER_ATTEMPT_OUTCOME.RETRYABLE
+            ? `${message} Нажмите «Создать заказ» ещё раз, чтобы повторить ту же попытку.`
+            : message
+        )
         return
       }
+
       const orderId = result.purchaseOrderIds?.[0] || null
       const itemsOrdered = result.itemsOrdered ?? 0
       const supplierLabel = selectedSupplier?.name || 'поставщик'
-      const msg = result.alreadyGenerated
-        ? `Заказ для «${supplierLabel}» уже был создан.`
-        : `Заказ для «${supplierLabel}» создан · ${itemsOrdered || selectedSupplierSummary?.pendingPositions || 0} позиций`
-      showSuccess(msg, {
-        duration: 6000,
-        action: orderId
-          ? { label: 'Открыть заказ', to: `/platform/procurement/${orderId}` }
-          : null,
-      })
+
+      if (result.nothingToOrder) {
+        showWarning(`Для «${supplierLabel}» нет позиций с количеством больше 0.`)
+        setGenerateOpen(false)
+        setConfirmGenerate(false)
+        return
+      }
+
+      if (result.idempotentReplay || result.alreadyGenerated) {
+        showSuccess(`Заказ для «${supplierLabel}» уже был создан.`, {
+          duration: 6000,
+          action: orderId
+            ? { label: 'Открыть заказ', to: `/platform/procurement/${orderId}` }
+            : null,
+        })
+      } else {
+        showSuccess(
+          `Заказ для «${supplierLabel}» создан · ${itemsOrdered} позиций`,
+          {
+            duration: 6000,
+            action: orderId
+              ? { label: 'Открыть заказ', to: `/platform/procurement/${orderId}` }
+              : null,
+          }
+        )
+      }
       setGenerateOpen(false)
       setConfirmGenerate(false)
+      // Next order starts from a clean field even if the row keeps its qty server-side.
+      setGenerationEpoch((epoch) => epoch + 1)
       await loadSnapshotMeta({ forceFilterRefresh: true })
       await loadItems()
       await reloadProcurement()
-    } catch (err) {
-      showError(err?.message || 'Не удалось сформировать заказы')
     } finally {
       setGenerating(false)
     }
@@ -641,15 +741,13 @@ export default function ProcurementPlannerView() {
     [dataVersion]
   )
 
-  const ordersProgress = useMemo(
+  const alertChips = useMemo(
     () =>
-      formatOrdersProgress({
-        scheduledSuppliers: scheduledTodaysSuppliers,
-        snapshotSuppliers: filterOptions.suppliers || [],
+      getPlannerAlertChips({
         unassignedOrderableCount: filterOptions.unassignedOrderableCount || 0,
-        inconsistentSupplierCount: filterOptions.inconsistentSupplierCount || 0,
+        suppliers: filterOptions.suppliers || [],
       }),
-    [filterOptions, scheduledTodaysSuppliers]
+    [filterOptions.unassignedOrderableCount, filterOptions.suppliers]
   )
 
   const supplierSelectOptions = useMemo(
@@ -714,7 +812,7 @@ export default function ProcurementPlannerView() {
     disabledReason: createDisabledReason,
     supplierName: selectedSupplier?.name || '',
   })
-  const orderCreatedForSupplier = isSupplierOrderCreated(selectedSupplierSummary)
+  const orderCreatedForSupplier = isSupplierPlanExportOrder(selectedSupplierSummary)
   const exportDisabledReason = getExportDisabledReason({
     snapshotId: snapshot?.id || '',
     snapshotStatus: snapshot?.status || '',
@@ -757,78 +855,157 @@ export default function ProcurementPlannerView() {
     Boolean(snapshot?.id) &&
     (filterOptionsLoading || filterOptionsSnapshotId !== snapshot.id)
 
+  /**
+   * История заказов строки — информативная, никогда не блокирующая.
+   * Порядок в столбце стабилен: сначала значение (или поле ввода), затем история.
+   */
+  function renderQtyHistory(item) {
+    const history = getItemOrderHistory(item)
+    const label = formatOrderHistoryLabel(history)
+    if (!label) return null
+    const title = formatOrderHistoryTitle(history)
+    return history.orderId ? (
+      <Link
+        to={`/platform/procurement/${history.orderId}`}
+        className="proc-planner__qty-history"
+        title={title}
+      >
+        {label}
+      </Link>
+    ) : (
+      <span className="proc-planner__qty-history" title={title}>
+        {label}
+      </span>
+    )
+  }
+
   function renderQtyCell(item, mobile = false) {
-    const locked = isItemQuantityLocked(item, filterOptions)
-    if (!locked && !canEditQuantity(item)) {
+    if (!canEditQuantity(item)) {
       // Поставщик не выбран (или строка принадлежит другому) — поля ввода нет вовсе,
       // чтобы нельзя было отправить правку, которая никуда не попадёт.
+      const history = getItemOrderHistory(item)
+      const hasHistory = history.documents > 0
+      const currentQty = Number(item.finalOrderQty)
+      const hasCurrentQty = Number.isFinite(currentQty) && currentQty > 0
       return (
         <div className="proc-planner__final proc-planner__final--readonly">
           <span
-            className="proc-planner__readonly-qty"
-            title={QUANTITY_REQUIRES_SUPPLIER_HINT}
-            aria-label={`${QUANTITY_REQUIRES_SUPPLIER_HINT}: ${item.productName}`}
+            className={
+              hasCurrentQty ? 'proc-planner__qty-value' : 'proc-planner__qty-value is-empty'
+            }
+            title={hasHistory ? formatOrderHistoryTitle(history) : QUANTITY_REQUIRES_SUPPLIER_HINT}
+            aria-label={
+              hasHistory
+                ? `${formatOrderHistoryTitle(history)}: ${item.productName}`
+                : `${QUANTITY_REQUIRES_SUPPLIER_HINT}: ${item.productName}`
+            }
           >
-            —
+            {hasCurrentQty ? formatNum(currentQty, 0) : '—'}
           </span>
-        </div>
-      )
-    }
-    if (locked) {
-      const hint = getLockedQuantityHint(item, filterOptions)
-      return (
-        <div className="proc-planner__final proc-planner__final--locked">
-          <span className="proc-planner__locked-qty">{formatNum(item.finalOrderQty, 0)}</span>
-          {hint.orderId ? (
-            <Link
-              to={`/platform/procurement/${hint.orderId}`}
-              className="proc-planner__in-order"
-              title={hint.label}
-            >
-              {hint.label}
-            </Link>
-          ) : (
-            <span className="proc-planner__in-order">{hint.label}</span>
-          )}
+          {renderQtyHistory(item)}
         </div>
       )
     }
 
     return (
       <div className="proc-planner__final">
-        <input
-          className={mobile ? undefined : 'proc-planner__input'}
-          type="number"
-          min={0}
-          step={1}
-          defaultValue={item.finalOrderQty}
-          key={`${mobile ? 'm-' : ''}final-${item.id}-${item.finalOrderQty}-${item.manualOverride}`}
-          disabled={!canEditPlan || !snapshotEditable}
-          data-qty-input={item.id}
-          onBlur={(e) => void commitQuantity(item, e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter') return
-            e.preventDefault()
-            if (e.repeat) return
-            void handleQtyEnter(item, e.target)
-          }}
-          aria-label={`Заказ для ${item.productName}`}
-        />
-        {item.manualOverride ? (
-          <button
-            type="button"
-            className="proc-planner__reset"
-            title="Сбросить к рекомендации"
-            aria-label="Сбросить к рекомендации"
+        <div className="proc-planner__final-input">
+          <input
+            className={mobile ? undefined : 'proc-planner__input'}
+            type="number"
+            min={0}
+            step={1}
+            defaultValue={item.finalOrderQty}
+            key={`${mobile ? 'm-' : ''}final-${item.id}-${item.finalOrderQty}-${item.manualOverride}-${generationEpoch}`}
             disabled={!canEditPlan || !snapshotEditable}
-            onClick={() => void handleReset(item)}
-          >
-            <RotateCcwIcon size={14} />
-          </button>
-        ) : null}
+            data-qty-input={item.id}
+            onBlur={(e) => void commitQuantity(item, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return
+              e.preventDefault()
+              if (e.repeat) return
+              void handleQtyEnter(item, e.target)
+            }}
+            aria-label={`Заказ для ${item.productName}`}
+          />
+          {item.manualOverride ? (
+            <button
+              type="button"
+              className="proc-planner__reset"
+              title="Сбросить к рекомендации"
+              aria-label="Сбросить к рекомендации"
+              disabled={!canEditPlan || !snapshotEditable}
+              onClick={() => void handleReset(item)}
+            >
+              <RotateCcwIcon size={14} />
+            </button>
+          ) : null}
+        </div>
+        {renderQtyHistory(item)}
       </div>
     )
   }
+
+  /** Chips navigate to the matching filter; they never just report a number. */
+  function handleAlertChipClick(chip) {
+    if (chip.id === 'unassigned') {
+      setFilters((current) => ({
+        ...current,
+        platformSupplierId: '',
+        orderableOnly: true,
+        unassignedOnly: true,
+      }))
+      return
+    }
+    if (chip.id === 'inconsistent') {
+      const supplierId = chip.supplierIds?.[0]
+      if (!supplierId) return
+      // Такой поставщик может быть вне сегодняшнего графика — иначе он не попадёт в список.
+      setSupplierScope('all')
+      setFilters((current) => ({
+        ...current,
+        platformSupplierId: supplierId,
+        unassignedOnly: false,
+      }))
+    }
+  }
+
+  const snapshotHeadline = buildSnapshotHeadline({
+    hasSnapshot: Boolean(snapshot),
+    status: snapshot?.status || '',
+    syncedAtLabel: formatSyncedAt(snapshot?.syncedAt),
+    itemCount: snapshot?.itemCount || 0,
+    negativeStockCount: snapshot?.negativeStockCount || 0,
+  })
+
+  const headerStrip = (
+    <div className="proc-planner__topbar">
+      <span className="proc-planner__snapshot" title={snapshotHeadline.title}>
+        <span className="proc-planner__snapshot-label">UMAG</span>
+        <span className="proc-planner__snapshot-text">{snapshotHeadline.text}</span>
+        {snapshotHeadline.warnText ? (
+          <span className="proc-planner__snapshot-warn">{snapshotHeadline.warnText}</span>
+        ) : null}
+      </span>
+      {alertChips.length > 0 ? (
+        <span className="proc-planner__chips">
+          {alertChips.map((chip) => (
+            <button
+              key={chip.id}
+              type="button"
+              className="proc-planner__chip"
+              title={chip.title}
+              aria-label={`${chip.label}: ${chip.count}. ${chip.title}`}
+              onClick={() => handleAlertChipClick(chip)}
+            >
+              <span className="proc-planner__chip-label">{chip.label}</span>
+              <span className="proc-planner__chip-count">{chip.count}</span>
+            </button>
+          ))}
+        </span>
+      ) : null}
+    </div>
+  )
 
   if (!isCloudMode()) {
     return (
@@ -838,6 +1015,7 @@ export default function ProcurementPlannerView() {
 
   return (
     <div className="proc-planner">
+      {headerSlot ? createPortal(headerStrip, headerSlot) : headerStrip}
       <PlatformSearchToolbar
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -989,6 +1167,21 @@ export default function ProcurementPlannerView() {
                     />
                     Только к заказу
                   </label>
+                  <label className="proc-planner__check">
+                    <input
+                      type="checkbox"
+                      checked={filters.unassignedOnly}
+                      onChange={(e) =>
+                        setFilters((f) => ({
+                          ...f,
+                          unassignedOnly: e.target.checked,
+                          orderableOnly: e.target.checked ? true : f.orderableOnly,
+                          platformSupplierId: e.target.checked ? '' : f.platformSupplierId,
+                        }))
+                      }
+                    />
+                    Только без поставщика
+                  </label>
                   <button
                     type="button"
                     className="btn btn--ghost btn--sm"
@@ -999,6 +1192,7 @@ export default function ProcurementPlannerView() {
                         subcategoryName: '',
                         warningsOnly: false,
                         orderableOnly: false,
+                        unassignedOnly: false,
                       }))
                     }
                   >
@@ -1088,10 +1282,12 @@ export default function ProcurementPlannerView() {
       />
 
       <div className="proc-planner__workflow" aria-live="polite">
-        <span className={`proc-planner__workflow-step is-${workflow.step}`}>
-          {workflow.label}
-        </span>
-        {workflow.step === 'created' && workflow.orderId ? (
+        {workflow.label ? (
+          <span className={`proc-planner__workflow-step is-${workflow.step}`}>
+            {workflow.label}
+          </span>
+        ) : null}
+        {workflow.orderId ? (
           <Link
             to={`/platform/procurement/${workflow.orderId}`}
             className="proc-planner__workflow-link"
@@ -1099,8 +1295,8 @@ export default function ProcurementPlannerView() {
             Открыть заказ
           </Link>
         ) : null}
-        {workflow.inconsistent ? (
-          <span className="proc-planner__warn">Есть позиции вне заказа</span>
+        {workflow.historyLabel ? (
+          <span className="proc-planner__workflow-history">{workflow.historyLabel}</span>
         ) : null}
         {saveStatusLabel ? (
           <span
@@ -1110,51 +1306,6 @@ export default function ProcurementPlannerView() {
             {saveStatusLabel}
           </span>
         ) : null}
-      </div>
-
-      <div className="proc-planner__meta">
-        {snapshot ? (
-          <>
-            <div className="proc-planner__meta-block">
-              <span className="proc-planner__meta-label">Снимок UMAG</span>
-              <span>
-                {snapshot.status === 'syncing'
-                  ? 'Синхронизация…'
-                  : snapshot.status === 'failed'
-                    ? 'Ошибка синхронизации'
-                    : `Обновлён ${formatSyncedAt(snapshot.syncedAt)}`}
-                {` · ${snapshot.itemCount} SKU`}
-                {snapshot.negativeStockCount > 0 ? (
-                  <span className="proc-planner__warn">
-                    {` · ${snapshot.negativeStockCount} отриц.`}
-                  </span>
-                ) : null}
-              </span>
-            </div>
-            <div className="proc-planner__meta-block">
-              <span className="proc-planner__meta-label">Прогресс заказов</span>
-              <span>
-                {ordersProgress.createdLabel}
-                {ordersProgress.remainingLabel ? ` · ${ordersProgress.remainingLabel}` : ''}
-                {ordersProgress.allDone ? ' · Все заказы созданы' : ''}
-              </span>
-              {ordersProgress.unscheduledLabel ? (
-                <span className="proc-planner__warn">{ordersProgress.unscheduledLabel}</span>
-              ) : null}
-              {ordersProgress.unassignedLabel ? (
-                <span className="proc-planner__warn">{ordersProgress.unassignedLabel}</span>
-              ) : null}
-              {ordersProgress.inconsistentLabel ? (
-                <span className="proc-planner__warn">{ordersProgress.inconsistentLabel}</span>
-              ) : null}
-            </div>
-          </>
-        ) : (
-          <div className="proc-planner__meta-block">
-            <span className="proc-planner__meta-label">Снимок UMAG</span>
-            <span>Нет снимка — нажмите синхронизацию</span>
-          </div>
-        )}
       </div>
 
       {snapshot?.status === 'failed' ? (
@@ -1321,7 +1472,7 @@ export default function ProcurementPlannerView() {
         <AdminModal
           title="Создать заказ"
           onClose={() => {
-            if (!generating) setGenerateOpen(false)
+            if (!generating) cancelOrderAttempt()
           }}
           footer={
             <>
@@ -1329,7 +1480,7 @@ export default function ProcurementPlannerView() {
                 type="button"
                 className="btn btn--ghost"
                 disabled={generating}
-                onClick={() => setGenerateOpen(false)}
+                onClick={() => cancelOrderAttempt()}
               >
                 Отмена
               </button>

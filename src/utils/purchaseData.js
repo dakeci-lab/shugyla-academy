@@ -1,4 +1,4 @@
-import { getWorkflowMode } from './procurementWorkflow'
+import { getWorkflowMode, isSimpleWorkflow } from './procurementWorkflow'
 
 export { PROCUREMENT_WORKFLOW_MODE, getWorkflowMode, isSimpleWorkflow } from './procurementWorkflow'
 
@@ -56,13 +56,20 @@ export const RETURNABLE_TO_DRAFT_STATUSES = [
 
 export const RECEIVING_STARTED_MESSAGE = 'Склад начал приёмку — заказ изменить нельзя.'
 
+export const ANALYTICS_RETURN_TO_DRAFT_MESSAGE =
+  'Аналитический заказ нельзя вернуть в черновик. Отмените его и создайте заново.'
+
+export const ANALYTICS_DIRECT_WRITE_MESSAGE =
+  'Аналитический заказ нельзя менять напрямую. Отмените его и создайте заново либо работайте через приёмку склада.'
+
 export function isPurchaseStatusReturnableToDraft(status) {
   return RETURNABLE_TO_DRAFT_STATUSES.includes(status)
 }
 
-/** Можно ли вернуть заказ в черновик: по статусу заказа и состоянию приёмки */
+/** Можно ли вернуть заказ в черновик: только simple, и пока склад не начал приёмку. */
 export function canReturnPurchaseToDraft(order, { receivingStarted = false } = {}) {
   if (!order) return false
+  if (!isSimpleWorkflow(order)) return false
   if (receivingStarted) return false
   return isPurchaseStatusReturnableToDraft(order.status)
 }
