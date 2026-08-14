@@ -5,6 +5,9 @@
  * Usage:
  *   npm run verify:procurement-repeat-analytics-orders
  *   npm run supabase:local:verify-procurement-repeat-analytics-orders
+ *
+ * Live DB target is the local Docker project. Default PROJECT_ID is
+ * shugyla-academy. Override with SUPABASE_PROJECT_ID only at runtime.
  */
 
 import { spawn, spawnSync } from 'child_process'

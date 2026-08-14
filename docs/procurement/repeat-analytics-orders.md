@@ -9,7 +9,7 @@
 - Новый migration-файл создан через `npx supabase migration new procurement_repeat_analytics_orders`.
 - `apply_migration` не используется.
 - AGENTS.md в репозитории нет; ориентир — CLAUDE.md + официальные docs Supabase (SECURITY DEFINER, `search_path = ''`, grants, USING + WITH CHECK, не `auth.role()`).
-- Прод: сначала эта миграция, затем Edge `umag-procurement`, затем фронт через push в `main` → `deploy-ps-production.yml` → ветка `ps-production`. Academy Docker volume не сбрасывать.
+- Прод (факт 2026-08-14, без `db push`): `[db.migrations] enabled = false`, поэтому SQL применили `npx supabase db query --linked --file supabase/migrations/20260814134910_procurement_repeat_analytics_orders.sql`, историю записали `npx supabase migration repair --linked --status applied 20260814134910`, затем Edge `npx supabase functions deploy umag-procurement --project-ref cxadzerxndlscwvdaymk`, затем push в `main` → `.github/workflows/deploy-ps-production.yml` → ветка `ps-production`. Academy Docker volume не сбрасывать.
 
 ## Root cause
 
@@ -196,14 +196,19 @@ npm run build
 
 `verify:procurement-snapshot-guard-static` по-прежнему читает старый файл `20260812032500_*` (там FOR SHARE). Инвариант «без FOR SHARE» живёт в repeat-analytics verify.
 
-Live, 2026-08-14, scratch project `shugyla-repeat-scratch2` (academy volume не трогали):
+Live, 2026-08-14: **103 checks passed** (generate / replay / cancel / concurrency / RLS) на изолированной scratch-Postgres. Academy volume не сбрасывали. Verify по умолчанию смотрит на `shugyla-academy`; scratch выбирался только runtime-env `SUPABASE_PROJECT_ID`.
 
-- Полный timestamp chain с нуля падает без `schema.sql`: `20260712163000` → `alter table academy_users add column if not exists role_id uuid`.
-- После `schema.sql` chain падает на старой `20260716220000_fix_time_tracker_checkout_after_rls.sql` (нет `platform_get_employee_work_location` / geo-колонок — CLI пропускает named `add_*.sql`).
-- Дальше data-dependent: `20260801124500` (пустой seed positions) и `20260812085722` (finance cleanup).
-- Scratch-only baseline: named purchase/geo SQL + position fixture, затем отдельно `20260812171700`, `20260813231600` и эта миграция.
-- `SUPABASE_PROJECT_ID=shugyla-repeat-scratch2 npm run supabase:local:verify-procurement-repeat-analytics-orders` → **103 checks passed** (generate/replay/cancel/concurrency/RLS).
-- Targeted: static 37, UI 69/69, order-actions 95, snapshot-guard-static 14, `npm run build` зелёный.
+Полный timestamp chain с нуля на пустой БД не встаёт — это старые файлы, не этот контракт:
+
+- без `schema.sql` падает `20260712163000` (`alter table academy_users add column if not exists role_id uuid`);
+- после `schema.sql` падает `20260716220000_fix_time_tracker_checkout_after_rls.sql` (нет geo / `platform_get_employee_work_location`; CLI пропускает named `add_*.sql`);
+- дальше data-dependent `20260801124500` и `20260812085722`.
+
+Scratch-only baseline: named purchase/geo SQL + fixture, затем отдельно `20260812171700`, `20260813231600` и эта миграция.
+
+Targeted: static 37, UI 69/69, order-actions 95, snapshot-guard-static 14, `npm run build` зелёный.
+
+Прод после этого: SQL `20260814134910` записан в `schema_migrations`, Edge `umag-procurement` задеплоен, фронт `e74724c` ушёл в `main`. GHA `deploy-ps-production` run [31826694354](https://github.com/dakeci-lab/shugyla-academy/actions/runs/31826694354) success. `https://web.shugyla-market.kz/version.json` → `"commit": "e74724ced99f7b4259371066aafcd777d4d673e7"`.
 
 ## Residual risks
 
