@@ -69,6 +69,7 @@
     "verify:procurement-norms-ui": "node scripts/verify-procurement-norms-ui.mjs",
     "verify:procurement-pagination-ux": "node scripts/verify-procurement-pagination-ux.mjs",
     "verify:procurement-desktop-ux": "node scripts/verify-procurement-desktop-ux.mjs",
+    "verify:procurement-mobile-access": "node scripts/verify-procurement-mobile-access.mjs",
     "verify:modal-scroll-lock": "node scripts/verify-modal-scroll-lock.mjs",
     "verify:mobile-profile": "node scripts/verify-mobile-profile.mjs",
     "verify:employee-documents": "node scripts/verify-employee-documents.mjs",

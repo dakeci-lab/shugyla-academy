@@ -298,9 +298,7 @@ export default function App() {
                   path="procurement"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <DesktopWebOnlyRoute>
-                        <ProcurementPage />
-                      </DesktopWebOnlyRoute>
+                      <ProcurementPage />
                     </PlatformRoute>
                   }
                 />
@@ -308,9 +306,7 @@ export default function App() {
                   path="procurement/analytics"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <DesktopWebOnlyRoute>
-                        <AnalyticsProcurementPage />
-                      </DesktopWebOnlyRoute>
+                      <AnalyticsProcurementPage />
                     </PlatformRoute>
                   }
                 />
@@ -318,9 +314,7 @@ export default function App() {
                   path="procurement/analytics/:id"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <DesktopWebOnlyRoute>
-                        <PurchaseDetailPage />
-                      </DesktopWebOnlyRoute>
+                      <PurchaseDetailPage />
                     </PlatformRoute>
                   }
                 />
@@ -328,9 +322,7 @@ export default function App() {
                   path="procurement/:id"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <DesktopWebOnlyRoute>
-                        <PurchaseDetailPage />
-                      </DesktopWebOnlyRoute>
+                      <PurchaseDetailPage />
                     </PlatformRoute>
                   }
                 />

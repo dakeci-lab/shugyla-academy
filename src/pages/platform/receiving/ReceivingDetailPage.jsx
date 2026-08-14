@@ -590,22 +590,17 @@ export default function ReceivingDetailPage() {
     setMessage('')
     try {
       const exportVersion = Number(document.exportVersion || 0) + 1
+      const exported = await createReceivingUmagXlsx(prepareItemsForSave(items))
+      const { totalQuantity, totalAmount } = exported.totals
       const exportOptions = {
         ...document,
         supplierInvoiceNumbers: parsedInvoiceNumbers,
         version: exportVersion,
+        // Не document.totalAmount: в имени файла стоит принятая сумма, а не заказанная.
+        exportTotalAmount: totalAmount,
       }
-      const exported = await createReceivingUmagXlsx(prepareItemsForSave(items))
       const fileName = buildReceivingUmagFilename(exportOptions)
       const umagComment = buildReceivingUmagComment(exportOptions)
-      const totalQuantity = exported.rows.reduce(
-        (sum, row) => sum + Number(row['Количество'] || 0),
-        0
-      )
-      const totalAmount = exported.rows.reduce(
-        (sum, row) => sum + Number(row['Количество'] || 0) * Number(row['Цена'] || 0),
-        0
-      )
       await recordReceivingUmagExport(document.id, {
         expectedVersion: document.version,
         expectedExportVersion: document.exportVersion,

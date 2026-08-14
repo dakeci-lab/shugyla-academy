@@ -285,6 +285,86 @@ export function sanitizeReceivingUmagFilenamePart(value, fallback = 'UNKNOWN') {
   return safe || fallback
 }
 
+/**
+ * Business date as YYYY-MM-DD.
+ *
+ * The date is read, never computed: an ISO timestamp is truncated instead of
+ * being run through the local timezone, so the same receipt keeps the same
+ * filename whoever downloads it and whenever they do it.
+ */
+export function normalizeReceivingUmagFilenameDate(value) {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10)
+  }
+
+  const match = String(value ?? '')
+    .trim()
+    .match(/^(\d{4})-(\d{2})-(\d{2})(?![\d-])/)
+  if (!match) return null
+
+  const [, year, month, day] = match
+  if (Number(month) < 1 || Number(month) > 12) return null
+  if (Number(day) < 1 || Number(day) > 31) return null
+  return `${year}-${month}-${day}`
+}
+
+/**
+ * Whole tenge, no separators — the amount is a label that makes the file
+ * recognizable in a downloads list, not an accounting figure.
+ */
+export function formatReceivingUmagFilenameAmount(value) {
+  const amount = parseLocalizedNumber(value)
+  if (amount == null || amount < 0) return null
+  return `${Math.round(amount)}тг`
+}
+
+/** Totals of the rows that actually reach UMAG, free of float drift. */
+export function summarizeReceivingUmagRows(rows) {
+  const list = Array.isArray(rows) ? rows : []
+  let totalQuantity = 0
+  let totalAmount = 0
+
+  for (const row of list) {
+    const quantity = parseLocalizedNumber(row?.['Количество']) ?? 0
+    const price = parseLocalizedNumber(row?.['Цена']) ?? 0
+    totalQuantity += quantity
+    totalAmount += quantity * price
+  }
+
+  return {
+    totalQuantity: Math.round(totalQuantity * 1000) / 1000,
+    totalAmount: Math.round(totalAmount * 100) / 100,
+  }
+}
+
+const FILENAME_DATE_KEYS = [
+  'expectedDeliveryDate',
+  'expected_delivery_date',
+  'receivingDate',
+  'receiving_date',
+  'deliveryDate',
+  'delivery_date',
+]
+const FILENAME_SUPPLIER_KEYS = ['supplierName', 'supplier_name', 'supplier']
+/**
+ * Deliberately without `totalAmount`: on a receiving document that field is the
+ * ordered sum, and the filename must show what was actually accepted.
+ */
+const FILENAME_AMOUNT_KEYS = [
+  'exportTotalAmount',
+  'export_total_amount',
+  'totalReceivedAmount',
+  'total_received_amount',
+]
+
+function firstFilenameValue(options, keys, normalize) {
+  for (const key of keys) {
+    const normalized = normalize(options?.[key])
+    if (normalized) return normalized
+  }
+  return null
+}
+
 function stripDocumentPrefix(value, prefix) {
   return String(value ?? '')
     .trim()
@@ -317,26 +397,38 @@ export function buildReceivingUmagComment(options = {}) {
   return parts.join('; ') || 'Приёмка Shugyla'
 }
 
-/** Build a path-safe, versioned filename for the UMAG import file. */
+/**
+ * Path-safe, versioned filename a person can recognize in their downloads:
+ * `UMAG_2026-08-14_Албини_387500тг_v1.xlsx`.
+ *
+ * Order and invoice numbers stayed behind in the UMAG comment on purpose — the
+ * previous `UMAG_PO-1842_INV-18275_v1.xlsx` told the warehouse nothing about
+ * which delivery it was looking at. A segment whose value is missing is left
+ * out rather than filled with a placeholder or an id; the version suffix is the
+ * only part that is always present, and it is what keeps repeated downloads of
+ * the same receipt apart. No clock time: the same receipt keeps one name.
+ */
 export function buildReceivingUmagFilename(options = {}) {
-  const rawOrderNumber =
-    options.purchaseOrderNumber ?? options.orderNumber ?? options.purchaseOrderId
-  const orderNumber = sanitizeReceivingUmagFilenamePart(
-    stripDocumentPrefix(rawOrderNumber, 'PO'),
-    'UNKNOWN'
+  const date = firstFilenameValue(
+    options,
+    FILENAME_DATE_KEYS,
+    normalizeReceivingUmagFilenameDate
   )
-  const invoiceNumbers = normalizeReceivingInvoiceNumbers(
-    options.invoiceNumbers ?? options.supplierInvoiceNumbers ?? options.invoiceNumber
+  const supplier = firstFilenameValue(options, FILENAME_SUPPLIER_KEYS, (value) =>
+    sanitizeReceivingUmagFilenamePart(value, '')
   )
-  const invoicePart = sanitizeReceivingUmagFilenamePart(
-    invoiceNumbers.map((number) => stripDocumentPrefix(number, 'INV')).join('-'),
-    'NO-INVOICE'
+  const amount = firstFilenameValue(
+    options,
+    FILENAME_AMOUNT_KEYS,
+    formatReceivingUmagFilenameAmount
   )
+
   const rawVersion = options.version ?? options.exportVersion ?? options.revision ?? 1
   const parsedVersion = Number(rawVersion)
   const version = Number.isInteger(parsedVersion) && parsedVersion > 0 ? parsedVersion : 1
 
-  return `UMAG_PO-${orderNumber}_INV-${invoicePart}_v${version}.xlsx`
+  const segments = ['UMAG', date, supplier, amount, `v${version}`].filter(Boolean)
+  return `${segments.join('_')}.xlsx`
 }
 
 /**
@@ -392,6 +484,7 @@ export async function createReceivingUmagXlsx(items) {
     bytes: new Uint8Array(output),
     rows,
     rowsCount: rows.length,
+    totals: summarizeReceivingUmagRows(rows),
   }
 }
 
@@ -425,9 +518,13 @@ export async function downloadReceivingUmagXlsxBytes(bytes, filename) {
 
 /** Validate, create and download a versioned UMAG XLSX in the browser. */
 export async function downloadReceivingUmagXlsx(items, options = {}) {
-  const { bytes, rows, rowsCount } = await createReceivingUmagXlsx(items)
-  const filename = buildReceivingUmagFilename(options)
+  const { bytes, rows, rowsCount, totals } = await createReceivingUmagXlsx(items)
+  // The amount in the name is the one in the file, not the one that was ordered.
+  const filename = buildReceivingUmagFilename({
+    exportTotalAmount: totals.totalAmount,
+    ...options,
+  })
   const comment = buildReceivingUmagComment(options)
   await downloadReceivingUmagXlsxBytes(bytes, filename)
-  return { filename, comment, rows, rowsCount }
+  return { filename, comment, rows, rowsCount, totals }
 }

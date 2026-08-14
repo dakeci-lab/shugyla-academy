@@ -6,8 +6,14 @@
 export const WEB_ONLY_NAV_IDS = new Set([
   'employees-payroll',
   'price-tags',
-  /** Entire «Закупки» group: procurement, receiving, suppliers, settlements, payments. */
-  'procurement-group',
+  /**
+   * «Закупки» по пунктам, а не группой целиком: «Закуп» (`procurement`)
+   * работает на телефоне, соседи по группе — нет.
+   */
+  'receiving',
+  'suppliers',
+  'settlements',
+  'supplier-payments',
 ])
 
 export function isWebOnlyNavEntry(item) {

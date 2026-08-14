@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useLocation, useParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
+import { usePlatformPageTitle } from '../../../context/PlatformPageTitleContext'
+import { getPlatformSection } from '../../../platform/platformNav'
 import {
   canViewPurchases,
   canEditPurchase,
@@ -55,6 +57,7 @@ const EXPORT_MENU_ID = 'purchase-detail-export-menu'
 /** Детальная страница закупа — /platform/procurement/:id */
 export default function PurchaseDetailPage() {
   const { id } = useParams()
+  const { pathname } = useLocation()
   const { user } = useSession()
   const { version, refresh } = useAdminRefresh()
   const [message, setMessage] = useState('')
@@ -172,6 +175,18 @@ export default function PurchaseDetailPage() {
       cancelled = true
     }
   }, [receivingDocId, cachedReceiving, version])
+
+  /**
+   * На телефоне системный Back перехвачен и открывает drawer, поэтому карточке
+   * нужна своя кнопка «Назад» в шапке — как у остальных детальных экранов.
+   * Заголовок берём тем же помощником, что и layout, чтобы он не изменился.
+   */
+  usePlatformPageTitle(getPlatformSection(pathname).title, '', {
+    showBack: true,
+    backFallback: pathname.startsWith('/platform/procurement/analytics/')
+      ? '/platform/procurement/analytics'
+      : '/platform/procurement',
+  })
 
   if (!canView) {
     return <PlatformAccessDenied title="Нет доступа к разделу «Закуп»" />
