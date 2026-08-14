@@ -7,7 +7,6 @@ import { ToastProvider } from './context/ToastContext'
 import ProtectedRoute from './components/ProtectedRoute'
 import InternalPlatformProviders from './components/platform/InternalPlatformProviders'
 import PlatformRoute from './components/platform/PlatformRoute'
-import DesktopWebOnlyRoute from './components/platform/DesktopWebOnlyRoute'
 import PlatformNotFound from './components/platform/PlatformNotFound'
 import HrPlatformRoute from './components/platform/HrPlatformRoute'
 import { LOGIN_PATH } from './router/authRoutes'
@@ -330,9 +329,7 @@ export default function App() {
                   path="receiving"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.RECEIVING}>
-                      <DesktopWebOnlyRoute>
-                        <ReceivingPage />
-                      </DesktopWebOnlyRoute>
+                      <ReceivingPage />
                     </PlatformRoute>
                   }
                 />
@@ -340,9 +337,7 @@ export default function App() {
                   path="receiving/:id"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.RECEIVING}>
-                      <DesktopWebOnlyRoute>
-                        <ReceivingDetailPage />
-                      </DesktopWebOnlyRoute>
+                      <ReceivingDetailPage />
                     </PlatformRoute>
                   }
                 />
@@ -350,9 +345,7 @@ export default function App() {
                   path="suppliers"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIERS}>
-                      <DesktopWebOnlyRoute>
-                        <SuppliersPage />
-                      </DesktopWebOnlyRoute>
+                      <SuppliersPage />
                     </PlatformRoute>
                   }
                 />
@@ -360,9 +353,7 @@ export default function App() {
                   path="suppliers/:id"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIERS}>
-                      <DesktopWebOnlyRoute>
-                        <SupplierDetailPage />
-                      </DesktopWebOnlyRoute>
+                      <SupplierDetailPage />
                     </PlatformRoute>
                   }
                 />
@@ -370,9 +361,7 @@ export default function App() {
                   path="settlements"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SETTLEMENTS}>
-                      <DesktopWebOnlyRoute>
-                        <SettlementsPage />
-                      </DesktopWebOnlyRoute>
+                      <SettlementsPage />
                     </PlatformRoute>
                   }
                 />
@@ -380,9 +369,7 @@ export default function App() {
                   path="supplier-payments"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIER_PAYMENTS}>
-                      <DesktopWebOnlyRoute>
-                        <SupplierPaymentsPage />
-                      </DesktopWebOnlyRoute>
+                      <SupplierPaymentsPage />
                     </PlatformRoute>
                   }
                 />

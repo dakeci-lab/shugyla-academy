@@ -5,6 +5,13 @@
  * browser download function so the exact workbook can be verified in Node.
  */
 
+/**
+ * Column order of the UMAG file.
+ *
+ * These labels order the five columns and key the mapped rows; they are never
+ * written into the sheet. UMAG reads the file as pure data, so row 1 is the
+ * first SKU — a header line there would be imported as a product.
+ */
 export const RECEIVING_UMAG_COLUMNS = Object.freeze([
   'Штрихкод',
   'Количество',
@@ -266,12 +273,10 @@ export function mapReceivingItemsToUmagRows(items) {
   return result.rows
 }
 
+/** Data-only rows in column order — no header line. */
 export function receivingUmagRowsToAoa(rows) {
   const list = Array.isArray(rows) ? rows : []
-  return [
-    [...RECEIVING_UMAG_COLUMNS],
-    ...list.map((row) => RECEIVING_UMAG_COLUMNS.map((column) => row[column])),
-  ]
+  return list.map((row) => RECEIVING_UMAG_COLUMNS.map((column) => row[column]))
 }
 
 export function sanitizeReceivingUmagFilenamePart(value, fallback = 'UNKNOWN') {
@@ -434,6 +439,12 @@ export function buildReceivingUmagFilename(options = {}) {
 /**
  * Create the exact binary XLSX that will later be downloaded in the browser.
  * Does not touch the DOM or the filesystem.
+ *
+ * The sheet is data from cell A1 down. Everything that used to imply a header
+ * line is gone with it: no autofilter, no frozen top row, no bold first row.
+ * Those are not decoration here — an autofilter range or a freeze split tells a
+ * reader (and some importers) that row 1 is labels, which would cost the first
+ * SKU of every delivery.
  */
 export async function createReceivingUmagXlsx(items) {
   const rows = mapReceivingItemsToUmagRows(items)
@@ -449,16 +460,8 @@ export async function createReceivingUmagXlsx(items) {
     { wch: 12 },
     { wch: 14 },
   ]
-  worksheet['!autofilter'] = { ref: `A1:E${rows.length + 1}` }
-  worksheet['!views'] = [
-    { state: 'frozen', ySplit: 1, topLeftCell: 'A2', activeCell: 'A2' },
-  ]
 
-  for (let column = 0; column < RECEIVING_UMAG_COLUMNS.length; column += 1) {
-    const address = XLSX.utils.encode_cell({ r: 0, c: column })
-    worksheet[address].s = { font: { bold: true } }
-  }
-  for (let rowIndex = 1; rowIndex <= rows.length; rowIndex += 1) {
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
     const barcodeCell = worksheet[XLSX.utils.encode_cell({ r: rowIndex, c: 0 })]
     barcodeCell.t = 's'
     barcodeCell.v = String(barcodeCell.v ?? '')

@@ -86,9 +86,9 @@ export const PLATFORM_NAV = [
     title: 'Закупки',
     description: 'Закуп, приёмка, поставщики, взаиморасчёты и оплаты.',
     /**
-     * Раздел не целиком desktop-only: «Закуп» открыт на телефоне (у него есть
-     * карточная мобильная раскладка), остальные пункты помечены webOnly
-     * поимённо — их таблицы на узкий экран не помещаются.
+     * Раздел целиком доступен с телефона. Ни один пункт не помечен webOnly:
+     * у каждого есть своя мобильная раскладка (карточки вместо таблиц), и
+     * закрывать их флагом означало прятать уже готовый и работающий экран.
      */
     children: [
       {
@@ -106,7 +106,6 @@ export const PLATFORM_NAV = [
         routeKey: ROUTE_KEYS.RECEIVING,
         title: 'Приёмка',
         description: 'Приёмка товара и сверка с накладными.',
-        webOnly: true,
       },
       {
         id: 'suppliers',
@@ -115,7 +114,6 @@ export const PLATFORM_NAV = [
         routeKey: ROUTE_KEYS.SUPPLIERS,
         title: 'Поставщики',
         description: 'База поставщиков и контактная информация.',
-        webOnly: true,
       },
       {
         id: 'settlements',
@@ -124,7 +122,6 @@ export const PLATFORM_NAV = [
         routeKey: ROUTE_KEYS.SETTLEMENTS,
         title: 'Взаиморасчёты',
         description: 'Приёмки, оплаты и задолженность по данным UMAG.',
-        webOnly: true,
       },
       {
         id: 'supplier-payments',
@@ -133,7 +130,6 @@ export const PLATFORM_NAV = [
         routeKey: ROUTE_KEYS.SUPPLIER_PAYMENTS,
         title: 'Оплаты поставщикам',
         description: 'Сроки оплаты задолженности с учётом отсрочки поставщика.',
-        webOnly: true,
       },
     ],
   },

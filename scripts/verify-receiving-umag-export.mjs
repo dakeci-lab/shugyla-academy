@@ -8,7 +8,9 @@
  */
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import * as XLSX from 'xlsx'
 import {
   RECEIVING_UMAG_COLUMNS,
@@ -109,9 +111,21 @@ function stagePureContract() {
   )
 
   const aoa = receivingUmagRowsToAoa(rows)
-  check('AOA header exact', JSON.stringify(aoa[0]) === JSON.stringify(RECEIVING_UMAG_COLUMNS))
-  check('AOA contains only header plus exported rows', aoa.length === 4)
-  check('AOA keeps numeric quantity and price', typeof aoa[1][1] === 'number' && typeof aoa[1][4] === 'number')
+  check('AOA has no header line', JSON.stringify(aoa[0]) !== JSON.stringify(RECEIVING_UMAG_COLUMNS))
+  check('AOA row 1 is the first SKU', aoa[0][0] === '0123456789012' && aoa[0][2] === 'Молоко 3,2%')
+  check('AOA contains exactly the exported rows', aoa.length === 3)
+  check(
+    'AOA keeps the five columns in order',
+    aoa.every((row) => row.length === RECEIVING_UMAG_COLUMNS.length)
+  )
+  check(
+    'AOA keeps numeric quantity and price',
+    typeof aoa[0][1] === 'number' && typeof aoa[0][4] === 'number'
+  )
+  check(
+    'no column label appears anywhere in the AOA',
+    !aoa.some((row) => row.some((cell) => RECEIVING_UMAG_COLUMNS.includes(cell)))
+  )
   console.log('')
 }
 
@@ -488,17 +502,20 @@ async function stageBinaryWorkbook() {
 
   const worksheet = workbook.Sheets[RECEIVING_UMAG_SHEET_NAME]
   const values = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true })
-  check('round-trip header exact', JSON.stringify(values[0]) === JSON.stringify(RECEIVING_UMAG_COLUMNS))
-  check('round-trip has no metadata or total rows', values.length === 3)
-  check('round-trip preserves Cyrillic product name', values[1][2] === 'Молоко Казахстан 3,2%')
-  check('round-trip preserves leading zeros', values[1][0] === '0012345678905')
-  check('round-trip preserves short scale barcode', values[2][0] === '2760682')
-  check('barcode cell is typed as text', worksheet.A2.t === 's' && worksheet.A3.t === 's')
-  check('quantity cells are numeric', worksheet.B2.t === 'n' && worksheet.B3.t === 'n')
-  check('price cells are numeric', worksheet.E2.t === 'n' && worksheet.E3.t === 'n')
-  check('fractional kg survives round-trip', values[2][1] === 33.7)
-  check('decimal price survives round-trip', values[2][4] === 3120.5)
-  check('worksheet range is exactly five columns', worksheet['!ref'] === 'A1:E3')
+  check('round-trip starts at the first SKU', JSON.stringify(values[0]) !== JSON.stringify(RECEIVING_UMAG_COLUMNS))
+  check('round-trip has no header, metadata or total rows', values.length === 2)
+  check('round-trip preserves Cyrillic product name', values[0][2] === 'Молоко Казахстан 3,2%')
+  check('round-trip preserves leading zeros', values[0][0] === '0012345678905')
+  check('round-trip preserves short scale barcode', values[1][0] === '2760682')
+  check('barcode cell is typed as text', worksheet.A1.t === 's' && worksheet.A2.t === 's')
+  check('quantity cells are numeric', worksheet.B1.t === 'n' && worksheet.B2.t === 'n')
+  check('price cells are numeric', worksheet.E1.t === 'n' && worksheet.E2.t === 'n')
+  check('fractional kg survives round-trip', values[1][1] === 33.7)
+  check('decimal price survives round-trip', values[1][4] === 3120.5)
+  check('worksheet range is exactly five columns of data', worksheet['!ref'] === 'A1:E2')
+  check('no autofilter implies a header row', worksheet['!autofilter'] == null)
+  check('no frozen pane splits off a header row', worksheet['!views'] == null || !worksheet['!views'].some((view) => view?.state === 'frozen'))
+  check('no table definition claims a header row', worksheet['!table'] == null)
   check(
     'browser download remains a separate async operation',
     downloadReceivingUmagXlsxBytes.constructor.name === 'AsyncFunction'
@@ -523,8 +540,90 @@ async function stageBinaryWorkbook() {
   console.log('')
 }
 
+/**
+ * The workbook written to a real file and read back off disk, the way UMAG
+ * receives it. Nothing is written inside the repository: the file lives in the
+ * OS temp directory and is removed even if an assertion throws.
+ */
+async function stageOnDiskRoundTrip() {
+  console.log('Stage 5: Headerless file written to disk and read back')
+
+  const directory = mkdtempSync(path.join(tmpdir(), 'shugyla-umag-'))
+  const file = path.join(directory, 'UMAG_2026-08-14_Албини_12470тг_v1.xlsx')
+
+  try {
+    const { bytes, rowsCount } = await createReceivingUmagXlsx([
+      validItem({
+        barcode: '0012345678905',
+        productName: 'Молоко Казахстан 3,2%',
+        receivedQty: 24,
+        unit: 'шт.',
+        actualPurchasePrice: 485,
+      }),
+      validItem({
+        barcode: '2760682',
+        productName: 'Сыр весовой',
+        receivedQty: 0.5,
+        unit: 'кг',
+        actualPurchasePrice: 1660,
+      }),
+    ])
+
+    writeFileSync(file, Buffer.from(bytes))
+    const onDisk = readFileSync(file)
+    check('a real .xlsx file is produced', onDisk.length > 0 && onDisk[0] === 0x50 && onDisk[1] === 0x4b)
+
+    const workbook = XLSX.read(onDisk, { type: 'buffer' })
+    const worksheet = workbook.Sheets[RECEIVING_UMAG_SHEET_NAME]
+    const values = XLSX.utils.sheet_to_json(worksheet, { header: 1, raw: true })
+
+    check('A1 holds the first barcode', worksheet.A1?.v === '0012345678905')
+    check('A1 is text, so leading zeros survive', worksheet.A1?.t === 's' && values[0][0] === '0012345678905')
+    check('the used range starts at A1', worksheet['!ref']?.startsWith('A1:'))
+    check('the used range is data only', worksheet['!ref'] === 'A1:E2')
+    check('two products give exactly two rows', rowsCount === 2 && values.length === 2)
+    check(
+      'row 1 is a complete SKU, not labels',
+      values[0][0] === '0012345678905' &&
+        values[0][1] === 24 &&
+        values[0][2] === 'Молоко Казахстан 3,2%' &&
+        values[0][3] === 'шт.' &&
+        values[0][4] === 485
+    )
+    check(
+      'row 2 is the second SKU',
+      values[1][0] === '2760682' && values[1][2] === 'Сыр весовой' && values[1][3] === 'кг'
+    )
+
+    const everyCellValue = Object.keys(worksheet)
+      .filter((address) => !address.startsWith('!'))
+      .map((address) => worksheet[address].v)
+    check(
+      'not one column label survives anywhere in the sheet',
+      RECEIVING_UMAG_COLUMNS.every((label) => !everyCellValue.includes(label))
+    )
+    check(
+      'quantity stays numeric on both rows',
+      worksheet.B1?.t === 'n' && worksheet.B2?.t === 'n' && values[1][1] === 0.5
+    )
+    check(
+      'price stays numeric on both rows',
+      worksheet.E1?.t === 'n' && worksheet.E2?.t === 'n' && values[1][4] === 1660
+    )
+    check(
+      'nothing in the file marks a header row',
+      worksheet['!autofilter'] == null && worksheet['!table'] == null
+    )
+  } finally {
+    rmSync(directory, { recursive: true, force: true })
+  }
+
+  check('no temporary file is left behind', !existsSync(directory))
+  console.log('')
+}
+
 function stageUiWiring() {
-  console.log('Stage 5: Receiving screen passes the accepted total')
+  console.log('Stage 6: Receiving screen passes the accepted total')
 
   const page = readFileSync(
     new URL('../src/pages/platform/receiving/ReceivingDetailPage.jsx', import.meta.url),
@@ -564,6 +663,7 @@ async function main() {
   stageComment()
   stageTotals()
   await stageBinaryWorkbook()
+  await stageOnDiskRoundTrip()
   stageUiWiring()
   console.log(`Verification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
+import { usePlatformPageTitle } from '../../../context/PlatformPageTitleContext'
 import { canReceiveGoods, canViewReceivingDocuments } from '../../../config/permissions'
 import {
   completeReceivingDocument,
@@ -408,6 +409,16 @@ export default function ReceivingDetailPage() {
     () => splitInvoiceNumbers(invoiceNumbersText),
     [invoiceNumbersText]
   )
+
+  /**
+   * На телефоне системный Back открывает drawer, поэтому карточке приёмки
+   * нужна собственная кнопка «Назад» в шапке — как у карточки закупа.
+   * Вызов стоит до ранних return'ов: хук обязан выполняться на каждом рендере.
+   */
+  usePlatformPageTitle('Приёмка', '', {
+    showBack: true,
+    backFallback: '/platform/receiving',
+  })
 
   if (!canView) {
     return <PlatformAccessDenied title="Нет доступа к разделу «Приёмка»" />

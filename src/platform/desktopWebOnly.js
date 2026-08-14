@@ -30,9 +30,14 @@ export function isDesktopWebOnlyBlocked({ isDesktopViewport = true } = {}) {
   return !isDesktopViewport
 }
 
-/** Reason shown to the user instead of silently removing the module. */
+/**
+ * Reason shown to the user instead of silently removing the module.
+ *
+ * Deliberately does not name «Закупки» any more: that group works on a phone,
+ * and a stale message here is how a wrong assumption gets copied forward.
+ */
 export const DESKTOP_WEB_ONLY_MESSAGE =
-  'Раздел доступен на компьютере или планшете: таблицы закупа не помещаются на узком экране.'
+  'Раздел доступен на компьютере или планшете: его таблицы не помещаются на узком экране.'
 
 /** True when a path belongs to a web-only nav leaf/group (incl. nested routes). */
 export function isDesktopWebOnlyPath(pathname, prefixes = []) {

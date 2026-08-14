@@ -938,21 +938,28 @@ async function stageDesktopWebOnly() {
   )
   const navSource = read('src/platform/platformNav.js')
 
-  // «Закуп» работает на телефоне; остальные пункты группы — нет. Поэтому
-  // webOnly помечена не группа целиком, а каждый её пункт по отдельности.
-  assert(
-    'procurement leaf is not web-only',
-    !webOnlyNav.WEB_ONLY_NAV_IDS.has('procurement') &&
-      !webOnlyNav.WEB_ONLY_NAV_IDS.has('procurement-group')
-  )
-  for (const id of ['receiving', 'suppliers', 'settlements', 'supplier-payments']) {
-    assert(`${id} id is web-only`, webOnlyNav.WEB_ONLY_NAV_IDS.has(id))
+  // Вся группа «Закупки» работает на телефоне: ни группа, ни один её пункт
+  // больше не помечены webOnly. Список ниже — полный, чтобы возврат флага
+  // на любой пункт был пойман здесь.
+  for (const id of [
+    'procurement-group',
+    'procurement',
+    'receiving',
+    'suppliers',
+    'settlements',
+    'supplier-payments',
+  ]) {
+    assert(`${id} is not web-only`, !webOnlyNav.WEB_ONLY_NAV_IDS.has(id))
   }
-  const groupHeader =
-    navSource.match(/id:\s*'procurement-group'[\s\S]*?children:/)?.[0] || ''
   assert(
-    'platform nav no longer marks the whole group webOnly',
-    groupHeader.length > 0 && !/webOnly:\s*true/.test(groupHeader)
+    'only payroll and price-tags stay desktop-only',
+    [...webOnlyNav.WEB_ONLY_NAV_IDS].sort().join(',') === 'employees-payroll,price-tags'
+  )
+  const groupBlock =
+    navSource.match(/id:\s*'procurement-group'[\s\S]*?\n  \},/)?.[0] || ''
+  assert(
+    'platform nav marks nothing in the group webOnly',
+    groupBlock.length > 0 && !/webOnly:\s*true/.test(groupBlock)
   )
   assert(
     'group children cover all procurement modules',
@@ -1261,13 +1268,19 @@ function stageSourceContracts() {
     /role="tablist"[\s\S]*Планирование[\s\S]*Заказы[\s\S]*Нормы/.test(page)
   )
   assert(
-    'nav marks the desktop-only siblings of «Закуп»',
-    /id:\s*'receiving'[\s\S]{0,320}webOnly:\s*true/.test(nav) &&
-      /id:\s*'suppliers'[\s\S]{0,320}webOnly:\s*true/.test(nav) &&
-      /id:\s*'settlements'[\s\S]{0,320}webOnly:\s*true/.test(nav) &&
-      /id:\s*'supplier-payments'[\s\S]{0,320}webOnly:\s*true/.test(nav)
+    'nav no longer marks any sibling of «Закуп» desktop-only',
+    !/id:\s*'receiving'[\s\S]{0,320}webOnly:\s*true/.test(nav) &&
+      !/id:\s*'suppliers'[\s\S]{0,320}webOnly:\s*true/.test(nav) &&
+      !/id:\s*'settlements'[\s\S]{0,320}webOnly:\s*true/.test(nav) &&
+      !/id:\s*'supplier-payments'[\s\S]{0,320}webOnly:\s*true/.test(nav)
   )
-  const guardedSections = [
+  // Каждый маршрут группы перечислен поимённо: если gate вернут на любой из
+  // них, упадёт именно этот assert, а не общий подсчёт.
+  const ungatedSections = [
+    'procurement',
+    'procurement/analytics',
+    'procurement/analytics/:id',
+    'procurement/:id',
     'receiving',
     'receiving/:id',
     'suppliers',
@@ -1275,18 +1288,18 @@ function stageSourceContracts() {
     'settlements',
     'supplier-payments',
   ]
-  for (const section of guardedSections) {
+  for (const section of ungatedSections) {
     const routeBlock = new RegExp(
       `path="${section.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[\\s\\S]{0,260}DesktopWebOnlyRoute`
     )
-    assert(`App guards ${section}`, routeBlock.test(app))
+    assert(`App does not gate ${section}`, !routeBlock.test(app))
   }
   assert(
-    'DesktopWebOnlyRoute still wraps every desktop-only route',
-    (app.match(/DesktopWebOnlyRoute/g) || []).length >= guardedSections.length
+    'no route in App.jsx is wrapped in DesktopWebOnlyRoute',
+    !app.includes('<DesktopWebOnlyRoute>')
   )
   assert(
-    'dashboard uses shared web-only link helper',
+    'dashboard still uses the shared web-only link helper',
     dashboard.includes('shouldHideDesktopWebOnlyLink') &&
       dashboard.includes('Активные закупы') &&
       dashboard.includes('/platform/suppliers') &&
