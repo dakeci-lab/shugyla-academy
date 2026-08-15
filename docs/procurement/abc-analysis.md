@@ -26,12 +26,34 @@
 
 ## Деплой
 
-Порядок обязателен и не обратный:
+Прод: порядок обязателен и не обратный.
 
 1. Применить миграцию `20260815072607_procurement_abc_analysis.sql`.
 2. Затем задеплоить Edge Function `umag-procurement`.
 
 Без миграции синк не сможет записать ABC-колонки. Без нового Edge старые снимки/строки останутся без ABC-фактов.
+
+### Disposable test project (не прод)
+
+Пустой disposable Supabase-проект (только leftover `snake_*`, пустая migration history) можно поднять без копии прод-данных и без полной платформы:
+
+0. `supabase/tests/fixtures/procurement_abc_staging_bootstrap.sql` — test-only, не migration.
+1. `supabase/migrations/20260809072915_procurement_planning_v1.sql`
+2. `supabase/migrations/20260809073454_procurement_planning_v1_hardening.sql`
+3. `supabase/migrations/20260810160315_procurement_partial_supplier_generation.sql`
+4. `supabase/migrations/20260810170350_require_supplier_for_procurement_generation.sql`
+5. `supabase/migrations/20260812032500_fix_procurement_snapshot_guard_security_definer.sql`
+6. `supabase/migrations/20260812041000_procurement_order_state_rpc.sql`
+7. `supabase/migrations/20260812054623_revoke_procurement_snapshot_guard_execute.sql`
+8. `supabase/migrations/20260812171700_procurement_norm_taxonomy_rpc.sql`
+9. `supabase/migrations/20260814134910_procurement_repeat_analytics_orders.sql`
+10. `supabase/migrations/20260815072607_procurement_abc_analysis.sql`
+
+Fixture отказывается работать на production project ref и если public уже не пустой. Permission helper — fail-closed (`false`). Live apply из Cursor не делается.
+
+```bash
+npm run verify:procurement-abc-staging-bootstrap
+```
 
 ## Охрана repeat-order
 
