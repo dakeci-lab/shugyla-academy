@@ -159,6 +159,7 @@ function AbcBadge({ axisLabel, value }) {
   const title = abcBadgeLabel(axisLabel, value)
   return (
     <span
+      role="img"
       className={`proc-planner__abc-badge${empty ? ' is-empty' : ` is-${letter.toLowerCase()}`}`}
       title={title}
       aria-label={title}
@@ -1395,6 +1396,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         </p>
       ) : null}
 
+      {Number(snapshot?.itemCount) > 0 || items.length > 0 ? (
       <p className="proc-planner__abc-legend">
         ABC:{' '}
         <span
@@ -1430,6 +1432,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         </span>{' '}
         нет данных. К — количество, В — выручка, П — прибыль.
       </p>
+      ) : null}
 
       <div className="proc-planner__desktop">
         <div className="proc-planner__table-wrap">

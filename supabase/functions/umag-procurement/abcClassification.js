@@ -8,6 +8,10 @@
  *   else → C
  * A tie therefore never straddles 80/95. The item that crosses a threshold stays
  * in the class where its group started (inclusive Pareto).
+ *
+ * Quantity metrics are quantized to 3 decimal places (`sales_8w numeric(14, 3)`)
+ * after barcode aggregation and before positiveTotal / sort / tie grouping, so
+ * float sums like 0.1+0.2 match 0.3.
  */
 
 export const ABC_SHARE_A = 0.8
@@ -26,6 +30,15 @@ export function parseReportAmount(value) {
 export function roundMoney(value) {
   if (!Number.isFinite(value)) return 0
   return Math.round(value * 100) / 100
+}
+
+/** Quantity precision matches `sales_8w numeric(14, 3)` before ABC tie grouping. */
+export const QTY_DECIMALS = 3
+
+export function roundQty(value) {
+  if (!Number.isFinite(value)) return 0
+  const factor = 10 ** QTY_DECIMALS
+  return Math.round(value * factor) / factor
 }
 
 export function barcodeKey(value) {
@@ -141,7 +154,10 @@ export function aggregateMetricsByBarcode(rows) {
 export function classifyAbcAxis(rows, options = {}) {
   const negativesAsCIfPositiveTotal = Boolean(options.negativesAsCIfPositiveTotal)
   const result = new Map()
-  const parsed = aggregateMetricsByBarcode(rows)
+  const parsed = aggregateMetricsByBarcode(rows).map((row) => ({
+    barcode: row.barcode,
+    metric: roundQty(row.metric),
+  }))
 
   const positiveTotal = parsed.reduce(
     (sum, row) => sum + (row.metric > 0 ? row.metric : 0),

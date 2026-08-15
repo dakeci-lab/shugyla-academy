@@ -26,6 +26,7 @@ const PLANNER_CSS = 'src/components/procurement/ProcurementPlannerView.css'
 const ABC_UI = 'src/utils/procurementAbc.js'
 const FINGERPRINT = 'src/utils/procurementAttemptFingerprint.js'
 const REPEAT_MIGRATION = 'supabase/migrations/20260814134910_procurement_repeat_analytics_orders.sql'
+const ABC_DOC = 'docs/procurement/abc-analysis.md'
 
 let checks = 0
 
@@ -209,6 +210,20 @@ async function stageClassifier() {
       lastWinsTrap.get('tail') === 'C'
   )
 
+  const floatTie = abc.classifyAbcAxis([
+    { barcode: 'leader', metric: 7.4 },
+    { barcode: 'float', metric: 0.1 },
+    { barcode: 'float', metric: 0.2 },
+    { barcode: 'exact', metric: 0.3 },
+  ])
+  assert(
+    '0.1+0.2 and 0.3 share one qty class after 3dp quantization',
+    abc.roundQty(0.1 + 0.2) === 0.3 &&
+      floatTie.get('float') === 'B' &&
+      floatTie.get('exact') === 'B' &&
+      floatTie.get('leader') === 'A'
+  )
+
   const dup = abc.accumulateSalesRows([
     { barcode: '111', saleQuantity: 2, saleSellingAmount: 10.25, saleArrivalAmount: 4.1 },
     { barcode: '111', saleQuantity: 3, saleSellingAmount: '15.75', saleArrivalAmount: '6.40' },
@@ -349,15 +364,33 @@ async function stageService() {
       { barcode: '01', revenue8w: null, cogs8w: null, profit8w: null, abcQty: null, abcRevenue: null, abcProfit: null },
     ]) === true
   )
+  const freshZeroPage = Array.from({ length: 25 }, (_, i) => ({
+    barcode: `z${String(i).padStart(2, '0')}`,
+    revenue8w: 0,
+    cogs8w: 0,
+    profit8w: 0,
+    abcQty: null,
+    abcRevenue: null,
+    abcProfit: null,
+  }))
   assert(
-    'notice when no loaded item has abc_qty/abc_revenue/abc_profit',
+    'fresh zero-movement page with computed 0 money is ABC-capable',
+    ui.snapshotItemsLackAbcFacts(freshZeroPage) === false
+  )
+  assert(
+    'legacy rows with null/undefined money and no class need resync notice',
     ui.snapshotItemsLackAbcFacts([
-      { abcQty: null, abcRevenue: null, abcProfit: null },
-      { abcQty: '', abcRevenue: undefined, abcProfit: null, revenue8w: 0 },
-    ]) === true &&
+      { abcQty: null, abcRevenue: null, abcProfit: null, revenue8w: null, cogs8w: undefined, profit8w: null },
+      { abcQty: '', abcRevenue: undefined, abcProfit: null },
+    ]) === true
+  )
+  assert(
+    'fresh row with negative or positive money is ABC-capable',
+    ui.snapshotItemsLackAbcFacts([
+      { abcQty: null, abcRevenue: null, abcProfit: null, revenue8w: -20, cogs8w: -8, profit8w: -12 },
+    ]) === false &&
       ui.snapshotItemsLackAbcFacts([
-        { abcQty: null, abcRevenue: null, abcProfit: null },
-        { abcQty: 'A', abcRevenue: null, abcProfit: null },
+        { abcQty: null, abcRevenue: null, abcProfit: null, revenue8w: 50, cogs8w: 20, profit8w: 30 },
       ]) === false
   )
   assert('empty item list is not treated as missing ABC', ui.snapshotItemsLackAbcFacts([]) === false)
@@ -517,7 +550,7 @@ function stageUi() {
   assert('loading/empty rows use TABLE_COL_SPAN', /colSpan=\{TABLE_COL_SPAN\}>Загрузка/.test(planner) && /colSpan=\{TABLE_COL_SPAN\}>Нет позиций/.test(planner))
   assert('desktop table has ABC column', planner.includes('proc-planner__col-abc') && planner.includes('<AbcBadges item={item} />'))
   assert('three badges come from ABC_AXES', planner.includes('ABC_AXES.map((axis)') && planner.includes('<AbcBadge'))
-  assert('badge shows the letter, not color alone', planner.includes('{letter}') && planner.includes('aria-label={title}') && planner.includes('title={title}'))
+  assert('badge shows the letter, not color alone', planner.includes('{letter}') && planner.includes('aria-label={title}') && planner.includes('title={title}') && /role="img"/.test(planner))
   assert('NULL renders an accessible dash', planner.includes("formatAbcClass") && planner.includes('is-empty'))
   assert('mobile cards show ABC badges', /proc-planner__card[\s\S]*<AbcBadges item=\{item\} \/>/.test(planner) || planner.includes('<AbcBadges item={item} />'))
   assert('three filter groups with A/B/C checkboxes', planner.includes('proc-planner__abc-filter') && planner.includes('ABC_CLASSES.map'))
@@ -525,6 +558,11 @@ function stageUi() {
   assert('sort buttons have aria-label and pressed state', planner.includes('abcSortAriaLabel') && planner.includes('aria-pressed={active}'))
   assert('changing filters/sort resets page', planner.includes('[debouncedSearch, filters, abcSort, snapshot?.id]'))
   assert('legend is present', planner.includes('proc-planner__abc-legend'))
+  assert(
+    'legend renders only when snapshot items are present',
+    planner.includes('Number(snapshot?.itemCount) > 0 || items.length > 0') &&
+      /itemCount\) > 0 \|\| items.length > 0 \? \(/.test(planner)
+  )
   assert('legend badges have title and aria-label', /proc-planner__abc-legend[\s\S]*aria-label="Класс A/.test(planner) && planner.includes('aria-label="Нет класса'))
   assert(
     'snapshot ABC unavailable notice uses exact copy',
@@ -540,6 +578,7 @@ function stageUi() {
   assert('sort cycle uses nextAbcSortState', planner.includes('nextAbcSortState(current, axis.column)'))
   assert('page resets to 1 on filter/sort change', planner.includes('setPage(1)') && planner.includes('[debouncedSearch, filters, abcSort, snapshot?.id]'))
   assert('A green / B amber / C red / dash gray', css.includes('.proc-planner__abc-badge.is-a') && css.includes('.proc-planner__abc-badge.is-b') && css.includes('.proc-planner__abc-badge.is-c') && css.includes('.proc-planner__abc-badge.is-empty'))
+  assert('ABC sort buttons are at least 24x24 CSS px', css.includes('min-width: 24px') && css.includes('min-height: 24px'))
   assert('no new ABC dashboard or export columns', !planner.includes('AbcDashboard') && !/PLAN_EXPORT_COLUMNS[\s\S]*ABC/.test(planner))
 }
 
@@ -571,22 +610,46 @@ function stageRepeatOrderInvariants() {
     'inclusion uses stock/sales/money helper, not sales8w > 0',
     edge.includes('shouldIncludeSnapshotBarcode({') && !/sales8w > 0/.test(edge)
   )
+  const docs = read(ABC_DOC)
+  assert(
+    'docs require migration first, then umag-procurement deploy',
+    docs.includes('Применить миграцию `20260815072607_procurement_abc_analysis.sql`.') &&
+      docs.includes('Затем задеплоить Edge Function `umag-procurement`.')
+  )
+  assert(
+    'qty is quantized to 3 dp before tie grouping',
+    classifier.includes('export const QTY_DECIMALS = 3') &&
+      classifier.includes('metric: roundQty(row.metric)')
+  )
 }
 
 const BACKEND_ONLY = process.argv.includes('--backend-only')
 const SERVICE_UI_ONLY = process.argv.includes('--service-ui-only')
 const SERVICE_ONLY = process.argv.includes('--service-only')
 
+const EXPECTED_CHECKS = {
+  full: 110,
+  backend: 55,
+  service: 33,
+  serviceUi: 55,
+}
+
 async function main() {
   if (SERVICE_ONLY) {
     await stageService()
-    console.log(`\n${checks}/${checks} checks passed (service only)`)
+    if (checks !== EXPECTED_CHECKS.service) {
+      fail(`expected ${EXPECTED_CHECKS.service} service checks, ran ${checks}`)
+    }
+    console.log(`\n${checks}/${EXPECTED_CHECKS.service} checks passed (service only)`)
     return
   }
   if (SERVICE_UI_ONLY) {
     await stageService()
     stageUi()
-    console.log(`\n${checks}/${checks} checks passed (service/UI only)`)
+    if (checks !== EXPECTED_CHECKS.serviceUi) {
+      fail(`expected ${EXPECTED_CHECKS.serviceUi} service/UI checks, ran ${checks}`)
+    }
+    console.log(`\n${checks}/${EXPECTED_CHECKS.serviceUi} checks passed (service/UI only)`)
     return
   }
   stageMigration()
@@ -596,7 +659,11 @@ async function main() {
     await stageService()
     stageUi()
   }
-  console.log(`\n${checks}/${checks} checks passed${BACKEND_ONLY ? ' (backend only)' : ''}`)
+  const expected = BACKEND_ONLY ? EXPECTED_CHECKS.backend : EXPECTED_CHECKS.full
+  if (checks !== expected) {
+    fail(`expected ${expected} checks, ran ${checks}`)
+  }
+  console.log(`\n${checks}/${expected} checks passed${BACKEND_ONLY ? ' (backend only)' : ''}`)
 }
 
 main().catch((err) => {

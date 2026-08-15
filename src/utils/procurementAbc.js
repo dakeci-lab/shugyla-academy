@@ -178,9 +178,18 @@ function itemHasAbcClass(item) {
   )
 }
 
-/** Snapshot-level: loaded rows exist and none have abc_qty / abc_revenue / abc_profit. */
+function hasWrittenAbcMoney(item) {
+  return item?.revenue8w != null || item?.cogs8w != null || item?.profit8w != null
+}
+
+/**
+ * Snapshot-level: loaded rows exist and none are ABC-capable.
+ * A written money fact (including 0) proves a fresh ABC snapshot even when
+ * every class is NULL. Legacy rows have revenue8w/cogs8w/profit8w null/undefined.
+ * Empty list is not treated as missing ABC.
+ */
 export function snapshotItemsLackAbcFacts(items) {
   const list = Array.isArray(items) ? items : []
   if (!list.length) return false
-  return !list.some((item) => itemHasAbcClass(item))
+  return !list.some((item) => itemHasAbcClass(item) || hasWrittenAbcMoney(item))
 }
