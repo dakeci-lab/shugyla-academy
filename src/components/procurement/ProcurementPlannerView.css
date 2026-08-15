@@ -393,6 +393,119 @@
   gap: 0.5rem !important;
 }
 
+.proc-planner__abc-unavailable {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  color: #92400e;
+}
+
+.proc-planner__abc-legend {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+  line-height: 1.4;
+}
+
+.proc-planner__abc-filter {
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.proc-planner__abc-filter legend {
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 0.2rem;
+}
+
+.proc-planner__abc-filter-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+}
+
+.proc-planner__abc-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.proc-planner__abc-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.35rem;
+  height: 1.35rem;
+  padding: 0 0.2rem;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.proc-planner__abc-badge.is-a {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.proc-planner__abc-badge.is-b {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.proc-planner__abc-badge.is-c {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.proc-planner__abc-badge.is-empty {
+  background: #f3f4f6;
+  color: #6b7280;
+  font-weight: 600;
+}
+
+.proc-planner__abc-head {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.proc-planner__abc-sort {
+  display: flex;
+  gap: 0.2rem;
+}
+
+.proc-planner__abc-sort-btn {
+  min-width: 1.6rem;
+  min-height: 1.4rem;
+  padding: 0 0.2rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 4px;
+  background: #fff;
+  color: #4b5563;
+  font: inherit;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.proc-planner__abc-sort-btn.is-active {
+  border-color: #059669;
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.proc-planner__abc-sort-btn:focus-visible {
+  outline: 2px solid #059669;
+  outline-offset: 1px;
+}
+
+.proc-planner__col-abc {
+  white-space: nowrap;
+}
+
 .proc-planner__table-wrap {
   overflow-x: auto;
   border: 1px solid var(--border, #e5e7eb);
@@ -403,7 +516,7 @@
 .proc-planner__table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 1040px;
+  min-width: 1140px;
   font-size: 0.8125rem;
 }
 

@@ -13,6 +13,10 @@ import {
   parseNormDays,
 } from '../utils/procurementPlanningMath'
 import {
+  describeSnapshotItemsAbcQuery,
+  snapshotItemsPageRange,
+} from '../utils/procurementAbc'
+import {
   accumulateSnapshotFilterRow,
   createSnapshotFilterAccumulator,
   finalizeSnapshotFilterOptions,
@@ -35,6 +39,17 @@ export function sanitizePlanningSearch(value) {
 function finiteNumber(value, fallback = 0) {
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
+}
+
+function nullableFiniteNumber(value) {
+  if (value == null || value === '') return null
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function nullableAbcClass(value) {
+  const cls = String(value || '').trim().toUpperCase()
+  return cls === 'A' || cls === 'B' || cls === 'C' ? cls : null
 }
 
 export const PROCUREMENT_PLANNING_ERROR_CODES = {
@@ -167,6 +182,12 @@ function normalizeItem(row) {
     avgDaily: finiteNumber(row.avg_daily, 0),
     purchasePrice: finiteNumber(row.purchase_price, 0),
     sellingPrice: finiteNumber(row.selling_price, 0),
+    revenue8w: nullableFiniteNumber(row.revenue_8w),
+    cogs8w: nullableFiniteNumber(row.cogs_8w),
+    profit8w: nullableFiniteNumber(row.profit_8w),
+    abcQty: nullableAbcClass(row.abc_qty),
+    abcRevenue: nullableAbcClass(row.abc_revenue),
+    abcProfit: nullableAbcClass(row.abc_profit),
     normDays: parseNormDays(row.norm_days),
     recommendedQty: finiteNumber(row.recommended_qty, 0),
     finalOrderQty: finiteNumber(row.final_order_qty, 0),
@@ -466,34 +487,38 @@ export async function fetchSnapshotItemsPage({
   warningsOnly = false,
   orderableOnly = false,
   unassignedOnly = false,
+  abcQty = [],
+  abcRevenue = [],
+  abcProfit = [],
+  sortField = '',
+  sortDir = 'asc',
 } = {}) {
   ensureClient()
   if (!snapshotId) return { items: [], totalCount: 0, page, pageSize }
 
-  const from = Math.max(0, (page - 1) * pageSize)
-  const to = from + pageSize - 1
+  const range = snapshotItemsPageRange(page, pageSize)
 
   let query = supabase
     .from('procurement_snapshot_items')
     .select('*', { count: 'exact' })
-    .eq('snapshot_id', snapshotId)
 
-  const q = sanitizePlanningSearch(search)
-  if (q) {
-    query = query.or(`product_name.ilike.%${q}%,barcode.ilike.%${q}%`)
-  }
-  if (categoryName) query = query.eq('category_name', categoryName)
-  if (subcategoryName) query = query.eq('subcategory_name', subcategoryName)
-  if (platformSupplierId) query = query.eq('platform_supplier_id', platformSupplierId)
-  if (unassignedOnly) query = query.is('platform_supplier_id', null)
-  if (warningsOnly) query = query.eq('negative_stock', true)
-  if (orderableOnly) query = query.gt('final_order_qty', 0)
+  query = applySnapshotItemsPageQuery(query, {
+    snapshotId,
+    search,
+    categoryName,
+    subcategoryName,
+    platformSupplierId,
+    warningsOnly,
+    orderableOnly,
+    unassignedOnly,
+    abcQty,
+    abcRevenue,
+    abcProfit,
+    sortField,
+    sortDir,
+  })
 
-  query = query
-    .order('category_name', { ascending: true })
-    .order('subcategory_name', { ascending: true })
-    .order('product_name', { ascending: true })
-    .range(from, to)
+  query = query.range(range.from, range.to)
 
   const { data, error, count } = await query
   if (error) throw new Error(error.message || 'Не удалось загрузить позиции')
@@ -510,6 +535,58 @@ export async function fetchSnapshotItemsPage({
     page,
     pageSize,
   }
+}
+
+/**
+ * Apply whitelisted filters/sort. ABC: OR inside an axis, AND across axes.
+ * Unknown sort fields fall back to the default category/subcategory/name order.
+ */
+export function applySnapshotItemsPageQuery(query, {
+  snapshotId,
+  search = '',
+  categoryName = '',
+  subcategoryName = '',
+  platformSupplierId = '',
+  warningsOnly = false,
+  orderableOnly = false,
+  unassignedOnly = false,
+  abcQty = [],
+  abcRevenue = [],
+  abcProfit = [],
+  sortField = '',
+  sortDir = 'asc',
+} = {}) {
+  query = query.eq('snapshot_id', snapshotId)
+
+  const q = sanitizePlanningSearch(search)
+  if (q) {
+    query = query.or(`product_name.ilike.%${q}%,barcode.ilike.%${q}%`)
+  }
+  if (categoryName) query = query.eq('category_name', categoryName)
+  if (subcategoryName) query = query.eq('subcategory_name', subcategoryName)
+  if (platformSupplierId) query = query.eq('platform_supplier_id', platformSupplierId)
+  if (unassignedOnly) query = query.is('platform_supplier_id', null)
+  if (warningsOnly) query = query.eq('negative_stock', true)
+  if (orderableOnly) query = query.gt('final_order_qty', 0)
+
+  const abcQuery = describeSnapshotItemsAbcQuery({
+    abcQty,
+    abcRevenue,
+    abcProfit,
+    sortField,
+    sortDir,
+  })
+  for (const filter of abcQuery.inFilters) {
+    query = query.in(filter.column, filter.values)
+  }
+  for (const order of abcQuery.orders) {
+    query = query.order(order.field, {
+      ascending: order.ascending,
+      ...(order.nullsFirst === false ? { nullsFirst: false } : {}),
+    })
+  }
+
+  return query
 }
 
 /** Full paginated scan of snapshot filter aggregates (no cache). */

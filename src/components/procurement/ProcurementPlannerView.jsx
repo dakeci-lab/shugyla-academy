@@ -80,9 +80,20 @@ import {
   listTodaysScheduledSuppliers,
 } from '../../utils/procurementPlannerUx'
 import { toProcurementUserMessage } from '../../utils/procurementErrors'
+import {
+  ABC_AXES,
+  ABC_CLASSES,
+  ABC_UNAVAILABLE_NOTICE,
+  abcBadgeLabel,
+  abcSortAriaLabel,
+  formatAbcClass,
+  nextAbcSortState,
+  snapshotItemsLackAbcFacts,
+  toggleAbcClassFilter,
+} from '../../utils/procurementAbc'
 import './ProcurementPlannerView.css'
 
-const TABLE_COL_SPAN = 9
+const TABLE_COL_SPAN = 10
 
 const DEFAULT_PAGE_SIZE = 25
 
@@ -142,6 +153,31 @@ function PlannerTooltipButton({ tooltip, className = '', children, ...rest }) {
   )
 }
 
+function AbcBadge({ axisLabel, value }) {
+  const letter = formatAbcClass(value)
+  const empty = letter === '—'
+  const title = abcBadgeLabel(axisLabel, value)
+  return (
+    <span
+      className={`proc-planner__abc-badge${empty ? ' is-empty' : ` is-${letter.toLowerCase()}`}`}
+      title={title}
+      aria-label={title}
+    >
+      {letter}
+    </span>
+  )
+}
+
+function AbcBadges({ item }) {
+  return (
+    <div className="proc-planner__abc-badges">
+      {ABC_AXES.map((axis) => (
+        <AbcBadge key={axis.key} axisLabel={axis.label} value={item[axis.itemKey]} />
+      ))}
+    </div>
+  )
+}
+
 /**
  * @param {{ headerSlot?: HTMLElement|null }} props
  *   headerSlot — DOM node next to the page tabs where the compact snapshot line and
@@ -180,7 +216,11 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
      * honours it (see the contract note in docs/ and in the chip title).
      */
     unassignedOnly: false,
+    abcQty: [],
+    abcRevenue: [],
+    abcProfit: [],
   })
+  const [abcSort, setAbcSort] = useState({ field: '', dir: 'asc' })
   const [filterOptions, setFilterOptions] = useState(EMPTY_FILTER_OPTIONS)
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(false)
   const [filterOptionsSnapshotId, setFilterOptionsSnapshotId] = useState('')
@@ -235,6 +275,9 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     if (filters.warningsOnly) n += 1
     if (filters.orderableOnly) n += 1
     if (filters.unassignedOnly) n += 1
+    if (filters.abcQty.length) n += 1
+    if (filters.abcRevenue.length) n += 1
+    if (filters.abcProfit.length) n += 1
     return n
   }, [filters])
 
@@ -330,6 +373,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         pageSize,
         search: debouncedSearch,
         ...filters,
+        sortField: abcSort.field,
+        sortDir: abcSort.dir,
       })
       setItems(result.items)
       setTotalCount(result.totalCount)
@@ -341,7 +386,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     } finally {
       setLoading(false)
     }
-  }, [snapshot, page, pageSize, debouncedSearch, filters, showError])
+  }, [snapshot, page, pageSize, debouncedSearch, filters, abcSort, showError])
 
   useEffect(() => {
     void loadSnapshotMeta()
@@ -353,7 +398,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, filters, snapshot?.id])
+  }, [debouncedSearch, filters, abcSort, snapshot?.id])
 
   /**
    * An attempt key is bound to the payload it was minted for. As soon as any part of
@@ -592,6 +637,13 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   }, [filterOptions.categorySubcategories, filters.categoryName])
 
   const snapshotEditable = isSnapshotQuantityEditable(snapshot?.status)
+  const abcUnavailable =
+    Boolean(snapshot?.id) &&
+    snapshot.status !== 'syncing' &&
+    snapshot.status !== 'failed' &&
+    !loading &&
+    items.length > 0 &&
+    snapshotItemsLackAbcFacts(items)
 
   async function runPlanExport(format) {
     if (
@@ -1182,6 +1234,28 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                     />
                     Только без поставщика
                   </label>
+                  {ABC_AXES.map((axis) => (
+                    <fieldset key={axis.key} className="proc-planner__abc-filter">
+                      <legend>ABC {axis.label}</legend>
+                      <div className="proc-planner__abc-filter-options">
+                        {ABC_CLASSES.map((cls) => (
+                          <label key={cls} className="proc-planner__check">
+                            <input
+                              type="checkbox"
+                              checked={filters[axis.filterKey].includes(cls)}
+                              onChange={() =>
+                                setFilters((f) => ({
+                                  ...f,
+                                  [axis.filterKey]: toggleAbcClassFilter(f[axis.filterKey], cls),
+                                }))
+                              }
+                            />
+                            {cls}
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  ))}
                   <button
                     type="button"
                     className="btn btn--ghost btn--sm"
@@ -1193,6 +1267,9 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                         warningsOnly: false,
                         orderableOnly: false,
                         unassignedOnly: false,
+                        abcQty: [],
+                        abcRevenue: [],
+                        abcProfit: [],
                       }))
                     }
                   >
@@ -1312,6 +1389,48 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         <p className="proc-planner__empty">{snapshot.error || 'Синхронизация не удалась.'}</p>
       ) : null}
 
+      {abcUnavailable ? (
+        <p className="proc-planner__abc-unavailable" role="status">
+          {ABC_UNAVAILABLE_NOTICE}
+        </p>
+      ) : null}
+
+      <p className="proc-planner__abc-legend">
+        ABC:{' '}
+        <span
+          className="proc-planner__abc-badge is-a"
+          title="Класс A — до 80% накопленного вклада"
+          aria-label="Класс A — до 80% накопленного вклада"
+        >
+          A
+        </span>{' '}
+        80% ·{' '}
+        <span
+          className="proc-planner__abc-badge is-b"
+          title="Класс B — от 80% до 95%"
+          aria-label="Класс B — от 80% до 95%"
+        >
+          B
+        </span>{' '}
+        95% ·{' '}
+        <span
+          className="proc-planner__abc-badge is-c"
+          title="Класс C — остальные с положительным вкладом"
+          aria-label="Класс C — остальные с положительным вкладом"
+        >
+          C
+        </span>{' '}
+        остальное ·{' '}
+        <span
+          className="proc-planner__abc-badge is-empty"
+          title="Нет положительного показателя или старый снимок"
+          aria-label="Нет класса — нет положительного показателя или старый снимок"
+        >
+          —
+        </span>{' '}
+        нет данных. К — количество, В — выручка, П — прибыль.
+      </p>
+
       <div className="proc-planner__desktop">
         <div className="proc-planner__table-wrap">
           <table className="proc-planner__table">
@@ -1319,6 +1438,32 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
               <tr>
                 <th className="proc-planner__col-num">№</th>
                 <th>Товар</th>
+                <th className="proc-planner__col-abc">
+                  <div className="proc-planner__abc-head">
+                    <span>ABC</span>
+                    <div className="proc-planner__abc-sort">
+                      {ABC_AXES.map((axis) => {
+                        const active = abcSort.field === axis.column
+                        const arrow = !active ? '' : abcSort.dir === 'asc' ? ' ↑' : ' ↓'
+                        const short = axis.key === 'qty' ? 'К' : axis.key === 'revenue' ? 'В' : 'П'
+                        return (
+                          <button
+                            key={axis.key}
+                            type="button"
+                            className={`proc-planner__abc-sort-btn${active ? ' is-active' : ''}`}
+                            aria-pressed={active}
+                            aria-label={abcSortAriaLabel(axis.label, abcSort, axis.column)}
+                            title={abcSortAriaLabel(axis.label, abcSort, axis.column)}
+                            onClick={() => setAbcSort((current) => nextAbcSortState(current, axis.column))}
+                          >
+                            {short}
+                            {arrow}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                </th>
                 <th>Продажи 8 нед.</th>
                 <th>Остаток</th>
                 <th>Ср/день</th>
@@ -1351,6 +1496,9 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                           {[item.categoryName, item.subcategoryName].filter(Boolean).join(' / ')}
                         </span>
                       </div>
+                    </td>
+                    <td>
+                      <AbcBadges item={item} />
                     </td>
                     <td>
                       <WeeklySpark values={item.weeklySales} />
@@ -1420,6 +1568,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                   </strong>
                   <span>{item.barcode}</span>
                 </div>
+                <AbcBadges item={item} />
                 <WeeklySpark values={item.weeklySales} />
                 <div className="proc-planner__card-grid">
                   <span>

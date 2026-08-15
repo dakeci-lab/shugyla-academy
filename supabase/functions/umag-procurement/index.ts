@@ -21,6 +21,13 @@ import {
   acquireUmagSession,
   umagFetchAuthed,
 } from '../_shared/umagAuth.ts'
+import {
+  accumulateSalesRows,
+  assignSnapshotAbcClasses,
+  mergeWeekSalesIntoSnapshot,
+  roundMoney,
+  shouldIncludeSnapshotBarcode,
+} from './abcClassification.js'
 
 const PERMISSION_EDIT = 'procurement.edit'
 const PERMISSION_CREATE = 'procurement.create'
@@ -374,6 +381,7 @@ async function handleSync(
     }
 
     const weeklySalesByBarcode = new Map<string, number[]>()
+    const moneyByBarcode = new Map<string, { revenue: number; cogs: number }>()
     const salesMetaByBarcode = new Map<
       string,
       { productName: string; measure: string }
@@ -387,27 +395,19 @@ async function handleSync(
         return sales
       }
 
-      const weekTotals = new Map<string, number>()
-      for (const row of sales) {
-        const barcode = asBarcode(row.barcode)
-        if (!barcode) continue
-        const qty = asNumber(row.saleQuantity, 0)
-        weekTotals.set(barcode, (weekTotals.get(barcode) || 0) + qty)
+      const { totals: weekTotals, meta: weekMeta } = accumulateSalesRows(sales)
+      for (const [barcode, meta] of weekMeta) {
         if (!salesMetaByBarcode.has(barcode)) {
-          salesMetaByBarcode.set(barcode, {
-            productName:
-              asText(row.productFullName) || asText(row.productName) || barcode,
-            measure: asText(row.measure),
-          })
+          salesMetaByBarcode.set(barcode, meta)
         }
       }
 
-      for (const [barcode, qty] of weekTotals) {
-        if (!weeklySalesByBarcode.has(barcode)) {
-          weeklySalesByBarcode.set(barcode, Array.from({ length: 8 }, () => 0))
-        }
-        weeklySalesByBarcode.get(barcode)![weekIndex] = qty
-      }
+      mergeWeekSalesIntoSnapshot({
+        weeklySalesByBarcode,
+        moneyByBarcode,
+        weekTotals,
+        weekIndex,
+      })
     }
 
     const supplierByUmagId = new Map<number, string>()
@@ -427,16 +427,31 @@ async function handleSync(
     }
 
     const barcodeSet = new Set<string>()
-    for (const [barcode, row] of stockByBarcode) {
-      if (asNumber(row.stockQuantity, 0) !== 0) barcodeSet.add(barcode)
-    }
-    for (const [barcode, weeksArr] of weeklySalesByBarcode) {
-      const sales8w = weeksArr.reduce((a, b) => a + b, 0)
-      if (sales8w > 0) barcodeSet.add(barcode)
+    const candidateBarcodes = new Set<string>([
+      ...stockByBarcode.keys(),
+      ...weeklySalesByBarcode.keys(),
+      ...moneyByBarcode.keys(),
+    ])
+    for (const barcode of candidateBarcodes) {
+      const stock = asNumber(stockByBarcode.get(barcode)?.stockQuantity, 0)
+      const weekly = weeklySalesByBarcode.get(barcode) || []
+      const sales8w = weekly.reduce((a, b) => a + b, 0)
+      const money = moneyByBarcode.get(barcode) || { revenue: 0, cogs: 0 }
+      if (
+        shouldIncludeSnapshotBarcode({
+          stock,
+          sales8w,
+          revenue: money.revenue,
+          cogs: money.cogs,
+          profit: money.revenue - money.cogs,
+        })
+      ) {
+        barcodeSet.add(barcode)
+      }
     }
 
     const nowIso = new Date().toISOString()
-    const items: Record<string, unknown>[] = []
+    const draftItems: Record<string, unknown>[] = []
     let negativeStockCount = 0
     let orderableCount = 0
 
@@ -466,7 +481,12 @@ async function handleSync(
 
       if (recommendedQty > 0) orderableCount += 1
 
-      items.push({
+      const money = moneyByBarcode.get(barcode) || { revenue: 0, cogs: 0 }
+      const revenue8w = roundMoney(money.revenue)
+      const cogs8w = roundMoney(money.cogs)
+      const profit8w = roundMoney(revenue8w - cogs8w)
+
+      draftItems.push({
         snapshot_id: snapshotId,
         barcode,
         product_name:
@@ -499,6 +519,9 @@ async function handleSync(
         avg_daily: avgDaily,
         purchase_price: asNumber(stock?.productDetails?.arrivalCost, 0),
         selling_price: asNumber(stock?.productDetails?.sellingPrice, 0),
+        revenue_8w: revenue8w,
+        cogs_8w: cogs8w,
+        profit_8w: profit8w,
         norm_days: normDays,
         recommended_qty: recommendedQty,
         final_order_qty: recommendedQty,
@@ -507,6 +530,21 @@ async function handleSync(
         updated_at: nowIso,
       })
     }
+
+    const abcByBarcode = assignSnapshotAbcClasses(draftItems)
+    const items = draftItems.map((item) => {
+      const abc = abcByBarcode.get(String(item.barcode || '')) || {
+        abc_qty: null,
+        abc_revenue: null,
+        abc_profit: null,
+      }
+      return {
+        ...item,
+        abc_qty: abc.abc_qty,
+        abc_revenue: abc.abc_revenue,
+        abc_profit: abc.abc_profit,
+      }
+    })
 
     for (let i = 0; i < items.length; i += INSERT_CHUNK) {
       const chunk = items.slice(i, i + INSERT_CHUNK)
