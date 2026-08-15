@@ -41,7 +41,7 @@ const REAL_MIGRATIONS = [
   '20260815072607_procurement_abc_analysis.sql',
 ]
 
-const EXPECTED_CHECKS = 79
+const EXPECTED_CHECKS = 81
 
 let checks = 0
 
@@ -69,6 +69,53 @@ function stripSqlComments(sql) {
   return sql
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/--[^\n]*/g, '')
+}
+
+function countRaisePlaceholders(format) {
+  let count = 0
+  for (let i = 0; i < format.length; i += 1) {
+    if (format[i] !== '%') continue
+    if (format[i + 1] === '%') {
+      i += 1
+      continue
+    }
+    count += 1
+  }
+  return count
+}
+
+function parseRaiseExceptions(sql) {
+  const body = stripSqlComments(sql)
+  const raises = []
+  const re = /\braise\s+exception\b([\s\S]*?);/gi
+  let match
+  while ((match = re.exec(body))) {
+    const stmt = match[1]
+    const first = /'((?:''|[^'])*)'/.exec(stmt)
+    if (!first) {
+      raises.push({
+        format: '',
+        placeholders: 0,
+        args: [],
+        raw: match[0].replace(/\s+/g, ' ').trim(),
+      })
+      continue
+    }
+    const format = first[1].replace(/''/g, "'")
+    const afterFormat = stmt.slice(first.index + first[0].length)
+    const usingIdx = afterFormat.search(/\busing\b/i)
+    const argPart = (usingIdx >= 0 ? afterFormat.slice(0, usingIdx) : afterFormat)
+      .replace(/^[\s,]+/, '')
+      .trim()
+    const args = argPart === '' ? [] : argPart.split(',').map((part) => part.trim()).filter(Boolean)
+    raises.push({
+      format,
+      placeholders: countRaisePlaceholders(format),
+      args,
+      raw: match[0].replace(/\s+/g, ' ').trim(),
+    })
+  }
+  return raises
 }
 
 function grantTargetsAnon(sql) {
@@ -159,6 +206,12 @@ assert(
   /public schema is not empty/i.test(fixture)
 )
 assert(
+  'non-empty public schema RAISE passes v_public_tables into the % placeholder',
+  /public schema is not empty \(% non-snake tables\)\.[\s\S]{0,120}v_public_tables\s+using errcode = '42501'/.test(
+    fixture
+  )
+)
+assert(
   'fixture counts only non-snake public tables',
   fixture.includes("c.relname not like 'snake_%'")
 )
@@ -177,6 +230,19 @@ assert(
 assert(
   'blocked-object abort uses errcode 42501',
   /existing real or partial Shugyla schema object[\s\S]*errcode = '42501'/.test(fixture)
+)
+
+const raises = parseRaiseExceptions(fixture)
+const mismatchedRaises = raises.filter((item) => item.placeholders !== item.args.length)
+assert(
+  'every RAISE format placeholder has a matching argument',
+  raises.length > 0 && mismatchedRaises.length === 0,
+  mismatchedRaises
+    .map(
+      (item) =>
+        `${item.placeholders} % vs ${item.args.length} args in ${item.raw.slice(0, 120)}`
+    )
+    .join(' | ')
 )
 
 console.log('Stage 3: snake leftover tables, no data copy, no destructive SQL')

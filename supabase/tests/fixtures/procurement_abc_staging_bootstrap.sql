@@ -91,7 +91,8 @@ begin
 
   if v_public_tables > 0 then
     raise exception
-      'TEST-ONLY procurement ABC bootstrap refused: public schema is not empty (% non-snake tables). Empty disposable project only; will not alter a real Shugyla schema.'
+      'TEST-ONLY procurement ABC bootstrap refused: public schema is not empty (% non-snake tables). Empty disposable project only; will not alter a real Shugyla schema.',
+      v_public_tables
       using errcode = '42501';
   end if;
 
