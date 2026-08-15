@@ -9,6 +9,9 @@
  * A tie therefore never straddles 80/95. The item that crosses a threshold stays
  * in the class where its group started (inclusive Pareto).
  *
+ * Non-positive metrics (zero, negative, missing) always get NULL on every axis,
+ * including profit. They never receive A/B/C. Pareto uses positiveTotal only.
+ *
  * Quantity metrics are quantized to 3 decimal places (`sales_8w numeric(14, 3)`)
  * after barcode aggregation and before positiveTotal / sort / tie grouping, so
  * float sums like 0.1+0.2 match 0.3.
@@ -148,11 +151,9 @@ export function aggregateMetricsByBarcode(rows) {
 
 /**
  * @param {Array<{ barcode: string, metric: number }>} rows
- * @param {{ negativesAsCIfPositiveTotal?: boolean }} [options]
  * @returns {Map<string, 'A'|'B'|'C'|null>}
  */
-export function classifyAbcAxis(rows, options = {}) {
-  const negativesAsCIfPositiveTotal = Boolean(options.negativesAsCIfPositiveTotal)
+export function classifyAbcAxis(rows) {
   const result = new Map()
   const parsed = aggregateMetricsByBarcode(rows).map((row) => ({
     barcode: row.barcode,
@@ -166,11 +167,7 @@ export function classifyAbcAxis(rows, options = {}) {
 
   for (const row of parsed) {
     if (row.metric > 0) continue
-    if (negativesAsCIfPositiveTotal && row.metric < 0 && positiveTotal > 0) {
-      result.set(row.barcode, 'C')
-    } else {
-      result.set(row.barcode, null)
-    }
+    result.set(row.barcode, null)
   }
 
   if (!(positiveTotal > 0)) {
@@ -219,8 +216,7 @@ export function assignSnapshotAbcClasses(items) {
     list.map((item) => ({ barcode: item.barcode, metric: metricOf(item, 'revenue_8w') }))
   )
   const profitMap = classifyAbcAxis(
-    list.map((item) => ({ barcode: item.barcode, metric: metricOf(item, 'profit_8w') })),
-    { negativesAsCIfPositiveTotal: true }
+    list.map((item) => ({ barcode: item.barcode, metric: metricOf(item, 'profit_8w') }))
   )
 
   const byBarcode = new Map()

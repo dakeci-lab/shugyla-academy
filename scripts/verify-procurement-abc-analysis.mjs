@@ -165,30 +165,136 @@ async function stageClassifier() {
     classesOf(zeros, ['hot', 'zero', 'none']) === 'A,null,null'
   )
 
-  const allNegative = abc.classifyAbcAxis(
-    [
-      { barcode: 'x', metric: -10 },
-      { barcode: 'y', metric: -3 },
-    ],
-    { negativesAsCIfPositiveTotal: true }
-  )
+  const allNegative = abc.classifyAbcAxis([
+    { barcode: 'x', metric: -10 },
+    { barcode: 'y', metric: -3 },
+  ])
   assert(
     'all-negative profit universe is NULL',
     classesOf(allNegative, ['x', 'y']) === 'null,null'
   )
 
-  const mixedProfit = abc.classifyAbcAxis(
+  const mixedProfit = abc.classifyAbcAxis([
+    { barcode: 'win', metric: 100 },
+    { barcode: 'ok', metric: 20 },
+    { barcode: 'loss', metric: -40 },
+    { barcode: 'zero', metric: 0 },
+  ])
+  assert(
+    'negative and zero profit stay NULL; positives keep A/B',
+    classesOf(mixedProfit, ['win', 'ok', 'loss', 'zero']) === 'A,B,null,null'
+  )
+
+  const leftoverFlag = abc.classifyAbcAxis(
     [
       { barcode: 'win', metric: 100 },
-      { barcode: 'ok', metric: 20 },
-      { barcode: 'loss', metric: -40 },
-      { barcode: 'zero', metric: 0 },
+      { barcode: 'loss', metric: -1 },
     ],
     { negativesAsCIfPositiveTotal: true }
   )
   assert(
-    'one negative with positive total is C; zero stays NULL',
-    classesOf(mixedProfit, ['win', 'ok', 'loss', 'zero']) === 'A,B,C,null'
+    'legacy negativesAsCIfPositiveTotal argument cannot assign C',
+    leftoverFlag.get('win') === 'A' && leftoverFlag.get('loss') == null
+  )
+
+  const qtyNegatives = abc.classifyAbcAxis([
+    { barcode: 'hot', metric: 80 },
+    { barcode: 'ret', metric: -5 },
+  ])
+  const revenueNegatives = abc.classifyAbcAxis([
+    { barcode: 'hot', metric: 800 },
+    { barcode: 'ret', metric: -50 },
+  ])
+  assert(
+    'qty and revenue negatives stay NULL when positives exist',
+    classesOf(qtyNegatives, ['hot', 'ret']) === 'A,null' &&
+      classesOf(revenueNegatives, ['hot', 'ret']) === 'A,null'
+  )
+
+  const profitLosses = [
+    -21768.13, -15000, -8000, -4200, -3100, -2500, -1800, -1200, -900, -650, -400, -250, -180,
+    -120, -80, -50, -35, -26,
+  ]
+  const productionLikeItems = [
+    { barcode: 'win', sales_8w: 50, revenue_8w: 500, profit_8w: 100 },
+    { barcode: 'ok', sales_8w: 20, revenue_8w: 200, profit_8w: 20 },
+    ...profitLosses.map((profit, index) => ({
+      barcode: `loss-${String(index + 1).padStart(2, '0')}`,
+      sales_8w: 10,
+      revenue_8w: 100,
+      profit_8w: profit,
+    })),
+  ]
+  const productionLike = abc.assignSnapshotAbcClasses(productionLikeItems)
+  const lossItems = productionLikeItems.filter((item) => item.barcode.startsWith('loss-'))
+  assert('production-like snapshot has 18 negative-profit SKUs', lossItems.length === 18)
+  assert(
+    'negative profit_8w values are preserved on the 18 loss SKUs',
+    lossItems.every((item, index) => item.profit_8w === profitLosses[index]) &&
+      profitLosses[0] === -21768.13 &&
+      profitLosses[17] === -26
+  )
+  assert(
+    '18 negative-profit SKUs never receive A/B/C on profit',
+    lossItems.every((item) => productionLike.get(item.barcode).abc_profit == null) &&
+      [...productionLike.values()].every((classes) => classes.abc_profit !== 'C')
+  )
+  assert(
+    'positive profit SKUs still follow Pareto 80/95',
+    productionLike.get('win').abc_profit === 'A' && productionLike.get('ok').abc_profit === 'B'
+  )
+
+  const weekSales = new Map()
+  const weekMoney = new Map()
+  const saleWeek = abc.accumulateSalesRows([
+    { barcode: 'ret-sku', saleQuantity: 10, saleSellingAmount: 10000, saleArrivalAmount: 6000 },
+    { barcode: 'good', saleQuantity: 5, saleSellingAmount: 5000, saleArrivalAmount: 2000 },
+  ])
+  abc.mergeWeekSalesIntoSnapshot({
+    weeklySalesByBarcode: weekSales,
+    moneyByBarcode: weekMoney,
+    weekTotals: saleWeek.totals,
+    weekIndex: 0,
+  })
+  const returnWeek = abc.accumulateSalesRows([
+    { barcode: 'ret-sku', saleQuantity: -8, saleSellingAmount: -9000, saleArrivalAmount: -2000 },
+  ])
+  abc.mergeWeekSalesIntoSnapshot({
+    weeklySalesByBarcode: weekSales,
+    moneyByBarcode: weekMoney,
+    weekTotals: returnWeek.totals,
+    weekIndex: 4,
+  })
+  const retMoney = weekMoney.get('ret-sku')
+  const goodMoney = weekMoney.get('good')
+  const retProfit = abc.roundMoney(retMoney.revenue - retMoney.cogs)
+  const goodProfit = abc.roundMoney(goodMoney.revenue - goodMoney.cogs)
+  assert(
+    'returns across weeks can net negative profit while preserving amounts',
+    retMoney.revenue === 1000 &&
+      retMoney.cogs === 4000 &&
+      retProfit === -3000 &&
+      goodProfit === 3000
+  )
+  const afterReturns = abc.assignSnapshotAbcClasses([
+    {
+      barcode: 'ret-sku',
+      sales_8w: weekSales.get('ret-sku').reduce((sum, qty) => sum + qty, 0),
+      revenue_8w: abc.roundMoney(retMoney.revenue),
+      profit_8w: retProfit,
+    },
+    {
+      barcode: 'good',
+      sales_8w: weekSales.get('good').reduce((sum, qty) => sum + qty, 0),
+      revenue_8w: abc.roundMoney(goodMoney.revenue),
+      profit_8w: goodProfit,
+    },
+  ])
+  assert(
+    'net-negative profit after returns is NULL; profitable SKU still classifies',
+    afterReturns.get('ret-sku').abc_profit == null &&
+      retProfit === -3000 &&
+      afterReturns.get('good').abc_profit === 'A'
   )
 
   const lastWinsTrapRows = [
@@ -619,6 +725,15 @@ function stageRepeatOrderInvariants() {
     classifier.includes('export const QTY_DECIMALS = 3') &&
       classifier.includes('metric: roundQty(row.metric)')
   )
+  assert(
+    'classifier has no negativesAsCIfPositiveTotal fallback',
+    !classifier.includes('negativesAsCIfPositiveTotal')
+  )
+  assert(
+    'docs say non-positive profit is NULL and never A/B/C',
+    docs.includes('Класс при метрике ≤ 0 — `NULL` / в UI «—», никогда A/B/C') &&
+      !docs.includes('убыточные получают C')
+  )
 }
 
 const BACKEND_ONLY = process.argv.includes('--backend-only')
@@ -626,8 +741,8 @@ const SERVICE_UI_ONLY = process.argv.includes('--service-ui-only')
 const SERVICE_ONLY = process.argv.includes('--service-only')
 
 const EXPECTED_CHECKS = {
-  full: 110,
-  backend: 55,
+  full: 120,
+  backend: 65,
   service: 33,
   serviceUi: 55,
 }
