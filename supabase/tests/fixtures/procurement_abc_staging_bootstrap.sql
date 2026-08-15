@@ -22,6 +22,7 @@
 --   8. supabase/migrations/20260812171700_procurement_norm_taxonomy_rpc.sql
 --   9. supabase/migrations/20260814134910_procurement_repeat_analytics_orders.sql
 --  10. supabase/migrations/20260815072607_procurement_abc_analysis.sql
+--  11. supabase/migrations/20260815095402_secure_platform_suppliers_rls.sql
 --
 -- Skipped on purpose (same date window, not required by the planning chain):
 --   receiving UMAG v1, recruitment, roles, finance, indexes on academy_*.

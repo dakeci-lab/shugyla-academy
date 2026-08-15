@@ -62,12 +62,10 @@ function classesOf(map, barcodes) {
 function stageMigration() {
   console.log('Stage 1: Migration static')
   const sql = read(MIGRATION)
-  const latest = fs
-    .readdirSync(path.join(ROOT, 'supabase/migrations'))
-    .filter((name) => /^\d+_.*\.sql$/.test(name))
-    .sort()
-    .at(-1)
-  assert('timestamped migration filename', latest === path.basename(MIGRATION), latest)
+  assert(
+    'timestamped migration filename',
+    path.basename(MIGRATION) === '20260815072607_procurement_abc_analysis.sql'
+  )
   assert('adds nullable money columns without default 0', /add column if not exists revenue_8w numeric\(14, 2\)/.test(sql))
   assert('cogs and profit are nullable numerics', sql.includes('cogs_8w numeric(14, 2)') && sql.includes('profit_8w numeric(14, 2)'))
   assert('ABC class columns are nullable text', /add column if not exists abc_qty text/.test(sql))

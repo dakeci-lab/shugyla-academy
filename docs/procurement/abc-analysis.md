@@ -26,12 +26,13 @@
 
 ## Деплой
 
-Прод: порядок обязателен и не обратный.
+Прод / remote Supabase не трогаем в этом PR. Когда применять вручную (не из Cursor), порядок:
 
-1. Применить миграцию `20260815072607_procurement_abc_analysis.sql`.
-2. Затем задеплоить Edge Function `umag-procurement`.
+1. Supplier hardening: `20260815095402_secure_platform_suppliers_rls.sql`
+2. ABC, если fresh environment ещё без неё: `20260815072607_procurement_abc_analysis.sql`
+3. Затем задеплоить Edge Function `umag-procurement`.
 
-Без миграции синк не сможет записать ABC-колонки. Без нового Edge старые снимки/строки останутся без ABC-фактов.
+Timestamp order, если обе миграции ещё не применены: сначала ABC `20260815072607`, затем hardening `20260815095402`, затем Edge. Применить миграцию `20260815072607_procurement_abc_analysis.sql`. Без ABC-миграции синк не сможет записать ABC-колонки. Без нового Edge старые снимки/строки останутся без ABC-фактов.
 
 ### Disposable test project (не прод)
 
@@ -48,6 +49,7 @@
 8. `supabase/migrations/20260812171700_procurement_norm_taxonomy_rpc.sql`
 9. `supabase/migrations/20260814134910_procurement_repeat_analytics_orders.sql`
 10. `supabase/migrations/20260815072607_procurement_abc_analysis.sql`
+11. `supabase/migrations/20260815095402_secure_platform_suppliers_rls.sql`
 
 Fixture отказывается работать на production project ref и если public уже не пустой. Permission helper — fail-closed (`false`). Live apply из Cursor не делается.
 
@@ -65,4 +67,5 @@ npm run verify:procurement-abc-staging-bootstrap
 npm run verify:procurement-abc-analysis
 npm run verify:procurement-repeat-analytics-orders
 npm run verify:procurement-planning-v1
+npm run verify:secure-platform-suppliers-rls
 ```
