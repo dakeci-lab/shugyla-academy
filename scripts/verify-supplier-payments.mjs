@@ -8,11 +8,18 @@
 
 import fs from 'fs'
 import path from 'path'
-import { fileURLToPath } from 'url'
+import { register } from 'node:module'
+import { fileURLToPath, pathToFileURL } from 'url'
 import assert from 'node:assert/strict'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
+
+// App sources are written for Vite: extensionless imports and import.meta.env.
+// Empty env keeps the app in local mode — no Supabase client, no network.
+globalThis.__VITE_ENV__ = {}
+register(pathToFileURL(path.join(__dirname, 'lib/extensionlessResolver.mjs')))
+
 let passed = 0
 
 function ok(name) {
@@ -45,7 +52,70 @@ function deriveStatus(debt, dueDate, today) {
   return 'upcoming'
 }
 
-function main() {
+/**
+ * The reported bug: a July receipt paid in August stayed overdue because the
+ * payments screen only ever synced the current month.
+ */
+async function checkCrossMonthSyncScope() {
+  const panel = read('src/components/suppliers/payments/SupplierPaymentsPanel.jsx')
+  assert.doesNotMatch(panel, /getMonthPeriodKeys/)
+  assert.match(panel, /const result = await syncUmagForPayments\(\)/)
+  assert.match(panel, /formatSyncCoverage\(lastRun\?\.date_from, lastRun\?\.date_to\)/)
+  assert.match(panel, /Охват: \{syncCoverage\}/)
+  ok('payments sync is not limited to the current month')
+
+  const paymentsService = read('src/services/supplierPaymentObligationsService.js')
+  assert.match(paymentsService, /syncUmagOpenObligations/)
+  assert.match(paymentsService, /export async function syncUmagForPayments\(\)/)
+  assert.match(paymentsService, /describeObligationsSyncResult\(result\)/)
+  assert.doesNotMatch(paymentsService, /syncUmagSettlements/)
+  ok('payments service calls the derived-period action')
+
+  const settlementsService = read('src/services/umagSettlementsService.js')
+  assert.match(settlementsService, /action: 'sync_open_obligations'/)
+  assert.match(settlementsService, /export async function syncUmagOpenObligations\(\)/)
+  // The settlements screen keeps its explicit period picker.
+  assert.match(settlementsService, /action: 'sync',\n\s*dateFrom,/)
+  assert.match(settlementsService, /async function invokeUmagSync\(requestBody\)/)
+  ok('explicit-period sync preserved for settlements')
+
+  const {
+    describeObligationsSyncResult,
+    formatSyncCoverage,
+  } = await import('../src/utils/supplierPaymentObligations.js')
+
+  assert.equal(
+    describeObligationsSyncResult({ months: { processed: ['2026-07', '2026-08'], remaining: [] } }),
+    'Обновлено 2 месяца. Календарь оплат обновлён.'
+  )
+  assert.equal(
+    describeObligationsSyncResult({ months: { processed: ['2026-08'], remaining: [] } }),
+    'Обновлено 1 месяц. Календарь оплат обновлён.'
+  )
+  assert.equal(
+    describeObligationsSyncResult({
+      months: { processed: ['2026-01'], remaining: ['2026-02', '2026-03'] },
+    }),
+    'Обновлено 1 месяц, осталось 2 месяца. Нажмите синхронизацию повторно.'
+  )
+  assert.equal(
+    describeObligationsSyncResult({ months: { processed: [], remaining: [] } }),
+    'Ни один месяц не обновлён. Проверьте журнал синхронизации.'
+  )
+  assert.equal(
+    describeObligationsSyncResult({}),
+    'Ни один месяц не обновлён. Проверьте журнал синхронизации.'
+  )
+  ok('sync result message states progress and the next action')
+
+  assert.equal(formatSyncCoverage('2026-07-01', '2026-08-31'), '01.07.2026 — 31.08.2026')
+  assert.equal(formatSyncCoverage('2026-08-01', '2026-08-01'), '01.08.2026')
+  assert.equal(formatSyncCoverage(null, '2026-08-31'), null)
+  assert.equal(formatSyncCoverage(undefined, undefined), null)
+  ok('coverage label shows the period actually synced')
+}
+
+async function main() {
   console.log('=== Supplier payments verification ===\n')
 
   const migration = read('supabase/migrations/20260727040000_supplier_payment_obligations.sql')
@@ -167,6 +237,8 @@ function main() {
   assert.equal(pickDefaultFromCounts({ overdue: 0, today: 0, upcoming: 3, termsMissing: 1 }), 'upcoming')
   ok('status and day-diff rules')
 
+  await checkCrossMonthSyncScope()
+
   console.log(`\n${passed} checks passed`)
 }
 
@@ -178,4 +250,4 @@ function pickDefaultFromCounts(tabCounts) {
   return 'overdue'
 }
 
-main()
+await main()
