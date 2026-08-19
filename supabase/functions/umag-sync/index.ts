@@ -2202,11 +2202,36 @@ async function runOpenObligationsSync(
   })
 
   try {
+    const monthWarnings: string[] = []
+
+    // Suppliers first, as the full sync does: a receipt from a supplier that is
+    // not mapped yet would otherwise land with platform_supplier_id null and its
+    // obligation would show up unnamed and unconfigurable. A failure here is not
+    // fatal — refreshing debt matters more than refreshing the directory.
+    const suppliersResult = await fetchAllSuppliers(session)
+    if (!suppliersResult.ok) {
+      monthWarnings.push('Справочник поставщиков не обновлён')
+    } else {
+      const suppliersUpsert = await upsertSuppliers(serviceClient, suppliersResult.agents)
+      if (suppliersUpsert instanceof Response) {
+        monthWarnings.push('Справочник поставщиков не сохранён')
+      } else {
+        const activeUmagIds = new Set<number>()
+        for (const agent of suppliersResult.agents) {
+          const id = asBigIntId(agent.id)
+          if (id != null) activeUmagIds.add(id)
+        }
+        const canonical = await reconcileCanonicalSuppliers(serviceClient, activeUmagIds)
+        if (canonical instanceof Response) {
+          monthWarnings.push('Сверка карточек поставщиков не выполнена')
+        }
+      }
+    }
+
     const supplierMap = await loadSupplierMap(serviceClient)
     const platformMap = await loadPlatformSupplierMap(serviceClient)
 
     const outcomes: MonthSyncOutcome[] = []
-    const monthWarnings: string[] = []
     const remaining: string[] = []
 
     for (let i = 0; i < plannedMonths.length; i += 1) {
@@ -2321,6 +2346,7 @@ async function runOpenObligationsSync(
 
     const warnings = [...monthWarnings]
     if (planned.skippedOlder.length > 0) {
+      // Older debt is not lost: it can still be synced from settlements by hand.
       warnings.push(
         `Месяцы старше лимита не обновлялись: ${planned.skippedOlder.join(', ')}`
       )
