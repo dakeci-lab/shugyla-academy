@@ -702,21 +702,7 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
     return b.amount - a.amount
   })
 
-  const totals = rows.reduce(
-    (acc, row) => {
-      acc.supplyCount += row.supplyCount
-      acc.amount += row.amount
-      acc.paymentAmount += row.paymentAmount
-      acc.paymentRefundAmount += row.paymentRefundAmount
-      // row.debt can be null for a row whose canonical supplier is
-      // unresolved — never let that turn the visible total into NaN.
-      acc.debt += toNumber(row.debt)
-      acc.returnCount += row.returnCount
-      acc.returnAmount += row.returnAmount
-      return acc
-    },
-    emptyTotals()
-  )
+  const totals = computeSettlementsListTotals(rows)
 
   return {
     rows,
@@ -739,4 +725,32 @@ function emptyTotals() {
     returnCount: 0,
     returnAmount: 0,
   }
+}
+
+/**
+ * Pure: aggregate footer totals for the currently visible settlement rows.
+ * Current-debt subtotal is a list subtotal, not global company debt — if any
+ * visible row has unresolved canonical debt (debt == null), the debt subtotal
+ * is null rather than silently treating unknown as zero.
+ */
+export function computeSettlementsListTotals(rows) {
+  let hasUnresolvedDebt = false
+
+  const totals = (rows || []).reduce(
+    (acc, row) => {
+      acc.supplyCount += row.supplyCount
+      acc.amount += row.amount
+      acc.paymentAmount += row.paymentAmount
+      acc.paymentRefundAmount += row.paymentRefundAmount
+      if (row.debt == null) hasUnresolvedDebt = true
+      else acc.debt += toNumber(row.debt)
+      acc.returnCount += row.returnCount
+      acc.returnAmount += row.returnAmount
+      return acc
+    },
+    emptyTotals()
+  )
+
+  if (hasUnresolvedDebt) totals.debt = null
+  return totals
 }

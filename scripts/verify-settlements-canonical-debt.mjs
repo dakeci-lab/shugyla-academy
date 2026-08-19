@@ -122,8 +122,9 @@ async function main() {
   ok('the error path has no reference to ledger/SUM — nothing to silently fall back to')
 
   // --- 8. Totals row: guarded against NaN from an unresolved row, documented ---
-  assert.match(umagSrc, /acc\.debt \+= toNumber\(row\.debt\)/)
-  ok("total row sums the visible rows' canonical debt (toNumber guards a null unresolved row from becoming NaN) — a per-page total of shown suppliers, not necessarily the global company debt (item 7)")
+  assert.match(umagSrc, /computeSettlementsListTotals\(rows\)/)
+  assert.match(umagSrc, /export function computeSettlementsListTotals/)
+  ok("total row uses computeSettlementsListTotals(rows) — list subtotal, null when any row.debt is unresolved (item 7 / Этап 3.2 F-6)")
 
   // --- 9. Period-scoped fields untouched (Case 9) ---------------------------
   assert.match(umagSrc, /row\.amount \+= toNumber\(supply\.amount\)/)
@@ -151,13 +152,15 @@ async function main() {
   ok('no ledger-vs-canonical reconciliation flag added (item 19)')
 
   // --- 12. UI: label rename only, no layout/CSS/route change ---------------
-  assert.match(panelSrc, /label="Текущий долг"/)
-  const labelCount = (panelSrc.match(/label="Текущий долг"/g) || []).length
+  assert.match(panelSrc, /label="По списку"/)
+  const rowLabelCount = (panelSrc.match(/label="Текущий долг"/g) || []).length
+  const subtotalLabelCount = (panelSrc.match(/label="По списку"/g) || []).length
   const thCount = (panelSrc.match(/<th>Текущий долг<\/th>/g) || []).length
   const spanCount = (panelSrc.match(/<span>Текущий долг<\/span>/g) || []).length
-  assert.equal(labelCount + thCount + spanCount, 5, 'expected all 5 debt-value labels renamed')
+  assert.equal(rowLabelCount + thCount + spanCount, 3, 'row/header debt labels stay "Текущий долг"')
+  assert.equal(subtotalLabelCount, 2, 'footer debt subtotal is labeled "По списку" (desktop + mobile)')
   assert.doesNotMatch(panelSrc, />Задолженность</)
-  ok('debt-value labels renamed "Задолженность" → "Текущий долг" everywhere it appears — no other text/labels touched')
+  ok('row debt labels stay "Текущий долг"; footer subtotal is "По списку" (Этап 3.2 F-6)')
 
   const cssStatus = execFileSync(
     'git',

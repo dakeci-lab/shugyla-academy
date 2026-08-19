@@ -14,7 +14,7 @@ select pg_advisory_xact_lock(202608191200);
 --      started_at is kept as a plausible in-flight run).
 --   2. Any `running` row (including the one kept above) older than the
 --      stale threshold used by umag-sync's own runtime cleanup
---      (STALE_SYNC_THRESHOLD_MINUTES = 15 in supabase/functions/_shared/
+--      (STALE_SYNC_THRESHOLD_MINUTES = 5 in supabase/functions/_shared/
 --      umagConfig.ts — keep these two in sync if that constant changes).
 -- ---------------------------------------------------------------------------
 
@@ -33,13 +33,13 @@ set
   finished_at = coalesce(r.finished_at, now()),
   error_message = coalesce(
     r.error_message,
-    'stale: closed by migration 20260819120000_umag_sync_runs_lock — either a duplicate running row for its entity, or older than the 15-minute stale-run threshold.'
+    'stale: closed by migration 20260819120000_umag_sync_runs_lock — either a duplicate running row for its entity, or older than the 5-minute stale-run threshold.'
   )
 from ranked_running
 where r.id = ranked_running.id
   and (
     ranked_running.rn > 1
-    or r.started_at < now() - interval '15 minutes'
+    or r.started_at < now() - interval '5 minutes'
   );
 
 -- ---------------------------------------------------------------------------

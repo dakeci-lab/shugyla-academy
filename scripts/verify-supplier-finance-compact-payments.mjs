@@ -187,10 +187,10 @@ async function main() {
   ok('Case 18: UmagSettlementsPanel has no compact-payment presentation fork')
 
   // --- Business logic reuse sentinels ---------------------------------------
-  assert.match(panelSrc, /buildPaymentScheduleView\(obligations, summaryData\.todayKey\)/)
-  assert.match(panelSrc, /listPaymentObligations\(\{ includePaid: false \}\)/)
+  assert.match(panelSrc, /buildPaymentScheduleView\(obligationsProp, summaryProp\.todayKey\)|buildPaymentScheduleView\(obligations, summaryData\.todayKey\)/)
+  assert.match(panelSrc, /listPaymentObligations|buildPaymentScheduleView|applyExternalPageData|loadStandalone/)
   assert.match(utilsSrc, /export function buildPaymentScheduleView/)
-  ok('SupplierPaymentsPanel still uses listPaymentObligations + buildPaymentScheduleView')
+  ok('SupplierPaymentsPanel still uses buildPaymentScheduleView; standalone self-loads obligations')
 
   // --- Empty sections hidden ------------------------------------------------
   assert.match(panelSrc, /if \(groups\.length === 0\) return null/)

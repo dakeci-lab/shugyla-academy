@@ -90,13 +90,16 @@ function TotalsMetaBlock({ periodLabel, lastRun }) {
   )
 }
 
-function TotalsMetricContent({ label, value, loading, isCount, tone }) {
+function TotalsMetricContent({ label, value, loading, isCount, tone, unavailable, unavailableTitle }) {
   const debtPositive = tone === 'debt' && Number(value) > 0
+  const debtUnavailable = tone === 'debt' && (unavailable || value == null)
   const display = loading
     ? '…'
-    : isCount
-      ? String(value ?? 0)
-      : formatUmagMoney(value)
+    : debtUnavailable
+      ? '—'
+      : isCount
+        ? String(value ?? 0)
+        : formatUmagMoney(value)
 
   return (
     <>
@@ -111,6 +114,7 @@ function TotalsMetricContent({ label, value, loading, isCount, tone }) {
                 ? ' umag-settlements__tfoot-value--debt'
                 : ''
         }`}
+        title={debtUnavailable ? unavailableTitle || 'Есть несопоставленные поставщики' : undefined}
       >
         {display}
       </strong>
@@ -166,10 +170,11 @@ function SettlementsTableFoot({
         </td>
         <td className="umag-settlements__tfoot-metric-cell">
           <TotalsMetricContent
-            label="Текущий долг"
+            label="По списку"
             value={totals?.debt}
             loading={loading}
             tone="debt"
+            unavailable={totals?.debt == null}
           />
         </td>
         {canViewRecon ? <td className="umag-settlements__tfoot-empty-cell" /> : null}
@@ -181,7 +186,7 @@ function SettlementsTableFoot({
 /** Mobile: compact sticky strip under card list (same aggregates). */
 function SettlementsMobileTotals({ totals, loading, periodLabel, lastRun }) {
   return (
-    <div className="umag-settlements__mobile-totals" aria-label="Итоги периода">
+    <div className="umag-settlements__mobile-totals" aria-label="Итоги списка">
       <TotalsMetaBlock periodLabel={periodLabel} lastRun={lastRun} />
       <div className="umag-settlements__mobile-totals-grid">
         <div className="umag-settlements__mobile-totals-cell">
@@ -209,10 +214,11 @@ function SettlementsMobileTotals({ totals, loading, periodLabel, lastRun }) {
         </div>
         <div className="umag-settlements__mobile-totals-cell">
           <TotalsMetricContent
-            label="Текущий долг"
+            label="По списку"
             value={totals?.debt}
             loading={loading}
             tone="debt"
+            unavailable={totals?.debt == null}
           />
         </div>
       </div>

@@ -22,7 +22,7 @@ import {
   formatUmagMoney,
   syncUmagSettlements,
 } from '../../../services/umagSettlementsService'
-import { fetchSupplierFinanceSummary } from '../../../services/supplierFinanceSummaryService'
+import { fetchSupplierFinancePageData } from '../../../services/supplierFinanceSummaryService'
 import { toAqtobeDateKey } from '../../../utils/supplierPaymentObligations'
 import { getMonthRangeKeys } from '../../../utils/settlementsPeriod'
 import {
@@ -90,6 +90,7 @@ export default function SupplierFinancePanel() {
   }
 
   const [summary, setSummary] = useState(null)
+  const [obligations, setObligations] = useState(null)
   const [lastSync, setLastSync] = useState(null)
   const [summaryLoading, setSummaryLoading] = useState(true)
   const [summaryError, setSummaryError] = useState('')
@@ -106,11 +107,13 @@ export default function SupplierFinancePanel() {
       // which would show as a fabricated "Долг = 0". Only call it when the
       // user actually has the permission that makes it safe to trust.
       if (canViewPayments) {
-        const data = await fetchSupplierFinanceSummary()
-        setSummary(data)
-        setLastSync(data.lastSync)
+        const pageData = await fetchSupplierFinancePageData()
+        setSummary(pageData.summary)
+        setObligations(pageData.obligations)
+        setLastSync(pageData.summary.lastSync)
       } else {
         setSummary(null)
+        setObligations(null)
         if (canViewSettlements) {
           setLastSync(await fetchLastUmagSyncRun())
         }
@@ -118,6 +121,7 @@ export default function SupplierFinancePanel() {
     } catch (err) {
       setSummaryError(err.message || 'Не удалось загрузить сводку')
       setSummary(null)
+      setObligations(null)
     } finally {
       setSummaryLoading(false)
     }
@@ -240,7 +244,14 @@ export default function SupplierFinancePanel() {
       </div>
 
       {activeTabMeta?.id === 'payments' ? (
-        <SupplierPaymentsPanel embedded summary={summary} refreshToken={refreshToken} />
+        <SupplierPaymentsPanel
+          embedded
+          externalSummaryProvided
+          summary={summary}
+          summaryLoading={summaryLoading}
+          obligations={obligations}
+          refreshToken={refreshToken}
+        />
       ) : null}
 
       {activeTabMeta?.id === 'settlements' ? (

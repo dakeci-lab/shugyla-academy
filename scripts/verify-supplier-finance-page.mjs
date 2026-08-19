@@ -153,7 +153,7 @@ async function main() {
   ok('Case 18: the sync button is disabled/shows the spinner both while this tab is syncing AND while lastSync.status is already running')
 
   // --- Case 10/11: embedded panels wired, no duplicate shell -----------------
-  assert.match(panelSrc, /<SupplierPaymentsPanel embedded summary=\{summary\} refreshToken=\{refreshToken\} \/>/)
+  assert.match(panelSrc, /<SupplierPaymentsPanel[\s\S]*embedded[\s\S]*externalSummaryProvided[\s\S]*obligations=\{obligations\}[\s\S]*refreshToken=\{refreshToken\}/)
   assert.match(panelSrc, /<UmagSettlementsPanel embedded refreshToken=\{refreshToken\} \/>/)
   ok('Case 10/11: both content panels are rendered with embedded (hides their own shell/KPIs/second ↻) — confirmed structurally in Этап 2.6')
 
@@ -165,8 +165,9 @@ async function main() {
   ok('item 18: embedded SupplierPaymentsPanel no longer shows a second "К оплате" title — tabs/list/detail sheet inside the section are untouched')
 
   // --- refreshToken plumbing on both embedded panels ------------------------
-  assert.match(paymentsSrc, /refreshToken = null,?\s*\n\} = \{\}\)/)
-  assert.match(paymentsSrc, /\[canView, load, refreshToken\]/)
+  assert.match(panelSrc, /fetchSupplierFinancePageData/)
+  assert.match(paymentsSrc, /externalSummaryProvided = false,/)
+  assert.match(paymentsSrc, /\[canView, externalSummaryProvided, applyExternalPageData, loadStandalone, refreshToken\]/)
   const settlementsSrc = read(SETTLEMENTS_PANEL)
   assert.match(settlementsSrc, /refreshToken = null \} = \{\}\)/)
   assert.match(settlementsSrc, /\[canView, loadData, refreshToken\]/)

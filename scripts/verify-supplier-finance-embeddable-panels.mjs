@@ -22,6 +22,7 @@ const ROOT = path.join(__dirname, '..')
 
 const PAYMENTS_PANEL = 'src/components/suppliers/payments/SupplierPaymentsPanel.jsx'
 const SETTLEMENTS_PANEL = 'src/components/suppliers/settlements/UmagSettlementsPanel.jsx'
+const FINANCE_PANEL = 'src/components/suppliers/finance/SupplierFinancePanel.jsx'
 const APP = 'src/App.jsx'
 const NAV = 'src/platform/platformNav.js'
 
@@ -47,6 +48,7 @@ function main() {
 
   const paymentsSrc = read(PAYMENTS_PANEL)
   const settlementsSrc = read(SETTLEMENTS_PANEL)
+  const financePanelSrc = read(FINANCE_PANEL)
   const appSrc = read(APP)
   const navSrc = read(NAV)
 
@@ -55,7 +57,9 @@ function main() {
   // destructuring — the invariant that still matters is that embedded and
   // summaryProp keep their original defaults, not the exact prop list.
   assert.match(paymentsSrc, /export default function SupplierPaymentsPanel\(\{/)
-  assert.match(paymentsSrc, /embedded = false,\s*\n\s*summary: summaryProp = null,/)
+  assert.match(paymentsSrc, /externalSummaryProvided = false,/)
+  assert.match(paymentsSrc, /summaryLoading = false,/)
+  assert.match(paymentsSrc, /obligations: obligationsProp = null,/)
   ok('Case 1: SupplierPaymentsPanel defaults to embedded=false — standalone usage (<SupplierPaymentsPanel />) is unchanged')
 
   assert.match(paymentsSrc, /\{!embedded && \(\s*\n\s*<div className="spo-panel__toolbar">/)
@@ -79,9 +83,15 @@ function main() {
   assert.match(paymentsSrc, /navigate\('\/platform\/suppliers', \{/)
   ok('"настроить отсрочку" navigation (openConfigure) untouched — kept in embedded mode (item 6)')
 
-  // --- Case 8: standalone payments still uses fetchSupplierFinanceSummary ---
-  assert.match(paymentsSrc, /summaryProp \? Promise\.resolve\(summaryProp\) : fetchSupplierFinanceSummary\(\)/)
-  ok('Case 8: the default (no summary prop) path still calls fetchSupplierFinanceSummary() — Этап 2.4 formula unchanged, just optionally skippable when a parent already has it')
+  // --- Case 8: standalone vs parent-owned summary -------------------------
+  assert.match(paymentsSrc, /const loadStandalone = useCallback\(async \(\) =>/)
+  assert.match(paymentsSrc, /fetchSupplierFinanceSummary\(\)/)
+  assert.match(paymentsSrc, /externalSummaryProvided/)
+  assert.match(paymentsSrc, /applyExternalPageData/)
+  assert.match(financePanelSrc, /fetchSupplierFinancePageData/)
+  assert.match(financePanelSrc, /externalSummaryProvided/)
+  assert.match(financePanelSrc, /obligations=\{obligations\}/)
+  ok('Case 8: standalone still self-loads; embedded uses parent fetchSupplierFinancePageData without duplicate summary fetch')
 
   assert.doesNotMatch(paymentsSrc, /debt: view\.summaries|overdue: view\.summaries|buildPaymentScheduleView\([^)]*\)\.summaries\.totalActiveDebt/)
   ok('KPI numbers are still sourced from the summary object, not re-derived from the obligations view')

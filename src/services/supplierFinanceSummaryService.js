@@ -129,17 +129,7 @@ export function sumNonRefundPaymentAmount(rows) {
  * original success/partial/failed/running status verbatim — never
  * normalized to success.
  */
-export async function fetchSupplierFinanceSummary() {
-  assertCloudReady()
-
-  const todayKey = toAqtobeDateKey()
-
-  const [obligations, lastRun, paidThisMonth] = await Promise.all([
-    listPaymentObligations({ includePaid: false }),
-    fetchLastUmagSyncRun(),
-    fetchPaidThisMonth(todayKey),
-  ])
-
+function buildFinanceSummaryFromParts(obligations, todayKey, paidThisMonth, lastRun) {
   const view = buildPaymentScheduleView(obligations, todayKey)
 
   return {
@@ -152,5 +142,51 @@ export async function fetchSupplierFinanceSummary() {
     openObligationsCount: view.activeCount,
     paidThisMonth,
     lastSync: lastRun,
+  }
+}
+
+async function loadFinanceSummaryData({ obligations: obligationsInput } = {}) {
+  const todayKey = toAqtobeDateKey()
+
+  const [obligations, lastRun, paidThisMonth] = await Promise.all([
+    obligationsInput != null
+      ? Promise.resolve(obligationsInput)
+      : listPaymentObligations({ includePaid: false }),
+    fetchLastUmagSyncRun(),
+    fetchPaidThisMonth(todayKey),
+  ])
+
+  return {
+    obligations,
+    todayKey,
+    lastRun,
+    paidThisMonth,
+    view: buildPaymentScheduleView(obligations, todayKey),
+  }
+}
+
+export async function fetchSupplierFinanceSummary({ obligations: obligationsInput } = {}) {
+  assertCloudReady()
+
+  const { obligations, todayKey, lastRun, paidThisMonth } = await loadFinanceSummaryData({
+    obligations: obligationsInput,
+  })
+
+  return buildFinanceSummaryFromParts(obligations, todayKey, paidThisMonth, lastRun)
+}
+
+/**
+ * One bulk read for the unified «Расчёты» shell: obligations feed both KPI
+ * summary and the embedded payment list without a second listPaymentObligations().
+ */
+export async function fetchSupplierFinancePageData() {
+  assertCloudReady()
+
+  const { obligations, todayKey, lastRun, paidThisMonth, view } = await loadFinanceSummaryData()
+
+  return {
+    summary: buildFinanceSummaryFromParts(obligations, todayKey, paidThisMonth, lastRun),
+    obligations,
+    view,
   }
 }

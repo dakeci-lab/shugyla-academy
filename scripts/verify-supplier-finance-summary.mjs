@@ -135,8 +135,10 @@ async function main() {
   // --- 7. No N+1 ------------------------------------------------------------
   assert.match(
     summarySrc,
-    /await Promise\.all\(\[\s*\n\s*listPaymentObligations\(\{ includePaid: false \}\),\s*\n\s*fetchLastUmagSyncRun\(\),\s*\n\s*fetchPaidThisMonth\(todayKey\),\s*\n\s*\]\)/
+    /await Promise\.all\(\[[\s\S]*listPaymentObligations\(\{ includePaid: false \}\),[\s\S]*fetchLastUmagSyncRun\(\),[\s\S]*fetchPaidThisMonth\(todayKey\),[\s\S]*\]\)/
   )
+  assert.match(summarySrc, /loadFinanceSummaryData/)
+  assert.match(summarySrc, /fetchSupplierFinancePageData/)
   assert.doesNotMatch(summarySrc, /for\s*\(.*supplier.*\)\s*\{[\s\S]*await/i)
   assert.doesNotMatch(summarySrc, /\.map\(async/i)
   ok('exactly 3 bulk async calls (obligations, last sync, month payments) via one Promise.all — no per-supplier loop')

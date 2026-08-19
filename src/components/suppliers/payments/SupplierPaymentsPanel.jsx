@@ -343,22 +343,26 @@ function GroupDetail({ group, todayKey, canEditTerms, onClose, onConfigure }) {
 }
 
 /**
- * @param {{ embedded?: boolean, summary?: object|null, refreshToken?: unknown }} [props]
+ * @param {{ embedded?: boolean, externalSummaryProvided?: boolean, summary?: object|null, summaryLoading?: boolean, obligations?: object[]|null, refreshToken?: unknown }} [props]
  *   embedded — Этап 2.6: hides the standalone shell (title, sync status,
  *     ↻ button, global KPIs) so this can render as pure payment-schedule
  *     content under a future shared header. The content itself — tabs,
  *     groups, obligation details, "настроить отсрочку" — is unchanged.
- *   summary — optional, already-loaded fetchSupplierFinanceSummary() result
- *     from a parent. When provided, load() skips its own summary fetch
- *     (avoids the duplicate bulk read a shared header would otherwise cause)
- *     but still fetches obligations itself for the schedule content.
+ *   externalSummaryProvided — Этап 3.2: parent owns summary/obligations;
+ *     this panel must not re-fetch financial summary or obligations.
+ *   summary — parent-provided fetchSupplierFinanceSummary() result.
+ *   summaryLoading — parent is still loading its owned summary/obligations.
+ *   obligations — parent-provided listPaymentObligations() rows for schedule.
  *   refreshToken — Этап 2.7: bump this (any changed value) to make an
  *     embedded instance reload without remounting/losing local state.
  *     Ignored in standalone use.
  */
 export default function SupplierPaymentsPanel({
   embedded = false,
+  externalSummaryProvided = false,
   summary: summaryProp = null,
+  summaryLoading = false,
+  obligations: obligationsProp = null,
   refreshToken = null,
 } = {}) {
   const { user } = useSession()
@@ -379,19 +383,12 @@ export default function SupplierPaymentsPanel({
   const [activeTab, setActiveTab] = useState('overdue')
   const [tabTouched, setTabTouched] = useState(false)
 
-  const load = useCallback(async () => {
+  const loadStandalone = useCallback(async () => {
     setLoading(true)
     setError('')
     try {
-      // Этап 2.4: KPI numbers come from the canonical fetchSupplierFinanceSummary()
-      // (one todayKey, one obligations read, same business logic as below).
-      // The per-supplier lists still read obligations directly — summary API
-      // deliberately has no supplier-level breakdown yet — reusing summary's
-      // todayKey keeps both calls' "today" identical, per Этап 2.4 item 6.
-      // Этап 2.6: a parent-supplied summary (embedded usage) skips this
-      // module's own summary fetch entirely.
       const [summaryData, obligations] = await Promise.all([
-        summaryProp ? Promise.resolve(summaryProp) : fetchSupplierFinanceSummary(),
+        fetchSupplierFinanceSummary(),
         listPaymentObligations({ includePaid: false }),
       ])
       const nextView = buildPaymentScheduleView(obligations, summaryData.todayKey)
@@ -406,14 +403,35 @@ export default function SupplierPaymentsPanel({
     } finally {
       setLoading(false)
     }
-  }, [summaryProp])
+  }, [])
+
+  const applyExternalPageData = useCallback(() => {
+    if (summaryLoading) {
+      setLoading(true)
+      setError('')
+      return
+    }
+    if (!summaryProp || !obligationsProp) {
+      setLoading(false)
+      return
+    }
+    const nextView = buildPaymentScheduleView(obligationsProp, summaryProp.todayKey)
+    setSummary(summaryProp)
+    setView(nextView)
+    setTodayKey(summaryProp.todayKey)
+    setLastRun(summaryProp.lastSync)
+    setLoading(false)
+    setError('')
+  }, [summaryLoading, summaryProp, obligationsProp])
 
   useEffect(() => {
     if (!canView) return
-    void load()
-    // refreshToken has no direct effect on load()'s own inputs — a parent
-    // (Этап 2.7 shared shell) bumps it to force a reload without remounting.
-  }, [canView, load, refreshToken])
+    if (externalSummaryProvided) {
+      applyExternalPageData()
+      return
+    }
+    void loadStandalone()
+  }, [canView, externalSummaryProvided, applyExternalPageData, loadStandalone, refreshToken])
 
   useEffect(() => {
     if (!view || tabTouched) return
@@ -425,15 +443,16 @@ export default function SupplierPaymentsPanel({
       if (document.visibilityState !== 'visible') return
       const finished = lastRun?.finished_at || lastRun?.started_at
       if (!finished) {
-        void load()
+        if (externalSummaryProvided) return
+        void loadStandalone()
         return
       }
       const ageMs = Date.now() - new Date(finished).getTime()
-      if (ageMs > 30 * 60 * 1000) void load()
+      if (ageMs > 30 * 60 * 1000 && !externalSummaryProvided) void loadStandalone()
     }
     document.addEventListener('visibilitychange', onVisibility)
     return () => document.removeEventListener('visibilitychange', onVisibility)
-  }, [lastRun, load])
+  }, [lastRun, loadStandalone, externalSummaryProvided])
 
   async function handleSync() {
     if (!canSync || syncing) return
@@ -454,7 +473,7 @@ export default function SupplierPaymentsPanel({
       toast.success?.(result.message || 'Синхронизация выполнена.')
     }
     setTabTouched(false)
-    await load()
+    await loadStandalone()
   }
 
   function openConfigure(group) {
@@ -469,7 +488,9 @@ export default function SupplierPaymentsPanel({
       state: {
         openEditId: group.platformSupplierId,
         focusSection: 'payment-terms',
-        returnTo: '/platform/supplier-payments',
+        returnTo: embedded
+          ? '/platform/supplier-finance?tab=payments'
+          : '/platform/supplier-payments',
       },
     })
   }

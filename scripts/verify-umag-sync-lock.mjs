@@ -89,13 +89,13 @@ function main() {
   assert.match(migration, /ranked_running\.rn > 1/)
   ok('duplicate running rows for the same entity: only the most recent started_at is kept as plausibly active, the rest are closed (Case with historical dupes)')
 
-  assert.match(migration, /r\.started_at < now\(\) - interval '15 minutes'/)
-  ok("pre-cleanup age check uses the same 15-minute threshold as the Edge Function's runtime cleanup")
+  assert.match(migration, /r\.started_at < now\(\) - interval '5 minutes'/)
+  ok("pre-cleanup age check uses the same 5-minute threshold as the Edge Function's runtime cleanup")
 
   // --- 2. Config: named constant, not a magic number ----------------------
   const config = read(CONFIG)
-  assert.match(config, /export const STALE_SYNC_THRESHOLD_MINUTES = 15/)
-  ok('STALE_SYNC_THRESHOLD_MINUTES = 15 is a named, commented constant in _shared/umagConfig.ts')
+  assert.match(config, /export const STALE_SYNC_THRESHOLD_MINUTES = 5/)
+  ok('STALE_SYNC_THRESHOLD_MINUTES = 5 is a named, commented constant in _shared/umagConfig.ts')
   assert.match(config, /No production telemetry was available/)
   assert.match(config, /deliberately\s*\n \* conservative fallback, not a measured value/)
   ok('the constant is honestly documented as a conservative fallback, not a measured value (no telemetry was available — see report)')
@@ -248,7 +248,7 @@ function main() {
 
 const PG_UNIQUE_VIOLATION = '23505'
 const SYNC_LOCK_INDEX_NAME = 'umag_sync_runs_entity_running_lock'
-const STALE_SYNC_THRESHOLD_MINUTES = 15
+const STALE_SYNC_THRESHOLD_MINUTES = 5
 
 function isSyncLockConflict(error) {
   if (!error) return false
@@ -296,21 +296,21 @@ function runMirrorCases(migration) {
   }
 
   // Case 4/5 — stale threshold math (mirrors the migration's and the Edge
-  // Function's identical `started_at < now() - 15 minutes` predicate).
+  // Function's identical `started_at < now() - 5 minutes` predicate).
   {
     const now = new Date('2026-08-19T12:00:00.000Z').getTime()
-    const staleStart = new Date(now - 16 * 60_000).toISOString()
-    const freshStart = new Date(now - 14 * 60_000).toISOString()
-    const exactlyAtEdge = new Date(now - 15 * 60_000).toISOString()
+    const staleStart = new Date(now - 6 * 60_000).toISOString()
+    const freshStart = new Date(now - 4 * 60_000).toISOString()
+    const exactlyAtEdge = new Date(now - 5 * 60_000).toISOString()
 
     assert.equal(isStale(staleStart, now), true)
-    mirrorOk('Case 4: a running row started 16 minutes ago is stale — next sync closes it and can acquire the lock')
+    mirrorOk('Case 4: a running row started 6 minutes ago is stale — next sync closes it and can acquire the lock')
 
     assert.equal(isStale(freshStart, now), false)
-    mirrorOk("Case 5: a running row started 14 minutes ago is NOT touched by cleanup — a fresh run's lock is never stolen early")
+    mirrorOk("Case 5: a running row started 4 minutes ago is NOT touched by cleanup — a fresh run's lock is never stolen early")
 
     assert.equal(isStale(exactlyAtEdge, now), false)
-    mirrorOk('boundary: a row exactly at the 15-minute mark is not yet stale (strict <, not <=) — errs toward not stealing a possibly-live lock')
+    mirrorOk('boundary: a row exactly at the 5-minute mark is not yet stale (strict <, not <=) — errs toward not stealing a possibly-live lock')
   }
 
   // Cases 6–8 — terminal statuses are outside the partial unique index predicate.

@@ -30,8 +30,13 @@ export const MAX_AUTO_SYNC_LOOKBACK_MONTHS = 24
  *
  * Kept in sync with the identical literal in the pre-cleanup step of
  * supabase/migrations/20260819120000_umag_sync_runs_lock.sql.
+ *
+ * Basis for 5 min: no production sync-duration telemetry exists yet; UMAG
+ * per-request timeout is 30 s and Edge has no stricter wall clock in repo.
+ * Five minutes is a recovery threshold well above expected platform timeout
+ * but avoids the previous 15-minute user lockout after a crashed run.
  */
-export const STALE_SYNC_THRESHOLD_MINUTES = 15
+export const STALE_SYNC_THRESHOLD_MINUTES = 5
 
 export type UmagConfig = {
   baseUrl: string
