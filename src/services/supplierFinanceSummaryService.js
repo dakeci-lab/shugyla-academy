@@ -14,6 +14,7 @@
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
+import { fetchAllSupabaseRows } from '../utils/supabasePagination'
 import { isUmagPaymentRefund } from '../utils/supplierLedger'
 import { buildPaymentScheduleView, toAqtobeDateKey } from '../utils/supplierPaymentObligations'
 import { addDaysToDateKey, getMonthRangeKeys } from '../utils/settlementsPeriod'
@@ -64,12 +65,16 @@ async function fetchPaidThisMonth(todayKey) {
     }
   }
 
-  const { data, error } = await supabase
-    .from('umag_document_payments')
-    .select('amount, payment_type, class_name')
-    .eq('is_source_deleted', false)
-    .gte('payment_time', fromIso)
-    .lt('payment_time', toIso)
+  const { data, error } = await fetchAllSupabaseRows(() =>
+    supabase
+      .from('umag_document_payments')
+      .select('id, amount, payment_type, class_name')
+      .eq('is_source_deleted', false)
+      .gte('payment_time', fromIso)
+      .lt('payment_time', toIso)
+      .order('payment_time', { ascending: true })
+      .order('id', { ascending: true })
+  )
 
   if (error) {
     return {

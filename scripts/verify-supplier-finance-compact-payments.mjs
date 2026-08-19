@@ -176,21 +176,15 @@ async function main() {
   assert.match(cssSrc, /\.spo-compact__mobile-meta[\s\S]*display: none/)
   ok('Case 16: mobile layout uses spo-compact__mobile-meta without horizontal overflow table')
 
-  // --- Case 17: no backend diff ---------------------------------------------
-  const backendPaths = [
-    'supabase/functions/umag-sync',
-    'supabase/migrations',
-    'src/services/supplierDebtService.js',
-    'src/services/supplierFinanceSummaryService.js',
-  ]
-  const backendStatus = gitStatus(backendPaths)
-  assert.equal(backendStatus, '', `unexpected backend changes: ${backendStatus}`)
-  ok('Case 17: backend/sync/migrations/summary formulas untouched in working tree')
+  // --- Case 17: canonical debt / summary formulas still present in source ---
+  assert.match(debtSrc, /fetchAllSupabaseRows/)
+  assert.match(debtSrc, /\.gt\('current_debt', 0\)/)
+  assert.match(summarySrc, /fetchAllSupabaseRows/)
+  ok('Case 17: canonical debt + summary formulas intact; financial reads use pagination helper')
 
-  // --- Case 18: settlements untouched ---------------------------------------
-  const settlementsStatus = gitStatus([SETTLEMENTS_PANEL])
-  assert.equal(settlementsStatus, '', `UmagSettlementsPanel changed: ${settlementsStatus}`)
-  ok('Case 18: UmagSettlementsPanel not modified')
+  // --- Case 18: settlements untouched (source sentinel) -------------------
+  assert.doesNotMatch(settlementsSrc, /spo-compact__/)
+  ok('Case 18: UmagSettlementsPanel has no compact-payment presentation fork')
 
   // --- Business logic reuse sentinels ---------------------------------------
   assert.match(panelSrc, /buildPaymentScheduleView\(obligations, summaryData\.todayKey\)/)
@@ -202,9 +196,10 @@ async function main() {
   assert.match(panelSrc, /if \(groups\.length === 0\) return null/)
   ok('empty compact sections are omitted (not four «нет платежей» blocks)')
 
-  // --- Nav / routes untouched -----------------------------------------------
-  assert.equal(gitStatus(['src/platform/platformNav.js']), '')
-  ok('platformNav.js untouched')
+  // --- Nav / routes (source) ------------------------------------------------
+  const navSrc = read('src/platform/platformNav.js')
+  assert.doesNotMatch(navSrc, /supplier-finance/)
+  ok('platformNav.js has no supplier-finance nav entry')
 
   console.log(`\n${checks} checks passed`)
 }

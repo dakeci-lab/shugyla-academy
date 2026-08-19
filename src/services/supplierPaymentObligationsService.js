@@ -5,6 +5,7 @@
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
+import { fetchAllSupabaseRows } from '../utils/supabasePagination'
 import {
   fetchLastUmagSyncRun,
   formatUmagDate,
@@ -90,17 +91,22 @@ export function normalizeObligation(row) {
 
 export async function listPaymentObligations({ includePaid = false } = {}) {
   assertCloudReady()
-  let query = supabase
-    .from('supplier_payment_obligations')
-    .select(OBLIGATION_SELECT)
-    .eq('is_source_deleted', false)
-    .order('due_date', { ascending: true, nullsFirst: false })
 
-  if (!includePaid) {
-    query = query.gt('current_debt', 0)
-  }
+  const { data, error } = await fetchAllSupabaseRows(() => {
+    let query = supabase
+      .from('supplier_payment_obligations')
+      .select(OBLIGATION_SELECT)
+      .eq('is_source_deleted', false)
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .order('id', { ascending: true })
 
-  const { data, error } = await query
+    if (!includePaid) {
+      query = query.gt('current_debt', 0)
+    }
+
+    return query
+  })
+
   if (error) throw new Error(error.message || 'Не удалось загрузить обязательства оплаты')
   return (data || []).map(normalizeObligation).filter(Boolean)
 }

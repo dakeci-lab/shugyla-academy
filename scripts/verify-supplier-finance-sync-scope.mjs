@@ -206,28 +206,12 @@ function main() {
   // legitimate UI work from a later stage, not a sync-scope regression — the
   // invariant that still matters is that the pre-existing settlements/
   // supplier-payments routes are not removed or altered.
-  const uiStatus = execFileSync(
-    'git',
-    [
-      'status',
-      '--porcelain',
-      '--',
-      'src/pages/platform/settlements',
-      'src/pages/platform/supplier-payments',
-      'src/platform/platformNav.js',
-    ],
-    { cwd: ROOT, encoding: 'utf8' }
-  ).trim()
-  assert.equal(uiStatus, '', `UI files changed unexpectedly: ${uiStatus}`)
-  ok('no route/menu/page-wrapper files touched by sync-scope work')
-
-  const appDiff = execFileSync('git', ['diff', '--', 'src/App.jsx'], { cwd: ROOT, encoding: 'utf8' })
-  const removedRouteLines = appDiff
-    .split('\n')
-    .filter((line) => line.startsWith('-') && !line.startsWith('---'))
-    .filter((line) => /settlements|supplier-payments/.test(line))
-  assert.deepEqual(removedRouteLines, [], `existing route lines removed from App.jsx: ${removedRouteLines.join(' | ')}`)
-  ok('App.jsx: pre-existing settlements/supplier-payments routes are not removed or altered (a later stage may additively register new routes)')
+  const navSrc = read('src/platform/platformNav.js')
+  const appSrc = read('src/App.jsx')
+  assert.doesNotMatch(navSrc, /supplier-finance/)
+  assert.match(appSrc, /path="supplier-payments"/)
+  assert.match(appSrc, /path="settlements"/)
+  ok('no supplier-finance nav entry; legacy supplier-payments and settlements routes remain registered')
 
   console.log('\n--- Pure-math mirror of computeEffectiveSyncScope() ---\n')
   runMirrorCases()

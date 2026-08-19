@@ -206,28 +206,12 @@ function main() {
   // legitimate UI work from a later stage, not a sync-lock regression — the
   // invariant that still matters is that the pre-existing settlements/
   // supplier-payments routes are not removed or altered.
-  const uiStatus = execFileSync(
-    'git',
-    [
-      'status',
-      '--porcelain',
-      '--',
-      'src/pages/platform/settlements',
-      'src/pages/platform/supplier-payments',
-      'src/platform/platformNav.js',
-    ],
-    { cwd: ROOT, encoding: 'utf8' }
-  ).trim()
-  assert.equal(uiStatus, '', `UI files changed unexpectedly: ${uiStatus}`)
-  ok('no route/menu/page-wrapper files touched by lock work — SYNC_ALREADY_RUNNING already resolves to a clear Russian message via the existing generic error-body path (verified below), no frontend change needed')
-
-  const appDiff = execFileSync('git', ['diff', '--', 'src/App.jsx'], { cwd: ROOT, encoding: 'utf8' })
-  const removedRouteLines = appDiff
-    .split('\n')
-    .filter((line) => line.startsWith('-') && !line.startsWith('---'))
-    .filter((line) => /settlements|supplier-payments/.test(line))
-  assert.deepEqual(removedRouteLines, [], `existing route lines removed from App.jsx: ${removedRouteLines.join(' | ')}`)
-  ok('App.jsx: pre-existing settlements/supplier-payments routes are not removed or altered (a later stage may additively register new routes)')
+  const navSrc = read('src/platform/platformNav.js')
+  const appSrc = read('src/App.jsx')
+  assert.doesNotMatch(navSrc, /supplier-finance/)
+  assert.match(appSrc, /path="supplier-payments"/)
+  assert.match(appSrc, /path="settlements"/)
+  ok('no supplier-finance nav entry; legacy supplier-payments and settlements routes remain registered')
 
   // The existing generic path (resolveEdgeFunctionUserMessage) picks body.message
   // verbatim when it looks like a Russian sentence, before ever falling back to
@@ -245,7 +229,7 @@ function main() {
   ok('Case 10: syncUmagForPayments (Оплаты) still delegates verbatim to syncUmagSettlements (Взаиморасчёты) — both tabs\' ↻ hit the exact same Edge Function call, hence the same DB lock')
 
   console.log('\n--- Mirrored pure-logic tests ---\n')
-  runMirrorCases()
+  runMirrorCases(migration)
 
   console.log(`\n${checks} checks passed`)
   console.log(
@@ -283,7 +267,7 @@ function mirrorOk(name) {
   console.log(`  ✓ ${name}`)
 }
 
-function runMirrorCases() {
+function runMirrorCases(migration) {
   // Case 11 — an unrelated DB error must never be classified as a lock conflict.
   {
     const fkViolation = { code: '23503', message: 'insert or update on table violates foreign key constraint' }
@@ -329,14 +313,21 @@ function runMirrorCases() {
     mirrorOk('boundary: a row exactly at the 15-minute mark is not yet stale (strict <, not <=) — errs toward not stealing a possibly-live lock')
   }
 
-  // Cases 6/7/8 — release-on-terminal-status is a property of the partial
-  // index predicate itself (WHERE status = 'running'), proven structurally
-  // above for all three terminal statuses at once; restated here as three
-  // explicit assertions against the same predicate for traceability.
-  for (const terminalStatus of ['success', 'partial', 'failed']) {
-    const indexedByLock = terminalStatus === 'running'
-    assert.equal(indexedByLock, false)
-    mirrorOk(`Case ${{ success: 6, partial: 7, failed: 8 }[terminalStatus]}: a run transitioned to '${terminalStatus}' no longer matches WHERE status='running' — the next acquisition is unblocked automatically, no separate release code needed`)
+  // Cases 6–8 — terminal statuses are outside the partial unique index predicate.
+  // A row with status success/partial/failed no longer matches WHERE status='running',
+  // so a second concurrent INSERT for the same entity is allowed without any explicit
+  // "release lock" code path.
+  {
+    const indexBlock =
+      migration.match(
+        /create unique index if not exists umag_sync_runs_entity_running_lock[\s\S]*?where status = 'running';/
+      )?.[0] || ''
+    assert.ok(indexBlock.length > 0, 'lock partial unique index block missing from migration')
+    assert.doesNotMatch(indexBlock, /where status = 'success'/i)
+    assert.doesNotMatch(indexBlock, /where status = 'partial'/i)
+    assert.doesNotMatch(indexBlock, /where status = 'failed'/i)
+    assert.match(migration, /set\s+status\s*=\s*'failed'/i)
+    mirrorOk("Cases 6–8: partial unique index covers only status='running'; stale/duplicate cleanup sets terminal 'failed'")
   }
 
   // Case 12 — stale diagnostics shape (mirrors cleanupStaleSyncRuns' UPDATE payload).

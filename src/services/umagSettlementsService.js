@@ -17,6 +17,7 @@ import {
   ledgerEventStatusLabel,
   sortLedgerNewestFirst,
 } from '../utils/supplierLedger'
+import { fetchAllSupabaseRows } from '../utils/supabasePagination'
 import {
   fetchCanonicalSupplierDebts,
   resolvePlatformSupplierIdsByUmagIds,
@@ -94,18 +95,6 @@ export function formatUmagDate(value) {
     month: '2-digit',
     year: 'numeric',
   })
-}
-
-/** Paginate PostgREST selects past the default 1000-row cap. */
-async function fetchAllSupabaseRows(buildQuery, pageSize = 1000) {
-  const rows = []
-  for (let from = 0; from < 100_000; from += pageSize) {
-    const { data, error } = await buildQuery().range(from, from + pageSize - 1)
-    if (error) return { data: null, error }
-    rows.push(...(data || []))
-    if (!data || data.length < pageSize) break
-  }
-  return { data: rows, error: null }
 }
 
 /** Local calendar YYYY-MM-DD in Asia/Aqtobe wall clock via offset format. */

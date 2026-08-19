@@ -15,6 +15,7 @@
  */
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
+import { fetchAllSupabaseRows } from '../utils/supabasePagination'
 import { isActiveOpenObligation } from '../utils/supplierPaymentObligations'
 
 /**
@@ -90,18 +91,25 @@ async function resolvePlatformSupplierIdByUmagId(umagSupplierId) {
 async function fetchOpenObligationRows(platformSupplierIds) {
   assertSupabaseReady()
 
-  let query = supabase
-    .from('supplier_payment_obligations')
-    .select('platform_supplier_id, current_debt, is_source_deleted')
-    .eq('is_source_deleted', false)
-    .gt('current_debt', 0)
-
-  if (Array.isArray(platformSupplierIds)) {
-    if (platformSupplierIds.length === 0) return []
-    query = query.in('platform_supplier_id', platformSupplierIds)
+  if (Array.isArray(platformSupplierIds) && platformSupplierIds.length === 0) {
+    return []
   }
 
-  const { data, error } = await query
+  const { data, error } = await fetchAllSupabaseRows(() => {
+    let query = supabase
+      .from('supplier_payment_obligations')
+      .select('id, platform_supplier_id, current_debt, is_source_deleted')
+      .eq('is_source_deleted', false)
+      .gt('current_debt', 0)
+      .order('id', { ascending: true })
+
+    if (Array.isArray(platformSupplierIds)) {
+      query = query.in('platform_supplier_id', platformSupplierIds)
+    }
+
+    return query
+  })
+
   if (error) {
     throw new Error(error.message || 'Не удалось рассчитать текущую задолженность поставщиков')
   }

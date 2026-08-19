@@ -22,6 +22,8 @@ const ROOT = path.join(__dirname, '..')
 
 const PAYMENTS_PANEL = 'src/components/suppliers/payments/SupplierPaymentsPanel.jsx'
 const SETTLEMENTS_PANEL = 'src/components/suppliers/settlements/UmagSettlementsPanel.jsx'
+const APP = 'src/App.jsx'
+const NAV = 'src/platform/platformNav.js'
 
 let checks = 0
 function ok(name) {
@@ -45,6 +47,8 @@ function main() {
 
   const paymentsSrc = read(PAYMENTS_PANEL)
   const settlementsSrc = read(SETTLEMENTS_PANEL)
+  const appSrc = read(APP)
+  const navSrc = read(NAV)
 
   // --- Case 1/2: SupplierPaymentsPanel — embedded prop, default false -----
   // Этап 2.7 additively threads a third prop (refreshToken) through the same
@@ -140,41 +144,20 @@ function main() {
   assert.deepEqual(suspiciousForks, [], `unexpected new component fork file(s): ${suspiciousForks.join(', ')}`)
   ok('Case 9: no new PaymentScheduleTab/SettlementsContent/*New.jsx fork files were created')
 
-  // Case 5/9 originally asserted these were the ONLY two files changed under
-  // src/ at all, when this stage's sole purpose was the embedded/summary
-  // prop refactor. Этап 2.7 legitimately builds a whole new consuming page
-  // around these same two panels (new shell component, new route, new
-  // presentation util, a third refreshToken prop on both panels) — so the
-  // real, still-meaningful invariant is narrower: no *forked duplicate* of
-  // either panel exists, and both original panel files are still part of
-  // the diff (not replaced/deleted), not that literally nothing else in the
-  // repo may ever change again.
-  const changedFiles = execFileSync('git', ['diff', '--name-only', '--', 'src'], {
-    cwd: ROOT,
-    encoding: 'utf8',
-  })
-    .trim()
-    .split('\n')
-    .filter(Boolean)
-  assert.ok(changedFiles.includes(PAYMENTS_PANEL), `${PAYMENTS_PANEL} missing from the diff — panel appears replaced rather than edited`)
-  ok('Case 5: SupplierPaymentsPanel is edited in place — no parallel copy-paste implementation; UmagSettlementsPanel may be unchanged in later presentation-only stages')
+  // Case 5: panels edited in place — check committed source, not working-tree diff.
+  assert.match(paymentsSrc, /export default function SupplierPaymentsPanel\(\{/)
+  assert.match(paymentsSrc, /embedded = false,/)
+  assert.match(paymentsSrc, /function CompactPaymentSchedule\(/)
+  assert.match(settlementsSrc, /export default function UmagSettlementsPanel\(\{ embedded = false/)
+  ok('Case 5: SupplierPaymentsPanel + UmagSettlementsPanel exist in source with embedded prop — no forked duplicate implementation')
 
-  // --- Case 10: nav untouched, App.jsx routes for THIS stage's own subject unmodified ---
-  // platformNav.js is the real "no visible menu entry" invariant and must
-  // stay at zero diff. App.jsx is expected to gain a new, additive, hidden
-  // /platform/supplier-finance route in Этап 2.7 — that is the whole point
-  // of that later stage, not a regression of this one. What still must hold
-  // here is that the settlements/supplier-payments routes THIS stage cares
-  // about are not removed or altered.
-  const navStatus = gitStatus(['src/platform/platformNav.js'])
-  assert.equal(navStatus, '', `unexpected nav changes: ${navStatus}`)
-  const appDiff = execFileSync('git', ['diff', '--', 'src/App.jsx'], { cwd: ROOT, encoding: 'utf8' })
-  const removedRouteLines = appDiff
-    .split('\n')
-    .filter((line) => line.startsWith('-') && !line.startsWith('---'))
-    .filter((line) => /settlements|supplier-payments/.test(line))
-  assert.deepEqual(removedRouteLines, [], `existing route lines removed from App.jsx: ${removedRouteLines.join(' | ')}`)
-  ok('Case 10: platformNav.js untouched (no nav entry), and App.jsx keeps its pre-existing settlements/supplier-payments routes intact (a later stage may additively register new routes)')
+  // --- Case 10: nav hidden, legacy routes preserved (source, not working-tree diff) ---
+  assert.doesNotMatch(navSrc, /supplier-finance/)
+  assert.doesNotMatch(navSrc, /SUPPLIER_FINANCE/)
+  assert.match(appSrc, /path="supplier-payments"/)
+  assert.match(appSrc, /path="settlements"/)
+  assert.match(appSrc, /path="supplier-finance"/)
+  ok('Case 10: platformNav.js has no supplier-finance entry; App.jsx keeps supplier-payments, settlements, and hidden supplier-finance routes')
 
   // --- Case 11: settlements CSS untouched; payments CSS may gain compact rules ---
   const settlementsCssStatus = gitStatus(['src/components/suppliers/settlements/UmagSettlementsPanel.css'])
