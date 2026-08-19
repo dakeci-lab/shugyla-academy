@@ -13,6 +13,7 @@ import {
   formatDaysUntilDue,
   formatPaymentTermsSnapshot,
   formatReceptionCount,
+  formatSyncCoverage,
   pickDefaultPaymentTab,
 } from '../../../utils/supplierPaymentObligations'
 import {
@@ -23,7 +24,6 @@ import {
   syncUmagForPayments,
   toAqtobeDateKey,
 } from '../../../services/supplierPaymentObligationsService'
-import { getMonthPeriodKeys } from '../../../services/umagSettlementsService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
@@ -272,18 +272,17 @@ export default function SupplierPaymentsPanel() {
   async function handleSync() {
     if (!canSync || syncing) return
     setSyncing(true)
-    const period = getMonthPeriodKeys()
-    const result = await syncUmagForPayments({
-      dateFrom: period.dateFrom,
-      dateTo: period.dateTo,
-    })
+    // Period is derived from open obligations: every month that still holds
+    // debt, not only the current one.
+    const result = await syncUmagForPayments()
     setSyncing(false)
     if (!result.success) {
       toast.error?.(result.message)
       return
     }
     if (result.status === 'partial' || result.warning) {
-      toast.warning?.(result.warning || result.message)
+      // Message carries the next action ("press again"), warning the diagnostics.
+      toast.warning?.([result.message, result.warning].filter(Boolean).join(' '))
     } else {
       toast.success?.(result.message || 'Синхронизация выполнена.')
     }
@@ -312,6 +311,11 @@ export default function SupplierPaymentsPanel() {
   const tabCounts = view?.tabCounts || {}
   const visibleGroups = view?.lists?.[activeTab] || []
   const activeTabMeta = TABS.find((tab) => tab.id === activeTab) || TABS[0]
+
+  const syncCoverage = useMemo(
+    () => formatSyncCoverage(lastRun?.date_from, lastRun?.date_to),
+    [lastRun]
+  )
 
   const staleWarning = useMemo(() => {
     const finished = lastRun?.finished_at || lastRun?.started_at
@@ -352,6 +356,11 @@ export default function SupplierPaymentsPanel() {
                     ? 'ошибка'
                     : lastRun.status}
                 )
+              </span>
+            ) : null}
+            {syncCoverage ? (
+              <span title="Период, который охватила последняя синхронизация">
+                Охват: {syncCoverage}
               </span>
             ) : null}
           </div>

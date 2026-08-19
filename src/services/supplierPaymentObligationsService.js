@@ -10,13 +10,14 @@ import {
   formatUmagDate,
   formatUmagDateTime,
   formatUmagMoney,
-  syncUmagSettlements,
+  syncUmagOpenObligations,
 } from './umagSettlementsService'
 import {
   buildPaymentScheduleView,
   buildSupplierPaymentSummary,
   computeDueDateFromTerms,
   deriveObligationStatus,
+  describeObligationsSyncResult,
   formatDaysUntilDue,
   formatPaymentTermsSnapshot,
   resolveSupplierPaymentTerms,
@@ -182,8 +183,16 @@ export async function applyMissingObligationSnapshotsForSupplier(platformSupplie
   return { updated }
 }
 
-export async function syncUmagForPayments({ dateFrom, dateTo }) {
-  return syncUmagSettlements({ dateFrom, dateTo, syncSuppliers: true })
+/**
+ * Refresh the payment calendar. Covers every month that still holds open debt,
+ * not just the current one: UMAG serves supplies by document period, so a
+ * receipt paid in a later month keeps a stale debt until its own month is
+ * re-read.
+ */
+export async function syncUmagForPayments() {
+  const result = await syncUmagOpenObligations()
+  if (!result.success) return result
+  return { ...result, message: describeObligationsSyncResult(result) }
 }
 
 export {
