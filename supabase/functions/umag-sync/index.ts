@@ -24,6 +24,7 @@ import {
   MAX_AUTO_SYNC_LOOKBACK_MONTHS,
   nearlyEqual,
   parseUmagEditTime,
+  STALE_SYNC_THRESHOLD_MINUTES,
   sumNumbers,
   UMAG_PAGE_SIZE,
 } from '../_shared/umagConfig.ts'
@@ -258,11 +259,84 @@ function validateBody(body: unknown): {
   }
 }
 
-async function createSyncRun(
+/** Postgres unique_violation. */
+const PG_UNIQUE_VIOLATION = '23505'
+/** Must match the index name in supabase/migrations/20260819120000_umag_sync_runs_lock.sql. */
+const SYNC_LOCK_INDEX_NAME = 'umag_sync_runs_entity_running_lock'
+
+/**
+ * True only for a unique-violation on the sync lock index specifically — not
+ * any other insert failure (RLS, bad schema, connection error, ...). Those
+ * must keep surfacing as real errors, never be swallowed as "already running".
+ */
+function isSyncLockConflict(
+  error: { code?: string; message?: string; details?: string } | null | undefined
+): boolean {
+  if (!error) return false
+  if (error.code !== PG_UNIQUE_VIOLATION) return false
+  const text = `${error.message ?? ''} ${error.details ?? ''}`
+  return text.includes(SYNC_LOCK_INDEX_NAME)
+}
+
+/**
+ * Этап 2.3: before a new sync attempts to acquire the lock, close any
+ * `running` row that is older than STALE_SYNC_THRESHOLD_MINUTES — most
+ * likely a crashed/killed Edge Function instance that never reached
+ * finishSyncRun(). This alone is NOT the lock (see acquireSyncRun's unique
+ * index) — it only recovers from a genuinely abandoned run so a fresh sync
+ * isn't blocked forever. A run that is merely close to the threshold but
+ * still legitimately in flight is left untouched.
+ */
+async function cleanupStaleSyncRuns(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any
+): Promise<{ staleClosed: number } | Response> {
+  const staleBefore = new Date(Date.now() - STALE_SYNC_THRESHOLD_MINUTES * 60_000).toISOString()
+  const { data, error } = await serviceClient
+    .from('umag_sync_runs')
+    .update({
+      status: 'failed',
+      finished_at: new Date().toISOString(),
+      error_message: `stale: run exceeded ${STALE_SYNC_THRESHOLD_MINUTES} min without finishing — closed by the next sync attempt's cleanup step.`,
+    })
+    .eq('status', 'running')
+    .lt('started_at', staleBefore)
+    .select('id')
+
+  if (error) {
+    console.error('umag_sync_stale_cleanup_failed', { message: error.message, code: error.code })
+    return umagErrorResponse(
+      'SUPABASE_UPSERT_FAILED',
+      `Не удалось проверить зависшие запуски синхронизации: ${error.message}`,
+      500
+    )
+  }
+
+  const staleClosed = (data || []).length
+  if (staleClosed > 0) {
+    console.warn('umag_sync_stale_runs_closed', { staleClosed, thresholdMinutes: STALE_SYNC_THRESHOLD_MINUTES })
+  }
+  return { staleClosed }
+}
+
+type SyncRunAcquireResult =
+  | { ok: true; runId: string }
+  | { ok: false; alreadyRunning: true; runId: string | null; startedAt: string | null }
+  | { ok: false; alreadyRunning: false; response: Response }
+
+/**
+ * The insert IS the lock acquisition: the partial unique index on
+ * umag_sync_runs (entity) WHERE status='running' (see the Этап 2.3
+ * migration) lets at most one row per entity be `running` at a time. A
+ * losing concurrent request gets a real 23505 from Postgres — that is the
+ * authoritative guarantee, not this function's own logic. Any other insert
+ * error (RLS, schema, connection, ...) is returned as a genuine failure.
+ */
+async function acquireSyncRun(
   // deno-lint-ignore no-explicit-any
   serviceClient: any,
   fields: Record<string, unknown>
-): Promise<string | null> {
+): Promise<SyncRunAcquireResult> {
   const { data, error } = await serviceClient
     .from('umag_sync_runs')
     .insert({
@@ -273,11 +347,53 @@ async function createSyncRun(
     })
     .select('id')
     .single()
-  if (error || !data?.id) {
-    console.error('umag_sync_run_create_failed', { message: error?.message })
-    return null
+
+  if (!error) {
+    if (!data?.id) {
+      console.error('umag_sync_run_create_failed', { message: 'insert returned no id' })
+      return {
+        ok: false,
+        alreadyRunning: false,
+        response: umagErrorResponse(
+          'SUPABASE_UPSERT_FAILED',
+          'Не удалось создать запись синхронизации.',
+          500
+        ),
+      }
+    }
+    return { ok: true, runId: data.id }
   }
-  return data.id
+
+  if (isSyncLockConflict(error)) {
+    // Best-effort: surface which run holds the lock. A race where it just
+    // finished between the failed insert and this select is harmless — the
+    // caller only needs "someone else was running a moment ago".
+    const { data: running } = await serviceClient
+      .from('umag_sync_runs')
+      .select('id, started_at')
+      .eq('entity', String(fields.entity ?? 'all'))
+      .eq('status', 'running')
+      .order('started_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    return {
+      ok: false,
+      alreadyRunning: true,
+      runId: running?.id ?? null,
+      startedAt: running?.started_at ?? null,
+    }
+  }
+
+  console.error('umag_sync_run_create_failed', { message: error.message, code: error.code })
+  return {
+    ok: false,
+    alreadyRunning: false,
+    response: umagErrorResponse(
+      'SUPABASE_UPSERT_FAILED',
+      `Не удалось создать запись синхронизации: ${error.message}`,
+      500
+    ),
+  }
 }
 
 async function finishSyncRun(
@@ -2104,17 +2220,41 @@ Deno.serve(async (req) => {
     return umagErrorResponse('VALIDATION_ERROR', 'Некорректный период синхронизации.', 400)
   }
 
-  // Fresh signin when credentials exist (or warm cache). umagFetchAuthed retries once on 401/403.
-  const session = await acquireUmagSession()
-  if ('error' in session) {
-    return mapUmagAuthError(session.error)
-  }
+  // Этап 2.3: close abandoned `running` rows before attempting the lock —
+  // recovery from a crashed instance, not the lock itself (see below).
+  const staleCleanup = await cleanupStaleSyncRuns(authz.serviceClient)
+  if (staleCleanup instanceof Response) return staleCleanup
 
-  const runId = await createSyncRun(authz.serviceClient, {
+  // The insert below IS the lock acquisition (partial unique index on
+  // umag_sync_runs (entity) WHERE status='running'). Done before the UMAG
+  // signin so a losing concurrent request never pays for one.
+  const acquired = await acquireSyncRun(authz.serviceClient, {
     entity: 'all',
     date_from: effectiveFrom,
     date_to: effectiveTo,
   })
+  if (!acquired.ok) {
+    if (acquired.alreadyRunning) {
+      return umagErrorResponse(
+        'SYNC_ALREADY_RUNNING',
+        'Синхронизация UMAG уже выполняется. Дождитесь её завершения.',
+        409,
+        { runId: acquired.runId, startedAt: acquired.startedAt }
+      )
+    }
+    return acquired.response
+  }
+  const runId = acquired.runId
+
+  // Fresh signin when credentials exist (or warm cache). umagFetchAuthed retries once on 401/403.
+  const session = await acquireUmagSession()
+  if ('error' in session) {
+    await finishSyncRun(authz.serviceClient, runId, {
+      status: 'failed',
+      error_message: `Ошибка входа в UMAG: ${session.error}`,
+    })
+    return mapUmagAuthError(session.error)
+  }
 
   try {
     let suppliersCreated = 0

@@ -17,6 +17,22 @@ export const UMAG_TIMEZONE_OFFSET_MS = 5 * 60 * 60 * 1000 // Asia/Aqtobe (+05), 
  */
 export const MAX_AUTO_SYNC_LOOKBACK_MONTHS = 24
 
+/**
+ * Этап 2.3 — how long a `running` umag_sync_runs row is trusted before the
+ * next sync attempt treats it as crashed/abandoned and closes it as stale.
+ *
+ * No production telemetry was available to measure real sync duration when
+ * this was set (no .env.local / live Supabase connection in this
+ * environment — see the Этап 2.3 report), so this is a deliberately
+ * conservative fallback, not a measured value. Revisit once real
+ * umag_sync_runs.started_at/finished_at history exists: keep this
+ * comfortably above the observed p95/max duration of a normal sync.
+ *
+ * Kept in sync with the identical literal in the pre-cleanup step of
+ * supabase/migrations/20260819120000_umag_sync_runs_lock.sql.
+ */
+export const STALE_SYNC_THRESHOLD_MINUTES = 15
+
 export type UmagConfig = {
   baseUrl: string
   authorization: string

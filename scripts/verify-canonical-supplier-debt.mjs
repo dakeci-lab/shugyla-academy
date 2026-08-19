@@ -59,16 +59,21 @@ async function load(relPath) {
 async function main() {
   console.log('=== Canonical supplier debt verification (Этап 2.1) ===\n')
 
-  // --- 1. No new migration / schema change --------------------------------
-  const migrationsStatus = execFileSync(
+  // --- 1. Stage 2.1's own migration for canonical debt is not present -----
+  // Этап 2.1 itself shipped with zero schema changes (this table already had
+  // everything it needed). Later stages may legitimately add their own
+  // migrations elsewhere (e.g. Этап 2.3's sync lock, checked by
+  // verify:umag-sync-lock) — this only checks that Этап 2.1 didn't invent
+  // a supplier_payment_obligations/debt-formula migration of its own.
+  const debtMigrations = execFileSync(
     'git',
-    ['status', '--porcelain', '--', 'supabase/migrations'],
+    ['ls-files', '--', 'supabase/migrations/*debt*.sql', 'supabase/migrations/*canonical*.sql'],
     { cwd: ROOT, encoding: 'utf8' }
   ).trim()
   assert(
-    'supabase/migrations has no new/modified files — Этап 2.1 ships without a schema migration',
-    migrationsStatus === '',
-    `git status shows changes: ${migrationsStatus}`
+    'no supplier-debt-formula migration exists — Этап 2.1 shipped without a schema migration',
+    debtMigrations === '',
+    `unexpected migration file(s): ${debtMigrations}`
   )
 
   // --- 2. supplierDebtService.js: formula shape ----------------------------

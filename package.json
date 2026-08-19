@@ -90,6 +90,7 @@
     "verify:supplier-reconciliations": "node scripts/verify-supplier-reconciliations.mjs",
     "verify:canonical-supplier-debt": "node scripts/verify-canonical-supplier-debt.mjs",
     "verify:supplier-finance-sync-scope": "node scripts/verify-supplier-finance-sync-scope.mjs",
+    "verify:umag-sync-lock": "node scripts/verify-umag-sync-lock.mjs",
     "verify:supplier-ledger": "node scripts/verify-supplier-ledger.mjs",
     "verify:supplier-centralization": "node scripts/verify-supplier-centralization.mjs",
     "verify:umag-first-suppliers": "node scripts/verify-umag-first-suppliers.mjs",

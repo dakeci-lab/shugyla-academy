@@ -50,18 +50,23 @@ function read(relPath) {
 function main() {
   console.log('=== Supplier finance sync-scope verification (Этап 2.2) ===\n')
 
-  // --- 1. No new migration ---------------------------------------------
-  const migrationsStatus = execFileSync(
+  // --- 1. Stage 2.2's own migration for sync-scope is not present --------
+  // Этап 2.2 itself shipped with zero schema changes (response metadata
+  // only, per item 21). Later stages may legitimately add their own
+  // migrations elsewhere (e.g. Этап 2.3's sync lock, checked by
+  // verify:umag-sync-lock) — this only checks that Этап 2.2 didn't invent
+  // a sync-scope/open-debt-floor migration of its own.
+  const scopeMigrations = execFileSync(
     'git',
-    ['status', '--porcelain', '--', 'supabase/migrations'],
+    ['ls-files', '--', 'supabase/migrations/*sync_scope*.sql', 'supabase/migrations/*open_debt*.sql'],
     { cwd: ROOT, encoding: 'utf8' }
   ).trim()
   assert.equal(
-    migrationsStatus,
+    scopeMigrations,
     '',
-    `supabase/migrations changed unexpectedly: ${migrationsStatus}`
+    `unexpected migration file(s): ${scopeMigrations}`
   )
-  ok('no schema migration added — response metadata only, per item 21')
+  ok('no sync-scope migration added — response metadata only, per item 21')
 
   // --- 2. Constant lives in a shared, named location ---------------------
   const config = read(CONFIG)
@@ -181,10 +186,10 @@ function main() {
   assert.match(reconService, /snapshot\.umagDebt = canonicalDebt\.debt/)
   ok('Этап 2.1 reconciliation snapshot still sources umagDebt from the canonical helper')
 
-  // --- 11. No lock / no reconciliation-flag scope creep (items 17, 20) ---
-  assert.doesNotMatch(edge, /advisory_lock|pg_try_advisory|SYNC_ALREADY_RUNNING|unique index.*running|stale.*running.*cleanup/i)
-  ok('no concurrency lock / stale-run cleanup added — reserved for Этап 2.3')
-
+  // --- 11. No reconciliation-flag scope creep (item 20) -------------------
+  // Item 17's "no lock this stage" was Этап 2.2's own boundary — Этап 2.3
+  // has since legitimately added the lock/stale-cleanup this reserved.
+  // That work has its own dedicated checks in verify:umag-sync-lock.
   assert.doesNotMatch(edge, /reconciliation_flag|ledger_delta|ledgerClosingBalance|ledger.*ba lance.*compare/i)
   ok('no ledger-vs-canonical reconciliation flag added — reserved for a later stage')
 
