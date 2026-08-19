@@ -31,6 +31,12 @@ export const UMAG_SETTLEMENTS_ERROR_CODES = {
   FORBIDDEN: 'FORBIDDEN',
   UNAUTHORIZED: 'UNAUTHORIZED',
   PARTIAL: 'PARTIAL_SYNC',
+  // Этап 2.3 backend contract (409) — recognized explicitly here (Этап 2.7)
+  // so callers can treat it as a compact business conflict, not a scary
+  // "unknown error". body.message from the Edge Function was already
+  // surfaced correctly before this addition (resolveEdgeFunctionUserMessage
+  // prefers a Cyrillic body.message) — this only adds a distinguishable code.
+  SYNC_ALREADY_RUNNING: 'SYNC_ALREADY_RUNNING',
   UNKNOWN: 'UNKNOWN',
 }
 
@@ -49,6 +55,8 @@ const USER_MESSAGES = {
   [UMAG_SETTLEMENTS_ERROR_CODES.UNAUTHORIZED]: 'Сессия истекла. Войдите снова.',
   [UMAG_SETTLEMENTS_ERROR_CODES.PARTIAL]:
     'Синхронизация завершилась с расхождением агрегатов. Проверьте журнал.',
+  [UMAG_SETTLEMENTS_ERROR_CODES.SYNC_ALREADY_RUNNING]:
+    'Синхронизация UMAG уже выполняется. Дождитесь её завершения.',
   [UMAG_SETTLEMENTS_ERROR_CODES.UNKNOWN]:
     'Не удалось выполнить синхронизацию UMAG. Повторите попытку.',
 }
@@ -146,6 +154,9 @@ function mapErrorCode(code) {
   if (normalized === 'UMAG_TIMEOUT') return UMAG_SETTLEMENTS_ERROR_CODES.UMAG_TIMEOUT
   if (normalized === 'VALIDATION_ERROR' || normalized === 'VALIDATION') {
     return UMAG_SETTLEMENTS_ERROR_CODES.VALIDATION
+  }
+  if (normalized === 'SYNC_ALREADY_RUNNING') {
+    return UMAG_SETTLEMENTS_ERROR_CODES.SYNC_ALREADY_RUNNING
   }
   if (normalized === 'FORBIDDEN') return UMAG_SETTLEMENTS_ERROR_CODES.FORBIDDEN
   if (normalized === 'UNAUTHORIZED') return UMAG_SETTLEMENTS_ERROR_CODES.UNAUTHORIZED

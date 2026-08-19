@@ -47,10 +47,11 @@ function main() {
   const settlementsSrc = read(SETTLEMENTS_PANEL)
 
   // --- Case 1/2: SupplierPaymentsPanel — embedded prop, default false -----
-  assert.match(
-    paymentsSrc,
-    /export default function SupplierPaymentsPanel\(\{ embedded = false, summary: summaryProp = null \} = \{\}\)/
-  )
+  // Этап 2.7 additively threads a third prop (refreshToken) through the same
+  // destructuring — the invariant that still matters is that embedded and
+  // summaryProp keep their original defaults, not the exact prop list.
+  assert.match(paymentsSrc, /export default function SupplierPaymentsPanel\(\{/)
+  assert.match(paymentsSrc, /embedded = false,\s*\n\s*summary: summaryProp = null,/)
   ok('Case 1: SupplierPaymentsPanel defaults to embedded=false — standalone usage (<SupplierPaymentsPanel />) is unchanged')
 
   assert.match(paymentsSrc, /\{!embedded && \(\s*\n\s*<div className="spo-panel__toolbar">/)
@@ -81,7 +82,10 @@ function main() {
   ok('KPI numbers are still sourced from the summary object, not re-derived from the obligations view')
 
   // --- Case 3/4: UmagSettlementsPanel — embedded prop, default false ------
-  assert.match(settlementsSrc, /export default function UmagSettlementsPanel\(\{ embedded = false \} = \{\}\)/)
+  // Этап 2.7 additively threads a second prop (refreshToken) through the same
+  // destructuring — the invariant that still matters is that embedded keeps
+  // its original default, not the exact prop list.
+  assert.match(settlementsSrc, /export default function UmagSettlementsPanel\(\{ embedded = false, refreshToken = null \} = \{\}\)/)
   ok('Case 3: UmagSettlementsPanel defaults to embedded=false — standalone usage (<UmagSettlementsPanel />) is unchanged')
 
   assert.match(settlementsSrc, /\{canSync && !embedded \? \(/)
@@ -135,6 +139,15 @@ function main() {
   assert.deepEqual(suspiciousForks, [], `unexpected new component fork file(s): ${suspiciousForks.join(', ')}`)
   ok('Case 9: no new PaymentScheduleTab/SettlementsContent/*New.jsx fork files were created')
 
+  // Case 5/9 originally asserted these were the ONLY two files changed under
+  // src/ at all, when this stage's sole purpose was the embedded/summary
+  // prop refactor. Этап 2.7 legitimately builds a whole new consuming page
+  // around these same two panels (new shell component, new route, new
+  // presentation util, a third refreshToken prop on both panels) — so the
+  // real, still-meaningful invariant is narrower: no *forked duplicate* of
+  // either panel exists, and both original panel files are still part of
+  // the diff (not replaced/deleted), not that literally nothing else in the
+  // repo may ever change again.
   const changedFiles = execFileSync('git', ['diff', '--name-only', '--', 'src'], {
     cwd: ROOT,
     encoding: 'utf8',
@@ -142,18 +155,26 @@ function main() {
     .trim()
     .split('\n')
     .filter(Boolean)
-  assert.deepEqual(
-    changedFiles.sort(),
-    [PAYMENTS_PANEL, SETTLEMENTS_PANEL].sort(),
-    `expected only the two panels to change under src/, got: ${changedFiles.join(', ')}`
-  )
-  ok('Case 5: exactly the two existing panel files changed under src/ — no parallel copy-paste implementation, standalone and embedded share the same functions/JSX')
+  assert.ok(changedFiles.includes(PAYMENTS_PANEL), `${PAYMENTS_PANEL} missing from the diff — panel appears replaced rather than edited`)
+  assert.ok(changedFiles.includes(SETTLEMENTS_PANEL), `${SETTLEMENTS_PANEL} missing from the diff — panel appears replaced rather than edited`)
+  ok('Case 5: both original panel files are still present in the diff (edited in place) — no parallel copy-paste implementation, standalone and embedded share the same functions/JSX')
 
-  // --- Case 10: routes/nav untouched ---------------------------------------
-  const routeStatus = gitStatus(['src/App.jsx', 'src/platform/platformNav.js'])
-  assert.equal(routeStatus, '', `unexpected route/nav changes: ${routeStatus}`)
-  assert.doesNotMatch(execFileSync('git', ['diff', '--', 'src/App.jsx'], { cwd: ROOT, encoding: 'utf8' }), /supplier-finance/)
-  ok('Case 10: App.jsx and platformNav.js untouched — no /platform/supplier-finance route added')
+  // --- Case 10: nav untouched, App.jsx routes for THIS stage's own subject unmodified ---
+  // platformNav.js is the real "no visible menu entry" invariant and must
+  // stay at zero diff. App.jsx is expected to gain a new, additive, hidden
+  // /platform/supplier-finance route in Этап 2.7 — that is the whole point
+  // of that later stage, not a regression of this one. What still must hold
+  // here is that the settlements/supplier-payments routes THIS stage cares
+  // about are not removed or altered.
+  const navStatus = gitStatus(['src/platform/platformNav.js'])
+  assert.equal(navStatus, '', `unexpected nav changes: ${navStatus}`)
+  const appDiff = execFileSync('git', ['diff', '--', 'src/App.jsx'], { cwd: ROOT, encoding: 'utf8' })
+  const removedRouteLines = appDiff
+    .split('\n')
+    .filter((line) => line.startsWith('-') && !line.startsWith('---'))
+    .filter((line) => /settlements|supplier-payments/.test(line))
+  assert.deepEqual(removedRouteLines, [], `existing route lines removed from App.jsx: ${removedRouteLines.join(' | ')}`)
+  ok('Case 10: platformNav.js untouched (no nav entry), and App.jsx keeps its pre-existing settlements/supplier-payments routes intact (a later stage may additively register new routes)')
 
   // --- Case 11: CSS untouched ------------------------------------------------
   const cssStatus = gitStatus([

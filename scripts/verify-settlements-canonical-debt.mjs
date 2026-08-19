@@ -167,6 +167,11 @@ async function main() {
   assert.equal(cssStatus, '', 'CSS changed — this stage must be text/data-source only')
   ok('no CSS/layout change to the settlements panel')
 
+  // App.jsx is checked separately below (not for zero diff): Этап 2.7 adds a
+  // new, additive, hidden /platform/supplier-finance route there, which is
+  // legitimate UI work from a later stage — the invariant that still matters
+  // is that the pre-existing settlements/supplier-payments routes are not
+  // removed or altered.
   const routeStatus = execFileSync(
     'git',
     [
@@ -176,7 +181,6 @@ async function main() {
       'src/pages/platform/settlements',
       'src/pages/platform/supplier-payments',
       'src/platform/platformNav.js',
-      'src/App.jsx',
       'src/components/suppliers/settlements/SettlementsFilterPopover.jsx',
       'src/components/suppliers/settlements/CreateReconciliationModal.jsx',
       'src/components/suppliers/settlements/ReconciliationDetailView.jsx',
@@ -186,6 +190,14 @@ async function main() {
   ).trim()
   assert.equal(routeStatus, '', `unexpected route/menu/other-component changes: ${routeStatus}`)
   ok('no routes/menu/filter-popover/reconciliation-modal/detail-sheet changes — only the debt source + label in the main panel')
+
+  const appDiff = execFileSync('git', ['diff', '--', 'src/App.jsx'], { cwd: ROOT, encoding: 'utf8' })
+  const removedRouteLines = appDiff
+    .split('\n')
+    .filter((line) => line.startsWith('-') && !line.startsWith('---'))
+    .filter((line) => /settlements|supplier-payments/.test(line))
+  assert.deepEqual(removedRouteLines, [], `existing route lines removed from App.jsx: ${removedRouteLines.join(' | ')}`)
+  ok('App.jsx: pre-existing settlements/supplier-payments routes are not removed or altered (a later stage may additively register new routes)')
 
   console.log('\n--- Real imports: pure logic exercised with fixture data ---\n')
   await runRealCases()

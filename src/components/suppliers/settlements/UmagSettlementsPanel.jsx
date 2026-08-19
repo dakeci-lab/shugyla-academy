@@ -679,14 +679,17 @@ function UmagSupplierDetail({
 }
 
 /**
- * @param {{ embedded?: boolean }} [props]
+ * @param {{ embedded?: boolean, refreshToken?: unknown }} [props]
  *   embedded — Этап 2.6: hides the standalone shell's sync button and the
  *     last-run warning banner so this can render as pure settlements content
  *     under a future shared header. Period filter, search, table, supplier
  *     drill-down, and reconciliation flow are unchanged — those are content,
  *     not shell, per Этап 2.6 item 7.
+ *   refreshToken — Этап 2.7: bump this (any changed value) to make an
+ *     embedded instance reload without remounting/losing local state
+ *     (selected supplier, open filter, etc.). Ignored in standalone use.
  */
-export default function UmagSettlementsPanel({ embedded = false } = {}) {
+export default function UmagSettlementsPanel({ embedded = false, refreshToken = null } = {}) {
   const { user } = useSession()
   const toast = useToast()
   const showSuccess = toast.success
@@ -748,7 +751,9 @@ export default function UmagSettlementsPanel({ embedded = false } = {}) {
   useEffect(() => {
     if (!canView) return
     void loadData()
-  }, [canView, loadData])
+    // refreshToken has no direct effect on loadData()'s own inputs — a parent
+    // (Этап 2.7 shared shell) bumps it to force a reload without remounting.
+  }, [canView, loadData, refreshToken])
 
   async function handleSync() {
     if (!canSync || syncing) return

@@ -200,6 +200,12 @@ function main() {
   // moved UmagSettlementsPanel's debt source — see their own verify scripts)
   // without that constituting new routing/menu surface, which remains the
   // real invariant sync-scope work must never introduce.
+  //
+  // App.jsx is checked separately below (not for zero diff): Этап 2.7 adds a
+  // new, additive, hidden /platform/supplier-finance route there, which is
+  // legitimate UI work from a later stage, not a sync-scope regression — the
+  // invariant that still matters is that the pre-existing settlements/
+  // supplier-payments routes are not removed or altered.
   const uiStatus = execFileSync(
     'git',
     [
@@ -209,12 +215,19 @@ function main() {
       'src/pages/platform/settlements',
       'src/pages/platform/supplier-payments',
       'src/platform/platformNav.js',
-      'src/App.jsx',
     ],
     { cwd: ROOT, encoding: 'utf8' }
   ).trim()
   assert.equal(uiStatus, '', `UI files changed unexpectedly: ${uiStatus}`)
   ok('no route/menu/page-wrapper files touched by sync-scope work')
+
+  const appDiff = execFileSync('git', ['diff', '--', 'src/App.jsx'], { cwd: ROOT, encoding: 'utf8' })
+  const removedRouteLines = appDiff
+    .split('\n')
+    .filter((line) => line.startsWith('-') && !line.startsWith('---'))
+    .filter((line) => /settlements|supplier-payments/.test(line))
+  assert.deepEqual(removedRouteLines, [], `existing route lines removed from App.jsx: ${removedRouteLines.join(' | ')}`)
+  ok('App.jsx: pre-existing settlements/supplier-payments routes are not removed or altered (a later stage may additively register new routes)')
 
   console.log('\n--- Pure-math mirror of computeEffectiveSyncScope() ---\n')
   runMirrorCases()

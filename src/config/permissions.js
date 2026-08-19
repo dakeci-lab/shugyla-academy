@@ -36,6 +36,9 @@ export const ROUTE_KEYS = {
   SUPPLIERS: 'suppliers',
   SETTLEMENTS: 'settlements',
   SUPPLIER_PAYMENTS: 'supplier_payments',
+  // Этап 2.7 — hidden unified page, not yet in platformNav.js. Same access
+  // as the union of the two existing routes below, nothing broader.
+  SUPPLIER_FINANCE: 'supplier_finance',
   PRODUCTS_GROUP: 'products_group',
   PRICE_TAGS: 'price_tags',
   SETTINGS: 'settings',
@@ -86,6 +89,7 @@ const ROUTE_ACCESS = {
   // Settlements: permission-first (umag.settlements.view); role fallback admin-only.
   [ROUTE_KEYS.SETTLEMENTS]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SUPPLIER_PAYMENTS]: [ROLE_IDS.ADMIN],
+  [ROUTE_KEYS.SUPPLIER_FINANCE]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.PRODUCTS_GROUP]: [
     ROLE_IDS.ADMIN,
     ROLE_IDS.BUYER,
@@ -229,6 +233,9 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.SUPPLIERS]: [P.SUPPLIERS_VIEW],
     [ROUTE_KEYS.SETTLEMENTS]: [P.UMAG_SETTLEMENTS_VIEW],
     [ROUTE_KEYS.SUPPLIER_PAYMENTS]: [P.SUPPLIER_PAYMENTS_VIEW],
+    // Union of the two existing routes' permissions — access to the hidden
+    // combined page never exceeds what a user can already reach separately.
+    [ROUTE_KEYS.SUPPLIER_FINANCE]: [P.UMAG_SETTLEMENTS_VIEW, P.SUPPLIER_PAYMENTS_VIEW],
     [ROUTE_KEYS.PRICE_TAGS]: [P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE],
     [ROUTE_KEYS.SETTINGS]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],
     [ROUTE_KEYS.SETTINGS_GENERAL]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],

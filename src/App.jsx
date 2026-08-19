@@ -78,6 +78,10 @@ const SettlementsPage = lazy(() => import('./pages/platform/settlements/Settleme
 const SupplierPaymentsPage = lazy(
   () => import('./pages/platform/supplier-payments/SupplierPaymentsPage')
 )
+// Этап 2.7: hidden unified successor — not linked from platformNav.js yet.
+const SupplierFinancePage = lazy(
+  () => import('./pages/platform/supplier-finance/SupplierFinancePage')
+)
 const ProcurementPage = lazy(() => import('./pages/platform/procurement/ProcurementPage'))
 const AnalyticsProcurementPage = lazy(
   () => import('./pages/platform/procurement/AnalyticsProcurementPage')
@@ -370,6 +374,15 @@ export default function App() {
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIER_PAYMENTS}>
                       <SupplierPaymentsPage />
+                    </PlatformRoute>
+                  }
+                />
+                {/* Этап 2.7: hidden — reachable by direct URL, no nav entry yet. */}
+                <Route
+                  path="supplier-finance"
+                  element={
+                    <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIER_FINANCE}>
+                      <SupplierFinancePage />
                     </PlatformRoute>
                   }
                 />

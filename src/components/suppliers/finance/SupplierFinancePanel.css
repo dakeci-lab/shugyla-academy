@@ -1,0 +1,141 @@
+.sfp-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.sfp-panel__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--color-text, #0f172a);
+}
+
+.sfp-panel__kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sfp-panel__kpi {
+  padding: 14px 16px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 14px;
+  background: #fff;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sfp-panel__kpi-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.sfp-panel__kpi-value {
+  margin-top: 6px;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+  color: var(--color-text, #0f172a);
+}
+
+.sfp-panel__kpi--overdue .sfp-panel__kpi-value {
+  color: #b91c1c;
+}
+
+.sfp-panel__kpi--today .sfp-panel__kpi-value {
+  color: #b45309;
+}
+
+.sfp-panel__error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.sfp-panel__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sfp-panel__tabs {
+  display: flex;
+  gap: 6px;
+}
+
+.sfp-panel__tab {
+  appearance: none;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  background: #fff;
+  color: #475569;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sfp-panel__tab--active {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.sfp-panel__sync {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sfp-panel__sync-status {
+  font-size: 13px;
+  color: var(--color-text-secondary, #64748b);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sfp-panel__sync-status--partial {
+  color: #b45309;
+}
+
+.sfp-panel__sync-status--failed {
+  color: #b91c1c;
+}
+
+.sfp-panel__sync-status--running {
+  color: #475569;
+}
+
+@media (max-width: 900px) {
+  .sfp-panel__kpis {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .sfp-panel__bar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .sfp-panel__sync {
+    width: 100%;
+    justify-content: space-between;
+  }
+}

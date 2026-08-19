@@ -213,7 +213,7 @@ function GroupDetail({ group, todayKey, canEditTerms, onClose, onConfigure }) {
 }
 
 /**
- * @param {{ embedded?: boolean, summary?: object|null }} [props]
+ * @param {{ embedded?: boolean, summary?: object|null, refreshToken?: unknown }} [props]
  *   embedded — Этап 2.6: hides the standalone shell (title, sync status,
  *     ↻ button, global KPIs) so this can render as pure payment-schedule
  *     content under a future shared header. The content itself — tabs,
@@ -222,8 +222,15 @@ function GroupDetail({ group, todayKey, canEditTerms, onClose, onConfigure }) {
  *     from a parent. When provided, load() skips its own summary fetch
  *     (avoids the duplicate bulk read a shared header would otherwise cause)
  *     but still fetches obligations itself for the schedule content.
+ *   refreshToken — Этап 2.7: bump this (any changed value) to make an
+ *     embedded instance reload without remounting/losing local state.
+ *     Ignored in standalone use.
  */
-export default function SupplierPaymentsPanel({ embedded = false, summary: summaryProp = null } = {}) {
+export default function SupplierPaymentsPanel({
+  embedded = false,
+  summary: summaryProp = null,
+  refreshToken = null,
+} = {}) {
   const { user } = useSession()
   const toast = useToast()
   const navigate = useNavigate()
@@ -274,7 +281,9 @@ export default function SupplierPaymentsPanel({ embedded = false, summary: summa
   useEffect(() => {
     if (!canView) return
     void load()
-  }, [canView, load])
+    // refreshToken has no direct effect on load()'s own inputs — a parent
+    // (Этап 2.7 shared shell) bumps it to force a reload without remounting.
+  }, [canView, load, refreshToken])
 
   useEffect(() => {
     if (!view || tabTouched) return
@@ -432,9 +441,11 @@ export default function SupplierPaymentsPanel({ embedded = false, summary: summa
       )}
 
       <section className="spo-panel__plan" aria-label="К оплате">
-        <div className="spo-panel__plan-head">
-          <h3 className="spo-panel__section-title">К оплате</h3>
-        </div>
+        {!embedded && (
+          <div className="spo-panel__plan-head">
+            <h3 className="spo-panel__section-title">К оплате</h3>
+          </div>
+        )}
 
         <div className="spo-panel__tabs" role="tablist" aria-label="Приоритет оплат">
           {TABS.map((tab) => {
