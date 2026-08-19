@@ -4,6 +4,12 @@
  * Frontend → this Edge Function → api.umag.kz → Supabase tables.
  * Never returns UMAG Authorization or raw credentials to the client.
  *
+ * Actions:
+ * - sync: one explicit period (settlements screen picks it).
+ * - sync_open_obligations: every month that still holds open debt, derived
+ *   automatically. UMAG serves supplies by document period, so a receipt paid in
+ *   a later month keeps its stale debt until its own month is re-fetched.
+ *
  * Primary endpoints:
  * - GET /rest/cabinet/org/agent/list (agentType=SUPPLIER)
  * - GET /rest/cabinet/opr/supplies/all
@@ -42,6 +48,23 @@ const PERMISSION_SYNC = 'umag.settlements.sync'
 const ALLOWED_BODY_KEYS = new Set(['action', 'dateFrom', 'dateTo', 'syncSuppliers'])
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 const AGGREGATE_EPSILON = 0.01
+
+/** Columns shared by every umag_supplies read that feeds obligation refresh. */
+const SUPPLY_OBLIGATION_COLUMNS =
+  'id, umag_supply_id, platform_supplier_id, doc_time, amount, payment_amount, debt, is_source_deleted'
+
+/**
+ * Newest months are refreshed first: debt older than a year rarely resolves and
+ * must not consume the budget that the months in daily use need.
+ */
+const MAX_OBLIGATION_SYNC_MONTHS = 12
+
+/**
+ * Soft budget for a multi-month run. One UMAG request may take up to
+ * UMAG_TIMEOUT_MS, so we stop between months and let a repeated call continue
+ * instead of being killed mid-month by the platform timeout.
+ */
+const OBLIGATION_SYNC_TIME_BUDGET_MS = 120_000
 
 type SyncStatus = 'running' | 'success' | 'partial' | 'failed'
 
@@ -213,11 +236,18 @@ function asBigIntId(value: unknown): number | null {
   return n
 }
 
-function validateBody(body: unknown): {
+type FullSyncRequest = {
+  action: 'sync'
   dateFrom: string
   dateTo: string
   syncSuppliers: boolean
-} | Response {
+}
+
+type OpenObligationsRequest = {
+  action: 'sync_open_obligations'
+}
+
+function validateBody(body: unknown): FullSyncRequest | OpenObligationsRequest | Response {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return umagErrorResponse('VALIDATION_ERROR', 'Некорректное тело запроса.', 400)
   }
@@ -229,8 +259,28 @@ function validateBody(body: unknown): {
   }
 
   const action = record.action == null ? 'sync' : String(record.action)
+
+  if (action === 'sync_open_obligations') {
+    // Reject an explicit period instead of ignoring it: the caller must not
+    // believe it controls a window that is derived from open debt.
+    for (const key of ['dateFrom', 'dateTo', 'syncSuppliers']) {
+      if (record[key] !== undefined) {
+        return umagErrorResponse(
+          'VALIDATION_ERROR',
+          `Поле ${key} недопустимо для action=sync_open_obligations: период определяется автоматически.`,
+          400
+        )
+      }
+    }
+    return { action: 'sync_open_obligations' }
+  }
+
   if (action !== 'sync') {
-    return umagErrorResponse('VALIDATION_ERROR', 'Поддерживается только action=sync.', 400)
+    return umagErrorResponse(
+      'VALIDATION_ERROR',
+      'Поддерживается action=sync или action=sync_open_obligations.',
+      400
+    )
   }
 
   const dateFrom = String(record.dateFrom || '')
@@ -251,6 +301,7 @@ function validateBody(body: unknown): {
   }
 
   return {
+    action: 'sync',
     dateFrom,
     dateTo,
     syncSuppliers: record.syncSuppliers !== false,
@@ -475,6 +526,79 @@ async function fetchAllSupplies(
   }
 
   return { ok: true, supplies, pages, source }
+}
+
+type SupplyAggregateSource = {
+  totalCount: number | null
+  amount: number | null
+  paymentAmount: number | null
+  paymentRefundAmount: number | null
+  debt: number | null
+}
+
+type SupplyAggregates = {
+  amount: number
+  paymentAmount: number
+  paymentRefundAmount: number
+  debt: number
+}
+
+/**
+ * Compare row sums against the totals UMAG reports for the same period.
+ * A mismatch means the snapshot is incomplete, which gates deletion reconcile.
+ */
+function compareSupplyAggregates(
+  supplies: UmagSupply[],
+  source: SupplyAggregateSource
+): {
+  calculated: SupplyAggregates
+  aggregatesMatch: boolean
+  mismatches: string[]
+  warningMessage: string | null
+} {
+  const calculated: SupplyAggregates = {
+    amount: sumNumbers(supplies.map((s) => s.amount)),
+    paymentAmount: sumNumbers(supplies.map((s) => s.paymentAmount)),
+    paymentRefundAmount: sumNumbers(supplies.map((s) => s.paymentRefundAmount)),
+    debt: sumNumbers(supplies.map((s) => s.debt)),
+  }
+
+  const mismatches: string[] = []
+  if (source.amount != null && !nearlyEqual(calculated.amount, source.amount, AGGREGATE_EPSILON)) {
+    mismatches.push(`amount: rows=${calculated.amount} source=${source.amount}`)
+  }
+  if (
+    source.paymentAmount != null &&
+    !nearlyEqual(calculated.paymentAmount, source.paymentAmount, AGGREGATE_EPSILON)
+  ) {
+    mismatches.push(
+      `paymentAmount: rows=${calculated.paymentAmount} source=${source.paymentAmount}`
+    )
+  }
+  if (
+    source.paymentRefundAmount != null &&
+    !nearlyEqual(calculated.paymentRefundAmount, source.paymentRefundAmount, AGGREGATE_EPSILON)
+  ) {
+    mismatches.push(
+      `paymentRefundAmount: rows=${calculated.paymentRefundAmount} source=${source.paymentRefundAmount}`
+    )
+  }
+  if (source.debt != null && !nearlyEqual(calculated.debt, source.debt, AGGREGATE_EPSILON)) {
+    mismatches.push(`debt: rows=${calculated.debt} source=${source.debt}`)
+  }
+  if (source.totalCount != null && supplies.length !== source.totalCount) {
+    mismatches.push(`totalCount: rows=${supplies.length} source=${source.totalCount}`)
+  }
+
+  const aggregatesMatch = mismatches.length === 0
+  return {
+    calculated,
+    aggregatesMatch,
+    mismatches,
+    warningMessage: aggregatesMatch
+      ? null
+      : `Расхождение агрегатов UMAG: ${mismatches.join('; ')}`,
+  }
 }
 
 async function upsertSuppliers(
@@ -1537,9 +1661,18 @@ async function fetchRowsByIdsInChunks(
   return { rows, error: null }
 }
 
-async function fetchPaginatedSupplies(
+/**
+ * Range pagination needs a total order: without one Postgres may repeat or skip
+ * rows across pages, which here would silently drop a month that still holds
+ * debt. Orders by a unique column, like rebuildLedgerEventsForPeriod does.
+ */
+async function fetchPaginatedRows(
   // deno-lint-ignore no-explicit-any
   serviceClient: any,
+  table: string,
+  select: string,
+  orderColumn: string,
+  // deno-lint-ignore no-explicit-any
   buildQuery: (q: any) => any
   // deno-lint-ignore no-explicit-any
 ): Promise<{ rows: any[]; error: { message: string; code?: string } | null }> {
@@ -1547,13 +1680,9 @@ async function fetchPaginatedSupplies(
   const rows: unknown[] = []
   let from = 0
   for (;;) {
-    const { data, error } = await buildQuery(
-      serviceClient
-        .from('umag_supplies')
-        .select(
-          'id, umag_supply_id, platform_supplier_id, doc_time, amount, payment_amount, debt, is_source_deleted'
-        )
-    ).range(from, from + pageSize - 1)
+    const { data, error } = await buildQuery(serviceClient.from(table).select(select))
+      .order(orderColumn, { ascending: true })
+      .range(from, from + pageSize - 1)
     if (error) return { rows: [], error }
     const page = data || []
     rows.push(...page)
@@ -1561,6 +1690,110 @@ async function fetchPaginatedSupplies(
     from += pageSize
   }
   return { rows, error: null }
+}
+
+async function fetchPaginatedSupplies(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  // deno-lint-ignore no-explicit-any
+  buildQuery: (q: any) => any
+  // deno-lint-ignore no-explicit-any
+): Promise<{ rows: any[]; error: { message: string; code?: string } | null }> {
+  return await fetchPaginatedRows(
+    serviceClient,
+    'umag_supplies',
+    SUPPLY_OBLIGATION_COLUMNS,
+    'umag_supply_id',
+    buildQuery
+  )
+}
+
+function aqtobeTodayDateKey(): string {
+  return aqtobeDateKeyFromIso(new Date().toISOString()) || '1970-01-01'
+}
+
+function monthKeyFromDateKey(dateKey: string): string {
+  return dateKey.slice(0, 7)
+}
+
+/**
+ * Whole calendar month bounds. Deletion reconcile compares a UMAG snapshot with
+ * everything stored in the window, so a partial window would soft-delete rows
+ * that merely fall outside it.
+ */
+function monthPeriodKeys(monthKey: string): { dateFrom: string; dateTo: string } {
+  const [year, month] = monthKey.split('-').map(Number)
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  return {
+    dateFrom: `${monthKey}-01`,
+    dateTo: `${monthKey}-${String(lastDay).padStart(2, '0')}`,
+  }
+}
+
+type OpenObligationMonths = {
+  months: string[]
+  skippedOlder: string[]
+  error: { message: string; code?: string } | null
+}
+
+/**
+ * Months (Asia/Aqtobe) that may still hold unpaid money: every open obligation,
+ * every supply with open debt, and always the current month.
+ *
+ * Obligations are included on their own because an obligation can stay open
+ * while its supply row already shows zero debt.
+ */
+async function collectOpenObligationMonths(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any
+): Promise<OpenObligationMonths> {
+  const months = new Set<string>()
+
+  const obligations = await fetchPaginatedRows(
+    serviceClient,
+    'supplier_payment_obligations',
+    'supply_document_date, source_doc_time',
+    'umag_supply_id',
+    (q) => q.eq('is_source_deleted', false).gt('current_debt', 0)
+  )
+  if (obligations.error) {
+    console.error('spo_open_months_select_failed', {
+      message: obligations.error.message,
+      code: obligations.error.code,
+    })
+    return { months: [], skippedOlder: [], error: obligations.error }
+  }
+  for (const row of obligations.rows) {
+    const dateKey =
+      (row.supply_document_date as string | null) ||
+      aqtobeDateKeyFromIso(row.source_doc_time as string | null)
+    if (dateKey) months.add(monthKeyFromDateKey(dateKey))
+  }
+
+  const supplies = await fetchPaginatedSupplies(serviceClient, (q) =>
+    q.eq('is_source_deleted', false).gt('debt', 0)
+  )
+  if (supplies.error) {
+    console.error('spo_open_months_supplies_failed', {
+      message: supplies.error.message,
+      code: supplies.error.code,
+    })
+    return { months: [], skippedOlder: [], error: supplies.error }
+  }
+  for (const row of supplies.rows) {
+    const dateKey = aqtobeDateKeyFromIso(row.doc_time as string | null)
+    if (dateKey) months.add(monthKeyFromDateKey(dateKey))
+  }
+
+  months.add(monthKeyFromDateKey(aqtobeTodayDateKey()))
+
+  const sorted = [...months].sort()
+  const overflow = Math.max(0, sorted.length - MAX_OBLIGATION_SYNC_MONTHS)
+  return {
+    months: sorted.slice(overflow),
+    skippedOlder: sorted.slice(0, overflow),
+    error: null,
+  }
 }
 
 /**
@@ -1617,6 +1850,65 @@ async function refreshPaymentObligations(
   for (const row of openDebtResult.rows) {
     const id = Number(row.umag_supply_id)
     if (!supplyByUmagId.has(id)) supplyByUmagId.set(id, row)
+  }
+
+  // An obligation can stay open while its supply already shows zero debt: the
+  // supply was paid outside the synced window, or its debt was cleared before
+  // this refresh existed. Such rows match neither query above, so without this
+  // pass they would never close.
+  const openObligations = await fetchPaginatedRows(
+    serviceClient,
+    'supplier_payment_obligations',
+    'umag_supply_id',
+    'umag_supply_id',
+    (q) => q.eq('is_source_deleted', false).gt('current_debt', 0)
+  )
+  if (openObligations.error) {
+    console.error('spo_open_obligations_select_failed', {
+      message: openObligations.error.message,
+      code: openObligations.error.code,
+    })
+    return emptyObligationsResult({
+      status: 'failed',
+      error_code: 'SUPABASE_SELECT_FAILED',
+      error_message: `Не удалось прочитать открытые обязательства: ${openObligations.error.message}`,
+    })
+  }
+
+  const orphanSupplyIds = [
+    ...new Set(
+      openObligations.rows
+        .map((row) => Number(row.umag_supply_id))
+        .filter((id) => Number.isFinite(id) && !supplyByUmagId.has(id))
+    ),
+  ]
+  if (orphanSupplyIds.length > 0) {
+    const orphanSupplies = await fetchRowsByIdsInChunks(
+      serviceClient,
+      'umag_supplies',
+      SUPPLY_OBLIGATION_COLUMNS,
+      'umag_supply_id',
+      orphanSupplyIds
+    )
+    if (orphanSupplies.error) {
+      console.error('spo_orphan_supplies_select_failed', {
+        message: orphanSupplies.error.message,
+        code: orphanSupplies.error.code,
+      })
+      return emptyObligationsResult({
+        status: 'failed',
+        error_code: 'SUPABASE_SELECT_FAILED',
+        error_message: `Не удалось прочитать приёмки открытых обязательств: ${orphanSupplies.error.message}`,
+      })
+    }
+    for (const row of orphanSupplies.rows) {
+      const id = Number(row.umag_supply_id)
+      if (!supplyByUmagId.has(id)) supplyByUmagId.set(id, row)
+    }
+    console.info('spo_orphan_obligations_reloaded', {
+      requested: orphanSupplyIds.length,
+      resolved: orphanSupplies.rows.length,
+    })
   }
 
   const supplyRows = [...supplyByUmagId.values()]
@@ -1870,6 +2162,455 @@ async function refreshPaymentObligations(
   return result
 }
 
+type MonthSyncOutcome = {
+  month: string
+  suppliesReceived: number
+  created: number
+  updated: number
+  reactivated: number
+  sourceDeleted: number
+  aggregatesMatch: boolean
+}
+
+/**
+ * Returns, UMAG payments and ledger events for one month.
+ *
+ * The payments screen used to trigger a full period sync, which refreshed these
+ * as a side effect. Debt does not depend on them, so every failure only adds a
+ * warning — but skipping them entirely would leave settlements and the supplier
+ * ledger staler than before this change.
+ */
+async function syncPeriodExtras(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  session: UmagSession,
+  dateFrom: string,
+  dateTo: string,
+  platformMap: Map<number, string>
+): Promise<{ warnings: string[]; returnsReceived: number; paymentsReceived: number; ledgerUpserted: number }> {
+  const warnings: string[] = []
+  let returnsReceived = 0
+  let paymentsReceived = 0
+  let ledgerUpserted = 0
+
+  const bounds = aqtobePeriodBoundsMs(dateFrom, dateTo)
+  if (!bounds) return { warnings, returnsReceived, paymentsReceived, ledgerUpserted }
+
+  const returnsResult = await fetchAllSupplyReturns(session, bounds.fromTime, bounds.toTime)
+  if (!returnsResult.ok) {
+    warnings.push('Возвраты поставщикам за текущий месяц не обновлены')
+  } else {
+    returnsReceived = returnsResult.returns.length
+    const calculatedReturnAmount = sumNumbers(
+      returnsResult.returns.map((item) => {
+        const { doc } = unwrapSupplyReturn(item)
+        return Math.abs(asNumber(doc.amount))
+      })
+    )
+    const returnSource = returnsResult.source
+    const returnMismatches: string[] = []
+    if (
+      returnSource.amount != null &&
+      !nearlyEqual(
+        calculatedReturnAmount,
+        Math.abs(asNumber(returnSource.amount)),
+        AGGREGATE_EPSILON
+      )
+    ) {
+      returnMismatches.push(
+        `returnAmount: rows=${calculatedReturnAmount} source=${returnSource.amount}`
+      )
+    }
+    if (
+      returnSource.totalCount != null &&
+      returnsResult.returns.length !== returnSource.totalCount
+    ) {
+      returnMismatches.push(
+        `returnTotalCount: rows=${returnsResult.returns.length} source=${returnSource.totalCount}`
+      )
+    }
+    if (returnMismatches.length > 0) {
+      console.warn('umag_sync_returns_aggregate_mismatch', {
+        mismatches: returnMismatches,
+        dateFrom,
+        dateTo,
+      })
+      warnings.push(`Расхождение агрегатов возвратов UMAG: ${returnMismatches.join('; ')}`)
+    }
+
+    const returnsUpsert = await upsertSupplyReturns(
+      serviceClient,
+      returnsResult.returns,
+      platformMap
+    )
+    if (returnsUpsert instanceof Response) {
+      warnings.push('Возвраты поставщикам не сохранены')
+    } else {
+      // Soft-delete only after a complete validated snapshot, exactly as the
+      // full sync does. Root-array responses carry no totalCount.
+      const snapshotComplete =
+        returnMismatches.length === 0 &&
+        returnsResult.paginationComplete &&
+        (returnSource.totalCount == null ||
+          returnSource.totalCount === returnsResult.returns.length)
+
+      if (snapshotComplete) {
+        const receivedReturnIds = new Set<number>()
+        for (const item of returnsResult.returns) {
+          const { doc } = unwrapSupplyReturn(item)
+          const id = asBigIntId(doc.id)
+          if (id != null) receivedReturnIds.add(id)
+        }
+        if (receivedReturnIds.size === returnsResult.returns.length) {
+          const reconcile = await reconcileMissingSupplyReturns(
+            serviceClient,
+            dateFrom,
+            dateTo,
+            receivedReturnIds
+          )
+          if (reconcile instanceof Response) {
+            warnings.push('Сверка удалённых возвратов не выполнена')
+          }
+        }
+      }
+    }
+  }
+
+  const paymentsResult = await fetchDocumentPaymentsForPeriod(
+    session,
+    bounds.fromTime,
+    bounds.toTime
+  )
+  if (!paymentsResult.ok) {
+    warnings.push('Оплаты UMAG за текущий месяц не обновлены')
+    return { warnings, returnsReceived, paymentsReceived, ledgerUpserted }
+  }
+
+  paymentsReceived = paymentsResult.payments.length
+  const { supplyToSupplier, returnToSupplier } = await buildPaymentSupplierLinkMaps(
+    serviceClient,
+    paymentsResult.payments
+  )
+  const platformByUmag = new Map<number, string>()
+  for (const [umagId, platformId] of platformMap.entries()) {
+    platformByUmag.set(Number(umagId), String(platformId))
+  }
+
+  const paymentsUpsert = await upsertDocumentPayments(
+    serviceClient,
+    paymentsResult.payments,
+    platformByUmag,
+    supplyToSupplier,
+    returnToSupplier
+  )
+  if (paymentsUpsert instanceof Response) {
+    warnings.push('Оплаты UMAG получены, но не сохранились')
+  }
+
+  const ledgerResult = await rebuildLedgerEventsForPeriod(serviceClient, dateFrom, dateTo)
+  if (ledgerResult instanceof Response) {
+    warnings.push('Ledger events за текущий месяц не обновлены')
+  } else {
+    ledgerUpserted = ledgerResult.upserted
+  }
+
+  return { warnings, returnsReceived, paymentsReceived, ledgerUpserted }
+}
+
+/**
+ * Re-fetch every month that still holds open debt, then rebuild obligations.
+ *
+ * The payments screen used to sync only the current month, so a receipt paid in
+ * a later month kept its stale debt forever: UMAG serves supplies by document
+ * period, and the payments ledger never writes umag_supplies.debt. UMAG stays
+ * the source of truth here — affected periods are re-read rather than having
+ * debt derived locally from payments.
+ *
+ * A month that fails is reported and skipped; the rest still gets refreshed.
+ */
+async function runOpenObligationsSync(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  session: UmagSession
+): Promise<Response> {
+  const startedAtMs = Date.now()
+
+  const planned = await collectOpenObligationMonths(serviceClient)
+  if (planned.error) {
+    return umagErrorResponse(
+      'SUPABASE_SELECT_FAILED',
+      `Не удалось определить месяцы с открытым долгом: ${planned.error.message}`,
+      500
+    )
+  }
+
+  const plannedMonths = planned.months
+  const plannedFrom = monthPeriodKeys(plannedMonths[0]).dateFrom
+  const plannedTo = monthPeriodKeys(plannedMonths[plannedMonths.length - 1]).dateTo
+
+  const runId = await createSyncRun(serviceClient, {
+    entity: 'obligations',
+    date_from: plannedFrom,
+    date_to: plannedTo,
+  })
+
+  try {
+    const monthWarnings: string[] = []
+
+    // Suppliers first, as the full sync does: a receipt from a supplier that is
+    // not mapped yet would otherwise land with platform_supplier_id null and its
+    // obligation would show up unnamed and unconfigurable. A failure here is not
+    // fatal — refreshing debt matters more than refreshing the directory.
+    const suppliersResult = await fetchAllSuppliers(session)
+    if (!suppliersResult.ok) {
+      monthWarnings.push('Справочник поставщиков не обновлён')
+    } else {
+      const suppliersUpsert = await upsertSuppliers(serviceClient, suppliersResult.agents)
+      if (suppliersUpsert instanceof Response) {
+        monthWarnings.push('Справочник поставщиков не сохранён')
+      } else {
+        const activeUmagIds = new Set<number>()
+        for (const agent of suppliersResult.agents) {
+          const id = asBigIntId(agent.id)
+          if (id != null) activeUmagIds.add(id)
+        }
+        const canonical = await reconcileCanonicalSuppliers(serviceClient, activeUmagIds)
+        if (canonical instanceof Response) {
+          monthWarnings.push('Сверка карточек поставщиков не выполнена')
+        }
+      }
+    }
+
+    const supplierMap = await loadSupplierMap(serviceClient)
+    const platformMap = await loadPlatformSupplierMap(serviceClient)
+
+    const outcomes: MonthSyncOutcome[] = []
+    const remaining: string[] = []
+
+    for (let i = 0; i < plannedMonths.length; i += 1) {
+      const month = plannedMonths[i]
+
+      // Always finish one month, then stop before overrunning the platform
+      // timeout. Oldest-first order makes a repeated call resume deterministically.
+      if (i > 0 && Date.now() - startedAtMs > OBLIGATION_SYNC_TIME_BUDGET_MS) {
+        remaining.push(...plannedMonths.slice(i))
+        break
+      }
+
+      const period = monthPeriodKeys(month)
+      const bounds = aqtobePeriodBoundsMs(period.dateFrom, period.dateTo)
+      if (!bounds) {
+        monthWarnings.push(`${month}: некорректные границы периода`)
+        continue
+      }
+
+      const suppliesResult = await fetchAllSupplies(session, bounds.fromTime, bounds.toTime)
+      if (!suppliesResult.ok) {
+        monthWarnings.push(`${month}: не удалось загрузить приёмки UMAG`)
+        continue
+      }
+
+      const source = suppliesResult.source
+      const aggregates = compareSupplyAggregates(suppliesResult.supplies, source)
+      if (aggregates.warningMessage) {
+        console.warn('umag_sync_aggregate_mismatch', {
+          mismatches: aggregates.mismatches,
+          dateFrom: period.dateFrom,
+          dateTo: period.dateTo,
+        })
+        monthWarnings.push(`${month}: ${aggregates.warningMessage}`)
+      }
+
+      const upsert = await upsertSupplies(
+        serviceClient,
+        suppliesResult.supplies,
+        supplierMap,
+        platformMap
+      )
+      if (upsert instanceof Response) {
+        monthWarnings.push(`${month}: не удалось сохранить приёмки`)
+        continue
+      }
+
+      const receivedIds = new Set<number>()
+      for (const supply of suppliesResult.supplies) {
+        const id = asBigIntId(supply.id)
+        if (id != null) receivedIds.add(id)
+      }
+
+      // Same guards as the full sync: reconcile only a complete, validated
+      // snapshot of a whole month. Prefer a stale row over a false delete.
+      let sourceDeleted = 0
+      if (
+        aggregates.aggregatesMatch &&
+        source.totalCount != null &&
+        receivedIds.size === suppliesResult.supplies.length
+      ) {
+        const reconcile = await reconcileMissingSupplies(
+          serviceClient,
+          period.dateFrom,
+          period.dateTo,
+          receivedIds
+        )
+        if (reconcile instanceof Response) {
+          monthWarnings.push(`${month}: сверка удалённых приёмок не выполнена`)
+        } else {
+          sourceDeleted = reconcile.sourceDeleted
+        }
+      }
+
+      outcomes.push({
+        month,
+        suppliesReceived: suppliesResult.supplies.length,
+        created: upsert.created,
+        updated: upsert.updated,
+        reactivated: upsert.reactivated,
+        sourceDeleted,
+        aggregatesMatch: aggregates.aggregatesMatch,
+      })
+    }
+
+    const processedMonths = outcomes.map((outcome) => outcome.month)
+    const refreshFrom = processedMonths.length
+      ? monthPeriodKeys(processedMonths[0]).dateFrom
+      : plannedFrom
+    const refreshTo = processedMonths.length
+      ? monthPeriodKeys(processedMonths[processedMonths.length - 1]).dateTo
+      : plannedTo
+
+    // Obligation refresh also covers open debt and open obligations globally,
+    // so this window only decides which supplies are re-read by document date.
+    const obligationsRefresh = await refreshPaymentObligations(
+      serviceClient,
+      refreshFrom,
+      refreshTo
+    )
+
+    // Debt is corrected by now. Returns / payments / ledger are refreshed only
+    // for the current month, and only if the budget allows, so the primary fix
+    // is never sacrificed to them.
+    const currentPeriod = monthPeriodKeys(monthKeyFromDateKey(aqtobeTodayDateKey()))
+    let extras = {
+      warnings: [] as string[],
+      returnsReceived: 0,
+      paymentsReceived: 0,
+      ledgerUpserted: 0,
+    }
+    if (Date.now() - startedAtMs > OBLIGATION_SYNC_TIME_BUDGET_MS) {
+      extras.warnings.push(
+        'Возвраты и оплаты UMAG за текущий месяц не обновлены: не хватило времени. Нажмите синхронизацию повторно.'
+      )
+    } else {
+      extras = await syncPeriodExtras(
+        serviceClient,
+        session,
+        currentPeriod.dateFrom,
+        currentPeriod.dateTo,
+        platformMap
+      )
+    }
+
+    const totals = outcomes.reduce(
+      (acc, outcome) => ({
+        received: acc.received + outcome.suppliesReceived,
+        created: acc.created + outcome.created,
+        updated: acc.updated + outcome.updated,
+        reactivated: acc.reactivated + outcome.reactivated,
+        sourceDeleted: acc.sourceDeleted + outcome.sourceDeleted,
+      }),
+      { received: 0, created: 0, updated: 0, reactivated: 0, sourceDeleted: 0 }
+    )
+
+    const warnings = [...monthWarnings, ...extras.warnings]
+    if (planned.skippedOlder.length > 0) {
+      // Older debt is not lost: it can still be synced from settlements by hand.
+      warnings.push(
+        `Месяцы старше лимита не обновлялись: ${planned.skippedOlder.join(', ')}`
+      )
+    }
+    if (remaining.length > 0) {
+      warnings.push(
+        `Осталось обновить месяцев: ${remaining.length}. Нажмите синхронизацию повторно.`
+      )
+    }
+    if (obligationsRefresh.status !== 'success') {
+      warnings.push(
+        obligationsRefresh.error_message ||
+          `Календарь оплат обновлён не полностью (${obligationsRefresh.obligations_failed}).`
+      )
+    }
+
+    const warning = warnings.join(' | ') || null
+    const status: SyncStatus = warning ? 'partial' : 'success'
+
+    await finishSyncRun(serviceClient, runId, {
+      status,
+      records_received: totals.received,
+      records_created: totals.created,
+      records_updated: totals.updated,
+      records_reactivated: totals.reactivated,
+      records_source_deleted: totals.sourceDeleted,
+      returns_received: extras.returnsReceived,
+      // Null, not true, when no month was processed: an empty every() would
+      // claim aggregates matched for a run that compared nothing.
+      aggregates_match: outcomes.length > 0 ? outcomes.every((o) => o.aggregatesMatch) : null,
+      warning_message: warning,
+      error_message: null,
+    })
+
+    console.info('umag_sync_open_obligations_done', {
+      planned: plannedMonths,
+      processed: processedMonths,
+      remaining,
+      skippedOlder: planned.skippedOlder,
+      elapsedMs: Date.now() - startedAtMs,
+      status,
+    })
+
+    return jsonResponse({
+      success: true,
+      status,
+      warning,
+      scope: 'open_obligations',
+      period: { dateFrom: refreshFrom, dateTo: refreshTo },
+      months: {
+        planned: plannedMonths,
+        processed: processedMonths,
+        remaining,
+        skippedOlder: planned.skippedOlder,
+        details: outcomes,
+      },
+      supplies: {
+        received: totals.received,
+        created: totals.created,
+        updated: totals.updated,
+        reactivated: totals.reactivated,
+        sourceDeleted: totals.sourceDeleted,
+      },
+      currentMonthExtras: {
+        period: currentPeriod,
+        returnsReceived: extras.returnsReceived,
+        paymentsReceived: extras.paymentsReceived,
+        ledgerUpserted: extras.ledgerUpserted,
+      },
+      paymentObligations: obligationsRefresh,
+      syncRunId: runId,
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'unknown'
+    console.error('umag_sync_open_obligations_unexpected', { message })
+    await finishSyncRun(serviceClient, runId, {
+      status: 'failed',
+      error_message: 'Внутренняя ошибка синхронизации обязательств UMAG',
+    })
+    return umagErrorResponse(
+      'INTERNAL_ERROR',
+      'Внутренняя ошибка синхронизации обязательств UMAG. Повторите попытку.',
+      500
+    )
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return corsPreflightResponse()
   if (req.method !== 'POST') {
@@ -1891,17 +2632,22 @@ Deno.serve(async (req) => {
 
   const validated = validateBody(body)
   if (validated instanceof Response) return validated
-  const { dateFrom, dateTo, syncSuppliers } = validated
-
-  const bounds = aqtobePeriodBoundsMs(dateFrom, dateTo)
-  if (!bounds) {
-    return umagErrorResponse('VALIDATION_ERROR', 'Некорректный период синхронизации.', 400)
-  }
 
   // Fresh signin when credentials exist (or warm cache). umagFetchAuthed retries once on 401/403.
   const session = await acquireUmagSession()
   if ('error' in session) {
     return mapUmagAuthError(session.error)
+  }
+
+  if (validated.action === 'sync_open_obligations') {
+    return await runOpenObligationsSync(authz.serviceClient, session)
+  }
+
+  const { dateFrom, dateTo, syncSuppliers } = validated
+
+  const bounds = aqtobePeriodBoundsMs(dateFrom, dateTo)
+  if (!bounds) {
+    return umagErrorResponse('VALIDATION_ERROR', 'Некорректный период синхронизации.', 400)
   }
 
   const runId = await createSyncRun(authz.serviceClient, {
@@ -1990,59 +2736,16 @@ Deno.serve(async (req) => {
       return suppliesResult.response
     }
 
-    const calculated = {
-      amount: sumNumbers(suppliesResult.supplies.map((s) => s.amount)),
-      paymentAmount: sumNumbers(suppliesResult.supplies.map((s) => s.paymentAmount)),
-      paymentRefundAmount: sumNumbers(suppliesResult.supplies.map((s) => s.paymentRefundAmount)),
-      debt: sumNumbers(suppliesResult.supplies.map((s) => s.debt)),
-    }
-
     const source = suppliesResult.source
-    const mismatches: string[] = []
-    if (source.amount != null && !nearlyEqual(calculated.amount, source.amount, AGGREGATE_EPSILON)) {
-      mismatches.push(
-        `amount: rows=${calculated.amount} source=${source.amount}`
-      )
-    }
-    if (
-      source.paymentAmount != null &&
-      !nearlyEqual(calculated.paymentAmount, source.paymentAmount, AGGREGATE_EPSILON)
-    ) {
-      mismatches.push(
-        `paymentAmount: rows=${calculated.paymentAmount} source=${source.paymentAmount}`
-      )
-    }
-    if (
-      source.paymentRefundAmount != null &&
-      !nearlyEqual(
-        calculated.paymentRefundAmount,
-        source.paymentRefundAmount,
-        AGGREGATE_EPSILON
-      )
-    ) {
-      mismatches.push(
-        `paymentRefundAmount: rows=${calculated.paymentRefundAmount} source=${source.paymentRefundAmount}`
-      )
-    }
-    if (source.debt != null && !nearlyEqual(calculated.debt, source.debt, AGGREGATE_EPSILON)) {
-      mismatches.push(`debt: rows=${calculated.debt} source=${source.debt}`)
-    }
-    if (
-      source.totalCount != null &&
-      suppliesResult.supplies.length !== source.totalCount
-    ) {
-      mismatches.push(
-        `totalCount: rows=${suppliesResult.supplies.length} source=${source.totalCount}`
-      )
-    }
-
-    const aggregatesMatch = mismatches.length === 0
-    const warningMessage = aggregatesMatch
-      ? null
-      : `Расхождение агрегатов UMAG: ${mismatches.join('; ')}`
+    const supplyAggregates = compareSupplyAggregates(suppliesResult.supplies, source)
+    const { calculated, aggregatesMatch, warningMessage } = supplyAggregates
 
     if (warningMessage) {
-      console.warn('umag_sync_aggregate_mismatch', { mismatches, dateFrom, dateTo })
+      console.warn('umag_sync_aggregate_mismatch', {
+        mismatches: supplyAggregates.mismatches,
+        dateFrom,
+        dateTo,
+      })
     }
 
     const suppliesUpsert = await upsertSupplies(
