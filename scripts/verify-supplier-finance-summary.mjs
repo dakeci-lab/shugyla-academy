@@ -167,13 +167,15 @@ async function main() {
   assert.doesNotMatch(panelSrc, /fetchSupplierPaymentsDashboard/)
   ok('SupplierPaymentsPanel no longer calls the old bundled dashboard fetch')
 
-  const cssStatus = execFileSync(
+  // Этап 2.8 may add spo-compact__ presentation CSS to SupplierPaymentsPanel.css.
+  // The invariant for THIS stage (2.4) is that the summary service formulas stay put.
+  const summaryServiceStatus = execFileSync(
     'git',
-    ['status', '--porcelain', '--', 'src/components/suppliers/payments/SupplierPaymentsPanel.css'],
+    ['status', '--porcelain', '--', 'src/services/supplierFinanceSummaryService.js'],
     { cwd: ROOT, encoding: 'utf8' }
   ).trim()
-  assert.equal(cssStatus, '', 'CSS changed — this stage must be data-source only')
-  ok('no CSS/layout changes to the payments panel (data source only, per item 31)')
+  assert.equal(summaryServiceStatus, '', 'supplierFinanceSummaryService.js changed — Этап 2.4 formulas must stay stable')
+  ok('supplierFinanceSummaryService.js untouched (CSS/layout may evolve in later presentation stages)')
 
   // Narrowed to routing/navigation/page wrappers — Этап 2.5 legitimately
   // touches UmagSettlementsPanel itself (its own debt-source migration,

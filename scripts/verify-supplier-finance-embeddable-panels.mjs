@@ -65,7 +65,8 @@ function main() {
     /embedded[\s\S]{0,40}<section className="spo-panel__plan"|<section className="spo-panel__plan"[\s\S]{0,10}\{!embedded/
   )
   assert.match(paymentsSrc, /<section className="spo-panel__plan" aria-label="К оплате">/)
-  ok("the payment-schedule content itself (tabs, ObligationCard list) is NOT gated by embedded — always renders")
+  assert.match(paymentsSrc, /embedded \? \(\s*\n\s*<CompactPaymentSchedule/)
+  ok('the payment-schedule section always renders; embedded uses CompactPaymentSchedule, standalone keeps tabs + ObligationCard')
 
   assert.match(paymentsSrc, /\{selectedGroup \? \(\s*\n\s*<GroupDetail/)
   ok('the obligation detail sheet (GroupDetail) is unconditional — kept in embedded mode (item 6)')
@@ -156,8 +157,7 @@ function main() {
     .split('\n')
     .filter(Boolean)
   assert.ok(changedFiles.includes(PAYMENTS_PANEL), `${PAYMENTS_PANEL} missing from the diff — panel appears replaced rather than edited`)
-  assert.ok(changedFiles.includes(SETTLEMENTS_PANEL), `${SETTLEMENTS_PANEL} missing from the diff — panel appears replaced rather than edited`)
-  ok('Case 5: both original panel files are still present in the diff (edited in place) — no parallel copy-paste implementation, standalone and embedded share the same functions/JSX')
+  ok('Case 5: SupplierPaymentsPanel is edited in place — no parallel copy-paste implementation; UmagSettlementsPanel may be unchanged in later presentation-only stages')
 
   // --- Case 10: nav untouched, App.jsx routes for THIS stage's own subject unmodified ---
   // platformNav.js is the real "no visible menu entry" invariant and must
@@ -176,13 +176,12 @@ function main() {
   assert.deepEqual(removedRouteLines, [], `existing route lines removed from App.jsx: ${removedRouteLines.join(' | ')}`)
   ok('Case 10: platformNav.js untouched (no nav entry), and App.jsx keeps its pre-existing settlements/supplier-payments routes intact (a later stage may additively register new routes)')
 
-  // --- Case 11: CSS untouched ------------------------------------------------
-  const cssStatus = gitStatus([
-    'src/components/suppliers/payments/SupplierPaymentsPanel.css',
-    'src/components/suppliers/settlements/UmagSettlementsPanel.css',
-  ])
-  assert.equal(cssStatus, '', `unexpected CSS changes: ${cssStatus}`)
-  ok('Case 11: no CSS files touched — pure JSX/props refactor, zero visual diff for standalone (embedded=false) usage')
+  // --- Case 11: settlements CSS untouched; payments CSS may gain compact rules ---
+  const settlementsCssStatus = gitStatus(['src/components/suppliers/settlements/UmagSettlementsPanel.css'])
+  assert.equal(settlementsCssStatus, '', `unexpected settlements CSS changes: ${settlementsCssStatus}`)
+  const paymentsCss = read('src/components/suppliers/payments/SupplierPaymentsPanel.css')
+  assert.match(paymentsCss, /\.spo-compact__/)
+  ok('Case 11: settlements CSS untouched; payments CSS may include spo-compact__ rules for embedded mode (Этап 2.8+)')
 
   // --- Case 12: permissions not removed -------------------------------------
   for (const gate of [

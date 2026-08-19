@@ -10,6 +10,7 @@ import {
 import {
   OBLIGATION_STATUS,
   OBLIGATION_STATUS_LABELS,
+  diffCalendarDays,
   formatDaysUntilDue,
   formatPaymentTermsSnapshot,
   formatReceptionCount,
@@ -41,6 +42,135 @@ const TABS = [
     empty: 'У всех обязательств настроен срок оплаты',
   },
 ]
+
+/** Этап 2.8: vertical groups for embedded «К оплате» — presentation only. */
+const COMPACT_SECTIONS = [
+  { id: 'overdue', label: 'Просрочено', summaryKey: 'overdue' },
+  { id: 'today', label: 'Сегодня', summaryKey: 'dueToday' },
+  { id: 'upcoming', label: 'Предстоящие', summaryKey: 'deferredNotYetDue' },
+  { id: 'termsMissing', label: 'Без срока', summaryKey: 'termsMissing' },
+]
+
+function formatCompactDueDate(dateKey) {
+  if (!dateKey) return '—'
+  const parts = String(dateKey).split('-')
+  if (parts.length !== 3) return '—'
+  return `${parts[2]}.${parts[1]}`
+}
+
+/** Compact status label — uses group.status from buildPaymentScheduleView, not re-derived. */
+function formatCompactStatusText(group, todayKey) {
+  switch (group.status) {
+    case OBLIGATION_STATUS.TERMS_MISSING:
+      return 'Без срока'
+    case OBLIGATION_STATUS.DUE_TODAY:
+      return 'Сегодня'
+    case OBLIGATION_STATUS.OVERDUE: {
+      const days = Math.abs(diffCalendarDays(todayKey, group.dueDate))
+      return `${days} дн.`
+    }
+    case OBLIGATION_STATUS.UPCOMING: {
+      const days = diffCalendarDays(todayKey, group.dueDate)
+      if (days === 1) return 'через 1 дн.'
+      return `через ${days} дн.`
+    }
+    default:
+      return '—'
+  }
+}
+
+function CompactObligationRow({ group, todayKey, canEditTerms, onOpen, onConfigure }) {
+  const tone = statusTone(group.status)
+  const isMissing = group.status === OBLIGATION_STATUS.TERMS_MISSING
+  const mapped = Boolean(group.platformSupplierId)
+  const statusText = formatCompactStatusText(group, todayKey)
+
+  return (
+    <div className={`spo-compact__row spo-compact__row--${tone}`}>
+      <button type="button" className="spo-compact__row-main" onClick={() => onOpen(group)}>
+        <span className="spo-compact__supplier">{group.name || 'Без названия'}</span>
+        <span className="spo-compact__due">{formatCompactDueDate(group.dueDate)}</span>
+        <span className={`spo-compact__status spo-compact__status--${tone}`}>{statusText}</span>
+        <span className="spo-compact__amount">{formatUmagMoney(group.amount)}</span>
+        <span className="spo-compact__mobile-meta">
+          {formatCompactDueDate(group.dueDate)} · {statusText}
+        </span>
+      </button>
+      {isMissing && canEditTerms && mapped ? (
+        <button
+          type="button"
+          className="spo-compact__configure"
+          onClick={(e) => {
+            e.stopPropagation()
+            onConfigure(group)
+          }}
+        >
+          Настроить отсрочку
+        </button>
+      ) : null}
+    </div>
+  )
+}
+
+function CompactPaymentSchedule({
+  view,
+  todayKey,
+  tabCounts,
+  loading,
+  error,
+  canEditTerms,
+  onOpen,
+  onConfigure,
+}) {
+  if (loading && !view) {
+    return <DelayedLoadingSkeleton variant="cards" count={4} />
+  }
+  if (error && !view) {
+    return (
+      <div className="spo-panel__error" role="alert">
+        {error}
+      </div>
+    )
+  }
+
+  const summaries = view?.summaries || {}
+  const lists = view?.lists || {}
+  const hasAny = COMPACT_SECTIONS.some((section) => (lists[section.id] || []).length > 0)
+
+  if (!hasAny) {
+    return <div className="spo-compact__empty">Нет обязательств к оплате</div>
+  }
+
+  return (
+    <div className="spo-compact">
+      {COMPACT_SECTIONS.map((section) => {
+        const groups = lists[section.id] || []
+        if (groups.length === 0) return null
+        const count = tabCounts[section.id] || 0
+        const amount = summaries[section.summaryKey] || 0
+        return (
+          <section key={section.id} className="spo-compact__section">
+            <h3 className="spo-compact__section-head">
+              {section.label} · {count} · {formatUmagMoney(amount)}
+            </h3>
+            <div className="spo-compact__rows">
+              {groups.map((group) => (
+                <CompactObligationRow
+                  key={group.key}
+                  group={group}
+                  todayKey={todayKey}
+                  canEditTerms={canEditTerms}
+                  onOpen={onOpen}
+                  onConfigure={onConfigure}
+                />
+              ))}
+            </div>
+          </section>
+        )
+      })}
+    </div>
+  )
+}
 
 function KpiCard({ label, value, tone, loading, primary }) {
   return (
@@ -447,52 +577,67 @@ export default function SupplierPaymentsPanel({
           </div>
         )}
 
-        <div className="spo-panel__tabs" role="tablist" aria-label="Приоритет оплат">
-          {TABS.map((tab) => {
-            const count = tabCounts[tab.id] || 0
-            const selected = activeTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                className={`spo-panel__tab spo-panel__tab--${tab.id}${
-                  selected ? ' spo-panel__tab--active' : ''
-                }`}
-                onClick={() => {
-                  setTabTouched(true)
-                  setActiveTab(tab.id)
-                }}
-              >
-                <span>{tab.label}</span>
-                <span className="spo-panel__tab-count">{count}</span>
-              </button>
-            )
-          })}
-        </div>
-
-        {loading && !view ? (
-          <DelayedLoadingSkeleton variant="cards" count={4} />
-        ) : error && !view ? (
-          <div className="spo-panel__error" role="alert">
-            {error}
-          </div>
-        ) : visibleGroups.length === 0 ? (
-          <div className="spo-panel__empty spo-panel__empty--compact">{activeTabMeta.empty}</div>
+        {embedded ? (
+          <CompactPaymentSchedule
+            view={view}
+            todayKey={todayKey}
+            tabCounts={tabCounts}
+            loading={loading}
+            error={error}
+            canEditTerms={canEditTerms}
+            onOpen={setSelectedGroup}
+            onConfigure={openConfigure}
+          />
         ) : (
-          <div className="spo-panel__cards">
-            {visibleGroups.map((group) => (
-              <ObligationCard
-                key={group.key}
-                group={group}
-                todayKey={todayKey}
-                canEditTerms={canEditTerms}
-                onOpen={setSelectedGroup}
-                onConfigure={openConfigure}
-              />
-            ))}
-          </div>
+          <>
+            <div className="spo-panel__tabs" role="tablist" aria-label="Приоритет оплат">
+              {TABS.map((tab) => {
+                const count = tabCounts[tab.id] || 0
+                const selected = activeTab === tab.id
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={selected}
+                    className={`spo-panel__tab spo-panel__tab--${tab.id}${
+                      selected ? ' spo-panel__tab--active' : ''
+                    }`}
+                    onClick={() => {
+                      setTabTouched(true)
+                      setActiveTab(tab.id)
+                    }}
+                  >
+                    <span>{tab.label}</span>
+                    <span className="spo-panel__tab-count">{count}</span>
+                  </button>
+                )
+              })}
+            </div>
+
+            {loading && !view ? (
+              <DelayedLoadingSkeleton variant="cards" count={4} />
+            ) : error && !view ? (
+              <div className="spo-panel__error" role="alert">
+                {error}
+              </div>
+            ) : visibleGroups.length === 0 ? (
+              <div className="spo-panel__empty spo-panel__empty--compact">{activeTabMeta.empty}</div>
+            ) : (
+              <div className="spo-panel__cards">
+                {visibleGroups.map((group) => (
+                  <ObligationCard
+                    key={group.key}
+                    group={group}
+                    todayKey={todayKey}
+                    canEditTerms={canEditTerms}
+                    onOpen={setSelectedGroup}
+                    onConfigure={openConfigure}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </section>
 

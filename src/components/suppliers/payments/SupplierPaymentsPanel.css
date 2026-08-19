@@ -469,3 +469,171 @@
     font-size: 22px;
   }
 }
+
+/* --- Этап 2.8: compact embedded payment schedule ------------------------- */
+
+.spo-compact {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+.spo-compact__section {
+  min-width: 0;
+}
+
+.spo-compact__section-head {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+
+.spo-compact__rows {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
+.spo-compact__row {
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  min-width: 0;
+}
+
+.spo-compact__row-main {
+  appearance: none;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 52px minmax(72px, 0.7fr) minmax(88px, auto);
+  gap: 8px 12px;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.spo-compact__supplier {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.spo-compact__due {
+  font-size: 13px;
+  color: var(--color-text-secondary, #64748b);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.spo-compact__status {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+}
+
+.spo-compact__status--overdue {
+  color: #b91c1c;
+}
+
+.spo-compact__status--today {
+  color: #b45309;
+}
+
+.spo-compact__status--upcoming {
+  color: var(--color-text-secondary, #64748b);
+}
+
+.spo-compact__status--missing {
+  color: var(--color-text-secondary, #64748b);
+}
+
+.spo-compact__amount {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--color-text, #0f172a);
+  white-space: nowrap;
+}
+
+.spo-compact__mobile-meta {
+  display: none;
+}
+
+.spo-compact__configure {
+  appearance: none;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2563eb;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.spo-compact__empty {
+  padding: 16px 0;
+  font-size: 13px;
+  color: var(--color-text-secondary, #64748b);
+}
+
+@media (max-width: 640px) {
+  .spo-compact__row-main {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-rows: auto auto;
+    gap: 2px 12px;
+    min-height: 52px;
+    padding: 10px 0;
+  }
+
+  .spo-compact__due,
+  .spo-compact__status {
+    display: none;
+  }
+
+  .spo-compact__mobile-meta {
+    display: block;
+    grid-column: 1 / -1;
+    font-size: 12px;
+    color: var(--color-text-secondary, #64748b);
+  }
+
+  .spo-compact__row--overdue .spo-compact__mobile-meta {
+    color: #b91c1c;
+  }
+
+  .spo-compact__row--today .spo-compact__mobile-meta {
+    color: #b45309;
+  }
+
+  .spo-compact__amount {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+  }
+
+  .spo-compact__supplier {
+    grid-column: 1;
+    grid-row: 1;
+    padding-right: 8px;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+}

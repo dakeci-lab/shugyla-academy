@@ -95,6 +95,7 @@
     "verify:settlements-canonical-debt": "node scripts/verify-settlements-canonical-debt.mjs",
     "verify:supplier-finance-embeddable-panels": "node scripts/verify-supplier-finance-embeddable-panels.mjs",
     "verify:supplier-finance-page": "node scripts/verify-supplier-finance-page.mjs",
+    "verify:supplier-finance-compact-payments": "node scripts/verify-supplier-finance-compact-payments.mjs",
     "verify:supplier-ledger": "node scripts/verify-supplier-ledger.mjs",
     "verify:supplier-centralization": "node scripts/verify-supplier-centralization.mjs",
     "verify:umag-first-suppliers": "node scripts/verify-umag-first-suppliers.mjs",
