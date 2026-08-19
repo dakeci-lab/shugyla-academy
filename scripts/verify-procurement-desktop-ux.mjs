@@ -908,10 +908,14 @@ async function stageDesktopWebOnly() {
     groupBlock.length > 0 && !/webOnly:\s*true/.test(groupBlock)
   )
   assert(
-    'group children cover all procurement modules',
-    /id:\s*'procurement-group'[\s\S]*?id:\s*'procurement'[\s\S]*?id:\s*'receiving'[\s\S]*?id:\s*'suppliers'[\s\S]*?id:\s*'settlements'[\s\S]*?id:\s*'supplier-payments'/.test(
+    'group children cover procurement nav modules',
+    /id:\s*'procurement-group'[\s\S]*?id:\s*'procurement'[\s\S]*?id:\s*'receiving'[\s\S]*?id:\s*'suppliers'[\s\S]*?id:\s*'supplier-finance'/.test(
       navSource
     )
+  )
+  assert(
+    'legacy settlements/payments are not in visible nav',
+    !/id:\s*'settlements'/.test(groupBlock) && !/id:\s*'supplier-payments'/.test(groupBlock)
   )
 
   const procurementGroupFixture = {

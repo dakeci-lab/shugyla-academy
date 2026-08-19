@@ -198,8 +198,9 @@ async function main() {
 
   // --- Nav / routes (source) ------------------------------------------------
   const navSrc = read('src/platform/platformNav.js')
-  assert.doesNotMatch(navSrc, /supplier-finance/)
-  ok('platformNav.js has no supplier-finance nav entry')
+  assert.match(navSrc, /supplier-finance/)
+  assert.match(navSrc, /label: 'Расчёты'/)
+  ok('platformNav.js exposes «Расчёты» unified nav entry')
 
   console.log(`\n${checks} checks passed`)
 }

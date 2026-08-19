@@ -183,7 +183,6 @@ async function main() {
       '--',
       'src/pages/platform/settlements',
       'src/pages/platform/supplier-payments',
-      'src/platform/platformNav.js',
       'src/components/suppliers/settlements/SettlementsFilterPopover.jsx',
       'src/components/suppliers/settlements/CreateReconciliationModal.jsx',
       'src/components/suppliers/settlements/ReconciliationDetailView.jsx',

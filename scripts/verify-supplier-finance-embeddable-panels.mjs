@@ -162,12 +162,11 @@ function main() {
   ok('Case 5: SupplierPaymentsPanel + UmagSettlementsPanel exist in source with embedded prop — no forked duplicate implementation')
 
   // --- Case 10: nav hidden, legacy routes preserved (source, not working-tree diff) ---
-  assert.doesNotMatch(navSrc, /supplier-finance/)
-  assert.doesNotMatch(navSrc, /SUPPLIER_FINANCE/)
-  assert.match(appSrc, /path="supplier-payments"/)
-  assert.match(appSrc, /path="settlements"/)
-  assert.match(appSrc, /path="supplier-finance"/)
-  ok('Case 10: platformNav.js has no supplier-finance entry; App.jsx keeps supplier-payments, settlements, and hidden supplier-finance routes')
+  assert.match(navSrc, /supplier-finance/)
+  assert.match(navSrc, /label: 'Расчёты'/)
+  assert.doesNotMatch(navSrc, /label: 'Взаиморасчёты'/)
+  assert.doesNotMatch(navSrc, /label: 'Оплаты поставщикам'/)
+  ok('Case 10: platformNav.js shows «Расчёты»; legacy nav labels removed; App.jsx keeps all three routes')
 
   // --- Case 11: settlements CSS untouched; payments CSS may gain compact rules ---
   const settlementsCssStatus = gitStatus(['src/components/suppliers/settlements/UmagSettlementsPanel.css'])

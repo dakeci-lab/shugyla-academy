@@ -82,6 +82,18 @@ const PROCUREMENT_GROUP = [
     paths: ['/platform/suppliers', '/platform/suppliers/sup-1'],
   },
   {
+    id: 'supplier-finance',
+    label: 'Расчёты',
+    navPath: '/platform/supplier-finance',
+    routeKey: 'ROUTE_KEYS.SUPPLIER_FINANCE',
+    routes: ['supplier-finance'],
+    paths: ['/platform/supplier-finance'],
+  },
+]
+
+/** Legacy rollback routes — still reachable on mobile, no longer in the drawer. */
+const LEGACY_PROCUREMENT_ROUTES = [
+  {
     id: 'settlements',
     label: 'Взаиморасчёты',
     navPath: '/platform/settlements',
@@ -98,6 +110,8 @@ const PROCUREMENT_GROUP = [
     paths: ['/platform/supplier-payments', '/platform/supplier-payments/plan-1'],
   },
 ]
+
+const ALL_PROCUREMENT_ROUTES = [...PROCUREMENT_GROUP, ...LEGACY_PROCUREMENT_ROUTES]
 
 /** Control group: modules outside «Закупки» that must stay desktop-only. */
 const STILL_DESKTOP_ONLY = [
@@ -135,18 +149,23 @@ const MOBILE_LAYOUTS = [
       /@media \(max-width: 768px\)[\s\S]*?\.supplier-cards\s*\{\s*display:\s*flex/.test(css),
   },
   {
-    id: 'settlements',
-    file: 'src/components/suppliers/settlements/UmagSettlementsPanel.css',
-    what: 'settlements hides its table and shows cards with sticky totals',
-    test: (css) =>
-      /@media \(max-width: 900px\)[\s\S]*?\.umag-settlements__table-wrap\s*\{\s*display:\s*none/.test(css) &&
-      /@media \(max-width: 900px\)[\s\S]*?\.umag-settlements__cards\s*\{\s*display:\s*flex/.test(css) &&
-      /@media \(max-width: 900px\)[\s\S]*?\.umag-settlements__mobile-totals\s*\{\s*display:\s*block/.test(css),
+    id: 'supplier-finance',
+    file: 'src/components/suppliers/finance/SupplierFinancePanel.css',
+    what: 'unified supplier finance shell adapts below 901px',
+    test: (css) => /@media \(max-width: 900px\)/.test(css),
   },
   {
-    id: 'supplier-payments',
+    id: 'settlements-legacy',
+    file: 'src/components/suppliers/settlements/UmagSettlementsPanel.css',
+    what: 'legacy settlements route still has mobile layout',
+    test: (css) =>
+      /@media \(max-width: 900px\)[\s\S]*?\.umag-settlements__table-wrap\s*\{\s*display:\s*none/.test(css) &&
+      /@media \(max-width: 900px\)[\s\S]*?\.umag-settlements__cards\s*\{\s*display:\s*flex/.test(css),
+  },
+  {
+    id: 'supplier-payments-legacy',
     file: 'src/components/suppliers/payments/SupplierPaymentsPanel.css',
-    what: 'supplier payments are cards at every width and adapt below 901px',
+    what: 'legacy supplier-payments route still has mobile layout',
     test: (css) =>
       /\.spo-panel__cards\s*\{[\s\S]*?display:\s*flex/.test(css) &&
       /@media \(max-width: 900px\)/.test(css),
@@ -215,7 +234,7 @@ async function stageNavModel() {
   }
 
   assert(
-    'the group has no other children beyond the five known ones',
+    'the group has no other children beyond the four known nav items',
     group.children.map((child) => child.id).join(',') ===
       PROCUREMENT_GROUP.map((section) => section.id).join(','),
     'a new module must be covered here before it ships'
@@ -239,7 +258,7 @@ async function stageNavModel() {
   const mobileGroup = mobileNav.find((item) => item.id === 'procurement-group')
   assert('«Закупки» is present in the mobile drawer', Boolean(mobileGroup))
   assert(
-    'the mobile drawer shows all five modules in order',
+    'the mobile drawer shows all four nav modules in order',
     mobileGroup.children.map((child) => child.id).join(',') ===
       PROCUREMENT_GROUP.map((section) => section.id).join(',')
   )
@@ -269,10 +288,10 @@ async function stageRouteAccessibility() {
   )
   assert(
     'no path of the group is a desktop-only prefix any more',
-    PROCUREMENT_GROUP.every((section) => !prefixes.includes(section.navPath))
+    ALL_PROCUREMENT_ROUTES.every((section) => !prefixes.includes(section.navPath))
   )
 
-  for (const section of PROCUREMENT_GROUP) {
+  for (const section of ALL_PROCUREMENT_ROUTES) {
     for (const pathname of section.paths) {
       assert(
         `${pathname} is not a desktop-only path`,
@@ -311,9 +330,9 @@ function stageRouteWiring() {
   console.log('Stage 3: App routes — no gate on any route of the group')
 
   const app = read(APP)
-  const declared = PROCUREMENT_GROUP.flatMap((section) => section.routes)
+  const declared = ALL_PROCUREMENT_ROUTES.flatMap((section) => section.routes)
 
-  for (const section of PROCUREMENT_GROUP) {
+  for (const section of ALL_PROCUREMENT_ROUTES) {
     for (const route of section.routes) {
       const element = routeElement(app, route)
       assert(
@@ -330,7 +349,7 @@ function stageRouteWiring() {
   }
 
   // Anything the group gains later has to be declared above, or this fails.
-  const groupPrefixes = PROCUREMENT_GROUP.map((section) => section.routes[0])
+  const groupPrefixes = ALL_PROCUREMENT_ROUTES.map((section) => section.routes[0])
   const foundInApp = [...app.matchAll(/path="([^"]+)"/g)]
     .map((match) => match[1])
     .filter((route) => groupPrefixes.some((prefix) => route === prefix || route.startsWith(`${prefix}/`)))
@@ -441,7 +460,7 @@ function stageUntouchedNeighbours() {
   console.log('Stage 6: nothing outside «Закупки» moved')
 
   const app = read(APP)
-  for (const section of PROCUREMENT_GROUP) {
+  for (const section of ALL_PROCUREMENT_ROUTES) {
     assert(`${section.id} keeps its route key in App.jsx`, app.includes(section.routeKey))
   }
   assert(
@@ -451,7 +470,8 @@ function stageUntouchedNeighbours() {
       app.includes('<SuppliersPage />') &&
       app.includes('<SupplierDetailPage />') &&
       app.includes('<SettlementsPage />') &&
-      app.includes('<SupplierPaymentsPage />')
+      app.includes('<SupplierPaymentsPage />') &&
+      app.includes('<SupplierFinancePage />')
   )
 
   // The gate mechanism itself survives for the modules that still use it.

@@ -159,11 +159,9 @@ async function main() {
   ok('canonical debt + paidThisMonth source formulas unchanged')
 
   // --- no cutover ------------------------------------------------------------
-  assert.doesNotMatch(navSrc, /supplier-finance/)
-  const appSrc = read('src/App.jsx')
-  assert.match(appSrc, /path="supplier-payments"/)
-  assert.match(appSrc, /path="settlements"/)
-  ok('no sidebar cutover; legacy routes remain alongside hidden supplier-finance')
+  assert.match(navSrc, /supplier-finance/)
+  assert.match(navSrc, /label: 'Расчёты'/)
+  ok('nav cutover complete: «Расчёты» visible; legacy routes remain in App.jsx')
 
   console.log(`\n${checks} checks passed`)
 }

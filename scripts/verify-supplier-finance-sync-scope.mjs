@@ -208,10 +208,10 @@ function main() {
   // supplier-payments routes are not removed or altered.
   const navSrc = read('src/platform/platformNav.js')
   const appSrc = read('src/App.jsx')
-  assert.doesNotMatch(navSrc, /supplier-finance/)
+  assert.match(navSrc, /supplier-finance/)
   assert.match(appSrc, /path="supplier-payments"/)
   assert.match(appSrc, /path="settlements"/)
-  ok('no supplier-finance nav entry; legacy supplier-payments and settlements routes remain registered')
+  ok('nav shows «Расчёты»; legacy supplier-payments and settlements routes remain registered')
 
   console.log('\n--- Pure-math mirror of computeEffectiveSyncScope() ---\n')
   runMirrorCases()

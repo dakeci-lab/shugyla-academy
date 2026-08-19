@@ -132,9 +132,10 @@ function main() {
   ok('settlements UI without large UMAG source banners')
 
   const nav = read('src/platform/platformNav.js')
-  assert.match(nav, /Оплаты поставщикам/)
-  assert.match(nav, /supplier-payments/)
-  ok('nav item under Закупки')
+  assert.match(nav, /label: 'Расчёты'/)
+  assert.match(nav, /supplier-finance/)
+  assert.match(nav, /ROUTE_KEYS\.SUPPLIER_FINANCE/)
+  ok('nav item «Расчёты» under Закупки')
 
   const app = read('src/App.jsx')
   assert.match(app, /SupplierPaymentsPage/)

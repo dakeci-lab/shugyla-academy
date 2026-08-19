@@ -133,10 +133,11 @@ async function main() {
   ok('F-9: embedded configure returns to unified page; standalone keeps legacy route')
 
   // --- Stage 3.1 + cutover guardrails --------------------------------------
-  assert.doesNotMatch(navSrc, /supplier-finance/)
   assert.match(summaryService, /fetchAllSupabaseRows/)
   assert.match(summaryService, /\.from\('umag_document_payments'\)/)
-  ok('F-1/F-2 pagination + formulas intact; no sidebar cutover')
+  assert.match(navSrc, /supplier-finance/)
+  assert.match(navSrc, /label: 'Расчёты'/)
+  ok('F-1/F-2 pagination + formulas intact; nav cutover shows «Расчёты»')
 
   console.log(`\n${checks} checks passed`)
 }

@@ -75,9 +75,10 @@ async function main() {
   ok('Case 1: /platform/supplier-finance is registered in App.jsx, wrapped in the existing PlatformRoute guard')
 
   // --- Case 2: nav hidden (source) ------------------------------------------
-  assert.doesNotMatch(navSrc, /supplier-finance/)
-  assert.doesNotMatch(navSrc, /SUPPLIER_FINANCE/)
-  ok('Case 2: platformNav.js contains no supplier-finance entry — no visible nav item')
+  assert.match(navSrc, /supplier-finance/)
+  assert.match(navSrc, /label: 'Расчёты'/)
+  assert.match(navSrc, /ROUTE_KEYS\.SUPPLIER_FINANCE/)
+  ok('Case 2: platformNav.js exposes «Расчёты» as the unified supplier finance entry')
 
   // --- Case 15 (permission scope): union of existing permissions, not broader ---
   assert.match(permsSrc, /SUPPLIER_FINANCE: 'supplier_finance'/)

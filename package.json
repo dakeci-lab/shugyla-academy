@@ -98,6 +98,7 @@
     "verify:supplier-finance-compact-payments": "node scripts/verify-supplier-finance-compact-payments.mjs",
     "verify:supplier-finance-release-blockers": "node scripts/verify-supplier-finance-release-blockers.mjs",
     "verify:supplier-finance-cutover-readiness": "node scripts/verify-supplier-finance-cutover-readiness.mjs",
+    "verify:supplier-finance-nav-cutover": "node scripts/verify-supplier-finance-nav-cutover.mjs",
     "verify:supplier-ledger": "node scripts/verify-supplier-ledger.mjs",
     "verify:supplier-centralization": "node scripts/verify-supplier-centralization.mjs",
     "verify:umag-first-suppliers": "node scripts/verify-umag-first-suppliers.mjs",

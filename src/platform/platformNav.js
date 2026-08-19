@@ -84,7 +84,7 @@ export const PLATFORM_NAV = [
     label: 'Закупки',
     routeKey: ROUTE_KEYS.PROCUREMENT_GROUP,
     title: 'Закупки',
-    description: 'Закуп, приёмка, поставщики, взаиморасчёты и оплаты.',
+    description: 'Закуп, приёмка, поставщики и расчёты.',
     /**
      * Раздел целиком доступен с телефона. Ни один пункт не помечен webOnly:
      * у каждого есть своя мобильная раскладка (карточки вместо таблиц), и
@@ -116,20 +116,12 @@ export const PLATFORM_NAV = [
         description: 'База поставщиков и контактная информация.',
       },
       {
-        id: 'settlements',
-        path: '/platform/settlements',
-        label: 'Взаиморасчёты',
-        routeKey: ROUTE_KEYS.SETTLEMENTS,
-        title: 'Взаиморасчёты',
-        description: 'Приёмки, оплаты и задолженность по данным UMAG.',
-      },
-      {
-        id: 'supplier-payments',
-        path: '/platform/supplier-payments',
-        label: 'Оплаты поставщикам',
-        routeKey: ROUTE_KEYS.SUPPLIER_PAYMENTS,
-        title: 'Оплаты поставщикам',
-        description: 'Сроки оплаты задолженности с учётом отсрочки поставщика.',
+        id: 'supplier-finance',
+        path: '/platform/supplier-finance',
+        label: 'Расчёты',
+        routeKey: ROUTE_KEYS.SUPPLIER_FINANCE,
+        title: 'Расчёты',
+        description: 'Сроки оплаты и взаиморасчёты с поставщиками по данным UMAG.',
       },
     ],
   },

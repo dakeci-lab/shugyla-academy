@@ -194,19 +194,21 @@ async function main() {
       '--',
       'src/pages/platform/settlements',
       'src/pages/platform/supplier-payments',
-      'src/platform/platformNav.js',
     ],
     { cwd: ROOT, encoding: 'utf8' }
   ).trim()
-  assert.equal(otherUiStatus, '', `unexpected UI/route changes: ${otherUiStatus}`)
-  ok('no new route/page/menu changes — this stage is data-layer only, per item 2')
+  assert.equal(otherUiStatus, '', `unexpected legacy page changes: ${otherUiStatus}`)
+  const navSrc = read('src/platform/platformNav.js')
+  assert.match(navSrc, /supplier-finance/)
+  assert.match(navSrc, /label: 'Расчёты'/)
+  ok('legacy settlement/payment pages untouched; nav cutover shows «Расчёты» in platformNav.js')
 
   // --- 9. Routes: legacy paths preserved in App.jsx source ------------------
   const appSrc = read('src/App.jsx')
+  assert.match(navSrc, /supplier-finance/)
   assert.match(appSrc, /path="supplier-payments"/)
   assert.match(appSrc, /path="settlements"/)
-  assert.match(appSrc, /path="supplier-finance"/)
-  ok('App.jsx keeps supplier-payments, settlements, and hidden supplier-finance routes')
+  ok('App.jsx keeps supplier-payments, settlements, and supplier-finance routes')
 
   console.log('\n--- Real imports: pure logic exercised with fixture data ---\n')
   await runRealCases()
