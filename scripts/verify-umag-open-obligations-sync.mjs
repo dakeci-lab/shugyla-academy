@@ -79,6 +79,15 @@ function checkStatic() {
   assert.match(sync, /const OBLIGATION_SYNC_TIME_BUDGET_MS = 120_000/)
   ok('month cap and time budget are explicit constants')
 
+  // Range pagination without a total order can skip rows, which here would
+  // silently drop a month that still holds debt.
+  const paginator = section(sync, 'async function fetchPaginatedRows', 'function aqtobeTodayDateKey')
+  assert.match(paginator, /\.order\(orderColumn, \{ ascending: true \}\)\s*\n\s*\.range\(/)
+  assert.match(paginator, /'umag_supply_id',\s*\n\s*buildQuery/)
+  const unorderedCalls = sync.match(/fetchPaginatedRows\(\s*\n\s*serviceClient,\s*\n\s*'[a-z_]+',\s*\n\s*'[^']+',\s*\n\s*\(q\)/g) || []
+  assert.equal(unorderedCalls.length, 0, 'every fetchPaginatedRows call must pass an order column')
+  ok('paginated reads are ordered, so no month can be skipped')
+
   const collect = section(
     sync,
     'async function collectOpenObligationMonths',
@@ -127,6 +136,31 @@ function checkStatic() {
   assert.match(run, /scope: 'open_obligations'/)
   assert.match(run, /months: \{/)
   ok('obligations refreshed once and reported in the response')
+
+  // An empty every() would claim the aggregates matched for a run that compared
+  // nothing, which is exactly the case an operator needs to notice.
+  assert.match(run, /outcomes\.length > 0 \? outcomes\.every\(\(o\) => o\.aggregatesMatch\) : null/)
+  ok('journal reports unknown, not matching, when no month was processed')
+
+  // Parity: the old payments button triggered a full period sync, so it also
+  // refreshed returns, UMAG payments and ledger events.
+  assert.match(run, /syncPeriodExtras\(/)
+  assert.match(run, /monthPeriodKeys\(monthKeyFromDateKey\(aqtobeTodayDateKey\(\)\)\)/)
+  assert.match(run, /Возвраты и оплаты UMAG за текущий месяц не обновлены: не хватило времени/)
+  assert.match(run, /currentMonthExtras/)
+
+  const extras = section(sync, 'async function syncPeriodExtras', 'async function runOpenObligationsSync')
+  assert.match(extras, /fetchAllSupplyReturns\(session, bounds\.fromTime, bounds\.toTime\)/)
+  assert.match(extras, /upsertSupplyReturns\(/)
+  assert.match(extras, /fetchDocumentPaymentsForPeriod\(/)
+  assert.match(extras, /upsertDocumentPayments\(/)
+  assert.match(extras, /rebuildLedgerEventsForPeriod\(serviceClient, dateFrom, dateTo\)/)
+  // Returns reconcile keeps the stricter guard the full sync uses.
+  assert.match(
+    extras,
+    /returnMismatches\.length === 0 &&\s*\n\s*returnsResult\.paginationComplete &&/
+  )
+  ok('returns, payments and ledger keep parity with the previous payments sync')
 
   // The orphan pass is what finally closes obligations whose supply is already paid.
   const refresh = section(
