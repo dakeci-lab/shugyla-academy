@@ -51,6 +51,9 @@
 | [#7](https://github.com/dakeci-lab/shugyla-academy/pull/7) | Edge | Действие `sync_open_obligations` + закрытие зависших обязательств |
 | [#8](https://github.com/dakeci-lab/shugyla-academy/pull/8) | Фронтенд | Вызов нового действия, охват периода, частичный прогон |
 
+PR последовательные: #7 основан на #6, #8 основан на #7. Это соответствует порядку
+деплоя и избавляет от конфликта в `package.json`. Сливать в порядке #6 → #7 → #8.
+
 Ключевые принципы:
 
 - **Источником истины остаётся UMAG.** Долг не вычисляется локально из реестра
@@ -60,8 +63,13 @@
 - **Устаревшая строка лучше ложного удаления.** Все существующие защиты сверки сохранены:
   полная пагинация, совпадение агрегатов, отсутствие дублей и пустых ID.
 - **Лимит глубины** — 12 месяцев за прогон, более старые перечисляются в предупреждении.
+  Такие месяцы не теряются: их можно синхронизировать вручную из взаиморасчётов.
 - **Бюджет времени** 120 с: один месяц завершается всегда, далее прогон
   останавливается между месяцами и сообщает остаток. Порядок от старых к новым.
+- **Справочник поставщиков обновляется, как и раньше.** Прежняя синхронизация оплат
+  вызывалась с `syncSuppliers: true`; без этого приёмка нового поставщика получила бы
+  `platform_supplier_id = null`, а её обязательство отображалось бы без названия и без
+  возможности настроить срок. Сбой обновления справочника не отменяет обновление долга.
 
 ## Preflight
 
@@ -164,10 +172,14 @@ where o.is_source_deleted = false
 
 ```bash
 npm run verify:umag-sync-runs-entity        # 6
-npm run verify:umag-open-obligations-sync   # 18
+npm run verify:umag-open-obligations-sync   # 19
 npm run verify:supplier-payments            # 16
 npm run verify:umag-sync-settlements-ux     # 82
 npm run verify:supplier-ledger              # 26
+npm run verify:supplier-reconciliations     # 8
+npm run verify:supplier-centralization      # 7
+npm run verify:umag-supply-returns          # 7
+npm run verify:umag-operation-details       # 6
 npm run build
 ```
 
