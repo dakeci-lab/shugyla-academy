@@ -16,13 +16,15 @@ import {
   pickDefaultPaymentTab,
 } from '../../../utils/supplierPaymentObligations'
 import {
-  fetchSupplierPaymentsDashboard,
+  buildPaymentScheduleView,
   formatUmagDate,
   formatUmagDateTime,
   formatUmagMoney,
+  listPaymentObligations,
   syncUmagForPayments,
   toAqtobeDateKey,
 } from '../../../services/supplierPaymentObligationsService'
+import { fetchSupplierFinanceSummary } from '../../../services/supplierFinanceSummaryService'
 import { getMonthPeriodKeys } from '../../../services/umagSettlementsService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
@@ -221,6 +223,7 @@ export default function SupplierPaymentsPanel() {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState('')
+  const [summary, setSummary] = useState(null)
   const [view, setView] = useState(null)
   const [todayKey, setTodayKey] = useState(() => toAqtobeDateKey())
   const [lastRun, setLastRun] = useState(null)
@@ -232,12 +235,23 @@ export default function SupplierPaymentsPanel() {
     setLoading(true)
     setError('')
     try {
-      const data = await fetchSupplierPaymentsDashboard()
-      setView(data.view)
-      setTodayKey(data.todayKey)
-      setLastRun(data.lastRun)
+      // Этап 2.4: KPI numbers come from the canonical fetchSupplierFinanceSummary()
+      // (one todayKey, one obligations read, same business logic as below).
+      // The per-supplier lists still read obligations directly — summary API
+      // deliberately has no supplier-level breakdown yet — reusing summary's
+      // todayKey keeps both calls' "today" identical, per Этап 2.4 item 6.
+      const [summaryData, obligations] = await Promise.all([
+        fetchSupplierFinanceSummary(),
+        listPaymentObligations({ includePaid: false }),
+      ])
+      const nextView = buildPaymentScheduleView(obligations, summaryData.todayKey)
+      setSummary(summaryData)
+      setView(nextView)
+      setTodayKey(summaryData.todayKey)
+      setLastRun(summaryData.lastSync)
     } catch (err) {
       setError(err.message || 'Не удалось загрузить оплаты поставщикам')
+      setSummary(null)
       setView(null)
     } finally {
       setLoading(false)
@@ -308,7 +322,6 @@ export default function SupplierPaymentsPanel() {
     })
   }
 
-  const summaries = view?.summaries
   const tabCounts = view?.tabCounts || {}
   const visibleGroups = view?.lists?.[activeTab] || []
   const activeTabMeta = TABS.find((tab) => tab.id === activeTab) || TABS[0]
@@ -382,22 +395,22 @@ export default function SupplierPaymentsPanel() {
       <div className="spo-panel__kpis" aria-label="Сводка оплат">
         <KpiCard
           label="Общий долг поставщикам"
-          value={summaries?.totalActiveDebt}
+          value={summary?.debt}
           tone="total"
           primary
-          loading={loading && !view}
+          loading={loading && !summary}
         />
         <KpiCard
           label="Просрочено"
-          value={summaries?.overdue}
+          value={summary?.overdue?.amount}
           tone="overdue"
-          loading={loading && !view}
+          loading={loading && !summary}
         />
         <KpiCard
           label="Сегодня к оплате"
-          value={summaries?.dueToday}
+          value={summary?.dueToday?.amount}
           tone="today"
-          loading={loading && !view}
+          loading={loading && !summary}
         />
       </div>
 

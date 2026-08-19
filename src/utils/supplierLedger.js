@@ -12,6 +12,26 @@ export const LEDGER_EVENT_TYPES = {
   ADJUSTMENT: 'adjustment',
 }
 
+/**
+ * True when a raw umag_document_payments row is money returning FROM the
+ * supplier TO the company (a refund) rather than a payment TO the supplier.
+ * Same signal set umag-sync applies server-side in classifyUmagPaymentType()
+ * (supabase/functions/_shared/umagDocumentPayments.ts) — kept in sync there,
+ * not re-derived independently. Extracted (Этап 2.4) from what used to be
+ * two identical inline copies in umagSettlementsService.js so «Взаиморасчёты»
+ * and the Financial Summary classify refunds the same way.
+ */
+export function isUmagPaymentRefund(payment) {
+  const rawAmount = payment?.amount
+  const signed = typeof rawAmount === 'number' ? rawAmount : Number(rawAmount)
+  const type = String(payment?.payment_type || '').toUpperCase()
+  return (
+    type === 'SUPPLY_REFUND' ||
+    (Number.isFinite(signed) && signed < 0) ||
+    String(payment?.class_name || '') === 'SupplyReturn'
+  )
+}
+
 export const LEDGER_EVENT_LABELS = {
   [LEDGER_EVENT_TYPES.OPENING_BALANCE]: 'Начальное сальдо',
   [LEDGER_EVENT_TYPES.RECEIVING]: 'Приёмка',

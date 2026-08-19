@@ -12,6 +12,7 @@ import {
 import {
   LEDGER_EVENT_TYPES,
   attachRunningBalances,
+  isUmagPaymentRefund,
   ledgerEventLabel,
   ledgerEventStatusLabel,
   sortLedgerNewestFirst,
@@ -421,11 +422,7 @@ export function buildSupplierOperationHistory(
   for (const payment of payments) {
     const signed = toNumber(payment.amount)
     const abs = Math.abs(signed)
-    const type = String(payment.payment_type || '').toUpperCase()
-    const isRefund =
-      type === 'SUPPLY_REFUND' ||
-      signed < 0 ||
-      String(payment.class_name || '') === 'SupplyReturn'
+    const isRefund = isUmagPaymentRefund(payment)
     const eventType = isRefund
       ? LEDGER_EVENT_TYPES.SUPPLIER_REFUND
       : LEDGER_EVENT_TYPES.SUPPLIER_PAYMENT
@@ -605,11 +602,7 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
     })
     const signed = toNumber(payment.amount)
     const abs = Math.abs(signed)
-    const type = String(payment.payment_type || '').toUpperCase()
-    const isRefund =
-      type === 'SUPPLY_REFUND' ||
-      signed < 0 ||
-      String(payment.class_name || '') === 'SupplyReturn'
+    const isRefund = isUmagPaymentRefund(payment)
     if (!isRefund) {
       row.documentPaymentAmount = (row.documentPaymentAmount || 0) + abs
     } else {
