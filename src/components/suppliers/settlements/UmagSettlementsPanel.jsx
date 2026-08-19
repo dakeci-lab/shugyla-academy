@@ -678,7 +678,15 @@ function UmagSupplierDetail({
   )
 }
 
-export default function UmagSettlementsPanel() {
+/**
+ * @param {{ embedded?: boolean }} [props]
+ *   embedded — Этап 2.6: hides the standalone shell's sync button and the
+ *     last-run warning banner so this can render as pure settlements content
+ *     under a future shared header. Period filter, search, table, supplier
+ *     drill-down, and reconciliation flow are unchanged — those are content,
+ *     not shell, per Этап 2.6 item 7.
+ */
+export default function UmagSettlementsPanel({ embedded = false } = {}) {
   const { user } = useSession()
   const toast = useToast()
   const showSuccess = toast.success
@@ -877,7 +885,7 @@ export default function UmagSettlementsPanel() {
                 anchorRef={filterButtonRef}
               />
             </PlatformToolbarActionWrap>
-            {canSync ? (
+            {canSync && !embedded ? (
               <PlatformToolbarActionWrap>
                 <PlatformSyncButton
                   onClick={() => void handleSync()}
@@ -892,7 +900,7 @@ export default function UmagSettlementsPanel() {
         }
       />
 
-      {lastRun?.warning_message && (
+      {!embedded && lastRun?.warning_message && (
         <div className="umag-settlements__warning" role="alert">
           {lastRun.warning_message}
         </div>

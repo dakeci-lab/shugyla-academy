@@ -212,7 +212,18 @@ function GroupDetail({ group, todayKey, canEditTerms, onClose, onConfigure }) {
   )
 }
 
-export default function SupplierPaymentsPanel() {
+/**
+ * @param {{ embedded?: boolean, summary?: object|null }} [props]
+ *   embedded — Этап 2.6: hides the standalone shell (title, sync status,
+ *     ↻ button, global KPIs) so this can render as pure payment-schedule
+ *     content under a future shared header. The content itself — tabs,
+ *     groups, obligation details, "настроить отсрочку" — is unchanged.
+ *   summary — optional, already-loaded fetchSupplierFinanceSummary() result
+ *     from a parent. When provided, load() skips its own summary fetch
+ *     (avoids the duplicate bulk read a shared header would otherwise cause)
+ *     but still fetches obligations itself for the schedule content.
+ */
+export default function SupplierPaymentsPanel({ embedded = false, summary: summaryProp = null } = {}) {
   const { user } = useSession()
   const toast = useToast()
   const navigate = useNavigate()
@@ -223,7 +234,7 @@ export default function SupplierPaymentsPanel() {
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [error, setError] = useState('')
-  const [summary, setSummary] = useState(null)
+  const [summary, setSummary] = useState(summaryProp)
   const [view, setView] = useState(null)
   const [todayKey, setTodayKey] = useState(() => toAqtobeDateKey())
   const [lastRun, setLastRun] = useState(null)
@@ -240,8 +251,10 @@ export default function SupplierPaymentsPanel() {
       // The per-supplier lists still read obligations directly — summary API
       // deliberately has no supplier-level breakdown yet — reusing summary's
       // todayKey keeps both calls' "today" identical, per Этап 2.4 item 6.
+      // Этап 2.6: a parent-supplied summary (embedded usage) skips this
+      // module's own summary fetch entirely.
       const [summaryData, obligations] = await Promise.all([
-        fetchSupplierFinanceSummary(),
+        summaryProp ? Promise.resolve(summaryProp) : fetchSupplierFinanceSummary(),
         listPaymentObligations({ includePaid: false }),
       ])
       const nextView = buildPaymentScheduleView(obligations, summaryData.todayKey)
@@ -256,7 +269,7 @@ export default function SupplierPaymentsPanel() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [summaryProp])
 
   useEffect(() => {
     if (!canView) return
@@ -342,77 +355,81 @@ export default function SupplierPaymentsPanel() {
 
   return (
     <div className="spo-panel">
-      <div className="spo-panel__toolbar">
-        <div>
-          <h2 className="spo-panel__title">Оплаты поставщикам</h2>
-          <p className="spo-panel__subtitle">Контроль сроков оплаты поставщикам</p>
-          <div className="spo-panel__meta">
-            <span className="spo-panel__source-chip" title="Источник данных">
-              UMAG
-            </span>
-            <span>
-              Обновлено:{' '}
-              {lastRun?.finished_at || lastRun?.started_at
-                ? formatUmagDateTime(lastRun.finished_at || lastRun.started_at)
-                : 'ещё не выполнялась'}
-            </span>
-            {lastRun?.status && lastRun.status !== 'success' ? (
-              <span className="spo-panel__meta-status">
-                (
-                {lastRun.status === 'partial'
-                  ? 'частично'
-                  : lastRun.status === 'failed'
-                    ? 'ошибка'
-                    : lastRun.status}
-                )
+      {!embedded && (
+        <div className="spo-panel__toolbar">
+          <div>
+            <h2 className="spo-panel__title">Оплаты поставщикам</h2>
+            <p className="spo-panel__subtitle">Контроль сроков оплаты поставщикам</p>
+            <div className="spo-panel__meta">
+              <span className="spo-panel__source-chip" title="Источник данных">
+                UMAG
               </span>
-            ) : null}
+              <span>
+                Обновлено:{' '}
+                {lastRun?.finished_at || lastRun?.started_at
+                  ? formatUmagDateTime(lastRun.finished_at || lastRun.started_at)
+                  : 'ещё не выполнялась'}
+              </span>
+              {lastRun?.status && lastRun.status !== 'success' ? (
+                <span className="spo-panel__meta-status">
+                  (
+                  {lastRun.status === 'partial'
+                    ? 'частично'
+                    : lastRun.status === 'failed'
+                      ? 'ошибка'
+                      : lastRun.status}
+                  )
+                </span>
+              ) : null}
+            </div>
           </div>
+          {canSync ? (
+            <PlatformSyncButton
+              onClick={() => void handleSync()}
+              syncing={syncing}
+              disabled={!canSync}
+              title="Синхронизация UMAG"
+              aria-label="Синхронизация UMAG"
+            />
+          ) : null}
         </div>
-        {canSync ? (
-          <PlatformSyncButton
-            onClick={() => void handleSync()}
-            syncing={syncing}
-            disabled={!canSync}
-            title="Синхронизация UMAG"
-            aria-label="Синхронизация UMAG"
-          />
-        ) : null}
-      </div>
+      )}
 
-      {lastRun?.warning_message ? (
+      {!embedded && lastRun?.warning_message ? (
         <div className="spo-panel__warning" role="status">
           {lastRun.warning_message}
         </div>
       ) : null}
 
-      {staleWarning ? (
+      {!embedded && staleWarning ? (
         <div className="spo-panel__warning" role="status">
           {staleWarning}
         </div>
       ) : null}
 
-      <div className="spo-panel__kpis" aria-label="Сводка оплат">
-        <KpiCard
-          label="Общий долг поставщикам"
-          value={summary?.debt}
-          tone="total"
-          primary
-          loading={loading && !summary}
-        />
-        <KpiCard
-          label="Просрочено"
-          value={summary?.overdue?.amount}
-          tone="overdue"
-          loading={loading && !summary}
-        />
-        <KpiCard
-          label="Сегодня к оплате"
-          value={summary?.dueToday?.amount}
-          tone="today"
-          loading={loading && !summary}
-        />
-      </div>
+      {!embedded && (
+        <div className="spo-panel__kpis" aria-label="Сводка оплат">
+          <KpiCard
+            label="Общий долг поставщикам"
+            value={summary?.debt}
+            tone="total"
+            primary
+            loading={loading && !summary}
+          />
+          <KpiCard
+            label="Просрочено"
+            value={summary?.overdue?.amount}
+            tone="overdue"
+            loading={loading && !summary}
+          />
+          <KpiCard
+            label="Сегодня к оплате"
+            value={summary?.dueToday?.amount}
+            tone="today"
+            loading={loading && !summary}
+          />
+        </div>
+      )}
 
       <section className="spo-panel__plan" aria-label="К оплате">
         <div className="spo-panel__plan-head">
