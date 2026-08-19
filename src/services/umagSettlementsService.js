@@ -177,20 +177,16 @@ function toNumber(value) {
 }
 
 /**
- * @param {{ dateFrom: string, dateTo: string, syncSuppliers?: boolean }} params
+ * Invoke umag-sync and normalize transport / Edge errors into user messages.
+ * Returns either `{ data }` on success or `{ failure }` ready to be surfaced.
  */
-export async function syncUmagSettlements({ dateFrom, dateTo, syncSuppliers = true }) {
+async function invokeUmagSync(requestBody) {
   if (!isSupabaseConfigured() || !supabase) {
-    return fail(UMAG_SETTLEMENTS_ERROR_CODES.UNKNOWN, 'Supabase не настроен.')
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
-    return fail(UMAG_SETTLEMENTS_ERROR_CODES.VALIDATION)
+    return { failure: fail(UMAG_SETTLEMENTS_ERROR_CODES.UNKNOWN, 'Supabase не настроен.') }
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('umag-sync', {
-      body: { action: 'sync', dateFrom, dateTo, syncSuppliers },
-    })
+    const { data, error } = await supabase.functions.invoke('umag-sync', { body: requestBody })
 
     if (error) {
       const body = await extractFunctionErrorBody(error)
@@ -202,62 +198,117 @@ export async function syncUmagSettlements({ dateFrom, dateTo, syncSuppliers = tr
             body,
             fallback: USER_MESSAGES[code] || USER_MESSAGES[UMAG_SETTLEMENTS_ERROR_CODES.UNKNOWN],
           })
-          return fail(code, message)
+          return { failure: fail(code, message) }
         }
       }
       const msg = error.message || ''
       if (!isGenericInvokeErrorMessage(msg) && /unauthorized|jwt|session/i.test(msg)) {
-        return fail(UMAG_SETTLEMENTS_ERROR_CODES.UNAUTHORIZED)
+        return { failure: fail(UMAG_SETTLEMENTS_ERROR_CODES.UNAUTHORIZED) }
       }
       if (/forbidden/i.test(msg)) {
-        return fail(UMAG_SETTLEMENTS_ERROR_CODES.FORBIDDEN)
-      }
-      return fail(
-        UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NETWORK,
-        resolveEdgeFunctionUserMessage({
-          error,
-          body,
-          fallback: USER_MESSAGES[UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NETWORK],
-        })
-      )
-    }
-
-    if (data?.success === true) {
-      const paymentObligations = data.paymentObligations || null
-      const failedObligations = Number(paymentObligations?.obligations_failed || 0)
-      let message = 'Синхронизация с UMAG выполнена.'
-      if (data.status === 'partial') {
-        if (failedObligations > 0) {
-          message = `Данные UMAG обновлены, календарь оплат обновлён не полностью: ${failedObligations}`
-        } else {
-          message = USER_MESSAGES[UMAG_SETTLEMENTS_ERROR_CODES.PARTIAL]
-        }
-      } else if (paymentObligations?.status === 'success') {
-        message = 'Синхронизация с UMAG выполнена. Календарь оплат обновлён.'
+        return { failure: fail(UMAG_SETTLEMENTS_ERROR_CODES.FORBIDDEN) }
       }
       return {
-        success: true,
-        status: data.status || 'success',
-        warning: data.warning || null,
-        period: data.period,
-        suppliers: data.suppliers,
-        supplies: data.supplies,
-        returns: data.returns,
-        paymentObligations,
-        aggregates: data.aggregates,
-        syncRunId: data.syncRunId,
-        message,
+        failure: fail(
+          UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NETWORK,
+          resolveEdgeFunctionUserMessage({
+            error,
+            body,
+            fallback: USER_MESSAGES[UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NETWORK],
+          })
+        ),
       }
     }
+
+    if (data?.success === true) return { data }
 
     if (data?.success === false) {
       const code = mapErrorCode(data.code)
-      return fail(code, data.message || USER_MESSAGES[code])
+      return { failure: fail(code, data.message || USER_MESSAGES[code]) }
     }
 
-    return fail(UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NETWORK)
+    return { failure: fail(UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NETWORK) }
   } catch {
-    return fail(UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NETWORK)
+    return { failure: fail(UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NETWORK) }
+  }
+}
+
+/**
+ * @param {{ dateFrom: string, dateTo: string, syncSuppliers?: boolean }} params
+ */
+export async function syncUmagSettlements({ dateFrom, dateTo, syncSuppliers = true }) {
+  if (!isSupabaseConfigured() || !supabase) {
+    return fail(UMAG_SETTLEMENTS_ERROR_CODES.UNKNOWN, 'Supabase не настроен.')
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateFrom) || !/^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
+    return fail(UMAG_SETTLEMENTS_ERROR_CODES.VALIDATION)
+  }
+
+  const { data, failure } = await invokeUmagSync({
+    action: 'sync',
+    dateFrom,
+    dateTo,
+    syncSuppliers,
+  })
+  if (failure) return failure
+
+  const paymentObligations = data.paymentObligations || null
+  const failedObligations = Number(paymentObligations?.obligations_failed || 0)
+  let message = 'Синхронизация с UMAG выполнена.'
+  if (data.status === 'partial') {
+    if (failedObligations > 0) {
+      message = `Данные UMAG обновлены, календарь оплат обновлён не полностью: ${failedObligations}`
+    } else {
+      message = USER_MESSAGES[UMAG_SETTLEMENTS_ERROR_CODES.PARTIAL]
+    }
+  } else if (paymentObligations?.status === 'success') {
+    message = 'Синхронизация с UMAG выполнена. Календарь оплат обновлён.'
+  }
+  return {
+    success: true,
+    status: data.status || 'success',
+    warning: data.warning || null,
+    period: data.period,
+    suppliers: data.suppliers,
+    supplies: data.supplies,
+    returns: data.returns,
+    paymentObligations,
+    aggregates: data.aggregates,
+    syncRunId: data.syncRunId,
+    message,
+  }
+}
+
+/**
+ * Sync every month that still holds open debt.
+ *
+ * No dates are sent: the Edge Function derives the months from open
+ * obligations, because a receipt paid in a later month can only be corrected by
+ * re-reading its own document month from UMAG.
+ */
+export async function syncUmagOpenObligations() {
+  if (!isSupabaseConfigured() || !supabase) {
+    return fail(UMAG_SETTLEMENTS_ERROR_CODES.UNKNOWN, 'Supabase не настроен.')
+  }
+
+  const { data, failure } = await invokeUmagSync({ action: 'sync_open_obligations' })
+  if (failure) return failure
+
+  const months = data.months || {}
+  return {
+    success: true,
+    status: data.status || 'success',
+    warning: data.warning || null,
+    period: data.period || null,
+    months: {
+      planned: months.planned || [],
+      processed: months.processed || [],
+      remaining: months.remaining || [],
+      skippedOlder: months.skippedOlder || [],
+    },
+    supplies: data.supplies || null,
+    paymentObligations: data.paymentObligations || null,
+    syncRunId: data.syncRunId || null,
   }
 }
 

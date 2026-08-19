@@ -286,6 +286,50 @@ export function pickDefaultPaymentTab(tabCounts = {}) {
   return 'overdue'
 }
 
+function formatMonthCount(count) {
+  const n = Number(count) || 0
+  const mod10 = n % 10
+  const mod100 = n % 100
+  if (mod10 === 1 && mod100 !== 11) return `${n} месяц`
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${n} месяца`
+  return `${n} месяцев`
+}
+
+/**
+ * Short outcome of an open-obligations sync. Details stay in the sync warning;
+ * this only answers "did anything get refreshed, and is more work pending".
+ */
+export function describeObligationsSyncResult(result) {
+  const processed = result?.months?.processed?.length || 0
+  const remaining = result?.months?.remaining?.length || 0
+
+  if (processed === 0) {
+    return 'Ни один месяц не обновлён. Проверьте журнал синхронизации.'
+  }
+  if (remaining > 0) {
+    return `Обновлено ${formatMonthCount(processed)}, осталось ${formatMonthCount(remaining)}. Нажмите синхронизацию повторно.`
+  }
+  return `Обновлено ${formatMonthCount(processed)}. Календарь оплат обновлён.`
+}
+
+/** dd.mm.yyyy from a plain YYYY-MM-DD key, without timezone conversion. */
+function formatDateKeyRu(dateKey) {
+  const [y, m, d] = String(dateKey || '').split('-')
+  if (!y || !m || !d) return null
+  return `${d}.${m}.${y}`
+}
+
+/**
+ * Period the last sync actually covered. Shown next to "Обновлено" so a recent
+ * timestamp cannot imply that months outside the window were checked.
+ */
+export function formatSyncCoverage(dateFrom, dateTo) {
+  const from = formatDateKeyRu(dateFrom)
+  const to = formatDateKeyRu(dateTo)
+  if (!from || !to) return null
+  return from === to ? from : `${from} — ${to}`
+}
+
 export function formatReceptionCount(count) {
   const n = Number(count) || 0
   const mod10 = n % 10

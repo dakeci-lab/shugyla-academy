@@ -14,6 +14,7 @@ import {
   formatDaysUntilDue,
   formatPaymentTermsSnapshot,
   formatReceptionCount,
+  formatSyncCoverage,
   pickDefaultPaymentTab,
 } from '../../../utils/supplierPaymentObligations'
 import {
@@ -468,7 +469,8 @@ export default function SupplierPaymentsPanel({
       return
     }
     if (result.status === 'partial' || result.warning) {
-      toast.warning?.(result.warning || result.message)
+      // Message carries the next action ("press again"), warning the diagnostics.
+      toast.warning?.([result.message, result.warning].filter(Boolean).join(' '))
     } else {
       toast.success?.(result.message || 'Синхронизация выполнена.')
     }
@@ -498,6 +500,11 @@ export default function SupplierPaymentsPanel({
   const tabCounts = view?.tabCounts || {}
   const visibleGroups = view?.lists?.[activeTab] || []
   const activeTabMeta = TABS.find((tab) => tab.id === activeTab) || TABS[0]
+
+  const syncCoverage = useMemo(
+    () => formatSyncCoverage(lastRun?.date_from, lastRun?.date_to),
+    [lastRun]
+  )
 
   const staleWarning = useMemo(() => {
     const finished = lastRun?.finished_at || lastRun?.started_at
@@ -539,6 +546,11 @@ export default function SupplierPaymentsPanel({
                       ? 'ошибка'
                       : lastRun.status}
                   )
+                </span>
+              ) : null}
+              {syncCoverage ? (
+                <span title="Период, который охватила последняя синхронизация">
+                  Охват: {syncCoverage}
                 </span>
               ) : null}
             </div>

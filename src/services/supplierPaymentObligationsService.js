@@ -18,6 +18,7 @@ import {
   buildSupplierPaymentSummary,
   computeDueDateFromTerms,
   deriveObligationStatus,
+  describeObligationsSyncResult,
   formatDaysUntilDue,
   formatPaymentTermsSnapshot,
   resolveSupplierPaymentTerms,
