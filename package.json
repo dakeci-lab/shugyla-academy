@@ -95,6 +95,7 @@
     "verify:umag-operation-details": "node scripts/verify-umag-operation-details.mjs",
     "verify:umag-sync-settlements-ux": "node scripts/verify-umag-sync-settlements-ux.mjs",
     "verify:umag-sync-runs-entity": "node scripts/verify-umag-sync-runs-entity.mjs",
+    "verify:umag-open-obligations-sync": "node scripts/verify-umag-open-obligations-sync.mjs",
     "verify:supplier-payments": "node scripts/verify-supplier-payments.mjs",
     "verify:employees-list": "node scripts/verify-employees-list.mjs",
     "verify:loading-system": "node scripts/verify-loading-system.mjs",
