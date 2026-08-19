@@ -1661,11 +1661,17 @@ async function fetchRowsByIdsInChunks(
   return { rows, error: null }
 }
 
+/**
+ * Range pagination needs a total order: without one Postgres may repeat or skip
+ * rows across pages, which here would silently drop a month that still holds
+ * debt. Orders by a unique column, like rebuildLedgerEventsForPeriod does.
+ */
 async function fetchPaginatedRows(
   // deno-lint-ignore no-explicit-any
   serviceClient: any,
   table: string,
   select: string,
+  orderColumn: string,
   // deno-lint-ignore no-explicit-any
   buildQuery: (q: any) => any
   // deno-lint-ignore no-explicit-any
@@ -1674,10 +1680,9 @@ async function fetchPaginatedRows(
   const rows: unknown[] = []
   let from = 0
   for (;;) {
-    const { data, error } = await buildQuery(serviceClient.from(table).select(select)).range(
-      from,
-      from + pageSize - 1
-    )
+    const { data, error } = await buildQuery(serviceClient.from(table).select(select))
+      .order(orderColumn, { ascending: true })
+      .range(from, from + pageSize - 1)
     if (error) return { rows: [], error }
     const page = data || []
     rows.push(...page)
@@ -1698,6 +1703,7 @@ async function fetchPaginatedSupplies(
     serviceClient,
     'umag_supplies',
     SUPPLY_OBLIGATION_COLUMNS,
+    'umag_supply_id',
     buildQuery
   )
 }
@@ -1747,6 +1753,7 @@ async function collectOpenObligationMonths(
     serviceClient,
     'supplier_payment_obligations',
     'supply_document_date, source_doc_time',
+    'umag_supply_id',
     (q) => q.eq('is_source_deleted', false).gt('current_debt', 0)
   )
   if (obligations.error) {
@@ -1852,6 +1859,7 @@ async function refreshPaymentObligations(
   const openObligations = await fetchPaginatedRows(
     serviceClient,
     'supplier_payment_obligations',
+    'umag_supply_id',
     'umag_supply_id',
     (q) => q.eq('is_source_deleted', false).gt('current_debt', 0)
   )
@@ -2165,6 +2173,151 @@ type MonthSyncOutcome = {
 }
 
 /**
+ * Returns, UMAG payments and ledger events for one month.
+ *
+ * The payments screen used to trigger a full period sync, which refreshed these
+ * as a side effect. Debt does not depend on them, so every failure only adds a
+ * warning — but skipping them entirely would leave settlements and the supplier
+ * ledger staler than before this change.
+ */
+async function syncPeriodExtras(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  session: UmagSession,
+  dateFrom: string,
+  dateTo: string,
+  platformMap: Map<number, string>
+): Promise<{ warnings: string[]; returnsReceived: number; paymentsReceived: number; ledgerUpserted: number }> {
+  const warnings: string[] = []
+  let returnsReceived = 0
+  let paymentsReceived = 0
+  let ledgerUpserted = 0
+
+  const bounds = aqtobePeriodBoundsMs(dateFrom, dateTo)
+  if (!bounds) return { warnings, returnsReceived, paymentsReceived, ledgerUpserted }
+
+  const returnsResult = await fetchAllSupplyReturns(session, bounds.fromTime, bounds.toTime)
+  if (!returnsResult.ok) {
+    warnings.push('Возвраты поставщикам за текущий месяц не обновлены')
+  } else {
+    returnsReceived = returnsResult.returns.length
+    const calculatedReturnAmount = sumNumbers(
+      returnsResult.returns.map((item) => {
+        const { doc } = unwrapSupplyReturn(item)
+        return Math.abs(asNumber(doc.amount))
+      })
+    )
+    const returnSource = returnsResult.source
+    const returnMismatches: string[] = []
+    if (
+      returnSource.amount != null &&
+      !nearlyEqual(
+        calculatedReturnAmount,
+        Math.abs(asNumber(returnSource.amount)),
+        AGGREGATE_EPSILON
+      )
+    ) {
+      returnMismatches.push(
+        `returnAmount: rows=${calculatedReturnAmount} source=${returnSource.amount}`
+      )
+    }
+    if (
+      returnSource.totalCount != null &&
+      returnsResult.returns.length !== returnSource.totalCount
+    ) {
+      returnMismatches.push(
+        `returnTotalCount: rows=${returnsResult.returns.length} source=${returnSource.totalCount}`
+      )
+    }
+    if (returnMismatches.length > 0) {
+      console.warn('umag_sync_returns_aggregate_mismatch', {
+        mismatches: returnMismatches,
+        dateFrom,
+        dateTo,
+      })
+      warnings.push(`Расхождение агрегатов возвратов UMAG: ${returnMismatches.join('; ')}`)
+    }
+
+    const returnsUpsert = await upsertSupplyReturns(
+      serviceClient,
+      returnsResult.returns,
+      platformMap
+    )
+    if (returnsUpsert instanceof Response) {
+      warnings.push('Возвраты поставщикам не сохранены')
+    } else {
+      // Soft-delete only after a complete validated snapshot, exactly as the
+      // full sync does. Root-array responses carry no totalCount.
+      const snapshotComplete =
+        returnMismatches.length === 0 &&
+        returnsResult.paginationComplete &&
+        (returnSource.totalCount == null ||
+          returnSource.totalCount === returnsResult.returns.length)
+
+      if (snapshotComplete) {
+        const receivedReturnIds = new Set<number>()
+        for (const item of returnsResult.returns) {
+          const { doc } = unwrapSupplyReturn(item)
+          const id = asBigIntId(doc.id)
+          if (id != null) receivedReturnIds.add(id)
+        }
+        if (receivedReturnIds.size === returnsResult.returns.length) {
+          const reconcile = await reconcileMissingSupplyReturns(
+            serviceClient,
+            dateFrom,
+            dateTo,
+            receivedReturnIds
+          )
+          if (reconcile instanceof Response) {
+            warnings.push('Сверка удалённых возвратов не выполнена')
+          }
+        }
+      }
+    }
+  }
+
+  const paymentsResult = await fetchDocumentPaymentsForPeriod(
+    session,
+    bounds.fromTime,
+    bounds.toTime
+  )
+  if (!paymentsResult.ok) {
+    warnings.push('Оплаты UMAG за текущий месяц не обновлены')
+    return { warnings, returnsReceived, paymentsReceived, ledgerUpserted }
+  }
+
+  paymentsReceived = paymentsResult.payments.length
+  const { supplyToSupplier, returnToSupplier } = await buildPaymentSupplierLinkMaps(
+    serviceClient,
+    paymentsResult.payments
+  )
+  const platformByUmag = new Map<number, string>()
+  for (const [umagId, platformId] of platformMap.entries()) {
+    platformByUmag.set(Number(umagId), String(platformId))
+  }
+
+  const paymentsUpsert = await upsertDocumentPayments(
+    serviceClient,
+    paymentsResult.payments,
+    platformByUmag,
+    supplyToSupplier,
+    returnToSupplier
+  )
+  if (paymentsUpsert instanceof Response) {
+    warnings.push('Оплаты UMAG получены, но не сохранились')
+  }
+
+  const ledgerResult = await rebuildLedgerEventsForPeriod(serviceClient, dateFrom, dateTo)
+  if (ledgerResult instanceof Response) {
+    warnings.push('Ledger events за текущий месяц не обновлены')
+  } else {
+    ledgerUpserted = ledgerResult.upserted
+  }
+
+  return { warnings, returnsReceived, paymentsReceived, ledgerUpserted }
+}
+
+/**
  * Re-fetch every month that still holds open debt, then rebuild obligations.
  *
  * The payments screen used to sync only the current month, so a receipt paid in
@@ -2333,6 +2486,30 @@ async function runOpenObligationsSync(
       refreshTo
     )
 
+    // Debt is corrected by now. Returns / payments / ledger are refreshed only
+    // for the current month, and only if the budget allows, so the primary fix
+    // is never sacrificed to them.
+    const currentPeriod = monthPeriodKeys(monthKeyFromDateKey(aqtobeTodayDateKey()))
+    let extras = {
+      warnings: [] as string[],
+      returnsReceived: 0,
+      paymentsReceived: 0,
+      ledgerUpserted: 0,
+    }
+    if (Date.now() - startedAtMs > OBLIGATION_SYNC_TIME_BUDGET_MS) {
+      extras.warnings.push(
+        'Возвраты и оплаты UMAG за текущий месяц не обновлены: не хватило времени. Нажмите синхронизацию повторно.'
+      )
+    } else {
+      extras = await syncPeriodExtras(
+        serviceClient,
+        session,
+        currentPeriod.dateFrom,
+        currentPeriod.dateTo,
+        platformMap
+      )
+    }
+
     const totals = outcomes.reduce(
       (acc, outcome) => ({
         received: acc.received + outcome.suppliesReceived,
@@ -2344,7 +2521,7 @@ async function runOpenObligationsSync(
       { received: 0, created: 0, updated: 0, reactivated: 0, sourceDeleted: 0 }
     )
 
-    const warnings = [...monthWarnings]
+    const warnings = [...monthWarnings, ...extras.warnings]
     if (planned.skippedOlder.length > 0) {
       // Older debt is not lost: it can still be synced from settlements by hand.
       warnings.push(
@@ -2373,7 +2550,10 @@ async function runOpenObligationsSync(
       records_updated: totals.updated,
       records_reactivated: totals.reactivated,
       records_source_deleted: totals.sourceDeleted,
-      aggregates_match: outcomes.every((outcome) => outcome.aggregatesMatch),
+      returns_received: extras.returnsReceived,
+      // Null, not true, when no month was processed: an empty every() would
+      // claim aggregates matched for a run that compared nothing.
+      aggregates_match: outcomes.length > 0 ? outcomes.every((o) => o.aggregatesMatch) : null,
       warning_message: warning,
       error_message: null,
     })
@@ -2406,6 +2586,12 @@ async function runOpenObligationsSync(
         updated: totals.updated,
         reactivated: totals.reactivated,
         sourceDeleted: totals.sourceDeleted,
+      },
+      currentMonthExtras: {
+        period: currentPeriod,
+        returnsReceived: extras.returnsReceived,
+        paymentsReceived: extras.paymentsReceived,
+        ledgerUpserted: extras.ledgerUpserted,
       },
       paymentObligations: obligationsRefresh,
       syncRunId: runId,
