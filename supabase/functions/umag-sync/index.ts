@@ -21,6 +21,7 @@ import {
 import {
   aqtobePeriodBoundsMs,
   maskStoreId,
+  MAX_AUTO_SYNC_LOOKBACK_MONTHS,
   nearlyEqual,
   parseUmagEditTime,
   sumNumbers,
@@ -1425,6 +1426,22 @@ function addCalendarDays(dateKey: string, days: number): string {
   return `${yy}-${mm}-${dd}`
 }
 
+/** Calendar-month subtraction (not days×30) — mirrors addCalendarDays' Date.UTC normalization. */
+function subtractCalendarMonths(dateKey: string, months: number): string {
+  const [y, m, d] = dateKey.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1 - months, d))
+  const yy = dt.getUTCFullYear()
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, '0')
+  const dd = String(dt.getUTCDate()).padStart(2, '0')
+  return `${yy}-${mm}-${dd}`
+}
+
+/** First day of the calendar month containing dateKey. */
+function startOfMonthKey(dateKey: string): string {
+  const [y, m] = dateKey.split('-').map(Number)
+  return `${y}-${String(m).padStart(2, '0')}-01`
+}
+
 function resolveTermsSnapshot(supplier: {
   payment_type?: string | null
   deferral_days?: number | null
@@ -1561,6 +1578,183 @@ async function fetchPaginatedSupplies(
     from += pageSize
   }
   return { rows, error: null }
+}
+
+type SyncScope = {
+  requestedFrom: string
+  requestedTo: string
+  recentStart: string
+  autoFloor: string
+  oldestOpenDebtDate: string | null
+  effectiveFrom: string
+  effectiveTo: string
+  openDebtCoverageComplete: boolean
+  uncoveredOpenObligationsCount: number
+  uncoveredOpenDebtAmount: number
+  unresolvedDateObligationsCount: number
+}
+
+type OpenObligationDatePoint = {
+  debt: number
+  dateKey: string | null
+}
+
+/**
+ * Paginated read of every currently open obligation's debt + best-effort date.
+ * "Open" mirrors the canonical debt predicate from Этап 2.1: is_source_deleted
+ * = false AND current_debt > 0 — closed/soft-deleted rows never widen the range.
+ */
+async function fetchOpenObligationDatePoints(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any
+): Promise<{
+  points: OpenObligationDatePoint[]
+  error: { message: string; code?: string } | null
+}> {
+  const pageSize = 1000
+  const rows: Array<{
+    current_debt: number
+    supply_document_date: string | null
+    umag_supply_row_id: string | null
+  }> = []
+  let from = 0
+  for (;;) {
+    const { data, error } = await serviceClient
+      .from('supplier_payment_obligations')
+      .select('current_debt, supply_document_date, umag_supply_row_id')
+      .eq('is_source_deleted', false)
+      .gt('current_debt', 0)
+      .range(from, from + pageSize - 1)
+    if (error) return { points: [], error }
+    const page = data || []
+    rows.push(...page)
+    if (page.length < pageSize) break
+    from += pageSize
+  }
+
+  // supply_document_date should always be set (backfilled from doc_time at
+  // obligation-refresh time), but fail-safe: recover it from the linked
+  // umag_supplies row when missing — doc_time there is NOT NULL by schema,
+  // and umag_supply_row_id is FK `on delete set null`, so if it's still
+  // present the referenced row still exists.
+  const needsLookup = rows.filter((r) => !r.supply_document_date && r.umag_supply_row_id)
+  const lookupIds = [...new Set(needsLookup.map((r) => r.umag_supply_row_id as string))]
+  const docTimeById = new Map<string, string>()
+  if (lookupIds.length > 0) {
+    const fetched = await fetchRowsByIdsInChunks(
+      serviceClient,
+      'umag_supplies',
+      'id, doc_time',
+      'id',
+      lookupIds
+    )
+    if (fetched.error) return { points: [], error: fetched.error }
+    for (const row of fetched.rows as Array<{ id: string; doc_time: string | null }>) {
+      if (row.doc_time) docTimeById.set(row.id, row.doc_time)
+    }
+  }
+
+  const points: OpenObligationDatePoint[] = rows.map((row) => {
+    let dateKey = row.supply_document_date
+    if (!dateKey && row.umag_supply_row_id) {
+      const docTime = docTimeById.get(row.umag_supply_row_id)
+      if (docTime) dateKey = aqtobeDateKeyFromIso(docTime)
+    }
+    return { debt: asNumber(row.current_debt), dateKey: dateKey ?? null }
+  })
+
+  return { points, error: null }
+}
+
+/**
+ * Split the VIEW range a caller asked for from the range a normal sync
+ * actually needs to hit UMAG for, so open supplier debt stays fresh no
+ * matter how old the underlying приёмка is — Этап 2.2.
+ *
+ *   automaticOpenDebtFrom = max(oldestOpenDebtDate, autoFloor)   — capped widening
+ *   effectiveFrom = min(recentStart, automaticOpenDebtFrom, requestedFrom)
+ *   effectiveTo   = today (Aqtobe)                                — always refresh "now"
+ *
+ * requestedFrom itself is never capped by MAX_AUTO_SYNC_LOOKBACK_MONTHS — an
+ * explicit historical VIEW-period request (backfill) stays honored even past it.
+ * "Uncovered" folds in both cap-truncated old debt AND debt whose date could
+ * not be resolved at all — neither can be called guaranteed-fresh.
+ */
+async function computeEffectiveSyncScope(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  requestedFrom: string,
+  requestedTo: string
+): Promise<SyncScope | Response> {
+  const todayKey = aqtobeDateKeyFromIso(new Date().toISOString())
+  if (!todayKey) {
+    return umagErrorResponse('INTERNAL_ERROR', 'Не удалось определить текущую дату.', 500)
+  }
+  const recentStart = startOfMonthKey(todayKey)
+  const autoFloor = subtractCalendarMonths(todayKey, MAX_AUTO_SYNC_LOOKBACK_MONTHS)
+
+  const { points, error } = await fetchOpenObligationDatePoints(serviceClient)
+  if (error) {
+    console.error('sync_scope_open_obligations_failed', {
+      message: error.message,
+      code: error.code,
+    })
+    return umagErrorResponse(
+      'SUPABASE_UPSERT_FAILED',
+      `Не удалось прочитать открытые обязательства для расчёта диапазона синхронизации: ${error.message}`,
+      500
+    )
+  }
+
+  let oldestOpenDebtDate: string | null = null
+  let unresolvedDateObligationsCount = 0
+  for (const point of points) {
+    if (point.dateKey == null) {
+      unresolvedDateObligationsCount += 1
+      continue
+    }
+    if (oldestOpenDebtDate == null || point.dateKey < oldestOpenDebtDate) {
+      oldestOpenDebtDate = point.dateKey
+    }
+  }
+
+  const automaticOpenDebtFrom =
+    oldestOpenDebtDate == null
+      ? recentStart
+      : oldestOpenDebtDate < autoFloor
+        ? autoFloor
+        : oldestOpenDebtDate
+
+  const effectiveFrom = [recentStart, automaticOpenDebtFrom, requestedFrom].reduce((min, key) =>
+    key < min ? key : min
+  )
+  const effectiveTo = todayKey
+
+  let uncoveredOpenObligationsCount = 0
+  let uncoveredOpenDebtAmount = 0
+  for (const point of points) {
+    if (point.dateKey == null || point.dateKey < effectiveFrom) {
+      uncoveredOpenObligationsCount += 1
+      uncoveredOpenDebtAmount += point.debt
+    }
+  }
+
+  const openDebtCoverageComplete =
+    unresolvedDateObligationsCount === 0 && uncoveredOpenObligationsCount === 0
+
+  return {
+    requestedFrom,
+    requestedTo,
+    recentStart,
+    autoFloor,
+    oldestOpenDebtDate,
+    effectiveFrom,
+    effectiveTo,
+    openDebtCoverageComplete,
+    uncoveredOpenObligationsCount,
+    uncoveredOpenDebtAmount,
+    unresolvedDateObligationsCount,
+  }
 }
 
 /**
@@ -1891,9 +2085,21 @@ Deno.serve(async (req) => {
 
   const validated = validateBody(body)
   if (validated instanceof Response) return validated
-  const { dateFrom, dateTo, syncSuppliers } = validated
+  const { dateFrom: requestedFrom, dateTo: requestedTo, syncSuppliers } = validated
 
-  const bounds = aqtobePeriodBoundsMs(dateFrom, dateTo)
+  // Этап 2.2: VIEW range (requested) vs. effective SYNC SCOPE — see
+  // computeEffectiveSyncScope() for the widening rule. requestedFrom can only
+  // push the sync range further back, never shrink it below what open
+  // supplier debt needs.
+  const syncScope = await computeEffectiveSyncScope(
+    authz.serviceClient,
+    requestedFrom,
+    requestedTo
+  )
+  if (syncScope instanceof Response) return syncScope
+  const { effectiveFrom, effectiveTo } = syncScope
+
+  const bounds = aqtobePeriodBoundsMs(effectiveFrom, effectiveTo)
   if (!bounds) {
     return umagErrorResponse('VALIDATION_ERROR', 'Некорректный период синхронизации.', 400)
   }
@@ -1906,8 +2112,8 @@ Deno.serve(async (req) => {
 
   const runId = await createSyncRun(authz.serviceClient, {
     entity: 'all',
-    date_from: dateFrom,
-    date_to: dateTo,
+    date_from: effectiveFrom,
+    date_to: effectiveTo,
   })
 
   try {
@@ -2042,7 +2248,7 @@ Deno.serve(async (req) => {
       : `Расхождение агрегатов UMAG: ${mismatches.join('; ')}`
 
     if (warningMessage) {
-      console.warn('umag_sync_aggregate_mismatch', { mismatches, dateFrom, dateTo })
+      console.warn('umag_sync_aggregate_mismatch', { mismatches, effectiveFrom, effectiveTo })
     }
 
     const suppliesUpsert = await upsertSupplies(
@@ -2105,7 +2311,8 @@ Deno.serve(async (req) => {
           success: true,
           status: 'partial',
           warning: 'Сверка удалённых приёмок пропущена: дубли/пустые ID в ответе UMAG',
-          period: { dateFrom, dateTo, fromTime: bounds.fromTime, toTime: bounds.toTime },
+          period: { dateFrom: effectiveFrom, dateTo: effectiveTo, fromTime: bounds.fromTime, toTime: bounds.toTime },
+          syncScope,
           suppliers: {
             created: suppliersCreated,
             updated: suppliersUpdated,
@@ -2126,8 +2333,8 @@ Deno.serve(async (req) => {
 
       const reconcile = await reconcileMissingSupplies(
         authz.serviceClient,
-        dateFrom,
-        dateTo,
+        effectiveFrom,
+        effectiveTo,
         receivedIds
       )
       if (reconcile instanceof Response) {
@@ -2157,8 +2364,8 @@ Deno.serve(async (req) => {
 
     const obligationsRefresh = await refreshPaymentObligations(
       authz.serviceClient,
-      dateFrom,
-      dateTo
+      effectiveFrom,
+      effectiveTo
     )
     const obligationsWarning =
       obligationsRefresh.status === 'success'
@@ -2226,8 +2433,8 @@ Deno.serve(async (req) => {
     if (returnsWarning) {
       console.warn('umag_sync_returns_aggregate_mismatch', {
         mismatches: returnMismatches,
-        dateFrom,
-        dateTo,
+        effectiveFrom,
+        effectiveTo,
       })
     }
 
@@ -2271,8 +2478,8 @@ Deno.serve(async (req) => {
       if (receivedReturnIds.size === returnsResult.returns.length) {
         const reconcileReturns = await reconcileMissingSupplyReturns(
           authz.serviceClient,
-          dateFrom,
-          dateTo,
+          effectiveFrom,
+          effectiveTo,
           receivedReturnIds
         )
         if (reconcileReturns instanceof Response) {
@@ -2346,8 +2553,8 @@ Deno.serve(async (req) => {
 
       const ledgerResult = await rebuildLedgerEventsForPeriod(
         authz.serviceClient,
-        dateFrom,
-        dateTo
+        effectiveFrom,
+        effectiveTo
       )
       if (ledgerResult instanceof Response) {
         paymentsWarning = [paymentsWarning, 'Ledger events не обновлены.']
@@ -2358,15 +2565,27 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Этап 2.2: a cap-truncated or date-unresolved old debt means this run
+    // cannot promise every open supplier debt is fresh — that must show up
+    // as 'partial', never a clean 'success' (see item 8/16 of Stage 2.2).
+    const coverageWarning = syncScope.openDebtCoverageComplete
+      ? null
+      : `Не все открытые долги гарантированно обновлены: ${syncScope.uncoveredOpenObligationsCount} обязательств (Σ ${syncScope.uncoveredOpenDebtAmount} ₸) вне синхронизированного диапазона${
+          syncScope.unresolvedDateObligationsCount > 0
+            ? `, из них ${syncScope.unresolvedDateObligationsCount} с неизвестной датой приёмки`
+            : ''
+        }.`
+
     const combinedWarning =
-      [warningMessage, returnsWarning, obligationsWarning, paymentsWarning]
+      [warningMessage, returnsWarning, obligationsWarning, paymentsWarning, coverageWarning]
         .filter(Boolean)
         .join(' | ') || null
     const status: SyncStatus =
       aggregatesMatch &&
       returnsAggregatesMatch &&
       obligationsRefresh.status === 'success' &&
-      !paymentsWarning
+      !paymentsWarning &&
+      syncScope.openDebtCoverageComplete
         ? 'success'
         : 'partial'
     await finishSyncRun(authz.serviceClient, runId, {
@@ -2409,7 +2628,8 @@ Deno.serve(async (req) => {
       success: true,
       status,
       warning: combinedWarning,
-      period: { dateFrom, dateTo, fromTime: bounds.fromTime, toTime: bounds.toTime },
+      period: { dateFrom: effectiveFrom, dateTo: effectiveTo, fromTime: bounds.fromTime, toTime: bounds.toTime },
+      syncScope,
       suppliers: {
         created: suppliersCreated,
         updated: suppliersUpdated,

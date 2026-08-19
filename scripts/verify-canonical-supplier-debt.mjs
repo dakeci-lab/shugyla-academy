@@ -174,8 +174,11 @@ async function main() {
   )
   const edgeFn = read('supabase/functions/umag-sync/index.ts')
   assert(
-    'umag-sync Edge Function period-handling not touched this stage (still client-supplied dateFrom/dateTo)',
-    /const \{ dateFrom, dateTo, syncSuppliers \} = validated/.test(edgeFn)
+    // Sync-scope widening (Этап 2.2) legitimately changes how the request's
+    // dateFrom/dateTo feed the pipeline — what must NEVER change is the
+    // canonical mirror formula itself: current_debt = umag_supplies.debt.
+    'refreshPaymentObligations still mirrors current_debt = umag_supplies.debt verbatim (canonical formula untouched)',
+    /const debt = asNumber\(supply\.debt\)/.test(edgeFn) && /current_debt: debt,/.test(edgeFn)
   )
 
   // --- 5. CreateReconciliationModal.jsx: label matches new meaning --------

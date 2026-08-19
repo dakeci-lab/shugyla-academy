@@ -9,6 +9,14 @@ export const UMAG_TIMEOUT_MS = 30_000
 export const UMAG_PAGE_SIZE = 500
 export const UMAG_TIMEZONE_OFFSET_MS = 5 * 60 * 60 * 1000 // Asia/Aqtobe (+05), no DST
 
+/**
+ * How far back a normal sync will automatically widen its UMAG fetch window
+ * to refresh open supplier debt older than the requested/recent range.
+ * Calendar months, not a fixed day count — see subtractCalendarMonths().
+ * Does NOT cap an explicit historical VIEW-period request (Этап 2.2).
+ */
+export const MAX_AUTO_SYNC_LOOKBACK_MONTHS = 24
+
 export type UmagConfig = {
   baseUrl: string
   authorization: string
