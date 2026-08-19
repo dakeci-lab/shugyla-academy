@@ -227,8 +227,8 @@ export default function CreateReconciliationModal({
         <section className="recon-create__block" aria-label="Показатели за период">
           <h3 className="recon-create__block-title">Показатели за выбранный период</h3>
           <p className="recon-create__hint">
-            Сумма задолженности — SUM(debt) активных приёмок за период. Это не полный бухгалтерский
-            баланс поставщика.
+            Приёмки, возвраты и оплаты — движение за выбранный период. Задолженность — открытый
+            долг поставщику на сегодня, не ограничен периодом акта.
           </p>
           {snapshotLoading ? (
             <div className="recon-create__loading">Расчёт показателей…</div>

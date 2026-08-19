@@ -6,6 +6,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
 import { fetchLastUmagSyncRun, formatUmagDate, formatUmagMoney } from './umagSettlementsService'
+import { fetchCanonicalSupplierDebt } from './supplierDebtService'
 
 export const RECONCILIATION_BUCKET = 'supplier-reconciliation-docs'
 export const MAX_RECONCILIATION_FILE_BYTES = 15 * 1024 * 1024
@@ -237,8 +238,13 @@ export function normalizeReconciliationDocument(row) {
 }
 
 /**
- * Period snapshot from active (non-deleted) umag_supplies + umag_supply_returns.
- * umagDebt remains SUM(debt) from supplies — not recalculated via returns.
+ * Period snapshot from active (non-deleted) umag_supplies + umag_supply_returns,
+ * plus the canonical current open debt (Этап 2.1 — не по диапазону дат).
+ *
+ * umagDebt = fetchCanonicalSupplierDebt() = Σ supplier_payment_obligations.current_debt
+ * for this supplier's OPEN obligations right now — a closing/current-debt value,
+ * independent of the период сверки. The период still governs every other field
+ * below (приёмки/возвраты/оплаты = движение за период).
  */
 export async function computeUmagSnapshotForSupplier({
   supplierId,
@@ -261,7 +267,7 @@ export async function computeUmagSnapshotForSupplier({
 
   let suppliesQuery = supabase
     .from('umag_supplies')
-    .select('amount, payment_amount, payment_refund_amount, debt')
+    .select('amount, payment_amount, payment_refund_amount')
     .eq('is_source_deleted', false)
     .gte('doc_time', fromIso)
     .lte('doc_time', toIso)
@@ -281,7 +287,11 @@ export async function computeUmagSnapshotForSupplier({
     returnsQuery = returnsQuery.eq('umag_supplier_id', umagSupplierId)
   }
 
-  const [suppliesRes, returnsRes] = await Promise.all([suppliesQuery, returnsQuery])
+  const [suppliesRes, returnsRes, canonicalDebt] = await Promise.all([
+    suppliesQuery,
+    returnsQuery,
+    fetchCanonicalSupplierDebt({ platformSupplierId: canonicalId, umagSupplierId }),
+  ])
   if (suppliesRes.error) {
     throw new Error(suppliesRes.error.message || 'Не удалось рассчитать показатели UMAG')
   }
@@ -295,12 +305,12 @@ export async function computeUmagSnapshotForSupplier({
     snapshot.umagSupplyAmount += toNumber(row.amount)
     snapshot.umagPaymentAmount += toNumber(row.payment_amount)
     snapshot.umagPaymentRefundAmount += toNumber(row.payment_refund_amount)
-    snapshot.umagDebt += toNumber(row.debt)
   }
   for (const row of returnsRes.data || []) {
     snapshot.umagSupplyReturnCount += 1
     snapshot.umagSupplyReturnAmount += Math.abs(toNumber(row.amount))
   }
+  snapshot.umagDebt = canonicalDebt.debt
   return snapshot
 }
 
