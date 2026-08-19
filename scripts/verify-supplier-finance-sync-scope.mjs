@@ -193,20 +193,19 @@ function main() {
   assert.doesNotMatch(edge, /reconciliation_flag|ledger_delta|ledgerClosingBalance|ledger.*ba lance.*compare/i)
   ok('no ledger-vs-canonical reconciliation flag added — reserved for a later stage')
 
-  // --- 12. Routes/menu/settlements screen untouched -------------------------
-  // Этап 2.2 itself touched no UI at all. Later stages may legitimately touch
-  // specific components without violating THIS invariant, which is about
-  // routing/navigation/the settlements screen never being repurposed for
-  // sync-scope work — narrower and still meaningful, unlike "zero UI diff
-  // ever again" (Этап 2.4 legitimately swapped SupplierPaymentsPanel's KPI
-  // data source; see verify:supplier-finance-summary for that stage's checks).
+  // --- 12. Routes/menu/pages untouched --------------------------------------
+  // Этап 2.2 itself touched no UI at all. Narrowed to routing/navigation/page
+  // wrappers specifically — later stages legitimately touch individual
+  // components (Этап 2.4 swapped SupplierPaymentsPanel's KPI source; Этап 2.5
+  // moved UmagSettlementsPanel's debt source — see their own verify scripts)
+  // without that constituting new routing/menu surface, which remains the
+  // real invariant sync-scope work must never introduce.
   const uiStatus = execFileSync(
     'git',
     [
       'status',
       '--porcelain',
       '--',
-      'src/components/suppliers/settlements',
       'src/pages/platform/settlements',
       'src/pages/platform/supplier-payments',
       'src/platform/platformNav.js',
@@ -215,7 +214,7 @@ function main() {
     { cwd: ROOT, encoding: 'utf8' }
   ).trim()
   assert.equal(uiStatus, '', `UI files changed unexpectedly: ${uiStatus}`)
-  ok('no route/menu/settlements-screen files touched by sync-scope work')
+  ok('no route/menu/page-wrapper files touched by sync-scope work')
 
   console.log('\n--- Pure-math mirror of computeEffectiveSyncScope() ---\n')
   runMirrorCases()

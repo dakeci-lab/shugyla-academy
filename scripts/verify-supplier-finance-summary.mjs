@@ -175,6 +175,11 @@ async function main() {
   assert.equal(cssStatus, '', 'CSS changed — this stage must be data-source only')
   ok('no CSS/layout changes to the payments panel (data source only, per item 31)')
 
+  // Narrowed to routing/navigation/page wrappers — Этап 2.5 legitimately
+  // touches UmagSettlementsPanel itself (its own debt-source migration,
+  // checked by verify:settlements-canonical-debt), which isn't new routing
+  // or menu surface and doesn't retroactively violate THIS stage's own
+  // "data-layer only, no new route/page/menu" claim.
   const otherUiStatus = execFileSync(
     'git',
     [
@@ -185,12 +190,11 @@ async function main() {
       'src/pages/platform/supplier-payments',
       'src/platform/platformNav.js',
       'src/App.jsx',
-      'src/components/suppliers/settlements',
     ],
     { cwd: ROOT, encoding: 'utf8' }
   ).trim()
   assert.equal(otherUiStatus, '', `unexpected UI/route changes: ${otherUiStatus}`)
-  ok('no new route/page/menu/settlements-screen changes — this stage is data-layer only, per item 2')
+  ok('no new route/page/menu changes — this stage is data-layer only, per item 2')
 
   console.log('\n--- Real imports: pure logic exercised with fixture data ---\n')
   await runRealCases()

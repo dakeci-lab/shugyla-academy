@@ -17,6 +17,10 @@ import {
   ledgerEventStatusLabel,
   sortLedgerNewestFirst,
 } from '../utils/supplierLedger'
+import {
+  fetchCanonicalSupplierDebts,
+  resolvePlatformSupplierIdsByUmagIds,
+} from './supplierDebtService'
 
 export const UMAG_SETTLEMENTS_ERROR_CODES = {
   VALIDATION: 'VALIDATION_ERROR',
@@ -299,7 +303,6 @@ function ensureSettlementRow(byKey, seed) {
       amount: 0,
       paymentAmount: 0,
       paymentRefundAmount: 0,
-      debt: 0,
       returnCount: 0,
       returnAmount: 0,
       documentPaymentAmount: 0,
@@ -321,6 +324,24 @@ function ensureSettlementRow(byKey, seed) {
     }
   }
   return row
+}
+
+/**
+ * Pure (Этап 2.5): a settlement row's canonical current debt from already
+ * bulk-fetched lookup maps — split out from fetchUmagSettlementsBySupplier()
+ * so it's directly testable without a live Supabase connection.
+ *
+ * A row only known by umagSupplierId that never resolves to a canonical
+ * platform_supplier_id (mapping truly missing, not just unfetched) has no
+ * safe way to attribute a specific debt — returns null, which the UI
+ * renders as "—" via formatUmagMoney(). Never 0 (looks like a real, paid-off
+ * debt) and never another supplier's total.
+ */
+export function resolveRowCanonicalDebt(row, resolvedPlatformIdByUmagId, canonicalDebtByPlatformId) {
+  const canonicalSupplierId =
+    row.platformSupplierId ||
+    (row.umagSupplierId != null ? resolvedPlatformIdByUmagId.get(row.umagSupplierId) ?? null : null)
+  return canonicalSupplierId != null ? canonicalDebtByPlatformId.get(canonicalSupplierId) ?? 0 : null
 }
 
 export function formatSignedUmagMoney(value) {
@@ -579,7 +600,6 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
     row.amount += toNumber(supply.amount)
     row.paymentAmount += toNumber(supply.payment_amount)
     row.paymentRefundAmount += toNumber(supply.payment_refund_amount)
-    row.debt += toNumber(supply.debt)
     row.supplies.push(supply)
   }
 
@@ -612,7 +632,40 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
     row.payments.push(payment)
   }
 
-  let rows = [...byKey.values()].map((row) => {
+  // Этап 2.5: «Задолженность» = canonical current debt (Этап 2.1), never the
+  // ledger closing balance and never a SUM(umag_supplies.debt)-for-period
+  // fallback — those formulas are gone from this path entirely. Bulk, not
+  // per-row: one resolve query for rows only known by umagSupplierId, one
+  // debt query for every canonical supplier this period's rows touch.
+  const rowsList = [...byKey.values()]
+  let resolvedPlatformIdByUmagId
+  let canonicalDebtByPlatformId
+  try {
+    const umagIdsNeedingResolution = [
+      ...new Set(
+        rowsList
+          .filter((row) => !row.platformSupplierId && row.umagSupplierId != null)
+          .map((row) => row.umagSupplierId)
+      ),
+    ]
+    resolvedPlatformIdByUmagId = await resolvePlatformSupplierIdsByUmagIds(umagIdsNeedingResolution)
+
+    const canonicalIds = [
+      ...new Set([
+        ...rowsList.filter((row) => row.platformSupplierId).map((row) => row.platformSupplierId),
+        ...resolvedPlatformIdByUmagId.values(),
+      ]),
+    ]
+    canonicalDebtByPlatformId = await fetchCanonicalSupplierDebts({ platformSupplierIds: canonicalIds })
+  } catch (err) {
+    return {
+      rows: [],
+      totals: emptyTotals(),
+      error: err.message || 'Не удалось рассчитать текущую задолженность поставщиков.',
+    }
+  }
+
+  let rows = rowsList.map((row) => {
     const openingBalance = openingByKey.get(row.key) || 0
     const history = buildSupplierOperationHistory(
       row.supplies,
@@ -621,14 +674,16 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
       openingBalance
     )
     const paidFromDocuments = toNumber(row.documentPaymentAmount)
+    const debt = resolveRowCanonicalDebt(row, resolvedPlatformIdByUmagId, canonicalDebtByPlatformId)
+
     return {
       ...row,
       openingBalance,
-      closingBalance: history.closingBalance,
+      // History/audit trail only — never read as product debt (Этап 2.5 item 11).
+      ledgerClosingBalance: history.closingBalance,
       // Prefer real payment documents for "Оплачено" when available.
       paymentAmount: paidFromDocuments > 0 ? paidFromDocuments : row.paymentAmount,
-      // Closing ledger balance is the period debt signal when ledger exists.
-      debt: history.operations.length > 0 ? history.closingBalance : row.debt,
+      debt,
       operations: history.operations,
     }
   })
@@ -653,7 +708,9 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
       acc.amount += row.amount
       acc.paymentAmount += row.paymentAmount
       acc.paymentRefundAmount += row.paymentRefundAmount
-      acc.debt += row.debt
+      // row.debt can be null for a row whose canonical supplier is
+      // unresolved — never let that turn the visible total into NaN.
+      acc.debt += toNumber(row.debt)
       acc.returnCount += row.returnCount
       acc.returnAmount += row.returnAmount
       return acc

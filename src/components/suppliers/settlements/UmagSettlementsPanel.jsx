@@ -166,7 +166,7 @@ function SettlementsTableFoot({
         </td>
         <td className="umag-settlements__tfoot-metric-cell">
           <TotalsMetricContent
-            label="Задолженность"
+            label="Текущий долг"
             value={totals?.debt}
             loading={loading}
             tone="debt"
@@ -209,7 +209,7 @@ function SettlementsMobileTotals({ totals, loading, periodLabel, lastRun }) {
         </div>
         <div className="umag-settlements__mobile-totals-cell">
           <TotalsMetricContent
-            label="Задолженность"
+            label="Текущий долг"
             value={totals?.debt}
             loading={loading}
             tone="debt"
@@ -391,7 +391,7 @@ function UmagSupplierDetail({
         <SummaryCard label="Сумма приёмок" value={supplier.amount} />
         <SummaryCard label="Возвраты поставщикам" value={supplier.returnAmount} />
         <SummaryCard label="Оплачено" value={supplier.paymentAmount} />
-        <SummaryCard label="Задолженность" value={supplier.debt} emphasize />
+        <SummaryCard label="Текущий долг" value={supplier.debt} emphasize />
         <SummaryCard label="Количество приёмок" value={supplier.supplyCount} isCount />
       </div>
 
@@ -915,7 +915,7 @@ export default function UmagSettlementsPanel() {
                   <th>Сумма приёмок</th>
                   <th>Возвраты поставщикам</th>
                   <th>Оплачено</th>
-                  <th>Задолженность</th>
+                  <th>Текущий долг</th>
                   {canViewRecon ? <th>Последняя сверка</th> : null}
                 </tr>
               </thead>
@@ -992,7 +992,7 @@ export default function UmagSettlementsPanel() {
                     <strong>{formatUmagMoney(row.returnAmount)}</strong>
                     <span>Оплачено</span>
                     <strong>{formatUmagMoney(row.paymentAmount)}</strong>
-                    <span>Задолженность</span>
+                    <span>Текущий долг</span>
                     <strong className={row.debt > 0 ? 'umag-settlements__debt' : undefined}>
                       {formatUmagMoney(row.debt)}
                     </strong>

@@ -194,19 +194,18 @@ function main() {
   assert.doesNotMatch(edge, /reconciliation_flag|ledger_delta|ledgerClosingBalance/i)
   ok('no ledger-vs-canonical reconciliation flag added this stage either')
 
-  // --- 9. Routes/menu/settlements screen untouched by the sync lock ---------
-  // Этап 2.3 itself touched no UI. Narrowed (not "zero UI diff ever again")
-  // so a later stage's deliberate, scoped component change — e.g. Этап 2.4
-  // swapping SupplierPaymentsPanel's KPI data source — doesn't trip this;
-  // routing/navigation/the settlements screen being left alone still is
-  // and remains the real invariant for lock-related work specifically.
+  // --- 9. Routes/menu/pages untouched by the sync lock ----------------------
+  // Этап 2.3 itself touched no UI. Narrowed to routing/navigation/page
+  // wrappers — later stages legitimately touch individual components
+  // (Этап 2.4's SupplierPaymentsPanel, Этап 2.5's UmagSettlementsPanel) without
+  // that being new routing/menu surface, which remains the real invariant
+  // lock-related work specifically must never introduce.
   const uiStatus = execFileSync(
     'git',
     [
       'status',
       '--porcelain',
       '--',
-      'src/components/suppliers/settlements',
       'src/pages/platform/settlements',
       'src/pages/platform/supplier-payments',
       'src/platform/platformNav.js',
@@ -215,7 +214,7 @@ function main() {
     { cwd: ROOT, encoding: 'utf8' }
   ).trim()
   assert.equal(uiStatus, '', `UI files changed unexpectedly: ${uiStatus}`)
-  ok('no route/menu/settlements-screen files touched by lock work — SYNC_ALREADY_RUNNING already resolves to a clear Russian message via the existing generic error-body path (verified below), no frontend change needed')
+  ok('no route/menu/page-wrapper files touched by lock work — SYNC_ALREADY_RUNNING already resolves to a clear Russian message via the existing generic error-body path (verified below), no frontend change needed')
 
   // The existing generic path (resolveEdgeFunctionUserMessage) picks body.message
   // verbatim when it looks like a Russian sentence, before ever falling back to

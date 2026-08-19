@@ -107,9 +107,12 @@ async function main() {
       /throw new UnresolvedSupplierDebtError\(umagSupplierId\)/.test(debtService)
   )
   assert(
+    // Этап 2.5 batched the single lookup into resolvePlatformSupplierIdsByUmagIds()
+    // (.in() instead of a lone .eq()) — same canonical link, now shared with the
+    // bulk path, per Этап 2.5 item 4. Not name matching either way.
     'unmapped-supplier resolution reuses the existing canonical link (platform_suppliers.umag_supplier_id, is_merged=false) — not name matching',
     /from\('platform_suppliers'\)/.test(debtService) &&
-      /\.eq\('umag_supplier_id',\s*umagSupplierId\)/.test(debtService) &&
+      /\.in\('umag_supplier_id',\s*ids\)/.test(debtService) &&
       /\.eq\('is_merged',\s*false\)/.test(debtService) &&
       !/ilike|\.eq\('name'/.test(debtService)
   )
@@ -166,11 +169,17 @@ async function main() {
     })()
   )
 
-  // --- 4. Ledger / settlements / sync untouched ----------------------------
+  // --- 4. Ledger / sync untouched; settlements now uses the SAME canonical helper ---
   const umagService = read('src/services/umagSettlementsService.js')
   assert(
-    'umagSettlementsService.js (Взаиморасчёты debt formula) not modified this stage',
-    /history\.operations\.length > 0 \? history\.closingBalance : row\.debt/.test(umagService)
+    // Этап 2.5 deliberately replaces this exact fallback expression with the
+    // canonical bulk debt lookup — see verify:settlements-canonical-debt for
+    // the full depth of that change. What must survive is that it now goes
+    // through THIS module's own canonical helper, not a reinvented formula.
+    'umagSettlementsService.js (Взаиморасчёты) now sources debt from supplierDebtService — the old ledger/SUM(debt) fallback is gone',
+    !/history\.operations\.length > 0 \? history\.closingBalance : row\.debt/.test(umagService) &&
+      /from '\.\/supplierDebtService'/.test(umagService) &&
+      /fetchCanonicalSupplierDebts/.test(umagService)
   )
   const ledgerUtil = read('src/utils/supplierLedger.js')
   assert(
