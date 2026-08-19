@@ -93,6 +93,16 @@ function checkStatic() {
 
   const run = section(sync, 'async function runOpenObligationsSync', 'Deno.serve(')
   assert.match(run, /entity: 'obligations'/)
+
+  // Parity with the previous payments sync, which always refreshed suppliers.
+  // Without it a new supplier stays unmapped and its obligation is unnamed.
+  assert.match(run, /fetchAllSuppliers\(session\)/)
+  assert.match(run, /upsertSuppliers\(serviceClient, suppliersResult\.agents\)/)
+  assert.match(run, /reconcileCanonicalSuppliers\(serviceClient, activeUmagIds\)/)
+  assert.match(run, /Справочник поставщиков не обновлён/)
+  assert.match(run, /loadPlatformSupplierMap\(serviceClient\)/)
+  ok('supplier directory refreshed before supplies are mapped')
+
   assert.match(run, /monthPeriodKeys\(month\)/)
   assert.match(run, /aqtobePeriodBoundsMs\(period\.dateFrom, period\.dateTo\)/)
   assert.match(run, /fetchAllSupplies\(session, bounds\.fromTime, bounds\.toTime\)/)
