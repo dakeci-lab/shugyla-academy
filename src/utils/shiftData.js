@@ -55,6 +55,21 @@ export const SHIFT_STATUS_OPTIONS = [
   { value: SHIFT_STATUS.ABSENCE, label: SHIFT_STATUS_LABELS.absence },
 ]
 
+/**
+ * UI-only: selecting this in the day editor deletes the row («Нет смены»).
+ * Not a DB status — never send to upsert.
+ */
+export const SHIFT_DAY_CLEAR = 'no_shift'
+
+export const SHIFT_DAY_CLEAR_OPTION = {
+  value: SHIFT_DAY_CLEAR,
+  label: 'Нет смены',
+}
+
+export function isShiftDayClearValue(value) {
+  return value === SHIFT_DAY_CLEAR
+}
+
 /** Коды вычисляемого статуса attendance (не хранятся в БД) */
 export const SHIFT_RESULT_CODE = {
   DAY_OFF: 'day_off',

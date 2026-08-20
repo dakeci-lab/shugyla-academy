@@ -6,6 +6,7 @@ import {
   formatMonthYearLabel,
   parseDateKey,
   isDateKey,
+  toDateKey,
   getMonthCalendarRange,
 } from '../../../utils/shiftData'
 import {
@@ -22,11 +23,12 @@ import { canEditEmployeeSchedule } from '../../../config/permissions'
 import { useSession } from '../../../context/SessionContext'
 import { useScheduleBackgroundSync, BULK_OPERATION_STATUS } from '../../../hooks/useScheduleBackgroundSync'
 import { allowMobileBrowserBackOnce } from '../../../hooks/useBlockMobileBrowserBack'
-import { toastError, toastWarning } from '../../../services/notificationService'
+import { toastError, toastWarning, toastSuccess } from '../../../services/notificationService'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import EmployeeScheduleCalendar from '../EmployeeScheduleCalendar'
 import ShiftDayEditModal from '../ShiftDayEditModal'
 import BulkScheduleModal from '../BulkScheduleModal'
+import ClearScheduleFromDateModal from '../ClearScheduleFromDateModal'
 import PlatformPeriodHeader from '../../platform/PlatformPeriodHeader'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import '../../EmployeeAvatar.css'
@@ -74,6 +76,8 @@ export default function EmployeeScheduleSection({
   const [error, setError] = useState('')
   const [editDateKey, setEditDateKey] = useState(null)
   const [showBulkModal, setShowBulkModal] = useState(false)
+  const [showClearFromModal, setShowClearFromModal] = useState(false)
+  const [clearingFromDate, setClearingFromDate] = useState(false)
   const sharedEmployeeRef = useRef(sharedEmployee)
   const onEmployeeSyncRef = useRef(onEmployeeSync)
   const onPeriodChangeRef = useRef(onPeriodChange)
@@ -121,9 +125,9 @@ export default function EmployeeScheduleSection({
     } finally {
       if (!quiet) setLoading(false)
     }
-  }, [employeeId, year, month])
+  }, [employeeId, year, month, sharedEmployee?.terminatedAt, sharedEmployee?.employmentStatus])
 
-  const { syncMetaByDate, bulkOperation, enqueueSave, enqueueBulkSave, retryBulkSave, retrySave, dismissBulkStatus } =
+  const { syncMetaByDate, bulkOperation, enqueueSave, enqueueClear, enqueueBulkSave, retryBulkSave, retrySave, dismissBulkStatus } =
     useScheduleBackgroundSync({
       employeeId,
       userId: user?.id || null,
@@ -191,6 +195,23 @@ export default function EmployeeScheduleSection({
     enqueueSave(payload, existingShift, setShifts)
   }
 
+  function handleClearShift(dateKey) {
+    if (!resolvedEmployee || !canEditEmployeeScheduleDate(resolvedEmployee, dateKey)) {
+      toastError(
+        getEmployeeScheduleDateRestrictionReason(resolvedEmployee, dateKey) ||
+          'Дата вне периода работы сотрудника'
+      )
+      return
+    }
+    const existingShift = shiftMap.get(dateKey) || null
+    if (!existingShift) {
+      setEditDateKey(null)
+      return
+    }
+    setEditDateKey(null)
+    enqueueClear(dateKey, existingShift, setShifts)
+  }
+
   function handleBulkApply(snapshot) {
     if (!resolvedEmployee) return false
     const { allowed, skipped } = filterScheduleEntriesToEmployment(
@@ -230,6 +251,44 @@ export default function EmployeeScheduleSection({
   function handleRetrySync(dateKey) {
     retrySave(dateKey, setShifts)
   }
+
+  async function handleClearFromDate(fromDate) {
+    if (!resolvedEmployee || clearingFromDate) return
+    setClearingFromDate(true)
+    try {
+      const { clearEmployeeShiftsFromDate } = await import(
+        '../../../services/platformDataService'
+      )
+      const result = await clearEmployeeShiftsFromDate(employeeId, fromDate)
+      setShowClearFromModal(false)
+      const deleted = Number(result?.deleted) || 0
+      const skipped = Number(result?.retainedWithAttendance) || 0
+      if (deleted === 0 && skipped === 0) {
+        toastSuccess('Нечего очищать с этой даты')
+      } else {
+        toastSuccess(
+          `Удалено смен: ${deleted}` +
+            (skipped > 0 ? `. Пропущено с фактом: ${skipped}` : '')
+        )
+      }
+      await loadScheduleData({ quiet: true })
+    } catch (err) {
+      toastError(err?.message || 'Не удалось очистить график')
+      throw err
+    } finally {
+      setClearingFromDate(false)
+    }
+  }
+
+  const defaultClearFromDate = useMemo(() => {
+    const terminatedAt = resolvedEmployee?.terminatedAt
+    if (terminatedAt && isDateKey(terminatedAt)) {
+      const date = parseDateKey(terminatedAt)
+      date.setDate(date.getDate() + 1)
+      return toDateKey(date)
+    }
+    return toDateKey(new Date())
+  }, [resolvedEmployee?.terminatedAt])
 
   if (!embedded && loading && !employee) {
     return <DelayedLoadingSkeleton variant="cards" count={3} />
@@ -278,11 +337,19 @@ export default function EmployeeScheduleSection({
             type="button"
             className="btn btn--primary btn--sm"
             onClick={() => setShowBulkModal(true)}
-            disabled={bulkSaving || !monthOverlapsEmployment}
+            disabled={bulkSaving || clearingFromDate || !monthOverlapsEmployment}
             title={setupDisabledReason || undefined}
-            aria-disabled={bulkSaving || !monthOverlapsEmployment}
+            aria-disabled={bulkSaving || clearingFromDate || !monthOverlapsEmployment}
           >
             Настроить график
+          </button>
+          <button
+            type="button"
+            className="btn btn--outline btn--sm"
+            onClick={() => setShowClearFromModal(true)}
+            disabled={bulkSaving || clearingFromDate}
+          >
+            Очистить график с даты…
           </button>
           {setupDisabledReason && (
             <span className="schedule-employee-actions__hint">{setupDisabledReason}</span>
@@ -350,6 +417,7 @@ export default function EmployeeScheduleSection({
           canEditActual={canEdit}
           onClose={() => setEditDateKey(null)}
           onSave={handleSaveShift}
+          onClear={handleClearShift}
         />
       )}
 
@@ -358,6 +426,15 @@ export default function EmployeeScheduleSection({
           employee={resolvedEmployee}
           onClose={() => setShowBulkModal(false)}
           onApply={handleBulkApply}
+        />
+      )}
+
+      {showClearFromModal && canEdit && resolvedEmployee && (
+        <ClearScheduleFromDateModal
+          employeeName={resolvedEmployee.name}
+          defaultFromDate={defaultClearFromDate}
+          onClose={() => setShowClearFromModal(false)}
+          onConfirm={handleClearFromDate}
         />
       )}
     </>

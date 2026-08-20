@@ -8,11 +8,15 @@ import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
 import {
   MAX_BULK_SHIFTS,
   assertScheduleChangeAllowed,
+  assertShiftDeleteAllowed,
   buildShiftRow,
   canEditEmployeeScheduleDate,
+  clearPlanShiftsFromDate,
   fetchExistingShiftsByDates,
+  isDateKey,
   normalizeEmployeeId,
   parseShiftInput,
+  toScheduleDateKey,
   validateShiftInput,
   type ShiftInput,
 } from '../_shared/employeeScheduleWrite.ts'
@@ -22,8 +26,21 @@ const PERMISSION_EDIT = 'schedule.edit'
 const PERMISSION_BULK_EDIT = 'schedule.bulk_edit'
 const PERMISSION_VIEW_TEAM = 'schedule.view_team'
 
-const ALLOWED_BODY_KEYS = new Set(['action', 'employee_id', 'shift', 'shifts', 'overwrite'])
-const ALLOWED_ACTIONS = new Set(['upsert_shift', 'bulk_upsert_shifts'])
+const ALLOWED_BODY_KEYS = new Set([
+  'action',
+  'employee_id',
+  'shift',
+  'shifts',
+  'overwrite',
+  'shift_date',
+  'from_date',
+])
+const ALLOWED_ACTIONS = new Set([
+  'upsert_shift',
+  'bulk_upsert_shifts',
+  'delete_shift',
+  'clear_shifts_from',
+])
 
 type SchedulableTarget = {
   id: number
@@ -182,6 +199,65 @@ Deno.serve(async (req) => {
       action,
       shift: mapSafeWorkforceShift(data as Record<string, unknown>),
     })
+  }
+
+  if (action === 'delete_shift') {
+    const shiftDate = toScheduleDateKey(payload.shift_date)
+    if (!shiftDate || !isDateKey(shiftDate)) {
+      return adminErrorResponse('validation_error', 422)
+    }
+
+    if (!canEditEmployeeScheduleDate(target.hired_at, target.terminated_at, shiftDate)) {
+      return adminErrorResponse('shift_outside_employment', 422)
+    }
+
+    const existingMap = await fetchExistingShiftsByDates(serviceClient, employeeId, [shiftDate])
+    const existing = existingMap.get(shiftDate) ?? null
+    const blockReason = assertShiftDeleteAllowed(existing)
+    if (blockReason) return adminErrorResponse(blockReason, 409)
+
+    if (!existing) {
+      return jsonResponse({ ok: true, action, deleted: false, shift_date: shiftDate })
+    }
+
+    const { error } = await serviceClient
+      .from('academy_employee_shifts')
+      .delete()
+      .eq('employee_id', employeeId)
+      .eq('shift_date', shiftDate)
+
+    if (error) {
+      console.error('schedule_delete_failed', { category: error.message })
+      return adminErrorResponse('internal_error', 500)
+    }
+
+    return jsonResponse({ ok: true, action, deleted: true, shift_date: shiftDate })
+  }
+
+  if (action === 'clear_shifts_from') {
+    const fromDate = toScheduleDateKey(payload.from_date)
+    if (!fromDate || !isDateKey(fromDate)) {
+      return adminErrorResponse('validation_error', 422)
+    }
+
+    // Repair / clear may include days after terminated_at — do not gate on employment window.
+    try {
+      const clearResult = await clearPlanShiftsFromDate(serviceClient, employeeId, fromDate, {
+        inclusive: true,
+      })
+      return jsonResponse({
+        ok: true,
+        action,
+        from_date: fromDate,
+        deleted: clearResult.deleted,
+        skipped_with_attendance: clearResult.retainedWithAttendance,
+      })
+    } catch (clearErr) {
+      console.error('schedule_clear_from_failed', {
+        category: clearErr instanceof Error ? clearErr.message : 'unknown',
+      })
+      return adminErrorResponse('internal_error', 500)
+    }
   }
 
   const shiftsOrError = parseShiftList(payload.shifts)

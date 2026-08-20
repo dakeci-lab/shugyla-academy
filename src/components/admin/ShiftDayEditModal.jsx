@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import AdminModal from './AdminModal'
 import {
   SHIFT_STATUS_OPTIONS,
+  SHIFT_DAY_CLEAR_OPTION,
+  isShiftDayClearValue,
   isWorkingShiftStatus,
   shiftToForm,
   validateShiftForm,
@@ -10,6 +12,7 @@ import {
   formatTimeValue,
 } from '../../utils/shiftData'
 import {
+  hasShiftAttendanceHistory,
   isDestructiveScheduleChange,
   getDestructiveScheduleChangeMessage,
 } from '../../utils/shiftAttendanceGuard'
@@ -25,11 +28,19 @@ export default function ShiftDayEditModal({
   canEditActual = true,
   onClose,
   onSave,
+  onClear,
 }) {
   const [form, setForm] = useState(() => shiftToForm(shift, dateKey))
   const [errors, setErrors] = useState({})
   const [destructiveConfirm, setDestructiveConfirm] = useState(false)
   const [pendingPayload, setPendingPayload] = useState(null)
+
+  const hasAttendance = useMemo(() => hasShiftAttendanceHistory(shift), [shift])
+  const canClearToEmpty = Boolean(shift) && !hasAttendance && typeof onClear === 'function'
+  const statusOptions = useMemo(() => {
+    if (!canClearToEmpty) return SHIFT_STATUS_OPTIONS
+    return [...SHIFT_STATUS_OPTIONS, SHIFT_DAY_CLEAR_OPTION]
+  }, [canClearToEmpty])
 
   useEffect(() => {
     setForm(shiftToForm(shift, dateKey))
@@ -38,7 +49,8 @@ export default function ShiftDayEditModal({
     setPendingPayload(null)
   }, [shift, dateKey])
 
-  const showShiftTimes = isWorkingShiftStatus(form.status)
+  const clearingDay = isShiftDayClearValue(form.status)
+  const showShiftTimes = !clearingDay && isWorkingShiftStatus(form.status)
   const lateMinutes = shift?.lateMinutes ?? shift?.computedStatus?.lateMinutes ?? 0
   const earlyLeaveMinutes =
     shift?.earlyLeaveMinutes ?? shift?.computedStatus?.earlyLeaveMinutes ?? 0
@@ -61,6 +73,13 @@ export default function ShiftDayEditModal({
 
   function handleSubmit(event) {
     event.preventDefault()
+
+    if (isShiftDayClearValue(form.status)) {
+      if (!canClearToEmpty) return
+      onClear(dateKey)
+      return
+    }
+
     const validationErrors = validateShiftForm(form)
     setErrors(validationErrors)
     if (Object.keys(validationErrors).length > 0) return
@@ -123,7 +142,7 @@ export default function ShiftDayEditModal({
             Отмена
           </button>
           <button type="submit" className="btn btn--primary" form="shift-day-form">
-            Сохранить
+            {clearingDay ? 'Убрать смену' : 'Сохранить'}
           </button>
         </>
       }
@@ -149,13 +168,26 @@ export default function ShiftDayEditModal({
             value={form.status}
             onChange={(e) => setForm({ ...form, status: e.target.value })}
           >
-            {SHIFT_STATUS_OPTIONS.map((option) => (
+            {statusOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
           </select>
         </label>
+
+        {hasAttendance && (
+          <p className="admin-form__hint">
+            По смене есть отметки прихода/ухода — пункт «Нет смены» недоступен. Факт можно
+            изменить в полях ниже.
+          </p>
+        )}
+
+        {clearingDay && (
+          <p className="admin-form__hint">
+            Смена будет удалена из графика. День станет «Нет смены».
+          </p>
+        )}
 
         {showShiftTimes && (
           <div className="admin-form__row">
@@ -186,7 +218,7 @@ export default function ShiftDayEditModal({
           </div>
         )}
 
-        {canEditActual && (
+        {canEditActual && !clearingDay && (
           <div className="admin-form__row">
             <label className="admin-form__label">
               Фактическое время прихода
@@ -209,15 +241,17 @@ export default function ShiftDayEditModal({
           </div>
         )}
 
-        <label className="admin-form__label">
-          Комментарий
-          <textarea
-            className="admin-form__input"
-            rows={3}
-            value={form.comment}
-            onChange={(e) => setForm({ ...form, comment: e.target.value })}
-          />
-        </label>
+        {!clearingDay && (
+          <label className="admin-form__label">
+            Комментарий
+            <textarea
+              className="admin-form__input"
+              rows={3}
+              value={form.comment}
+              onChange={(e) => setForm({ ...form, comment: e.target.value })}
+            />
+          </label>
+        )}
       </form>
     </AdminModal>
   )

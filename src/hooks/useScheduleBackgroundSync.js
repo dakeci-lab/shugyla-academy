@@ -3,6 +3,7 @@ import { normalizeShift } from '../utils/shiftData'
 import {
   saveEmployeeShift,
   applyBulkEmployeeShifts,
+  deleteEmployeeShiftDay,
 } from '../services/platformDataService'
 import { toastSuccess, toastError, toastWarning } from '../services/notificationService'
 
@@ -58,6 +59,10 @@ export function upsertShiftInList(shifts, nextShift) {
     list.push(nextShift)
   }
   return list.sort((a, b) => a.shiftDate.localeCompare(b.shiftDate))
+}
+
+export function removeShiftFromList(shifts, shiftDate) {
+  return (shifts || []).filter((row) => row.shiftDate !== shiftDate)
 }
 
 /** Фоновая синхронизация графика с optimistic UI */
@@ -169,14 +174,89 @@ export function useScheduleBackgroundSync({ employeeId, userId, onBulkSuccess })
     [employeeId, runSingleSave]
   )
 
+  const runSingleDelete = useCallback(
+    async (dateKey, existingShift, setShifts) => {
+      const nextVersion = (mutationVersionsRef.current.get(dateKey) || 0) + 1
+      mutationVersionsRef.current.set(dateKey, nextVersion)
+
+      if (inFlightRef.current.get(dateKey)) {
+        inFlightRef.current.get(dateKey).abortStale = true
+      }
+
+      const flight = { abortStale: false }
+      inFlightRef.current.set(dateKey, flight)
+
+      setSyncMeta(dateKey, {
+        syncStatus: SYNC_STATUS.SAVING,
+        mutationVersion: nextVersion,
+        localData: { action: 'delete_shift', shiftDate: dateKey },
+        previousData: existingShift ?? null,
+        errorMessage: null,
+      })
+
+      try {
+        await deleteEmployeeShiftDay(employeeId, dateKey)
+        if (
+          flight.abortStale ||
+          mutationVersionsRef.current.get(dateKey) !== nextVersion
+        ) {
+          return
+        }
+
+        setShifts((prev) => removeShiftFromList(prev, dateKey))
+        setSyncMeta(dateKey, {
+          syncStatus: SYNC_STATUS.SYNCED,
+          mutationVersion: nextVersion,
+          errorMessage: null,
+        })
+        toastSuccess('Смена убрана')
+      } catch (error) {
+        if (
+          flight.abortStale ||
+          mutationVersionsRef.current.get(dateKey) !== nextVersion
+        ) {
+          return
+        }
+
+        if (existingShift) {
+          setShifts((prev) => upsertShiftInList(prev, existingShift))
+        }
+        setSyncMeta(dateKey, {
+          syncStatus: SYNC_STATUS.ERROR,
+          mutationVersion: nextVersion,
+          errorMessage: error.message || 'Не удалось убрать смену',
+        })
+        toastError(error.message || 'Не удалось убрать смену')
+      } finally {
+        if (inFlightRef.current.get(dateKey) === flight) {
+          inFlightRef.current.delete(dateKey)
+        }
+      }
+    },
+    [employeeId, setSyncMeta]
+  )
+
+  const enqueueClear = useCallback(
+    (dateKey, existingShift, setShifts) => {
+      toastWarning('Убираем смену…', 2200)
+      setShifts((prev) => removeShiftFromList(prev, dateKey))
+      void runSingleDelete(dateKey, existingShift, setShifts)
+    },
+    [runSingleDelete]
+  )
+
   const retrySave = useCallback(
     (dateKey, setShifts) => {
       const meta = syncMetaByDate[dateKey]
       if (!meta?.localData) return
+      if (meta.localData?.action === 'delete_shift') {
+        enqueueClear(dateKey, meta.previousData, setShifts)
+        return
+      }
       const existing = meta.previousData
       enqueueSave(meta.localData, existing, setShifts)
     },
-    [enqueueSave, syncMetaByDate]
+    [enqueueClear, enqueueSave, syncMetaByDate]
   )
 
   const runBulkSave = useCallback(
@@ -286,6 +366,7 @@ export function useScheduleBackgroundSync({ employeeId, userId, onBulkSuccess })
     bulkOperation,
     hasUnsyncedChanges,
     enqueueSave,
+    enqueueClear,
     enqueueBulkSave,
     retryBulkSave,
     retrySave,

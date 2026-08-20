@@ -492,17 +492,20 @@ export async function updateEmployee(id, updates) {
     return
   }
   await getAdapter().updateEmployee(id, updates)
+  await maybeClearLocalShiftsAfterTermination(id, updates)
 }
 
 export async function deactivateEmployee(id) {
+  const terminatedAt = todayEmployeeDateKey()
   if (isCloudMode()) {
     await updateEmployeeAsAdmin(id, {
       employmentStatus: 'terminated',
-      terminatedAt: todayEmployeeDateKey(),
+      terminatedAt,
     })
     return
   }
   await getAdapter().deactivateEmployee(id)
+  await shiftLocalAdapter.clearEmployeeShiftsAfterTermination(Number(id), terminatedAt)
 }
 
 export async function restoreEmployee(id) {
@@ -514,6 +517,18 @@ export async function restoreEmployee(id) {
     return
   }
   await getAdapter().restoreEmployee(id)
+}
+
+async function maybeClearLocalShiftsAfterTermination(id, updates) {
+  const status = updates?.employmentStatus ?? updates?.status
+  const isTerm =
+    status === 'terminated' || status === 'inactive' || status === 'deactivated'
+  if (!isTerm) return
+  const terminatedAt =
+    updates?.terminatedAt != null && String(updates.terminatedAt).trim() !== ''
+      ? String(updates.terminatedAt).trim().slice(0, 10)
+      : todayEmployeeDateKey()
+  await shiftLocalAdapter.clearEmployeeShiftsAfterTermination(Number(id), terminatedAt)
 }
 
 export async function permanentlyDeleteEmployee(id) {
@@ -939,6 +954,23 @@ export async function applyBulkEmployeeShifts(employeeId, entries, options = {})
     }
   }
   return count
+}
+
+export async function deleteEmployeeShiftDay(employeeId, shiftDate) {
+  const result = await getShiftAdapter().deleteEmployeeShift(Number(employeeId), shiftDate)
+  const { year, month } = parseYearMonthFromDateKey(shiftDate)
+  notifyRatingUpdated(year, month)
+  return result
+}
+
+export async function clearEmployeeShiftsFromDate(employeeId, fromDate) {
+  const result = await getShiftAdapter().clearEmployeeShiftsFromDate(
+    Number(employeeId),
+    fromDate
+  )
+  const { year, month } = parseYearMonthFromDateKey(fromDate)
+  notifyRatingUpdated(year, month)
+  return result
 }
 
 export async function getWorkLocations() {

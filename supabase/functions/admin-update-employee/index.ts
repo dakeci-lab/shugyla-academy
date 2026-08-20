@@ -29,6 +29,11 @@ import {
   resolveActivePositionForAssignment,
 } from '../_shared/employeePositions.ts'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
+import {
+  clearPlanShiftsAfterTerminationDate,
+  isTerminatedEmploymentStatus,
+  toScheduleDateKey,
+} from '../_shared/employeeScheduleWrite.ts'
 
 const PERMISSION_EDIT = 'employees.edit'
 
@@ -411,12 +416,39 @@ Deno.serve(async (req) => {
     return adminErrorResponse('internal_error', 500)
   }
 
+  const updatedRow = updated as DbEmployeeRow
+  let scheduleClear: { deleted: number; retained_with_attendance: number } | null = null
+  const effectiveTerminatedAt = toScheduleDateKey(updatedRow.terminated_at)
+  if (
+    effectiveTerminatedAt &&
+    isTerminatedEmploymentStatus(updatedRow.status)
+  ) {
+    try {
+      const clearResult = await clearPlanShiftsAfterTerminationDate(
+        serviceClient,
+        employeeId,
+        effectiveTerminatedAt
+      )
+      scheduleClear = {
+        deleted: clearResult.deleted,
+        retained_with_attendance: clearResult.retainedWithAttendance,
+      }
+    } catch (clearErr) {
+      console.error('admin_update_employee_schedule_clear_failed', {
+        category: clearErr instanceof Error ? clearErr.message : 'unknown',
+        employeeId,
+      })
+      return adminErrorResponse('schedule_clear_failed', 500)
+    }
+  }
+
   const catalog = await loadPositionCatalogByIds(serviceClient, [
-    (updated as DbEmployeeRow).position_id,
+    updatedRow.position_id,
   ])
 
   return jsonResponse({
     ok: true,
-    employee: mapSafeEmployee(updated as DbEmployeeRow, catalog),
+    employee: mapSafeEmployee(updatedRow, catalog),
+    ...(scheduleClear ? { schedule_clear: scheduleClear } : {}),
   })
 })

@@ -12,6 +12,14 @@ function assertWithinEmployment(employeeId, dateKey) {
   }
 }
 
+/** Mirror Edge hasShiftAttendanceHistory on raw localStorage rows. */
+function rowHasAttendanceHistory(row) {
+  if (!row) return false
+  if (row.actual_start_time || row.actual_end_time) return true
+  if (row.check_in_latitude != null || row.check_out_latitude != null) return true
+  return false
+}
+
 function readShifts() {
   const data = localStorage.getItem(STORAGE_KEY)
   return data ? JSON.parse(data) : []
@@ -137,4 +145,76 @@ export async function bulkApplyEmployeeShifts(
 
   writeShifts(shifts)
   return applied
+}
+
+/** Delete plan row → calendar «Нет смены». Rejects shifts with attendance. */
+export async function deleteEmployeeShift(employeeId, shiftDate) {
+  assertWithinEmployment(employeeId, shiftDate)
+  const shifts = readShifts()
+  const idx = shifts.findIndex(
+    (row) => Number(row.employee_id) === Number(employeeId) && row.shift_date === shiftDate
+  )
+  if (idx < 0) {
+    return { deleted: false, shiftDate }
+  }
+
+  const existing = shifts[idx]
+  if (rowHasAttendanceHistory(existing)) {
+    throw new Error('По этой смене уже есть фактические данные. Удаление запрещено.')
+  }
+
+  shifts.splice(idx, 1)
+  writeShifts(shifts)
+  return { deleted: true, shiftDate }
+}
+
+/**
+ * After termination: remove plan rows with shift_date > terminatedAt and no attendance.
+ * Idempotent. Does not touch days on/before termination.
+ */
+export async function clearEmployeeShiftsAfterTermination(employeeId, terminatedAt) {
+  return clearEmployeeShiftsFromDate(employeeId, terminatedAt, { inclusive: false })
+}
+
+/**
+ * Clear plan rows from fromDate without attendance.
+ * inclusive true → shift_date >= fromDate; false → shift_date > fromDate.
+ * Does not gate on terminated_at (repair for terminated staff).
+ */
+export async function clearEmployeeShiftsFromDate(
+  employeeId,
+  fromDate,
+  { inclusive = true } = {}
+) {
+  const fromKey = String(fromDate || '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(fromKey)) {
+    return { deleted: 0, retainedWithAttendance: 0 }
+  }
+
+  const shifts = readShifts()
+  let deleted = 0
+  let retainedWithAttendance = 0
+  const next = []
+
+  for (const row of shifts) {
+    if (Number(row.employee_id) !== Number(employeeId)) {
+      next.push(row)
+      continue
+    }
+    const dateKey = String(row.shift_date)
+    const beforeFrom = inclusive ? dateKey < fromKey : dateKey <= fromKey
+    if (beforeFrom) {
+      next.push(row)
+      continue
+    }
+    if (rowHasAttendanceHistory(row)) {
+      retainedWithAttendance += 1
+      next.push(row)
+      continue
+    }
+    deleted += 1
+  }
+
+  writeShifts(next)
+  return { deleted, retainedWithAttendance }
 }
