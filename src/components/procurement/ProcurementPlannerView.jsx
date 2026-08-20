@@ -1322,14 +1322,17 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   function renderDesktopSkuRow(item, index, { indent = false } = {}) {
     return (
-      <tr key={item.id} className={indent ? 'proc-planner__tree-sku' : undefined}>
+      <tr
+        key={item.id}
+        className={`proc-planner__sku-row${indent ? ' proc-planner__tree-sku' : ''}`}
+      >
         <td className="proc-planner__col-num proc-planner__sticky-num">
           {index + 1}
         </td>
         <td className="proc-planner__col-product proc-planner__sticky-product">
           <div className={`proc-planner__product${indent ? ' is-tree-child' : ''}`}>
-            <strong>{item.productName}</strong>
-            <span>{item.barcode}</span>
+            <strong title={item.productName}>{item.productName}</strong>
+            <span title={item.barcode}>{item.barcode}</span>
           </div>
         </td>
         <td>
@@ -1449,7 +1452,9 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             >
               {expanded ? '−' : '+'}
             </button>
-            <span className="proc-planner__tree-group-name">{label}</span>
+            <span className="proc-planner__tree-group-name" title={label}>
+              {label}
+            </span>
             <span
               className="proc-planner__tree-group-count"
               title={countsScopeTitle}
@@ -1536,7 +1541,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   function renderMobileSkuCard(item, index) {
     return (
-      <li key={item.id} className="proc-planner__card">
+      <li key={item.id} className="proc-planner__card proc-planner__sku-row">
         <div className="proc-planner__card-top">
           <strong>
             <span className="proc-planner__row-num" aria-hidden="true">
@@ -1637,7 +1642,9 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
           <span className="proc-planner__tree-toggle" aria-hidden="true">
             {expanded ? '−' : '+'}
           </span>
-          <span className="proc-planner__tree-group-name">{label}</span>
+          <span className="proc-planner__tree-group-name" title={label}>
+            {label}
+          </span>
           <span className="proc-planner__tree-group-count" title={countsScopeTitle}>
             {count}
           </span>
