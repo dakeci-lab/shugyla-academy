@@ -330,12 +330,12 @@ export function normalizeSupplierMatchName(name) {
 }
 
 /**
- * Unique active suppliers scheduled for today (deliveryWeekdays).
- * Same source semantics as «Визиты поставщиков».
+ * Unique active suppliers whose order day is today (orderWeekdays).
+ * Empty orderWeekdays → excluded; no fallback to deliveryWeekdays.
  * @param {Array<object>} suppliers
  * @param {{ now?: Date, weekdayId?: string|null, timeZone?: string }} [options]
  */
-export function listTodaysScheduledSuppliers(
+export function listTodaysOrderSuppliers(
   suppliers,
   { now = new Date(), weekdayId = null, timeZone = 'Asia/Almaty' } = {}
 ) {
@@ -348,8 +348,8 @@ export function listTodaysScheduledSuppliers(
     if (!supplier?.id || seen.has(supplier.id)) continue
     if (supplier.status !== 'active') continue
     if (
-      !Array.isArray(supplier.deliveryWeekdays) ||
-      !supplier.deliveryWeekdays.includes(dayId)
+      !Array.isArray(supplier.orderWeekdays) ||
+      !supplier.orderWeekdays.includes(dayId)
     ) {
       continue
     }
@@ -404,7 +404,8 @@ function sortSupplierSelectRows(rows) {
 
 /**
  * Build supplier rows for the planner selector.
- * - today: scheduled active visits (even without snapshot rows)
+ * - today: active suppliers with order day = today (even without snapshot rows);
+ *   `scheduledSuppliers` is the result of `listTodaysOrderSuppliers`
  * - all: active catalog enriched with snapshot + leftover snapshot-only legacy rows
  */
 export function buildPlannerSupplierSelectOptions({
@@ -455,8 +456,13 @@ export function buildPlannerSupplierSelectOptions({
   return sortSupplierSelectRows(rows)
 }
 
-/** Whether a selected supplier id belongs to today's scheduled visits. */
-export function isSupplierInTodaySchedule(
+/**
+ * Whether a selected supplier id belongs to today's order-day list.
+ * @param {string} supplierId
+ * @param {Array<object>} scheduledSuppliers result of `listTodaysOrderSuppliers`
+ * @param {Array<object>} [snapshotSuppliers]
+ */
+export function isSupplierInTodaysOrderList(
   supplierId,
   scheduledSuppliers = [],
   snapshotSuppliers = []

@@ -135,38 +135,66 @@ async function stageSummariesAndWorkflow() {
       ux.isSupplierInconsistent(s4)
   )
 
-  const inactiveExcluded = ux.listTodaysScheduledSuppliers(
+  const inactiveExcluded = ux.listTodaysOrderSuppliers(
     [
       {
         id: 'active-1',
         name: 'Active',
         status: 'active',
-        deliveryWeekdays: ['mon'],
+        orderWeekdays: ['mon'],
       },
       {
         id: 'inactive-1',
         name: 'Inactive',
         status: 'inactive',
-        deliveryWeekdays: ['mon'],
+        orderWeekdays: ['mon'],
       },
       {
         id: 'archived-1',
         name: 'Archived',
         status: 'archived',
-        deliveryWeekdays: ['mon'],
+        orderWeekdays: ['mon'],
       },
       {
         id: 'other-day',
         name: 'Tuesday',
         status: 'active',
-        deliveryWeekdays: ['tue'],
+        orderWeekdays: ['tue'],
       },
     ],
     { weekdayId: 'mon' }
   )
   assert(
-    'inactive excluded from today schedule',
+    'inactive excluded from today order list',
     inactiveExcluded.length === 1 && inactiveExcluded[0].id === 'active-1'
+  )
+
+  const kezi = {
+    id: 'kezi',
+    name: 'TOO Kezi',
+    status: 'active',
+    orderWeekdays: ['wed'],
+    deliveryWeekdays: ['thu'],
+  }
+  assert(
+    'Kezi excluded on delivery Thursday',
+    ux.listTodaysOrderSuppliers([kezi], { weekdayId: 'thu' }).length === 0
+  )
+  assert(
+    'Kezi included on order Wednesday',
+    ux.listTodaysOrderSuppliers([kezi], { weekdayId: 'wed' }).length === 1 &&
+      ux.listTodaysOrderSuppliers([kezi], { weekdayId: 'wed' })[0].id === 'kezi'
+  )
+  const deliveryOnly = {
+    id: 'd-only',
+    name: 'Only Delivery',
+    status: 'active',
+    orderWeekdays: [],
+    deliveryWeekdays: ['thu'],
+  }
+  assert(
+    'delivery-only excluded from today order list',
+    ux.listTodaysOrderSuppliers([deliveryOnly], { weekdayId: 'thu' }).length === 0
   )
 
   assert(
@@ -720,13 +748,13 @@ async function stageSupplierScopeOptions() {
   )
 
   const scheduled = [
-    { id: 'sched-1', name: 'Сегодняшний', status: 'active', deliveryWeekdays: ['mon'] },
-    { id: 'sched-empty', name: 'Без строк', status: 'active', deliveryWeekdays: ['mon'] },
+    { id: 'sched-1', name: 'Сегодняшний', status: 'active', orderWeekdays: ['mon'] },
+    { id: 'sched-empty', name: 'Без строк', status: 'active', orderWeekdays: ['mon'] },
   ]
   const catalog = [
     ...scheduled,
-    { id: 'other-1', name: 'Другой день', status: 'active', deliveryWeekdays: ['tue'] },
-    { id: 'inactive-1', name: 'Неактивный', status: 'inactive', deliveryWeekdays: ['mon'] },
+    { id: 'other-1', name: 'Другой день', status: 'active', orderWeekdays: ['tue'] },
+    { id: 'inactive-1', name: 'Неактивный', status: 'inactive', orderWeekdays: ['mon'] },
   ]
   const snapshotSuppliers = [
     {
@@ -789,8 +817,8 @@ async function stageSupplierScopeOptions() {
   )
   assert(
     'scope switch clears hidden selection',
-    ux.isSupplierInTodaySchedule('other-1', scheduled, snapshotSuppliers) === false &&
-      ux.isSupplierInTodaySchedule('sched-1', scheduled, snapshotSuppliers) === true
+    ux.isSupplierInTodaysOrderList('other-1', scheduled, snapshotSuppliers) === false &&
+      ux.isSupplierInTodaysOrderList('sched-1', scheduled, snapshotSuppliers) === true
   )
 }
 
@@ -1084,6 +1112,7 @@ function stageSourceContracts() {
   console.log('Stage 4: source contracts')
   const service = read('src/services/procurementPlanningService.js')
   const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
+  const uxSrc = read('src/utils/procurementPlannerUx.js')
   const page = read('src/pages/platform/procurement/ProcurementPage.jsx')
   const nav = read('src/platform/platformNav.js')
   const app = read('src/App.jsx')
@@ -1091,6 +1120,18 @@ function stageSourceContracts() {
   const select = read('src/components/suppliers/SearchableSupplierSelect.jsx')
   const pkg = read('package.json')
 
+  const listFnMatch = uxSrc.match(
+    /export function listTodaysOrderSuppliers\([\s\S]*?\n\}/
+  )
+  assert(
+    'listTodaysOrderSuppliers filters by orderWeekdays only',
+    Boolean(listFnMatch) &&
+      listFnMatch[0].includes('orderWeekdays') &&
+      !listFnMatch[0].includes('deliveryWeekdays') &&
+      !uxSrc.includes('listTodaysScheduledSuppliers') &&
+      !uxSrc.includes('isSupplierInTodaySchedule') &&
+      uxSrc.includes('isSupplierInTodaysOrderList')
+  )
   assert(
     'filter options select qty + order id',
     service.includes('final_order_qty, generated_purchase_order_id')
@@ -1107,8 +1148,9 @@ function stageSourceContracts() {
     !planner.includes('Частично сформирован')
   )
   assert(
-    'planner still scopes the supplier list by today schedule',
-    planner.includes('listTodaysScheduledSuppliers') &&
+    'planner still scopes the supplier list by today order days',
+    planner.includes('listTodaysOrderSuppliers') &&
+      !planner.includes('listTodaysScheduledSuppliers') &&
       planner.includes('getAllSuppliersSync') &&
       planner.includes('dataVersion')
   )
@@ -1214,7 +1256,8 @@ function stageSourceContracts() {
     planner.includes("useState('today')") &&
       planner.includes('buildPlannerSupplierSelectOptions') &&
       planner.includes('Сегодня ·') &&
-      planner.includes('На сегодня визитов нет')
+      planner.includes('На сегодня заказов нет') &&
+      !planner.includes('На сегодня визитов нет')
   )
   assert(
     'planner persists local filter delta to cache',
