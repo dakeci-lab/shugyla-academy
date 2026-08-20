@@ -6,9 +6,30 @@
 export const ABC_CLASSES = Object.freeze(['A', 'B', 'C'])
 
 export const ABC_AXES = Object.freeze([
-  { key: 'qty', filterKey: 'abcQty', column: 'abc_qty', itemKey: 'abcQty', label: 'Количество' },
-  { key: 'revenue', filterKey: 'abcRevenue', column: 'abc_revenue', itemKey: 'abcRevenue', label: 'Выручка' },
-  { key: 'profit', filterKey: 'abcProfit', column: 'abc_profit', itemKey: 'abcProfit', label: 'Прибыль' },
+  {
+    key: 'qty',
+    filterKey: 'abcQty',
+    column: 'abc_qty',
+    itemKey: 'abcQty',
+    label: 'Количество',
+    shortLabel: 'К',
+  },
+  {
+    key: 'revenue',
+    filterKey: 'abcRevenue',
+    column: 'abc_revenue',
+    itemKey: 'abcRevenue',
+    label: 'Выручка',
+    shortLabel: 'В',
+  },
+  {
+    key: 'profit',
+    filterKey: 'abcProfit',
+    column: 'abc_profit',
+    itemKey: 'abcProfit',
+    label: 'Прибыль',
+    shortLabel: 'П',
+  },
 ])
 
 export const ABC_SORT_FIELDS = Object.freeze(['abc_qty', 'abc_revenue', 'abc_profit'])

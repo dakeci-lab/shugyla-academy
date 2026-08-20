@@ -145,6 +145,21 @@ export function createSnapshotFilterAccumulator() {
     categoryCounts: new Map(),
     /** @type {Map<string, number>} snapshot-wide SKU counts per category\\0subcategory */
     pairCounts: new Map(),
+    /** @type {Map<string, number>} snapshot-wide orderable (qty>0) counts */
+    categoryCountsOrderable: new Map(),
+    /** @type {Map<string, number>} */
+    pairCountsOrderable: new Map(),
+    /**
+     * @type {Map<string, Map<string, number>>}
+     * supplierId → categoryName → count (all SKUs of supplier)
+     */
+    categoryCountsBySupplier: new Map(),
+    /** @type {Map<string, Map<string, number>>} supplierId → pairKey → count */
+    pairCountsBySupplier: new Map(),
+    /** @type {Map<string, Map<string, number>>} supplierId → category → orderable count */
+    categoryCountsBySupplierOrderable: new Map(),
+    /** @type {Map<string, Map<string, number>>} */
+    pairCountsBySupplierOrderable: new Map(),
     suppliers: new Map(),
     unassignedOrderableCount: 0,
   }
@@ -164,6 +179,51 @@ function emptySupplierSummary(id, name = '') {
   }
 }
 
+function bumpNestedCount(rootMap, outerKey, innerKey, delta = 1) {
+  if (!outerKey || !innerKey) return
+  let inner = rootMap.get(outerKey)
+  if (!inner) {
+    inner = new Map()
+    rootMap.set(outerKey, inner)
+  }
+  const next = (inner.get(innerKey) || 0) + delta
+  if (next <= 0) inner.delete(innerKey)
+  else inner.set(innerKey, next)
+  if (inner.size === 0) rootMap.delete(outerKey)
+}
+
+function nestedMapsToObject(rootMap) {
+  const out = {}
+  for (const [outerKey, inner] of rootMap || []) {
+    out[outerKey] = Object.fromEntries(inner)
+  }
+  return out
+}
+
+function cloneNestedCountObject(value) {
+  const out = {}
+  for (const [outerKey, inner] of Object.entries(value || {})) {
+    out[outerKey] = { ...(inner || {}) }
+  }
+  return out
+}
+
+function bumpPlainCount(mapObj, key, delta = 1) {
+  if (!key) return
+  const next = Math.max(0, (mapObj[key] || 0) + delta)
+  if (next <= 0) delete mapObj[key]
+  else mapObj[key] = next
+}
+
+function bumpNestedPlainCount(rootObj, outerKey, innerKey, delta = 1) {
+  if (!outerKey || !innerKey) return
+  if (!rootObj[outerKey]) rootObj[outerKey] = {}
+  const next = Math.max(0, (rootObj[outerKey][innerKey] || 0) + delta)
+  if (next <= 0) delete rootObj[outerKey][innerKey]
+  else rootObj[outerKey][innerKey] = next
+  if (Object.keys(rootObj[outerKey]).length === 0) delete rootObj[outerKey]
+}
+
 /**
  * Fold one DB/client row into the filter accumulator.
  * @param {object} row
@@ -172,25 +232,44 @@ function emptySupplierSummary(id, name = '') {
 export function accumulateSnapshotFilterRow(row, state) {
   const cat = row?.category_name || row?.categoryName || ''
   const sub = row?.subcategory_name || row?.subcategoryName || ''
-  if (cat) {
-    state.categories.add(cat)
-    state.categoryCounts.set(cat, (state.categoryCounts.get(cat) || 0) + 1)
-  }
-  if (cat && sub) {
-    const pairKey = `${cat}\u0000${sub}`
-    state.pairs.add(pairKey)
-    state.pairCounts.set(pairKey, (state.pairCounts.get(pairKey) || 0) + 1)
-  }
-
+  const pairKey = cat && sub ? `${cat}\u0000${sub}` : ''
   const qty = qtyOf(row)
   const orderable = qty > 0
   const generatedId = generatedIdOf(row)
   const supplierId = supplierIdOf(row)
   const supplierName = supplierNameOf(row, supplierId)
 
+  if (cat) {
+    state.categories.add(cat)
+    state.categoryCounts.set(cat, (state.categoryCounts.get(cat) || 0) + 1)
+    if (orderable) {
+      state.categoryCountsOrderable.set(
+        cat,
+        (state.categoryCountsOrderable.get(cat) || 0) + 1
+      )
+    }
+  }
+  if (pairKey) {
+    state.pairs.add(pairKey)
+    state.pairCounts.set(pairKey, (state.pairCounts.get(pairKey) || 0) + 1)
+    if (orderable) {
+      state.pairCountsOrderable.set(
+        pairKey,
+        (state.pairCountsOrderable.get(pairKey) || 0) + 1
+      )
+    }
+  }
+
   if (!supplierId) {
     if (orderable) state.unassignedOrderableCount += 1
     return
+  }
+
+  if (cat) bumpNestedCount(state.categoryCountsBySupplier, supplierId, cat, 1)
+  if (pairKey) bumpNestedCount(state.pairCountsBySupplier, supplierId, pairKey, 1)
+  if (orderable) {
+    if (cat) bumpNestedCount(state.categoryCountsBySupplierOrderable, supplierId, cat, 1)
+    if (pairKey) bumpNestedCount(state.pairCountsBySupplierOrderable, supplierId, pairKey, 1)
   }
 
   let summary = state.suppliers.get(supplierId)
@@ -260,6 +339,20 @@ function recomputeSupplierAggregates(suppliers, unassignedOrderableCount = 0) {
 export function finalizeSnapshotFilterOptions(state) {
   const categoryCounts = { ...(Object.fromEntries(state.categoryCounts || [])) }
   const pairCounts = { ...(Object.fromEntries(state.pairCounts || [])) }
+  const categoryCountsOrderable = {
+    ...(Object.fromEntries(state.categoryCountsOrderable || [])),
+  }
+  const pairCountsOrderable = {
+    ...(Object.fromEntries(state.pairCountsOrderable || [])),
+  }
+  const categoryCountsBySupplier = nestedMapsToObject(state.categoryCountsBySupplier)
+  const pairCountsBySupplier = nestedMapsToObject(state.pairCountsBySupplier)
+  const categoryCountsBySupplierOrderable = nestedMapsToObject(
+    state.categoryCountsBySupplierOrderable
+  )
+  const pairCountsBySupplierOrderable = nestedMapsToObject(
+    state.pairCountsBySupplierOrderable
+  )
   const categorySubcategories = [...state.pairs]
     .map((key) => {
       const [categoryName, subcategoryName] = key.split('\u0000')
@@ -285,6 +378,12 @@ export function finalizeSnapshotFilterOptions(state) {
     categorySubcategories,
     categoryCounts,
     pairCounts,
+    categoryCountsOrderable,
+    pairCountsOrderable,
+    categoryCountsBySupplier,
+    pairCountsBySupplier,
+    categoryCountsBySupplierOrderable,
+    pairCountsBySupplierOrderable,
     ...aggregates,
   }
 }
@@ -294,12 +393,16 @@ export function getItemSummaryContribution(item) {
   const supplierId = supplierIdOf(item)
   const qty = qtyOf(item)
   const generatedId = generatedIdOf(item)
+  const categoryName = item?.category_name || item?.categoryName || ''
+  const subcategoryName = item?.subcategory_name || item?.subcategoryName || ''
   return {
     supplierId,
     supplierName: supplierNameOf(item, supplierId || ''),
     qty,
     orderable: qty > 0,
     generatedId: generatedId || null,
+    categoryName,
+    subcategoryName,
   }
 }
 
@@ -309,6 +412,18 @@ function cloneFilterOptions(filterOptions) {
     categorySubcategories: [...(filterOptions?.categorySubcategories || [])],
     categoryCounts: { ...(filterOptions?.categoryCounts || {}) },
     pairCounts: { ...(filterOptions?.pairCounts || {}) },
+    categoryCountsOrderable: { ...(filterOptions?.categoryCountsOrderable || {}) },
+    pairCountsOrderable: { ...(filterOptions?.pairCountsOrderable || {}) },
+    categoryCountsBySupplier: cloneNestedCountObject(
+      filterOptions?.categoryCountsBySupplier
+    ),
+    pairCountsBySupplier: cloneNestedCountObject(filterOptions?.pairCountsBySupplier),
+    categoryCountsBySupplierOrderable: cloneNestedCountObject(
+      filterOptions?.categoryCountsBySupplierOrderable
+    ),
+    pairCountsBySupplierOrderable: cloneNestedCountObject(
+      filterOptions?.pairCountsBySupplierOrderable
+    ),
     suppliers: (filterOptions?.suppliers || []).map((s) => ({ ...s })),
     generatedSupplierCount: filterOptions?.generatedSupplierCount || 0,
     pendingSupplierCount: filterOptions?.pendingSupplierCount || 0,
@@ -317,8 +432,38 @@ function cloneFilterOptions(filterOptions) {
   }
 }
 
+function applyOrderableCategoryDelta(options, contribution, sign) {
+  if (!contribution?.orderable) return
+  const delta = sign >= 0 ? 1 : -1
+  const cat = contribution.categoryName || ''
+  const sub = contribution.subcategoryName || ''
+  const pairKey = cat && sub ? `${cat}\u0000${sub}` : ''
+  if (cat) bumpPlainCount(options.categoryCountsOrderable, cat, delta)
+  if (pairKey) bumpPlainCount(options.pairCountsOrderable, pairKey, delta)
+  if (contribution.supplierId) {
+    if (cat) {
+      bumpNestedPlainCount(
+        options.categoryCountsBySupplierOrderable,
+        contribution.supplierId,
+        cat,
+        delta
+      )
+    }
+    if (pairKey) {
+      bumpNestedPlainCount(
+        options.pairCountsBySupplierOrderable,
+        contribution.supplierId,
+        pairKey,
+        delta
+      )
+    }
+  }
+}
+
 function applyContribution(options, contribution, sign) {
   const delta = sign >= 0 ? 1 : -1
+  applyOrderableCategoryDelta(options, contribution, sign)
+
   if (!contribution?.supplierId) {
     if (contribution?.orderable) {
       options.unassignedOrderableCount = Math.max(
@@ -378,6 +523,14 @@ export function applyItemDeltaToFilterOptions(filterOptions, oldItem, newItem) {
   return {
     categories: next.categories,
     categorySubcategories: next.categorySubcategories,
+    categoryCounts: next.categoryCounts,
+    pairCounts: next.pairCounts,
+    categoryCountsOrderable: next.categoryCountsOrderable,
+    pairCountsOrderable: next.pairCountsOrderable,
+    categoryCountsBySupplier: next.categoryCountsBySupplier,
+    pairCountsBySupplier: next.pairCountsBySupplier,
+    categoryCountsBySupplierOrderable: next.categoryCountsBySupplierOrderable,
+    pairCountsBySupplierOrderable: next.pairCountsBySupplierOrderable,
     ...aggregates,
   }
 }
@@ -1111,11 +1264,14 @@ export function getFirstEditableItemId(items, isEditable) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* P2/PR B: in-table category tree (lazy expand) — not dual-mode list nav      */
+/* In-table category tree (lazy expand) — supplier-scoped counts (PR1)         */
 /* -------------------------------------------------------------------------- */
 
-/** Counts from filterOptions scan are snapshot-wide, not page/supplier-scoped. */
+/** Snapshot-wide counts label when no supplier is selected. */
 export const PLANNER_CATEGORY_COUNTS_SCOPE_LABEL = 'по снимку'
+
+/** Supplier-scoped counts label. */
+export const PLANNER_CATEGORY_COUNTS_SUPPLIER_LABEL = 'у поставщика'
 
 /** Default page size for SKU pages loaded inside an expanded tree branch. */
 export const PLANNER_TREE_BRANCH_PAGE_SIZE = 50
@@ -1134,43 +1290,157 @@ export function isPlannerTreeViewMode({ search = '', abcSortField = '' } = {}) {
 }
 
 /**
- * Nav model: categories with snapshot itemCount + nested subcategories.
- * Counts come from filterOptions.categoryCounts / pairCounts (scan), never page length.
+ * Honest scope label for tree group counts.
+ * @returns {'по снимку'|'у поставщика'}
  */
-export function buildPlannerCategoryNavModel(filterOptions) {
-  const categories = Array.isArray(filterOptions?.categories)
-    ? filterOptions.categories
-    : []
-  const pairs = Array.isArray(filterOptions?.categorySubcategories)
-    ? filterOptions.categorySubcategories
-    : []
-  const categoryCounts = filterOptions?.categoryCounts || {}
-  const pairCounts = filterOptions?.pairCounts || {}
+export function getPlannerCategoryCountsScopeLabel({ platformSupplierId = '' } = {}) {
+  return platformSupplierId
+    ? PLANNER_CATEGORY_COUNTS_SUPPLIER_LABEL
+    : PLANNER_CATEGORY_COUNTS_SCOPE_LABEL
+}
 
-  return categories.map((categoryName) => {
-    const subcategories = pairs
-      .filter((p) => p.categoryName === categoryName)
-      .map((p) => {
-        const key = `${p.categoryName}\u0000${p.subcategoryName}`
-        const fromPair =
-          typeof p.itemCount === 'number'
-            ? p.itemCount
-            : pairCounts[key]
+/**
+ * Chip «Только к заказу N»: snapshot-wide without supplier, else supplier orderablePositions.
+ */
+export function getOrderableChipCount({
+  supplierId = '',
+  summary = null,
+  snapshotOrderableCount = 0,
+} = {}) {
+  if (supplierId) {
+    return Math.max(0, Math.round(finiteNumber(summary?.orderablePositions, 0)))
+  }
+  return Math.max(0, Math.round(finiteNumber(snapshotOrderableCount, 0)))
+}
+
+/**
+ * Pick category/pair count maps for tree nav.
+ * Always returns both item counts (N) and orderable counts (M) for the active scope.
+ * When orderableOnly — listing uses orderable maps (same predicate as leaf fetch).
+ */
+export function resolvePlannerCategoryCountMaps(
+  filterOptions,
+  { platformSupplierId = '', orderableOnly = false } = {}
+) {
+  const supplierId = String(platformSupplierId || '')
+  if (supplierId) {
+    const categoryCountsAll =
+      filterOptions?.categoryCountsBySupplier?.[supplierId] || {}
+    const pairCountsAll = filterOptions?.pairCountsBySupplier?.[supplierId] || {}
+    const categoryCountsOrderable =
+      filterOptions?.categoryCountsBySupplierOrderable?.[supplierId] || {}
+    const pairCountsOrderable =
+      filterOptions?.pairCountsBySupplierOrderable?.[supplierId] || {}
+    if (orderableOnly) {
+      return {
+        categoryCounts: categoryCountsOrderable,
+        pairCounts: pairCountsOrderable,
+        categoryOrderableCounts: categoryCountsOrderable,
+        pairOrderableCounts: pairCountsOrderable,
+        hideZero: true,
+      }
+    }
+    return {
+      categoryCounts: categoryCountsAll,
+      pairCounts: pairCountsAll,
+      categoryOrderableCounts: categoryCountsOrderable,
+      pairOrderableCounts: pairCountsOrderable,
+      hideZero: true,
+    }
+  }
+
+  const categoryCountsAll = filterOptions?.categoryCounts || {}
+  const pairCountsAll = filterOptions?.pairCounts || {}
+  const categoryCountsOrderable = filterOptions?.categoryCountsOrderable || {}
+  const pairCountsOrderable = filterOptions?.pairCountsOrderable || {}
+  if (orderableOnly) {
+    return {
+      categoryCounts: categoryCountsOrderable,
+      pairCounts: pairCountsOrderable,
+      categoryOrderableCounts: categoryCountsOrderable,
+      pairOrderableCounts: pairCountsOrderable,
+      hideZero: true,
+    }
+  }
+  return {
+    categoryCounts: categoryCountsAll,
+    pairCounts: pairCountsAll,
+    categoryOrderableCounts: categoryCountsOrderable,
+    pairOrderableCounts: pairCountsOrderable,
+    hideZero: false,
+  }
+}
+
+/** Compact meta line for tree group rows: «N поз · M к заказу». */
+export function formatPlannerTreeGroupMeta({
+  itemCount = 0,
+  orderableCount = 0,
+} = {}) {
+  const n = Math.max(0, Math.round(finiteNumber(itemCount, 0)))
+  const m = Math.max(0, Math.round(finiteNumber(orderableCount, 0)))
+  return `${n} поз · ${m} к заказу`
+}
+
+/**
+ * Nav model: categories with itemCount (N) + orderableCount (M) + nested subs.
+ * Counts from filterOptions scan aggregates — never page length.
+ *
+ * @param {object} filterOptions
+ * @param {{ platformSupplierId?: string, orderableOnly?: boolean }} [scope]
+ */
+export function buildPlannerCategoryNavModel(
+  filterOptions,
+  { platformSupplierId = '', orderableOnly = false } = {}
+) {
+  const {
+    categoryCounts,
+    pairCounts,
+    categoryOrderableCounts,
+    pairOrderableCounts,
+    hideZero,
+  } = resolvePlannerCategoryCountMaps(filterOptions, {
+    platformSupplierId,
+    orderableOnly,
+  })
+
+  const categoryNames = Object.keys(categoryCounts || {}).sort((a, b) =>
+    a.localeCompare(b, 'ru')
+  )
+
+  const model = categoryNames.map((categoryName) => {
+    const subcategories = Object.keys(pairCounts || {})
+      .filter((key) => key.startsWith(`${categoryName}\u0000`))
+      .map((key) => {
+        const subcategoryName = key.slice(categoryName.length + 1)
         return {
           categoryName,
-          subcategoryName: p.subcategoryName || '',
-          itemCount: Math.max(0, Math.round(finiteNumber(fromPair, 0))),
+          subcategoryName,
+          itemCount: Math.max(0, Math.round(finiteNumber(pairCounts[key], 0))),
+          orderableCount: Math.max(
+            0,
+            Math.round(finiteNumber(pairOrderableCounts?.[key], 0))
+          ),
         }
       })
+      .filter((sub) => !hideZero || sub.itemCount > 0)
+      .sort((a, b) => a.subcategoryName.localeCompare(b.subcategoryName, 'ru'))
+
     return {
       categoryName,
       itemCount: Math.max(
         0,
         Math.round(finiteNumber(categoryCounts[categoryName], 0))
       ),
+      orderableCount: Math.max(
+        0,
+        Math.round(finiteNumber(categoryOrderableCounts?.[categoryName], 0))
+      ),
       subcategories,
     }
   })
+
+  if (!hideZero) return model
+  return model.filter((entry) => entry.itemCount > 0)
 }
 
 /**
@@ -1181,16 +1451,16 @@ export function plannerCategoryExpandsToSku(subcategoryCount = 0) {
   return Number(subcategoryCount) <= 1
 }
 
+/** @deprecated Counts are honest for supplier/orderable; kept for callers that still import it. */
 export function plannerCategoryCountsNeedScopeNote({
   platformSupplierId = '',
   orderableOnly = false,
   search = '',
 } = {}) {
-  return Boolean(
-    platformSupplierId ||
-      orderableOnly ||
-      (typeof search === 'string' && search.trim())
-  )
+  void platformSupplierId
+  void orderableOnly
+  void search
+  return false
 }
 
 export { positiveQty }

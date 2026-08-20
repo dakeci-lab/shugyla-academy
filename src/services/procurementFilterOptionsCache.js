@@ -3,11 +3,11 @@
  * Stores only aggregated options (not item rows).
  */
 
-export const FILTER_OPTIONS_CACHE_VERSION = 2
+export const FILTER_OPTIONS_CACHE_VERSION = 3
 export const FILTER_OPTIONS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 /** Serve cache without background scan while younger than this. */
 export const FILTER_OPTIONS_REVALIDATE_AFTER_MS = 5 * 60 * 1000
-export const FILTER_OPTIONS_STORAGE_KEY = 'shugyla.procurement.filterOptions.v2'
+export const FILTER_OPTIONS_STORAGE_KEY = 'shugyla.procurement.filterOptions.v3'
 export const FILTER_OPTIONS_MAX_PERSISTED_ENTRIES = 3
 
 const memoryCache = new Map()
@@ -20,6 +20,12 @@ export function createEmptyFilterOptions() {
     categorySubcategories: [],
     categoryCounts: {},
     pairCounts: {},
+    categoryCountsOrderable: {},
+    pairCountsOrderable: {},
+    categoryCountsBySupplier: {},
+    pairCountsBySupplier: {},
+    categoryCountsBySupplierOrderable: {},
+    pairCountsBySupplierOrderable: {},
     suppliers: [],
     generatedSupplierCount: 0,
     pendingSupplierCount: 0,
@@ -70,6 +76,32 @@ function cloneOptions(options) {
     categorySubcategories: (options.categorySubcategories || []).map((row) => ({ ...row })),
     categoryCounts: { ...(options.categoryCounts || {}) },
     pairCounts: { ...(options.pairCounts || {}) },
+    categoryCountsOrderable: { ...(options.categoryCountsOrderable || {}) },
+    pairCountsOrderable: { ...(options.pairCountsOrderable || {}) },
+    categoryCountsBySupplier: Object.fromEntries(
+      Object.entries(options.categoryCountsBySupplier || {}).map(([id, map]) => [
+        id,
+        { ...(map || {}) },
+      ])
+    ),
+    pairCountsBySupplier: Object.fromEntries(
+      Object.entries(options.pairCountsBySupplier || {}).map(([id, map]) => [
+        id,
+        { ...(map || {}) },
+      ])
+    ),
+    categoryCountsBySupplierOrderable: Object.fromEntries(
+      Object.entries(options.categoryCountsBySupplierOrderable || {}).map(([id, map]) => [
+        id,
+        { ...(map || {}) },
+      ])
+    ),
+    pairCountsBySupplierOrderable: Object.fromEntries(
+      Object.entries(options.pairCountsBySupplierOrderable || {}).map(([id, map]) => [
+        id,
+        { ...(map || {}) },
+      ])
+    ),
     suppliers: (options.suppliers || []).map((row) => ({ ...row })),
     generatedSupplierCount: options.generatedSupplierCount || 0,
     pendingSupplierCount: options.pendingSupplierCount || 0,

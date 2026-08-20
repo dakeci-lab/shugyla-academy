@@ -31,7 +31,6 @@ import AdminModal from '../admin/AdminModal'
 import ConfirmDialog from '../admin/ConfirmDialog'
 import SearchableSupplierSelect from '../suppliers/SearchableSupplierSelect'
 import PlatformSearchToolbar, {
-  PlatformFilterButton,
   PlatformToolbarActionWrap,
   PlatformToolbarIconButton,
 } from '../platform/PlatformSearchToolbar'
@@ -57,12 +56,13 @@ import {
   buildPlannerCategoryNavModel,
   buildSnapshotHeadline,
   classifyGenerateOutcome,
+  formatPlannerTreeGroupMeta,
+  getOrderableChipCount,
+  getPlannerCategoryCountsScopeLabel,
   isPlannerTreeViewMode,
-  plannerCategoryCountsNeedScopeNote,
   plannerCategoryExpandsToSku,
   plannerCategoryTreeKey,
   plannerSubcategoryTreeKey,
-  PLANNER_CATEGORY_COUNTS_SCOPE_LABEL,
   PLANNER_TREE_BRANCH_PAGE_SIZE,
   PLANNER_WEEK_COLUMN_COUNT,
   createOrderAttemptTracker,
@@ -92,19 +92,17 @@ import {
 import { toProcurementUserMessage } from '../../utils/procurementErrors'
 import {
   ABC_AXES,
-  ABC_CLASSES,
   ABC_UNAVAILABLE_NOTICE,
   abcBadgeLabel,
   abcSortAriaLabel,
   formatAbcClass,
   nextAbcSortState,
   snapshotItemsLackAbcFacts,
-  toggleAbcClassFilter,
 } from '../../utils/procurementAbc'
 import './ProcurementPlannerView.css'
 
-/** № + Товар + ABC + 8 weeks + Остаток + Ср/день + Норма + Рек. + Заказ + Поставщик */
-const TABLE_COL_SPAN = 3 + PLANNER_WEEK_COLUMN_COUNT + 6
+/** № + Товар + К + В + П + 8 weeks + Остаток + Ср/день + Норма + Рек. + Заказ + Поставщик */
+const TABLE_COL_SPAN = 5 + PLANNER_WEEK_COLUMN_COUNT + 6
 
 const DEFAULT_PAGE_SIZE = 25
 const TREE_BRANCH_PAGE_SIZE = PLANNER_TREE_BRANCH_PAGE_SIZE
@@ -150,6 +148,12 @@ const EMPTY_FILTER_OPTIONS = {
   categorySubcategories: [],
   categoryCounts: {},
   pairCounts: {},
+  categoryCountsOrderable: {},
+  pairCountsOrderable: {},
+  categoryCountsBySupplier: {},
+  pairCountsBySupplier: {},
+  categoryCountsBySupplierOrderable: {},
+  pairCountsBySupplierOrderable: {},
   suppliers: [],
   generatedSupplierCount: 0,
   pendingSupplierCount: 0,
@@ -273,11 +277,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     orderableOnly: false,
     /**
      * Rows with a positive qty and no platform supplier.
-     *
-     * Forward-compatible: `fetchSnapshotItemsPage` destructures the filters it knows,
-     * so today the flag is inert and the «Без поставщика» chip lands on the wider
-     * «только к заказу» superset. It starts filtering exactly as soon as the service
-     * honours it (see the contract note in docs/ and in the chip title).
+     * Set by alert chip «Без поставщика».
      */
     unassignedOnly: false,
     abcQty: [],
@@ -289,7 +289,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(false)
   const [filterOptionsSnapshotId, setFilterOptionsSnapshotId] = useState('')
   const [supplierScope, setSupplierScope] = useState('today')
-  const [filterOpen, setFilterOpen] = useState(false)
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
   const [generating, setGenerating] = useState(false)
@@ -301,7 +300,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   const [saveStatus, setSaveStatus] = useState('idle')
   const [pendingSaveCount, setPendingSaveCount] = useState(0)
   const [hasSaveError, setHasSaveError] = useState(false)
-  const filterButtonRef = useRef(null)
   const exportMenuRef = useRef(null)
   const pendingSaveCountRef = useRef(0)
   const failedSaveIdsRef = useRef(new Set())
@@ -345,19 +343,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     search: debouncedSearch,
     abcSortField: abcSort.field,
   })
-
-  const activeFilterCount = useMemo(() => {
-    let n = 0
-    if (filters.categoryName) n += 1
-    if (filters.subcategoryName) n += 1
-    if (filters.warningsOnly) n += 1
-    if (filters.orderableOnly) n += 1
-    if (filters.unassignedOnly) n += 1
-    if (filters.abcQty.length) n += 1
-    if (filters.abcRevenue.length) n += 1
-    if (filters.abcProfit.length) n += 1
-    return n
-  }, [filters])
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 250)
@@ -799,24 +784,18 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     }
   }, [exportMenuOpen])
 
-  const subcategoryOptions = useMemo(() => {
-    const pairs = filterOptions.categorySubcategories || []
-    if (!filters.categoryName) return pairs
-    return pairs.filter((p) => p.categoryName === filters.categoryName)
-  }, [filterOptions.categorySubcategories, filters.categoryName])
+  const categoryNavModel = useMemo(
+    () =>
+      buildPlannerCategoryNavModel(filterOptions, {
+        platformSupplierId: filters.platformSupplierId,
+        orderableOnly: filters.orderableOnly,
+      }),
+    [filterOptions, filters.platformSupplierId, filters.orderableOnly]
+  )
 
-  const categoryNavModel = useMemo(() => {
-    const model = buildPlannerCategoryNavModel(filterOptions)
-    if (!filters.categoryName) return model
-    return model.filter((entry) => entry.categoryName === filters.categoryName)
-  }, [filterOptions, filters.categoryName])
-
-  const countsScopeTitle = plannerCategoryCountsNeedScopeNote({
+  const countsScopeTitle = getPlannerCategoryCountsScopeLabel({
     platformSupplierId: filters.platformSupplierId,
-    orderableOnly: filters.orderableOnly,
   })
-    ? `${PLANNER_CATEGORY_COUNTS_SCOPE_LABEL} (без учёта поставщика / «к заказу»)`
-    : PLANNER_CATEGORY_COUNTS_SCOPE_LABEL
 
   const loadBranchSkuPage = useCallback(
     async (branchKey, { categoryName, subcategoryName, append = false } = {}) => {
@@ -1135,6 +1114,11 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     )
   }, [filters.platformSupplierId, supplierSelectOptions, filterOptions.suppliers])
   const selectedSupplierSummary = selectedSupplier || null
+  const orderableChipCount = getOrderableChipCount({
+    supplierId: filters.platformSupplierId,
+    summary: selectedSupplierSummary,
+    snapshotOrderableCount: snapshot?.orderableCount || 0,
+  })
 
   function handleSupplierScopeChange(nextScope) {
     setSupplierScope(nextScope)
@@ -1335,9 +1319,11 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             <span title={item.barcode}>{item.barcode}</span>
           </div>
         </td>
-        <td>
-          <AbcBadges item={item} compact />
-        </td>
+        {ABC_AXES.map((axis) => (
+          <td key={`${item.id}-${axis.key}`} className="proc-planner__col-abc-axis">
+            <AbcBadge axisLabel={axis.label} value={item[axis.itemKey]} />
+          </td>
+        ))}
         {Array.from({ length: PLANNER_WEEK_COLUMN_COUNT }, (_, weekIndex) => (
           <td key={`week-${item.id}-${weekIndex}`} className="proc-planner__col-week">
             <WeeklySalesCell value={item.weeklySales?.[weekIndex]} />
@@ -1434,11 +1420,13 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   function renderTreeGroupRow({
     key,
     label,
-    count,
+    itemCount,
+    orderableCount,
     expanded,
     onToggle,
     depth = 0,
   }) {
+    const meta = formatPlannerTreeGroupMeta({ itemCount, orderableCount })
     return (
       <tr key={key} className={`proc-planner__tree-group depth-${depth}`}>
         <td colSpan={TABLE_COL_SPAN}>
@@ -1456,12 +1444,19 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
               {label}
             </span>
             <span
-              className="proc-planner__tree-group-count"
-              title={countsScopeTitle}
+              className="proc-planner__tree-group-meta"
+              title={`${meta} · ${countsScopeTitle}`}
             >
-              {count}
+              <span className="proc-planner__tree-group-meta-item">
+                {Math.max(0, Math.round(Number(itemCount) || 0))} поз
+              </span>
+              <span className="proc-planner__tree-group-meta-sep" aria-hidden="true">
+                ·
+              </span>
+              <span className="proc-planner__tree-group-meta-item">
+                {Math.max(0, Math.round(Number(orderableCount) || 0))} к заказу
+              </span>
             </span>
-            <span className="proc-planner__tree-group-scope">{PLANNER_CATEGORY_COUNTS_SCOPE_LABEL}</span>
           </div>
         </td>
       </tr>
@@ -1491,7 +1486,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         renderTreeGroupRow({
           key: catKey,
           label: entry.categoryName || 'Без категории',
-          count: entry.itemCount,
+          itemCount: entry.itemCount,
+          orderableCount: entry.orderableCount,
           expanded: catExpanded,
           onToggle: () => toggleCategoryExpand(entry),
           depth: 0,
@@ -1518,7 +1514,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             renderTreeGroupRow({
               key: subKey,
               label: sub.subcategoryName || 'Без подкатегории',
-              count: sub.itemCount,
+              itemCount: sub.itemCount,
+              orderableCount: sub.orderableCount,
               expanded: subExpanded,
               onToggle: () =>
                 toggleSubcategoryExpand(entry.categoryName, sub.subcategoryName),
@@ -1626,11 +1623,13 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   function renderMobileTreeGroup({
     key,
     label,
-    count,
+    itemCount,
+    orderableCount,
     expanded,
     onToggle,
     depth = 0,
   }) {
+    const meta = formatPlannerTreeGroupMeta({ itemCount, orderableCount })
     return (
       <div key={key} className={`proc-planner__tree-mobile-group depth-${depth}`}>
         <button
@@ -1645,11 +1644,19 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
           <span className="proc-planner__tree-group-name" title={label}>
             {label}
           </span>
-          <span className="proc-planner__tree-group-count" title={countsScopeTitle}>
-            {count}
-          </span>
-          <span className="proc-planner__tree-group-scope">
-            {PLANNER_CATEGORY_COUNTS_SCOPE_LABEL}
+          <span
+            className="proc-planner__tree-group-meta"
+            title={`${meta} · ${countsScopeTitle}`}
+          >
+            <span className="proc-planner__tree-group-meta-item">
+              {Math.max(0, Math.round(Number(itemCount) || 0))} поз
+            </span>
+            <span className="proc-planner__tree-group-meta-sep" aria-hidden="true">
+              ·
+            </span>
+            <span className="proc-planner__tree-group-meta-item">
+              {Math.max(0, Math.round(Number(orderableCount) || 0))} к заказу
+            </span>
           </span>
         </button>
       </div>
@@ -1672,7 +1679,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             renderMobileTreeGroup({
               key: catKey,
               label: entry.categoryName || 'Без категории',
-              count: entry.itemCount,
+              itemCount: entry.itemCount,
+              orderableCount: entry.orderableCount,
               expanded: catExpanded,
               onToggle: () => toggleCategoryExpand(entry),
               depth: 0,
@@ -1701,7 +1709,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
               renderMobileTreeGroup({
                 key: subKey,
                 label: sub.subcategoryName || 'Без подкатегории',
-                count: sub.itemCount,
+                itemCount: sub.itemCount,
+                orderableCount: sub.orderableCount,
                 expanded: subExpanded,
                 onToggle: () =>
                   toggleSubcategoryExpand(entry.categoryName, sub.subcategoryName),
@@ -1867,11 +1876,25 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
               }
             >
               <span className="proc-planner__orderable-toggle-label">Только к заказу</span>
-              {Number(snapshot?.orderableCount) > 0 ? (
+              {orderableChipCount > 0 ? (
                 <span className="proc-planner__orderable-toggle-count">
-                  {Math.round(Number(snapshot.orderableCount))}
+                  {orderableChipCount}
                 </span>
               ) : null}
+            </button>
+            <button
+              type="button"
+              className={`proc-planner__orderable-toggle${filters.warningsOnly ? ' is-active' : ''}`}
+              aria-pressed={filters.warningsOnly}
+              title="Показать только позиции с отрицательным остатком UMAG"
+              onClick={() =>
+                setFilters((current) => ({
+                  ...current,
+                  warningsOnly: !current.warningsOnly,
+                }))
+              }
+            >
+              <span className="proc-planner__orderable-toggle-label">Предупреждения</span>
             </button>
             <PlatformToolbarActionWrap>
               <span className="proc-planner__tip-wrap" data-tooltip={syncTooltip}>
@@ -1883,144 +1906,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                   aria-label={syncAria}
                 />
               </span>
-            </PlatformToolbarActionWrap>
-            <PlatformToolbarActionWrap>
-              <span
-                className="proc-planner__tip-wrap"
-                data-tooltip="Дополнительные фильтры"
-              >
-                <PlatformFilterButton
-                  buttonRef={filterButtonRef}
-                  active={activeFilterCount > 0}
-                  count={activeFilterCount || null}
-                  onClick={() => setFilterOpen((v) => !v)}
-                  ariaExpanded={filterOpen}
-                  ariaLabel="Дополнительные фильтры"
-                  title="Дополнительные фильтры"
-                />
-              </span>
-              {filterOpen ? (
-                <div className="proc-planner__filter-pop">
-                  <label>
-                    Категория
-                    <select
-                      value={filters.categoryName}
-                      onChange={(e) =>
-                        setFilters((f) => ({
-                          ...f,
-                          categoryName: e.target.value,
-                          subcategoryName: '',
-                        }))
-                      }
-                    >
-                      <option value="">Все</option>
-                      {filterOptions.categories.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Подкатегория
-                    <select
-                      value={filters.subcategoryName}
-                      disabled={!filters.categoryName}
-                      onChange={(e) =>
-                        setFilters((f) => ({ ...f, subcategoryName: e.target.value }))
-                      }
-                    >
-                      <option value="">
-                        {filters.categoryName ? 'Все' : 'Сначала категория'}
-                      </option>
-                      {subcategoryOptions.map((p) => (
-                        <option
-                          key={`${p.categoryName}::${p.subcategoryName}`}
-                          value={p.subcategoryName}
-                        >
-                          {p.subcategoryName}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="proc-planner__check">
-                    <input
-                      type="checkbox"
-                      checked={filters.warningsOnly}
-                      onChange={(e) =>
-                        setFilters((f) => ({ ...f, warningsOnly: e.target.checked }))
-                      }
-                    />
-                    Только предупреждения
-                  </label>
-                  <label className="proc-planner__check">
-                    <input
-                      type="checkbox"
-                      checked={filters.orderableOnly}
-                      onChange={(e) =>
-                        setFilters((f) => ({ ...f, orderableOnly: e.target.checked }))
-                      }
-                    />
-                    Только к заказу
-                  </label>
-                  <label className="proc-planner__check">
-                    <input
-                      type="checkbox"
-                      checked={filters.unassignedOnly}
-                      onChange={(e) =>
-                        setFilters((f) => ({
-                          ...f,
-                          unassignedOnly: e.target.checked,
-                          orderableOnly: e.target.checked ? true : f.orderableOnly,
-                          platformSupplierId: e.target.checked ? '' : f.platformSupplierId,
-                        }))
-                      }
-                    />
-                    Только без поставщика
-                  </label>
-                  {ABC_AXES.map((axis) => (
-                    <fieldset key={axis.key} className="proc-planner__abc-filter">
-                      <legend>ABC {axis.label}</legend>
-                      <div className="proc-planner__abc-filter-options">
-                        {ABC_CLASSES.map((cls) => (
-                          <label key={cls} className="proc-planner__check">
-                            <input
-                              type="checkbox"
-                              checked={filters[axis.filterKey].includes(cls)}
-                              onChange={() =>
-                                setFilters((f) => ({
-                                  ...f,
-                                  [axis.filterKey]: toggleAbcClassFilter(f[axis.filterKey], cls),
-                                }))
-                              }
-                            />
-                            {cls}
-                          </label>
-                        ))}
-                      </div>
-                    </fieldset>
-                  ))}
-                  <button
-                    type="button"
-                    className="btn btn--ghost btn--sm"
-                    onClick={() =>
-                      setFilters((current) => ({
-                        ...current,
-                        categoryName: '',
-                        subcategoryName: '',
-                        warningsOnly: false,
-                        orderableOnly: false,
-                        unassignedOnly: false,
-                        abcQty: [],
-                        abcRevenue: [],
-                        abcProfit: [],
-                      }))
-                    }
-                  >
-                    Сбросить
-                  </button>
-                </div>
-              ) : null}
             </PlatformToolbarActionWrap>
             <PlatformToolbarActionWrap>
               <PlannerTooltipButton
@@ -2155,35 +2040,45 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
               <tr>
                 <th className="proc-planner__col-num proc-planner__sticky-num">№</th>
                 <th className="proc-planner__col-product proc-planner__sticky-product">Товар</th>
-                <th className="proc-planner__col-abc proc-planner__col-abc--compact">
-                  <div className="proc-planner__abc-head proc-planner__abc-head--compact">
-                    <span className="proc-planner__abc-head-label">
-                      ABC
-                      <AbcColumnHelp />
-                    </span>
-                    <div className="proc-planner__abc-sort">
-                      {ABC_AXES.map((axis) => {
-                        const active = abcSort.field === axis.column
-                        const arrow = !active ? '' : abcSort.dir === 'asc' ? ' ↑' : ' ↓'
-                        const short = axis.key === 'qty' ? 'К' : axis.key === 'revenue' ? 'В' : 'П'
-                        return (
-                          <button
-                            key={axis.key}
-                            type="button"
-                            className={`proc-planner__abc-sort-btn${active ? ' is-active' : ''}`}
-                            aria-pressed={active}
-                            aria-label={abcSortAriaLabel(axis.label, abcSort, axis.column)}
-                            title={abcSortAriaLabel(axis.label, abcSort, axis.column)}
-                            onClick={() => setAbcSort((current) => nextAbcSortState(current, axis.column))}
-                          >
-                            {short}
-                            {arrow}
-                          </button>
-                        )
-                      })}
-                    </div>
-                  </div>
-                </th>
+                {ABC_AXES.map((axis, axisIndex) => {
+                  const active = abcSort.field === axis.column
+                  const dir = active ? abcSort.dir : ''
+                  return (
+                    <th
+                      key={axis.key}
+                      className="proc-planner__col-abc-axis"
+                      title={axis.label}
+                    >
+                      <div className="proc-planner__abc-axis-head">
+                        <button
+                          type="button"
+                          className={`proc-planner__abc-axis-btn${active ? ' is-active' : ''}${dir ? ` is-${dir}` : ''}`}
+                          aria-pressed={active}
+                          aria-label={abcSortAriaLabel(axis.label, abcSort, axis.column)}
+                          title={abcSortAriaLabel(axis.label, abcSort, axis.column)}
+                          onClick={() =>
+                            setAbcSort((current) => nextAbcSortState(current, axis.column))
+                          }
+                        >
+                          <span className="proc-planner__abc-axis-label">{axis.shortLabel}</span>
+                          <span className="proc-planner__abc-axis-arrows" aria-hidden="true">
+                            <span
+                              className={`proc-planner__abc-arrow is-up${active && dir === 'asc' ? ' is-on' : ''}`}
+                            >
+                              ↑
+                            </span>
+                            <span
+                              className={`proc-planner__abc-arrow is-down${active && dir === 'desc' ? ' is-on' : ''}`}
+                            >
+                              ↓
+                            </span>
+                          </span>
+                        </button>
+                        {axisIndex === 0 ? <AbcColumnHelp /> : null}
+                      </div>
+                    </th>
+                  )
+                })}
                 {weekColumns.labels.map((label, weekIndex) => (
                   <th
                     key={`week-h-${weekIndex}`}
