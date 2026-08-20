@@ -75,9 +75,9 @@ import {
   canEditItemQuantity,
   isSnapshotQuantityEditable,
   QUANTITY_REQUIRES_SUPPLIER_HINT,
-  isSupplierInTodaySchedule,
+  isSupplierInTodaysOrderList,
   isSupplierPlanExportOrder,
-  listTodaysScheduledSuppliers,
+  listTodaysOrderSuppliers,
 } from '../../utils/procurementPlannerUx'
 import { toProcurementUserMessage } from '../../utils/procurementErrors'
 import {
@@ -789,8 +789,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     }
   }
 
-  const scheduledTodaysSuppliers = useMemo(
-    () => listTodaysScheduledSuppliers(getAllSuppliersSync()),
+  const todaysOrderSuppliers = useMemo(
+    () => listTodaysOrderSuppliers(getAllSuppliersSync()),
     [dataVersion]
   )
 
@@ -807,11 +807,11 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     () =>
       buildPlannerSupplierSelectOptions({
         scope: supplierScope,
-        scheduledSuppliers: scheduledTodaysSuppliers,
+        scheduledSuppliers: todaysOrderSuppliers,
         catalogSuppliers: getAllSuppliersSync(),
         snapshotSuppliers: filterOptions.suppliers || [],
       }),
-    [supplierScope, scheduledTodaysSuppliers, filterOptions.suppliers, dataVersion]
+    [supplierScope, todaysOrderSuppliers, filterOptions.suppliers, dataVersion]
   )
 
   const selectedSupplier = useMemo(() => {
@@ -830,9 +830,9 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     if (nextScope !== 'today') return
     if (
       filters.platformSupplierId &&
-      !isSupplierInTodaySchedule(
+      !isSupplierInTodaysOrderList(
         filters.platformSupplierId,
-        scheduledTodaysSuppliers,
+        todaysOrderSuppliers,
         filterOptions.suppliers || []
       )
     ) {
@@ -1100,7 +1100,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                 loadingLabel="Загрузка поставщиков…"
                 emptyLabel={
                   supplierScope === 'today'
-                    ? 'На сегодня визитов нет'
+                    ? 'На сегодня заказов нет'
                     : 'Поставщики не найдены'
                 }
                 disabled={supplierSelectLoading}
@@ -1116,7 +1116,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                       aria-pressed={supplierScope === 'today'}
                       onClick={() => handleSupplierScopeChange('today')}
                     >
-                      {`Сегодня · ${scheduledTodaysSuppliers.length}`}
+                      {`Сегодня · ${todaysOrderSuppliers.length}`}
                     </button>
                     <button
                       type="button"
