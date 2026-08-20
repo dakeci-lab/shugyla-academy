@@ -970,72 +970,6 @@ export function buildSnapshotHeadline({
   }
 }
 
-/** Short formula shown in the planner sense line (P1). */
-export const PLANNER_SENSE_FORMULA =
-  'Рек. = max(0, round(Ср/день × Норма − Остаток*))'
-
-/** Tooltip / title for the formula fragment. */
-export const PLANNER_SENSE_FORMULA_HINT =
-  'Ср/день = сумма 8 нед. / 56. Остаток* = max(0, остаток UMAG).'
-
-const PERIOD_DATE_KEY_RE = /^(\d{4})-(\d{2})-(\d{2})$/
-
-/** YYYY-MM-DD → DD.MM.YYYY (calendar key, no TZ shift). */
-export function formatPlannerPeriodDateRu(dateKey) {
-  const m = PERIOD_DATE_KEY_RE.exec(String(dateKey || ''))
-  if (!m) return ''
-  return `${m[3]}.${m[2]}.${m[1]}`
-}
-
-/**
- * Compact sense line: период · формула · к заказу N.
- * Pure — dates are snapshot calendar keys; N = snapshot.orderableCount.
- *
- * @returns {{
- *   periodText: string|null,
- *   formulaText: string,
- *   formulaTitle: string,
- *   orderableText: string,
- *   orderableSupplierText: string|null,
- *   text: string,
- *   title: string,
- * }}
- */
-export function buildPlannerSenseLine({
-  periodFrom = '',
-  periodTo = '',
-  orderableCount = 0,
-  supplierOrderableCount = null,
-} = {}) {
-  const fromLabel = formatPlannerPeriodDateRu(periodFrom)
-  const toLabel = formatPlannerPeriodDateRu(periodTo)
-  const periodText =
-    fromLabel && toLabel ? `Период: ${fromLabel}–${toLabel}` : null
-  const n = Math.max(0, Math.round(finiteNumber(orderableCount, 0)))
-  const orderableText = `К заказу: ${n}`
-  const supplierN =
-    supplierOrderableCount == null
-      ? null
-      : Math.max(0, Math.round(finiteNumber(supplierOrderableCount, 0)))
-  const orderableSupplierText =
-    supplierN == null ? null : `у поставщика: ${supplierN}`
-
-  const parts = [periodText, PLANNER_SENSE_FORMULA, orderableText].filter(Boolean)
-  if (orderableSupplierText) parts.push(orderableSupplierText)
-
-  return {
-    periodText,
-    formulaText: PLANNER_SENSE_FORMULA,
-    formulaTitle: PLANNER_SENSE_FORMULA_HINT,
-    orderableText,
-    orderableSupplierText,
-    text: parts.join(' · '),
-    title: `${PLANNER_SENSE_FORMULA_HINT}${periodText ? ` ${periodText}.` : ''} ${orderableText}${
-      orderableSupplierText ? ` · ${orderableSupplierText}` : ''
-    }`.trim(),
-  }
-}
-
 /**
  * Compact action chips for the header strip. Only non-zero counters produce a chip —
  * nothing is rendered when the plan is clean.
@@ -1177,27 +1111,26 @@ export function getFirstEditableItemId(items, isEditable) {
 }
 
 /* -------------------------------------------------------------------------- */
-/* P2: dual-mode category navigation (variant C) + A-light group headers       */
+/* P2/PR B: in-table category tree (lazy expand) — not dual-mode list nav      */
 /* -------------------------------------------------------------------------- */
 
-export const PLANNER_BROWSE_FLAT = 'flat'
-export const PLANNER_BROWSE_CATEGORIES = 'categories'
 /** Counts from filterOptions scan are snapshot-wide, not page/supplier-scoped. */
 export const PLANNER_CATEGORY_COUNTS_SCOPE_LABEL = 'по снимку'
 
-/**
- * Whether snapshot-wide category counts may disagree with the active toolbar filters.
- */
-export function plannerCategoryCountsNeedScopeNote({
-  platformSupplierId = '',
-  orderableOnly = false,
-  search = '',
-} = {}) {
-  return Boolean(
-    platformSupplierId ||
-      orderableOnly ||
-      (typeof search === 'string' && search.trim())
-  )
+/** Default page size for SKU pages loaded inside an expanded tree branch. */
+export const PLANNER_TREE_BRANCH_PAGE_SIZE = 50
+
+export function plannerCategoryTreeKey(categoryName = '') {
+  return `c:${categoryName || ''}`
+}
+
+export function plannerSubcategoryTreeKey(categoryName = '', subcategoryName = '') {
+  return `s:${categoryName || ''}\u0000${subcategoryName || ''}`
+}
+
+/** Tree when idle; flat SKU list when searching or ABC-sorting. */
+export function isPlannerTreeViewMode({ search = '', abcSortField = '' } = {}) {
+  return !String(search || '').trim() && !abcSortField
 }
 
 /**
@@ -1241,51 +1174,23 @@ export function buildPlannerCategoryNavModel(filterOptions) {
 }
 
 /**
- * @returns {'categories'|'subcategories'|'items'}
+ * Whether expanding a category should fetch SKUs immediately (0–1 subs)
+ * or show collapsed subcategory rows first (>1 subs).
  */
-export function resolvePlannerCategoryBrowseLevel({
-  categoryName = '',
-  subcategoryName = '',
-  subcategoryCount = 0,
+export function plannerCategoryExpandsToSku(subcategoryCount = 0) {
+  return Number(subcategoryCount) <= 1
+}
+
+export function plannerCategoryCountsNeedScopeNote({
+  platformSupplierId = '',
+  orderableOnly = false,
+  search = '',
 } = {}) {
-  if (!categoryName) return 'categories'
-  if (!subcategoryName && subcategoryCount > 1) return 'subcategories'
-  return 'items'
-}
-
-/** A-light group label — name only, never a “full Focus” count. */
-export function formatPlannerGroupHeaderLabel(categoryName, subcategoryName) {
-  const cat = (categoryName || '').trim() || 'Без категории'
-  const sub = (subcategoryName || '').trim()
-  return sub ? `${cat} / ${sub}` : cat
-}
-
-/**
- * Interleave optional group header rows for default category sort.
- * @returns {Array<{ type: 'group', key: string, label: string }|{ type: 'item', item: object, index: number }>}
- */
-export function buildPlannerSkuTableRows(items, { groupHeaders = false } = {}) {
-  const list = Array.isArray(items) ? items : []
-  if (!groupHeaders) {
-    return list.map((item, index) => ({ type: 'item', item, index }))
-  }
-  const rows = []
-  let lastKey = null
-  list.forEach((item, index) => {
-    const cat = item?.categoryName || ''
-    const sub = item?.subcategoryName || ''
-    const key = `${cat}\u0000${sub}`
-    if (key !== lastKey) {
-      rows.push({
-        type: 'group',
-        key,
-        label: formatPlannerGroupHeaderLabel(cat, sub),
-      })
-      lastKey = key
-    }
-    rows.push({ type: 'item', item, index })
-  })
-  return rows
+  return Boolean(
+    platformSupplierId ||
+      orderableOnly ||
+      (typeof search === 'string' && search.trim())
+  )
 }
 
 export { positiveQty }

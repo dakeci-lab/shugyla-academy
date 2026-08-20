@@ -650,7 +650,11 @@ function stageUi() {
   const planner = read(PLANNER)
   const css = read(PLANNER_CSS)
 
-  assert('TABLE_COL_SPAN is 10', planner.includes('const TABLE_COL_SPAN = 10'))
+  assert(
+    'TABLE_COL_SPAN accounts for week columns',
+    /TABLE_COL_SPAN\s*=\s*3\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*6/.test(planner) ||
+      planner.includes('const TABLE_COL_SPAN = 17')
+  )
   assert('loading/empty rows use TABLE_COL_SPAN', /colSpan=\{TABLE_COL_SPAN\}>Загрузка/.test(planner) && /colSpan=\{TABLE_COL_SPAN\}>Нет позиций/.test(planner))
   assert('desktop table has ABC column', planner.includes('proc-planner__col-abc') && planner.includes('<AbcBadges item={item} />'))
   assert('three badges come from ABC_AXES', planner.includes('ABC_AXES.map((axis)') && planner.includes('<AbcBadge'))
@@ -661,13 +665,13 @@ function stageUi() {
   assert('filter reset clears ABC groups and keeps supplier', planner.includes('abcQty: []') && planner.includes('abcRevenue: []') && planner.includes('abcProfit: []') && !/setFilters\(\{[\s\S]{0,220}platformSupplierId:\s*''/.test(planner))
   assert('sort buttons have aria-label and pressed state', planner.includes('abcSortAriaLabel') && planner.includes('aria-pressed={active}'))
   assert('changing filters/sort resets page', planner.includes('[debouncedSearch, filters, abcSort, snapshot?.id]'))
-  assert('legend is present', planner.includes('proc-planner__abc-legend'))
+  assert('legend moved to ABC column help tooltip', planner.includes('AbcColumnHelp') && planner.includes('ABC_COLUMN_HELP') && !planner.includes('proc-planner__abc-legend'))
   assert(
-    'legend renders only when snapshot items are present',
-    planner.includes('Number(snapshot?.itemCount) > 0 || items.length > 0') &&
-      /itemCount\) > 0 \|\| items.length > 0 \? \(/.test(planner)
+    'ABC help covers class thresholds and axes',
+    planner.includes('до 80%') &&
+      planner.includes('К — количество') &&
+      planner.includes('proc-planner__abc-help')
   )
-  assert('legend badges have title and aria-label', /proc-planner__abc-legend[\s\S]*aria-label="Класс A/.test(planner) && planner.includes('aria-label="Нет класса'))
   assert(
     'snapshot ABC unavailable notice uses exact copy',
     planner.includes('{ABC_UNAVAILABLE_NOTICE}') &&
@@ -741,7 +745,7 @@ const SERVICE_UI_ONLY = process.argv.includes('--service-ui-only')
 const SERVICE_ONLY = process.argv.includes('--service-only')
 
 const EXPECTED_CHECKS = {
-  full: 120,
+  full: 119,
   backend: 65,
   service: 33,
   serviceUi: 55,

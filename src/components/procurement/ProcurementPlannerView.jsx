@@ -54,18 +54,17 @@ import {
   applySaveResultToFailedIds,
   buildPlannerSupplierSelectOptions,
   buildPlannerWeekColumnLabels,
-  buildPlannerSenseLine,
   buildPlannerCategoryNavModel,
-  buildPlannerSkuTableRows,
   buildSnapshotHeadline,
   classifyGenerateOutcome,
-  getNextOrderPositions,
-  PLANNER_BROWSE_CATEGORIES,
-  PLANNER_BROWSE_FLAT,
-  PLANNER_CATEGORY_COUNTS_SCOPE_LABEL,
-  PLANNER_WEEK_COLUMN_COUNT,
+  isPlannerTreeViewMode,
   plannerCategoryCountsNeedScopeNote,
-  resolvePlannerCategoryBrowseLevel,
+  plannerCategoryExpandsToSku,
+  plannerCategoryTreeKey,
+  plannerSubcategoryTreeKey,
+  PLANNER_CATEGORY_COUNTS_SCOPE_LABEL,
+  PLANNER_TREE_BRANCH_PAGE_SIZE,
+  PLANNER_WEEK_COLUMN_COUNT,
   createOrderAttemptTracker,
   filterItemsForSupplierPlanExport,
   formatOrderHistoryLabel,
@@ -108,6 +107,24 @@ import './ProcurementPlannerView.css'
 const TABLE_COL_SPAN = 3 + PLANNER_WEEK_COLUMN_COUNT + 6
 
 const DEFAULT_PAGE_SIZE = 25
+const TREE_BRANCH_PAGE_SIZE = PLANNER_TREE_BRANCH_PAGE_SIZE
+
+/** Hover help for ABC column header (replaces on-screen legend). */
+const ABC_COLUMN_HELP =
+  'A — до 80% накопленного вклада; B — от 80% до 95%; C — остальные с положительным вкладом; — нет данных. К — количество, В — выручка, П — прибыль.'
+
+function AbcColumnHelp() {
+  return (
+    <span className="proc-planner__abc-help" title={ABC_COLUMN_HELP} aria-label={ABC_COLUMN_HELP}>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 10v5" />
+        <path d="M12 7h.01" />
+      </svg>
+    </span>
+  )
+}
+
 
 /** Scope for hard-clear vs soft keep-previous (excludes page/pageSize). */
 function buildPlannerItemsScopeKey(snapshotId, debouncedSearch, filters, abcSort) {
@@ -246,7 +263,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [browseMode, setBrowseMode] = useState(PLANNER_BROWSE_FLAT)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filters, setFilters] = useState({
@@ -319,6 +335,16 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
    * `final_order_qty` for a row that has just been ordered.
    */
   const [generationEpoch, setGenerationEpoch] = useState(0)
+  /** Expanded tree nodes: `c:Cat` / `s:Cat\0Sub`. */
+  const [expandedKeys, setExpandedKeys] = useState(() => new Set())
+  /** Lazy SKU pages per expanded leaf key. */
+  const [branchState, setBranchState] = useState({})
+  const branchRequestIdsRef = useRef({})
+
+  const treeMode = isPlannerTreeViewMode({
+    search: debouncedSearch,
+    abcSortField: abcSort.field,
+  })
 
   const activeFilterCount = useMemo(() => {
     let n = 0
@@ -420,23 +446,17 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       return
     }
 
-    if (browseMode === PLANNER_BROWSE_CATEGORIES) {
-      const pairsForCat = (filterOptions.categorySubcategories || []).filter(
-        (p) => p.categoryName === filters.categoryName
-      )
-      const level = resolvePlannerCategoryBrowseLevel({
-        categoryName: filters.categoryName,
-        subcategoryName: filters.subcategoryName,
-        subcategoryCount: pairsForCat.length,
-      })
-      if (level !== 'items') {
-        itemsRequestIdRef.current += 1
-        setItems([])
-        setTotalCount(0)
-        lastCommittedQtyRef.current = new Map()
-        setLoading(false)
-        return
-      }
+    const treeMode = isPlannerTreeViewMode({
+      search: debouncedSearch,
+      abcSortField: abcSort.field,
+    })
+    if (treeMode) {
+      itemsRequestIdRef.current += 1
+      setItems([])
+      setTotalCount(0)
+      lastItemsScopeKeyRef.current = ''
+      setLoading(false)
+      return
     }
 
     const scopeKey = buildPlannerItemsScopeKey(
@@ -478,17 +498,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         setLoading(false)
       }
     }
-  }, [
-    snapshot,
-    page,
-    pageSize,
-    debouncedSearch,
-    filters,
-    abcSort,
-    browseMode,
-    filterOptions.categorySubcategories,
-    showError,
-  ])
+  }, [snapshot, page, pageSize, debouncedSearch, filters, abcSort, showError])
 
   useEffect(() => {
     void loadSnapshotMeta()
@@ -501,6 +511,37 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   useEffect(() => {
     setPage(1)
   }, [debouncedSearch, filters, abcSort, snapshot?.id])
+
+  const resetTreeState = useCallback(() => {
+    setExpandedKeys(new Set())
+    setBranchState({})
+    branchRequestIdsRef.current = {}
+  }, [])
+
+  useEffect(() => {
+    resetTreeState()
+  }, [
+    snapshot?.id,
+    filters.platformSupplierId,
+    filters.orderableOnly,
+    filters.warningsOnly,
+    filters.unassignedOnly,
+    filters.abcQty,
+    filters.abcRevenue,
+    filters.abcProfit,
+    resetTreeState,
+  ])
+
+  useEffect(() => {
+    if (
+      isPlannerTreeViewMode({
+        search: debouncedSearch,
+        abcSortField: abcSort.field,
+      })
+    ) {
+      resetTreeState()
+    }
+  }, [debouncedSearch, abcSort.field, resetTreeState])
 
   /**
    * An attempt key is bound to the payload it was minted for. As soon as any part of
@@ -592,6 +633,23 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   function applySavedItem(updated) {
     lastCommittedQtyRef.current.set(updated.id, updated.finalOrderQty)
     setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)))
+    setBranchState((prev) => {
+      let changed = false
+      const next = {}
+      for (const [key, branch] of Object.entries(prev)) {
+        const list = branch?.items || []
+        const idx = list.findIndex((it) => it.id === updated.id)
+        if (idx === -1) {
+          next[key] = branch
+          continue
+        }
+        changed = true
+        const nextItems = list.slice()
+        nextItems[idx] = updated
+        next[key] = { ...branch, items: nextItems }
+      }
+      return changed ? next : prev
+    })
   }
 
   /**
@@ -689,12 +747,21 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     const result = await commitQuantity(item, inputEl.value)
     if (!result.ok) return // stale/in-flight/error — do not advance focus
 
-    const nextId = getNextEditableItemId(items, item.id, canEditQuantity)
+    let list = items
+    if (treeMode) {
+      for (const branch of Object.values(branchState)) {
+        if ((branch?.items || []).some((it) => it.id === item.id)) {
+          list = branch.items
+          break
+        }
+      }
+    }
+    const nextId = getNextEditableItemId(list, item.id, canEditQuantity)
     if (nextId) {
       focusQtyInputForItem(nextId)
       return
     }
-    if (page < totalPages) {
+    if (!treeMode && page < totalPages) {
       pendingFocusRef.current = 'firstEditable'
       setPage((p) => p + 1)
     }
@@ -738,104 +805,147 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     return pairs.filter((p) => p.categoryName === filters.categoryName)
   }, [filterOptions.categorySubcategories, filters.categoryName])
 
-  const categoryNavModel = useMemo(
-    () => buildPlannerCategoryNavModel(filterOptions),
-    [filterOptions]
-  )
+  const categoryNavModel = useMemo(() => {
+    const model = buildPlannerCategoryNavModel(filterOptions)
+    if (!filters.categoryName) return model
+    return model.filter((entry) => entry.categoryName === filters.categoryName)
+  }, [filterOptions, filters.categoryName])
 
-  const categoryBrowseLevel = useMemo(() => {
-    if (browseMode !== PLANNER_BROWSE_CATEGORIES) return 'items'
-    return resolvePlannerCategoryBrowseLevel({
-      categoryName: filters.categoryName,
-      subcategoryName: filters.subcategoryName,
-      subcategoryCount: subcategoryOptions.length,
-    })
-  }, [
-    browseMode,
-    filters.categoryName,
-    filters.subcategoryName,
-    subcategoryOptions.length,
-  ])
-
-  const showCategoryNavigator = categoryBrowseLevel !== 'items'
-  const showSkuTable = browseMode === PLANNER_BROWSE_FLAT || categoryBrowseLevel === 'items'
-
-  const categoryCountsNeedNote = plannerCategoryCountsNeedScopeNote({
+  const countsScopeTitle = plannerCategoryCountsNeedScopeNote({
     platformSupplierId: filters.platformSupplierId,
     orderableOnly: filters.orderableOnly,
-    search: debouncedSearch,
   })
+    ? `${PLANNER_CATEGORY_COUNTS_SCOPE_LABEL} (без учёта поставщика / «к заказу»)`
+    : PLANNER_CATEGORY_COUNTS_SCOPE_LABEL
 
-  const groupHeadersEnabled =
-    showSkuTable && !abcSort.field && !String(debouncedSearch || '').trim()
+  const loadBranchSkuPage = useCallback(
+    async (branchKey, { categoryName, subcategoryName, append = false } = {}) => {
+      if (!snapshot?.id) return
 
-  const skuTableRows = useMemo(
-    () => buildPlannerSkuTableRows(items, { groupHeaders: groupHeadersEnabled }),
-    [items, groupHeadersEnabled]
+      let nextPage = 1
+      let skip = false
+      setBranchState((current) => {
+        const prev = current[branchKey]
+        if (append) {
+          const loaded = prev?.items?.length || 0
+          if (prev && loaded >= (prev.totalCount || 0)) {
+            skip = true
+            return current
+          }
+          nextPage = Math.floor(loaded / TREE_BRANCH_PAGE_SIZE) + 1
+        }
+        return {
+          ...current,
+          [branchKey]: {
+            items: append ? prev?.items || [] : [],
+            totalCount: append ? prev?.totalCount || 0 : 0,
+            loading: true,
+          },
+        }
+      })
+      if (skip) return
+
+      const requestId = (branchRequestIdsRef.current[branchKey] || 0) + 1
+      branchRequestIdsRef.current[branchKey] = requestId
+      try {
+        const result = await fetchSnapshotItemsPage({
+          snapshotId: snapshot.id,
+          page: nextPage,
+          pageSize: TREE_BRANCH_PAGE_SIZE,
+          search: '',
+          ...filters,
+          categoryName: categoryName || '',
+          subcategoryName: subcategoryName || '',
+          sortField: '',
+          sortDir: 'asc',
+        })
+        if (requestId !== branchRequestIdsRef.current[branchKey]) return
+        setBranchState((current) => {
+          const existing = current[branchKey]?.items || []
+          const merged = append ? existing.concat(result.items || []) : result.items || []
+          for (const it of result.items || []) {
+            lastCommittedQtyRef.current.set(it.id, it.finalOrderQty)
+          }
+          return {
+            ...current,
+            [branchKey]: {
+              items: merged,
+              totalCount: result.totalCount || 0,
+              loading: false,
+            },
+          }
+        })
+      } catch (err) {
+        if (requestId !== branchRequestIdsRef.current[branchKey]) return
+        setBranchState((current) => ({
+          ...current,
+          [branchKey]: {
+            items: append ? current[branchKey]?.items || [] : [],
+            totalCount: append ? current[branchKey]?.totalCount || 0 : 0,
+            loading: false,
+          },
+        }))
+        showError(toProcurementUserMessage(err, 'Не удалось загрузить позиции.'))
+      }
+    },
+    [snapshot?.id, filters, showError]
   )
 
-  function handleBrowseModeChange(nextMode) {
-    setBrowseMode(nextMode)
-    setPage(1)
-    setFilters((current) => ({
-      ...current,
-      categoryName: '',
-      subcategoryName: '',
-    }))
-  }
-
-  function openCategoryNav(categoryName) {
-    const entry = categoryNavModel.find((c) => c.categoryName === categoryName)
-    const subs = entry?.subcategories || []
-    setPage(1)
-    if (subs.length <= 1) {
-      setFilters((current) => ({
-        ...current,
-        categoryName,
-        subcategoryName: subs[0]?.subcategoryName || '',
-      }))
-      return
-    }
-    setFilters((current) => ({
-      ...current,
-      categoryName,
-      subcategoryName: '',
-    }))
-  }
-
-  function openSubcategoryNav(subcategoryName) {
-    setPage(1)
-    setFilters((current) => ({
-      ...current,
-      subcategoryName: subcategoryName || '',
-    }))
-  }
-
-  function navigateCategoryBreadcrumb(target) {
-    setPage(1)
-    if (target === 'root') {
-      setFilters((current) => ({
-        ...current,
-        categoryName: '',
-        subcategoryName: '',
-      }))
-      return
-    }
-    if (target === 'category') {
-      const subs = subcategoryOptions
-      if (subs.length <= 1) {
-        setFilters((current) => ({
-          ...current,
-          subcategoryName: '',
-        }))
-        // Stay on items if ≤1 sub; if somehow multiple, clearing sub shows sub list
-        return
+  function collapseTreeKey(key) {
+    setExpandedKeys((current) => {
+      const next = new Set(current)
+      next.delete(key)
+      if (key.startsWith('c:')) {
+        const cat = key.slice(2)
+        for (const k of [...next]) {
+          if (k.startsWith(`s:${cat}\u0000`)) next.delete(k)
+        }
       }
-      setFilters((current) => ({
-        ...current,
-        subcategoryName: '',
-      }))
+      return next
+    })
+    setBranchState((current) => {
+      const next = { ...current }
+      delete next[key]
+      if (key.startsWith('c:')) {
+        const cat = key.slice(2)
+        for (const k of Object.keys(next)) {
+          if (k.startsWith(`s:${cat}\u0000`)) delete next[k]
+        }
+      }
+      return next
+    })
+    delete branchRequestIdsRef.current[key]
+  }
+
+  function toggleCategoryExpand(entry) {
+    const key = plannerCategoryTreeKey(entry.categoryName)
+    if (expandedKeys.has(key)) {
+      collapseTreeKey(key)
+      return
     }
+    setExpandedKeys((current) => new Set(current).add(key))
+    if (plannerCategoryExpandsToSku(entry.subcategories.length)) {
+      const onlySub = entry.subcategories[0]
+      void loadBranchSkuPage(key, {
+        categoryName: entry.categoryName,
+        subcategoryName: onlySub?.subcategoryName || '',
+        append: false,
+      })
+    }
+  }
+
+  function toggleSubcategoryExpand(categoryName, subcategoryName) {
+    const key = plannerSubcategoryTreeKey(categoryName, subcategoryName)
+    if (expandedKeys.has(key)) {
+      collapseTreeKey(key)
+      return
+    }
+    setExpandedKeys((current) => new Set(current).add(key))
+    void loadBranchSkuPage(key, {
+      categoryName,
+      subcategoryName,
+      append: false,
+    })
   }
 
   const snapshotEditable = isSnapshotQuantityEditable(snapshot?.status)
@@ -1095,8 +1205,12 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
   const from = totalCount === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, totalCount)
-  const isInitialLoading = loading && items.length === 0
-  const isFetching = loading && items.length > 0
+  const isInitialLoading = treeMode
+    ? Boolean(snapshot?.id) &&
+      (filterOptionsLoading || filterOptionsSnapshotId !== snapshot.id) &&
+      categoryNavModel.length === 0
+    : loading && items.length === 0
+  const isFetching = !treeMode && loading && items.length > 0
   const weekColumns = useMemo(
     () => buildPlannerWeekColumnLabels(snapshot?.periodFrom, snapshot?.periodTo),
     [snapshot?.periodFrom, snapshot?.periodTo]
@@ -1206,6 +1320,403 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     )
   }
 
+  function renderDesktopSkuRow(item, index, { indent = false } = {}) {
+    return (
+      <tr key={item.id} className={indent ? 'proc-planner__tree-sku' : undefined}>
+        <td className="proc-planner__col-num proc-planner__sticky-num">
+          {index + 1}
+        </td>
+        <td className="proc-planner__col-product proc-planner__sticky-product">
+          <div className={`proc-planner__product${indent ? ' is-tree-child' : ''}`}>
+            <strong>{item.productName}</strong>
+            <span>{item.barcode}</span>
+          </div>
+        </td>
+        <td>
+          <AbcBadges item={item} compact />
+        </td>
+        {Array.from({ length: PLANNER_WEEK_COLUMN_COUNT }, (_, weekIndex) => (
+          <td key={`week-${item.id}-${weekIndex}`} className="proc-planner__col-week">
+            <WeeklySalesCell value={item.weeklySales?.[weekIndex]} />
+          </td>
+        ))}
+        <td>
+          <span
+            className={
+              item.negativeStock ? 'proc-planner__stock is-neg' : 'proc-planner__stock'
+            }
+            title={
+              item.negativeStock
+                ? 'Отрицательный остаток UMAG — в расчёте как 0'
+                : undefined
+            }
+          >
+            {formatNum(item.rawStock, 2)}
+          </span>
+        </td>
+        <td>{formatNum(item.avgDaily, 2)}</td>
+        <td>
+          <span
+            className="proc-planner__norm-value"
+            title="Настраивается во вкладке «Нормы»"
+          >
+            {item.normDays}
+          </span>
+        </td>
+        <td className="proc-planner__col-rec">
+          {formatNum(item.recommendedQty, 0)}
+        </td>
+        <td className="proc-planner__col-order proc-planner__col-order--accent proc-planner__sticky-order">
+          {renderQtyCell(item)}
+        </td>
+        <td>{item.umagSupplierName || '—'}</td>
+      </tr>
+    )
+  }
+
+  function renderBranchSkuBlock(branchKey, { categoryName, subcategoryName, indent }) {
+    const branch = branchState[branchKey]
+    const rows = []
+    if (branch?.loading && !(branch.items || []).length) {
+      rows.push(
+        <tr key={`${branchKey}-loading`}>
+          <td colSpan={TABLE_COL_SPAN} className="proc-planner__tree-muted">
+            Загрузка…
+          </td>
+        </tr>
+      )
+      return rows
+    }
+    const list = branch?.items || []
+    if (!branch?.loading && list.length === 0) {
+      rows.push(
+        <tr key={`${branchKey}-empty`}>
+          <td colSpan={TABLE_COL_SPAN} className="proc-planner__tree-muted">
+            Нет позиций
+          </td>
+        </tr>
+      )
+      return rows
+    }
+    list.forEach((item, index) => {
+      rows.push(renderDesktopSkuRow(item, index, { indent }))
+    })
+    const total = branch?.totalCount || 0
+    const remaining = Math.max(0, total - list.length)
+    if (remaining > 0 || branch?.loading) {
+      rows.push(
+        <tr key={`${branchKey}-more`}>
+          <td colSpan={TABLE_COL_SPAN}>
+            <button
+              type="button"
+              className="proc-planner__tree-more"
+              disabled={Boolean(branch?.loading)}
+              onClick={() =>
+                void loadBranchSkuPage(branchKey, {
+                  categoryName,
+                  subcategoryName,
+                  append: true,
+                })
+              }
+            >
+              {branch?.loading ? 'Загрузка…' : `Ещё · ${remaining}`}
+            </button>
+          </td>
+        </tr>
+      )
+    }
+    return rows
+  }
+
+  function renderTreeGroupRow({
+    key,
+    label,
+    count,
+    expanded,
+    onToggle,
+    depth = 0,
+  }) {
+    return (
+      <tr key={key} className={`proc-planner__tree-group depth-${depth}`}>
+        <td colSpan={TABLE_COL_SPAN}>
+          <div className="proc-planner__tree-group-inner">
+            <button
+              type="button"
+              className="proc-planner__tree-toggle"
+              aria-expanded={expanded}
+              aria-label={expanded ? `Свернуть ${label}` : `Развернуть ${label}`}
+              onClick={onToggle}
+            >
+              {expanded ? '−' : '+'}
+            </button>
+            <span className="proc-planner__tree-group-name">{label}</span>
+            <span
+              className="proc-planner__tree-group-count"
+              title={countsScopeTitle}
+            >
+              {count}
+            </span>
+            <span className="proc-planner__tree-group-scope">{PLANNER_CATEGORY_COUNTS_SCOPE_LABEL}</span>
+          </div>
+        </td>
+      </tr>
+    )
+  }
+
+  function renderTreeTableBody() {
+    if (isInitialLoading) {
+      return (
+        <tr>
+          <td colSpan={TABLE_COL_SPAN}>Загрузка…</td>
+        </tr>
+      )
+    }
+    if (categoryNavModel.length === 0) {
+      return (
+        <tr>
+          <td colSpan={TABLE_COL_SPAN}>Нет категорий</td>
+        </tr>
+      )
+    }
+    const rows = []
+    for (const entry of categoryNavModel) {
+      const catKey = plannerCategoryTreeKey(entry.categoryName)
+      const catExpanded = expandedKeys.has(catKey)
+      rows.push(
+        renderTreeGroupRow({
+          key: catKey,
+          label: entry.categoryName || 'Без категории',
+          count: entry.itemCount,
+          expanded: catExpanded,
+          onToggle: () => toggleCategoryExpand(entry),
+          depth: 0,
+        })
+      )
+      if (!catExpanded) continue
+      if (plannerCategoryExpandsToSku(entry.subcategories.length)) {
+        const onlySub = entry.subcategories[0]
+        rows.push(
+          ...renderBranchSkuBlock(catKey, {
+            categoryName: entry.categoryName,
+            subcategoryName: onlySub?.subcategoryName || '',
+            indent: true,
+          })
+        )
+      } else {
+        for (const sub of entry.subcategories) {
+          const subKey = plannerSubcategoryTreeKey(
+            entry.categoryName,
+            sub.subcategoryName
+          )
+          const subExpanded = expandedKeys.has(subKey)
+          rows.push(
+            renderTreeGroupRow({
+              key: subKey,
+              label: sub.subcategoryName || 'Без подкатегории',
+              count: sub.itemCount,
+              expanded: subExpanded,
+              onToggle: () =>
+                toggleSubcategoryExpand(entry.categoryName, sub.subcategoryName),
+              depth: 1,
+            })
+          )
+          if (!subExpanded) continue
+          rows.push(
+            ...renderBranchSkuBlock(subKey, {
+              categoryName: entry.categoryName,
+              subcategoryName: sub.subcategoryName,
+              indent: true,
+            })
+          )
+        }
+      }
+    }
+    return rows
+  }
+
+  function renderMobileSkuCard(item, index) {
+    return (
+      <li key={item.id} className="proc-planner__card">
+        <div className="proc-planner__card-top">
+          <strong>
+            <span className="proc-planner__row-num" aria-hidden="true">
+              {index + 1}.
+            </span>{' '}
+            {item.productName}
+          </strong>
+          <span>{item.barcode}</span>
+        </div>
+        <AbcBadges item={item} />
+        <WeeklySpark values={item.weeklySales} />
+        <div className="proc-planner__card-grid">
+          <span>
+            Остаток{' '}
+            <b className={item.negativeStock ? 'is-neg' : ''}>
+              {formatNum(item.rawStock, 2)}
+            </b>
+          </span>
+          <span>
+            Ср/день <b>{formatNum(item.avgDaily, 2)}</b>
+          </span>
+          <label>
+            Норма
+            <span
+              className="proc-planner__norm-value"
+              title="Настраивается во вкладке «Нормы»"
+            >
+              {item.normDays}
+            </span>
+          </label>
+          <label className="proc-planner__card-order">
+            Заказ
+            {renderQtyCell(item, true)}
+          </label>
+        </div>
+        <div className="proc-planner__card-foot">
+          <span>{item.umagSupplierName || 'Без поставщика'}</span>
+          <span className="proc-planner__card-rec">
+            рек. {formatNum(item.recommendedQty, 0)}
+          </span>
+        </div>
+      </li>
+    )
+  }
+
+  function renderMobileBranchCards(branchKey, { categoryName, subcategoryName }) {
+    const branch = branchState[branchKey]
+    if (branch?.loading && !(branch.items || []).length) {
+      return <p className="proc-planner__empty">Загрузка…</p>
+    }
+    const list = branch?.items || []
+    if (!list.length) {
+      return <p className="proc-planner__empty">Нет позиций</p>
+    }
+    const total = branch?.totalCount || 0
+    const remaining = Math.max(0, total - list.length)
+    return (
+      <>
+        <ul className="proc-planner__cards">
+          {list.map((item, index) => renderMobileSkuCard(item, index))}
+        </ul>
+        {remaining > 0 || branch?.loading ? (
+          <button
+            type="button"
+            className="proc-planner__tree-more"
+            disabled={Boolean(branch?.loading)}
+            onClick={() =>
+              void loadBranchSkuPage(branchKey, {
+                categoryName,
+                subcategoryName,
+                append: true,
+              })
+            }
+          >
+            {branch?.loading ? 'Загрузка…' : `Ещё · ${remaining}`}
+          </button>
+        ) : null}
+      </>
+    )
+  }
+
+  function renderMobileTreeGroup({
+    key,
+    label,
+    count,
+    expanded,
+    onToggle,
+    depth = 0,
+  }) {
+    return (
+      <div key={key} className={`proc-planner__tree-mobile-group depth-${depth}`}>
+        <button
+          type="button"
+          className="proc-planner__tree-mobile-toggle"
+          aria-expanded={expanded}
+          onClick={onToggle}
+        >
+          <span className="proc-planner__tree-toggle" aria-hidden="true">
+            {expanded ? '−' : '+'}
+          </span>
+          <span className="proc-planner__tree-group-name">{label}</span>
+          <span className="proc-planner__tree-group-count" title={countsScopeTitle}>
+            {count}
+          </span>
+          <span className="proc-planner__tree-group-scope">
+            {PLANNER_CATEGORY_COUNTS_SCOPE_LABEL}
+          </span>
+        </button>
+      </div>
+    )
+  }
+
+  function renderMobileTree() {
+    if (isInitialLoading) {
+      return <p className="proc-planner__empty">Загрузка…</p>
+    }
+    if (categoryNavModel.length === 0) {
+      return <p className="proc-planner__empty">Нет категорий</p>
+    }
+    return (
+      <div className="proc-planner__tree-mobile">
+        {categoryNavModel.flatMap((entry) => {
+          const catKey = plannerCategoryTreeKey(entry.categoryName)
+          const catExpanded = expandedKeys.has(catKey)
+          const blocks = [
+            renderMobileTreeGroup({
+              key: catKey,
+              label: entry.categoryName || 'Без категории',
+              count: entry.itemCount,
+              expanded: catExpanded,
+              onToggle: () => toggleCategoryExpand(entry),
+              depth: 0,
+            }),
+          ]
+          if (!catExpanded) return blocks
+          if (plannerCategoryExpandsToSku(entry.subcategories.length)) {
+            const onlySub = entry.subcategories[0]
+            blocks.push(
+              <div key={`${catKey}-sku`} className="proc-planner__tree-mobile-children">
+                {renderMobileBranchCards(catKey, {
+                  categoryName: entry.categoryName,
+                  subcategoryName: onlySub?.subcategoryName || '',
+                })}
+              </div>
+            )
+            return blocks
+          }
+          for (const sub of entry.subcategories) {
+            const subKey = plannerSubcategoryTreeKey(
+              entry.categoryName,
+              sub.subcategoryName
+            )
+            const subExpanded = expandedKeys.has(subKey)
+            blocks.push(
+              renderMobileTreeGroup({
+                key: subKey,
+                label: sub.subcategoryName || 'Без подкатегории',
+                count: sub.itemCount,
+                expanded: subExpanded,
+                onToggle: () =>
+                  toggleSubcategoryExpand(entry.categoryName, sub.subcategoryName),
+                depth: 1,
+              })
+            )
+            if (!subExpanded) continue
+            blocks.push(
+              <div key={`${subKey}-sku`} className="proc-planner__tree-mobile-children">
+                {renderMobileBranchCards(subKey, {
+                  categoryName: entry.categoryName,
+                  subcategoryName: sub.subcategoryName,
+                })}
+              </div>
+            )
+          }
+          return blocks
+        })}
+      </div>
+    )
+  }
+
   /** Chips navigate to the matching filter; they never just report a number. */
   function handleAlertChipClick(chip) {
     if (chip.id === 'unassigned') {
@@ -1237,54 +1748,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     itemCount: snapshot?.itemCount || 0,
     negativeStockCount: snapshot?.negativeStockCount || 0,
   })
-  const senseLine = useMemo(
-    () =>
-      buildPlannerSenseLine({
-        periodFrom: snapshot?.periodFrom,
-        periodTo: snapshot?.periodTo,
-        orderableCount: snapshot?.orderableCount || 0,
-        supplierOrderableCount: filters.platformSupplierId
-          ? getNextOrderPositions(selectedSupplierSummary)
-          : null,
-      }),
-    [
-      snapshot?.periodFrom,
-      snapshot?.periodTo,
-      snapshot?.orderableCount,
-      filters.platformSupplierId,
-      selectedSupplierSummary,
-    ]
-  )
-
   const headerStrip = (
     <div className="proc-planner__topbar">
-      {snapshot?.id ? (
-        <div className="proc-planner__sense" title={senseLine.title}>
-          {senseLine.periodText ? (
-            <span className="proc-planner__sense-period">{senseLine.periodText}</span>
-          ) : null}
-          {senseLine.periodText ? (
-            <span className="proc-planner__sense-sep" aria-hidden="true">
-              ·
-            </span>
-          ) : null}
-          <span className="proc-planner__sense-formula" title={senseLine.formulaTitle}>
-            {senseLine.formulaText}
-          </span>
-          <span className="proc-planner__sense-sep" aria-hidden="true">
-            ·
-          </span>
-          <span className="proc-planner__sense-orderable">{senseLine.orderableText}</span>
-          {senseLine.orderableSupplierText ? (
-            <>
-              <span className="proc-planner__sense-sep" aria-hidden="true">
-                ·
-              </span>
-              <span className="proc-planner__sense-supplier">{senseLine.orderableSupplierText}</span>
-            </>
-          ) : null}
-        </div>
-      ) : null}
       <span className="proc-planner__snapshot" title={snapshotHeadline.title}>
         <span className="proc-planner__snapshot-label">UMAG</span>
         <span className="proc-planner__snapshot-text">{snapshotHeadline.text}</span>
@@ -1401,28 +1866,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                 </span>
               ) : null}
             </button>
-            <div
-              className="proc-planner__browse-mode"
-              role="group"
-              aria-label="Режим списка"
-            >
-              <button
-                type="button"
-                className={`proc-planner__browse-mode-btn${browseMode === PLANNER_BROWSE_FLAT ? ' is-active' : ''}`}
-                aria-pressed={browseMode === PLANNER_BROWSE_FLAT}
-                onClick={() => handleBrowseModeChange(PLANNER_BROWSE_FLAT)}
-              >
-                Плоский
-              </button>
-              <button
-                type="button"
-                className={`proc-planner__browse-mode-btn${browseMode === PLANNER_BROWSE_CATEGORIES ? ' is-active' : ''}`}
-                aria-pressed={browseMode === PLANNER_BROWSE_CATEGORIES}
-                onClick={() => handleBrowseModeChange(PLANNER_BROWSE_CATEGORIES)}
-              >
-                По категориям
-              </button>
-            </div>
             <PlatformToolbarActionWrap>
               <span className="proc-planner__tip-wrap" data-tooltip={syncTooltip}>
                 <PlatformSyncButton
@@ -1689,156 +2132,16 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         </p>
       ) : null}
 
-      {Number(snapshot?.itemCount) > 0 || items.length > 0 ? (
-      <p className="proc-planner__abc-legend">
-        ABC:{' '}
-        <span
-          className="proc-planner__abc-badge is-a"
-          title="Класс A — до 80% накопленного вклада"
-          aria-label="Класс A — до 80% накопленного вклада"
-        >
-          A
-        </span>{' '}
-        80% ·{' '}
-        <span
-          className="proc-planner__abc-badge is-b"
-          title="Класс B — от 80% до 95%"
-          aria-label="Класс B — от 80% до 95%"
-        >
-          B
-        </span>{' '}
-        95% ·{' '}
-        <span
-          className="proc-planner__abc-badge is-c"
-          title="Класс C — остальные с положительным вкладом"
-          aria-label="Класс C — остальные с положительным вкладом"
-        >
-          C
-        </span>{' '}
-        остальное ·{' '}
-        <span
-          className="proc-planner__abc-badge is-empty"
-          title="Нет положительного показателя или старый снимок"
-          aria-label="Нет класса — нет положительного показателя или старый снимок"
-        >
-          —
-        </span>{' '}
-        нет данных. К — количество, В — выручка, П — прибыль.
-      </p>
+      {!treeMode ? (
+        <p className="proc-planner__flat-hint" role="status">
+          Поиск / сортировка ABC — плоский список
+        </p>
       ) : null}
 
-      {browseMode === PLANNER_BROWSE_CATEGORIES ? (
-        <nav className="proc-planner__crumbs" aria-label="Категории">
-          <button
-            type="button"
-            className="proc-planner__crumb"
-            onClick={() => navigateCategoryBreadcrumb('root')}
-          >
-            Все категории
-          </button>
-          {filters.categoryName ? (
-            <>
-              <span className="proc-planner__crumb-sep" aria-hidden="true">
-                /
-              </span>
-              <button
-                type="button"
-                className="proc-planner__crumb"
-                onClick={() => navigateCategoryBreadcrumb('category')}
-              >
-                {filters.categoryName}
-              </button>
-            </>
-          ) : null}
-          {filters.subcategoryName ? (
-            <>
-              <span className="proc-planner__crumb-sep" aria-hidden="true">
-                /
-              </span>
-              <span className="proc-planner__crumb is-current">{filters.subcategoryName}</span>
-            </>
-          ) : null}
-        </nav>
-      ) : null}
-
-      {showCategoryNavigator ? (
-        <div className="proc-planner__cat-nav" aria-label="Навигация по категориям">
-          {categoryCountsNeedNote ? (
-            <p className="proc-planner__cat-nav-note">
-              Счётчики — {PLANNER_CATEGORY_COUNTS_SCOPE_LABEL} (без учёта поставщика / «к заказу» /
-              поиска)
-            </p>
-          ) : (
-            <p className="proc-planner__cat-nav-note">
-              Счётчики — {PLANNER_CATEGORY_COUNTS_SCOPE_LABEL}
-            </p>
-          )}
-          {categoryBrowseLevel === 'categories' ? (
-            categoryNavModel.length === 0 ? (
-              <p className="proc-planner__empty">
-                {filterOptionsLoading ? 'Загрузка категорий…' : 'Категорий нет'}
-              </p>
-            ) : (
-              <ul className="proc-planner__cat-list">
-                {categoryNavModel.map((entry) => (
-                  <li key={entry.categoryName || '__empty__'}>
-                    <button
-                      type="button"
-                      className="proc-planner__cat-item"
-                      onClick={() => openCategoryNav(entry.categoryName)}
-                    >
-                      <span className="proc-planner__cat-item-name">{entry.categoryName}</span>
-                      <span
-                        className="proc-planner__cat-item-count"
-                        title={`${PLANNER_CATEGORY_COUNTS_SCOPE_LABEL}: ${entry.itemCount}`}
-                      >
-                        {entry.itemCount}
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )
-          ) : (
-            <ul className="proc-planner__cat-list">
-              {subcategoryOptions.map((pair) => {
-                const count =
-                  typeof pair.itemCount === 'number'
-                    ? pair.itemCount
-                    : filterOptions.pairCounts?.[
-                        `${pair.categoryName}\u0000${pair.subcategoryName}`
-                      ] || 0
-                return (
-                  <li key={`${pair.categoryName}::${pair.subcategoryName}`}>
-                    <button
-                      type="button"
-                      className="proc-planner__cat-item"
-                      onClick={() => openSubcategoryNav(pair.subcategoryName)}
-                    >
-                      <span className="proc-planner__cat-item-name">
-                        {pair.subcategoryName || 'Без подкатегории'}
-                      </span>
-                      <span
-                        className="proc-planner__cat-item-count"
-                        title={`${PLANNER_CATEGORY_COUNTS_SCOPE_LABEL}: ${count}`}
-                      >
-                        {count}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          )}
-        </div>
-      ) : null}
-
-      {showSkuTable ? (
-      <>
       <div className="proc-planner__desktop">
         <div
           className={`proc-planner__table-wrap${isFetching ? ' proc-planner__table-wrap--fetching' : ''}`}
-          aria-busy={loading || undefined}
+          aria-busy={(treeMode ? filterOptionsLoading : loading) || undefined}
         >
           <table className="proc-planner__table">
             <thead>
@@ -1847,7 +2150,10 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                 <th className="proc-planner__col-product proc-planner__sticky-product">Товар</th>
                 <th className="proc-planner__col-abc proc-planner__col-abc--compact">
                   <div className="proc-planner__abc-head proc-planner__abc-head--compact">
-                    <span>ABC</span>
+                    <span className="proc-planner__abc-head-label">
+                      ABC
+                      <AbcColumnHelp />
+                    </span>
                     <div className="proc-planner__abc-sort">
                       {ABC_AXES.map((axis) => {
                         const active = abcSort.field === axis.column
@@ -1891,173 +2197,76 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
               </tr>
             </thead>
             <tbody>
-              {isInitialLoading ? (
-                <tr>
-                  <td colSpan={TABLE_COL_SPAN}>Загрузка…</td>
-                </tr>
-              ) : items.length === 0 ? (
-                <tr>
-                  <td colSpan={TABLE_COL_SPAN}>Нет позиций</td>
-                </tr>
-              ) : (
-                skuTableRows.map((row) =>
-                  row.type === 'group' ? (
-                    <tr key={`g-${row.key}`} className="proc-planner__group-row">
-                      <td colSpan={TABLE_COL_SPAN} className="proc-planner__group-cell">
-                        {row.label}
-                      </td>
+              {treeMode
+                ? renderTreeTableBody()
+                : isInitialLoading ? (
+                    <tr>
+                      <td colSpan={TABLE_COL_SPAN}>Загрузка…</td>
+                    </tr>
+                  ) : items.length === 0 ? (
+                    <tr>
+                      <td colSpan={TABLE_COL_SPAN}>Нет позиций</td>
                     </tr>
                   ) : (
-                  <tr key={row.item.id}>
-                    <td className="proc-planner__col-num proc-planner__sticky-num">
-                      {(page - 1) * pageSize + row.index + 1}
-                    </td>
-                    <td className="proc-planner__col-product proc-planner__sticky-product">
-                      <div className="proc-planner__product">
-                        <strong>{row.item.productName}</strong>
-                        <span>{row.item.barcode}</span>
-                        <span className="proc-planner__cat">
-                          {[row.item.categoryName, row.item.subcategoryName]
-                            .filter(Boolean)
-                            .join(' / ')}
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      <AbcBadges item={row.item} compact />
-                    </td>
-                    {Array.from({ length: PLANNER_WEEK_COLUMN_COUNT }, (_, weekIndex) => (
-                      <td key={`week-${row.item.id}-${weekIndex}`} className="proc-planner__col-week">
-                        <WeeklySalesCell value={row.item.weeklySales?.[weekIndex]} />
-                      </td>
-                    ))}
-                    <td>
-                      <span
-                        className={
-                          row.item.negativeStock
-                            ? 'proc-planner__stock is-neg'
-                            : 'proc-planner__stock'
-                        }
-                        title={
-                          row.item.negativeStock
-                            ? 'Отрицательный остаток UMAG — в расчёте как 0'
-                            : undefined
-                        }
-                      >
-                        {formatNum(row.item.rawStock, 2)}
-                      </span>
-                    </td>
-                    <td>{formatNum(row.item.avgDaily, 2)}</td>
-                    <td>
-                      <span
-                        className="proc-planner__norm-value"
-                        title="Настраивается во вкладке «Нормы»"
-                      >
-                        {row.item.normDays}
-                      </span>
-                    </td>
-                    <td className="proc-planner__col-rec">
-                      {formatNum(row.item.recommendedQty, 0)}
-                    </td>
-                    <td className="proc-planner__col-order proc-planner__col-order--accent proc-planner__sticky-order">
-                      {renderQtyCell(row.item)}
-                    </td>
-                    <td>{row.item.umagSupplierName || '—'}</td>
-                  </tr>
-                  )
-                )
-              )}
+                    items.map((item, index) =>
+                      renderDesktopSkuRow(item, (page - 1) * pageSize + index)
+                    )
+                  )}
             </tbody>
           </table>
         </div>
-        <TablePagination
-          page={page}
-          totalPages={totalPages}
-          from={from}
-          to={to}
-          totalCount={totalCount}
-          onPageChange={setPage}
-          pageSize={pageSize}
-          onPageSizeChange={(nextPageSize) => {
-            setPage(1)
-            setPageSize(nextPageSize)
-          }}
-          disabled={loading}
-        />
+        {!treeMode ? (
+          <TablePagination
+            page={page}
+            totalPages={totalPages}
+            from={from}
+            to={to}
+            totalCount={totalCount}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={(nextPageSize) => {
+              setPage(1)
+              setPageSize(nextPageSize)
+            }}
+            disabled={loading}
+          />
+        ) : null}
       </div>
 
       <div
         className={`proc-planner__mobile${isFetching ? ' proc-planner__mobile--fetching' : ''}`}
-        aria-busy={loading || undefined}
+        aria-busy={(treeMode ? filterOptionsLoading : loading) || undefined}
       >
-        {isInitialLoading ? (
+        {treeMode ? (
+          renderMobileTree()
+        ) : isInitialLoading ? (
           <p className="proc-planner__empty">Загрузка…</p>
         ) : items.length === 0 ? (
           <p className="proc-planner__empty">Нет позиций</p>
         ) : (
           <ul className="proc-planner__cards">
-            {items.map((item, index) => (
-              <li key={item.id} className="proc-planner__card">
-                <div className="proc-planner__card-top">
-                  <strong>
-                    <span className="proc-planner__row-num" aria-hidden="true">
-                      {(page - 1) * pageSize + index + 1}.
-                    </span>{' '}
-                    {item.productName}
-                  </strong>
-                  <span>{item.barcode}</span>
-                </div>
-                <AbcBadges item={item} />
-                <WeeklySpark values={item.weeklySales} />
-                <div className="proc-planner__card-grid">
-                  <span>
-                    Остаток{' '}
-                    <b className={item.negativeStock ? 'is-neg' : ''}>
-                      {formatNum(item.rawStock, 2)}
-                    </b>
-                  </span>
-                  <span>
-                    Ср/день <b>{formatNum(item.avgDaily, 2)}</b>
-                  </span>
-                  <label>
-                    Норма
-                    <span
-                      className="proc-planner__norm-value"
-                      title="Настраивается во вкладке «Нормы»"
-                    >
-                      {item.normDays}
-                    </span>
-                  </label>
-                  <label className="proc-planner__card-order">
-                    Заказ
-                    {renderQtyCell(item, true)}
-                  </label>
-                </div>
-                <div className="proc-planner__card-foot">
-                  <span>{item.umagSupplierName || 'Без поставщика'}</span>
-                  <span className="proc-planner__card-rec">рек. {formatNum(item.recommendedQty, 0)}</span>
-                </div>
-              </li>
-            ))}
+            {items.map((item, index) =>
+              renderMobileSkuCard(item, (page - 1) * pageSize + index)
+            )}
           </ul>
         )}
-        <TablePagination
-          page={page}
-          totalPages={totalPages}
-          from={from}
-          to={to}
-          totalCount={totalCount}
-          onPageChange={setPage}
-          pageSize={pageSize}
-          onPageSizeChange={(nextPageSize) => {
-            setPage(1)
-            setPageSize(nextPageSize)
-          }}
-          disabled={loading}
-        />
+        {!treeMode ? (
+          <TablePagination
+            page={page}
+            totalPages={totalPages}
+            from={from}
+            to={to}
+            totalCount={totalCount}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={(nextPageSize) => {
+              setPage(1)
+              setPageSize(nextPageSize)
+            }}
+            disabled={loading}
+          />
+        ) : null}
       </div>
-      </>
-      ) : null}
 
       {generateOpen ? (
         <AdminModal
