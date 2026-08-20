@@ -97,6 +97,25 @@ const TABLE_COL_SPAN = 10
 
 const DEFAULT_PAGE_SIZE = 25
 
+/** Scope for hard-clear vs soft keep-previous (excludes page/pageSize). */
+function buildPlannerItemsScopeKey(snapshotId, debouncedSearch, filters, abcSort) {
+  return [
+    snapshotId || '',
+    debouncedSearch || '',
+    filters?.categoryName || '',
+    filters?.subcategoryName || '',
+    filters?.platformSupplierId || '',
+    filters?.warningsOnly ? '1' : '0',
+    filters?.orderableOnly ? '1' : '0',
+    filters?.unassignedOnly ? '1' : '0',
+    Array.isArray(filters?.abcQty) ? filters.abcQty.join(',') : '',
+    Array.isArray(filters?.abcRevenue) ? filters.abcRevenue.join(',') : '',
+    Array.isArray(filters?.abcProfit) ? filters.abcProfit.join(',') : '',
+    abcSort?.field || '',
+    abcSort?.dir || 'asc',
+  ].join('|')
+}
+
 const EMPTY_FILTER_OPTIONS = {
   categories: [],
   categorySubcategories: [],
@@ -254,6 +273,10 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
    * old node would otherwise compare against the old, now-outdated item.finalOrderQty.
    */
   const lastCommittedQtyRef = useRef(new Map())
+  /** Monotonic id so out-of-order page responses cannot overwrite newer results. */
+  const itemsRequestIdRef = useRef(0)
+  /** Last applied items scope (filters/search/abc/snapshot) — change ⇒ hard clear. */
+  const lastItemsScopeKeyRef = useRef('')
   /** Set to 'firstEditable' when Enter advances to the next page; consumed once items settle. */
   const pendingFocusRef = useRef(null)
   /**
@@ -360,12 +383,28 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   const loadItems = useCallback(async () => {
     if (!snapshot?.id || snapshot.status === 'syncing' || snapshot.status === 'failed') {
+      itemsRequestIdRef.current += 1
       setItems([])
       setTotalCount(0)
       lastCommittedQtyRef.current = new Map()
+      lastItemsScopeKeyRef.current = ''
       setLoading(false)
       return
     }
+
+    const scopeKey = buildPlannerItemsScopeKey(
+      snapshot.id,
+      debouncedSearch,
+      filters,
+      abcSort
+    )
+    if (scopeKey !== lastItemsScopeKeyRef.current) {
+      setItems([])
+      setTotalCount(0)
+      lastCommittedQtyRef.current = new Map()
+    }
+
+    const requestId = ++itemsRequestIdRef.current
     setLoading(true)
     try {
       const result = await fetchSnapshotItemsPage({
@@ -377,15 +416,20 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         sortField: abcSort.field,
         sortDir: abcSort.dir,
       })
+      if (requestId !== itemsRequestIdRef.current) return
+      lastItemsScopeKeyRef.current = scopeKey
       setItems(result.items)
       setTotalCount(result.totalCount)
       lastCommittedQtyRef.current = new Map(
         (result.items || []).map((it) => [it.id, it.finalOrderQty])
       )
     } catch (err) {
+      if (requestId !== itemsRequestIdRef.current) return
       showError(toProcurementUserMessage(err, 'Не удалось загрузить позиции.'))
     } finally {
-      setLoading(false)
+      if (requestId === itemsRequestIdRef.current) {
+        setLoading(false)
+      }
     }
   }, [snapshot, page, pageSize, debouncedSearch, filters, abcSort, showError])
 
@@ -894,6 +938,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
   const from = totalCount === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, totalCount)
+  const isInitialLoading = loading && items.length === 0
+  const isFetching = loading && items.length > 0
 
   const saveStatusLabel =
     saveStatus === 'saving'
@@ -1435,7 +1481,10 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       ) : null}
 
       <div className="proc-planner__desktop">
-        <div className="proc-planner__table-wrap">
+        <div
+          className={`proc-planner__table-wrap${isFetching ? ' proc-planner__table-wrap--fetching' : ''}`}
+          aria-busy={loading || undefined}
+        >
           <table className="proc-planner__table">
             <thead>
               <tr>
@@ -1477,7 +1526,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {isInitialLoading ? (
                 <tr>
                   <td colSpan={TABLE_COL_SPAN}>Загрузка…</td>
                 </tr>
@@ -1550,11 +1599,15 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             setPage(1)
             setPageSize(nextPageSize)
           }}
+          disabled={loading}
         />
       </div>
 
-      <div className="proc-planner__mobile">
-        {loading ? (
+      <div
+        className={`proc-planner__mobile${isFetching ? ' proc-planner__mobile--fetching' : ''}`}
+        aria-busy={loading || undefined}
+      >
+        {isInitialLoading ? (
           <p className="proc-planner__empty">Загрузка…</p>
         ) : items.length === 0 ? (
           <p className="proc-planner__empty">Нет позиций</p>
@@ -1617,6 +1670,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             setPage(1)
             setPageSize(nextPageSize)
           }}
+          disabled={loading}
         />
       </div>
 

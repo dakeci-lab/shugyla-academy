@@ -507,10 +507,44 @@
 }
 
 .proc-planner__table-wrap {
+  position: relative;
   overflow-x: auto;
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 10px;
   background: var(--surface, #fff);
+}
+
+.proc-planner__table-wrap--fetching {
+  opacity: 0.62;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.proc-planner__table-wrap--fetching::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 1;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent, #2563eb),
+    transparent
+  );
+  background-size: 40% 100%;
+  animation: proc-planner-fetch-bar 0.9s linear infinite;
+}
+
+@keyframes proc-planner-fetch-bar {
+  0% {
+    background-position: -40% 0;
+  }
+  100% {
+    background-position: 140% 0;
+  }
 }
 
 .proc-planner__table {
@@ -670,7 +704,32 @@ a.proc-planner__qty-history:hover {
 }
 
 .proc-planner__mobile {
+  position: relative;
   display: none;
+}
+
+.proc-planner__mobile--fetching {
+  opacity: 0.62;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.proc-planner__mobile--fetching::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: 1;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--accent, #2563eb),
+    transparent
+  );
+  background-size: 40% 100%;
+  animation: proc-planner-fetch-bar 0.9s linear infinite;
 }
 
 .proc-planner__cards {

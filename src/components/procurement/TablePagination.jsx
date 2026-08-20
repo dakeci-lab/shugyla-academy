@@ -32,14 +32,15 @@ export default function TablePagination({
   pageSize,
   onPageSizeChange,
   pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
+  disabled = false,
 }) {
   if (totalCount === 0) return null
 
-  const canPrev = page > 1
-  const canNext = page < totalPages
+  const canPrev = page > 1 && !disabled
+  const canNext = page < totalPages && !disabled
 
   return (
-    <div className="table-pagination">
+    <div className={`table-pagination${disabled ? ' table-pagination--disabled' : ''}`}>
       <div className="table-pagination__controls">
         <button
           type="button"
@@ -89,6 +90,7 @@ export default function TablePagination({
             <span className="sr-only">Строк на странице</span>
             <select
               value={pageSize}
+              disabled={disabled}
               onChange={(event) => onPageSizeChange?.(Number(event.target.value))}
               aria-label="Строк на странице"
               title="Строк на странице"
