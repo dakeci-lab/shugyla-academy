@@ -237,6 +237,12 @@ function stageStaticFrontend() {
   assert('adapter no direct upsert to shifts table', !adapter.includes(".from('academy_employee_shifts').upsert"))
   assert('upsert_shift action wired', adapter.includes("'upsert_shift'"))
   assert('bulk_upsert_shifts action wired', adapter.includes("'bulk_upsert_shifts'"))
+  assert('delete_shift action wired', adapter.includes("'delete_shift'"))
+  const fnSourceFull = fs.readFileSync(
+    path.join(ROOT, 'supabase/functions/admin-manage-employee-schedule/index.ts'),
+    'utf8'
+  )
+  assert('Edge delete_shift action allowed', fnSourceFull.includes("'delete_shift'"))
   console.log('')
 }
 

@@ -472,7 +472,7 @@ export default function EmployeeProfileSection({ employeeId }) {
       {deactivateTarget && (
         <ConfirmDialog
           title="Уволить сотрудника?"
-          message={`Сотрудник «${deactivateTarget.name}» получит статус «Уволен» и потеряет доступ к платформе. Исторические данные, график, рейтинг, посещаемость и обучение сохранятся.`}
+          message={`Сотрудник «${deactivateTarget.name}» получит статус «Уволен» и потеряет доступ к платформе. Будущие смены без отметок прихода/ухода будут сняты (дни после даты увольнения станут «Нет смены»). Смены с фактом и дни до даты увольнения сохранятся.`}
           confirmLabel="Уволить"
           onCancel={() => setDeactivateTarget(null)}
           onConfirm={confirmDeactivate}
@@ -483,7 +483,7 @@ export default function EmployeeProfileSection({ employeeId }) {
       {activateTarget && (
         <ConfirmDialog
           title="Восстановить сотрудника?"
-          message={`Вернуть сотрудника «${activateTarget.name}» в статус «Работает»? Прежние данные сохранятся.`}
+          message={`Вернуть сотрудника «${activateTarget.name}» в статус «Работает»? Ранее снятые при увольнении будущие смены не восстановятся — график после даты увольнения нужно настроить заново.`}
           confirmLabel="Восстановить сотрудника"
           confirmVariant="primary"
           onCancel={() => setActivateTarget(null)}

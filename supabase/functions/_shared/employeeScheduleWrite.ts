@@ -105,6 +105,96 @@ export function assertScheduleChangeAllowed(
   return null
 }
 
+/** Hard block: never delete a shift that already has attendance facts. */
+export function assertShiftDeleteAllowed(
+  existing: Record<string, unknown> | null
+): string | null {
+  if (!existing) return null
+  if (hasShiftAttendanceHistory(existing)) return 'shift_has_attendance_history'
+  return null
+}
+
+export type ClearFutureShiftsResult = {
+  deleted: number
+  retainedWithAttendance: number
+}
+
+/**
+ * Delete plan rows from fromDate without attendance.
+ * @param inclusive true → shift_date >= fromDate; false → shift_date > fromDate
+ */
+export async function clearPlanShiftsFromDate(
+  serviceClient: SupabaseClient,
+  employeeId: number,
+  fromDate: string,
+  { inclusive = true }: { inclusive?: boolean } = {}
+): Promise<ClearFutureShiftsResult> {
+  const fromKey = toScheduleDateKey(fromDate)
+  if (!fromKey || !isDateKey(fromKey)) {
+    return { deleted: 0, retainedWithAttendance: 0 }
+  }
+
+  let query = serviceClient
+    .from('academy_employee_shifts')
+    .select(
+      'id, shift_date, actual_start_time, actual_end_time, check_in_latitude, check_out_latitude'
+    )
+    .eq('employee_id', employeeId)
+
+  query = inclusive ? query.gte('shift_date', fromKey) : query.gt('shift_date', fromKey)
+
+  const { data, error } = await query
+
+  if (error) {
+    throw new Error('clear_future_shifts_lookup_failed')
+  }
+
+  const toDelete: string[] = []
+  let retainedWithAttendance = 0
+  for (const row of data ?? []) {
+    if (hasShiftAttendanceHistory(row as Record<string, unknown>)) {
+      retainedWithAttendance += 1
+      continue
+    }
+    if (row?.id) toDelete.push(String(row.id))
+  }
+
+  if (!toDelete.length) {
+    return { deleted: 0, retainedWithAttendance }
+  }
+
+  const { error: deleteError } = await serviceClient
+    .from('academy_employee_shifts')
+    .delete()
+    .in('id', toDelete)
+
+  if (deleteError) {
+    throw new Error('clear_future_shifts_delete_failed')
+  }
+
+  return { deleted: toDelete.length, retainedWithAttendance }
+}
+
+/**
+ * Delete plan rows with shift_date > terminatedAt that have no attendance.
+ * Idempotent. Does not touch days on/before termination or rows with facts.
+ */
+export async function clearPlanShiftsAfterTerminationDate(
+  serviceClient: SupabaseClient,
+  employeeId: number,
+  terminatedAt: string
+): Promise<ClearFutureShiftsResult> {
+  return clearPlanShiftsFromDate(serviceClient, employeeId, terminatedAt, {
+    inclusive: false,
+  })
+}
+
+/** Whether an employee status should trigger post-termination schedule clear. */
+export function isTerminatedEmploymentStatus(status: unknown): boolean {
+  const value = String(status || '').trim()
+  return value === 'terminated' || value === 'inactive' || value === 'deactivated'
+}
+
 export function assertNoForbiddenShiftKeys(shift: Record<string, unknown>): string | null {
   for (const key of Object.keys(shift)) {
     if (FORBIDDEN_SHIFT_KEYS.has(key)) return 'forbidden_field'

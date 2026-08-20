@@ -32,7 +32,10 @@ function mapScheduleWriteError(errorBody, fallbackMessage = ERROR_MESSAGES.defau
     return ERROR_MESSAGES.validation
   }
   if (code === 'shift_has_attendance_history') {
-    return 'По этой смене уже есть фактические данные. Удаление или замена на выходной запрещены без подтверждения.'
+    return 'По этой смене уже есть фактические данные. Удаление запрещено.'
+  }
+  if (code === 'shift_outside_employment') {
+    return 'Дата вне периода работы сотрудника'
   }
   if (code === 'online_employee_not_schedulable') {
     return 'Для сотрудников с режимом «Онлайн» график смен не используется.'
@@ -178,4 +181,32 @@ export async function bulkApplyEmployeeShifts(
   })
 
   return data.applied ?? 0
+}
+
+/** Delete plan row → calendar «Нет смены». Rejects shifts with attendance. */
+export async function deleteEmployeeShift(employeeId, shiftDate) {
+  const data = await invokeScheduleWrite({
+    action: 'delete_shift',
+    employee_id: Number(employeeId),
+    shift_date: shiftDate,
+  })
+  return {
+    deleted: Boolean(data.deleted),
+    shiftDate: data.shift_date || shiftDate,
+  }
+}
+
+/** Clear plan from fromDate inclusive (no attendance). Allowed past terminated_at. */
+export async function clearEmployeeShiftsFromDate(employeeId, fromDate) {
+  const data = await invokeScheduleWrite({
+    action: 'clear_shifts_from',
+    employee_id: Number(employeeId),
+    from_date: fromDate,
+  })
+  return {
+    deleted: Number(data.deleted) || 0,
+    retainedWithAttendance:
+      Number(data.skipped_with_attendance ?? data.retainedWithAttendance) || 0,
+    fromDate: data.from_date || fromDate,
+  }
 }
