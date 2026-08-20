@@ -92,6 +92,234 @@
   min-width: 0;
 }
 
+.proc-planner__sense {
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0.2rem 0.35rem;
+  min-width: 0;
+  max-width: min(100%, 52rem);
+  color: var(--text, #111827);
+  font-variant-numeric: tabular-nums;
+}
+
+.proc-planner__sense-sep {
+  color: #9ca3af;
+}
+
+.proc-planner__sense-formula {
+  color: var(--text-secondary, #5c6370);
+  cursor: help;
+}
+
+.proc-planner__sense-orderable {
+  font-weight: 700;
+  color: #1d4ed8;
+  white-space: nowrap;
+}
+
+.proc-planner__sense-supplier {
+  color: var(--text-secondary, #5c6370);
+  white-space: nowrap;
+}
+
+.proc-planner__orderable-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  min-height: 34px;
+  padding: 0 0.65rem;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  color: var(--text, #111827);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.proc-planner__orderable-toggle:hover {
+  border-color: #93c5fd;
+  background: #f8fbff;
+}
+
+.proc-planner__orderable-toggle.is-active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.proc-planner__orderable-toggle:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
+.proc-planner__orderable-toggle-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 999px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.proc-planner__orderable-toggle.is-active .proc-planner__orderable-toggle-count {
+  background: #bfdbfe;
+}
+
+.proc-planner__browse-mode {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface, #fff);
+}
+
+.proc-planner__browse-mode-btn {
+  min-height: 34px;
+  padding: 0 0.7rem;
+  border: 0;
+  border-right: 1px solid var(--border, #d1d5db);
+  background: transparent;
+  color: var(--text-secondary, #5c6370);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.proc-planner__browse-mode-btn:last-child {
+  border-right: 0;
+}
+
+.proc-planner__browse-mode-btn.is-active {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.proc-planner__browse-mode-btn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.proc-planner__crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.35rem;
+  margin: 0 0 0.55rem;
+  font-size: 0.8125rem;
+}
+
+.proc-planner__crumb {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: #2563eb;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.proc-planner__crumb.is-current {
+  color: var(--text, #111827);
+  cursor: default;
+}
+
+.proc-planner__crumb-sep {
+  color: #9ca3af;
+}
+
+.proc-planner__cat-nav {
+  margin: 0 0 0.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+}
+
+.proc-planner__cat-nav-note {
+  margin: 0 0 0.55rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.proc-planner__cat-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.proc-planner__cat-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  min-height: 40px;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.proc-planner__cat-item:hover {
+  background: #f8fafc;
+  border-color: #e5e7eb;
+}
+
+.proc-planner__cat-item:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 1px;
+}
+
+.proc-planner__cat-item-name {
+  font-weight: 600;
+  min-width: 0;
+}
+
+.proc-planner__cat-item-count {
+  flex: none;
+  min-width: 1.75rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 999px;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.proc-planner__group-row td {
+  padding: 0.4rem 0.65rem;
+  background: #f3f4f6;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.proc-planner__group-cell {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #374151;
+  letter-spacing: 0.01em;
+}
+
 .proc-planner__snapshot-label {
   flex: none;
   font-size: 0.625rem;
@@ -374,11 +602,136 @@
 }
 
 .proc-planner__col-num {
-  width: 2.5rem;
+  width: 2.75rem;
+  min-width: 2.75rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary, #6b7280);
   white-space: nowrap;
+}
+
+.proc-planner__col-product {
+  min-width: 168px;
+}
+
+.proc-planner__col-week {
+  width: 2.6rem;
+  min-width: 2.6rem;
+  max-width: 3rem;
+  padding-left: 0.25rem;
+  padding-right: 0.25rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.proc-planner__week-val {
+  display: inline-block;
+  width: 100%;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--text, #111827);
+}
+
+.proc-planner__week-val.is-zero {
+  font-weight: 400;
+  color: #9ca3af;
+}
+
+.proc-planner__col-order {
+  min-width: 5.5rem;
+}
+
+.proc-planner__col-order--accent {
+  background: #f0f7ff;
+}
+
+.proc-planner__col-order--accent .proc-planner__input {
+  border-color: #93c5fd;
+  font-weight: 600;
+}
+
+.proc-planner__col-rec {
+  color: #6b7280;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+
+.proc-planner__abc-badges--compact {
+  gap: 0.15rem;
+}
+
+.proc-planner__abc-badges--compact .proc-planner__abc-badge {
+  min-width: 1.1rem;
+  height: 1.1rem;
+  padding: 0 0.12rem;
+  font-size: 0.625rem;
+}
+
+.proc-planner__abc-head--compact {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.proc-planner__col-abc--compact .proc-planner__abc-sort-btn {
+  min-width: 20px;
+  min-height: 20px;
+  padding: 0 0.15rem;
+  font-size: 0.625rem;
+}
+
+.proc-planner__card-order {
+  font-weight: 600;
+}
+
+.proc-planner__card-order .proc-planner__input {
+  border-color: #93c5fd;
+  font-weight: 600;
+}
+
+.proc-planner__card-rec {
+  color: #6b7280;
+  font-weight: 400;
+}
+
+/* Sticky: № + Товар left; Заказ right — weeks scroll in the middle. */
+.proc-planner__sticky-num,
+.proc-planner__sticky-product,
+.proc-planner__sticky-order {
+  position: sticky;
+  background: var(--surface, #fff);
+  z-index: 2;
+}
+
+.proc-planner__table thead .proc-planner__sticky-num,
+.proc-planner__table thead .proc-planner__sticky-product,
+.proc-planner__table thead .proc-planner__sticky-order {
+  background: #fafbfc;
+  z-index: 3;
+}
+
+.proc-planner__table thead .proc-planner__sticky-order.proc-planner__col-order--accent,
+.proc-planner__table tbody .proc-planner__sticky-order.proc-planner__col-order--accent {
+  background: #f0f7ff;
+}
+
+.proc-planner__table thead .proc-planner__sticky-order.proc-planner__col-order--accent {
+  background: #e8f1ff;
+}
+
+.proc-planner__sticky-num {
+  left: 0;
+}
+
+.proc-planner__sticky-product {
+  left: 2.75rem;
+  box-shadow: 4px 0 6px -4px rgba(15, 23, 42, 0.18);
+}
+
+.proc-planner__sticky-order {
+  right: 0;
+  box-shadow: -4px 0 6px -4px rgba(15, 23, 42, 0.18);
 }
 
 .proc-planner__row-num {
@@ -549,8 +902,9 @@
 
 .proc-planner__table {
   width: 100%;
-  border-collapse: collapse;
-  min-width: 1140px;
+  border-collapse: separate;
+  border-spacing: 0;
+  min-width: 1380px;
   font-size: 0.8125rem;
 }
 

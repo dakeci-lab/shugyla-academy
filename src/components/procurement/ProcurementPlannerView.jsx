@@ -53,8 +53,19 @@ import {
   applyItemDeltaToFilterOptions,
   applySaveResultToFailedIds,
   buildPlannerSupplierSelectOptions,
+  buildPlannerWeekColumnLabels,
+  buildPlannerSenseLine,
+  buildPlannerCategoryNavModel,
+  buildPlannerSkuTableRows,
   buildSnapshotHeadline,
   classifyGenerateOutcome,
+  getNextOrderPositions,
+  PLANNER_BROWSE_CATEGORIES,
+  PLANNER_BROWSE_FLAT,
+  PLANNER_CATEGORY_COUNTS_SCOPE_LABEL,
+  PLANNER_WEEK_COLUMN_COUNT,
+  plannerCategoryCountsNeedScopeNote,
+  resolvePlannerCategoryBrowseLevel,
   createOrderAttemptTracker,
   filterItemsForSupplierPlanExport,
   formatOrderHistoryLabel,
@@ -93,7 +104,8 @@ import {
 } from '../../utils/procurementAbc'
 import './ProcurementPlannerView.css'
 
-const TABLE_COL_SPAN = 10
+/** № + Товар + ABC + 8 weeks + Остаток + Ср/день + Норма + Рек. + Заказ + Поставщик */
+const TABLE_COL_SPAN = 3 + PLANNER_WEEK_COLUMN_COUNT + 6
 
 const DEFAULT_PAGE_SIZE = 25
 
@@ -119,6 +131,8 @@ function buildPlannerItemsScopeKey(snapshotId, debouncedSearch, filters, abcSort
 const EMPTY_FILTER_OPTIONS = {
   categories: [],
   categorySubcategories: [],
+  categoryCounts: {},
+  pairCounts: {},
   suppliers: [],
   generatedSupplierCount: 0,
   pendingSupplierCount: 0,
@@ -149,6 +163,7 @@ function formatSyncedAt(value) {
   })
 }
 
+/** Mobile compact 8-week pills (desktop uses separate columns). */
 function WeeklySpark({ values }) {
   const arr = Array.isArray(values) ? values : []
   return (
@@ -159,6 +174,16 @@ function WeeklySpark({ values }) {
         </span>
       ))}
     </div>
+  )
+}
+
+function WeeklySalesCell({ value }) {
+  const n = Number(value)
+  const empty = !Number.isFinite(n) || n === 0
+  return (
+    <span className={`proc-planner__week-val${empty ? ' is-zero' : ''}`}>
+      {formatNum(Number.isFinite(n) ? n : 0, 0)}
+    </span>
   )
 }
 
@@ -188,9 +213,11 @@ function AbcBadge({ axisLabel, value }) {
   )
 }
 
-function AbcBadges({ item }) {
+function AbcBadges({ item, compact = false }) {
   return (
-    <div className="proc-planner__abc-badges">
+    <div
+      className={`proc-planner__abc-badges${compact ? ' proc-planner__abc-badges--compact' : ''}`}
+    >
       {ABC_AXES.map((axis) => (
         <AbcBadge key={axis.key} axisLabel={axis.label} value={item[axis.itemKey]} />
       ))}
@@ -219,6 +246,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  const [browseMode, setBrowseMode] = useState(PLANNER_BROWSE_FLAT)
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [filters, setFilters] = useState({
@@ -392,6 +420,25 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       return
     }
 
+    if (browseMode === PLANNER_BROWSE_CATEGORIES) {
+      const pairsForCat = (filterOptions.categorySubcategories || []).filter(
+        (p) => p.categoryName === filters.categoryName
+      )
+      const level = resolvePlannerCategoryBrowseLevel({
+        categoryName: filters.categoryName,
+        subcategoryName: filters.subcategoryName,
+        subcategoryCount: pairsForCat.length,
+      })
+      if (level !== 'items') {
+        itemsRequestIdRef.current += 1
+        setItems([])
+        setTotalCount(0)
+        lastCommittedQtyRef.current = new Map()
+        setLoading(false)
+        return
+      }
+    }
+
     const scopeKey = buildPlannerItemsScopeKey(
       snapshot.id,
       debouncedSearch,
@@ -431,7 +478,17 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         setLoading(false)
       }
     }
-  }, [snapshot, page, pageSize, debouncedSearch, filters, abcSort, showError])
+  }, [
+    snapshot,
+    page,
+    pageSize,
+    debouncedSearch,
+    filters,
+    abcSort,
+    browseMode,
+    filterOptions.categorySubcategories,
+    showError,
+  ])
 
   useEffect(() => {
     void loadSnapshotMeta()
@@ -680,6 +737,106 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     if (!filters.categoryName) return pairs
     return pairs.filter((p) => p.categoryName === filters.categoryName)
   }, [filterOptions.categorySubcategories, filters.categoryName])
+
+  const categoryNavModel = useMemo(
+    () => buildPlannerCategoryNavModel(filterOptions),
+    [filterOptions]
+  )
+
+  const categoryBrowseLevel = useMemo(() => {
+    if (browseMode !== PLANNER_BROWSE_CATEGORIES) return 'items'
+    return resolvePlannerCategoryBrowseLevel({
+      categoryName: filters.categoryName,
+      subcategoryName: filters.subcategoryName,
+      subcategoryCount: subcategoryOptions.length,
+    })
+  }, [
+    browseMode,
+    filters.categoryName,
+    filters.subcategoryName,
+    subcategoryOptions.length,
+  ])
+
+  const showCategoryNavigator = categoryBrowseLevel !== 'items'
+  const showSkuTable = browseMode === PLANNER_BROWSE_FLAT || categoryBrowseLevel === 'items'
+
+  const categoryCountsNeedNote = plannerCategoryCountsNeedScopeNote({
+    platformSupplierId: filters.platformSupplierId,
+    orderableOnly: filters.orderableOnly,
+    search: debouncedSearch,
+  })
+
+  const groupHeadersEnabled =
+    showSkuTable && !abcSort.field && !String(debouncedSearch || '').trim()
+
+  const skuTableRows = useMemo(
+    () => buildPlannerSkuTableRows(items, { groupHeaders: groupHeadersEnabled }),
+    [items, groupHeadersEnabled]
+  )
+
+  function handleBrowseModeChange(nextMode) {
+    setBrowseMode(nextMode)
+    setPage(1)
+    setFilters((current) => ({
+      ...current,
+      categoryName: '',
+      subcategoryName: '',
+    }))
+  }
+
+  function openCategoryNav(categoryName) {
+    const entry = categoryNavModel.find((c) => c.categoryName === categoryName)
+    const subs = entry?.subcategories || []
+    setPage(1)
+    if (subs.length <= 1) {
+      setFilters((current) => ({
+        ...current,
+        categoryName,
+        subcategoryName: subs[0]?.subcategoryName || '',
+      }))
+      return
+    }
+    setFilters((current) => ({
+      ...current,
+      categoryName,
+      subcategoryName: '',
+    }))
+  }
+
+  function openSubcategoryNav(subcategoryName) {
+    setPage(1)
+    setFilters((current) => ({
+      ...current,
+      subcategoryName: subcategoryName || '',
+    }))
+  }
+
+  function navigateCategoryBreadcrumb(target) {
+    setPage(1)
+    if (target === 'root') {
+      setFilters((current) => ({
+        ...current,
+        categoryName: '',
+        subcategoryName: '',
+      }))
+      return
+    }
+    if (target === 'category') {
+      const subs = subcategoryOptions
+      if (subs.length <= 1) {
+        setFilters((current) => ({
+          ...current,
+          subcategoryName: '',
+        }))
+        // Stay on items if ≤1 sub; if somehow multiple, clearing sub shows sub list
+        return
+      }
+      setFilters((current) => ({
+        ...current,
+        subcategoryName: '',
+      }))
+    }
+  }
 
   const snapshotEditable = isSnapshotQuantityEditable(snapshot?.status)
   const abcUnavailable =
@@ -940,6 +1097,10 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   const to = Math.min(page * pageSize, totalCount)
   const isInitialLoading = loading && items.length === 0
   const isFetching = loading && items.length > 0
+  const weekColumns = useMemo(
+    () => buildPlannerWeekColumnLabels(snapshot?.periodFrom, snapshot?.periodTo),
+    [snapshot?.periodFrom, snapshot?.periodTo]
+  )
 
   const saveStatusLabel =
     saveStatus === 'saving'
@@ -1076,9 +1237,54 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     itemCount: snapshot?.itemCount || 0,
     negativeStockCount: snapshot?.negativeStockCount || 0,
   })
+  const senseLine = useMemo(
+    () =>
+      buildPlannerSenseLine({
+        periodFrom: snapshot?.periodFrom,
+        periodTo: snapshot?.periodTo,
+        orderableCount: snapshot?.orderableCount || 0,
+        supplierOrderableCount: filters.platformSupplierId
+          ? getNextOrderPositions(selectedSupplierSummary)
+          : null,
+      }),
+    [
+      snapshot?.periodFrom,
+      snapshot?.periodTo,
+      snapshot?.orderableCount,
+      filters.platformSupplierId,
+      selectedSupplierSummary,
+    ]
+  )
 
   const headerStrip = (
     <div className="proc-planner__topbar">
+      {snapshot?.id ? (
+        <div className="proc-planner__sense" title={senseLine.title}>
+          {senseLine.periodText ? (
+            <span className="proc-planner__sense-period">{senseLine.periodText}</span>
+          ) : null}
+          {senseLine.periodText ? (
+            <span className="proc-planner__sense-sep" aria-hidden="true">
+              ·
+            </span>
+          ) : null}
+          <span className="proc-planner__sense-formula" title={senseLine.formulaTitle}>
+            {senseLine.formulaText}
+          </span>
+          <span className="proc-planner__sense-sep" aria-hidden="true">
+            ·
+          </span>
+          <span className="proc-planner__sense-orderable">{senseLine.orderableText}</span>
+          {senseLine.orderableSupplierText ? (
+            <>
+              <span className="proc-planner__sense-sep" aria-hidden="true">
+                ·
+              </span>
+              <span className="proc-planner__sense-supplier">{senseLine.orderableSupplierText}</span>
+            </>
+          ) : null}
+        </div>
+      ) : null}
       <span className="proc-planner__snapshot" title={snapshotHeadline.title}>
         <span className="proc-planner__snapshot-label">UMAG</span>
         <span className="proc-planner__snapshot-text">{snapshotHeadline.text}</span>
@@ -1175,6 +1381,47 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                   </div>
                 }
               />
+            </div>
+            <button
+              type="button"
+              className={`proc-planner__orderable-toggle${filters.orderableOnly ? ' is-active' : ''}`}
+              aria-pressed={filters.orderableOnly}
+              title="Показать только позиции с количеством к заказу больше 0"
+              onClick={() =>
+                setFilters((current) => ({
+                  ...current,
+                  orderableOnly: !current.orderableOnly,
+                }))
+              }
+            >
+              <span className="proc-planner__orderable-toggle-label">Только к заказу</span>
+              {Number(snapshot?.orderableCount) > 0 ? (
+                <span className="proc-planner__orderable-toggle-count">
+                  {Math.round(Number(snapshot.orderableCount))}
+                </span>
+              ) : null}
+            </button>
+            <div
+              className="proc-planner__browse-mode"
+              role="group"
+              aria-label="Режим списка"
+            >
+              <button
+                type="button"
+                className={`proc-planner__browse-mode-btn${browseMode === PLANNER_BROWSE_FLAT ? ' is-active' : ''}`}
+                aria-pressed={browseMode === PLANNER_BROWSE_FLAT}
+                onClick={() => handleBrowseModeChange(PLANNER_BROWSE_FLAT)}
+              >
+                Плоский
+              </button>
+              <button
+                type="button"
+                className={`proc-planner__browse-mode-btn${browseMode === PLANNER_BROWSE_CATEGORIES ? ' is-active' : ''}`}
+                aria-pressed={browseMode === PLANNER_BROWSE_CATEGORIES}
+                onClick={() => handleBrowseModeChange(PLANNER_BROWSE_CATEGORIES)}
+              >
+                По категориям
+              </button>
             </div>
             <PlatformToolbarActionWrap>
               <span className="proc-planner__tip-wrap" data-tooltip={syncTooltip}>
@@ -1480,6 +1727,114 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       </p>
       ) : null}
 
+      {browseMode === PLANNER_BROWSE_CATEGORIES ? (
+        <nav className="proc-planner__crumbs" aria-label="Категории">
+          <button
+            type="button"
+            className="proc-planner__crumb"
+            onClick={() => navigateCategoryBreadcrumb('root')}
+          >
+            Все категории
+          </button>
+          {filters.categoryName ? (
+            <>
+              <span className="proc-planner__crumb-sep" aria-hidden="true">
+                /
+              </span>
+              <button
+                type="button"
+                className="proc-planner__crumb"
+                onClick={() => navigateCategoryBreadcrumb('category')}
+              >
+                {filters.categoryName}
+              </button>
+            </>
+          ) : null}
+          {filters.subcategoryName ? (
+            <>
+              <span className="proc-planner__crumb-sep" aria-hidden="true">
+                /
+              </span>
+              <span className="proc-planner__crumb is-current">{filters.subcategoryName}</span>
+            </>
+          ) : null}
+        </nav>
+      ) : null}
+
+      {showCategoryNavigator ? (
+        <div className="proc-planner__cat-nav" aria-label="Навигация по категориям">
+          {categoryCountsNeedNote ? (
+            <p className="proc-planner__cat-nav-note">
+              Счётчики — {PLANNER_CATEGORY_COUNTS_SCOPE_LABEL} (без учёта поставщика / «к заказу» /
+              поиска)
+            </p>
+          ) : (
+            <p className="proc-planner__cat-nav-note">
+              Счётчики — {PLANNER_CATEGORY_COUNTS_SCOPE_LABEL}
+            </p>
+          )}
+          {categoryBrowseLevel === 'categories' ? (
+            categoryNavModel.length === 0 ? (
+              <p className="proc-planner__empty">
+                {filterOptionsLoading ? 'Загрузка категорий…' : 'Категорий нет'}
+              </p>
+            ) : (
+              <ul className="proc-planner__cat-list">
+                {categoryNavModel.map((entry) => (
+                  <li key={entry.categoryName || '__empty__'}>
+                    <button
+                      type="button"
+                      className="proc-planner__cat-item"
+                      onClick={() => openCategoryNav(entry.categoryName)}
+                    >
+                      <span className="proc-planner__cat-item-name">{entry.categoryName}</span>
+                      <span
+                        className="proc-planner__cat-item-count"
+                        title={`${PLANNER_CATEGORY_COUNTS_SCOPE_LABEL}: ${entry.itemCount}`}
+                      >
+                        {entry.itemCount}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )
+          ) : (
+            <ul className="proc-planner__cat-list">
+              {subcategoryOptions.map((pair) => {
+                const count =
+                  typeof pair.itemCount === 'number'
+                    ? pair.itemCount
+                    : filterOptions.pairCounts?.[
+                        `${pair.categoryName}\u0000${pair.subcategoryName}`
+                      ] || 0
+                return (
+                  <li key={`${pair.categoryName}::${pair.subcategoryName}`}>
+                    <button
+                      type="button"
+                      className="proc-planner__cat-item"
+                      onClick={() => openSubcategoryNav(pair.subcategoryName)}
+                    >
+                      <span className="proc-planner__cat-item-name">
+                        {pair.subcategoryName || 'Без подкатегории'}
+                      </span>
+                      <span
+                        className="proc-planner__cat-item-count"
+                        title={`${PLANNER_CATEGORY_COUNTS_SCOPE_LABEL}: ${count}`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
+      ) : null}
+
+      {showSkuTable ? (
+      <>
       <div className="proc-planner__desktop">
         <div
           className={`proc-planner__table-wrap${isFetching ? ' proc-planner__table-wrap--fetching' : ''}`}
@@ -1488,10 +1843,10 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
           <table className="proc-planner__table">
             <thead>
               <tr>
-                <th className="proc-planner__col-num">№</th>
-                <th>Товар</th>
-                <th className="proc-planner__col-abc">
-                  <div className="proc-planner__abc-head">
+                <th className="proc-planner__col-num proc-planner__sticky-num">№</th>
+                <th className="proc-planner__col-product proc-planner__sticky-product">Товар</th>
+                <th className="proc-planner__col-abc proc-planner__col-abc--compact">
+                  <div className="proc-planner__abc-head proc-planner__abc-head--compact">
                     <span>ABC</span>
                     <div className="proc-planner__abc-sort">
                       {ABC_AXES.map((axis) => {
@@ -1516,12 +1871,22 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                     </div>
                   </div>
                 </th>
-                <th>Продажи 8 нед.</th>
+                {weekColumns.labels.map((label, weekIndex) => (
+                  <th
+                    key={`week-h-${weekIndex}`}
+                    className="proc-planner__col-week"
+                    title={weekColumns.titles[weekIndex]}
+                  >
+                    {label}
+                  </th>
+                ))}
                 <th>Остаток</th>
                 <th>Ср/день</th>
                 <th>Норма</th>
-                <th>Рек.</th>
-                <th>Заказ</th>
+                <th className="proc-planner__col-rec">Рек.</th>
+                <th className="proc-planner__col-order proc-planner__col-order--accent proc-planner__sticky-order">
+                  Заказ
+                </th>
                 <th>Поставщик</th>
               </tr>
             </thead>
@@ -1535,54 +1900,72 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                   <td colSpan={TABLE_COL_SPAN}>Нет позиций</td>
                 </tr>
               ) : (
-                items.map((item, index) => (
-                  <tr key={item.id}>
-                    <td className="proc-planner__col-num">
-                      {(page - 1) * pageSize + index + 1}
+                skuTableRows.map((row) =>
+                  row.type === 'group' ? (
+                    <tr key={`g-${row.key}`} className="proc-planner__group-row">
+                      <td colSpan={TABLE_COL_SPAN} className="proc-planner__group-cell">
+                        {row.label}
+                      </td>
+                    </tr>
+                  ) : (
+                  <tr key={row.item.id}>
+                    <td className="proc-planner__col-num proc-planner__sticky-num">
+                      {(page - 1) * pageSize + row.index + 1}
                     </td>
-                    <td>
+                    <td className="proc-planner__col-product proc-planner__sticky-product">
                       <div className="proc-planner__product">
-                        <strong>{item.productName}</strong>
-                        <span>{item.barcode}</span>
+                        <strong>{row.item.productName}</strong>
+                        <span>{row.item.barcode}</span>
                         <span className="proc-planner__cat">
-                          {[item.categoryName, item.subcategoryName].filter(Boolean).join(' / ')}
+                          {[row.item.categoryName, row.item.subcategoryName]
+                            .filter(Boolean)
+                            .join(' / ')}
                         </span>
                       </div>
                     </td>
                     <td>
-                      <AbcBadges item={item} />
+                      <AbcBadges item={row.item} compact />
                     </td>
-                    <td>
-                      <WeeklySpark values={item.weeklySales} />
-                    </td>
+                    {Array.from({ length: PLANNER_WEEK_COLUMN_COUNT }, (_, weekIndex) => (
+                      <td key={`week-${row.item.id}-${weekIndex}`} className="proc-planner__col-week">
+                        <WeeklySalesCell value={row.item.weeklySales?.[weekIndex]} />
+                      </td>
+                    ))}
                     <td>
                       <span
                         className={
-                          item.negativeStock ? 'proc-planner__stock is-neg' : 'proc-planner__stock'
+                          row.item.negativeStock
+                            ? 'proc-planner__stock is-neg'
+                            : 'proc-planner__stock'
                         }
                         title={
-                          item.negativeStock
+                          row.item.negativeStock
                             ? 'Отрицательный остаток UMAG — в расчёте как 0'
                             : undefined
                         }
                       >
-                        {formatNum(item.rawStock, 2)}
+                        {formatNum(row.item.rawStock, 2)}
                       </span>
                     </td>
-                    <td>{formatNum(item.avgDaily, 2)}</td>
+                    <td>{formatNum(row.item.avgDaily, 2)}</td>
                     <td>
                       <span
                         className="proc-planner__norm-value"
                         title="Настраивается во вкладке «Нормы»"
                       >
-                        {item.normDays}
+                        {row.item.normDays}
                       </span>
                     </td>
-                    <td>{formatNum(item.recommendedQty, 0)}</td>
-                    <td>{renderQtyCell(item)}</td>
-                    <td>{item.umagSupplierName || '—'}</td>
+                    <td className="proc-planner__col-rec">
+                      {formatNum(row.item.recommendedQty, 0)}
+                    </td>
+                    <td className="proc-planner__col-order proc-planner__col-order--accent proc-planner__sticky-order">
+                      {renderQtyCell(row.item)}
+                    </td>
+                    <td>{row.item.umagSupplierName || '—'}</td>
                   </tr>
-                ))
+                  )
+                )
               )}
             </tbody>
           </table>
@@ -1645,14 +2028,14 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                       {item.normDays}
                     </span>
                   </label>
-                  <label>
+                  <label className="proc-planner__card-order">
                     Заказ
                     {renderQtyCell(item, true)}
                   </label>
                 </div>
                 <div className="proc-planner__card-foot">
                   <span>{item.umagSupplierName || 'Без поставщика'}</span>
-                  <span>рек. {formatNum(item.recommendedQty, 0)}</span>
+                  <span className="proc-planner__card-rec">рек. {formatNum(item.recommendedQty, 0)}</span>
                 </div>
               </li>
             ))}
@@ -1673,6 +2056,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
           disabled={loading}
         />
       </div>
+      </>
+      ) : null}
 
       {generateOpen ? (
         <AdminModal

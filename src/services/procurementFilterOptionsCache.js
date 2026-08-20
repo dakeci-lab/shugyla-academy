@@ -3,11 +3,11 @@
  * Stores only aggregated options (not item rows).
  */
 
-export const FILTER_OPTIONS_CACHE_VERSION = 1
+export const FILTER_OPTIONS_CACHE_VERSION = 2
 export const FILTER_OPTIONS_CACHE_TTL_MS = 24 * 60 * 60 * 1000
 /** Serve cache without background scan while younger than this. */
 export const FILTER_OPTIONS_REVALIDATE_AFTER_MS = 5 * 60 * 1000
-export const FILTER_OPTIONS_STORAGE_KEY = 'shugyla.procurement.filterOptions.v1'
+export const FILTER_OPTIONS_STORAGE_KEY = 'shugyla.procurement.filterOptions.v2'
 export const FILTER_OPTIONS_MAX_PERSISTED_ENTRIES = 3
 
 const memoryCache = new Map()
@@ -18,6 +18,8 @@ export function createEmptyFilterOptions() {
   return {
     categories: [],
     categorySubcategories: [],
+    categoryCounts: {},
+    pairCounts: {},
     suppliers: [],
     generatedSupplierCount: 0,
     pendingSupplierCount: 0,
@@ -66,6 +68,8 @@ function cloneOptions(options) {
   return {
     categories: [...(options.categories || [])],
     categorySubcategories: (options.categorySubcategories || []).map((row) => ({ ...row })),
+    categoryCounts: { ...(options.categoryCounts || {}) },
+    pairCounts: { ...(options.pairCounts || {}) },
     suppliers: (options.suppliers || []).map((row) => ({ ...row })),
     generatedSupplierCount: options.generatedSupplierCount || 0,
     pendingSupplierCount: options.pendingSupplierCount || 0,

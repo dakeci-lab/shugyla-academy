@@ -3,6 +3,65 @@
  */
 
 import { computeAttemptPayloadFingerprint } from './procurementAttemptFingerprint.js'
+import { addDaysToDateKey } from './timezone.js'
+
+/** Matches sync `buildEightWeekRanges` / `PLANNING_WEEK_COUNT`. */
+export const PLANNER_WEEK_COLUMN_COUNT = 8
+
+const DATE_KEY_RE = /^(\d{4})-(\d{2})-(\d{2})$/
+
+function isDateKey(value) {
+  return DATE_KEY_RE.test(String(value || ''))
+}
+
+/** YYYY-MM-DD → ДД.ММ */
+function formatDateKeyShortRu(dateKey) {
+  const m = DATE_KEY_RE.exec(String(dateKey || ''))
+  if (!m) return ''
+  return `${m[3]}.${m[2]}`
+}
+
+/**
+ * Eight week column labels from snapshot period (index 0 = oldest, 7 = newest).
+ * Mirrors umag-procurement windows: week i = [periodFrom + i*7, periodFrom + i*7 + 6].
+ *
+ * @param {string|null|undefined} periodFrom
+ * @param {string|null|undefined} periodTo
+ * @returns {{ labels: string[], titles: string[], fromKeys: string[], toKeys: string[] }}
+ */
+export function buildPlannerWeekColumnLabels(periodFrom, periodTo) {
+  const count = PLANNER_WEEK_COLUMN_COUNT
+  if (!isDateKey(periodFrom) || !isDateKey(periodTo)) {
+    const labels = Array.from({ length: count }, (_, i) => `W${i + 1}`)
+    const titles = labels.map(
+      (label, i) =>
+        `${label}: неделя ${i + 1} из ${count} (oldest→newest; период снимка недоступен)`
+    )
+    return {
+      labels,
+      titles,
+      fromKeys: Array.from({ length: count }, () => ''),
+      toKeys: Array.from({ length: count }, () => ''),
+    }
+  }
+
+  const from = String(periodFrom)
+  const labels = []
+  const titles = []
+  const fromKeys = []
+  const toKeys = []
+  for (let i = 0; i < count; i += 1) {
+    const weekFrom = addDaysToDateKey(from, i * 7)
+    const weekTo = addDaysToDateKey(weekFrom, 6)
+    fromKeys.push(weekFrom)
+    toKeys.push(weekTo)
+    labels.push(formatDateKeyShortRu(weekTo))
+    titles.push(
+      `Неделя ${i + 1} из ${count} (oldest→newest): ${formatDateKeyShortRu(weekFrom)}–${formatDateKeyShortRu(weekTo)}`
+    )
+  }
+  return { labels, titles, fromKeys, toKeys }
+}
 
 function finiteNumber(value, fallback = 0) {
   const n = Number(value)
@@ -82,6 +141,10 @@ export function createSnapshotFilterAccumulator() {
   return {
     categories: new Set(),
     pairs: new Set(),
+    /** @type {Map<string, number>} snapshot-wide SKU counts per category */
+    categoryCounts: new Map(),
+    /** @type {Map<string, number>} snapshot-wide SKU counts per category\\0subcategory */
+    pairCounts: new Map(),
     suppliers: new Map(),
     unassignedOrderableCount: 0,
   }
@@ -109,8 +172,15 @@ function emptySupplierSummary(id, name = '') {
 export function accumulateSnapshotFilterRow(row, state) {
   const cat = row?.category_name || row?.categoryName || ''
   const sub = row?.subcategory_name || row?.subcategoryName || ''
-  if (cat) state.categories.add(cat)
-  if (cat && sub) state.pairs.add(`${cat}\u0000${sub}`)
+  if (cat) {
+    state.categories.add(cat)
+    state.categoryCounts.set(cat, (state.categoryCounts.get(cat) || 0) + 1)
+  }
+  if (cat && sub) {
+    const pairKey = `${cat}\u0000${sub}`
+    state.pairs.add(pairKey)
+    state.pairCounts.set(pairKey, (state.pairCounts.get(pairKey) || 0) + 1)
+  }
 
   const qty = qtyOf(row)
   const orderable = qty > 0
@@ -188,10 +258,16 @@ function recomputeSupplierAggregates(suppliers, unassignedOrderableCount = 0) {
  * @param {ReturnType<typeof createSnapshotFilterAccumulator>} state
  */
 export function finalizeSnapshotFilterOptions(state) {
+  const categoryCounts = { ...(Object.fromEntries(state.categoryCounts || [])) }
+  const pairCounts = { ...(Object.fromEntries(state.pairCounts || [])) }
   const categorySubcategories = [...state.pairs]
     .map((key) => {
       const [categoryName, subcategoryName] = key.split('\u0000')
-      return { categoryName, subcategoryName }
+      return {
+        categoryName,
+        subcategoryName,
+        itemCount: pairCounts[key] || 0,
+      }
     })
     .sort((a, b) => {
       const catCmp = a.categoryName.localeCompare(b.categoryName, 'ru')
@@ -207,6 +283,8 @@ export function finalizeSnapshotFilterOptions(state) {
   return {
     categories: [...state.categories].sort((a, b) => a.localeCompare(b, 'ru')),
     categorySubcategories,
+    categoryCounts,
+    pairCounts,
     ...aggregates,
   }
 }
@@ -229,6 +307,8 @@ function cloneFilterOptions(filterOptions) {
   return {
     categories: [...(filterOptions?.categories || [])],
     categorySubcategories: [...(filterOptions?.categorySubcategories || [])],
+    categoryCounts: { ...(filterOptions?.categoryCounts || {}) },
+    pairCounts: { ...(filterOptions?.pairCounts || {}) },
     suppliers: (filterOptions?.suppliers || []).map((s) => ({ ...s })),
     generatedSupplierCount: filterOptions?.generatedSupplierCount || 0,
     pendingSupplierCount: filterOptions?.pendingSupplierCount || 0,
@@ -890,6 +970,72 @@ export function buildSnapshotHeadline({
   }
 }
 
+/** Short formula shown in the planner sense line (P1). */
+export const PLANNER_SENSE_FORMULA =
+  'Рек. = max(0, round(Ср/день × Норма − Остаток*))'
+
+/** Tooltip / title for the formula fragment. */
+export const PLANNER_SENSE_FORMULA_HINT =
+  'Ср/день = сумма 8 нед. / 56. Остаток* = max(0, остаток UMAG).'
+
+const PERIOD_DATE_KEY_RE = /^(\d{4})-(\d{2})-(\d{2})$/
+
+/** YYYY-MM-DD → DD.MM.YYYY (calendar key, no TZ shift). */
+export function formatPlannerPeriodDateRu(dateKey) {
+  const m = PERIOD_DATE_KEY_RE.exec(String(dateKey || ''))
+  if (!m) return ''
+  return `${m[3]}.${m[2]}.${m[1]}`
+}
+
+/**
+ * Compact sense line: период · формула · к заказу N.
+ * Pure — dates are snapshot calendar keys; N = snapshot.orderableCount.
+ *
+ * @returns {{
+ *   periodText: string|null,
+ *   formulaText: string,
+ *   formulaTitle: string,
+ *   orderableText: string,
+ *   orderableSupplierText: string|null,
+ *   text: string,
+ *   title: string,
+ * }}
+ */
+export function buildPlannerSenseLine({
+  periodFrom = '',
+  periodTo = '',
+  orderableCount = 0,
+  supplierOrderableCount = null,
+} = {}) {
+  const fromLabel = formatPlannerPeriodDateRu(periodFrom)
+  const toLabel = formatPlannerPeriodDateRu(periodTo)
+  const periodText =
+    fromLabel && toLabel ? `Период: ${fromLabel}–${toLabel}` : null
+  const n = Math.max(0, Math.round(finiteNumber(orderableCount, 0)))
+  const orderableText = `К заказу: ${n}`
+  const supplierN =
+    supplierOrderableCount == null
+      ? null
+      : Math.max(0, Math.round(finiteNumber(supplierOrderableCount, 0)))
+  const orderableSupplierText =
+    supplierN == null ? null : `у поставщика: ${supplierN}`
+
+  const parts = [periodText, PLANNER_SENSE_FORMULA, orderableText].filter(Boolean)
+  if (orderableSupplierText) parts.push(orderableSupplierText)
+
+  return {
+    periodText,
+    formulaText: PLANNER_SENSE_FORMULA,
+    formulaTitle: PLANNER_SENSE_FORMULA_HINT,
+    orderableText,
+    orderableSupplierText,
+    text: parts.join(' · '),
+    title: `${PLANNER_SENSE_FORMULA_HINT}${periodText ? ` ${periodText}.` : ''} ${orderableText}${
+      orderableSupplierText ? ` · ${orderableSupplierText}` : ''
+    }`.trim(),
+  }
+}
+
 /**
  * Compact action chips for the header strip. Only non-zero counters produce a chip —
  * nothing is rendered when the plan is clean.
@@ -1028,6 +1174,118 @@ export function getFirstEditableItemId(items, isEditable) {
   const list = Array.isArray(items) ? items : []
   const found = list.find((it) => isEditable(it))
   return found ? found.id : null
+}
+
+/* -------------------------------------------------------------------------- */
+/* P2: dual-mode category navigation (variant C) + A-light group headers       */
+/* -------------------------------------------------------------------------- */
+
+export const PLANNER_BROWSE_FLAT = 'flat'
+export const PLANNER_BROWSE_CATEGORIES = 'categories'
+/** Counts from filterOptions scan are snapshot-wide, not page/supplier-scoped. */
+export const PLANNER_CATEGORY_COUNTS_SCOPE_LABEL = 'по снимку'
+
+/**
+ * Whether snapshot-wide category counts may disagree with the active toolbar filters.
+ */
+export function plannerCategoryCountsNeedScopeNote({
+  platformSupplierId = '',
+  orderableOnly = false,
+  search = '',
+} = {}) {
+  return Boolean(
+    platformSupplierId ||
+      orderableOnly ||
+      (typeof search === 'string' && search.trim())
+  )
+}
+
+/**
+ * Nav model: categories with snapshot itemCount + nested subcategories.
+ * Counts come from filterOptions.categoryCounts / pairCounts (scan), never page length.
+ */
+export function buildPlannerCategoryNavModel(filterOptions) {
+  const categories = Array.isArray(filterOptions?.categories)
+    ? filterOptions.categories
+    : []
+  const pairs = Array.isArray(filterOptions?.categorySubcategories)
+    ? filterOptions.categorySubcategories
+    : []
+  const categoryCounts = filterOptions?.categoryCounts || {}
+  const pairCounts = filterOptions?.pairCounts || {}
+
+  return categories.map((categoryName) => {
+    const subcategories = pairs
+      .filter((p) => p.categoryName === categoryName)
+      .map((p) => {
+        const key = `${p.categoryName}\u0000${p.subcategoryName}`
+        const fromPair =
+          typeof p.itemCount === 'number'
+            ? p.itemCount
+            : pairCounts[key]
+        return {
+          categoryName,
+          subcategoryName: p.subcategoryName || '',
+          itemCount: Math.max(0, Math.round(finiteNumber(fromPair, 0))),
+        }
+      })
+    return {
+      categoryName,
+      itemCount: Math.max(
+        0,
+        Math.round(finiteNumber(categoryCounts[categoryName], 0))
+      ),
+      subcategories,
+    }
+  })
+}
+
+/**
+ * @returns {'categories'|'subcategories'|'items'}
+ */
+export function resolvePlannerCategoryBrowseLevel({
+  categoryName = '',
+  subcategoryName = '',
+  subcategoryCount = 0,
+} = {}) {
+  if (!categoryName) return 'categories'
+  if (!subcategoryName && subcategoryCount > 1) return 'subcategories'
+  return 'items'
+}
+
+/** A-light group label — name only, never a “full Focus” count. */
+export function formatPlannerGroupHeaderLabel(categoryName, subcategoryName) {
+  const cat = (categoryName || '').trim() || 'Без категории'
+  const sub = (subcategoryName || '').trim()
+  return sub ? `${cat} / ${sub}` : cat
+}
+
+/**
+ * Interleave optional group header rows for default category sort.
+ * @returns {Array<{ type: 'group', key: string, label: string }|{ type: 'item', item: object, index: number }>}
+ */
+export function buildPlannerSkuTableRows(items, { groupHeaders = false } = {}) {
+  const list = Array.isArray(items) ? items : []
+  if (!groupHeaders) {
+    return list.map((item, index) => ({ type: 'item', item, index }))
+  }
+  const rows = []
+  let lastKey = null
+  list.forEach((item, index) => {
+    const cat = item?.categoryName || ''
+    const sub = item?.subcategoryName || ''
+    const key = `${cat}\u0000${sub}`
+    if (key !== lastKey) {
+      rows.push({
+        type: 'group',
+        key,
+        label: formatPlannerGroupHeaderLabel(cat, sub),
+      })
+      lastKey = key
+    }
+    rows.push({ type: 'item', item, index })
+  })
+  return rows
 }
 
 export { positiveQty }
