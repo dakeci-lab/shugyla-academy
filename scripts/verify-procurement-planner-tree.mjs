@@ -65,10 +65,39 @@ assert(
     /delete next\[key\]/.test(planner)
 )
 assert(
-  'counts labeled «по снимку»',
+  'counts scope labels: snapshot vs supplier (tooltip only)',
   uxSrc.includes('PLANNER_CATEGORY_COUNTS_SCOPE_LABEL') &&
-    planner.includes('PLANNER_CATEGORY_COUNTS_SCOPE_LABEL') &&
-    uxSrc.includes("по снимку")
+    uxSrc.includes('PLANNER_CATEGORY_COUNTS_SUPPLIER_LABEL') &&
+    uxSrc.includes('getPlannerCategoryCountsScopeLabel') &&
+    planner.includes('getPlannerCategoryCountsScopeLabel') &&
+    planner.includes('countsScopeTitle') &&
+    !planner.includes('proc-planner__tree-group-scope')
+)
+assert(
+  'tree group meta «N поз · M к заказу»',
+  planner.includes('proc-planner__tree-group-meta') &&
+    planner.includes(' поз') &&
+    planner.includes(' к заказу') &&
+    uxSrc.includes('formatPlannerTreeGroupMeta') &&
+    plannerCss.includes('.proc-planner__tree-group-meta')
+)
+assert(
+  'supplier-scoped nav + orderable chip helpers wired',
+  planner.includes('buildPlannerCategoryNavModel(filterOptions,') &&
+    planner.includes('platformSupplierId: filters.platformSupplierId') &&
+    planner.includes('getOrderableChipCount') &&
+    !planner.includes('proc-planner__filter-pop') &&
+    !planner.includes('PlatformFilterButton') &&
+    planner.includes('Предупреждения')
+)
+assert(
+  'filterOptions cache bumped to v3',
+  read('src/services/procurementFilterOptionsCache.js').includes(
+    'filterOptions.v3'
+  ) &&
+    read('src/services/procurementFilterOptionsCache.js').includes(
+      'FILTER_OPTIONS_CACHE_VERSION = 3'
+    )
 )
 assert(
   'tree vs flat mode helper',
@@ -128,7 +157,9 @@ assert(
   'SKU row hover is instant gray without transition',
   plannerCss.includes('tr.proc-planner__sku-row:hover') &&
     plannerCss.includes('background: #f3f4f6') &&
-    /proc-planner__sku-row[^{]*\{[^}]*transition:\s*none/.test(plannerCss)
+    /tr\.proc-planner__sku-row,\s*\n\.proc-planner__card\.proc-planner__sku-row \{[^}]*transition:\s*none/.test(
+      plannerCss
+    )
 )
 
 const ux = await import(
@@ -170,13 +201,86 @@ ux.accumulateSnapshotFilterRow(
   },
   state
 )
+ux.accumulateSnapshotFilterRow(
+  {
+    category_name: 'Dairy',
+    subcategory_name: 'Milk',
+    platform_supplier_id: 's2',
+    final_order_qty: 0,
+  },
+  state
+)
+ux.accumulateSnapshotFilterRow(
+  {
+    category_name: 'Dairy',
+    subcategory_name: 'Milk',
+    platform_supplier_id: 's2',
+    final_order_qty: 3,
+  },
+  state
+)
 const options = ux.finalizeSnapshotFilterOptions(state)
 const model = ux.buildPlannerCategoryNavModel(options)
 assert(
   'nav model count from filterOptions (not page length)',
-  model[0]?.categoryName === 'Non Food' &&
-    model[0]?.itemCount === 2 &&
-    model[0]?.subcategories?.length === 2
+  model.find((e) => e.categoryName === 'Non Food')?.itemCount === 2 &&
+    model.find((e) => e.categoryName === 'Dairy')?.itemCount === 2
+)
+assert(
+  'nav model orderableCount M from scan (not page length)',
+  model.find((e) => e.categoryName === 'Non Food')?.orderableCount === 2 &&
+    model.find((e) => e.categoryName === 'Dairy')?.orderableCount === 1 &&
+    model.find((e) => e.categoryName === 'Dairy')?.subcategories?.[0]
+      ?.orderableCount === 1
+)
+assert(
+  'formatPlannerTreeGroupMeta structure',
+  ux.formatPlannerTreeGroupMeta({ itemCount: 1314, orderableCount: 14 }) ===
+    '1314 поз · 14 к заказу'
+)
+assert(
+  'keyed supplier category counts in finalize',
+  options.categoryCountsBySupplier?.s1?.['Non Food'] === 2 &&
+    options.categoryCountsBySupplier?.s2?.Dairy === 2 &&
+    options.categoryCountsBySupplierOrderable?.s2?.Dairy === 1
+)
+const scoped = ux.buildPlannerCategoryNavModel(options, {
+  platformSupplierId: 's1',
+})
+assert(
+  'supplier nav hides other categories',
+  scoped.length === 1 &&
+    scoped[0].categoryName === 'Non Food' &&
+    scoped[0].itemCount === 2 &&
+    scoped[0].orderableCount === 2
+)
+const orderableScoped = ux.buildPlannerCategoryNavModel(options, {
+  platformSupplierId: 's2',
+  orderableOnly: true,
+})
+assert(
+  'orderableOnly supplier nav uses orderable counts',
+  orderableScoped.length === 1 &&
+    orderableScoped[0].categoryName === 'Dairy' &&
+    orderableScoped[0].itemCount === 1
+)
+assert(
+  'scope labels honest',
+  ux.getPlannerCategoryCountsScopeLabel({}) === 'по снимку' &&
+    ux.getPlannerCategoryCountsScopeLabel({ platformSupplierId: 's1' }) ===
+      'у поставщика'
+)
+assert(
+  'orderable chip count from supplier summary',
+  ux.getOrderableChipCount({
+    supplierId: '',
+    snapshotOrderableCount: 99,
+  }) === 99 &&
+    ux.getOrderableChipCount({
+      supplierId: 's1',
+      summary: { orderablePositions: 14 },
+      snapshotOrderableCount: 99,
+    }) === 14
 )
 assert(
   'tree keys stable',

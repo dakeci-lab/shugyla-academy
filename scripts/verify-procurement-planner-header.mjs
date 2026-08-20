@@ -39,25 +39,40 @@ assert(
     /orderableOnly:\s*!current\.orderableOnly/.test(planner)
 )
 assert(
-  'advanced checkbox still wired to same orderableOnly',
-  /checked=\{filters\.orderableOnly\}/.test(planner)
+  'orderable chip count uses getOrderableChipCount',
+  planner.includes('getOrderableChipCount') &&
+    uxSrc.includes('export function getOrderableChipCount')
+)
+assert(
+  'warnings toolbar chip present; advanced filter popover removed',
+  planner.includes('Предупреждения') &&
+    /warningsOnly:\s*!current\.warningsOnly/.test(planner) &&
+    !planner.includes('proc-planner__filter-pop') &&
+    !planner.includes('PlatformFilterButton')
 )
 assert('on-screen ABC legend removed', !planner.includes('proc-planner__abc-legend'))
 assert(
-  'ABC column help icon present',
+  'ABC three axis columns with permanent sort arrows',
+  planner.includes('proc-planner__col-abc-axis') &&
+    planner.includes('proc-planner__abc-axis-btn') &&
+    planner.includes('proc-planner__abc-arrow') &&
+    plannerCss.includes('.proc-planner__abc-arrow.is-on')
+)
+assert(
+  'ABC column help icon on first axis',
   planner.includes('AbcColumnHelp') &&
     planner.includes('ABC_COLUMN_HELP') &&
-    planner.includes('proc-planner__abc-help')
+    planner.includes('proc-planner__abc-help') &&
+    /axisIndex === 0 \? <AbcColumnHelp/.test(planner)
 )
 assert(
   'ABC help CSS present',
   plannerCss.includes('.proc-planner__abc-help')
 )
 assert(
-  'ABC compact desktop classes',
-  planner.includes('proc-planner__col-abc--compact') &&
-    planner.includes('proc-planner__abc-badges--compact') &&
-    /<AbcBadges item=\{[^}]+\} compact \/>/.test(planner)
+  'desktop ABC cells are per-axis badges',
+  /ABC_AXES\.map\(\(axis\) => \(\s*<td[\s\S]*?AbcBadge/.test(planner) &&
+    !/<AbcBadges item=\{item\} compact \/>/.test(planner)
 )
 assert(
   'order column accent class',

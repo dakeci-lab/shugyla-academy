@@ -652,17 +652,30 @@ function stageUi() {
 
   assert(
     'TABLE_COL_SPAN accounts for week columns',
-    /TABLE_COL_SPAN\s*=\s*3\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*6/.test(planner) ||
-      planner.includes('const TABLE_COL_SPAN = 17')
+    /TABLE_COL_SPAN\s*=\s*5\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*6/.test(planner) ||
+      planner.includes('const TABLE_COL_SPAN = 19')
   )
   assert('loading/empty rows use TABLE_COL_SPAN', /colSpan=\{TABLE_COL_SPAN\}>Загрузка/.test(planner) && /colSpan=\{TABLE_COL_SPAN\}>Нет позиций/.test(planner))
-  assert('desktop table has ABC column', planner.includes('proc-planner__col-abc') && planner.includes('<AbcBadges item={item} />'))
+  assert(
+    'desktop table has three ABC axis columns',
+    planner.includes('proc-planner__col-abc-axis') &&
+      planner.includes('proc-planner__abc-axis-btn') &&
+      /ABC_AXES\.map\(\(axis\) => \(\s*<td[\s\S]*?AbcBadge/.test(planner)
+  )
   assert('three badges come from ABC_AXES', planner.includes('ABC_AXES.map((axis)') && planner.includes('<AbcBadge'))
   assert('badge shows the letter, not color alone', planner.includes('{letter}') && planner.includes('aria-label={title}') && planner.includes('title={title}') && /role="img"/.test(planner))
   assert('NULL renders an accessible dash', planner.includes("formatAbcClass") && planner.includes('is-empty'))
   assert('mobile cards show ABC badges', /proc-planner__card[\s\S]*<AbcBadges item=\{item\} \/>/.test(planner) || planner.includes('<AbcBadges item={item} />'))
-  assert('three filter groups with A/B/C checkboxes', planner.includes('proc-planner__abc-filter') && planner.includes('ABC_CLASSES.map'))
-  assert('filter reset clears ABC groups and keeps supplier', planner.includes('abcQty: []') && planner.includes('abcRevenue: []') && planner.includes('abcProfit: []') && !/setFilters\(\{[\s\S]{0,220}platformSupplierId:\s*''/.test(planner))
+  assert('three filter groups with A/B/C checkboxes', !planner.includes('proc-planner__abc-filter'))
+  assert(
+    'ABC class filter UI removed; sort + empty abc filter state remain',
+    !planner.includes('toggleAbcClassFilter') &&
+      planner.includes('abcQty: []') &&
+      planner.includes('abcRevenue: []') &&
+      planner.includes('abcProfit: []') &&
+      !planner.includes('proc-planner__filter-pop') &&
+      planner.includes('nextAbcSortState')
+  )
   assert('sort buttons have aria-label and pressed state', planner.includes('abcSortAriaLabel') && planner.includes('aria-pressed={active}'))
   assert('changing filters/sort resets page', planner.includes('[debouncedSearch, filters, abcSort, snapshot?.id]'))
   assert('legend moved to ABC column help tooltip', planner.includes('AbcColumnHelp') && planner.includes('ABC_COLUMN_HELP') && !planner.includes('proc-planner__abc-legend'))
@@ -686,7 +699,17 @@ function stageUi() {
   assert('sort cycle uses nextAbcSortState', planner.includes('nextAbcSortState(current, axis.column)'))
   assert('page resets to 1 on filter/sort change', planner.includes('setPage(1)') && planner.includes('[debouncedSearch, filters, abcSort, snapshot?.id]'))
   assert('A green / B amber / C red / dash gray', css.includes('.proc-planner__abc-badge.is-a') && css.includes('.proc-planner__abc-badge.is-b') && css.includes('.proc-planner__abc-badge.is-c') && css.includes('.proc-planner__abc-badge.is-empty'))
-  assert('ABC sort buttons are at least 24x24 CSS px', css.includes('min-width: 24px') && css.includes('min-height: 24px'))
+  assert(
+    'ABC sort axis buttons are at least 24×32 CSS px',
+    css.includes('.proc-planner__abc-axis-btn') &&
+      css.includes('min-width: 24px') &&
+      css.includes('min-height: 32px')
+  )
+  assert(
+    'permanent ↑↓ affordance on ABC headers',
+    planner.includes('proc-planner__abc-arrow') &&
+      css.includes('.proc-planner__abc-arrow.is-on')
+  )
   assert('no new ABC dashboard or export columns', !planner.includes('AbcDashboard') && !/PLAN_EXPORT_COLUMNS[\s\S]*ABC/.test(planner))
 }
 
@@ -745,10 +768,10 @@ const SERVICE_UI_ONLY = process.argv.includes('--service-ui-only')
 const SERVICE_ONLY = process.argv.includes('--service-only')
 
 const EXPECTED_CHECKS = {
-  full: 119,
+  full: 120,
   backend: 65,
   service: 33,
-  serviceUi: 55,
+  serviceUi: 56,
 }
 
 async function main() {

@@ -529,12 +529,11 @@ function stageLayoutInvariants() {
       planner.includes('platformSupplierId: supplierId')
   )
   assert(
-    'the unassigned filter is reachable and resettable from the filter popup',
-    planner.includes('Только без поставщика') &&
-      /categoryName: '',\n\s*subcategoryName: '',\n\s*warningsOnly: false,\n\s*orderableOnly: false,\n\s*unassignedOnly: false,/.test(
-        planner
-      ) &&
-      planner.includes('if (filters.unassignedOnly) n += 1')
+    'unassigned filter is reachable via alert chip (no advanced filter popover)',
+    !planner.includes('Только без поставщика') &&
+      !planner.includes('proc-planner__filter-pop') &&
+      planner.includes("chip.id === 'unassigned'") &&
+      planner.includes('unassignedOnly: true')
   )
 
   assert(
