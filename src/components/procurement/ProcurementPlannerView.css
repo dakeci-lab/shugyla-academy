@@ -436,7 +436,9 @@
 }
 
 .proc-planner__col-product {
-  min-width: 168px;
+  width: 14rem;
+  min-width: 14rem;
+  max-width: 14rem;
 }
 
 .proc-planner__col-week {
@@ -464,7 +466,9 @@
 }
 
 .proc-planner__col-order {
-  min-width: 5.5rem;
+  width: 5.75rem;
+  min-width: 5.75rem;
+  max-width: 5.75rem;
 }
 
 .proc-planner__col-order--accent {
@@ -572,12 +576,37 @@
 
 .proc-planner__sticky-product {
   left: 2.75rem;
-  box-shadow: 4px 0 6px -4px rgba(15, 23, 42, 0.18);
 }
 
 .proc-planner__sticky-order {
   right: 0;
-  box-shadow: -4px 0 6px -4px rgba(15, 23, 42, 0.18);
+}
+
+/* SKU row hover: instant gray — no transition (feels snappy). */
+.proc-planner__table tbody tr.proc-planner__sku-row,
+.proc-planner__card.proc-planner__sku-row {
+  transition: none;
+}
+
+.proc-planner__table tbody tr.proc-planner__sku-row:hover > td,
+.proc-planner__table tbody tr.proc-planner__sku-row:focus-within > td {
+  background: #f3f4f6;
+  transition: none;
+}
+
+.proc-planner__table tbody tr.proc-planner__sku-row:hover > td.proc-planner__sticky-num,
+.proc-planner__table tbody tr.proc-planner__sku-row:hover > td.proc-planner__sticky-product,
+.proc-planner__table tbody tr.proc-planner__sku-row:hover > td.proc-planner__sticky-order,
+.proc-planner__table tbody tr.proc-planner__sku-row:focus-within > td.proc-planner__sticky-num,
+.proc-planner__table tbody tr.proc-planner__sku-row:focus-within > td.proc-planner__sticky-product,
+.proc-planner__table tbody tr.proc-planner__sku-row:focus-within > td.proc-planner__sticky-order {
+  background: #f3f4f6;
+}
+
+.proc-planner__card.proc-planner__sku-row:hover,
+.proc-planner__card.proc-planner__sku-row:focus-within {
+  background: #f3f4f6;
+  transition: none;
 }
 
 .proc-planner__row-num {
@@ -742,6 +771,7 @@
 
 .proc-planner__table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
   min-width: 1380px;
@@ -766,15 +796,25 @@
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
-  min-width: 160px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .proc-planner__product strong {
   font-weight: 600;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 .proc-planner__product span {
   color: var(--text-secondary, #6b7280);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 0.75rem;
 }
 

@@ -94,6 +94,42 @@ assert(
     planner.includes('proc-planner__orderable-toggle') &&
     planner.includes('proc-planner__snapshot')
 )
+assert(
+  'sticky product/order have no box-shadow strips',
+  !/\.proc-planner__sticky-product\s*\{[^}]*box-shadow/.test(plannerCss) &&
+    !/\.proc-planner__sticky-order\s*\{[^}]*box-shadow/.test(plannerCss)
+)
+assert(
+  'product column has fixed width bounds',
+  /\.proc-planner__col-product\s*\{[^}]*width:\s*14rem/.test(plannerCss) &&
+    /\.proc-planner__col-product\s*\{[^}]*max-width:\s*14rem/.test(plannerCss)
+)
+assert(
+  'product name clamps with ellipsis path',
+  plannerCss.includes('-webkit-line-clamp: 2') &&
+    plannerCss.includes('text-overflow: ellipsis')
+)
+assert(
+  'product / group labels expose full text via title',
+  planner.includes('title={item.productName}') &&
+    planner.includes('title={item.barcode}') &&
+    /tree-group-name" title=\{label\}/.test(planner)
+)
+assert(
+  'table layout fixed to keep columns stable on expand',
+  /\.proc-planner__table\s*\{[^}]*table-layout:\s*fixed/.test(plannerCss)
+)
+assert(
+  'SKU rows use proc-planner__sku-row for hover highlight',
+  planner.includes("proc-planner__sku-row") &&
+    planner.includes('className="proc-planner__card proc-planner__sku-row"')
+)
+assert(
+  'SKU row hover is instant gray without transition',
+  plannerCss.includes('tr.proc-planner__sku-row:hover') &&
+    plannerCss.includes('background: #f3f4f6') &&
+    /proc-planner__sku-row[^{]*\{[^}]*transition:\s*none/.test(plannerCss)
+)
 
 const ux = await import(
   pathToFileURL(path.join(ROOT, 'src/utils/procurementPlannerUx.js')).href
