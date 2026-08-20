@@ -74,6 +74,15 @@
   outline-offset: 1px;
 }
 
+.table-pagination__size select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.table-pagination--disabled {
+  opacity: 0.85;
+}
+
 @media (max-width: 600px) {
   .table-pagination {
     padding: 9px 10px;
