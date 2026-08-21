@@ -9,7 +9,10 @@ import {
 } from '../services/candidatePhotoService'
 import { isCloudMode } from '../lib/dataMode'
 import { APPLICATION_QUESTION_TYPES, mapApplicationFormRpcError } from '../utils/applicationForm'
-import { getPublicVacancyDisplay } from '../utils/careersVacancyDisplay'
+import {
+  getPublicVacancyDisplay,
+  getPublicVacancyFacts,
+} from '../utils/careersVacancyDisplay'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
 import { kzPhoneTailToDisplay, validateKzPhoneTail } from '../utils/kzPhone'
 import {
@@ -19,9 +22,13 @@ import {
 import { useLanguage } from '../context/LanguageContext'
 import DynamicApplicationForm from '../components/apply/DynamicApplicationForm'
 import { getCareersHomePath } from '../router/hostSurface'
+import iconSunmark from '../assets/brand/logo/icon-sunmark.png'
+import patternTile from '../assets/brand/pattern/pattern-tile.svg'
 import '../components/admin/admin-shared.css'
 import '../components/CandidateAvatar.css'
 import './Apply.css'
+
+const APPLY_FORM_ID = 'careers-apply-form'
 
 function emptyValues(questions) {
   const values = {}
@@ -31,11 +38,38 @@ function emptyValues(questions) {
   return values
 }
 
+function BackChevron() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M15 6l-6 6 6 6" />
+    </svg>
+  )
+}
+
+function GalleryPlaceholder({ label }) {
+  return (
+    <div className="apply-success__ph" aria-hidden="true">
+      <span
+        className="apply-success__ph-pattern"
+        style={{ backgroundImage: `url(${patternTile})` }}
+      />
+      <div className="apply-success__ph-inner">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+          <rect x="3" y="4" width="18" height="16" rx="2.5" />
+          <circle cx="9" cy="10" r="2" />
+          <path d="M21 16.5l-5.2-5.2a2 2 0 0 0-2.8 0L4 20" />
+        </svg>
+        <span>{label}</span>
+      </div>
+    </div>
+  )
+}
+
 /** Публичная анкета кандидата — /apply/:slug */
 export default function ApplyPage() {
   const { slug } = useParams()
   const location = useLocation()
-  const { t } = useLanguage()
+  const { t, lang } = useLanguage()
   const hubPath = `${getCareersHomePath()}${location.search || ''}`
 
   const [loadState, setLoadState] = useState('loading')
@@ -62,6 +96,13 @@ export default function ApplyPage() {
   )
 
   const display = getPublicVacancyDisplay(vacancy || {})
+  const sideFacts = useMemo(
+    () =>
+      getPublicVacancyFacts(vacancy || {}, t, lang).filter((fact) =>
+        ['city', 'employment', 'schedule', 'salary', 'store'].includes(fact.key)
+      ),
+    [vacancy, t, lang]
+  )
 
   useEffect(() => {
     if (!vacancy?.title) return undefined
@@ -121,7 +162,7 @@ export default function ApplyPage() {
   if (loadState === 'loading') {
     return (
       <div className="apply-page">
-        <div className="apply-page__card apply-page__closed">
+        <div className="apply-page__state">
           <p className="apply-page__brand-title">Shugyla Market</p>
           <h1>{t.careersLoading}</h1>
         </div>
@@ -132,15 +173,13 @@ export default function ApplyPage() {
   if (loadState === 'error') {
     return (
       <div className="apply-page">
-        <div className="apply-page__card apply-page__closed">
+        <div className="apply-page__state">
           <p className="apply-page__brand-title">Shugyla Market</p>
           <h1>{t.careersLoadErrorTitle}</h1>
           <p>{t.careersLoadError}</p>
-          <p>
-            <Link to={hubPath} className="btn btn--outline">
-              {t.careersBackToVacancies}
-            </Link>
-          </p>
+          <Link to={hubPath} className="apply-page__btn apply-page__btn--outline">
+            {t.careersAllVacanciesLink}
+          </Link>
         </div>
       </div>
     )
@@ -149,31 +188,48 @@ export default function ApplyPage() {
   if (loadState === 'missing' || !slug || !vacancy) {
     return (
       <div className="apply-page">
-        <div className="apply-page__card apply-page__closed">
+        <div className="apply-page__state">
           <p className="apply-page__brand-title">Shugyla Market</p>
           <h1>{t.careersClosedTitle}</h1>
-          <p>
-            <Link to={hubPath} className="btn btn--primary">
-              {t.careersClosedCta}
-            </Link>
-          </p>
+          <Link to={hubPath} className="apply-page__btn">
+            {t.careersClosedCta}
+          </Link>
         </div>
       </div>
     )
   }
 
   if (submitted) {
+    const gallery = [
+      t.careersSuccessGalleryHall,
+      t.careersSuccessGalleryFacade,
+      t.careersSuccessGalleryShelves,
+      t.careersSuccessGalleryTeam,
+    ]
     return (
-      <div className="apply-page">
-        <div className="apply-page__card apply-page__success">
-          <p className="apply-page__brand-title">Shugyla Market</p>
-          <h1 className="apply-page__success-title">{t.careersSuccessTitle}</h1>
-          <p>{successMessage}</p>
-          <p>
-            <Link to={hubPath} className="btn btn--outline">
-              {t.careersClosedCta}
+      <div className="apply-page apply-page--success">
+        <div className="apply-success">
+          <div className="apply-success__hero">
+            <div className="apply-success__icon" aria-hidden="true">
+              <span className="apply-success__ring" />
+              <img className="apply-success__sun" src={iconSunmark} alt="" width={72} height={72} />
+              <span className="apply-success__check">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                  <path d="M4 12.5l5 5L20 6.5" />
+                </svg>
+              </span>
+            </div>
+            <h1 className="apply-success__heading">{t.careersSuccessHeading}</h1>
+            <p className="apply-success__lead">{successMessage || t.careersSuccessLead}</p>
+            <Link to={hubPath} className="apply-page__btn">
+              {t.careersSuccessBack}
             </Link>
-          </p>
+          </div>
+          <div className="apply-success__gallery" aria-hidden="true">
+            {gallery.map((label) => (
+              <GalleryPlaceholder key={label} label={label} />
+            ))}
+          </div>
         </div>
       </div>
     )
@@ -335,11 +391,11 @@ export default function ApplyPage() {
 
       setSuccessMessage(
         result.message ||
-          'Анкета успешно отправлена. Мы свяжемся с вами после рассмотрения.'
+          t.careersSuccessLead
       )
       if (result.localPhotoWarning) {
         setSuccessMessage(
-          `${result.message || 'Анкета успешно отправлена.'} ${result.localPhotoWarning}`
+          `${result.message || t.careersSuccessTitle}. ${result.localPhotoWarning}`
         )
       }
       setSubmitted(true)
@@ -351,72 +407,121 @@ export default function ApplyPage() {
     }
   }
 
+  const submitDisabled = submitting || photoUploading || hasUnknownType || !consentGiven
+  const submitLabel = photoUploading
+    ? t.careersPhotoUploading
+    : submitting
+      ? t.careersSubmitting
+      : t.careersSubmit
+
   return (
     <div className="apply-page">
-      <div className="apply-page__card">
-        <div className="apply-page__brand">
-          <p className="apply-page__brand-title">Shugyla Market</p>
-          <p className="apply-page__brand-sub">{t.careersFormLabel}</p>
-          <p className="apply-page__brand-sub">
-            <Link to={hubPath}>{t.careersBackToVacancies}</Link>
-          </p>
+      <div className="apply-page__shell">
+        <Link to={hubPath} className="apply-page__back">
+          <BackChevron />
+          {t.careersAllVacanciesLink}
+        </Link>
+
+        <div className="apply-page__grid">
+          <div className="apply-page__primary">
+            <header className="apply-page__intro">
+              <h1 className="apply-page__vacancy-title">{display.title}</h1>
+              <p className="apply-page__lead">{t.careersFormLead}</p>
+            </header>
+
+            <form id={APPLY_FORM_ID} className="careers-apply-form" onSubmit={handleSubmit}>
+              <section className="apply-form__section">
+                <h2 className="apply-form__section-title">{t.careersFormSection}</h2>
+                <DynamicApplicationForm
+                  questions={questions}
+                  values={values}
+                  errors={fieldErrors}
+                  onChange={handleValueChange}
+                  onPhotoChange={handlePhotoChange}
+                  photoPreview={photoPreview}
+                  photoWarning={photoUploading ? t.careersPhotoUploading : photoWarning}
+                  disabled={submitting || photoUploading}
+                />
+              </section>
+
+              <div className="apply-page__trust">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
+                  <rect x="4.5" y="10.5" width="15" height="9.5" rx="2" />
+                  <path d="M8 10.5V7.5a4 4 0 0 1 8 0v3" />
+                </svg>
+                <span>{t.careersFormTrust}</span>
+              </div>
+
+              <label className="careers-consent">
+                <input
+                  type="checkbox"
+                  checked={consentGiven}
+                  required
+                  disabled={submitting || photoUploading}
+                  onChange={(event) => {
+                    setConsentGiven(event.target.checked)
+                    if (event.target.checked && error === t.careersConsentRequired) {
+                      setError('')
+                    }
+                  }}
+                />
+                <span>{t.careersConsent} *</span>
+              </label>
+
+              {error && <p className="careers-apply-form__error">{error}</p>}
+
+              <button
+                type="submit"
+                className="apply-page__btn careers-apply-form__submit apply-page__submit--desktop"
+                disabled={submitDisabled}
+              >
+                {submitLabel}
+              </button>
+            </form>
+          </div>
+
+          <aside className="apply-page__aside">
+            {(display.positionName || display.title || sideFacts.length > 0) && (
+              <div className="apply-page__side-card">
+                <h2 className="apply-page__side-title">{t.careersVacancyAboutTitle}</h2>
+                <ul>
+                  <li>{display.positionName || display.title}</li>
+                  {sideFacts.map((fact) => (
+                    <li key={fact.key}>
+                      <span className="apply-page__side-label">{fact.label}</span>
+                      {fact.value}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+            <div className="apply-page__aside-ph" aria-hidden="true">
+              <span
+                className="apply-page__aside-ph-pattern"
+                style={{ backgroundImage: `url(${patternTile})` }}
+              />
+              <div className="apply-page__aside-ph-inner">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                  <rect x="3" y="4" width="18" height="16" rx="2.5" />
+                  <circle cx="9" cy="10" r="2" />
+                  <path d="M21 16.5l-5.2-5.2a2 2 0 0 0-2.8 0L4 20" />
+                </svg>
+                <span>{t.careersVacancyStorePhotoLabel}</span>
+              </div>
+            </div>
+          </aside>
         </div>
+      </div>
 
-        <section>
-          <h1 className="apply-page__vacancy-title">{display.title}</h1>
-          {display.positionName ? (
-            <p className="apply-page__vacancy-position">{display.positionName}</p>
-          ) : null}
-          {display.description ? (
-            <p className="apply-page__vacancy-desc">{display.description}</p>
-          ) : null}
-        </section>
-
-        <form className="careers-apply-form" onSubmit={handleSubmit}>
-          <section className="apply-form__section">
-            <h2 className="apply-form__section-title">{t.careersFormSection}</h2>
-            <DynamicApplicationForm
-              questions={questions}
-              values={values}
-              errors={fieldErrors}
-              onChange={handleValueChange}
-              onPhotoChange={handlePhotoChange}
-              photoPreview={photoPreview}
-              photoWarning={photoUploading ? t.careersPhotoUploading : photoWarning}
-              disabled={submitting || photoUploading}
-            />
-          </section>
-
-          <label className="careers-consent">
-            <input
-              type="checkbox"
-              checked={consentGiven}
-              required
-              disabled={submitting || photoUploading}
-              onChange={(event) => {
-                setConsentGiven(event.target.checked)
-                if (event.target.checked && error === t.careersConsentRequired) {
-                  setError('')
-                }
-              }}
-            />
-            <span>{t.careersConsent} *</span>
-          </label>
-
-          {error && <p className="careers-apply-form__error">{error}</p>}
-
-          <button
-            type="submit"
-            className="btn btn--primary careers-apply-form__submit"
-            disabled={submitting || photoUploading || hasUnknownType || !consentGiven}
-          >
-            {photoUploading
-              ? t.careersPhotoUploading
-              : submitting
-                ? t.careersSubmitting
-                : t.careersSubmit}
-          </button>
-        </form>
+      <div className="apply-page__sticky-cta sticky-cta">
+        <button
+          type="submit"
+          form={APPLY_FORM_ID}
+          className="apply-page__btn apply-page__btn--block"
+          disabled={submitDisabled}
+        >
+          {submitLabel}
+        </button>
       </div>
     </div>
   )
