@@ -1882,20 +1882,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                 </span>
               ) : null}
             </button>
-            <button
-              type="button"
-              className={`proc-planner__orderable-toggle${filters.warningsOnly ? ' is-active' : ''}`}
-              aria-pressed={filters.warningsOnly}
-              title="Показать только позиции с отрицательным остатком UMAG"
-              onClick={() =>
-                setFilters((current) => ({
-                  ...current,
-                  warningsOnly: !current.warningsOnly,
-                }))
-              }
-            >
-              <span className="proc-planner__orderable-toggle-label">Предупреждения</span>
-            </button>
             <PlatformToolbarActionWrap>
               <span className="proc-planner__tip-wrap" data-tooltip={syncTooltip}>
                 <PlatformSyncButton
