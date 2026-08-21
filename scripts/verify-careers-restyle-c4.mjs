@@ -46,8 +46,8 @@ assert(
     !apply.includes("Navigate to={`/apply/${")
 )
 assert(
-  'success uses icon-sunmark + check badge + pattern gallery',
-  apply.includes('icon-sunmark.png') &&
+  'success uses icon-sunmark-on-white + check badge + pattern gallery',
+  apply.includes('icon-sunmark-on-white.png') &&
     apply.includes('apply-success__check') &&
     apply.includes('pattern-tile.svg') &&
     apply.includes('apply-success__gallery') &&
@@ -105,8 +105,8 @@ assert(
   detail.includes('vacancy-detail__sticky-cta') && hub.includes('careers-hero')
 )
 assert(
-  'sunmark asset present',
-  exists('src/assets/brand/logo/icon-sunmark.png')
+  'sunmark on-white asset present (legacy optional)',
+  exists('src/assets/brand/logo/icon-sunmark-on-white.png')
 )
 
 console.log(`\n${checks}/${checks} checks passed`)

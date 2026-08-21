@@ -137,6 +137,7 @@
     "verify:domain-deployment": "node scripts/verify-domain-deployment.mjs",
     "verify:sunmark-icons-s1": "node scripts/verify-sunmark-icons-s1.mjs",
     "verify:sunmark-icons-s2": "node scripts/verify-sunmark-icons-s2.mjs",
+    "verify:sunmark-icons-s3": "node scripts/verify-sunmark-icons-s3.mjs",
     "verify:host-surfaces": "node scripts/verify-domain-deployment.mjs",
     "verify:notification-settings-admin": "node scripts/verify-notification-settings-admin.mjs",
     "verify:notification-panel-mark-all-read": "node scripts/verify-notification-panel-mark-all-read.mjs",

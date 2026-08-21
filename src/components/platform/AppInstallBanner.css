@@ -24,17 +24,13 @@
 }
 
 .app-install-banner__logo {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
+  display: block;
+  width: 32px;
+  height: 32px;
   margin-left: 18px;
-  background: var(--color-primary);
-  color: white;
-  font-weight: 700;
-  font-size: 16px;
-  border-radius: 8px;
+  object-fit: contain;
+  background: transparent;
+  border-radius: 0;
   flex-shrink: 0;
 }
 

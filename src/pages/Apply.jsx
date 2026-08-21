@@ -22,7 +22,7 @@ import {
 import { useLanguage } from '../context/LanguageContext'
 import DynamicApplicationForm from '../components/apply/DynamicApplicationForm'
 import { getCareersHomePath } from '../router/hostSurface'
-import iconSunmark from '../assets/brand/logo/icon-sunmark.png'
+import iconSunmark from '../assets/brand/logo/icon-sunmark-on-white.png'
 import patternTile from '../assets/brand/pattern/pattern-tile.svg'
 import '../components/admin/admin-shared.css'
 import '../components/CandidateAvatar.css'
