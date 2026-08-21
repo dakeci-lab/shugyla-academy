@@ -39,6 +39,12 @@ const detail = read('src/pages/VacancyDetailPage.jsx')
 const hub = read('src/pages/ApplyHub.jsx')
 
 assert(
+  'apply aside uses store facade photo',
+  apply.includes('CareersPhoto') &&
+    apply.includes('photo-store-facade.jpg') &&
+    apply.includes('careersVacancyStorePhotoLabel')
+)
+assert(
   'success remains submitted state (no new success route)',
   apply.includes('if (submitted)') &&
     apply.includes('apply-success') &&

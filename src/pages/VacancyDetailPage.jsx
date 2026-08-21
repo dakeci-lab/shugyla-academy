@@ -10,7 +10,9 @@ import {
 import { toUserErrorMessage } from '../utils/userErrorMessage'
 import { useLanguage } from '../context/LanguageContext'
 import { getCareersHomePath } from '../router/hostSurface'
-import patternTile from '../assets/brand/pattern/pattern-tile.svg'
+import CareersPhoto from '../components/careers/CareersPhoto'
+import photoTeamEmployee from '../assets/brand/photos/photo-team-employee.jpg'
+import '../components/careers/CareersPhoto.css'
 import './VacancyDetail.css'
 
 function BackChevron() {
@@ -155,20 +157,12 @@ export default function VacancyDetailPage() {
             ) : null}
 
             <div className="vacancy-detail__media vacancy-detail__media--mobile">
-              <div className="vacancy-detail__ph" aria-hidden="true">
-                <span
-                  className="vacancy-detail__ph-pattern"
-                  style={{ backgroundImage: `url(${patternTile})` }}
-                />
-                <div className="vacancy-detail__ph-inner">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <rect x="3" y="4" width="18" height="16" rx="2.5" />
-                    <circle cx="9" cy="10" r="2" />
-                    <path d="M21 16.5l-5.2-5.2a2 2 0 0 0-2.8 0L4 20" />
-                  </svg>
-                  <span>{t.careersVacancyPhotoLabel}</span>
-                </div>
-              </div>
+              <CareersPhoto
+                src={photoTeamEmployee}
+                alt={t.careersVacancyPhotoLabel}
+                className="vacancy-detail__ph"
+                objectPosition="center 18%"
+              />
             </div>
 
             <ContentBlock block={blocks.duties} />
@@ -199,20 +193,12 @@ export default function VacancyDetailPage() {
             ) : null}
 
             <div className="vacancy-detail__media vacancy-detail__media--desktop">
-              <div className="vacancy-detail__ph vacancy-detail__ph--tall" aria-hidden="true">
-                <span
-                  className="vacancy-detail__ph-pattern"
-                  style={{ backgroundImage: `url(${patternTile})` }}
-                />
-                <div className="vacancy-detail__ph-inner">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                    <rect x="3" y="4" width="18" height="16" rx="2.5" />
-                    <circle cx="9" cy="10" r="2" />
-                    <path d="M21 16.5l-5.2-5.2a2 2 0 0 0-2.8 0L4 20" />
-                  </svg>
-                  <span>{t.careersVacancyPhotoLabel}</span>
-                </div>
-              </div>
+              <CareersPhoto
+                src={photoTeamEmployee}
+                alt={t.careersVacancyPhotoLabel}
+                className="vacancy-detail__ph vacancy-detail__ph--tall"
+                objectPosition="center 18%"
+              />
             </div>
           </aside>
         </div>

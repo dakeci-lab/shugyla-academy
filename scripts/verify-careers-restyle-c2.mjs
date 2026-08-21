@@ -44,10 +44,14 @@ assert(
     hub.includes('careersHeroSecondaryCta')
 )
 assert(
-  'hub hero uses pattern/placeholder media',
-  hub.includes('PhotoPlaceholder') &&
-    hub.includes('pattern-tile.svg') &&
+  'hub hero uses store facade photo',
+  hub.includes('CareersPhoto') &&
+    hub.includes('photo-store-facade.jpg') &&
     hub.includes('careersHeroPhotoLabel')
+)
+assert(
+  'hub about uses team employee photo',
+  hub.includes('photo-team-employee.jpg') && hub.includes('careersAboutPhotoLabel')
 )
 assert(
   'hub renders benefits cards',

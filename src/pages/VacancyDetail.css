@@ -188,14 +188,6 @@
 }
 
 .vacancy-detail__ph {
-  position: relative;
-  background: linear-gradient(135deg, #f3efe9, #ede7de);
-  border-radius: var(--radius-lg, 20px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #b9afa3;
-  overflow: hidden;
   min-height: 180px;
 }
 
@@ -203,38 +195,12 @@
   min-height: 320px;
 }
 
-.vacancy-detail__ph-pattern {
-  position: absolute;
-  width: 130px;
-  height: 130px;
-  top: 0;
-  right: 0;
-  opacity: 0.9;
-  background-size: 62px 64px;
-  background-repeat: repeat;
-  -webkit-mask-image: linear-gradient(135deg, black 30%, transparent 72%);
-  mask-image: linear-gradient(135deg, black 30%, transparent 72%);
-  pointer-events: none;
+.vacancy-detail__ph .careers-photo__img {
+  min-height: 180px;
 }
 
-.vacancy-detail__ph-inner {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  text-align: center;
-  padding: 0.875rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #a69c8f;
-}
-
-.vacancy-detail__ph-inner svg {
-  width: 2.125rem;
-  height: 2.125rem;
-  opacity: 0.55;
+.vacancy-detail__ph--tall .careers-photo__img {
+  min-height: 320px;
 }
 
 .vacancy-detail__media--mobile {
