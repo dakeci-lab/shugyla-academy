@@ -11,7 +11,7 @@ import { toUserErrorMessage } from '../utils/userErrorMessage'
 import { useLanguage } from '../context/LanguageContext'
 import { getCareersHomePath } from '../router/hostSurface'
 import CareersPhoto from '../components/careers/CareersPhoto'
-import photoTeamEmployee from '../assets/brand/photos/photo-team-employee.jpg'
+import photoTeamEmployee from '../assets/brand/photos/photo-team-employee-square.jpg'
 import '../components/careers/CareersPhoto.css'
 import './VacancyDetail.css'
 
@@ -161,7 +161,7 @@ export default function VacancyDetailPage() {
                 src={photoTeamEmployee}
                 alt={t.careersVacancyPhotoLabel}
                 className="vacancy-detail__ph"
-                objectPosition="center 18%"
+                aspect="square"
               />
             </div>
 
@@ -196,8 +196,8 @@ export default function VacancyDetailPage() {
               <CareersPhoto
                 src={photoTeamEmployee}
                 alt={t.careersVacancyPhotoLabel}
-                className="vacancy-detail__ph vacancy-detail__ph--tall"
-                objectPosition="center 18%"
+                className="vacancy-detail__ph"
+                aspect="square"
               />
             </div>
           </aside>

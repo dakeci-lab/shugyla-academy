@@ -453,14 +453,10 @@
 }
 
 .careers-about__media {
-  min-height: 220px;
   background: rgba(255, 255, 255, 0.14);
   position: relative;
   z-index: 1;
-}
-
-.careers-about__media .careers-photo__img {
-  min-height: 220px;
+  min-height: 0;
 }
 
 /* —— Contact —— */

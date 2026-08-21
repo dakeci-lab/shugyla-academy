@@ -38,6 +38,12 @@ assert(
   page.includes('fetchPublishedVacanciesForApply') && !page.includes("rpc('")
 )
 assert(
+  'detail employee photo is square asset + aspect',
+  page.includes('photo-team-employee-square.jpg') &&
+    page.includes('aspect="square"') &&
+    !page.includes('vacancy-detail__ph--tall')
+)
+assert(
   'detail has back link to vacancies list',
   page.includes('vacancy-detail__back') && page.includes('careersAllVacanciesLink')
 )

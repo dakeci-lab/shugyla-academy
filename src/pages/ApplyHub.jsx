@@ -8,7 +8,7 @@ import { CAREERS_CONTACT } from '../components/careers/careersContact'
 import CareersPhoto from '../components/careers/CareersPhoto'
 import patternTile from '../assets/brand/pattern/pattern-tile.svg'
 import photoStoreFacade from '../assets/brand/photos/photo-store-facade.jpg'
-import photoTeamEmployee from '../assets/brand/photos/photo-team-employee.jpg'
+import photoTeamEmployee from '../assets/brand/photos/photo-team-employee-square.jpg'
 import '../components/careers/CareersPhoto.css'
 import './ApplyHub.css'
 
@@ -316,7 +316,7 @@ export default function ApplyHubPage() {
               src={photoTeamEmployee}
               alt={t.careersAboutPhotoLabel}
               className="careers-about__media"
-              objectPosition="center 18%"
+              aspect="square"
             />
           </div>
         </section>
