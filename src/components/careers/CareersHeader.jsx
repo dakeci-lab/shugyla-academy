@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom'
 import LangSwitch from '../LangSwitch'
+import logoPrimary from '../../assets/brand/logo/logo-primary.png'
 import {
   getCareersHomePath,
   getCareersUrl,
@@ -15,12 +16,13 @@ export default function CareersHeader() {
   const homePath = getCareersHomePath()
   const surface = getHostSurface()
   const brand = (
-    <>
-      <span className="careers-header__mark" aria-hidden="true">
-        S
-      </span>
-      <span className="careers-header__name">Shugyla Market</span>
-    </>
+    <img
+      className="careers-header__logo"
+      src={logoPrimary}
+      alt="Shugyla Market"
+      width={160}
+      height={40}
+    />
   )
 
   return (

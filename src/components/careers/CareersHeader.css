@@ -2,56 +2,84 @@
   position: sticky;
   top: 0;
   z-index: 20;
-  background: rgba(244, 247, 245, 0.92);
-  backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(20, 32, 26, 0.08);
+  background: var(--brand-white);
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .careers-header__inner {
-  max-width: 720px;
+  max-width: 1100px;
   margin: 0 auto;
-  padding: 0.7rem 1rem;
+  padding: 1rem 1.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
-  min-height: 3.25rem;
+  min-height: 3.5rem;
 }
 
 .careers-header__brand {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
   text-decoration: none;
   color: inherit;
   min-width: 0;
 }
 
-.careers-header__mark {
-  width: 2rem;
-  height: 2rem;
-  border-radius: 0.55rem;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: #15803d;
-  color: #fff;
-  font-weight: 700;
-  font-size: 0.95rem;
-  flex-shrink: 0;
-}
-
-.careers-header__name {
-  font-weight: 700;
-  font-size: 1rem;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.careers-header__logo {
+  height: 34px;
+  width: auto;
+  display: block;
 }
 
 .careers-header__actions {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
+}
+
+/* Scoped LangSwitch pills — do not change global / platform LangSwitch.css */
+.careers-header .lang-switch {
+  display: flex;
+  background: var(--brand-cream);
+  border: none;
+  border-radius: 999px;
+  padding: 3px;
+  gap: 0;
+}
+
+.careers-header .lang-switch__btn {
+  padding: 6px 10px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--brand-charcoal);
+  opacity: 0.55;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: var(--font-body);
+  box-shadow: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.careers-header .lang-switch__btn:hover {
+  opacity: 0.85;
+  color: var(--brand-charcoal);
+}
+
+.careers-header .lang-switch__btn--active {
+  background: var(--brand-white);
+  opacity: 1;
+  color: var(--brand-orange);
+  box-shadow: none;
+}
+
+@media (max-width: 640px) {
+  .careers-header__inner {
+    padding: 1rem 1.25rem;
+  }
+
+  .careers-header__logo {
+    height: 26px;
+  }
 }

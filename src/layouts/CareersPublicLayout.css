@@ -1,8 +1,21 @@
 .careers-public-layout {
   min-height: 100vh;
-  background:
-    radial-gradient(1200px 480px at 10% -10%, rgba(22, 163, 74, 0.12), transparent 55%),
-    radial-gradient(900px 420px at 100% 0%, rgba(15, 118, 110, 0.08), transparent 50%),
-    #f4f7f5;
-  color: #14201a;
+  display: flex;
+  flex-direction: column;
+  background: #efeae4;
+  color: var(--brand-charcoal);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.careers-public-layout__main {
+  flex: 1 1 auto;
+  width: 100%;
+}
+
+.careers-public-layout h1,
+.careers-public-layout h2,
+.careers-public-layout h3 {
+  font-family: var(--font-display);
+  font-weight: 700;
 }
