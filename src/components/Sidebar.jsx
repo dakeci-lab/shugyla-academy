@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import sunmarkOnWhite from '../assets/brand/logo/icon-sunmark-on-white.png'
 import './Sidebar.css'
 
 /** Пункты бокового меню legacy-админ-панели (без Academy Learning). */
@@ -15,7 +16,15 @@ export default function Sidebar({ activeTab, onTabChange }) {
   return (
     <aside className="sidebar">
       <div className="sidebar__header">
-        <span className="sidebar__logo-icon">S</span>
+        <img
+          className="sidebar__logo-icon"
+          src={sunmarkOnWhite}
+          alt=""
+          width={32}
+          height={32}
+          aria-hidden="true"
+          decoding="async"
+        />
         <div className="sidebar__brand">
           <span className="sidebar__title">Shugyla Platform</span>
           <span className="sidebar__subtitle">Админ</span>

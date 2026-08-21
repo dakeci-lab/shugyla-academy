@@ -4,6 +4,7 @@ import { login, getPostLoginPath, LOGIN_ERROR } from '../utils/auth'
 import { useSession, AUTH_STATUS, SESSION_TYPE } from '../context/SessionContext'
 import { isCloudMode } from '../lib/dataMode'
 import AuthLoadingScreen from '../components/AuthLoadingScreen'
+import sunmarkOnWhite from '../assets/brand/logo/icon-sunmark-on-white.png'
 import './Login.css'
 
 const DEACTIVATED_MESSAGE = 'Доступ закрыт: сотрудник уволен. Обратитесь к администратору.'
@@ -144,7 +145,15 @@ export default function Login() {
         <div className="login-page__decor login-page__decor--ring login-page__decor--5" />
 
         <div className="login-page__brand-inner">
-          <div className="login-page__brand-logo">S</div>
+          <img
+            className="login-page__brand-logo"
+            src={sunmarkOnWhite}
+            alt=""
+            width={88}
+            height={88}
+            aria-hidden="true"
+            decoding="async"
+          />
           <h1 className="login-page__brand-title">Shugyla Platform</h1>
           <p className="login-page__brand-subtitle">
             Внутренняя система управления Shugyla Market

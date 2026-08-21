@@ -29,19 +29,14 @@
 }
 
 .login-page__brand-logo {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: block;
   width: 88px;
   height: 88px;
-  margin-bottom: 28px;
-  background: rgba(255, 255, 255, 0.18);
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-radius: 22px;
-  font-size: 44px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  backdrop-filter: blur(8px);
+  margin: 0 auto 28px;
+  object-fit: contain;
+  background: #fff;
+  border: none;
+  border-radius: 16px;
 }
 
 .login-page__brand-title {
@@ -311,8 +306,7 @@
     width: 64px;
     height: 64px;
     margin-bottom: 16px;
-    font-size: 32px;
-    border-radius: 16px;
+    border-radius: 12px;
   }
 
   .login-page__brand-title {
@@ -376,16 +370,13 @@
 }
 
 .login-page__logo-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 40px;
-  height: 40px;
-  background: var(--color-primary);
-  color: white;
-  font-weight: 700;
-  font-size: 20px;
-  border-radius: 8px;
+  display: block;
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  background: transparent;
+  border-radius: 0;
+  flex-shrink: 0;
 }
 
 .login-page__title {

@@ -9,6 +9,7 @@ import {
 import { filterPlatformNav } from '../../platform/platformAccess'
 import { excludeWebOnlyNavItems } from '../../platform/webOnlyNav'
 import PlatformSidebarMobileProfile from './PlatformSidebarMobileProfile'
+import sunmarkOnWhite from '../../assets/brand/logo/icon-sunmark-on-white.png'
 import './PlatformSidebar.css'
 
 const MOBILE_QUERY = '(max-width: 900px)'
@@ -257,7 +258,15 @@ export default function PlatformSidebar({ isOpen = false, onNavigate, panelRef =
           <PlatformSidebarMobileProfile user={user} onNavigate={handleNavClick} />
         ) : (
           <div className="platform-sidebar__brand-row">
-            <span className="platform-sidebar__logo-icon">S</span>
+            <img
+              className="platform-sidebar__logo-icon"
+              src={sunmarkOnWhite}
+              alt=""
+              width={32}
+              height={32}
+              aria-hidden="true"
+              decoding="async"
+            />
             <div className="platform-sidebar__brand">
               <span className="platform-sidebar__title">Shugyla Platform</span>
               <span className="platform-sidebar__subtitle">Внутренняя платформа</span>
