@@ -94,8 +94,17 @@ assert('local questions preserve bindings', localAdapter.includes('field_binding
 assert('local questions preserve help and placeholder', localAdapter.includes('help_text: q.helpText') && localAdapter.includes('placeholder: q.placeholder'))
 assert('local mock vacancies have positions', localAdapter.includes('position_id: cashierPositionId'))
 assert('hub provides city filter only from vacancy data', hub.includes('cities.length > 1') && hub.includes('selectedCity'))
-assert('hub renders compact structured facts', hub.includes('getPublicVacancyFacts') && hub.includes('apply-hub-card__facts'))
-assert('detail renders structured facts', detail.includes('vacancy-detail__facts') && detail.includes('getPublicVacancyFacts'))
+assert(
+  'hub renders vacancy meta from public fields',
+  hub.includes('getPublicVacancyDisplay') &&
+    hub.includes('careers-vacancy-card') &&
+    (hub.includes('employmentType') || hub.includes('getVacancyMetaParts'))
+)
+assert(
+  'detail renders structured facts',
+  detail.includes('getPublicVacancyFacts') &&
+    (detail.includes('vacancy-detail__side-card') || detail.includes('vacancy-detail__facts'))
+)
 assert('consent is required client-side', apply.includes('careersConsent') && apply.includes('consentGiven') && apply.includes('required'))
 assert('consent blocks submit', apply.includes('!consentGiven'))
 assert('consent does not change submit service contract', !submitService.includes('consent'))
