@@ -1,16 +1,20 @@
-Shugyla Market — фирменные ассеты для разработки карьерной страницы
-=====================================================================
+Shugyla Market — фирменные ассеты для разработки
+=================================================
 
 fonts/
   Bluecurve-Light.ttf, Bluecurve-Regular.ttf, Bluecurve-Bold.ttf — фирменный шрифт (заголовки)
   Montserrat — подключается через Google Fonts (не входит в архив)
 
 logo/
-  logo-primary.png     — логотип на белом/светлом фоне (полноцветный)
-  logo-on-green.png     — логотип для зелёного фона (белый текст + оранжевое солнце)
-  logo-white-mono.png   — монохромный белый логотип (для оранжевого/тёмного фона, фото)
-  icon-sunmark.png      — только знак-солнце (favicon, success-иконка, декор)
-  Все вырезаны напрямую из shugyla-брендбук.pdf, не перерисованы.
+  logo-primary.png          — логотип на белом/светлом фоне (полноцветный wordmark)
+  logo-on-green.png         — логотип для зелёного фона (белый текст + оранжевое солнце)
+  logo-white-mono.png       — монохромный белый логотип (для оранжевого/тёмного фона, фото)
+  icon-sunmark.png          — legacy знак-солнце (сейчас на careers success; часто с тёмным превью)
+  icon-sunmark-source.png   — исходник sunmark от владельца (зелёный круг + оранжевые лучи)
+  icon-sunmark-on-white.png — знак по центру на белом квадрате 512×512, с padding (~14% на сторону);
+                              предпочитать для platform mark / favicon / PWA / splash на светлом фоне
+  Wordmark вырезан из shugyla-брендбук.pdf; sunmark-source — фирменный файл владельца (2026-08-21).
+  PWA icons (`public/icons/*`) генерируются из icon-sunmark-on-white.png: `node scripts/generate-pwa-icons.mjs`.
 
 pattern/
   pattern-tile.svg — фирменный паттерн, tileable, 108×112px, используй background-repeat

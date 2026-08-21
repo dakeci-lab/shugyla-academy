@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { isPwaStandalone } from '../../utils/pwaStandalone'
+import sunmarkOnWhite from '../../assets/brand/logo/icon-sunmark-on-white.png'
 import './AppInstallBanner.css'
 
 /** Баннер установки PWA — только mobile */
@@ -53,7 +54,15 @@ export default function AppInstallBanner() {
       <button type="button" className="app-install-banner__dismiss" onClick={handleDismiss} aria-label="Закрыть">
         ×
       </button>
-      <span className="app-install-banner__logo">S</span>
+      <img
+        className="app-install-banner__logo"
+        src={sunmarkOnWhite}
+        alt=""
+        width={32}
+        height={32}
+        aria-hidden="true"
+        decoding="async"
+      />
       <div className="app-install-banner__text">
         <strong>Shugyla Platform</strong>
         <span>Открыть в приложении «Shugyla Platform»</span>

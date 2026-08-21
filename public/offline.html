@@ -29,17 +29,12 @@
         box-shadow: 0 8px 24px rgba(20, 40, 28, 0.08);
       }
       .logo {
+        display: block;
         width: 64px;
         height: 64px;
         margin: 0 auto 16px;
-        border-radius: 16px;
-        background: #2a9d5c;
-        color: #fff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 28px;
-        font-weight: 700;
+        object-fit: contain;
+        background: transparent;
       }
       h1 {
         margin: 0 0 8px;
@@ -68,7 +63,16 @@
   </head>
   <body>
     <div class="card">
-      <div class="logo" aria-hidden="true">S</div>
+      <!-- Relative to offline.html at deploy base (/ or /shugyla-academy/) — same as SW caches. -->
+      <img
+        class="logo"
+        src="pwa-icons/icon-192.png"
+        alt=""
+        width="64"
+        height="64"
+        aria-hidden="true"
+        decoding="async"
+      />
       <h1>Нет подключения к интернету</h1>
       <p>Проверьте интернет и попробуйте снова</p>
       <button type="button" onclick="window.location.reload()">Повторить</button>

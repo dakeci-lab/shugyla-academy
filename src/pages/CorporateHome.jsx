@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import LangSwitch from '../components/LangSwitch'
 import { useLanguage } from '../context/LanguageContext'
 import { getCareersUrl } from '../router/hostSurface'
+import sunmarkOnWhite from '../assets/brand/logo/icon-sunmark-on-white.png'
 import './CorporateHome.css'
 
 const CONTACT_EMAIL = 'academy@shugyla.kz'
@@ -24,9 +25,15 @@ export default function CorporateHome() {
         <LangSwitch />
       </div>
       <section className="corporate-home__card" aria-labelledby="corporate-home-title">
-        <div className="corporate-home__mark" aria-hidden="true">
-          S
-        </div>
+        <img
+          className="corporate-home__mark"
+          src={sunmarkOnWhite}
+          alt=""
+          width={52}
+          height={52}
+          aria-hidden="true"
+          decoding="async"
+        />
         <p className="corporate-home__brand">Shugyla Market</p>
         <h1 id="corporate-home-title" className="corporate-home__title">
           {t.corporateTitle}

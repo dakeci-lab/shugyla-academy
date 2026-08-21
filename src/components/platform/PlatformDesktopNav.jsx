@@ -3,6 +3,7 @@ import { Link, NavLink, useLocation } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext'
 import { PLATFORM_NAV, isNavItemActive, isPathInGroup } from '../../platform/platformNav'
 import { filterPlatformNav } from '../../platform/platformAccess'
+import sunmarkOnWhite from '../../assets/brand/logo/icon-sunmark-on-white.png'
 import './PlatformDesktopNav.css'
 
 const CLOSE_DELAY_MS = 160
@@ -295,9 +296,15 @@ export default function PlatformDesktopNav() {
 export function PlatformDesktopLogo() {
   return (
     <Link to="/platform" className="platform-layout__logo" aria-label="Главная">
-      <span className="platform-layout__logo-mark" aria-hidden="true">
-        S
-      </span>
+      <img
+        className="platform-layout__logo-mark"
+        src={sunmarkOnWhite}
+        alt=""
+        width={32}
+        height={32}
+        aria-hidden="true"
+        decoding="async"
+      />
     </Link>
   )
 }

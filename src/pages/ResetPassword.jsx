@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { updatePassword, mapAuthError, usesSupabaseAuth } from '../services/authService'
 import { LOGIN_PATH } from '../router/authRoutes'
+import sunmarkOnWhite from '../assets/brand/logo/icon-sunmark-on-white.png'
 import './Login.css'
 
 /** Сброс пароля — /reset-password (card-layout, не форма входа) */
@@ -103,7 +104,15 @@ export default function ResetPassword() {
     <div className="login-page">
       <div className="login-page__card">
         <div className="login-page__logo">
-          <span className="login-page__logo-icon">S</span>
+          <img
+            className="login-page__logo-icon"
+            src={sunmarkOnWhite}
+            alt=""
+            width={32}
+            height={32}
+            aria-hidden="true"
+            decoding="async"
+          />
           <div>
             <h1 className="login-page__title">Новый пароль</h1>
             <p className="login-page__brand-sub">Shugyla Platform</p>

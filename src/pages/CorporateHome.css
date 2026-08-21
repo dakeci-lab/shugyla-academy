@@ -27,13 +27,10 @@
   width: 3.25rem;
   height: 3.25rem;
   margin: 0 auto 0.8rem;
-  display: grid;
-  place-items: center;
-  border-radius: 14px;
-  background: #15803d;
-  color: #fff;
-  font-size: 1.35rem;
-  font-weight: 700;
+  display: block;
+  object-fit: contain;
+  background: transparent;
+  border-radius: 0;
 }
 
 .corporate-home__brand {

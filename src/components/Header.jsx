@@ -4,6 +4,7 @@ import { useSession } from '../context/SessionContext'
 import { useLanguage } from '../context/LanguageContext'
 import { LOGIN_PATH } from '../router/authRoutes'
 import LangSwitch from './LangSwitch'
+import sunmarkOnWhite from '../assets/brand/logo/icon-sunmark-on-white.png'
 import './Header.css'
 
 /**
@@ -26,7 +27,15 @@ export default function Header({ variant = 'default' }) {
     <header className={`header ${variant === 'landing' ? 'header--landing' : ''}`}>
       <div className="header__inner container">
         <Link to={logoTo} className="header__logo">
-          <span className="header__logo-icon">S</span>
+          <img
+            className="header__logo-icon"
+            src={sunmarkOnWhite}
+            alt=""
+            width={32}
+            height={32}
+            aria-hidden="true"
+            decoding="async"
+          />
           <span className="header__logo-text">
             Shugyla <strong>Platform</strong>
           </span>
