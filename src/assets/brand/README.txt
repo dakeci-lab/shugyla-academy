@@ -18,7 +18,8 @@ logo/
 
 photos/
   photo-store-facade.jpg   — фасад магазина (hero hub + apply aside «Фото магазина»)
-  photo-team-employee.jpg  — сотрудник в форме (about «Фото команды» + vacancy «Фото сотрудника»)
+  photo-team-employee.jpg         — исходник (вертикаль), архив
+  photo-team-employee-square.jpg  — квадратный кадр (лицо + форма); about + vacancy
 
 pattern/
   pattern-tile.svg — фирменный паттерн, tileable, 108×112px, используй background-repeat

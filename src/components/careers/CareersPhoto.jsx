@@ -1,10 +1,17 @@
 /**
  * Brand photo slot for public careers surfaces (hero / about / vacancy / apply).
- * Replaces pattern placeholders when a real asset is available.
+ * Use aspect="square" for team/employee shots so media blocks stay compact.
  */
-export default function CareersPhoto({ src, alt, className = '', objectPosition = 'center' }) {
+export default function CareersPhoto({
+  src,
+  alt,
+  className = '',
+  objectPosition = 'center',
+  aspect = 'auto',
+}) {
+  const aspectClass = aspect === 'square' ? 'careers-photo--square' : ''
   return (
-    <div className={`careers-photo ${className}`.trim()}>
+    <div className={`careers-photo ${aspectClass} ${className}`.trim()}>
       <img
         className="careers-photo__img"
         src={src}

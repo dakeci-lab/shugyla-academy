@@ -50,8 +50,10 @@ assert(
     hub.includes('careersHeroPhotoLabel')
 )
 assert(
-  'hub about uses team employee photo',
-  hub.includes('photo-team-employee.jpg') && hub.includes('careersAboutPhotoLabel')
+  'hub about uses square team employee photo',
+  hub.includes('photo-team-employee-square.jpg') &&
+    hub.includes('careersAboutPhotoLabel') &&
+    hub.includes('aspect="square"')
 )
 assert(
   'hub renders benefits cards',

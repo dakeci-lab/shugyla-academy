@@ -188,19 +188,7 @@
 }
 
 .vacancy-detail__ph {
-  min-height: 180px;
-}
-
-.vacancy-detail__ph--tall {
-  min-height: 320px;
-}
-
-.vacancy-detail__ph .careers-photo__img {
-  min-height: 180px;
-}
-
-.vacancy-detail__ph--tall .careers-photo__img {
-  min-height: 320px;
+  min-height: 0;
 }
 
 .vacancy-detail__media--mobile {
