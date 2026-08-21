@@ -24,6 +24,9 @@ import DynamicApplicationForm from '../components/apply/DynamicApplicationForm'
 import { getCareersHomePath } from '../router/hostSurface'
 import iconSunmark from '../assets/brand/logo/icon-sunmark-on-white.png'
 import patternTile from '../assets/brand/pattern/pattern-tile.svg'
+import photoStoreFacade from '../assets/brand/photos/photo-store-facade.jpg'
+import CareersPhoto from '../components/careers/CareersPhoto'
+import '../components/careers/CareersPhoto.css'
 import '../components/admin/admin-shared.css'
 import '../components/CandidateAvatar.css'
 import './Apply.css'
@@ -495,20 +498,11 @@ export default function ApplyPage() {
                 </ul>
               </div>
             )}
-            <div className="apply-page__aside-ph" aria-hidden="true">
-              <span
-                className="apply-page__aside-ph-pattern"
-                style={{ backgroundImage: `url(${patternTile})` }}
-              />
-              <div className="apply-page__aside-ph-inner">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-                  <rect x="3" y="4" width="18" height="16" rx="2.5" />
-                  <circle cx="9" cy="10" r="2" />
-                  <path d="M21 16.5l-5.2-5.2a2 2 0 0 0-2.8 0L4 20" />
-                </svg>
-                <span>{t.careersVacancyStorePhotoLabel}</span>
-              </div>
-            </div>
+            <CareersPhoto
+              src={photoStoreFacade}
+              alt={t.careersVacancyStorePhotoLabel}
+              className="apply-page__aside-ph"
+            />
           </aside>
         </div>
       </div>

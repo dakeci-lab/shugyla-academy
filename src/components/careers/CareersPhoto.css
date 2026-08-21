@@ -1,0 +1,16 @@
+.careers-photo {
+  position: relative;
+  border-radius: var(--radius-lg, 20px);
+  overflow: hidden;
+  background: #ede7de;
+  min-height: 180px;
+}
+
+.careers-photo__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  object-fit: cover;
+  object-position: center;
+}

@@ -173,6 +173,10 @@
   height: 100%;
 }
 
+.careers-hero__media .careers-photo__img {
+  min-height: 360px;
+}
+
 /* —— Benefits —— */
 .careers-benefits {
   padding: 0 0 2.25rem;
@@ -455,12 +459,8 @@
   z-index: 1;
 }
 
-.careers-about__media .careers-ph__label {
-  color: rgba(255, 255, 255, 0.75);
-}
-
-.careers-about__media .careers-ph__inner {
-  color: rgba(255, 255, 255, 0.65);
+.careers-about__media .careers-photo__img {
+  min-height: 220px;
 }
 
 /* —— Contact —— */

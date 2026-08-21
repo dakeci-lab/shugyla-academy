@@ -5,31 +5,16 @@ import { getPublicVacancyDisplay } from '../utils/careersVacancyDisplay'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
 import { useLanguage } from '../context/LanguageContext'
 import { CAREERS_CONTACT } from '../components/careers/careersContact'
+import CareersPhoto from '../components/careers/CareersPhoto'
 import patternTile from '../assets/brand/pattern/pattern-tile.svg'
+import photoStoreFacade from '../assets/brand/photos/photo-store-facade.jpg'
+import photoTeamEmployee from '../assets/brand/photos/photo-team-employee.jpg'
+import '../components/careers/CareersPhoto.css'
 import './ApplyHub.css'
 
 function scrollToId(id) {
   const el = document.getElementById(id)
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-}
-
-function PhotoPlaceholder({ label, className = '' }) {
-  return (
-    <div className={`careers-ph ${className}`.trim()} aria-hidden="true">
-      <span
-        className="careers-ph__pattern"
-        style={{ backgroundImage: `url(${patternTile})` }}
-      />
-      <div className="careers-ph__inner">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
-          <rect x="3" y="4" width="18" height="16" rx="2.5" />
-          <circle cx="9" cy="10" r="2" />
-          <path d="M21 16.5l-5.2-5.2a2 2 0 0 0-2.8 0L4 20" />
-        </svg>
-        <span className="careers-ph__label">{label}</span>
-      </div>
-    </div>
-  )
 }
 
 function VacancyBriefcaseIcon() {
@@ -186,7 +171,11 @@ export default function ApplyHubPage() {
               </button>
             </div>
           </div>
-          <PhotoPlaceholder label={t.careersHeroPhotoLabel} className="careers-hero__media" />
+          <CareersPhoto
+            src={photoStoreFacade}
+            alt={t.careersHeroPhotoLabel}
+            className="careers-hero__media"
+          />
         </section>
 
         <section className="careers-benefits" aria-label={t.careersBenefitStabilityTitle}>
@@ -323,9 +312,11 @@ export default function ApplyHubPage() {
                 {t.careersAboutCta}
               </button>
             </div>
-            <PhotoPlaceholder
-              label={t.careersAboutPhotoLabel}
+            <CareersPhoto
+              src={photoTeamEmployee}
+              alt={t.careersAboutPhotoLabel}
               className="careers-about__media"
+              objectPosition="center 18%"
             />
           </div>
         </section>

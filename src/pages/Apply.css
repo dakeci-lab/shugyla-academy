@@ -410,47 +410,11 @@ textarea.apply-form__control {
 }
 
 .apply-page__aside-ph {
-  position: relative;
   min-height: 280px;
-  border-radius: var(--radius-lg, 20px);
-  background: linear-gradient(135deg, #f3efe9, #ede7de);
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #b9afa3;
 }
 
-.apply-page__aside-ph-pattern {
-  position: absolute;
-  width: 130px;
-  height: 130px;
-  top: 0;
-  right: 0;
-  opacity: 0.9;
-  background-size: 62px 64px;
-  background-repeat: repeat;
-  -webkit-mask-image: linear-gradient(135deg, black 30%, transparent 72%);
-  mask-image: linear-gradient(135deg, black 30%, transparent 72%);
-}
-
-.apply-page__aside-ph-inner {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  text-align: center;
-  font-size: 0.75rem;
-  font-weight: 600;
-  color: #a69c8f;
-}
-
-.apply-page__aside-ph-inner svg {
-  width: 2.125rem;
-  height: 2.125rem;
-  opacity: 0.55;
+.apply-page__aside-ph .careers-photo__img {
+  min-height: 280px;
 }
 
 .apply-page__state {

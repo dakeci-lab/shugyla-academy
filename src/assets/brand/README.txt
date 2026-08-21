@@ -16,6 +16,10 @@ logo/
   Wordmark вырезан из shugyla-брендбук.pdf; sunmark-source — фирменный файл владельца (2026-08-21).
   PWA icons (`public/icons/*`) генерируются из icon-sunmark-on-white.png: `node scripts/generate-pwa-icons.mjs`.
 
+photos/
+  photo-store-facade.jpg   — фасад магазина (hero hub + apply aside «Фото магазина»)
+  photo-team-employee.jpg  — сотрудник в форме (about «Фото команды» + vacancy «Фото сотрудника»)
+
 pattern/
   pattern-tile.svg — фирменный паттерн, tileable, 108×112px, используй background-repeat
 
