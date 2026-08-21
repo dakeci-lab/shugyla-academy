@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import useMediaQuery from '../../../hooks/useMediaQuery'
 import { useBodyScrollLock } from '../../../hooks/useBodyScrollLock'
-import { CloseIcon, RefreshIcon } from '../../icons/PlatformIcons'
+import { CloseIcon, CheckCheckIcon, RefreshIcon } from '../../icons/PlatformIcons'
 import { useNotificationInbox } from '../../../context/NotificationInboxContext'
 import NotificationList from './NotificationList'
 import NotificationEmptyState from './NotificationEmptyState'
@@ -84,7 +84,16 @@ function PanelContent() {
   )
 }
 
-function PanelHeader({ isMobile, onClose, onRefresh, refreshing, unreadCount }) {
+function PanelHeader({
+  isMobile,
+  onClose,
+  onRefresh,
+  refreshing,
+  unreadCount,
+  onMarkAllRead,
+  markingAll,
+}) {
+  const markAllDisabled = markingAll || unreadCount <= 0
   return (
     <div className="notification-panel__header">
       <div className="notification-panel__title-wrap">
@@ -100,6 +109,16 @@ function PanelHeader({ isMobile, onClose, onRefresh, refreshing, unreadCount }) 
 
       <div className="notification-panel__actions">
         <PushNotificationToggle />
+        <button
+          type="button"
+          className="notification-panel__icon-btn"
+          onClick={onMarkAllRead}
+          disabled={markAllDisabled}
+          aria-label="Прочитать все"
+          title="Прочитать все"
+        >
+          <CheckCheckIcon size={18} />
+        </button>
         <button
           type="button"
           className="notification-panel__icon-btn"
@@ -130,10 +149,12 @@ export default function NotificationPanel({ anchorRef, open, onClose }) {
   const isMobile = useMediaQuery(MOBILE_QUERY)
   const panelRef = useRef(null)
   const [animatedOpen, setAnimatedOpen] = useState(false)
+  const [markingAll, setMarkingAll] = useState(false)
   const {
     unreadCount,
     loading,
     refreshNotifications,
+    markAllAsRead,
   } = useNotificationInbox()
 
   useBodyScrollLock(open && isMobile)
@@ -173,6 +194,16 @@ export default function NotificationPanel({ anchorRef, open, onClose }) {
     }
   }, [anchorRef, isMobile, onClose, open])
 
+  async function handleMarkAllRead() {
+    if (markingAll || unreadCount <= 0) return
+    setMarkingAll(true)
+    try {
+      await markAllAsRead()
+    } finally {
+      setMarkingAll(false)
+    }
+  }
+
   if (!open) return null
 
   const panelBody = (
@@ -197,6 +228,8 @@ export default function NotificationPanel({ anchorRef, open, onClose }) {
         onRefresh={refreshNotifications}
         refreshing={loading}
         unreadCount={unreadCount}
+        onMarkAllRead={() => void handleMarkAllRead()}
+        markingAll={markingAll}
       />
       <div className="notification-panel__body">
         <PanelContent />
