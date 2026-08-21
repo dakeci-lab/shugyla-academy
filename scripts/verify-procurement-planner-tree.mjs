@@ -88,7 +88,7 @@ assert(
     planner.includes('getOrderableChipCount') &&
     !planner.includes('proc-planner__filter-pop') &&
     !planner.includes('PlatformFilterButton') &&
-    planner.includes('Предупреждения')
+    !planner.includes('Предупреждения')
 )
 assert(
   'filterOptions cache bumped to v3',

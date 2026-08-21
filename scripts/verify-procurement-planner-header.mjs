@@ -44,9 +44,9 @@ assert(
     uxSrc.includes('export function getOrderableChipCount')
 )
 assert(
-  'warnings toolbar chip present; advanced filter popover removed',
-  planner.includes('Предупреждения') &&
-    /warningsOnly:\s*!current\.warningsOnly/.test(planner) &&
+  'warnings toolbar chip removed; advanced filter popover still gone',
+  !planner.includes('Предупреждения') &&
+    !/warningsOnly:\s*!current\.warningsOnly/.test(planner) &&
     !planner.includes('proc-planner__filter-pop') &&
     !planner.includes('PlatformFilterButton')
 )
