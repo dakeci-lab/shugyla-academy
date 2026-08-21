@@ -1,6 +1,7 @@
 import {
   ALLOWED_CANDIDATE_PHOTO_TYPES,
 } from '../../services/candidatePhotoService'
+import { useLanguage } from '../../context/LanguageContext'
 import KzPhoneField from './KzPhoneField'
 
 /**
@@ -18,6 +19,8 @@ export default function DynamicApplicationForm({
   disabled = false,
   preview = false,
 }) {
+  const { t } = useLanguage()
+
   return (
     <div className="apply-form__fields">
       {(questions || []).map((q) => {
@@ -50,25 +53,46 @@ export default function DynamicApplicationForm({
               </>
             ) : q.questionType === 'photo' ? (
               <div className="apply-photo-field">
-                <label className="apply-form__label" htmlFor={id}>
+                <span className="apply-form__label" id={`${id}-label`}>
                   {labelText}
-                </label>
+                </span>
                 <input
                   id={id}
-                  className="apply-form__control"
+                  className="apply-photo-uploader__input"
                   type="file"
                   accept={ALLOWED_CANDIDATE_PHOTO_TYPES.join(',')}
                   disabled={disabled || preview}
-                  required={q.required && !preview}
+                  required={q.required && !preview && !photoPreview}
+                  aria-labelledby={`${id}-label`}
                   onChange={(e) => onPhotoChange?.(q.id, e)}
                 />
+                <label
+                  htmlFor={id}
+                  className={`apply-photo-uploader${photoPreview ? ' apply-photo-uploader--filled' : ''}${disabled || preview ? ' apply-photo-uploader--disabled' : ''}`}
+                >
+                  {photoPreview ? (
+                    <div className="apply-photo-uploader__preview">
+                      <img src={photoPreview} alt="" />
+                    </div>
+                  ) : (
+                    <>
+                      <span className="apply-photo-uploader__icon" aria-hidden="true">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+                          <path d="M12 15V4" />
+                          <path d="M8 8l4-4 4 4" />
+                          <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3" />
+                        </svg>
+                      </span>
+                      <span className="apply-photo-uploader__title">{t.careersPhotoUploadTitle}</span>
+                      <span className="apply-photo-uploader__hint">{t.careersPhotoUploadHint}</span>
+                    </>
+                  )}
+                  <span className="apply-photo-uploader__btn">
+                    {photoPreview ? t.careersPhotoChange : t.careersPhotoChoose}
+                  </span>
+                </label>
                 {q.helpText ? <p className="apply-form__help">{q.helpText}</p> : null}
                 {photoWarning ? <p className="apply-photo-warning">{photoWarning}</p> : null}
-                {photoPreview ? (
-                  <div className="apply-photo-preview">
-                    <img src={photoPreview} alt="Превью фото" />
-                  </div>
-                ) : null}
                 {preview ? (
                   <p className="apply-form__help">В предварительном просмотре файл не загружается.</p>
                 ) : null}

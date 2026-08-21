@@ -1,15 +1,43 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useLocation, useParams } from 'react-router-dom'
 import { fetchPublishedVacanciesForApply } from '../services/publicApplyVacanciesService'
 import {
+  getPublicVacancyContentBlocks,
   getPublicVacancyDisplay,
   getPublicVacancyFacts,
+  getPublicVacancyPills,
 } from '../utils/careersVacancyDisplay'
 import { toUserErrorMessage } from '../utils/userErrorMessage'
 import { useLanguage } from '../context/LanguageContext'
 import { getCareersHomePath } from '../router/hostSurface'
-import './Apply.css'
-import './ApplyHub.css'
+import patternTile from '../assets/brand/pattern/pattern-tile.svg'
+import './VacancyDetail.css'
+
+function BackChevron() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M15 6l-6 6 6 6" />
+    </svg>
+  )
+}
+
+function ContentBlock({ block }) {
+  if (!block) return null
+  return (
+    <section className="vacancy-detail__block" aria-labelledby={`vacancy-block-${block.key}`}>
+      <h3 id={`vacancy-block-${block.key}`}>{block.title}</h3>
+      {block.lines?.length ? (
+        <ul>
+          {block.lines.map((line) => (
+            <li key={`${block.key}-${line}`}>{line}</li>
+          ))}
+        </ul>
+      ) : block.text ? (
+        <p>{block.text}</p>
+      ) : null}
+    </section>
+  )
+}
 
 /** Публичная детальная страница вакансии — /vacancies/:slug */
 export default function VacancyDetailPage() {
@@ -44,70 +72,157 @@ export default function VacancyDetailPage() {
   }, [load])
 
   const display = getPublicVacancyDisplay(vacancy || {})
-  const facts = getPublicVacancyFacts(vacancy || {}, t, lang)
+  const facts = useMemo(
+    () => getPublicVacancyFacts(vacancy || {}, t, lang),
+    [vacancy, t, lang]
+  )
+  const pills = useMemo(() => getPublicVacancyPills(vacancy || {}, t), [vacancy, t])
+  const blocks = useMemo(
+    () => getPublicVacancyContentBlocks(vacancy || {}, t, lang),
+    [vacancy, t, lang]
+  )
   const homePath = `${getCareersHomePath()}${location.search || ''}`
+  const applyPath = vacancy
+    ? `/apply/${encodeURIComponent(vacancy.slug)}${location.search || ''}`
+    : homePath
 
-  return (
-    <div className="apply-page">
-      <main className="apply-page__card">
-        {loadState === 'loading' && (
-          <div className="apply-page__closed" aria-busy="true">
+  const sideFacts = facts.filter((fact) =>
+    ['store', 'city', 'employment', 'schedule', 'salary'].includes(fact.key)
+  )
+
+  if (loadState === 'loading') {
+    return (
+      <div className="vacancy-detail">
+        <main className="vacancy-detail__main">
+          <div className="vacancy-detail__state" aria-busy="true">
             <p>{t.careersLoading}</p>
           </div>
-        )}
+        </main>
+      </div>
+    )
+  }
 
-        {loadState === 'error' && (
-          <div className="apply-page__closed" role="alert">
+  if (loadState === 'error') {
+    return (
+      <div className="vacancy-detail">
+        <main className="vacancy-detail__main">
+          <div className="vacancy-detail__state" role="alert">
             <p>{error || t.careersLoadError}</p>
-            <button type="button" className="btn btn--primary" onClick={load}>
+            <button type="button" className="vacancy-detail__btn" onClick={load}>
               {t.careersRetry}
             </button>
           </div>
-        )}
+        </main>
+      </div>
+    )
+  }
 
-        {loadState === 'loaded' && !vacancy ? (
-          <div className="apply-page__closed">
+  if (!vacancy) {
+    return (
+      <div className="vacancy-detail">
+        <main className="vacancy-detail__main">
+          <div className="vacancy-detail__state">
             <h1>{t.careersClosedTitle}</h1>
-            <Link to={homePath} className="btn btn--primary">
+            <Link to={homePath} className="vacancy-detail__btn">
               {t.careersClosedCta}
             </Link>
           </div>
-        ) : null}
+        </main>
+      </div>
+    )
+  }
 
-        {loadState === 'loaded' && vacancy ? (
-          <article>
-            <p className="apply-page__brand-sub">
-              <Link to={homePath}>{t.careersBackToVacancies}</Link>
-            </p>
-            <h1 className="apply-page__vacancy-title">{display.title}</h1>
-            {display.positionName ? (
-              <p className="apply-page__vacancy-position">{display.positionName}</p>
+  return (
+    <div className="vacancy-detail">
+      <main className="vacancy-detail__main">
+        <Link to={homePath} className="vacancy-detail__back">
+          <BackChevron />
+          {t.careersAllVacanciesLink}
+        </Link>
+
+        <div className="vacancy-detail__grid">
+          <div className="vacancy-detail__primary">
+            <h1 className="vacancy-detail__title">{display.title}</h1>
+
+            {pills.length ? (
+              <div className="vacancy-detail__pills">
+                {pills.map((pill) => (
+                  <span key={pill.key} className="vacancy-detail__pill">
+                    {pill.value}
+                  </span>
+                ))}
+              </div>
             ) : null}
-            {display.description ? (
-              <p className="apply-page__vacancy-desc">{display.description}</p>
-            ) : null}
-            {facts.length ? (
-              <section className="vacancy-detail__facts" aria-labelledby="vacancy-facts-title">
-                <h2 id="vacancy-facts-title">{t.vacancyFactsTitle}</h2>
-                <dl>
-                  {facts.map((fact) => (
-                    <div key={fact.key}>
-                      <dt>{fact.label}</dt>
-                      <dd>{fact.value}</dd>
-                    </div>
-                  ))}
-                </dl>
-              </section>
-            ) : null}
-            <Link
-              to={`/apply/${encodeURIComponent(vacancy.slug)}${location.search || ''}`}
-              className="btn btn--primary btn--lg"
-            >
-              {t.careersApplyCta}
+
+            <div className="vacancy-detail__media vacancy-detail__media--mobile">
+              <div className="vacancy-detail__ph" aria-hidden="true">
+                <span
+                  className="vacancy-detail__ph-pattern"
+                  style={{ backgroundImage: `url(${patternTile})` }}
+                />
+                <div className="vacancy-detail__ph-inner">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                    <rect x="3" y="4" width="18" height="16" rx="2.5" />
+                    <circle cx="9" cy="10" r="2" />
+                    <path d="M21 16.5l-5.2-5.2a2 2 0 0 0-2.8 0L4 20" />
+                  </svg>
+                  <span>{t.careersVacancyPhotoLabel}</span>
+                </div>
+              </div>
+            </div>
+
+            <ContentBlock block={blocks.duties} />
+            <ContentBlock block={blocks.expectations} />
+            <ContentBlock block={blocks.offers} />
+
+            <Link to={applyPath} className="vacancy-detail__btn vacancy-detail__btn--desktop">
+              {t.careersRespondCta}
             </Link>
-          </article>
-        ) : null}
+          </div>
+
+          <aside className="vacancy-detail__aside">
+            {sideFacts.length ? (
+              <div className="vacancy-detail__side-card">
+                <h2 className="vacancy-detail__side-title">{t.careersVacancyAboutTitle}</h2>
+                <ul>
+                  {display.positionName || display.title ? (
+                    <li>{display.positionName || display.title}</li>
+                  ) : null}
+                  {sideFacts.map((fact) => (
+                    <li key={fact.key}>
+                      <span className="vacancy-detail__side-label">{fact.label}</span>
+                      {fact.value}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
+
+            <div className="vacancy-detail__media vacancy-detail__media--desktop">
+              <div className="vacancy-detail__ph vacancy-detail__ph--tall" aria-hidden="true">
+                <span
+                  className="vacancy-detail__ph-pattern"
+                  style={{ backgroundImage: `url(${patternTile})` }}
+                />
+                <div className="vacancy-detail__ph-inner">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+                    <rect x="3" y="4" width="18" height="16" rx="2.5" />
+                    <circle cx="9" cy="10" r="2" />
+                    <path d="M21 16.5l-5.2-5.2a2 2 0 0 0-2.8 0L4 20" />
+                  </svg>
+                  <span>{t.careersVacancyPhotoLabel}</span>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
       </main>
+
+      <div className="vacancy-detail__sticky-cta sticky-cta">
+        <Link to={applyPath} className="vacancy-detail__btn vacancy-detail__btn--block">
+          {t.careersRespondCta}
+        </Link>
+      </div>
     </div>
   )
 }

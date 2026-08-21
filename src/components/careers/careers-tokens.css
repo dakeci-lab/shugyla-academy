@@ -1,0 +1,41 @@
+/* Brand tokens + Bluecurve — scoped to careers public shell only. */
+
+@font-face {
+  font-family: 'Bluecurve';
+  src: url('../../assets/brand/fonts/Bluecurve-Light.ttf') format('truetype');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Bluecurve';
+  src: url('../../assets/brand/fonts/Bluecurve-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Bluecurve';
+  src: url('../../assets/brand/fonts/Bluecurve-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+.careers-public-layout {
+  --brand-green: #14a752;
+  --brand-green-dark: #0e8a41;
+  --brand-orange: #f09718;
+  --brand-charcoal: #38342f;
+  --brand-cream: #fff2e9;
+  --brand-white: #ffffff;
+  --ink-soft: #6b655f;
+  --border-soft: #ece4dc;
+  --font-display: 'Bluecurve', 'Montserrat', sans-serif;
+  --font-body: 'Montserrat', sans-serif;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+}
