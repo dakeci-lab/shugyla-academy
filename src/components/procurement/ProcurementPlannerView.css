@@ -644,13 +644,7 @@
   left: 0;
 }
 
-.proc-planner__sticky-product {
-  left: 2.75rem;
-}
-
-.proc-planner__sticky-barcode {
-  left: 13.75rem;
-}
+/* Sticky-left offsets for product/barcode come from inline styles (computeStickyLeft). */
 
 .proc-planner__sticky-order {
   right: 0;
@@ -826,6 +820,123 @@
   font-weight: 600;
   background: #fafbfc;
   white-space: nowrap;
+  position: relative;
+}
+
+.proc-planner__col-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 100%;
+  padding-right: 0.35rem;
+}
+
+.proc-planner__col-resizer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  z-index: 2;
+}
+
+.proc-planner__col-resizer:hover,
+.proc-planner__col-resizer:active {
+  background: rgba(37, 99, 235, 0.18);
+}
+
+.proc-planner__table th.is-reorderable {
+  cursor: grab;
+}
+
+.proc-planner__table th.is-dragging {
+  opacity: 0.55;
+}
+
+.proc-planner__table th.is-drag-over {
+  box-shadow: inset 0 -2px 0 var(--accent, #2563eb);
+}
+
+.proc-planner__desktop-bar {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-bottom: 0.45rem;
+}
+
+.proc-planner__column-settings {
+  position: relative;
+}
+
+.proc-planner__column-settings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  color: #4b5563;
+  cursor: pointer;
+}
+
+.proc-planner__column-settings-btn:hover,
+.proc-planner__column-settings-btn.is-open {
+  border-color: #cbd5e1;
+  color: #111827;
+  background: #f8fafc;
+}
+
+.proc-planner__column-settings-popover {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 30;
+  width: min(18rem, calc(100vw - 2rem));
+  padding: 0.85rem;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  background: var(--surface, #fff);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+.proc-planner__column-settings-head strong {
+  display: block;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.proc-planner__column-settings-head p {
+  margin: 0 0 0.65rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1.35;
+}
+
+.proc-planner__column-settings-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem 0.75rem;
+  max-height: 16rem;
+  overflow: auto;
+  margin-bottom: 0.75rem;
+}
+
+.proc-planner__column-settings-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.proc-planner__column-settings-reset {
+  width: 100%;
 }
 
 .proc-planner__product {

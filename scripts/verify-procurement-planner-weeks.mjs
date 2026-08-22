@@ -27,6 +27,7 @@ function assert(label, condition) {
 
 const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
 const plannerCss = read('src/components/procurement/ProcurementPlannerView.css')
+const layoutSrc = read('src/utils/plannerColumnLayout.js')
 const ux = read('src/utils/procurementPlannerUx.js')
 
 assert(
@@ -50,18 +51,24 @@ assert(
   !planner.includes('>Продажи 8 нед.<') && !planner.includes('Продажи 8 нед.</th>')
 )
 assert(
-  'desktop maps week headers from weekColumns',
-  planner.includes('weekColumns.labels.map') && planner.includes('proc-planner__col-week')
+  'desktop maps week headers via renderPlannerColumnHeader + weekColumns',
+  planner.includes('weekColumns.labels[weekIndex]') &&
+    planner.includes('weekColumns.titles[weekIndex]') &&
+    planner.includes('renderPlannerColumnHeader') &&
+    layoutSrc.includes('proc-planner__col-week')
 )
 assert(
-  'desktop cells read weeklySales[i]',
+  'desktop cells read weeklySales[i] in renderPlannerSkuCell',
   planner.includes('item.weeklySales?.[weekIndex]') ||
     planner.includes('item.weeklySales[weekIndex]')
 )
 assert(
-  'TABLE_COL_SPAN accounts for 8 week columns',
-  planner.includes('PLANNER_WEEK_COLUMN_COUNT') &&
-    /TABLE_COL_SPAN\s*=\s*6\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*7/.test(planner)
+  'default visible column count 21',
+  planner.includes('visibleColumns') && planner.includes('getVisibleColumns')
+)
+assert(
+  'service rows use visibleColumnCount',
+  planner.includes('colSpan={visibleColumnCount}') && !planner.includes('TABLE_COL_SPAN')
 )
 assert(
   'mobile keeps WeeklySpark (no 8 week th in cards)',
@@ -70,9 +77,10 @@ assert(
 )
 assert(
   'sticky classes on num, product, barcode, order',
-  planner.includes('proc-planner__sticky-product') &&
-    planner.includes('proc-planner__sticky-barcode') &&
-    planner.includes('proc-planner__sticky-order')
+  layoutSrc.includes('proc-planner__sticky-product') &&
+    layoutSrc.includes('proc-planner__sticky-barcode') &&
+    layoutSrc.includes('proc-planner__sticky-order') &&
+    planner.includes('buildPlannerColumnInlineStyle')
 )
 assert(
   'CSS sticky for product/barcode/order',

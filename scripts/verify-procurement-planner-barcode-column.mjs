@@ -8,10 +8,14 @@
 
 import fs from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { register } from 'node:module'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
+
+register(pathToFileURL(path.join(__dirname, 'lib/extensionlessResolver.mjs')))
+globalThis.__VITE_ENV__ = {}
 
 let checks = 0
 
@@ -29,16 +33,26 @@ const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
 const plannerCss = read('src/components/procurement/ProcurementPlannerView.css')
 const planExport = read('src/utils/procurementPlanExport.js')
 
+const registry = await import(
+  pathToFileURL(path.join(ROOT, 'src/utils/procurementPlannerColumnRegistry.js')).href
+)
+const layout = await import(pathToFileURL(path.join(ROOT, 'src/utils/plannerColumnLayout.js')).href)
+
+const defaults = registry.getDefaultPlannerColumnSettings()
+const visible = layout.getVisibleColumns(defaults)
+
+assert('default visible column count 21', visible.length === 21)
+
 assert(
-  'TABLE_COL_SPAN = 6 + PLANNER_WEEK_COLUMN_COUNT + 7',
-  /TABLE_COL_SPAN\s*=\s*6\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*7/.test(planner)
+  'dynamic thead via renderPlannerColumnHeader',
+  planner.includes('renderPlannerColumnHeader') &&
+    planner.includes('visibleColumns.map((col) => renderPlannerColumnHeader(col))')
 )
 
 assert(
-  'thead: Товар → Штрихкод with sticky classes',
-  /<th className="proc-planner__col-product proc-planner__sticky-product">Товар<\/th>[\s\S]*?<th className="proc-planner__col-barcode proc-planner__sticky-barcode">Штрихкод<\/th>/.test(
-    planner
-  )
+  'product before barcode in default registry order',
+  visible.findIndex((col) => col.columnName === 'product') <
+    visible.findIndex((col) => col.columnName === 'barcode')
 )
 
 assert(
@@ -47,36 +61,36 @@ assert(
 )
 
 assert(
-  'SKU row: dedicated barcode td with title',
-  /proc-planner__col-barcode proc-planner__sticky-barcode[\s\S]*?title=\{item\.barcode/.test(
-    planner
-  )
+  'SKU row: barcode cell with title in renderPlannerSkuCell',
+  /case 'barcode':[\s\S]{0,400}title=\{item\.barcode/.test(planner)
 )
 
 assert(
   'SKU barcode cell does not use em-dash fallback',
-  !/proc-planner__col-barcode[\s\S]{0,120}\|\|\s*'—'/.test(planner) &&
-    !/proc-planner__col-barcode[\s\S]{0,120}\|\|\s*"—"/.test(planner)
+  !/case 'barcode':[\s\S]{0,200}\|\|\s*'—'/.test(planner)
 )
 
 assert(
-  'tree group row: 3 leading cells + tail colspan',
-  planner.includes('colSpan={TABLE_COL_SPAN - 3}') &&
-    planner.includes('className="proc-planner__tree-group-tail"') &&
-    /proc-planner__tree-group[\s\S]{0,800}proc-planner__sticky-barcode[\s\S]{0,400}TABLE_COL_SPAN - 3/.test(
-      planner
-    )
+  'tree group row: locked-left cells + plannerTreeTailColSpan',
+  planner.includes('getVisibleLockedLeftColumns(visibleColumns)') &&
+    planner.includes('colSpan={plannerTreeTailColSpan(visibleColumns)}') &&
+    planner.includes('className="proc-planner__tree-group-tail"')
 )
 
 assert(
-  'loading/empty rows use TABLE_COL_SPAN only',
-  planner.includes('colSpan={TABLE_COL_SPAN}') && !planner.includes('colSpan={21}')
+  'loading/empty rows use visibleColumnCount',
+  planner.includes('colSpan={visibleColumnCount}') && !planner.includes('TABLE_COL_SPAN')
 )
 
 assert(
-  'sticky barcode left 13.75rem',
+  'default barcode sticky left 220px via computeStickyLeft',
+  layout.computeStickyLeft('barcode', visible) === 220
+)
+
+assert(
+  'CSS no hardcoded sticky-barcode left (inline runtime)',
   plannerCss.includes('.proc-planner__sticky-barcode') &&
-    /\.proc-planner__sticky-barcode\s*\{[^}]*left:\s*13\.75rem/.test(plannerCss)
+    !/\.proc-planner__sticky-barcode\s*\{[^}]*left:\s*13\.75rem/.test(plannerCss)
 )
 
 assert(

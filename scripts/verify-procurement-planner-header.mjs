@@ -27,6 +27,7 @@ function assert(label, condition) {
 
 const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
 const plannerCss = read('src/components/procurement/ProcurementPlannerView.css')
+const layoutSrc = read('src/utils/plannerColumnLayout.js')
 const uxSrc = read('src/utils/procurementPlannerUx.js')
 
 assert('sense-line removed from UI', !planner.includes('proc-planner__sense'))
@@ -53,41 +54,48 @@ assert(
 assert('on-screen ABC legend removed', !planner.includes('proc-planner__abc-legend'))
 assert(
   'ABC three axis columns with permanent sort arrows',
-  planner.includes('proc-planner__col-abc-axis') &&
+  layoutSrc.includes('proc-planner__col-abc-axis') &&
     planner.includes('proc-planner__abc-axis-btn') &&
     planner.includes('proc-planner__abc-arrow') &&
     plannerCss.includes('.proc-planner__abc-arrow.is-on')
 )
 assert(
-  'ABC column help icon on first axis',
+  'ABC column help icon on first visible ABC axis',
   planner.includes('AbcColumnHelp') &&
     planner.includes('ABC_COLUMN_HELP') &&
     planner.includes('proc-planner__abc-help') &&
-    /axisIndex === 0 \? <AbcColumnHelp/.test(planner)
+    planner.includes('firstVisibleAbcColumnName')
 )
 assert(
   'ABC help CSS present',
   plannerCss.includes('.proc-planner__abc-help')
 )
 assert(
-  'desktop ABC cells are per-axis badges',
-  /ABC_AXES\.map\(\(axis\) => \(\s*<td[\s\S]*?AbcBadge/.test(planner) &&
+  'desktop ABC cells via renderPlannerSkuCell + AbcBadge',
+  planner.includes("case 'abcQty':") &&
+    planner.includes('AbcBadge') &&
     !/<AbcBadges item=\{item\} compact \/>/.test(planner)
 )
 assert(
   'order column accent class',
-  planner.includes('proc-planner__col-order--accent') &&
+  layoutSrc.includes('proc-planner__col-order--accent') &&
     plannerCss.includes('.proc-planner__col-order--accent')
 )
 assert(
   'rec column muted class',
-  planner.includes('proc-planner__col-rec') && plannerCss.includes('.proc-planner__col-rec')
+  layoutSrc.includes('proc-planner__col-rec') && plannerCss.includes('.proc-planner__col-rec')
 )
 assert('browse mode removed', !planner.includes('proc-planner__browse-mode'))
 assert('cat-nav removed', !planner.includes('proc-planner__cat-nav'))
 assert(
   'SKU category subtitle removed',
   !/className="proc-planner__cat"/.test(planner)
+)
+assert(
+  'column settings gear coexists with snapshot strip',
+  planner.includes('proc-planner__snapshot') &&
+    planner.includes('proc-planner__column-settings') &&
+    planner.includes('proc-planner__desktop-bar')
 )
 
 console.log(`\n${checks}/${checks} checks passed`)

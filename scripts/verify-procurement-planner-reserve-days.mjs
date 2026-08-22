@@ -27,6 +27,7 @@ function assert(label, condition) {
 
 const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
 const plannerCss = read('src/components/procurement/ProcurementPlannerView.css')
+const layoutSrc = read('src/utils/plannerColumnLayout.js')
 const mathSrc = read('src/utils/procurementPlanningMath.js')
 const planExport = read('src/utils/procurementPlanExport.js')
 
@@ -47,15 +48,20 @@ assert(
 )
 
 assert(
-  'TABLE_COL_SPAN tail is +7 (21 with 8 weeks)',
-  /TABLE_COL_SPAN\s*=\s*6\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*7/.test(planner)
+  'service rows use visibleColumnCount (21 default)',
+  planner.includes('colSpan={visibleColumnCount}') && !planner.includes('TABLE_COL_SPAN')
 )
 
+const registrySrc = read('src/utils/procurementPlannerColumnRegistry.js')
+
 assert(
-  'desktop header order: Остаток → Запас/дн → Спрос/дн',
-  /<th>Остаток<\/th>[\s\S]*?<th[^>]*>Запас\/дн<\/th>[\s\S]*?<th>Спрос\/дн<\/th>/.test(
-    planner
-  )
+  'registry column order: stock → reserveDays → avgDaily',
+  (() => {
+    const stockIdx = registrySrc.indexOf("columnName: 'stock'")
+    const reserveIdx = registrySrc.indexOf("columnName: 'reserveDays'")
+    const avgIdx = registrySrc.indexOf("columnName: 'avgDaily'")
+    return stockIdx > 0 && stockIdx < reserveIdx && reserveIdx < avgIdx
+  })()
 )
 
 assert('planner imports calcReserveDays', planner.includes('calcReserveDays'))
@@ -65,7 +71,8 @@ assert(
 )
 assert(
   'desktop row has reserve cell class',
-  planner.includes('proc-planner__col-reserve')
+  layoutSrc.includes('proc-planner__col-reserve') &&
+    planner.includes("col.columnName === 'reserveDays'")
 )
 assert(
   'no legacy Ср/день header',
@@ -78,8 +85,8 @@ assert(
 )
 
 assert(
-  'tree/loading rows use TABLE_COL_SPAN only',
-  planner.includes('colSpan={TABLE_COL_SPAN}') && !planner.includes('colSpan={21}')
+  'tree/loading rows use visibleColumnCount',
+  planner.includes('colSpan={visibleColumnCount}') && !planner.includes('TABLE_COL_SPAN')
 )
 
 assert(
