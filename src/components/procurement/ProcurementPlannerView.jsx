@@ -64,7 +64,6 @@ import {
   plannerCategoryTreeKey,
   plannerSubcategoryTreeKey,
   PLANNER_TREE_BRANCH_PAGE_SIZE,
-  PLANNER_WEEK_COLUMN_COUNT,
   createOrderAttemptTracker,
   filterItemsForSupplierPlanExport,
   formatOrderHistoryLabel,
@@ -100,15 +99,71 @@ import {
   snapshotItemsLackAbcFacts,
 } from '../../utils/procurementAbc'
 import { calcReserveDays } from '../../utils/procurementPlanningMath'
+import {
+  getDefaultPlannerColumnSettings,
+  getPlannerColumnDef,
+  getReorderablePlannerColumnNames,
+  getTogglablePlannerColumnNames,
+  PROCUREMENT_PLANNER_TABLE_NAME,
+} from '../../utils/procurementPlannerColumnRegistry'
+import {
+  mergePlannerColumnSettings,
+  normalizePlannerColumnSettingsForSave,
+  PLANNER_COLUMN_RESIZE_MIN_WIDTH,
+  reorderTogglablePlannerColumns,
+} from '../../utils/plannerColumnSettingsMerge'
+import {
+  buildPlannerColumnInlineStyle,
+  getPlannerColumnClassName,
+  getVisibleColumns,
+  getVisibleLockedLeftColumns,
+  isPlannerAbcColumnName,
+  parseWeekColumnIndex,
+  plannerTreeTailColSpan,
+} from '../../utils/plannerColumnLayout'
+import { getTableSettings, saveTableSettings } from '../../services/tableSettingsService'
 import './ProcurementPlannerView.css'
-
-/** № + Товар + Штрихкод + К + В + П + 8 weeks + Остаток + Запас/дн + Спрос/дн + Норма + Рек. + Заказ + Поставщик */
-const TABLE_COL_SPAN = 6 + PLANNER_WEEK_COLUMN_COUNT + 7
 
 const RESERVE_DAYS_TITLE = 'Запас/дн = round(расч. остаток ÷ спрос/день)'
 
 const DEFAULT_PAGE_SIZE = 25
 const TREE_BRANCH_PAGE_SIZE = PLANNER_TREE_BRANCH_PAGE_SIZE
+
+const ABC_COLUMN_BY_NAME = Object.freeze({
+  abcQty: ABC_AXES[0],
+  abcRevenue: ABC_AXES[1],
+  abcProfit: ABC_AXES[2],
+})
+
+const REORDERABLE_PLANNER_COLUMNS = new Set(getReorderablePlannerColumnNames())
+const TOGGLABLE_PLANNER_COLUMNS = getTogglablePlannerColumnNames()
+
+function plannerColumnNameToAbcSortField(columnName) {
+  return ABC_COLUMN_BY_NAME[columnName]?.column || ''
+}
+
+function isPlannerColumnReorderable(columnName) {
+  return REORDERABLE_PLANNER_COLUMNS.has(columnName)
+}
+
+function PlannerColumnSettingsIcon({ size = 18 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+  )
+}
 
 /** Hover help for ABC column header (replaces on-screen legend). */
 const ABC_COLUMN_HELP =
@@ -346,6 +401,206 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   /** Lazy SKU pages per expanded leaf key. */
   const [branchState, setBranchState] = useState({})
   const branchRequestIdsRef = useRef({})
+
+  const [columnSettings, setColumnSettings] = useState(() => getDefaultPlannerColumnSettings())
+  const [columnSettingsOpen, setColumnSettingsOpen] = useState(false)
+  const [dragColumnName, setDragColumnName] = useState(null)
+  const [dropColumnName, setDropColumnName] = useState(null)
+  const columnSettingsPopoverRef = useRef(null)
+  const columnSettingsRefState = useRef(columnSettings)
+  const resizeStateRef = useRef(null)
+
+  useEffect(() => {
+    columnSettingsRefState.current = columnSettings
+  }, [columnSettings])
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const saved = await getTableSettings(PROCUREMENT_PLANNER_TABLE_NAME)
+        if (cancelled) return
+        const merged = mergePlannerColumnSettings(saved, getDefaultPlannerColumnSettings())
+        setColumnSettings(merged)
+        setPageSize(merged.pageSize || DEFAULT_PAGE_SIZE)
+      } catch {
+        if (!cancelled) {
+          const defaults = getDefaultPlannerColumnSettings()
+          setColumnSettings(defaults)
+          setPageSize(defaults.pageSize || DEFAULT_PAGE_SIZE)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!columnSettingsOpen) return undefined
+    function handlePointerDown(event) {
+      const target = event.target
+      if (!(target instanceof Node)) return
+      if (columnSettingsPopoverRef.current?.contains(target)) return
+      setColumnSettingsOpen(false)
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [columnSettingsOpen])
+
+  const persistColumnSettings = useCallback(async (nextSettings) => {
+    const normalized = normalizePlannerColumnSettingsForSave({
+      ...nextSettings,
+      pageSize: nextSettings.pageSize ?? columnSettingsRefState.current.pageSize ?? DEFAULT_PAGE_SIZE,
+    })
+    setColumnSettings(normalized)
+    if (normalized.pageSize) setPageSize(normalized.pageSize)
+    try {
+      await saveTableSettings(normalized)
+    } catch {
+      // Non-blocking — planner keeps working with in-memory layout.
+    }
+  }, [])
+
+  const handlePageSizeChange = useCallback(
+    (nextPageSize) => {
+      setPage(1)
+      setPageSize(nextPageSize)
+      void persistColumnSettings({
+        ...columnSettingsRefState.current,
+        pageSize: nextPageSize,
+      })
+    },
+    [persistColumnSettings]
+  )
+
+  const handleColumnResizePointerMove = useCallback((event) => {
+    const state = resizeStateRef.current
+    if (!state) return
+    const delta = event.clientX - state.startX
+    const nextWidth = Math.max(
+      PLANNER_COLUMN_RESIZE_MIN_WIDTH,
+      Math.round(state.startWidth + delta)
+    )
+    setColumnSettings((current) => ({
+      ...current,
+      columns: current.columns.map((col) =>
+        col.columnName === state.columnName ? { ...col, width: nextWidth } : col
+      ),
+    }))
+  }, [])
+
+  const handleColumnResizePointerUp = useCallback(() => {
+    window.removeEventListener('pointermove', handleColumnResizePointerMove)
+    window.removeEventListener('pointerup', handleColumnResizePointerUp)
+    if (!resizeStateRef.current) return
+    resizeStateRef.current = null
+    void persistColumnSettings(columnSettingsRefState.current)
+  }, [handleColumnResizePointerMove, persistColumnSettings])
+
+  const handleColumnResizePointerDown = useCallback(
+    (event, columnName) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const col = columnSettingsRefState.current.columns.find(
+        (item) => item.columnName === columnName
+      )
+      if (!col) return
+      resizeStateRef.current = {
+        columnName,
+        startX: event.clientX,
+        startWidth: col.width,
+      }
+      window.addEventListener('pointermove', handleColumnResizePointerMove)
+      window.addEventListener('pointerup', handleColumnResizePointerUp)
+    },
+    [handleColumnResizePointerMove, handleColumnResizePointerUp]
+  )
+
+  useEffect(
+    () => () => {
+      window.removeEventListener('pointermove', handleColumnResizePointerMove)
+      window.removeEventListener('pointerup', handleColumnResizePointerUp)
+    },
+    [handleColumnResizePointerMove, handleColumnResizePointerUp]
+  )
+
+  const handleColumnDragStart = useCallback((event, columnName) => {
+    if (!isPlannerColumnReorderable(columnName)) {
+      event.preventDefault()
+      return
+    }
+    setDragColumnName(columnName)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', columnName)
+  }, [])
+
+  const handleColumnDragOver = useCallback((event, columnName) => {
+    if (!isPlannerColumnReorderable(columnName) || !dragColumnName) return
+    event.preventDefault()
+    event.dataTransfer.dropEffect = 'move'
+    setDropColumnName(columnName)
+  }, [dragColumnName])
+
+  const handleColumnDrop = useCallback(
+    (event, columnName) => {
+      event.preventDefault()
+      if (!dragColumnName || !isPlannerColumnReorderable(columnName)) return
+      if (dragColumnName === columnName) return
+      const reordered = reorderTogglablePlannerColumns(
+        columnSettingsRefState.current,
+        dragColumnName,
+        columnName
+      )
+      void persistColumnSettings(reordered)
+      setDragColumnName(null)
+      setDropColumnName(null)
+    },
+    [dragColumnName, persistColumnSettings]
+  )
+
+  const handleColumnDragEnd = useCallback(() => {
+    setDragColumnName(null)
+    setDropColumnName(null)
+  }, [])
+
+  const handleColumnVisibilityToggle = useCallback(
+    (columnName) => {
+      const current = columnSettingsRefState.current.columns.find(
+        (col) => col.columnName === columnName
+      )
+      const willHide = current?.visible !== false
+      if (willHide) {
+        const sortField = plannerColumnNameToAbcSortField(columnName)
+        if (sortField && abcSort.field === sortField) {
+          setAbcSort({ field: '', dir: 'asc' })
+        }
+      }
+      void persistColumnSettings({
+        ...columnSettingsRefState.current,
+        columns: columnSettingsRefState.current.columns.map((col) =>
+          col.columnName === columnName ? { ...col, visible: !willHide } : col
+        ),
+      })
+    },
+    [abcSort.field, persistColumnSettings]
+  )
+
+  const handleResetColumnSettings = useCallback(() => {
+    const defaults = getDefaultPlannerColumnSettings()
+    setPage(1)
+    setPageSize(defaults.pageSize)
+    setAbcSort({ field: '', dir: 'asc' })
+    void persistColumnSettings(defaults)
+    setColumnSettingsOpen(false)
+  }, [persistColumnSettings])
+
+  const visibleColumns = useMemo(() => getVisibleColumns(columnSettings), [columnSettings])
+  const visibleColumnCount = visibleColumns.length
+  const firstVisibleAbcColumnName = useMemo(
+    () => visibleColumns.find((col) => isPlannerAbcColumnName(col.columnName))?.columnName,
+    [visibleColumns]
+  )
 
   const treeMode = isPlannerTreeViewMode({
     search: debouncedSearch,
@@ -1312,69 +1567,222 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     )
   }
 
+  function renderPlannerColumnHeaderShell(col, content) {
+    const className = getPlannerColumnClassName(col.columnName)
+    const style = buildPlannerColumnInlineStyle(col, visibleColumns)
+    const reorderable = isPlannerColumnReorderable(col.columnName)
+    const headerClassName = [
+      className,
+      dragColumnName === col.columnName ? 'is-dragging' : '',
+      dropColumnName === col.columnName && dragColumnName ? 'is-drag-over' : '',
+      reorderable ? 'is-reorderable' : '',
+    ]
+      .filter(Boolean)
+      .join(' ')
+
+    return (
+      <th
+        key={col.columnName}
+        className={headerClassName}
+        style={style}
+        draggable={reorderable || undefined}
+        onDragStart={(event) => handleColumnDragStart(event, col.columnName)}
+        onDragOver={(event) => handleColumnDragOver(event, col.columnName)}
+        onDrop={(event) => handleColumnDrop(event, col.columnName)}
+        onDragEnd={handleColumnDragEnd}
+      >
+        <div className="proc-planner__col-head">
+          {content}
+          <span
+            className="proc-planner__col-resizer"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={`Изменить ширину столбца ${getPlannerColumnDef(col.columnName)?.label || col.columnName}`}
+            onPointerDown={(event) => handleColumnResizePointerDown(event, col.columnName)}
+          />
+        </div>
+      </th>
+    )
+  }
+
+  function renderPlannerColumnHeader(col) {
+    if (isPlannerAbcColumnName(col.columnName)) {
+      const axis = ABC_COLUMN_BY_NAME[col.columnName]
+      const active = abcSort.field === axis.column
+      const dir = active ? abcSort.dir : ''
+      return renderPlannerColumnHeaderShell(
+        col,
+        <div className="proc-planner__abc-axis-head" title={axis.label}>
+          <button
+            type="button"
+            className={`proc-planner__abc-axis-btn${active ? ' is-active' : ''}${dir ? ` is-${dir}` : ''}`}
+            aria-pressed={active}
+            aria-label={abcSortAriaLabel(axis.label, abcSort, axis.column)}
+            title={abcSortAriaLabel(axis.label, abcSort, axis.column)}
+            onClick={() => setAbcSort((current) => nextAbcSortState(current, axis.column))}
+          >
+            <span className="proc-planner__abc-axis-label">{axis.shortLabel}</span>
+            <span className="proc-planner__abc-axis-arrows" aria-hidden="true">
+              <span
+                className={`proc-planner__abc-arrow is-up${active && dir === 'asc' ? ' is-on' : ''}`}
+              >
+                ↑
+              </span>
+              <span
+                className={`proc-planner__abc-arrow is-down${active && dir === 'desc' ? ' is-on' : ''}`}
+              >
+                ↓
+              </span>
+            </span>
+          </button>
+          {col.columnName === firstVisibleAbcColumnName ? <AbcColumnHelp /> : null}
+        </div>
+      )
+    }
+
+    const weekIndex = parseWeekColumnIndex(col.columnName)
+    if (weekIndex >= 0) {
+      return renderPlannerColumnHeaderShell(
+        col,
+        <span title={weekColumns.titles[weekIndex]}>{weekColumns.labels[weekIndex]}</span>
+      )
+    }
+
+    const label = getPlannerColumnDef(col.columnName)?.label || col.columnName
+    return renderPlannerColumnHeaderShell(col, label)
+  }
+
+  function renderPlannerSkuCell(col, item, index, { indent = false } = {}) {
+    const className = getPlannerColumnClassName(col.columnName)
+    const style = buildPlannerColumnInlineStyle(col, visibleColumns)
+
+    switch (col.columnName) {
+      case 'rowNum':
+        return (
+          <td key={col.columnName} className={className} style={style}>
+            {index + 1}
+          </td>
+        )
+      case 'product':
+        return (
+          <td key={col.columnName} className={className} style={style}>
+            <div className={`proc-planner__product${indent ? ' is-tree-child' : ''}`}>
+              <strong title={item.productName}>{item.productName}</strong>
+            </div>
+          </td>
+        )
+      case 'barcode':
+        return (
+          <td
+            key={col.columnName}
+            className={className}
+            style={style}
+            title={item.barcode || undefined}
+          >
+            {item.barcode || ''}
+          </td>
+        )
+      case 'abcQty':
+      case 'abcRevenue':
+      case 'abcProfit': {
+        const axis = ABC_COLUMN_BY_NAME[col.columnName]
+        return (
+          <td key={col.columnName} className={className} style={style}>
+            <AbcBadge axisLabel={axis.label} value={item[axis.itemKey]} />
+          </td>
+        )
+      }
+      default: {
+        const weekIndex = parseWeekColumnIndex(col.columnName)
+        if (weekIndex >= 0) {
+          return (
+            <td key={col.columnName} className={className} style={style}>
+              <WeeklySalesCell value={item.weeklySales?.[weekIndex]} />
+            </td>
+          )
+        }
+        if (col.columnName === 'stock') {
+          return (
+            <td key={col.columnName} className={className} style={style}>
+              <span
+                className={
+                  item.negativeStock ? 'proc-planner__stock is-neg' : 'proc-planner__stock'
+                }
+                title={
+                  item.negativeStock
+                    ? 'Отрицательный остаток UMAG — в расчёте как 0'
+                    : undefined
+                }
+              >
+                {formatNum(item.rawStock, 2)}
+              </span>
+            </td>
+          )
+        }
+        if (col.columnName === 'reserveDays') {
+          return (
+            <td
+              key={col.columnName}
+              className={className}
+              style={style}
+              title={RESERVE_DAYS_TITLE}
+            >
+              {formatReserveDays(calcReserveDays(item.calculationStock, item.avgDaily))}
+            </td>
+          )
+        }
+        if (col.columnName === 'avgDaily') {
+          return (
+            <td key={col.columnName} className={className} style={style}>
+              {formatNum(item.avgDaily, 2)}
+            </td>
+          )
+        }
+        if (col.columnName === 'normDays') {
+          return (
+            <td key={col.columnName} className={className} style={style}>
+              <span
+                className="proc-planner__norm-value"
+                title="Настраивается во вкладке «Нормы»"
+              >
+                {item.normDays}
+              </span>
+            </td>
+          )
+        }
+        if (col.columnName === 'recommendedQty') {
+          return (
+            <td key={col.columnName} className={className} style={style}>
+              {formatNum(item.recommendedQty, 0)}
+            </td>
+          )
+        }
+        if (col.columnName === 'orderQty') {
+          return (
+            <td key={col.columnName} className={className} style={style}>
+              {renderQtyCell(item)}
+            </td>
+          )
+        }
+        if (col.columnName === 'supplier') {
+          return (
+            <td key={col.columnName} className={className} style={style}>
+              {item.umagSupplierName || '—'}
+            </td>
+          )
+        }
+        return null
+      }
+    }
+  }
+
   function renderDesktopSkuRow(item, index, { indent = false } = {}) {
     return (
       <tr
         key={item.id}
         className={`proc-planner__sku-row${indent ? ' proc-planner__tree-sku' : ''}`}
       >
-        <td className="proc-planner__col-num proc-planner__sticky-num">
-          {index + 1}
-        </td>
-        <td className="proc-planner__col-product proc-planner__sticky-product">
-          <div className={`proc-planner__product${indent ? ' is-tree-child' : ''}`}>
-            <strong title={item.productName}>{item.productName}</strong>
-          </div>
-        </td>
-        <td
-          className="proc-planner__col-barcode proc-planner__sticky-barcode"
-          title={item.barcode || undefined}
-        >
-          {item.barcode || ''}
-        </td>
-        {ABC_AXES.map((axis) => (
-          <td key={`${item.id}-${axis.key}`} className="proc-planner__col-abc-axis">
-            <AbcBadge axisLabel={axis.label} value={item[axis.itemKey]} />
-          </td>
-        ))}
-        {Array.from({ length: PLANNER_WEEK_COLUMN_COUNT }, (_, weekIndex) => (
-          <td key={`week-${item.id}-${weekIndex}`} className="proc-planner__col-week">
-            <WeeklySalesCell value={item.weeklySales?.[weekIndex]} />
-          </td>
-        ))}
-        <td>
-          <span
-            className={
-              item.negativeStock ? 'proc-planner__stock is-neg' : 'proc-planner__stock'
-            }
-            title={
-              item.negativeStock
-                ? 'Отрицательный остаток UMAG — в расчёте как 0'
-                : undefined
-            }
-          >
-            {formatNum(item.rawStock, 2)}
-          </span>
-        </td>
-        <td className="proc-planner__col-reserve" title={RESERVE_DAYS_TITLE}>
-          {formatReserveDays(calcReserveDays(item.calculationStock, item.avgDaily))}
-        </td>
-        <td>{formatNum(item.avgDaily, 2)}</td>
-        <td>
-          <span
-            className="proc-planner__norm-value"
-            title="Настраивается во вкладке «Нормы»"
-          >
-            {item.normDays}
-          </span>
-        </td>
-        <td className="proc-planner__col-rec">
-          {formatNum(item.recommendedQty, 0)}
-        </td>
-        <td className="proc-planner__col-order proc-planner__col-order--accent proc-planner__sticky-order">
-          {renderQtyCell(item)}
-        </td>
-        <td>{item.umagSupplierName || '—'}</td>
+        {visibleColumns.map((col) => renderPlannerSkuCell(col, item, index, { indent }))}
       </tr>
     )
   }
@@ -1385,7 +1793,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     if (branch?.loading && !(branch.items || []).length) {
       rows.push(
         <tr key={`${branchKey}-loading`}>
-          <td colSpan={TABLE_COL_SPAN} className="proc-planner__tree-muted">
+          <td colSpan={visibleColumnCount} className="proc-planner__tree-muted">
             Загрузка…
           </td>
         </tr>
@@ -1396,7 +1804,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     if (!branch?.loading && list.length === 0) {
       rows.push(
         <tr key={`${branchKey}-empty`}>
-          <td colSpan={TABLE_COL_SPAN} className="proc-planner__tree-muted">
+          <td colSpan={visibleColumnCount} className="proc-planner__tree-muted">
             Нет позиций
           </td>
         </tr>
@@ -1411,7 +1819,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     if (remaining > 0 || branch?.loading) {
       rows.push(
         <tr key={`${branchKey}-more`}>
-          <td colSpan={TABLE_COL_SPAN}>
+          <td colSpan={visibleColumnCount}>
             <button
               type="button"
               className="proc-planner__tree-more"
@@ -1443,47 +1851,54 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     depth = 0,
   }) {
     const meta = formatPlannerTreeGroupMeta({ itemCount, orderableCount })
+    const lockedLeftColumns = getVisibleLockedLeftColumns(visibleColumns)
     return (
       <tr key={key} className={`proc-planner__tree-group depth-${depth}`}>
+        {lockedLeftColumns.map((col) => {
+          const className = getPlannerColumnClassName(col.columnName)
+          const style = buildPlannerColumnInlineStyle(col, visibleColumns)
+          if (col.columnName === 'product') {
+            return (
+              <td key={col.columnName} className={className} style={style}>
+                <div className="proc-planner__tree-group-inner">
+                  <button
+                    type="button"
+                    className="proc-planner__tree-toggle"
+                    aria-expanded={expanded}
+                    aria-label={expanded ? `Свернуть ${label}` : `Развернуть ${label}`}
+                    onClick={onToggle}
+                  >
+                    {expanded ? '−' : '+'}
+                  </button>
+                  <span className="proc-planner__tree-group-name" title={label}>
+                    {label}
+                  </span>
+                  <span
+                    className="proc-planner__tree-group-meta"
+                    title={`${meta} · ${countsScopeTitle}`}
+                  >
+                    <span className="proc-planner__tree-group-meta-item">
+                      {Math.max(0, Math.round(Number(itemCount) || 0))} поз
+                    </span>
+                    <span className="proc-planner__tree-group-meta-sep" aria-hidden="true">
+                      ·
+                    </span>
+                    <span className="proc-planner__tree-group-meta-item">
+                      {Math.max(0, Math.round(Number(orderableCount) || 0))} к заказу
+                    </span>
+                  </span>
+                </div>
+              </td>
+            )
+          }
+          return (
+            <td key={col.columnName} className={className} style={style} aria-hidden="true" />
+          )
+        })}
         <td
-          className="proc-planner__col-num proc-planner__sticky-num"
-          aria-hidden="true"
+          colSpan={plannerTreeTailColSpan(visibleColumns)}
+          className="proc-planner__tree-group-tail"
         />
-        <td className="proc-planner__col-product proc-planner__sticky-product">
-          <div className="proc-planner__tree-group-inner">
-            <button
-              type="button"
-              className="proc-planner__tree-toggle"
-              aria-expanded={expanded}
-              aria-label={expanded ? `Свернуть ${label}` : `Развернуть ${label}`}
-              onClick={onToggle}
-            >
-              {expanded ? '−' : '+'}
-            </button>
-            <span className="proc-planner__tree-group-name" title={label}>
-              {label}
-            </span>
-            <span
-              className="proc-planner__tree-group-meta"
-              title={`${meta} · ${countsScopeTitle}`}
-            >
-              <span className="proc-planner__tree-group-meta-item">
-                {Math.max(0, Math.round(Number(itemCount) || 0))} поз
-              </span>
-              <span className="proc-planner__tree-group-meta-sep" aria-hidden="true">
-                ·
-              </span>
-              <span className="proc-planner__tree-group-meta-item">
-                {Math.max(0, Math.round(Number(orderableCount) || 0))} к заказу
-              </span>
-            </span>
-          </div>
-        </td>
-        <td
-          className="proc-planner__col-barcode proc-planner__sticky-barcode"
-          aria-hidden="true"
-        />
-        <td colSpan={TABLE_COL_SPAN - 3} className="proc-planner__tree-group-tail" />
       </tr>
     )
   }
@@ -1492,14 +1907,14 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     if (isInitialLoading) {
       return (
         <tr>
-          <td colSpan={TABLE_COL_SPAN}>Загрузка…</td>
+          <td colSpan={visibleColumnCount}>Загрузка…</td>
         </tr>
       )
     }
     if (categoryNavModel.length === 0) {
       return (
         <tr>
-          <td colSpan={TABLE_COL_SPAN}>Нет категорий</td>
+          <td colSpan={visibleColumnCount}>Нет категорий</td>
         </tr>
       )
     }
@@ -1800,6 +2215,67 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     itemCount: snapshot?.itemCount || 0,
     negativeStockCount: snapshot?.negativeStockCount || 0,
   })
+
+  function getColumnToggleLabel(columnName) {
+    const weekIndex = parseWeekColumnIndex(columnName)
+    if (weekIndex >= 0) return weekColumns.labels[weekIndex]
+    return getPlannerColumnDef(columnName)?.label || columnName
+  }
+
+  function renderColumnSettingsGear() {
+    const togglableSorted = [...columnSettings.columns]
+      .sort((a, b) => a.columnOrdinalNumber - b.columnOrdinalNumber)
+      .filter((col) => TOGGLABLE_PLANNER_COLUMNS.includes(col.columnName))
+
+    return (
+      <div className="proc-planner__column-settings" ref={columnSettingsPopoverRef}>
+        <button
+          type="button"
+          className={`proc-planner__column-settings-btn${columnSettingsOpen ? ' is-open' : ''}`}
+          aria-expanded={columnSettingsOpen}
+          aria-controls="proc-planner-column-settings-panel"
+          aria-label="Настройки столбцов таблицы"
+          title="Настройки столбцов"
+          onClick={() => setColumnSettingsOpen((open) => !open)}
+        >
+          <PlannerColumnSettingsIcon />
+        </button>
+        {columnSettingsOpen ? (
+          <div
+            id="proc-planner-column-settings-panel"
+            className="proc-planner__column-settings-popover"
+            role="dialog"
+            aria-label="Видимость столбцов"
+          >
+            <div className="proc-planner__column-settings-head">
+              <strong>Видимость столбцов</strong>
+              <p>Настройте таблицу под себя — выбор сохранится</p>
+            </div>
+            <div className="proc-planner__column-settings-list">
+              {togglableSorted.map((col) => (
+                <label key={col.columnName} className="proc-planner__column-settings-item">
+                  <input
+                    type="checkbox"
+                    checked={col.visible !== false}
+                    onChange={() => handleColumnVisibilityToggle(col.columnName)}
+                  />
+                  <span>{getColumnToggleLabel(col.columnName)}</span>
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              className="proc-planner__column-settings-reset btn btn--ghost"
+              onClick={() => handleResetColumnSettings()}
+            >
+              По умолчанию
+            </button>
+          </div>
+        ) : null}
+      </div>
+    )
+  }
+
   const headerStrip = (
     <div className="proc-planner__topbar">
       <span className="proc-planner__snapshot" title={snapshotHeadline.title}>
@@ -2053,85 +2529,25 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       ) : null}
 
       <div className="proc-planner__desktop">
+        <div className="proc-planner__desktop-bar">{renderColumnSettingsGear()}</div>
         <div
           className={`proc-planner__table-wrap${isFetching ? ' proc-planner__table-wrap--fetching' : ''}`}
           aria-busy={(treeMode ? filterOptionsLoading : loading) || undefined}
         >
           <table className="proc-planner__table">
             <thead>
-              <tr>
-                <th className="proc-planner__col-num proc-planner__sticky-num">№</th>
-                <th className="proc-planner__col-product proc-planner__sticky-product">Товар</th>
-                <th className="proc-planner__col-barcode proc-planner__sticky-barcode">Штрихкод</th>
-                {ABC_AXES.map((axis, axisIndex) => {
-                  const active = abcSort.field === axis.column
-                  const dir = active ? abcSort.dir : ''
-                  return (
-                    <th
-                      key={axis.key}
-                      className="proc-planner__col-abc-axis"
-                      title={axis.label}
-                    >
-                      <div className="proc-planner__abc-axis-head">
-                        <button
-                          type="button"
-                          className={`proc-planner__abc-axis-btn${active ? ' is-active' : ''}${dir ? ` is-${dir}` : ''}`}
-                          aria-pressed={active}
-                          aria-label={abcSortAriaLabel(axis.label, abcSort, axis.column)}
-                          title={abcSortAriaLabel(axis.label, abcSort, axis.column)}
-                          onClick={() =>
-                            setAbcSort((current) => nextAbcSortState(current, axis.column))
-                          }
-                        >
-                          <span className="proc-planner__abc-axis-label">{axis.shortLabel}</span>
-                          <span className="proc-planner__abc-axis-arrows" aria-hidden="true">
-                            <span
-                              className={`proc-planner__abc-arrow is-up${active && dir === 'asc' ? ' is-on' : ''}`}
-                            >
-                              ↑
-                            </span>
-                            <span
-                              className={`proc-planner__abc-arrow is-down${active && dir === 'desc' ? ' is-on' : ''}`}
-                            >
-                              ↓
-                            </span>
-                          </span>
-                        </button>
-                        {axisIndex === 0 ? <AbcColumnHelp /> : null}
-                      </div>
-                    </th>
-                  )
-                })}
-                {weekColumns.labels.map((label, weekIndex) => (
-                  <th
-                    key={`week-h-${weekIndex}`}
-                    className="proc-planner__col-week"
-                    title={weekColumns.titles[weekIndex]}
-                  >
-                    {label}
-                  </th>
-                ))}
-                <th>Остаток</th>
-                <th className="proc-planner__col-reserve">Запас/дн</th>
-                <th>Спрос/дн</th>
-                <th>Норма</th>
-                <th className="proc-planner__col-rec">Рек.</th>
-                <th className="proc-planner__col-order proc-planner__col-order--accent proc-planner__sticky-order">
-                  Заказ
-                </th>
-                <th>Поставщик</th>
-              </tr>
+              <tr>{visibleColumns.map((col) => renderPlannerColumnHeader(col))}</tr>
             </thead>
             <tbody>
               {treeMode
                 ? renderTreeTableBody()
                 : isInitialLoading ? (
                     <tr>
-                      <td colSpan={TABLE_COL_SPAN}>Загрузка…</td>
+                      <td colSpan={visibleColumnCount}>Загрузка…</td>
                     </tr>
                   ) : items.length === 0 ? (
                     <tr>
-                      <td colSpan={TABLE_COL_SPAN}>Нет позиций</td>
+                      <td colSpan={visibleColumnCount}>Нет позиций</td>
                     </tr>
                   ) : (
                     items.map((item, index) =>
@@ -2150,10 +2566,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             totalCount={totalCount}
             onPageChange={setPage}
             pageSize={pageSize}
-            onPageSizeChange={(nextPageSize) => {
-              setPage(1)
-              setPageSize(nextPageSize)
-            }}
+            onPageSizeChange={handlePageSizeChange}
             disabled={loading}
           />
         ) : null}
@@ -2185,10 +2598,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             totalCount={totalCount}
             onPageChange={setPage}
             pageSize={pageSize}
-            onPageSizeChange={(nextPageSize) => {
-              setPage(1)
-              setPageSize(nextPageSize)
-            }}
+            onPageSizeChange={handlePageSizeChange}
             disabled={loading}
           />
         ) : null}
