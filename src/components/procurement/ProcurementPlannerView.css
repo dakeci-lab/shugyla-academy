@@ -486,6 +486,12 @@
   font-weight: 400;
 }
 
+.proc-planner__col-reserve {
+  min-width: 3.25rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .proc-planner__col-abc-axis {
   width: 2.75rem;
   min-width: 2.75rem;
@@ -784,7 +790,7 @@
   table-layout: fixed;
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 1460px;
+  min-width: 1500px;
   font-size: 0.8125rem;
 }
 

@@ -652,8 +652,8 @@ function stageUi() {
 
   assert(
     'TABLE_COL_SPAN accounts for week columns',
-    /TABLE_COL_SPAN\s*=\s*5\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*6/.test(planner) ||
-      planner.includes('const TABLE_COL_SPAN = 19')
+    /TABLE_COL_SPAN\s*=\s*5\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*7/.test(planner) ||
+      planner.includes('const TABLE_COL_SPAN = 20')
   )
   assert('loading/empty rows use TABLE_COL_SPAN', /colSpan=\{TABLE_COL_SPAN\}>Загрузка/.test(planner) && /colSpan=\{TABLE_COL_SPAN\}>Нет позиций/.test(planner))
   assert(

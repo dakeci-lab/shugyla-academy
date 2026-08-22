@@ -34,6 +34,17 @@ export function calcRecommendedQty(avgDaily, normDays, calculationStock) {
 }
 
 /**
+ * Days of cover at current demand: round(calculationStock / avgDaily).
+ * Returns null when avgDaily <= 0 (UI shows «—»).
+ */
+export function calcReserveDays(calculationStock, avgDaily) {
+  const stock = Number(calculationStock)
+  const avg = Number(avgDaily)
+  if (!Number.isFinite(stock) || !Number.isFinite(avg) || avg <= 0) return null
+  return Math.round(stock / avg)
+}
+
+/**
  * When norm days change: always recompute recommendation.
  * If manual_override is false, final follows recommendation.
  * If true, final is preserved.
