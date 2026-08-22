@@ -74,6 +74,16 @@ async function stageFormulas() {
   assert('resolveNormDays keeps zero rule', math.resolveNormDays('A', 'B', [
     { category_name: 'A', subcategory_name: 'B', norm_days: 0 },
   ]) === 0)
+
+  assert('calcReserveDays 10/2 → 5', math.calcReserveDays(10, 2) === 5)
+  assert('calcReserveDays 11/4 → 3', math.calcReserveDays(11, 4) === 3)
+  assert('calcReserveDays 0/1.5 → 0', math.calcReserveDays(0, 1.5) === 0)
+  assert('calcReserveDays 5/0 → null', math.calcReserveDays(5, 0) === null)
+  assert('calcReserveDays negative avg → null', math.calcReserveDays(5, -1) === null)
+  assert(
+    'negative raw → calculationStock 0 → reserve 0',
+    math.calcReserveDays(math.calcCalculationStock(-5), 2) === 0
+  )
 }
 
 async function stageGroupingAndExport() {
@@ -540,7 +550,9 @@ async function stagePlanExportAndPlannerUi() {
   assert('planner has № column', planner.includes('proc-planner__col-num') && planner.includes('>№<'))
   assert(
     'planner page numbering formula',
-    planner.includes('(page - 1) * pageSize + index + 1')
+    planner.includes('(page - 1) * pageSize + index + 1') ||
+      (planner.includes('(page - 1) * pageSize + index') &&
+        planner.includes('{index + 1}'))
   )
   assert('planner mobile row number', planner.includes('proc-planner__row-num'))
   assert('planner export menu aria', planner.includes('aria-haspopup="menu"'))

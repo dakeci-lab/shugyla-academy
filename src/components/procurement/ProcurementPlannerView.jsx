@@ -99,10 +99,13 @@ import {
   nextAbcSortState,
   snapshotItemsLackAbcFacts,
 } from '../../utils/procurementAbc'
+import { calcReserveDays } from '../../utils/procurementPlanningMath'
 import './ProcurementPlannerView.css'
 
-/** № + Товар + К + В + П + 8 weeks + Остаток + Ср/день + Норма + Рек. + Заказ + Поставщик */
-const TABLE_COL_SPAN = 5 + PLANNER_WEEK_COLUMN_COUNT + 6
+/** № + Товар + К + В + П + 8 weeks + Остаток + Запас/дн + Спрос/дн + Норма + Рек. + Заказ + Поставщик */
+const TABLE_COL_SPAN = 5 + PLANNER_WEEK_COLUMN_COUNT + 7
+
+const RESERVE_DAYS_TITLE = 'Запас/дн = round(расч. остаток ÷ спрос/день)'
 
 const DEFAULT_PAGE_SIZE = 25
 const TREE_BRANCH_PAGE_SIZE = PLANNER_TREE_BRANCH_PAGE_SIZE
@@ -168,6 +171,11 @@ function formatNum(value, digits = 1) {
     maximumFractionDigits: digits,
     minimumFractionDigits: 0,
   })
+}
+
+function formatReserveDays(days) {
+  if (days == null) return '—'
+  return formatNum(days, 0)
 }
 
 function formatSyncedAt(value) {
@@ -1343,6 +1351,9 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             {formatNum(item.rawStock, 2)}
           </span>
         </td>
+        <td className="proc-planner__col-reserve" title={RESERVE_DAYS_TITLE}>
+          {formatReserveDays(calcReserveDays(item.calculationStock, item.avgDaily))}
+        </td>
         <td>{formatNum(item.avgDaily, 2)}</td>
         <td>
           <span
@@ -1558,7 +1569,13 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             </b>
           </span>
           <span>
-            Ср/день <b>{formatNum(item.avgDaily, 2)}</b>
+            Запас/дн{' '}
+            <b title={RESERVE_DAYS_TITLE}>
+              {formatReserveDays(calcReserveDays(item.calculationStock, item.avgDaily))}
+            </b>
+          </span>
+          <span>
+            Спрос/дн <b>{formatNum(item.avgDaily, 2)}</b>
           </span>
           <label>
             Норма
@@ -2075,7 +2092,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                   </th>
                 ))}
                 <th>Остаток</th>
-                <th>Ср/день</th>
+                <th className="proc-planner__col-reserve">Запас/дн</th>
+                <th>Спрос/дн</th>
                 <th>Норма</th>
                 <th className="proc-planner__col-rec">Рек.</th>
                 <th className="proc-planner__col-order proc-planner__col-order--accent proc-planner__sticky-order">

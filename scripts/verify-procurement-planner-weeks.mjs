@@ -61,7 +61,7 @@ assert(
 assert(
   'TABLE_COL_SPAN accounts for 8 week columns',
   planner.includes('PLANNER_WEEK_COLUMN_COUNT') &&
-    /TABLE_COL_SPAN\s*=\s*5\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*6/.test(planner)
+    /TABLE_COL_SPAN\s*=\s*5\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*7/.test(planner)
 )
 assert(
   'mobile keeps WeeklySpark (no 8 week th in cards)',
