@@ -27,6 +27,7 @@ function assert(label, condition) {
 
 const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
 const plannerCss = read('src/components/procurement/ProcurementPlannerView.css')
+const layoutSrc = read('src/utils/plannerColumnLayout.js')
 const uxSrc = read('src/utils/procurementPlannerUx.js')
 
 assert('browse mode UI removed', !planner.includes('proc-planner__browse-mode'))
@@ -117,9 +118,9 @@ assert(
 )
 assert(
   'P0/P1 markers kept',
-  planner.includes('weekColumns.labels.map') &&
-    planner.includes('proc-planner__sticky-order') &&
-    planner.includes('proc-planner__col-order--accent') &&
+  planner.includes('weekColumns.labels[') &&
+    layoutSrc.includes('proc-planner__sticky-order') &&
+    layoutSrc.includes('proc-planner__col-order--accent') &&
     planner.includes('proc-planner__orderable-toggle') &&
     planner.includes('proc-planner__snapshot')
 )
@@ -138,8 +139,10 @@ assert(
   /\.proc-planner__col-barcode\s*\{[^}]*width:\s*8\.5rem/.test(plannerCss)
 )
 assert(
-  'tree group uses leading cells + tail colspan',
-  planner.includes('TABLE_COL_SPAN - 3') && planner.includes('proc-planner__tree-group-tail')
+  'tree group uses locked-left cells + plannerTreeTailColSpan',
+  planner.includes('getVisibleLockedLeftColumns(visibleColumns)') &&
+    planner.includes('plannerTreeTailColSpan(visibleColumns)') &&
+    planner.includes('proc-planner__tree-group-tail')
 )
 assert(
   'product name clamps with ellipsis path',

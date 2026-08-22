@@ -23,6 +23,7 @@ const CLASSIFIER = 'supabase/functions/umag-procurement/abcClassification.js'
 const SERVICE = 'src/services/procurementPlanningService.js'
 const PLANNER = 'src/components/procurement/ProcurementPlannerView.jsx'
 const PLANNER_CSS = 'src/components/procurement/ProcurementPlannerView.css'
+const PLANNER_LAYOUT = 'src/utils/plannerColumnLayout.js'
 const ABC_UI = 'src/utils/procurementAbc.js'
 const FINGERPRINT = 'src/utils/procurementAttemptFingerprint.js'
 const REPEAT_MIGRATION = 'supabase/migrations/20260814134910_procurement_repeat_analytics_orders.sql'
@@ -649,20 +650,30 @@ function stageUi() {
   console.log('Stage 4: Planner UI')
   const planner = read(PLANNER)
   const css = read(PLANNER_CSS)
+  const layout = read(PLANNER_LAYOUT)
 
-  assert(
-    'TABLE_COL_SPAN accounts for week columns',
-    /TABLE_COL_SPAN\s*=\s*6\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*7/.test(planner) ||
-      planner.includes('const TABLE_COL_SPAN = 21')
-  )
-  assert('loading/empty rows use TABLE_COL_SPAN', /colSpan=\{TABLE_COL_SPAN\}>Загрузка/.test(planner) && /colSpan=\{TABLE_COL_SPAN\}>Нет позиций/.test(planner))
+assert(
+  'TABLE_COL_SPAN replaced by visibleColumnCount',
+  planner.includes('visibleColumnCount') && !planner.includes('TABLE_COL_SPAN')
+)
+assert(
+  'loading/empty rows use visibleColumnCount',
+  /colSpan=\{visibleColumnCount\}>Загрузка/.test(planner) &&
+    /colSpan=\{visibleColumnCount\}>Нет позиций/.test(planner)
+)
   assert(
     'desktop table has three ABC axis columns',
-    planner.includes('proc-planner__col-abc-axis') &&
+    layout.includes('proc-planner__col-abc-axis') &&
       planner.includes('proc-planner__abc-axis-btn') &&
-      /ABC_AXES\.map\(\(axis\) => \(\s*<td[\s\S]*?AbcBadge/.test(planner)
+      planner.includes("case 'abcQty':") &&
+      planner.includes('AbcBadge')
   )
-  assert('three badges come from ABC_AXES', planner.includes('ABC_AXES.map((axis)') && planner.includes('<AbcBadge'))
+  assert(
+    'three badges via ABC column renderers',
+    planner.includes("case 'abcRevenue':") &&
+      planner.includes("case 'abcProfit':") &&
+      planner.includes('<AbcBadge')
+  )
   assert('badge shows the letter, not color alone', planner.includes('{letter}') && planner.includes('aria-label={title}') && planner.includes('title={title}') && /role="img"/.test(planner))
   assert('NULL renders an accessible dash', planner.includes("formatAbcClass") && planner.includes('is-empty'))
   assert('mobile cards show ABC badges', /proc-planner__card[\s\S]*<AbcBadges item=\{item\} \/>/.test(planner) || planner.includes('<AbcBadges item={item} />'))
