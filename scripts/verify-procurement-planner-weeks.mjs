@@ -61,7 +61,7 @@ assert(
 assert(
   'TABLE_COL_SPAN accounts for 8 week columns',
   planner.includes('PLANNER_WEEK_COLUMN_COUNT') &&
-    /TABLE_COL_SPAN\s*=\s*5\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*7/.test(planner)
+    /TABLE_COL_SPAN\s*=\s*6\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*7/.test(planner)
 )
 assert(
   'mobile keeps WeeklySpark (no 8 week th in cards)',
@@ -69,13 +69,15 @@ assert(
     !/proc-planner__mobile[\s\S]{0,800}weekColumns\.labels\.map/.test(planner)
 )
 assert(
-  'sticky classes on product and order',
+  'sticky classes on num, product, barcode, order',
   planner.includes('proc-planner__sticky-product') &&
+    planner.includes('proc-planner__sticky-barcode') &&
     planner.includes('proc-planner__sticky-order')
 )
 assert(
-  'CSS sticky for product/order',
+  'CSS sticky for product/barcode/order',
   plannerCss.includes('.proc-planner__sticky-product') &&
+    plannerCss.includes('.proc-planner__sticky-barcode') &&
     plannerCss.includes('.proc-planner__sticky-order') &&
     /position:\s*sticky/.test(plannerCss)
 )

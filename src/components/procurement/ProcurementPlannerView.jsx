@@ -102,8 +102,8 @@ import {
 import { calcReserveDays } from '../../utils/procurementPlanningMath'
 import './ProcurementPlannerView.css'
 
-/** № + Товар + К + В + П + 8 weeks + Остаток + Запас/дн + Спрос/дн + Норма + Рек. + Заказ + Поставщик */
-const TABLE_COL_SPAN = 5 + PLANNER_WEEK_COLUMN_COUNT + 7
+/** № + Товар + Штрихкод + К + В + П + 8 weeks + Остаток + Запас/дн + Спрос/дн + Норма + Рек. + Заказ + Поставщик */
+const TABLE_COL_SPAN = 6 + PLANNER_WEEK_COLUMN_COUNT + 7
 
 const RESERVE_DAYS_TITLE = 'Запас/дн = round(расч. остаток ÷ спрос/день)'
 
@@ -1324,8 +1324,13 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         <td className="proc-planner__col-product proc-planner__sticky-product">
           <div className={`proc-planner__product${indent ? ' is-tree-child' : ''}`}>
             <strong title={item.productName}>{item.productName}</strong>
-            <span title={item.barcode}>{item.barcode}</span>
           </div>
+        </td>
+        <td
+          className="proc-planner__col-barcode proc-planner__sticky-barcode"
+          title={item.barcode || undefined}
+        >
+          {item.barcode || ''}
         </td>
         {ABC_AXES.map((axis) => (
           <td key={`${item.id}-${axis.key}`} className="proc-planner__col-abc-axis">
@@ -1440,7 +1445,11 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     const meta = formatPlannerTreeGroupMeta({ itemCount, orderableCount })
     return (
       <tr key={key} className={`proc-planner__tree-group depth-${depth}`}>
-        <td colSpan={TABLE_COL_SPAN}>
+        <td
+          className="proc-planner__col-num proc-planner__sticky-num"
+          aria-hidden="true"
+        />
+        <td className="proc-planner__col-product proc-planner__sticky-product">
           <div className="proc-planner__tree-group-inner">
             <button
               type="button"
@@ -1470,6 +1479,11 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             </span>
           </div>
         </td>
+        <td
+          className="proc-planner__col-barcode proc-planner__sticky-barcode"
+          aria-hidden="true"
+        />
+        <td colSpan={TABLE_COL_SPAN - 3} className="proc-planner__tree-group-tail" />
       </tr>
     )
   }
@@ -1557,11 +1571,16 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             </span>{' '}
             {item.productName}
           </strong>
-          <span>{item.barcode}</span>
         </div>
         <AbcBadges item={item} />
         <WeeklySpark values={item.weeklySales} />
         <div className="proc-planner__card-grid">
+          <span>
+            Штрихкод{' '}
+            <b className="proc-planner__card-barcode" title={item.barcode || undefined}>
+              {item.barcode || ''}
+            </b>
+          </span>
           <span>
             Остаток{' '}
             <b className={item.negativeStock ? 'is-neg' : ''}>
@@ -2043,6 +2062,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
               <tr>
                 <th className="proc-planner__col-num proc-planner__sticky-num">№</th>
                 <th className="proc-planner__col-product proc-planner__sticky-product">Товар</th>
+                <th className="proc-planner__col-barcode proc-planner__sticky-barcode">Штрихкод</th>
                 {ABC_AXES.map((axis, axisIndex) => {
                   const active = abcSort.field === axis.column
                   const dir = active ? abcSort.dir : ''
