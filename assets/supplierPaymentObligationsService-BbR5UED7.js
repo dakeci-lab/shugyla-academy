@@ -1,0 +1,22 @@
+import{C as n,b as f,B as g}from"./index-Co1Pebuc.js";import{n as b,y as h,t as S,z as D,s as A}from"./umagSettlementsService-ry5JXnya.js";const l=`
+  id,
+  platform_supplier_id,
+  umag_supply_id,
+  umag_supply_row_id,
+  supply_document_date,
+  source_doc_time,
+  original_supply_amount,
+  current_payment_amount,
+  current_debt,
+  payment_terms_type_snapshot,
+  deferment_days_snapshot,
+  due_date,
+  terms_snapshot_created_at,
+  is_source_deleted,
+  first_seen_at,
+  last_synced_at,
+  paid_at,
+  created_at,
+  updated_at,
+  supplier:platform_suppliers!platform_supplier_id(id, name, payment_type, deferral_days)
+`;function _(){if(!f()||!g()||!n)throw new Error("Оплаты поставщикам доступны только в облачном режиме")}function u(e){const t=typeof e=="number"?e:Number(e);return Number.isFinite(t)?t:0}function m(e){if(!e)return null;const t=Array.isArray(e.supplier)?e.supplier[0]:e.supplier;return{id:e.id,platformSupplierId:e.platform_supplier_id,umagSupplyId:e.umag_supply_id,umagSupplyRowId:e.umag_supply_row_id,supplyDocumentDate:e.supply_document_date,sourceDocTime:e.source_doc_time,originalSupplyAmount:u(e.original_supply_amount),currentPaymentAmount:u(e.current_payment_amount),currentDebt:u(e.current_debt),paymentTermsTypeSnapshot:e.payment_terms_type_snapshot,defermentDaysSnapshot:e.deferment_days_snapshot==null?null:Number(e.deferment_days_snapshot),dueDate:e.due_date,termsSnapshotCreatedAt:e.terms_snapshot_created_at,isSourceDeleted:!!e.is_source_deleted,firstSeenAt:e.first_seen_at,lastSyncedAt:e.last_synced_at,paidAt:e.paid_at,createdAt:e.created_at,updatedAt:e.updated_at,supplierName:(t==null?void 0:t.name)||"Без названия",supplierPaymentType:(t==null?void 0:t.payment_type)||null,supplierDeferralDays:(t==null?void 0:t.deferral_days)==null?null:Number(t.deferral_days)}}async function T({includePaid:e=!1}={}){_();const{data:t,error:a}=await b(()=>{let r=n.from("supplier_payment_obligations").select(l).eq("is_source_deleted",!1).order("due_date",{ascending:!0,nullsFirst:!1}).order("id",{ascending:!0});return e||(r=r.gt("current_debt",0)),r});if(a)throw new Error(a.message||"Не удалось загрузить обязательства оплаты");return(t||[]).map(m).filter(Boolean)}async function F(e){if(_(),!e)return[];const{data:t,error:a}=await n.from("supplier_payment_obligations").select(l).eq("platform_supplier_id",e).eq("is_source_deleted",!1).order("due_date",{ascending:!0,nullsFirst:!1});if(a)throw new Error(a.message||"Не удалось загрузить оплаты поставщика");return(t||[]).map(m).filter(Boolean)}async function N(e,t){if(_(),!e)return{updated:0};const a=h(t);if(!a.configured)return{updated:0};const{data:r,error:d}=await n.from("supplier_payment_obligations").select("id, supply_document_date, source_doc_time, due_date, terms_snapshot_created_at, payment_terms_type_snapshot").eq("platform_supplier_id",e).eq("is_source_deleted",!1).gt("current_debt",0).is("due_date",null);if(d)throw new Error(d.message||"Не удалось обновить сроки оплаты");const c=new Date().toISOString();let p=0;for(const s of r||[]){if(s.due_date!=null||s.terms_snapshot_created_at!=null)continue;const o=s.supply_document_date||(s.source_doc_time?S(new Date(s.source_doc_time)):null);if(!o)continue;const y=D(o,a),{error:i}=await n.from("supplier_payment_obligations").update({payment_terms_type_snapshot:a.type,deferment_days_snapshot:a.days,due_date:y,terms_snapshot_created_at:c}).eq("id",s.id).is("due_date",null);if(i)throw new Error(i.message||"Не удалось сохранить срок оплаты");p+=1}return{updated:p}}async function O({dateFrom:e,dateTo:t}){return A({dateFrom:e,dateTo:t,syncSuppliers:!0})}export{N as a,T as b,F as l,O as s};

@@ -1,0 +1,1 @@
+const a={trainee:"Стажёр"};function u(e){if(!e)return"";const t=e.code;return t&&a[t]?a[t]:e.name||t||""}function i(e,t=[]){const n=u(e);return n?t.filter(r=>u(r)===n).length:0}function o(e,t=[]){if(!e)return"";const n=u(e);if(i(e,t)<=1)return n;const r=Number(e.employeeCount)||0;return r>0?`${n} — используется сотрудниками (${r})`:`${n} — без сотрудников`}export{o as f};

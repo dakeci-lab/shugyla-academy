@@ -1,0 +1,1 @@
+import{r as a}from"./index-Co1Pebuc.js";function i(e){const[s,c]=a.useState(()=>typeof window<"u"&&window.matchMedia(e).matches);return a.useEffect(()=>{const t=window.matchMedia(e),n=()=>c(t.matches);return n(),t.addEventListener("change",n),()=>t.removeEventListener("change",n)},[e]),s}const d="(max-width: 768px)";export{d as M,i as u};

@@ -1,0 +1,1 @@
+import{D as u,r as s}from"./index-Co1Pebuc.js";function l(){const{version:o,reload:a,notifyChange:t}=u(),[r,n]=s.useState(0),i=s.useCallback(async()=>{await a(),n(e=>e+1)},[a]),c=s.useCallback(()=>{t(),n(e=>e+1)},[t]);return{version:r+o,refresh:i,notifyChange:c}}export{l as u};

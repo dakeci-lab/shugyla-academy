@@ -1,0 +1,1 @@
+import{aH as m,ah as n,j as t,w as s,aJ as c}from"./index-Co1Pebuc.js";function p(){const{employeeId:e}=m(),[r]=n();if(!e||!/^\d+$/.test(e))return t.jsx(s,{to:"/platform/employees/list",replace:!0});const a=new URLSearchParams(r).toString(),o=`${c(e)}${a?`?${a}`:""}#schedule`;return t.jsx(s,{to:o,replace:!0})}export{p as default};

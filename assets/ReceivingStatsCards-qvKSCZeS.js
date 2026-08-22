@@ -1,0 +1,1 @@
+import{j as e}from"./index-Co1Pebuc.js";import{S as o}from"./StatusBadge-C7Xiuv-6.js";import{a as t,b as a}from"./receivingPhotoUtils-BHUfLolC.js";import"./PurchaseStatsCards-Btc6cEFZ.js";function E({status:r}){return e.jsx(o,{label:a[r]||r,type:t[r]||"idle"})}export{E as R};
