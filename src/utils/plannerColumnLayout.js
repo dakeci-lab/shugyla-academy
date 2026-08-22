@@ -46,10 +46,27 @@ export function computeStickyLeft(columnName, visibleColumns) {
 }
 
 /**
+ * Sticky offsets only — for tbody cells (width comes from thead / colgroup).
  * @param {{ columnName: string, width: number }} col
  * @param {ReturnType<typeof getVisibleColumns>} visibleColumns
  */
-export function buildPlannerColumnInlineStyle(col, visibleColumns) {
+export function buildPlannerColumnBodyStyle(col, visibleColumns) {
+  const def = getPlannerColumnDef(col.columnName)
+  if (def?.stickySide === 'left') {
+    return { left: `${computeStickyLeft(col.columnName, visibleColumns)}px` }
+  }
+  if (def?.stickySide === 'right') {
+    return { right: 0 }
+  }
+  return undefined
+}
+
+/**
+ * Width + sticky — for thead cells only (table-layout: fixed propagates width).
+ * @param {{ columnName: string, width: number }} col
+ * @param {ReturnType<typeof getVisibleColumns>} visibleColumns
+ */
+export function buildPlannerColumnHeaderStyle(col, visibleColumns) {
   const style = { width: `${col.width}px` }
   const def = getPlannerColumnDef(col.columnName)
   if (def?.stickySide === 'left') {
@@ -58,6 +75,11 @@ export function buildPlannerColumnInlineStyle(col, visibleColumns) {
     style.right = 0
   }
   return style
+}
+
+/** @deprecated Use buildPlannerColumnHeaderStyle */
+export function buildPlannerColumnInlineStyle(col, visibleColumns) {
+  return buildPlannerColumnHeaderStyle(col, visibleColumns)
 }
 
 /**

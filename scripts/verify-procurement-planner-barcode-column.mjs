@@ -94,9 +94,16 @@ assert(
 )
 
 assert(
-  'product column ~11rem, barcode ~8.5rem',
-  /\.proc-planner__col-product\s*\{[^}]*width:\s*11rem/.test(plannerCss) &&
-    /\.proc-planner__col-barcode\s*\{[^}]*width:\s*8\.5rem/.test(plannerCss)
+  'default product/barcode widths from registry (176px / 136px)',
+  defaults.columns.find((col) => col.columnName === 'product')?.width === 176 &&
+    defaults.columns.find((col) => col.columnName === 'barcode')?.width === 136
+)
+
+assert(
+  'width on thead only (colgroup + header style, not body)',
+  planner.includes('<colgroup>') &&
+    planner.includes('buildPlannerColumnHeaderStyle(col, visibleColumns)') &&
+    planner.includes('buildPlannerColumnBodyStyle(col, visibleColumns)')
 )
 
 assert(

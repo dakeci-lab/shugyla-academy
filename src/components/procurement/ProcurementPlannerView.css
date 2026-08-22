@@ -427,8 +427,6 @@
 }
 
 .proc-planner__col-num {
-  width: 2.75rem;
-  min-width: 2.75rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
   color: var(--text-secondary, #6b7280);
@@ -436,15 +434,11 @@
 }
 
 .proc-planner__col-product {
-  width: 11rem;
-  min-width: 11rem;
-  max-width: 11rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .proc-planner__col-barcode {
-  width: 8.5rem;
-  min-width: 8.5rem;
-  max-width: 8.5rem;
   font-variant-numeric: tabular-nums;
   font-size: 0.8125rem;
   color: var(--text-secondary, #6b7280);
@@ -454,9 +448,6 @@
 }
 
 .proc-planner__col-week {
-  width: 2.6rem;
-  min-width: 2.6rem;
-  max-width: 3rem;
   padding-left: 0.25rem;
   padding-right: 0.25rem;
   text-align: right;
@@ -477,12 +468,6 @@
   color: #9ca3af;
 }
 
-.proc-planner__col-order {
-  width: 5.75rem;
-  min-width: 5.75rem;
-  max-width: 5.75rem;
-}
-
 .proc-planner__col-order--accent {
   background: #f0f7ff;
 }
@@ -499,15 +484,11 @@
 }
 
 .proc-planner__col-reserve {
-  min-width: 3.25rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 .proc-planner__col-abc-axis {
-  width: 2.75rem;
-  min-width: 2.75rem;
-  max-width: 3.25rem;
   padding-left: 0.2rem;
   padding-right: 0.2rem;
   text-align: center;
@@ -812,6 +793,7 @@
 .proc-planner__table td {
   padding: 0.55rem 0.65rem;
   border-bottom: 1px solid var(--border, #eef0f3);
+  border-right: 1px solid var(--border, #e5e7eb);
   text-align: left;
   vertical-align: top;
 }
@@ -826,17 +808,36 @@
 .proc-planner__col-head {
   position: relative;
   display: flex;
+  align-items: stretch;
+  min-height: 100%;
+}
+
+.proc-planner__col-drag-handle {
+  flex: 1;
+  display: flex;
   align-items: center;
   gap: 0.25rem;
-  min-height: 100%;
+  min-width: 0;
   padding-right: 0.35rem;
+}
+
+.proc-planner__col-drag-handle.is-reorderable {
+  cursor: grab;
+}
+
+.proc-planner__col-drag-handle.is-reorderable:active {
+  cursor: grabbing;
+}
+
+.proc-planner__table th.is-dragging .proc-planner__col-drag-handle {
+  opacity: 0.55;
 }
 
 .proc-planner__col-resizer {
   position: absolute;
   top: 0;
-  right: 0;
-  width: 6px;
+  right: -3px;
+  width: 7px;
   height: 100%;
   cursor: col-resize;
   touch-action: none;
@@ -844,17 +845,27 @@
   z-index: 2;
 }
 
+.proc-planner__col-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 3px;
+  width: 1px;
+  height: 100%;
+  background: var(--border, #e5e7eb);
+  pointer-events: none;
+}
+
+.proc-planner__col-resizer:hover::after,
+.proc-planner__col-resizer:active::after {
+  width: 2px;
+  right: 2px;
+  background: var(--accent, #2563eb);
+}
+
 .proc-planner__col-resizer:hover,
 .proc-planner__col-resizer:active {
-  background: rgba(37, 99, 235, 0.18);
-}
-
-.proc-planner__table th.is-reorderable {
-  cursor: grab;
-}
-
-.proc-planner__table th.is-dragging {
-  opacity: 0.55;
+  background: rgba(37, 99, 235, 0.08);
 }
 
 .proc-planner__table th.is-drag-over {

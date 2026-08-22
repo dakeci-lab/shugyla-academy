@@ -113,7 +113,8 @@ import {
   reorderTogglablePlannerColumns,
 } from '../../utils/plannerColumnSettingsMerge'
 import {
-  buildPlannerColumnInlineStyle,
+  buildPlannerColumnBodyStyle,
+  buildPlannerColumnHeaderStyle,
   getPlannerColumnClassName,
   getVisibleColumns,
   getVisibleLockedLeftColumns,
@@ -506,10 +507,12 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         (item) => item.columnName === columnName
       )
       if (!col) return
+      const th = event.currentTarget.closest('th')
+      const measuredWidth = th ? th.getBoundingClientRect().width : col.width
       resizeStateRef.current = {
         columnName,
         startX: event.clientX,
-        startWidth: col.width,
+        startWidth: measuredWidth,
       }
       window.addEventListener('pointermove', handleColumnResizePointerMove)
       window.addEventListener('pointerup', handleColumnResizePointerUp)
@@ -1569,13 +1572,12 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   function renderPlannerColumnHeaderShell(col, content) {
     const className = getPlannerColumnClassName(col.columnName)
-    const style = buildPlannerColumnInlineStyle(col, visibleColumns)
+    const style = buildPlannerColumnHeaderStyle(col, visibleColumns)
     const reorderable = isPlannerColumnReorderable(col.columnName)
     const headerClassName = [
       className,
       dragColumnName === col.columnName ? 'is-dragging' : '',
       dropColumnName === col.columnName && dragColumnName ? 'is-drag-over' : '',
-      reorderable ? 'is-reorderable' : '',
     ]
       .filter(Boolean)
       .join(' ')
@@ -1585,14 +1587,23 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         key={col.columnName}
         className={headerClassName}
         style={style}
-        draggable={reorderable || undefined}
-        onDragStart={(event) => handleColumnDragStart(event, col.columnName)}
         onDragOver={(event) => handleColumnDragOver(event, col.columnName)}
         onDrop={(event) => handleColumnDrop(event, col.columnName)}
-        onDragEnd={handleColumnDragEnd}
       >
         <div className="proc-planner__col-head">
-          {content}
+          <div
+            className={[
+              'proc-planner__col-drag-handle',
+              reorderable ? 'is-reorderable' : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+            draggable={reorderable || undefined}
+            onDragStart={(event) => handleColumnDragStart(event, col.columnName)}
+            onDragEnd={handleColumnDragEnd}
+          >
+            {content}
+          </div>
           <span
             className="proc-planner__col-resizer"
             role="separator"
@@ -1654,7 +1665,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   function renderPlannerSkuCell(col, item, index, { indent = false } = {}) {
     const className = getPlannerColumnClassName(col.columnName)
-    const style = buildPlannerColumnInlineStyle(col, visibleColumns)
+    const style = buildPlannerColumnBodyStyle(col, visibleColumns)
 
     switch (col.columnName) {
       case 'rowNum':
@@ -1856,7 +1867,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       <tr key={key} className={`proc-planner__tree-group depth-${depth}`}>
         {lockedLeftColumns.map((col) => {
           const className = getPlannerColumnClassName(col.columnName)
-          const style = buildPlannerColumnInlineStyle(col, visibleColumns)
+          const style = buildPlannerColumnBodyStyle(col, visibleColumns)
           if (col.columnName === 'product') {
             return (
               <td key={col.columnName} className={className} style={style}>
@@ -2535,6 +2546,11 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
           aria-busy={(treeMode ? filterOptionsLoading : loading) || undefined}
         >
           <table className="proc-planner__table">
+            <colgroup>
+              {visibleColumns.map((col) => (
+                <col key={col.columnName} style={{ width: `${col.width}px` }} />
+              ))}
+            </colgroup>
             <thead>
               <tr>{visibleColumns.map((col) => renderPlannerColumnHeader(col))}</tr>
             </thead>

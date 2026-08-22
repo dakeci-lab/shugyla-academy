@@ -139,8 +139,47 @@ assert(
 )
 
 assert(
-  'T2: inline width via buildPlannerColumnInlineStyle',
-  planner.includes('buildPlannerColumnInlineStyle(col, visibleColumns)')
+  'T2: header width via buildPlannerColumnHeaderStyle',
+  planner.includes('buildPlannerColumnHeaderStyle(col, visibleColumns)')
+)
+
+assert(
+  'T2: body sticky via buildPlannerColumnBodyStyle',
+  planner.includes('buildPlannerColumnBodyStyle(col, visibleColumns)')
+)
+
+assert(
+  'layout exports buildPlannerColumnHeaderStyle + buildPlannerColumnBodyStyle',
+  layoutSrc.includes('export function buildPlannerColumnHeaderStyle') &&
+    layoutSrc.includes('export function buildPlannerColumnBodyStyle')
+)
+
+const plannerCss = read('src/components/procurement/ProcurementPlannerView.css')
+
+assert(
+  'hotfix: no rem max-width on product/barcode columns',
+  !plannerCss.includes('max-width: 11rem') && !plannerCss.includes('max-width: 8.5rem')
+)
+
+assert(
+  'hotfix: vertical column dividers on table cells',
+  plannerCss.includes('border-right: 1px solid var(--border')
+)
+
+assert(
+  'hotfix: colgroup for column widths',
+  planner.includes('<colgroup>') && planner.includes('<col key={col.columnName}')
+)
+
+assert(
+  'hotfix: resize uses measured th width',
+  planner.includes('getBoundingClientRect().width')
+)
+
+assert(
+  'hotfix: drag handle separate from resizer',
+  planner.includes('proc-planner__col-drag-handle') &&
+    planner.includes('className="proc-planner__col-resizer"')
 )
 
 const defaults = registry.getDefaultPlannerColumnSettings()
@@ -324,8 +363,8 @@ assert(
 
 assert(
   'T3: CSS resizer and popover styles',
-  read('src/components/procurement/ProcurementPlannerView.css').includes('.proc-planner__col-resizer') &&
-    read('src/components/procurement/ProcurementPlannerView.css').includes('.proc-planner__column-settings-popover')
+  plannerCss.includes('.proc-planner__col-resizer') &&
+    plannerCss.includes('.proc-planner__column-settings-popover')
 )
 
 console.log(`\n${checks}/${checks} checks passed`)

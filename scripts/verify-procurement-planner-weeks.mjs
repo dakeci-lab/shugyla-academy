@@ -80,7 +80,7 @@ assert(
   layoutSrc.includes('proc-planner__sticky-product') &&
     layoutSrc.includes('proc-planner__sticky-barcode') &&
     layoutSrc.includes('proc-planner__sticky-order') &&
-    planner.includes('buildPlannerColumnInlineStyle')
+    planner.includes('buildPlannerColumnHeaderStyle')
 )
 assert(
   'CSS sticky for product/barcode/order',

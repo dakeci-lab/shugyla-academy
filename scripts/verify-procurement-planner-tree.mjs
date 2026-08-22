@@ -130,13 +130,10 @@ assert(
     !/\.proc-planner__sticky-order\s*\{[^}]*box-shadow/.test(plannerCss)
 )
 assert(
-  'product column has fixed width bounds',
-  /\.proc-planner__col-product\s*\{[^}]*width:\s*11rem/.test(plannerCss) &&
-    /\.proc-planner__col-product\s*\{[^}]*max-width:\s*11rem/.test(plannerCss)
-)
-assert(
-  'barcode column has fixed width bounds',
-  /\.proc-planner__col-barcode\s*\{[^}]*width:\s*8\.5rem/.test(plannerCss)
+  'product/barcode widths from persisted settings (not CSS rem bounds)',
+  planner.includes('buildPlannerColumnHeaderStyle') &&
+    planner.includes('<colgroup>') &&
+    !plannerCss.includes('max-width: 11rem')
 )
 assert(
   'tree group uses locked-left cells + plannerTreeTailColSpan',
