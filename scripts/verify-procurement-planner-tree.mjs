@@ -130,8 +130,16 @@ assert(
 )
 assert(
   'product column has fixed width bounds',
-  /\.proc-planner__col-product\s*\{[^}]*width:\s*14rem/.test(plannerCss) &&
-    /\.proc-planner__col-product\s*\{[^}]*max-width:\s*14rem/.test(plannerCss)
+  /\.proc-planner__col-product\s*\{[^}]*width:\s*11rem/.test(plannerCss) &&
+    /\.proc-planner__col-product\s*\{[^}]*max-width:\s*11rem/.test(plannerCss)
+)
+assert(
+  'barcode column has fixed width bounds',
+  /\.proc-planner__col-barcode\s*\{[^}]*width:\s*8\.5rem/.test(plannerCss)
+)
+assert(
+  'tree group uses leading cells + tail colspan',
+  planner.includes('TABLE_COL_SPAN - 3') && planner.includes('proc-planner__tree-group-tail')
 )
 assert(
   'product name clamps with ellipsis path',
@@ -141,7 +149,8 @@ assert(
 assert(
   'product / group labels expose full text via title',
   planner.includes('title={item.productName}') &&
-    planner.includes('title={item.barcode}') &&
+    (planner.includes('title={item.barcode}') ||
+      planner.includes('title={item.barcode || undefined}')) &&
     /tree-group-name" title=\{label\}/.test(planner)
 )
 assert(

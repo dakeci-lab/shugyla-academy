@@ -82,6 +82,7 @@
     "verify:procurement-pagination-ux": "node scripts/verify-procurement-pagination-ux.mjs",
     "verify:procurement-planner-weeks": "node scripts/verify-procurement-planner-weeks.mjs",
     "verify:procurement-planner-reserve-days": "node scripts/verify-procurement-planner-reserve-days.mjs",
+    "verify:procurement-planner-barcode-column": "node scripts/verify-procurement-planner-barcode-column.mjs",
     "verify:procurement-planner-header": "node scripts/verify-procurement-planner-header.mjs",
     "verify:procurement-planner-tree": "node scripts/verify-procurement-planner-tree.mjs",
     "verify:procurement-planner-categories": "node scripts/verify-procurement-planner-tree.mjs",

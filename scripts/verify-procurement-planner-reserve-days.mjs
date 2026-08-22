@@ -47,8 +47,8 @@ assert(
 )
 
 assert(
-  'TABLE_COL_SPAN tail is +7 (20 with 8 weeks)',
-  /TABLE_COL_SPAN\s*=\s*5\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*7/.test(planner)
+  'TABLE_COL_SPAN tail is +7 (21 with 8 weeks)',
+  /TABLE_COL_SPAN\s*=\s*6\s*\+\s*PLANNER_WEEK_COLUMN_COUNT\s*\+\s*7/.test(planner)
 )
 
 assert(
@@ -79,7 +79,7 @@ assert(
 
 assert(
   'tree/loading rows use TABLE_COL_SPAN only',
-  planner.includes('colSpan={TABLE_COL_SPAN}') && !planner.includes('colSpan={20}')
+  planner.includes('colSpan={TABLE_COL_SPAN}') && !planner.includes('colSpan={21}')
 )
 
 assert(
