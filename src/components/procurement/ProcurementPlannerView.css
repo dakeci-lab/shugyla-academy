@@ -608,6 +608,9 @@
 .proc-planner__table thead .proc-planner__sticky-product,
 .proc-planner__table thead .proc-planner__sticky-barcode,
 .proc-planner__table thead .proc-planner__sticky-order {
+  /* .proc-planner__table th sets position: relative (for the resize-handle anchor);
+     this more specific selector restores position: sticky for the frozen header cells. */
+  position: sticky;
   background: #fafbfc;
   z-index: 3;
 }
