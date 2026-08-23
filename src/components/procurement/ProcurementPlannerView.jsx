@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext'
@@ -172,12 +172,13 @@ const ABC_COLUMN_HELP =
 
 function AbcColumnHelp() {
   return (
-    <span className="proc-planner__abc-help" title={ABC_COLUMN_HELP} aria-label={ABC_COLUMN_HELP}>
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" />
-        <path d="M12 10v5" />
-        <path d="M12 7h.01" />
-      </svg>
+    <span
+      className="proc-planner__abc-help"
+      title={ABC_COLUMN_HELP}
+      aria-label={ABC_COLUMN_HELP}
+      role="img"
+    >
+      ?
     </span>
   )
 }
@@ -600,10 +601,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   const visibleColumns = useMemo(() => getVisibleColumns(columnSettings), [columnSettings])
   const visibleColumnCount = visibleColumns.length
-  const firstVisibleAbcColumnName = useMemo(
-    () => visibleColumns.find((col) => isPlannerAbcColumnName(col.columnName))?.columnName,
-    [visibleColumns]
-  )
 
   const treeMode = isPlannerTreeViewMode({
     search: debouncedSearch,
@@ -1637,16 +1634,15 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
               <span
                 className={`proc-planner__abc-arrow is-up${active && dir === 'asc' ? ' is-on' : ''}`}
               >
-                ↑
+                ▲
               </span>
               <span
                 className={`proc-planner__abc-arrow is-down${active && dir === 'desc' ? ' is-on' : ''}`}
               >
-                ↓
+                ▼
               </span>
             </span>
           </button>
-          {col.columnName === firstVisibleAbcColumnName ? <AbcColumnHelp /> : null}
         </div>
       )
     }
@@ -2299,17 +2295,19 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       {alertChips.length > 0 ? (
         <span className="proc-planner__chips">
           {alertChips.map((chip) => (
-            <button
-              key={chip.id}
-              type="button"
-              className="proc-planner__chip"
-              title={chip.title}
-              aria-label={`${chip.label}: ${chip.count}. ${chip.title}`}
-              onClick={() => handleAlertChipClick(chip)}
-            >
-              <span className="proc-planner__chip-label">{chip.label}</span>
-              <span className="proc-planner__chip-count">{chip.count}</span>
-            </button>
+            <Fragment key={chip.id}>
+              <button
+                type="button"
+                className="proc-planner__chip"
+                title={chip.title}
+                aria-label={`${chip.label}: ${chip.count}. ${chip.title}`}
+                onClick={() => handleAlertChipClick(chip)}
+              >
+                <span className="proc-planner__chip-label">{chip.label}</span>
+                <span className="proc-planner__chip-count">{chip.count}</span>
+              </button>
+              {chip.id === 'unassigned' ? <AbcColumnHelp /> : null}
+            </Fragment>
           ))}
         </span>
       ) : null}

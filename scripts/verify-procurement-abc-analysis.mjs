@@ -711,10 +711,11 @@ assert(
   assert('page resets to 1 on filter/sort change', planner.includes('setPage(1)') && planner.includes('[debouncedSearch, filters, abcSort, snapshot?.id]'))
   assert('A green / B amber / C red / dash gray', css.includes('.proc-planner__abc-badge.is-a') && css.includes('.proc-planner__abc-badge.is-b') && css.includes('.proc-planner__abc-badge.is-c') && css.includes('.proc-planner__abc-badge.is-empty'))
   assert(
-    'ABC sort axis buttons are at least 24×32 CSS px',
+    'ABC sort axis buttons at least 24×24 CSS px, label + arrows in one row',
     css.includes('.proc-planner__abc-axis-btn') &&
       css.includes('min-width: 24px') &&
-      css.includes('min-height: 32px')
+      css.includes('min-height: 24px') &&
+      /\.proc-planner__abc-axis-btn\s*\{[^}]*flex-direction:\s*row/.test(css)
   )
   assert(
     'permanent ↑↓ affordance on ABC headers',

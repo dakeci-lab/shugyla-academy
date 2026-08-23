@@ -60,11 +60,12 @@ assert(
     plannerCss.includes('.proc-planner__abc-arrow.is-on')
 )
 assert(
-  'ABC column help icon on first visible ABC axis',
+  'ABC column help icon lives next to the «Без поставщика» toolbar chip, not the column header',
   planner.includes('AbcColumnHelp') &&
     planner.includes('ABC_COLUMN_HELP') &&
     planner.includes('proc-planner__abc-help') &&
-    planner.includes('firstVisibleAbcColumnName')
+    /chip\.id === 'unassigned' \? <AbcColumnHelp \/> : null/.test(planner) &&
+    !planner.includes('firstVisibleAbcColumnName')
 )
 assert(
   'ABC help CSS present',
