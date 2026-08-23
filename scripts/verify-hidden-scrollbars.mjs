@@ -61,13 +61,20 @@ function main() {
   assert('modal lock uses scrollbar width check', modalLock.includes('getScrollbarWidth()'))
   assert('modal lock padding only when width > 0', modalLock.match(/scrollbarWidth > 0[\s\S]*paddingRight/))
 
+  // Owner-approved exception: the procurement planner table wants a persistent
+  // scroll indicator (like UMAG's product grid), so it opts back into a visible
+  // scrollbar. See the comment on this exception in src/index.css.
+  const SCROLLBAR_EXCEPTIONS = new Set([
+    'src/components/procurement/ProcurementPlannerView.css',
+  ])
+
   const cssFiles = walkCssFiles(SRC)
   const offenders = []
 
   for (const filePath of cssFiles) {
     const rel = path.relative(ROOT, filePath)
+    if (rel === 'src/index.css' || SCROLLBAR_EXCEPTIONS.has(rel)) continue
     const content = fs.readFileSync(filePath, 'utf8')
-    if (rel === 'src/index.css') continue
 
     if (/scrollbar-width:\s*(thin|auto)/.test(content)) {
       offenders.push(`${rel}: scrollbar-width thin/auto`)
@@ -80,7 +87,11 @@ function main() {
     }
   }
 
-  assert('no local custom scrollbar styles remain', offenders.length === 0, offenders.join('; '))
+  assert(
+    'no local custom scrollbar styles outside approved exceptions',
+    offenders.length === 0,
+    offenders.join('; ')
+  )
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

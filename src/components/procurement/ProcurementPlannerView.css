@@ -758,7 +758,12 @@
   background: var(--surface, #fff);
 }
 
+/* Deliberate, scoped exception to the platform's no-visible-scrollbar rule in
+   src/index.css (that reset sets display:none, which our width/height alone
+   cannot override — see the comment there). Owner asked for a persistent
+   scroll indicator on this specific table, like UMAG's product grid. */
 .proc-planner__table-wrap::-webkit-scrollbar {
+  display: block;
   width: 10px;
   height: 10px;
 }
