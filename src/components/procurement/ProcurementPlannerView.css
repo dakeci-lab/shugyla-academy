@@ -594,12 +594,15 @@
   font-weight: 400;
 }
 
-/* Sticky: № + Товар + Штрихкод left; Заказ right — weeks scroll in the middle. */
+/* № / Товар / Штрихкод / Заказ scroll with everything else, like UMAG's product
+   grid — no frozen columns. Left/right offsets still come from plannerColumnLayout.js
+   (computeStickyLeft) for the category-tree row split, but position:static makes the
+   browser ignore them here instead of pinning the column. */
 .proc-planner__sticky-num,
 .proc-planner__sticky-product,
 .proc-planner__sticky-barcode,
 .proc-planner__sticky-order {
-  position: sticky;
+  position: static;
   background: var(--surface, #fff);
   z-index: 2;
 }
@@ -608,9 +611,7 @@
 .proc-planner__table thead .proc-planner__sticky-product,
 .proc-planner__table thead .proc-planner__sticky-barcode,
 .proc-planner__table thead .proc-planner__sticky-order {
-  /* .proc-planner__table th sets position: relative (for the resize-handle anchor);
-     this more specific selector restores position: sticky for the frozen header cells. */
-  position: sticky;
+  position: static;
   background: #fafbfc;
   z-index: 3;
 }
@@ -748,9 +749,37 @@
   /* Bounded like UMAG's product grid: scroll happens inside this box (both axes),
      so the native scrollbar stays reachable and thead can stick to its top. */
   max-height: calc(100vh - 250px);
+  /* Classic always-visible scrollbar instead of macOS's hide-until-scrolling
+     overlay, so position/remaining-content is visible at rest, not just mid-gesture. */
+  scrollbar-width: thin;
+  scrollbar-color: #c7cbd1 transparent;
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 10px;
   background: var(--surface, #fff);
+}
+
+.proc-planner__table-wrap::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+.proc-planner__table-wrap::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.proc-planner__table-wrap::-webkit-scrollbar-thumb {
+  background-color: #c7cbd1;
+  border-radius: 6px;
+  border: 2px solid var(--surface, #fff);
+  background-clip: padding-box;
+}
+
+.proc-planner__table-wrap::-webkit-scrollbar-thumb:hover {
+  background-color: #9aa1ab;
+}
+
+.proc-planner__table-wrap::-webkit-scrollbar-corner {
+  background: transparent;
 }
 
 .proc-planner__table-wrap--fetching {
