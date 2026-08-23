@@ -14,6 +14,7 @@ import { isCloudMode } from '../../lib/dataMode'
 import {
   exportSnapshotItemsCsv,
   fetchLatestProcurementSnapshot,
+  fetchProcurementSnapshotStockHealth,
   fetchSnapshotFilterOptions,
   fetchSnapshotItemsPage,
   fetchSnapshotAttemptItems,
@@ -22,6 +23,7 @@ import {
   syncProcurementPlanning,
   updateItemFinalOrderQty,
 } from '../../services/procurementPlanningService'
+import ProcurementStockHealthWidget from './ProcurementStockHealthWidget'
 import {
   getCachedFilterOptions,
   setCachedFilterOptions,
@@ -328,6 +330,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   const canGenerate = canCreatePurchase(user) && canTransferToReceiving(user)
 
   const [snapshot, setSnapshot] = useState(null)
+  const [stockHealth, setStockHealth] = useState(null)
   const [items, setItems] = useState([])
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
@@ -664,6 +667,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   const loadSnapshotMeta = useCallback(async ({ forceFilterRefresh = false } = {}) => {
     if (!isCloudMode()) {
       setSnapshot(null)
+      setStockHealth(null)
       setLoading(false)
       return
     }
@@ -675,6 +679,20 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       } else {
         applyFilterOptions('', EMPTY_FILTER_OPTIONS)
         setFilterOptionsLoading(false)
+      }
+      if (snap?.id) {
+        // Own try/catch: the KPI widget is a nice-to-have on top of the
+        // planner, not a hard requirement — one RPC failing here (e.g. the
+        // migration hasn't reached this environment yet) shouldn't surface
+        // as a page-level error or block loading the plan itself.
+        try {
+          setStockHealth(await fetchProcurementSnapshotStockHealth(snap.id))
+        } catch (healthErr) {
+          console.warn('Не удалось загрузить сводку по остаткам:', healthErr)
+          setStockHealth(null)
+        }
+      } else {
+        setStockHealth(null)
       }
     } catch (err) {
       showError(toProcurementUserMessage(err, 'Не удалось загрузить снимок.'))
@@ -2333,6 +2351,10 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   return (
     <div className="proc-planner">
       {headerSlot ? createPortal(headerStrip, headerSlot) : headerStrip}
+      <ProcurementStockHealthWidget
+        stockHealth={stockHealth}
+        asOfLabel={snapshot?.syncedAt ? formatSyncedAt(snapshot.syncedAt) : null}
+      />
       <PlatformSearchToolbar
         value={search}
         onChange={(e) => setSearch(e.target.value)}

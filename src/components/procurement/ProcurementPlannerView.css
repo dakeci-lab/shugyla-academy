@@ -1462,3 +1462,144 @@ a.proc-planner__qty-history:hover {
     right: 0.25rem;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Stock-health widget (80/10/10 retail standard, ties into buyer KPI)         */
+/* -------------------------------------------------------------------------- */
+
+.proc-stock-health {
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  background: var(--surface, #fff);
+}
+
+.proc-stock-health__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.proc-stock-health__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text, #111827);
+}
+
+.proc-stock-health__standard {
+  margin-left: 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--text-secondary, #9ca3af);
+  cursor: help;
+}
+
+.proc-stock-health__asof {
+  font-size: 0.6875rem;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.proc-stock-health__bar {
+  display: flex;
+  height: 20px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #f3f4f6;
+  margin-bottom: 0.85rem;
+}
+
+.proc-stock-health__bar-seg {
+  height: 100%;
+}
+
+.proc-stock-health__bar-seg.is-onNorm {
+  background: #eef1f4;
+}
+
+.proc-stock-health__bar-seg.is-overNorm {
+  background: #f6bcbc;
+}
+
+.proc-stock-health__bar-seg.is-underNorm {
+  background: #c2ecd0;
+}
+
+.proc-stock-health__bar-seg.is-no-demand {
+  background: #f3f4f6;
+}
+
+.proc-stock-health__legend {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem 1rem;
+}
+
+.proc-stock-health__legend-item {
+  min-width: 0;
+}
+
+.proc-stock-health__legend-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--text-secondary, #6b7280);
+  margin-bottom: 0.2rem;
+}
+
+.proc-stock-health__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  flex: none;
+}
+
+.proc-stock-health__dot.is-onNorm {
+  background: #cbd2d9;
+}
+
+.proc-stock-health__dot.is-overNorm {
+  background: #e07a7a;
+}
+
+.proc-stock-health__dot.is-underNorm {
+  background: #6ec895;
+}
+
+.proc-stock-health__dot.is-no-demand {
+  background: #d1d5db;
+}
+
+.proc-stock-health__legend-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text, #111827);
+  line-height: 1.2;
+}
+
+.proc-stock-health__legend-value.is-off-target {
+  color: #912018;
+}
+
+.proc-stock-health__legend-meta {
+  display: block;
+  font-size: 0.6875rem;
+  color: var(--text-secondary, #9ca3af);
+}
+
+.proc-stock-health__legend-meta.is-off-target {
+  color: #912018;
+}
+
+.proc-stock-health__legend-item.is-muted .proc-stock-health__legend-value {
+  color: var(--text-secondary, #9ca3af);
+}
+
+@media (max-width: 700px) {
+  .proc-stock-health__legend {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

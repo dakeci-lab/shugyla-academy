@@ -1123,6 +1123,52 @@ export function buildSnapshotHeadline({
   }
 }
 
+/** Retail standard for the stock-health widget: 80% of rated SKUs on norm,
+ * up to 10% overstock, up to 10% understock. Ties into buyer KPI/bonus. */
+export const STOCK_HEALTH_TARGET = Object.freeze({
+  onNorm: 80,
+  overNorm: 10,
+  underNorm: 10,
+})
+
+/**
+ * Shapes raw bucket counts from get_procurement_snapshot_stock_health into
+ * display-ready percentages against STOCK_HEALTH_TARGET.
+ *
+ * The 80/10/10 denominator is "rated" SKUs (total minus noDemand) — items
+ * with no demand signal (avg_daily <= 0, shown as "—" in the table) have
+ * nothing to compare their stock against and are reported separately.
+ *
+ * @param {{ total: number, noDemand: number, underNorm: number, onNorm: number, overNorm: number }|null} stockHealth
+ */
+export function buildStockHealthSummary(stockHealth) {
+  if (!stockHealth || !(stockHealth.total > 0)) return null
+
+  const { total, noDemand, underNorm, onNorm, overNorm } = stockHealth
+  const rated = Math.max(0, total - noDemand)
+  const pctOfRated = (count) => (rated > 0 ? Math.round((count / rated) * 100) : 0)
+
+  function bucket(key, label, count, target, badWhen) {
+    const pct = pctOfRated(count)
+    const deviation = pct - target
+    const isOffTarget = badWhen === 'above' ? deviation > 0 : deviation < 0
+    return { key, label, count, pct, target, deviation, isOffTarget }
+  }
+
+  return {
+    rated,
+    buckets: [
+      bucket('onNorm', 'Точно', onNorm, STOCK_HEALTH_TARGET.onNorm, 'below'),
+      bucket('overNorm', 'Перезатарка', overNorm, STOCK_HEALTH_TARGET.overNorm, 'above'),
+      bucket('underNorm', 'Недостаток', underNorm, STOCK_HEALTH_TARGET.underNorm, 'above'),
+    ],
+    noDemand: {
+      count: noDemand,
+      pct: total > 0 ? Math.round((noDemand / total) * 100) : 0,
+    },
+  }
+}
+
 /**
  * Compact action chips for the header strip. Only non-zero counters produce a chip —
  * nothing is rendered when the plan is clean.

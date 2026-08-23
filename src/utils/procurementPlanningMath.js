@@ -44,9 +44,18 @@ export function calcReserveDays(calculationStock, avgDaily) {
   return Math.round(stock / avg)
 }
 
+/** Retail tolerance band around the norm: within ±20% counts as "on norm".
+ * Reserve days is a rounded integer while the norm is a flat per-category
+ * target, so exact equality is a near-impossible target in practice — with
+ * strict equality, real data showed ~1% of SKUs landing exactly on norm
+ * instead of the intended ~80%. */
+export const STOCK_HEALTH_NORM_TOLERANCE = 0.2
+
 /**
- * Highlights «Запас/дн» against the item's norm: below norm means lean stock
- * (green), above norm means overstock (red), equal means no highlight.
+ * Highlights «Запас/дн» against the item's norm: meaningfully below the
+ * tolerance band means lean stock heading toward a shortage (green),
+ * meaningfully above means overstock (red), within the band means no
+ * highlight — matches the retail 80/10/10 standard's "точно" bucket.
  * Returns null (no highlight) when reserveDays is unknown (calcReserveDays
  * returned null — no demand data) or normDays isn't a finite number.
  */
@@ -54,8 +63,10 @@ export function compareReserveDaysToNorm(reserveDays, normDays) {
   if (reserveDays == null) return null
   const norm = Number(normDays)
   if (!Number.isFinite(norm)) return null
-  if (reserveDays < norm) return 'below-norm'
-  if (reserveDays > norm) return 'above-norm'
+  const lower = norm * (1 - STOCK_HEALTH_NORM_TOLERANCE)
+  const upper = norm * (1 + STOCK_HEALTH_NORM_TOLERANCE)
+  if (reserveDays < lower) return 'below-norm'
+  if (reserveDays > upper) return 'above-norm'
   return null
 }
 

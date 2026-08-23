@@ -473,6 +473,33 @@ export async function fetchProcurementSnapshotById(snapshotId) {
 }
 
 /**
+ * Retail 80/10/10 stock-health buckets for the planner's KPI widget.
+ * Computed fresh on the server from the same columns the table shows
+ * (calculation_stock/avg_daily/norm_days) — never cached, since editing a
+ * norm via the "Нормы" tab updates norm_days on existing snapshot items
+ * immediately, between UMAG syncs.
+ */
+export async function fetchProcurementSnapshotStockHealth(snapshotId) {
+  ensureClient()
+  if (!snapshotId) return null
+
+  const { data, error } = await supabase.rpc('get_procurement_snapshot_stock_health', {
+    p_snapshot_id: snapshotId,
+  })
+  if (error) throw new Error(error.message || 'Не удалось загрузить сводку по остаткам')
+  const row = Array.isArray(data) ? data[0] : data
+  if (!row) return null
+
+  return {
+    total: Number(row.total_count) || 0,
+    noDemand: Number(row.no_demand_count) || 0,
+    underNorm: Number(row.under_norm_count) || 0,
+    onNorm: Number(row.on_norm_count) || 0,
+    overNorm: Number(row.over_norm_count) || 0,
+  }
+}
+
+/**
  * Server-side paginated items with filters.
  * @returns {{ items, totalCount, page, pageSize }}
  */

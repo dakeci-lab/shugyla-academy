@@ -127,6 +127,25 @@ assert(
   math.compareReserveDaysToNorm(3, undefined) === null
 )
 
+// ±20% tolerance band (owner decision, 2026-08-24): reserve days is a rounded
+// integer while the norm is a flat per-category target, so exact equality is
+// a near-impossible target — real production data showed ~1% of SKUs landing
+// exactly on norm instead of the intended ~80%.
+assert('STOCK_HEALTH_NORM_TOLERANCE is 20%', math.STOCK_HEALTH_NORM_TOLERANCE === 0.2)
+assert(
+  'a value that would fail strict equality but sits inside the ±20% band is not highlighted',
+  math.compareReserveDaysToNorm(11, 10) === null && math.compareReserveDaysToNorm(9, 10) === null
+)
+assert(
+  'the band is inclusive at its edges (norm*0.8 and norm*1.2)',
+  math.compareReserveDaysToNorm(8, 10) === null && math.compareReserveDaysToNorm(12, 10) === null
+)
+assert(
+  'just outside the band is still highlighted',
+  math.compareReserveDaysToNorm(7, 10) === 'below-norm' &&
+    math.compareReserveDaysToNorm(13, 10) === 'above-norm'
+)
+
 assert(
   'planner imports compareReserveDaysToNorm',
   planner.includes('compareReserveDaysToNorm')
