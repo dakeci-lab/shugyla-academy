@@ -98,7 +98,7 @@ import {
   nextAbcSortState,
   snapshotItemsLackAbcFacts,
 } from '../../utils/procurementAbc'
-import { calcReserveDays } from '../../utils/procurementPlanningMath'
+import { calcReserveDays, compareReserveDaysToNorm } from '../../utils/procurementPlanningMath'
 import {
   getDefaultPlannerColumnSettings,
   getPlannerColumnDef,
@@ -1727,14 +1727,21 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
           )
         }
         if (col.columnName === 'reserveDays') {
+          const reserveDays = calcReserveDays(item.calculationStock, item.avgDaily)
+          const reserveStatus = compareReserveDaysToNorm(reserveDays, item.normDays)
           return (
             <td
               key={col.columnName}
-              className={className}
+              className={[
+                className,
+                reserveStatus ? `proc-planner__reserve-${reserveStatus}` : '',
+              ]
+                .filter(Boolean)
+                .join(' ')}
               style={style}
               title={RESERVE_DAYS_TITLE}
             >
-              {formatReserveDays(calcReserveDays(item.calculationStock, item.avgDaily))}
+              {formatReserveDays(reserveDays)}
             </td>
           )
         }
@@ -1984,6 +1991,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   }
 
   function renderMobileSkuCard(item, index) {
+    const reserveDays = calcReserveDays(item.calculationStock, item.avgDaily)
+    const reserveStatus = compareReserveDaysToNorm(reserveDays, item.normDays)
     return (
       <li key={item.id} className="proc-planner__card proc-planner__sku-row">
         <div className="proc-planner__card-top">
@@ -2011,8 +2020,11 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
           </span>
           <span>
             Запас/дн{' '}
-            <b title={RESERVE_DAYS_TITLE}>
-              {formatReserveDays(calcReserveDays(item.calculationStock, item.avgDaily))}
+            <b
+              className={reserveStatus ? `proc-planner__reserve-${reserveStatus}` : undefined}
+              title={RESERVE_DAYS_TITLE}
+            >
+              {formatReserveDays(reserveDays)}
             </b>
           </span>
           <span>

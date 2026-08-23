@@ -488,6 +488,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* «Запас/дн» vs «Норма»: below norm = lean stock, above norm = overstock.
+   Exact shades supplied by the owner. Applied to the td (desktop) or the
+   inline <b> value (mobile card). */
+.proc-planner__reserve-below-norm {
+  background: #c2ecd0;
+}
+
+.proc-planner__reserve-above-norm {
+  background: #f6bcbc;
+}
+
 .proc-planner__col-abc-axis {
   padding-left: 0.2rem;
   padding-right: 0.2rem;

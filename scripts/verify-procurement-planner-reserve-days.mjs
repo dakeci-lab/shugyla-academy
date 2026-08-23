@@ -109,4 +109,42 @@ assert(
     !mathSrc.includes('reserve_days')
 )
 
+/* «Запас/дн» vs «Норма» highlight (below norm = green, above = red) */
+
+assert(
+  'procurementPlanningMath exports compareReserveDaysToNorm',
+  mathSrc.includes('export function compareReserveDaysToNorm')
+)
+assert('compareReserveDaysToNorm below norm', math.compareReserveDaysToNorm(3, 4) === 'below-norm')
+assert('compareReserveDaysToNorm above norm', math.compareReserveDaysToNorm(10, 4) === 'above-norm')
+assert('compareReserveDaysToNorm equal → null', math.compareReserveDaysToNorm(4, 4) === null)
+assert(
+  'compareReserveDaysToNorm unknown reserve (no demand) → null',
+  math.compareReserveDaysToNorm(null, 4) === null
+)
+assert(
+  'compareReserveDaysToNorm non-finite norm → null',
+  math.compareReserveDaysToNorm(3, undefined) === null
+)
+
+assert(
+  'planner imports compareReserveDaysToNorm',
+  planner.includes('compareReserveDaysToNorm')
+)
+assert(
+  'desktop reserve cell applies below/above-norm modifier class',
+  /proc-planner__reserve-\$\{reserveStatus\}/.test(planner)
+)
+assert(
+  'mobile card reserve value applies below/above-norm modifier class',
+  planner.includes('reserveStatus ? `proc-planner__reserve-${reserveStatus}` : undefined')
+)
+assert(
+  'CSS defines the two highlight shades from the owner screenshot',
+  plannerCss.includes('.proc-planner__reserve-below-norm') &&
+    plannerCss.includes('#c2ecd0') &&
+    plannerCss.includes('.proc-planner__reserve-above-norm') &&
+    plannerCss.includes('#f6bcbc')
+)
+
 console.log(`\n${checks}/${checks} checks passed`)

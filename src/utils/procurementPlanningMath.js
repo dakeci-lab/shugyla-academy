@@ -45,6 +45,21 @@ export function calcReserveDays(calculationStock, avgDaily) {
 }
 
 /**
+ * Highlights «Запас/дн» against the item's norm: below norm means lean stock
+ * (green), above norm means overstock (red), equal means no highlight.
+ * Returns null (no highlight) when reserveDays is unknown (calcReserveDays
+ * returned null — no demand data) or normDays isn't a finite number.
+ */
+export function compareReserveDaysToNorm(reserveDays, normDays) {
+  if (reserveDays == null) return null
+  const norm = Number(normDays)
+  if (!Number.isFinite(norm)) return null
+  if (reserveDays < norm) return 'below-norm'
+  if (reserveDays > norm) return 'above-norm'
+  return null
+}
+
+/**
  * When norm days change: always recompute recommendation.
  * If manual_override is false, final follows recommendation.
  * If true, final is preserved.
