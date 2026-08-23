@@ -480,10 +480,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     const state = resizeStateRef.current
     if (!state) return
     const delta = event.clientX - state.startX
-    const nextWidth = Math.max(
-      PLANNER_COLUMN_RESIZE_MIN_WIDTH,
-      Math.round(state.startWidth + delta)
-    )
+    const minWidth = getPlannerColumnDef(state.columnName)?.minWidth ?? PLANNER_COLUMN_RESIZE_MIN_WIDTH
+    const nextWidth = Math.max(minWidth, Math.round(state.startWidth + delta))
     setColumnSettings((current) => ({
       ...current,
       columns: current.columns.map((col) =>

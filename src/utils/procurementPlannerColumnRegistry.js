@@ -14,6 +14,8 @@ export const DEFAULT_PLANNER_PAGE_SIZE = 25
  * @property {string} columnName
  * @property {string} label
  * @property {number} defaultWidth width in px
+ * @property {number} [minWidth] resize floor in px; falls back to
+ *   PLANNER_COLUMN_RESIZE_MIN_WIDTH (plannerColumnSettingsMerge.js) when unset
  * @property {boolean} lockedVisible
  * @property {PlannerStickySide} stickySide
  * @property {boolean} exposedInToggle
@@ -26,6 +28,10 @@ export const PROCUREMENT_PLANNER_COLUMN_REGISTRY = Object.freeze([
     columnName: 'rowNum',
     label: '№',
     defaultWidth: 44,
+    // Narrower floor than the shared default: this column only ever holds a
+    // page-local index (1-2 digits in practice), so it doesn't need as much
+    // room as text/number columns to stay resizable down further.
+    minWidth: 32,
     lockedVisible: true,
     stickySide: 'left',
     exposedInToggle: false,
@@ -44,9 +50,14 @@ export const PROCUREMENT_PLANNER_COLUMN_REGISTRY = Object.freeze([
     columnName: 'barcode',
     label: 'Штрихкод',
     defaultWidth: 136,
-    lockedVisible: true,
+    // Not always needed, so it's hideable via the column-settings popover —
+    // unlike rowNum/product it isn't essential on every screen. Still sits in
+    // the fixed left block when visible (see LOCKED_LEFT_COLUMN_NAMES in
+    // plannerColumnSettingsMerge.js) and getReorderablePlannerColumnNames()
+    // excludes it, so toggling visibility doesn't also make it draggable.
+    lockedVisible: false,
     stickySide: 'left',
-    exposedInToggle: false,
+    exposedInToggle: true,
     sort: false,
   },
   {
@@ -241,10 +252,16 @@ export function getTogglablePlannerColumnNames() {
   )
 }
 
-/** Togglable columns that can be reordered (between barcode block and orderQty). */
+/**
+ * Togglable columns that can be reordered (between the locked-left block and
+ * orderQty). Excludes 'supplier' (fixed tail) and 'barcode' — barcode is
+ * hideable but stays pinned in the locked-left block via
+ * LOCKED_LEFT_COLUMN_NAMES (plannerColumnSettingsMerge.js) when visible, so
+ * it must not also appear in the reorderable middle zone.
+ */
 export function getReorderablePlannerColumnNames() {
   return PROCUREMENT_PLANNER_COLUMN_REGISTRY.filter(
-    (def) => def.exposedInToggle && def.columnName !== 'supplier'
+    (def) => def.exposedInToggle && def.columnName !== 'supplier' && def.columnName !== 'barcode'
   ).map((def) => def.columnName)
 }
 

@@ -72,13 +72,30 @@ assert(
 )
 
 assert(
-  '4 locked columns flagged',
-  registry.getLockedPlannerColumnNames().length === 4
+  '3 locked columns flagged (rowNum/product/orderQty — barcode is now hideable)',
+  registry.getLockedPlannerColumnNames().length === 3
 )
 
 assert(
-  '17 togglable columns flagged',
-  registry.getTogglablePlannerColumnNames().length === 17
+  '18 togglable columns flagged (barcode joined the list)',
+  registry.getTogglablePlannerColumnNames().length === 18
+)
+
+assert(
+  'barcode is hideable but not reorderable',
+  registry.getTogglablePlannerColumnNames().includes('barcode') &&
+    !registry.getReorderablePlannerColumnNames().includes('barcode')
+)
+
+assert(
+  'rowNum has a narrower resize floor than the shared default',
+  registry.getPlannerColumnDef('rowNum').minWidth <
+    merge.PLANNER_COLUMN_RESIZE_MIN_WIDTH
+)
+
+assert(
+  'resize handler looks up a per-column min width',
+  planner.includes("getPlannerColumnDef(state.columnName)?.minWidth ?? PLANNER_COLUMN_RESIZE_MIN_WIDTH")
 )
 
 assert(
@@ -259,7 +276,7 @@ assert(
 )
 
 assert(
-  'T4: reorderable middle zone is 16 columns (17 togglable − supplier)',
+  'T4: reorderable middle zone is 16 columns (18 togglable − supplier − barcode)',
   registry.getReorderablePlannerColumnNames().length === 16
 )
 
