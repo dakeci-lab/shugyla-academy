@@ -744,7 +744,10 @@
 
 .proc-planner__table-wrap {
   position: relative;
-  overflow-x: auto;
+  overflow: auto;
+  /* Bounded like UMAG's product grid: scroll happens inside this box (both axes),
+     so the native scrollbar stays reachable and thead can stick to its top. */
+  max-height: calc(100vh - 250px);
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 10px;
   background: var(--surface, #fff);
@@ -799,6 +802,14 @@
   border-right: 1px solid var(--border, #e5e7eb);
   text-align: left;
   vertical-align: top;
+}
+
+.proc-planner__table thead {
+  /* Whole header row group sticks to the top of the scroll box, same as UMAG's
+     product grid, so column titles survive vertical scroll. */
+  position: sticky;
+  top: 0;
+  z-index: 4;
 }
 
 .proc-planner__table th {
