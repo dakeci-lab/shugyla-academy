@@ -350,10 +350,6 @@
   border-radius: 12px;
 }
 
-.proc-planner__supplier-quick .searchable-supplier-select__dropdown {
-  z-index: 70;
-}
-
 .proc-planner__supplier-scope {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1450,11 +1446,11 @@ a.proc-planner__qty-history:hover {
     overflow: visible;
   }
 
-  .proc-planner__supplier-quick .searchable-supplier-select__dropdown {
+  .proc-planner__supplier-quick-dropdown {
     max-height: min(42dvh, 280px);
   }
 
-  .proc-planner__supplier-quick .searchable-supplier-select__list {
+  .proc-planner__supplier-quick-dropdown .searchable-supplier-select__list {
     max-height: min(34dvh, 220px);
   }
 

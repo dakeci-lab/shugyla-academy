@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { getSuppliers } from '../../services/platformDataService'
 import {
   SUPPLIER_STATUS,
@@ -20,6 +21,7 @@ import './SearchableSupplierSelect.css'
  * @param {string} [props.loadingLabel]
  * @param {string} [props.emptyLabel]
  * @param {React.ReactNode} [props.dropdownHeader] — optional content above the search field
+ * @param {string} [props.dropdownClassName] — extra class for the portaled dropdown (for page-specific overrides)
  */
 export default function SearchableSupplierSelect({
   suppliers: suppliersProp,
@@ -37,12 +39,14 @@ export default function SearchableSupplierSelect({
   loadingLabel = 'Загрузка поставщиков…',
   emptyLabel = 'Поставщики не найдены',
   dropdownHeader = null,
+  dropdownClassName = '',
 }) {
   const autoId = useId()
   const controlId = idProp || autoId
   const listboxId = `${controlId}-listbox`
   const rootRef = useRef(null)
   const triggerRef = useRef(null)
+  const dropdownRef = useRef(null)
   const searchRef = useRef(null)
   const listRef = useRef(null)
   const ignoreNextTriggerClickRef = useRef(false)
@@ -50,6 +54,7 @@ export default function SearchableSupplierSelect({
   const [isOpen, setIsOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const [dropdownPosition, setDropdownPosition] = useState(null)
 
   const allSuppliers = useMemo(() => {
     const list = (suppliersProp ?? getSuppliers()).filter((supplier) => !supplier.isMerged)
@@ -105,14 +110,42 @@ export default function SearchableSupplierSelect({
     if (!isOpen) return
 
     function handlePointerDown(event) {
-      if (!rootRef.current?.contains(event.target)) {
-        close()
-      }
+      if (rootRef.current?.contains(event.target)) return
+      if (dropdownRef.current?.contains(event.target)) return
+      close()
     }
 
     document.addEventListener('mousedown', handlePointerDown)
     return () => document.removeEventListener('mousedown', handlePointerDown)
   }, [isOpen, close])
+
+  const updateDropdownPosition = useCallback(() => {
+    const trigger = triggerRef.current
+    if (!trigger) return
+    const rect = trigger.getBoundingClientRect()
+    setDropdownPosition({
+      top: rect.bottom + 4,
+      left: rect.left,
+      width: rect.width,
+    })
+  }, [])
+
+  // Dropdown is portaled to <body>, so it's positioned via fixed coords
+  // computed from the trigger — it no longer depends on ancestor
+  // stacking contexts, sticky headers, or overflow clipping.
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setDropdownPosition(null)
+      return
+    }
+    updateDropdownPosition()
+    window.addEventListener('scroll', updateDropdownPosition, true)
+    window.addEventListener('resize', updateDropdownPosition)
+    return () => {
+      window.removeEventListener('scroll', updateDropdownPosition, true)
+      window.removeEventListener('resize', updateDropdownPosition)
+    }
+  }, [isOpen, updateDropdownPosition])
 
   useEffect(() => {
     if (!isOpen || highlightedIndex < 0) return
@@ -242,9 +275,16 @@ export default function SearchableSupplierSelect({
         </span>
       </button>
 
-      {isOpen && (
+      {isOpen && dropdownPosition && createPortal(
         <div
-          className="searchable-supplier-select__dropdown"
+          ref={dropdownRef}
+          className={`searchable-supplier-select__dropdown${dropdownClassName ? ` ${dropdownClassName}` : ''}`}
+          style={{
+            position: 'fixed',
+            top: dropdownPosition.top,
+            left: dropdownPosition.left,
+            width: dropdownPosition.width,
+          }}
           onMouseDown={handleDropdownClick}
           onClick={handleDropdownClick}
         >
@@ -315,7 +355,8 @@ export default function SearchableSupplierSelect({
               })
             )}
           </ul>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

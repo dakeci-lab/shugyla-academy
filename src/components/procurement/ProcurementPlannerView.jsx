@@ -2390,6 +2390,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                     : 'Поставщики не найдены'
                 }
                 disabled={supplierSelectLoading}
+                dropdownClassName="proc-planner__supplier-quick-dropdown"
                 dropdownHeader={
                   <div
                     className="proc-planner__supplier-scope"
