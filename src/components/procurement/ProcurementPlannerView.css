@@ -872,7 +872,6 @@
 }
 
 .proc-planner__col-head {
-  position: relative;
   display: flex;
   align-items: stretch;
   min-height: 100%;
