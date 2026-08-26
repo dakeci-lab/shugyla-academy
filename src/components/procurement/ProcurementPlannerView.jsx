@@ -2276,17 +2276,16 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
     return (
       <div className="proc-planner__column-settings" ref={columnSettingsPopoverRef}>
-        <button
-          type="button"
-          className={`proc-planner__column-settings-btn${columnSettingsOpen ? ' is-open' : ''}`}
+        <PlatformToolbarIconButton
+          active={columnSettingsOpen}
           aria-expanded={columnSettingsOpen}
           aria-controls="proc-planner-column-settings-panel"
           aria-label="Настройки столбцов таблицы"
           title="Настройки столбцов"
           onClick={() => setColumnSettingsOpen((open) => !open)}
         >
-          <PlannerColumnSettingsIcon />
-        </button>
+          <PlannerColumnSettingsIcon size={20} />
+        </PlatformToolbarIconButton>
         {columnSettingsOpen ? (
           <div
             id="proc-planner-column-settings-panel"
@@ -2536,6 +2535,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                 ) : null}
               </div>
             </PlatformToolbarActionWrap>
+            <PlatformToolbarActionWrap>{renderColumnSettingsGear()}</PlatformToolbarActionWrap>
           </>
         }
       />
@@ -2584,7 +2584,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       ) : null}
 
       <div className="proc-planner__desktop">
-        <div className="proc-planner__desktop-bar">{renderColumnSettingsGear()}</div>
         <div
           className={`proc-planner__table-wrap${isFetching ? ' proc-planner__table-wrap--fetching' : ''}`}
           aria-busy={(treeMode ? filterOptionsLoading : loading) || undefined}

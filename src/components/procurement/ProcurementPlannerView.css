@@ -937,35 +937,8 @@
   box-shadow: inset 0 -2px 0 var(--accent, #2563eb);
 }
 
-.proc-planner__desktop-bar {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  margin-bottom: 0.45rem;
-}
-
 .proc-planner__column-settings {
   position: relative;
-}
-
-.proc-planner__column-settings-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 2rem;
-  height: 2rem;
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 8px;
-  background: var(--surface, #fff);
-  color: #4b5563;
-  cursor: pointer;
-}
-
-.proc-planner__column-settings-btn:hover,
-.proc-planner__column-settings-btn.is-open {
-  border-color: #cbd5e1;
-  color: #111827;
-  background: #f8fafc;
 }
 
 .proc-planner__column-settings-popover {
