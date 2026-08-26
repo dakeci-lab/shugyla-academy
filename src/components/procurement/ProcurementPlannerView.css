@@ -1599,3 +1599,34 @@ a.proc-planner__qty-history:hover {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+.proc-stock-health__skeleton-block {
+  display: inline-block;
+  height: 0.8em;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #eef0f2 25%, #f6f7f8 37%, #eef0f2 63%);
+  background-size: 400% 100%;
+  animation: proc-stock-health-shimmer 1.4s ease infinite;
+}
+
+.proc-stock-health--skeleton .proc-stock-health__bar {
+  background: linear-gradient(90deg, #eef0f2 25%, #f6f7f8 37%, #eef0f2 63%);
+  background-size: 400% 100%;
+  animation: proc-stock-health-shimmer 1.4s ease infinite;
+}
+
+@keyframes proc-stock-health-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proc-stock-health__skeleton-block,
+  .proc-stock-health--skeleton .proc-stock-health__bar {
+    animation: none;
+  }
+}

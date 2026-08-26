@@ -331,6 +331,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   const [snapshot, setSnapshot] = useState(null)
   const [stockHealth, setStockHealth] = useState(null)
+  const [stockHealthLoading, setStockHealthLoading] = useState(false)
   const [items, setItems] = useState([])
   const [totalCount, setTotalCount] = useState(0)
   const [page, setPage] = useState(1)
@@ -668,6 +669,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     if (!isCloudMode()) {
       setSnapshot(null)
       setStockHealth(null)
+      setStockHealthLoading(false)
       setLoading(false)
       return
     }
@@ -675,24 +677,34 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       const snap = await fetchLatestProcurementSnapshot()
       setSnapshot(snap)
       if (snap?.id) {
-        await loadFilterOptions(snap.id, { forceRefresh: forceFilterRefresh })
+        // Filter options and the stock-health KPI both depend only on the
+        // snapshot id, not on each other — run them in parallel instead of
+        // chaining, so the widget's data (and the space reserved for it,
+        // see ProcurementStockHealthWidget's skeleton) resolves as early as
+        // possible instead of waiting behind an unrelated fetch.
+        setStockHealthLoading(true)
+        await Promise.all([
+          loadFilterOptions(snap.id, { forceRefresh: forceFilterRefresh }),
+          (async () => {
+            // Own try/catch: the KPI widget is a nice-to-have on top of the
+            // planner, not a hard requirement — one RPC failing here (e.g. the
+            // migration hasn't reached this environment yet) shouldn't surface
+            // as a page-level error or block loading the plan itself.
+            try {
+              setStockHealth(await fetchProcurementSnapshotStockHealth(snap.id))
+            } catch (healthErr) {
+              console.warn('Не удалось загрузить сводку по остаткам:', healthErr)
+              setStockHealth(null)
+            } finally {
+              setStockHealthLoading(false)
+            }
+          })(),
+        ])
       } else {
         applyFilterOptions('', EMPTY_FILTER_OPTIONS)
         setFilterOptionsLoading(false)
-      }
-      if (snap?.id) {
-        // Own try/catch: the KPI widget is a nice-to-have on top of the
-        // planner, not a hard requirement — one RPC failing here (e.g. the
-        // migration hasn't reached this environment yet) shouldn't surface
-        // as a page-level error or block loading the plan itself.
-        try {
-          setStockHealth(await fetchProcurementSnapshotStockHealth(snap.id))
-        } catch (healthErr) {
-          console.warn('Не удалось загрузить сводку по остаткам:', healthErr)
-          setStockHealth(null)
-        }
-      } else {
         setStockHealth(null)
+        setStockHealthLoading(false)
       }
     } catch (err) {
       showError(toProcurementUserMessage(err, 'Не удалось загрузить снимок.'))
@@ -2353,6 +2365,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       {headerSlot ? createPortal(headerStrip, headerSlot) : headerStrip}
       <ProcurementStockHealthWidget
         stockHealth={stockHealth}
+        loading={stockHealthLoading}
         asOfLabel={snapshot?.syncedAt ? formatSyncedAt(snapshot.syncedAt) : null}
       />
       <PlatformSearchToolbar

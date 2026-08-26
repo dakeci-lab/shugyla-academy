@@ -15,13 +15,52 @@ function DeviationLabel({ bucket }) {
 }
 
 /**
- * Retail 80/10/10 stock-health KPI widget for the planner header.
- * Renders nothing until stockHealth has loaded (no layout shift once it does
- * — see the min-height reserved in CSS for the legend grid).
+ * Skeleton with the same markup/classes as the real widget, so its box
+ * height matches exactly — swapping it for real content causes no reflow
+ * of the toolbar/table below.
  */
-export default function ProcurementStockHealthWidget({ stockHealth, asOfLabel }) {
+function StockHealthSkeleton() {
+  return (
+    <div className="proc-stock-health proc-stock-health--skeleton" aria-hidden="true">
+      <div className="proc-stock-health__head">
+        <span className="proc-stock-health__title">
+          <span className="proc-stock-health__skeleton-block" style={{ width: '13rem' }} />
+        </span>
+      </div>
+
+      <div className="proc-stock-health__bar" />
+
+      <div className="proc-stock-health__legend">
+        {[0, 1, 2, 3].map((key) => (
+          <div key={key} className="proc-stock-health__legend-item">
+            <div className="proc-stock-health__legend-label">
+              <span className="proc-stock-health__skeleton-block" style={{ width: '70%' }} />
+            </div>
+            <div className="proc-stock-health__legend-value">
+              <span className="proc-stock-health__skeleton-block" style={{ width: '2.5rem' }} />
+            </div>
+            <div className="proc-stock-health__legend-meta">
+              <span className="proc-stock-health__skeleton-block" style={{ width: '60%' }} />
+            </div>
+            <div className="proc-stock-health__legend-meta">
+              <span className="proc-stock-health__skeleton-block" style={{ width: '45%' }} />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Retail 80/10/10 stock-health KPI widget for the planner header.
+ * While `stockHealth` is still loading, renders a same-sized skeleton
+ * instead of nothing, so the toolbar/table below don't jump once the data
+ * (and the widget's real content) lands.
+ */
+export default function ProcurementStockHealthWidget({ stockHealth, asOfLabel, loading = false }) {
   const summary = buildStockHealthSummary(stockHealth)
-  if (!summary) return null
+  if (!summary) return loading ? <StockHealthSkeleton /> : null
 
   return (
     <div className="proc-stock-health">
