@@ -62,37 +62,46 @@
   border: 1px solid #fecaca;
 }
 
+/* Underline tabs — same pattern as .procurement-page__tabs-row, so «Расчёты»
+   reads as the same platform as «Планирование/Заказы/Нормы» instead of a
+   separate, pill-button-styled page. */
 .sfp-panel__bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 10px;
+  gap: 0.25rem 1rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
 }
 
 .sfp-panel__tabs {
   display: flex;
-  gap: 6px;
+  gap: 0.25rem;
 }
 
 .sfp-panel__tab {
   appearance: none;
-  padding: 7px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--color-border, #e2e8f0);
-  background: #fff;
-  color: #475569;
+  border: none;
+  background: transparent;
+  padding: 0.55rem 0.9rem;
   font: inherit;
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
   cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
   white-space: nowrap;
 }
 
 .sfp-panel__tab--active {
-  border-color: #cbd5e1;
-  background: #f8fafc;
-  color: #0f172a;
+  color: var(--color-text, #111827);
+  border-bottom-color: var(--color-primary, #059669);
+}
+
+.sfp-panel__tab:focus-visible {
+  outline: 2px solid var(--color-primary, #059669);
+  outline-offset: 2px;
 }
 
 .sfp-panel__sync {
@@ -100,6 +109,7 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  padding-bottom: 0.4rem;
 }
 
 .sfp-panel__sync-status {
