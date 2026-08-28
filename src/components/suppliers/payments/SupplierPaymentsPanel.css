@@ -471,11 +471,49 @@
 }
 
 /* --- Этап 2.8: compact embedded payment schedule ------------------------- */
+/* Deliberately mirrors .umag-settlements__table-wrap / th so «К оплате» and
+   «Взаиморасчёты» read as one page instead of two different UIs. */
+
+.spo-compact__search-toolbar {
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.spo-compact__wrap {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--color-white, #fff);
+}
+
+.spo-compact__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) 52px minmax(72px, 0.7fr) minmax(88px, auto);
+  gap: 8px 12px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary, #64748b);
+  background: #f8fafc;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.spo-compact__head span:last-child {
+  text-align: right;
+}
+
+.spo-compact__head span:nth-child(2) {
+  text-align: center;
+}
+
+.spo-compact__head span:nth-child(3) {
+  text-align: right;
+}
 
 .spo-compact {
   display: flex;
   flex-direction: column;
-  gap: 20px;
   min-width: 0;
 }
 
@@ -483,23 +521,33 @@
   min-width: 0;
 }
 
+.spo-compact__section + .spo-compact__section {
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
 .spo-compact__section-head {
-  margin: 0 0 6px;
-  font-size: 13px;
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--color-text, #0f172a);
+  background: #fbfcfd;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
   font-variant-numeric: tabular-nums;
 }
 
 .spo-compact__rows {
   display: flex;
   flex-direction: column;
-  border-top: 1px solid var(--color-border, #e2e8f0);
 }
 
 .spo-compact__row {
   border-bottom: 1px solid var(--color-border, #e2e8f0);
   min-width: 0;
+}
+
+.spo-compact__row:last-child {
+  border-bottom: none;
 }
 
 .spo-compact__row-main {
@@ -510,13 +558,17 @@
   align-items: center;
   width: 100%;
   min-height: 48px;
-  padding: 8px 0;
+  padding: 8px 12px;
   border: 0;
   background: transparent;
   text-align: left;
   font: inherit;
   color: inherit;
   cursor: pointer;
+}
+
+.spo-compact__row-main:hover {
+  background: #f8fafc;
 }
 
 .spo-compact__supplier {
@@ -593,12 +645,16 @@
 }
 
 @media (max-width: 640px) {
+  .spo-compact__head {
+    display: none;
+  }
+
   .spo-compact__row-main {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-rows: auto auto;
     gap: 2px 12px;
     min-height: 52px;
-    padding: 10px 0;
+    padding: 10px 12px;
   }
 
   .spo-compact__due,

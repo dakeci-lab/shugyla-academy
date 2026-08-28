@@ -30,6 +30,7 @@ import { fetchSupplierFinanceSummary } from '../../../services/supplierFinanceSu
 import { getMonthPeriodKeys } from '../../../services/umagSettlementsService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
+import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './SupplierPaymentsPanel.css'
 
@@ -113,12 +114,24 @@ function CompactObligationRow({ group, todayKey, canEditTerms, onOpen, onConfigu
   )
 }
 
+function CompactColumnsHead() {
+  return (
+    <div className="spo-compact__head" role="row">
+      <span role="columnheader">Поставщик</span>
+      <span role="columnheader">Срок</span>
+      <span role="columnheader">Статус</span>
+      <span role="columnheader">Сумма</span>
+    </div>
+  )
+}
+
 function CompactPaymentSchedule({
   view,
   todayKey,
   tabCounts,
   loading,
   error,
+  search,
   canEditTerms,
   onOpen,
   onConfigure,
@@ -136,39 +149,53 @@ function CompactPaymentSchedule({
 
   const summaries = view?.summaries || {}
   const lists = view?.lists || {}
-  const hasAny = COMPACT_SECTIONS.some((section) => (lists[section.id] || []).length > 0)
+  const query = search?.trim().toLowerCase() || ''
+  const filteredSections = COMPACT_SECTIONS.map((section) => {
+    const groups = lists[section.id] || []
+    const filtered = query
+      ? groups.filter((group) => (group.name || '').toLowerCase().includes(query))
+      : groups
+    return { section, groups: filtered }
+  }).filter(({ groups }) => groups.length > 0)
 
-  if (!hasAny) {
-    return <div className="spo-compact__empty">Нет обязательств к оплате</div>
+  if (filteredSections.length === 0) {
+    return (
+      <div className="spo-compact__empty">
+        {query ? 'По вашему запросу ничего не найдено.' : 'Нет обязательств к оплате'}
+      </div>
+    )
   }
 
   return (
-    <div className="spo-compact">
-      {COMPACT_SECTIONS.map((section) => {
-        const groups = lists[section.id] || []
-        if (groups.length === 0) return null
-        const count = tabCounts[section.id] || 0
-        const amount = summaries[section.summaryKey] || 0
-        return (
-          <section key={section.id} className="spo-compact__section">
-            <h3 className="spo-compact__section-head">
-              {section.label} · {count} · {formatUmagMoney(amount)}
-            </h3>
-            <div className="spo-compact__rows">
-              {groups.map((group) => (
-                <CompactObligationRow
-                  key={group.key}
-                  group={group}
-                  todayKey={todayKey}
-                  canEditTerms={canEditTerms}
-                  onOpen={onOpen}
-                  onConfigure={onConfigure}
-                />
-              ))}
-            </div>
-          </section>
-        )
-      })}
+    <div className="spo-compact__wrap">
+      <CompactColumnsHead />
+      <div className="spo-compact">
+        {filteredSections.map(({ section, groups }) => {
+          const count = query ? groups.length : tabCounts[section.id] || 0
+          const amount = query
+            ? groups.reduce((sum, group) => sum + (group.amount || 0), 0)
+            : summaries[section.summaryKey] || 0
+          return (
+            <section key={section.id} className="spo-compact__section">
+              <h3 className="spo-compact__section-head">
+                {section.label} · {count} · {formatUmagMoney(amount)}
+              </h3>
+              <div className="spo-compact__rows">
+                {groups.map((group) => (
+                  <CompactObligationRow
+                    key={group.key}
+                    group={group}
+                    todayKey={todayKey}
+                    canEditTerms={canEditTerms}
+                    onOpen={onOpen}
+                    onConfigure={onConfigure}
+                  />
+                ))}
+              </div>
+            </section>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -383,6 +410,7 @@ export default function SupplierPaymentsPanel({
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [activeTab, setActiveTab] = useState('overdue')
   const [tabTouched, setTabTouched] = useState(false)
+  const [compactSearch, setCompactSearch] = useState('')
 
   const loadStandalone = useCallback(async () => {
     setLoading(true)
@@ -611,16 +639,29 @@ export default function SupplierPaymentsPanel({
         )}
 
         {embedded ? (
-          <CompactPaymentSchedule
-            view={view}
-            todayKey={todayKey}
-            tabCounts={tabCounts}
-            loading={loading}
-            error={error}
-            canEditTerms={canEditTerms}
-            onOpen={setSelectedGroup}
-            onConfigure={openConfigure}
-          />
+          <>
+            <PlatformSearchToolbar
+              value={compactSearch}
+              onChange={(e) => setCompactSearch(e.target.value)}
+              onClear={() => setCompactSearch('')}
+              showClear
+              placeholder="Поиск по поставщику"
+              ariaLabel="Поиск по поставщику"
+              flush
+              className="spo-compact__search-toolbar"
+            />
+            <CompactPaymentSchedule
+              view={view}
+              todayKey={todayKey}
+              tabCounts={tabCounts}
+              loading={loading}
+              error={error}
+              search={compactSearch}
+              canEditTerms={canEditTerms}
+              onOpen={setSelectedGroup}
+              onConfigure={openConfigure}
+            />
+          </>
         ) : (
           <>
             <div className="spo-panel__tabs" role="tablist" aria-label="Приоритет оплат">
