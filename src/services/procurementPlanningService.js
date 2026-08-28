@@ -461,6 +461,27 @@ export async function fetchLatestProcurementSnapshot() {
   return normalizeSnapshot(data)
 }
 
+/**
+ * Склад — history of every past sync (procurement_snapshots is append-only,
+ * see migration comment: "Refresh creates a new row"). Newest first.
+ */
+export async function fetchProcurementSnapshotsPage({ page = 1, pageSize = 25 } = {}) {
+  ensureClient()
+  const range = snapshotItemsPageRange(page, pageSize)
+  const { data, error, count } = await supabase
+    .from('procurement_snapshots')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(range.from, range.to)
+  if (error) throw new Error(error.message || 'Не удалось загрузить историю склада')
+  return {
+    items: (data || []).map(normalizeSnapshot),
+    totalCount: count ?? 0,
+    page,
+    pageSize,
+  }
+}
+
 export async function fetchProcurementSnapshotById(snapshotId) {
   ensureClient()
   const { data, error } = await supabase

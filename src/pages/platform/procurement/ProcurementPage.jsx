@@ -48,6 +48,7 @@ import WeekScheduleNav from '../../../components/procurement/WeekScheduleNav'
 import ProcurementPlannerView from '../../../components/procurement/ProcurementPlannerView'
 import ProcurementNormsView from '../../../components/procurement/ProcurementNormsView'
 import ProcurementAbcAnalysisView from '../../../components/procurement/ProcurementAbcAnalysisView'
+import ProcurementWarehouseView from '../../../components/procurement/ProcurementWarehouseView'
 import TablePagination from '../../../components/procurement/TablePagination'
 import '../../../components/admin/admin-shared.css'
 import './ProcurementPage.css'
@@ -438,6 +439,17 @@ export default function ProcurementPage() {
           >
             ABC
           </button>
+          <button
+            type="button"
+            role="tab"
+            className={
+              mainTab === 'warehouse' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
+            }
+            aria-selected={mainTab === 'warehouse'}
+            onClick={() => setMainTab('warehouse')}
+          >
+            Склад
+          </button>
         </div>
         {/*
           Slot to the right of the tabs. The planner portals its compact UMAG snapshot
@@ -453,6 +465,8 @@ export default function ProcurementPage() {
         <ProcurementNormsView />
       ) : mainTab === 'abc' ? (
         <ProcurementAbcAnalysisView />
+      ) : mainTab === 'warehouse' ? (
+        <ProcurementWarehouseView />
       ) : (
         <>
       <WeekScheduleNav
