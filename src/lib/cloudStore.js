@@ -34,6 +34,13 @@ function createIdleModuleStates() {
 let store = { ...emptyStore }
 let moduleStates = createIdleModuleStates()
 let moduleErrors = {}
+/** Sticky per-module flag — once true, stays true until clearCloudStore(). Lets a
+ *  background reload (module state bounced back to idle/loading) keep serving the
+ *  last known-good data instead of the UI flashing empty mid-refresh. */
+function createUnreachedModuleFlags() {
+  return Object.fromEntries(CLOUD_MODULES.map((name) => [name, false]))
+}
+let moduleEverReady = createUnreachedModuleFlags()
 
 function assertModuleName(moduleName) {
   if (!CLOUD_MODULES.includes(moduleName)) {
@@ -87,6 +94,7 @@ export function markModuleLoading(moduleName) {
 export function markModuleReady(moduleName) {
   assertModuleName(moduleName)
   moduleStates = { ...moduleStates, [moduleName]: MODULE_STATUS.READY }
+  moduleEverReady = { ...moduleEverReady, [moduleName]: true }
   delete moduleErrors[moduleName]
   ensureCloudStoreReady()
 }
@@ -142,10 +150,16 @@ export function setCloudStore(data) {
 export function clearCloudStore() {
   store = { ...emptyStore }
   resetModuleLoadStates()
+  moduleEverReady = createUnreachedModuleFlags()
 }
 
 function readWhenReady(moduleName, value) {
-  return isModuleReady(moduleName) ? value : null
+  if (isModuleReady(moduleName)) return value
+  // A background reload (save/refresh) bounced this module back to idle/loading —
+  // once it has loaded successfully before, keep serving that data instead of
+  // flashing an empty list until the refetch resolves.
+  if (moduleEverReady[moduleName]) return value
+  return null
 }
 
 export function getCloudEmployees() {

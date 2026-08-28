@@ -54,7 +54,7 @@ const NARROW_SEARCH_QUERY = '(max-width: 480px)'
 export function SuppliersListPage() {
   const { user } = useSession()
   const { success: showSuccess, error: showError } = useToast()
-  const { version, refresh } = useAdminRefresh()
+  const { version } = useAdminRefresh()
   const { version: dataVersion } = usePlatformData()
   const location = useLocation()
   const navigate = useNavigate()
@@ -209,7 +209,8 @@ export function SuppliersListPage() {
       } else {
         await createSupplier(payload)
       }
-      await refresh()
+      // updateSupplier/createSupplier already reload cloud data internally — a
+      // second full refresh() here just duplicated the same fetch.
       const returnTo = returnToRef.current
       const cameFromPayments = Boolean(returnTo)
       closeForm()
@@ -224,7 +225,7 @@ export function SuppliersListPage() {
     } finally {
       setSaving(false)
     }
-  }, [closeForm, editId, form, navigate, refresh, showSuccess])
+  }, [closeForm, editId, form, navigate, showSuccess])
 
   const requestDelete = useCallback(() => {
     if (!editId) return
@@ -268,7 +269,7 @@ export function SuppliersListPage() {
     setDeleting(true)
     try {
       await deleteSupplier(deleteTarget.id)
-      await refresh()
+      // deleteSupplier already reloads cloud data internally.
       showSuccess('Поставщик удалён')
       setDeleteTarget(null)
       closeForm()
