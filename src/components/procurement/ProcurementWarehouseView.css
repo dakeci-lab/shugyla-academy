@@ -5,6 +5,40 @@
   min-width: 0;
 }
 
+/* Indeterminate progress bar — shown under the header row while an Excel
+   export is scanning through the snapshot's pages, like a browser tab's
+   own loading indicator. */
+.proc-wh__loading-bar {
+  position: relative;
+  height: 3px;
+  width: 100%;
+  margin-top: -8px;
+  overflow: hidden;
+  background: var(--color-border, #e2e8f0);
+  border-radius: 999px;
+}
+
+.proc-wh__loading-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -35%;
+  height: 100%;
+  width: 35%;
+  background: var(--color-primary, #059669);
+  border-radius: 999px;
+  animation: proc-wh-loading-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes proc-wh-loading-slide {
+  0% {
+    left: -35%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
 .proc-wh__empty {
   padding: 28px 16px;
   text-align: center;
@@ -128,9 +162,26 @@
   color: #b45309;
 }
 
-.proc-wh__row-btn {
-  padding: 5px 12px;
-  font-size: 12px;
+.proc-wh__date-link {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: #2563eb;
+  cursor: pointer;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.proc-wh__date-link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.proc-wh__date-link:disabled {
+  color: var(--color-text-secondary, #94a3b8);
+  cursor: default;
 }
 
 .proc-wh__icon-btn {

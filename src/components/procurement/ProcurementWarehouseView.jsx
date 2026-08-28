@@ -216,6 +216,7 @@ export default function ProcurementWarehouseView() {
             {detailExporting ? 'Экспорт…' : 'Скачать Excel'}
           </button>
         </div>
+        {detailExporting ? <div className="proc-wh__loading-bar" aria-hidden="true" /> : null}
 
         <PlatformSearchToolbar
           value={detailSearch}
@@ -325,6 +326,7 @@ export default function ProcurementWarehouseView() {
 
   return (
     <div className="proc-wh">
+      {exportingId ? <div className="proc-wh__loading-bar" aria-hidden="true" /> : null}
       {historyLoading && snapshots.length === 0 ? (
         <DelayedLoadingSkeleton variant="table" count={8} />
       ) : historyError ? (
@@ -337,20 +339,18 @@ export default function ProcurementWarehouseView() {
             <table className="proc-wh__table">
               <thead>
                 <tr>
-                  <th>Синхронизация</th>
-                  <th>Период</th>
-                  <th>Статус</th>
+                  <th>Дата</th>
                   <th className="proc-wh__col-num">Позиций</th>
                   <th className="proc-wh__col-num">Отриц. остатки</th>
                   <th className="proc-wh__col-num">К заказу</th>
-                  <th>Кто запустил</th>
+                  <th>Пользователь</th>
                   <th className="proc-wh__col-actions">Действия</th>
                 </tr>
               </thead>
               <tbody>
                 {snapshots.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="proc-wh__empty-cell">
+                    <td colSpan={6} className="proc-wh__empty-cell">
                       История склада пока пуста — выполните синхронизацию на вкладке
                       «Планирование».
                     </td>
@@ -358,28 +358,21 @@ export default function ProcurementWarehouseView() {
                 ) : (
                   snapshots.map((snapshot) => (
                     <tr key={snapshot.id}>
-                      <td>{formatUmagDateTime(snapshot.syncedAt || snapshot.createdAt)}</td>
-                      <td>{formatPeriod(snapshot)}</td>
                       <td>
-                        <span
-                          className={`proc-wh__status proc-wh__status--${statusTone(snapshot.status)}`}
+                        <button
+                          type="button"
+                          className="proc-wh__date-link"
+                          onClick={() => openSnapshot(snapshot)}
+                          disabled={snapshot.status === 'syncing'}
                         >
-                          {STATUS_LABELS[snapshot.status] || snapshot.status}
-                        </span>
+                          {formatUmagDateTime(snapshot.syncedAt || snapshot.createdAt)}
+                        </button>
                       </td>
                       <td className="proc-wh__col-num">{formatQty(snapshot.itemCount)}</td>
                       <td className="proc-wh__col-num">{formatQty(snapshot.negativeStockCount)}</td>
                       <td className="proc-wh__col-num">{formatQty(snapshot.orderableCount)}</td>
                       <td>{snapshot.createdByName || '—'}</td>
                       <td className="proc-wh__col-actions">
-                        <button
-                          type="button"
-                          className="btn btn--outline proc-wh__row-btn"
-                          onClick={() => openSnapshot(snapshot)}
-                          disabled={snapshot.status === 'syncing'}
-                        >
-                          Открыть
-                        </button>
                         <button
                           type="button"
                           className="proc-wh__icon-btn"
