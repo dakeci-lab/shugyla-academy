@@ -22,11 +22,12 @@ const STATUS_LABELS = {
   ready: 'Готов',
   syncing: 'Синхронизация…',
   failed: 'Ошибка',
-  generated: 'Сформирован',
+  generated: 'Заказы сформированы',
+  partially_generated: 'Заказы частично сформированы',
 }
 
 function statusTone(status) {
-  if (status === 'ready' || status === 'generated') return 'ok'
+  if (status === 'ready' || status === 'generated' || status === 'partially_generated') return 'ok'
   if (status === 'failed') return 'error'
   return 'pending'
 }
