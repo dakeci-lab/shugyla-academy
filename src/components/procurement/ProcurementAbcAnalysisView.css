@@ -67,6 +67,13 @@
   text-align: right;
 }
 
+.proc-abc__col-rank {
+  text-align: right;
+  color: var(--color-text-secondary, #94a3b8);
+  font-variant-numeric: tabular-nums;
+  width: 1%;
+}
+
 .proc-abc__product-name {
   font-weight: 600;
   color: var(--color-text, #0f172a);

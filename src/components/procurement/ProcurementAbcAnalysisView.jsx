@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { isCloudMode } from '../../lib/dataMode'
 import {
   fetchAbcAnalysisPage,
@@ -68,12 +68,18 @@ export default function ProcurementAbcAnalysisView() {
     setPage(1)
   }, [debouncedSearch])
 
+  // A new search can fire its fetch before the page-reset above has
+  // committed (stale page number), and slow/fast responses can resolve out
+  // of order — either way a late response must not clobber a newer one.
+  const requestIdRef = useRef(0)
+
   const load = useCallback(async () => {
     if (!snapshot?.id) {
       setItems([])
       setTotalCount(0)
       return
     }
+    const requestId = ++requestIdRef.current
     setLoading(true)
     setError('')
     try {
@@ -83,14 +89,16 @@ export default function ProcurementAbcAnalysisView() {
         pageSize,
         search: debouncedSearch,
       })
+      if (requestId !== requestIdRef.current) return
       setItems(result.items)
       setTotalCount(result.totalCount)
     } catch (err) {
+      if (requestId !== requestIdRef.current) return
       setError(err.message || 'Не удалось загрузить ABC-анализ')
       setItems([])
       setTotalCount(0)
     } finally {
-      setLoading(false)
+      if (requestId === requestIdRef.current) setLoading(false)
     }
   }, [snapshot?.id, page, pageSize, debouncedSearch])
 
@@ -132,6 +140,7 @@ export default function ProcurementAbcAnalysisView() {
             <table className="proc-abc__table">
               <thead>
                 <tr>
+                  <th className="proc-abc__col-rank">№</th>
                   <th>Товар</th>
                   <th>Категория</th>
                   <th className="proc-abc__col-class">Класс</th>
@@ -143,21 +152,22 @@ export default function ProcurementAbcAnalysisView() {
               <tbody>
                 {loading && items.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="proc-abc__empty-cell">
+                    <td colSpan={7} className="proc-abc__empty-cell">
                       Загрузка…
                     </td>
                   </tr>
                 ) : items.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="proc-abc__empty-cell">
+                    <td colSpan={7} className="proc-abc__empty-cell">
                       {debouncedSearch
                         ? 'По вашему запросу ничего не найдено.'
                         : 'Нет товаров в снимке.'}
                     </td>
                   </tr>
                 ) : (
-                  items.map((item) => (
+                  items.map((item, index) => (
                     <tr key={item.id}>
+                      <td className="proc-abc__col-rank">{(page - 1) * pageSize + index + 1}</td>
                       <td>
                         <div className="proc-abc__product-name">{item.productName || '—'}</div>
                         <div className="proc-abc__product-barcode">{item.barcode}</div>
