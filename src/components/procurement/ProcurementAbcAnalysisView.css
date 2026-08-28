@@ -1,0 +1,95 @@
+.proc-abc {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.proc-abc__empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--color-text-secondary, #64748b);
+  font-size: 14px;
+  border: 1px dashed var(--color-border, #e2e8f0);
+  border-radius: 12px;
+}
+
+.proc-abc__error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+}
+
+.proc-abc__wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--color-white, #fff);
+}
+
+.proc-abc__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.proc-abc__table th,
+.proc-abc__table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  white-space: nowrap;
+}
+
+.proc-abc__table th {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary, #64748b);
+  background: #f8fafc;
+}
+
+.proc-abc__table tr:last-child td {
+  border-bottom: none;
+}
+
+.proc-abc__table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+.proc-abc__col-class,
+.proc-abc__col-num {
+  text-align: right;
+}
+
+.proc-abc__product-name {
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+  white-space: normal;
+  max-width: 320px;
+}
+
+.proc-abc__product-barcode {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--color-text-secondary, #94a3b8);
+  font-variant-numeric: tabular-nums;
+}
+
+.proc-abc__category {
+  color: var(--color-text-secondary, #64748b);
+  white-space: normal;
+  max-width: 220px;
+}
+
+.proc-abc__empty-cell {
+  text-align: center;
+  color: var(--color-text-secondary, #64748b);
+  padding: 28px 16px !important;
+  white-space: normal;
+}

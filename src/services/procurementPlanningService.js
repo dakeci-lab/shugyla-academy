@@ -616,6 +616,54 @@ export function applySnapshotItemsPageQuery(query, {
   return query
 }
 
+/**
+ * ABC-анализ: read-only ranking AAA → CCC (best to worst across all three
+ * axes together), ties broken by revenue. Unlike fetchSnapshotItemsPage this
+ * sort is fixed — the ranking itself is the point of the page, not a column
+ * the buyer toggles.
+ */
+export async function fetchAbcAnalysisPage({
+  snapshotId,
+  page = 1,
+  pageSize = 50,
+  search = '',
+  categoryName = '',
+} = {}) {
+  ensureClient()
+  if (!snapshotId) return { items: [], totalCount: 0, page, pageSize }
+
+  const range = snapshotItemsPageRange(page, pageSize)
+
+  let query = supabase
+    .from('procurement_snapshot_items')
+    .select('*', { count: 'exact' })
+    .eq('snapshot_id', snapshotId)
+
+  const q = sanitizePlanningSearch(search)
+  if (q) {
+    query = query.or(`product_name.ilike.%${q}%,barcode.ilike.%${q}%`)
+  }
+  if (categoryName) query = query.eq('category_name', categoryName)
+
+  query = query
+    .order('abc_qty', { ascending: true, nullsFirst: false })
+    .order('abc_revenue', { ascending: true, nullsFirst: false })
+    .order('abc_profit', { ascending: true, nullsFirst: false })
+    .order('revenue_8w', { ascending: false, nullsFirst: false })
+    .order('barcode', { ascending: true })
+    .range(range.from, range.to)
+
+  const { data, error, count } = await query
+  if (error) throw new Error(error.message || 'Не удалось загрузить ABC-анализ')
+
+  return {
+    items: (data || []).map(normalizeItem),
+    totalCount: count ?? 0,
+    page,
+    pageSize,
+  }
+}
+
 /** Full paginated scan of snapshot filter aggregates (no cache). */
 export async function scanSnapshotFilterOptions(snapshotId) {
   ensureClient()

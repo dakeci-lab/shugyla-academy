@@ -94,12 +94,11 @@ import { toProcurementUserMessage } from '../../utils/procurementErrors'
 import {
   ABC_AXES,
   ABC_UNAVAILABLE_NOTICE,
-  abcBadgeLabel,
   abcSortAriaLabel,
-  formatAbcClass,
   nextAbcSortState,
   snapshotItemsLackAbcFacts,
 } from '../../utils/procurementAbc'
+import { AbcBadge, AbcBadges } from './AbcBadges'
 import { calcReserveDays, compareReserveDaysToNorm } from '../../utils/procurementPlanningMath'
 import {
   getDefaultPlannerColumnSettings,
@@ -282,34 +281,6 @@ function PlannerTooltipButton({ tooltip, className = '', children, ...rest }) {
         {children}
       </button>
     </span>
-  )
-}
-
-function AbcBadge({ axisLabel, value }) {
-  const letter = formatAbcClass(value)
-  const empty = letter === '—'
-  const title = abcBadgeLabel(axisLabel, value)
-  return (
-    <span
-      role="img"
-      className={`proc-planner__abc-badge${empty ? ' is-empty' : ` is-${letter.toLowerCase()}`}`}
-      title={title}
-      aria-label={title}
-    >
-      {letter}
-    </span>
-  )
-}
-
-function AbcBadges({ item, compact = false }) {
-  return (
-    <div
-      className={`proc-planner__abc-badges${compact ? ' proc-planner__abc-badges--compact' : ''}`}
-    >
-      {ABC_AXES.map((axis) => (
-        <AbcBadge key={axis.key} axisLabel={axis.label} value={item[axis.itemKey]} />
-      ))}
-    </div>
   )
 }
 
