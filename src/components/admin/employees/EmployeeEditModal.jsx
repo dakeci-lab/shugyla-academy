@@ -19,6 +19,7 @@ import {
   linkCandidateToEmployee,
   getWorkLocations,
   getCandidateById,
+  checkEmployeeLoginAvailability,
 } from '../../../services/platformDataService'
 import { transferCandidatePhotoToEmployee } from '../../../services/candidatePhotoService'
 import { resetEmployeePasswordAsAdmin } from '../../../services/employeeAdminService'
@@ -88,6 +89,7 @@ export default function EmployeeEditModal({
   const [passwordResetConfirmOpen, setPasswordResetConfirmOpen] = useState(false)
   const [passwordResetting, setPasswordResetting] = useState(false)
   const [temporaryPassword, setTemporaryPassword] = useState('')
+  const [loginCheck, setLoginCheck] = useState({ status: 'idle', suggestion: '' })
 
   useEffect(() => {
     setForm(
@@ -126,6 +128,53 @@ export default function EmployeeEditModal({
       .then(setWorkLocations)
       .catch(() => setWorkLocations([]))
   }, [])
+
+  // Live login-availability check on the create form only. Advisory: the actual
+  // create call still enforces the conflict server-side (see admin-create-employee).
+  useEffect(() => {
+    if (editId || !cloudMode) {
+      setLoginCheck({ status: 'idle', suggestion: '' })
+      return undefined
+    }
+    const login = form.login.trim()
+    if (!login) {
+      setLoginCheck({ status: 'idle', suggestion: '' })
+      return undefined
+    }
+
+    let cancelled = false
+    setLoginCheck({ status: 'checking', suggestion: '' })
+
+    const timer = setTimeout(async () => {
+      const result = await checkEmployeeLoginAvailability(login)
+      if (cancelled || !result) {
+        if (!cancelled) setLoginCheck({ status: 'idle', suggestion: '' })
+        return
+      }
+      if (result.available) {
+        if (!cancelled) setLoginCheck({ status: 'available', suggestion: '' })
+        return
+      }
+
+      // Taken — probe login2, login3, … for a free suffix to suggest.
+      for (let suffix = 2; suffix <= 9; suffix += 1) {
+        if (cancelled) return
+        const candidate = `${login}${suffix}`
+        const candidateResult = await checkEmployeeLoginAvailability(candidate)
+        if (cancelled) return
+        if (candidateResult?.available) {
+          setLoginCheck({ status: 'taken', suggestion: candidate })
+          return
+        }
+      }
+      setLoginCheck({ status: 'taken', suggestion: '' })
+    }, 500)
+
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [form.login, editId, cloudMode])
 
   const editingSelf = useMemo(
     () => Boolean(editId && sessionUser?.id != null && Number(sessionUser.id) === Number(editId)),
@@ -852,6 +901,30 @@ export default function EmployeeEditModal({
                 <span className="admin-form__hint">
                   Изменение логина и данных входа будет доступно после безопасной синхронизации с
                   Auth.
+                </span>
+              )}
+              {!editId && cloudMode && loginCheck.status === 'checking' && (
+                <span className="admin-form__hint">Проверка логина…</span>
+              )}
+              {!editId && cloudMode && loginCheck.status === 'available' && (
+                <span className="admin-form__hint admin-form__hint--ok">Логин свободен</span>
+              )}
+              {!editId && cloudMode && loginCheck.status === 'taken' && (
+                <span className="admin-form__hint admin-form__hint--warning">
+                  Логин уже занят другим сотрудником.
+                  {loginCheck.suggestion && (
+                    <>
+                      {' '}
+                      Свободен:{' '}
+                      <button
+                        type="button"
+                        className="admin-form__hint-action"
+                        onClick={() => patchForm({ login: loginCheck.suggestion })}
+                      >
+                        {loginCheck.suggestion}
+                      </button>
+                    </>
+                  )}
                 </span>
               )}
             </label>

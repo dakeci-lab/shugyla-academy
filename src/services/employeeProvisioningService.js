@@ -98,3 +98,27 @@ export async function createEmployeeWithAuth(payload) {
 
   return data.employee
 }
+
+/**
+ * Cloud-only: pre-submit login availability check, so the form can warn before
+ * the user hits the hard 409 from createEmployeeWithAuth.
+ * Returns null (instead of throwing) on any auth/network hiccup — the check is
+ * advisory only, the server-side conflict check on submit remains authoritative.
+ */
+export async function checkEmployeeLoginAvailability(login) {
+  const trimmed = login?.trim()
+  if (!isCloudMode() || !supabase || !trimmed) return null
+
+  const { data: sessionData } = await supabase.auth.getSession()
+  if (!sessionData?.session?.access_token) return null
+
+  try {
+    const { data, error } = await supabase.functions.invoke('admin-check-employee-login', {
+      body: { login: trimmed },
+    })
+    if (error || !data?.ok) return null
+    return { login: data.login, available: Boolean(data.available) }
+  } catch {
+    return null
+  }
+}

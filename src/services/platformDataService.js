@@ -14,7 +14,7 @@ import {
   MODULE_STATUS,
 } from '../lib/cloudStore'
 import { normalizeEmployee } from '../utils/employeeData'
-import { createEmployeeWithAuth } from './employeeProvisioningService'
+import { createEmployeeWithAuth, checkEmployeeLoginAvailability } from './employeeProvisioningService'
 import { updateEmployeeAsAdmin } from './employeeAdminService'
 import * as supabaseAdapter from './supabaseDataAdapter'
 import * as localAdapter from './localDataAdapter'
@@ -427,6 +427,8 @@ export async function getEmployees() {
   }
   return localAdapter.getEmployees()
 }
+
+export { checkEmployeeLoginAvailability }
 
 export async function createEmployee(data) {
   if (isCloudMode()) {

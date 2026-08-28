@@ -275,10 +275,12 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Login collisions are always a hard conflict here. The only safe idempotent
+    // shortcut is the source_candidate_id check above (same candidate, same request).
+    // A login match against a DIFFERENT candidate/request must never be treated as
+    // "already done" — that used to silently attach the new hire to someone else's
+    // existing account instead of erroring. See docs/hr/login-collision-incident.md.
     const existingEmployee = await findEmployeeByLogin(serviceClient, canonical)
-    if (existingEmployee?.auth_user_id) {
-      return jsonResponse({ ok: true, employee: existingEmployee, idempotent: true }, 200)
-    }
     if (existingEmployee) {
       return errorResponse('conflict', 'Login already exists', 409)
     }

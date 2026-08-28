@@ -431,6 +431,12 @@ entrypoint = "./functions/admin-create-employee/index.ts"
 # For example, if you want to serve static HTML pages in your function:
 # static_files = [ "./functions/admin-create-employee/*.html" ]
 
+[functions.admin-check-employee-login]
+enabled = true
+verify_jwt = true
+import_map = "./functions/admin-check-employee-login/deno.json"
+entrypoint = "./functions/admin-check-employee-login/index.ts"
+
 [functions.admin-list-employees]
 enabled = true
 verify_jwt = true
