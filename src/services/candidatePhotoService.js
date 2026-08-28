@@ -58,6 +58,56 @@ export function resolveCandidatePhotoStoragePath(candidate) {
   return extractCandidatePhotoPathFromUrl(candidate.photoUrl || candidate.photo_url || null)
 }
 
+// Signed URLs are re-requested on every list load; caching the URL string (not the
+// image) keyed by storage path lets the browser's own HTTP cache reuse the actual
+// image bytes across reloads instead of re-downloading on every visit.
+const SIGNED_URL_CACHE_KEY = 'shugyla:candidatePhotoSignedUrlCache:v1'
+const SIGNED_URL_REUSE_BUFFER_MS = 60_000
+
+let signedUrlCache = null
+
+function loadSignedUrlCache() {
+  if (signedUrlCache) return signedUrlCache
+  signedUrlCache = new Map()
+  try {
+    const raw = sessionStorage.getItem(SIGNED_URL_CACHE_KEY)
+    if (raw) {
+      for (const [path, entry] of Object.entries(JSON.parse(raw))) {
+        if (entry?.url && typeof entry.expiresAt === 'number') {
+          signedUrlCache.set(path, entry)
+        }
+      }
+    }
+  } catch {
+    // sessionStorage unavailable (private mode, etc.) — in-memory cache still works
+  }
+  return signedUrlCache
+}
+
+function persistSignedUrlCache() {
+  try {
+    sessionStorage.setItem(
+      SIGNED_URL_CACHE_KEY,
+      JSON.stringify(Object.fromEntries(signedUrlCache.entries()))
+    )
+  } catch {
+    // ignore — cache still works in-memory for the current session
+  }
+}
+
+function getCachedSignedUrl(path) {
+  const entry = loadSignedUrlCache().get(path)
+  if (entry && entry.expiresAt - Date.now() > SIGNED_URL_REUSE_BUFFER_MS) {
+    return entry.url
+  }
+  return null
+}
+
+function setCachedSignedUrl(path, url, expiresIn) {
+  loadSignedUrlCache().set(path, { url, expiresAt: Date.now() + expiresIn * 1000 })
+  persistSignedUrlCache()
+}
+
 export async function createCandidatePhotoSignedUrl(
   storagePath,
   expiresIn = CANDIDATE_PHOTO_SIGNED_URL_TTL_SEC
@@ -67,6 +117,9 @@ export async function createCandidatePhotoSignedUrl(
   }
   if (!storagePath) throw new Error('Файл не найден')
 
+  const cached = getCachedSignedUrl(storagePath)
+  if (cached) return cached
+
   const { data, error } = await supabase.storage
     .from(CANDIDATE_PHOTO_BUCKET)
     .createSignedUrl(storagePath, expiresIn)
@@ -74,6 +127,7 @@ export async function createCandidatePhotoSignedUrl(
   if (error || !data?.signedUrl) {
     throw new Error(error?.message || 'Не удалось открыть фото')
   }
+  setCachedSignedUrl(storagePath, data.signedUrl, expiresIn)
   return data.signedUrl
 }
 
@@ -96,25 +150,30 @@ export async function attachCandidatePhotoSignedUrls(candidates, expiresIn = CAN
     }))
   }
 
-  const { data, error } = await supabase.storage
-    .from(CANDIDATE_PHOTO_BUCKET)
-    .createSignedUrls(paths, expiresIn)
-
-  if (error || !Array.isArray(data)) {
-    return candidates.map((c) => ({
-      ...c,
-      photoUrl: c.photoUrl?.startsWith('data:') ? c.photoUrl : null,
-    }))
+  const byPath = new Map()
+  const pathsToFetch = []
+  for (const path of paths) {
+    const cached = getCachedSignedUrl(path)
+    if (cached) byPath.set(path, cached)
+    else pathsToFetch.push(path)
   }
 
-  const byPath = new Map()
-  data.forEach((row, index) => {
-    const signed = row?.signedUrl || row?.signedURL
-    const path = row?.path || paths[index]
-    if (path && signed && !row?.error) {
-      byPath.set(path, signed)
+  if (pathsToFetch.length) {
+    const { data, error } = await supabase.storage
+      .from(CANDIDATE_PHOTO_BUCKET)
+      .createSignedUrls(pathsToFetch, expiresIn)
+
+    if (!error && Array.isArray(data)) {
+      data.forEach((row, index) => {
+        const signed = row?.signedUrl || row?.signedURL
+        const path = row?.path || pathsToFetch[index]
+        if (path && signed && !row?.error) {
+          byPath.set(path, signed)
+          setCachedSignedUrl(path, signed, expiresIn)
+        }
+      })
     }
-  })
+  }
 
   return candidates.map((c) => {
     const path = resolveCandidatePhotoStoragePath(c)
