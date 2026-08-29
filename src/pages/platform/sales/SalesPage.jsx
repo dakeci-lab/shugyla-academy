@@ -8,6 +8,7 @@ import {
   fetchLatestSalesSyncRun,
   syncNextSalesMonth,
   backfillSalesReceipts,
+  resyncSalesMonth,
   formatMonthLabel,
 } from '../../../services/salesDataService'
 import { DelayedLoadingSkeleton } from '../../../components/loading/LoadingSkeleton'
@@ -35,6 +36,9 @@ export default function SalesPage() {
   const [syncing, setSyncing] = useState(false)
   const [syncProgressLabel, setSyncProgressLabel] = useState('')
   const [syncError, setSyncError] = useState('')
+  const [resyncMonth, setResyncMonth] = useState('')
+  const [resyncing, setResyncing] = useState(false)
+  const [resyncError, setResyncError] = useState('')
 
   const requestRef = useRef(0)
 
@@ -95,6 +99,20 @@ export default function SalesPage() {
     }
   }
 
+  async function handleResyncMonth() {
+    if (resyncing || !resyncMonth) return
+    setResyncing(true)
+    setResyncError('')
+    try {
+      await resyncSalesMonth(resyncMonth)
+      await loadFacts()
+    } catch (err) {
+      setResyncError(err?.message || 'Не удалось пересинхронизировать месяц.')
+    } finally {
+      setResyncing(false)
+    }
+  }
+
   if (!canView) {
     return <PlatformAccessDenied title="Нет доступа к разделу «Продажи»" />
   }
@@ -108,6 +126,14 @@ export default function SalesPage() {
     () => new Map(receiptFacts.map((row) => [row.monthKey, row.receiptCount])),
     [receiptFacts]
   )
+  const availableMonths = useMemo(
+    () => [...new Set(facts.map((row) => row.monthKey))].sort().reverse(),
+    [facts]
+  )
+
+  useEffect(() => {
+    if (!resyncMonth && availableMonths.length > 0) setResyncMonth(availableMonths[0])
+  }, [availableMonths, resyncMonth])
 
   return (
     <div className="sales-page">
@@ -179,6 +205,40 @@ export default function SalesPage() {
       {syncError ? (
         <div className="sales-page__error" role="alert">
           {syncError}
+        </div>
+      ) : null}
+
+      {canSync && availableMonths.length > 0 ? (
+        <div className="sales-page__resync">
+          <span className="sales-page__resync-label">
+            Пересинхронизировать месяц (например, после исправления категорий в UMAG):
+          </span>
+          <select
+            className="sales-page__resync-select"
+            value={resyncMonth}
+            onChange={(e) => setResyncMonth(e.target.value)}
+            disabled={resyncing}
+          >
+            {availableMonths.map((monthKey) => (
+              <option key={monthKey} value={monthKey}>
+                {formatMonthLabel(monthKey)}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            className="btn btn--ghost sales-page__resync-btn"
+            onClick={() => void handleResyncMonth()}
+            disabled={resyncing || syncing}
+          >
+            {resyncing ? 'Пересинхронизация…' : 'Пересинхронизировать'}
+          </button>
+        </div>
+      ) : null}
+
+      {resyncError ? (
+        <div className="sales-page__error" role="alert">
+          {resyncError}
         </div>
       ) : null}
 

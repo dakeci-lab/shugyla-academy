@@ -13,11 +13,11 @@ function assertConfigured() {
   }
 }
 
-async function invokeSalesSync(action) {
+async function invokeSalesSync(action, extra = {}) {
   assertConfigured()
   try {
     const { data, error } = await supabase.functions.invoke('umag-sales-sync', {
-      body: { action },
+      body: { action, ...extra },
     })
     if (error) {
       const body = await extractFunctionErrorBody(error)
@@ -51,6 +51,11 @@ export function syncNextSalesMonth() {
 /** Fills sales_month_receipt_facts for any already-synced month still missing a receipt count. */
 export function backfillSalesReceipts() {
   return invokeSalesSync('backfill_receipts')
+}
+
+/** Redoes one already-synced month from scratch (e.g. after fixing category taxonomy in UMAG). */
+export function resyncSalesMonth(monthKey) {
+  return invokeSalesSync('resync_month', { monthKey })
 }
 
 /** Latest sales_facts sync run — for "last synced" status and up-to-date checks. */

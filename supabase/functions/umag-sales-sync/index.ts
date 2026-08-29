@@ -347,45 +347,31 @@ async function resolveNextMonthKey(
   return nextMonthKey(String(data.date_from))
 }
 
-async function handleSyncNext(
-  authz: Exclude<Awaited<ReturnType<typeof authorizeWorkforceRequest>>, Response>
-): Promise<Response> {
-  if (authz.permissions[PERMISSION_SYNC] !== true) {
-    return adminErrorResponse('forbidden', 403)
-  }
+type MonthSyncOutcome =
+  | { ok: true; factRowCount: number; salesRowCount: number; receiptCount: number | null }
+  | { ok: false; response: Response }
 
-  await cleanupStaleSyncRuns(authz.serviceClient)
-
-  const monthKey = await resolveNextMonthKey(authz.serviceClient)
-  const currentMonthKey = currentAlmatyMonthKey()
-  if (monthKey > currentMonthKey) {
-    return jsonResponse({ success: true, upToDate: true, monthSynced: null, nextMonth: null })
-  }
-
-  const acquired = await acquireSyncRun(authz.serviceClient, {
-    date_from: monthKey,
-    date_to: lastDayOfMonthKey(monthKey),
-  })
-  if (!acquired.ok) {
-    if (acquired.alreadyRunning) {
-      return umagErrorResponse(
-        'SYNC_ALREADY_RUNNING',
-        'Синхронизация продаж уже выполняется.',
-        409,
-        { startedAt: acquired.startedAt }
-      )
-    }
-    return acquired.response
-  }
-  const runId = acquired.runId
-
+/**
+ * Does the actual UMAG fetch + aggregate + write for one month, against an
+ * already-acquired sync-run lock. Shared by handleSyncNext (monthKey =
+ * "whatever comes after the last success") and handleResyncMonth (monthKey
+ * = explicit, for redoing a month after e.g. a category correction in
+ * UMAG — the stock catalog join always uses TODAY's categories, so redoing
+ * a past month picks up any retroactive fix).
+ */
+async function performMonthSync(
+  // deno-lint-ignore no-explicit-any
+  serviceClient: any,
+  runId: string,
+  monthKey: string
+): Promise<MonthSyncOutcome> {
   const session = await acquireUmagSession()
   if ('error' in session) {
-    await finishSyncRun(authz.serviceClient, runId, {
+    await finishSyncRun(serviceClient, runId, {
       status: 'failed',
       error_message: `UMAG auth failed: ${session.error}`,
     })
-    return mapUmagAuthError(session.error)
+    return { ok: false, response: mapUmagAuthError(session.error) }
   }
   const storeId = session.storeId
   console.log('umag_sales_sync_month_start', { storeId: maskStoreId(storeId), monthKey })
@@ -399,12 +385,12 @@ async function handleSyncNext(
   ])
 
   if (stockResult instanceof Response) {
-    await finishSyncRun(authz.serviceClient, runId, { status: 'failed', error_message: 'UMAG stock fetch failed' })
-    return stockResult
+    await finishSyncRun(serviceClient, runId, { status: 'failed', error_message: 'UMAG stock fetch failed' })
+    return { ok: false, response: stockResult }
   }
   if (salesResult instanceof Response) {
-    await finishSyncRun(authz.serviceClient, runId, { status: 'failed', error_message: 'UMAG sales fetch failed' })
-    return salesResult
+    await finishSyncRun(serviceClient, runId, { status: 'failed', error_message: 'UMAG sales fetch failed' })
+    return { ok: false, response: salesResult }
   }
 
   const stockByBarcode = stockResult
@@ -452,26 +438,36 @@ async function handleSyncNext(
     }
   })
 
-  const { error: deleteErr } = await authz.serviceClient
+  const { error: deleteErr } = await serviceClient
     .from('sales_category_month_facts')
     .delete()
     .eq('month_key', monthKey)
   if (deleteErr) {
-    await finishSyncRun(authz.serviceClient, runId, {
+    await finishSyncRun(serviceClient, runId, {
       status: 'failed',
       error_message: `Не удалось очистить месяц перед перезаписью: ${deleteErr.message}`,
     })
-    return umagErrorResponse('SUPABASE_DELETE_FAILED', `Не удалось очистить месяц: ${deleteErr.message}`, 500)
+    return {
+      ok: false,
+      response: umagErrorResponse('SUPABASE_DELETE_FAILED', `Не удалось очистить месяц: ${deleteErr.message}`, 500),
+    }
   }
 
   if (factRows.length > 0) {
-    const { error: insertErr } = await authz.serviceClient.from('sales_category_month_facts').insert(factRows)
+    const { error: insertErr } = await serviceClient.from('sales_category_month_facts').insert(factRows)
     if (insertErr) {
-      await finishSyncRun(authz.serviceClient, runId, {
+      await finishSyncRun(serviceClient, runId, {
         status: 'failed',
         error_message: `Не удалось сохранить факты продаж: ${insertErr.message}`,
       })
-      return umagErrorResponse('SUPABASE_INSERT_FAILED', `Не удалось сохранить факты продаж: ${insertErr.message}`, 500)
+      return {
+        ok: false,
+        response: umagErrorResponse(
+          'SUPABASE_INSERT_FAILED',
+          `Не удалось сохранить факты продаж: ${insertErr.message}`,
+          500
+        ),
+      }
     }
   }
 
@@ -482,7 +478,7 @@ async function handleSyncNext(
     console.warn('umag_sales_sync_receipt_count_failed', { monthKey })
   } else {
     receiptCount = receiptCountResult
-    const { error: receiptErr } = await authz.serviceClient
+    const { error: receiptErr } = await serviceClient
       .from('sales_month_receipt_facts')
       .upsert(
         { month_key: monthKey, receipt_count: receiptCount, synced_at: nowIso },
@@ -493,11 +489,48 @@ async function handleSyncNext(
     }
   }
 
-  await finishSyncRun(authz.serviceClient, runId, {
+  await finishSyncRun(serviceClient, runId, {
     status: 'success',
     records_received: salesRows.length,
     records_created: factRows.length,
   })
+
+  return { ok: true, factRowCount: factRows.length, salesRowCount: salesRows.length, receiptCount }
+}
+
+async function handleSyncNext(
+  authz: Exclude<Awaited<ReturnType<typeof authorizeWorkforceRequest>>, Response>
+): Promise<Response> {
+  if (authz.permissions[PERMISSION_SYNC] !== true) {
+    return adminErrorResponse('forbidden', 403)
+  }
+
+  await cleanupStaleSyncRuns(authz.serviceClient)
+
+  const monthKey = await resolveNextMonthKey(authz.serviceClient)
+  const currentMonthKey = currentAlmatyMonthKey()
+  if (monthKey > currentMonthKey) {
+    return jsonResponse({ success: true, upToDate: true, monthSynced: null, nextMonth: null })
+  }
+
+  const acquired = await acquireSyncRun(authz.serviceClient, {
+    date_from: monthKey,
+    date_to: lastDayOfMonthKey(monthKey),
+  })
+  if (!acquired.ok) {
+    if (acquired.alreadyRunning) {
+      return umagErrorResponse(
+        'SYNC_ALREADY_RUNNING',
+        'Синхронизация продаж уже выполняется.',
+        409,
+        { startedAt: acquired.startedAt }
+      )
+    }
+    return acquired.response
+  }
+
+  const outcome = await performMonthSync(authz.serviceClient, acquired.runId, monthKey)
+  if (!outcome.ok) return outcome.response
 
   const next = nextMonthKey(monthKey)
   const upToDate = next > currentAlmatyMonthKey()
@@ -506,19 +539,67 @@ async function handleSyncNext(
     success: true,
     upToDate,
     monthSynced: monthKey,
-    categoriesWritten: factRows.length,
-    recordsReceived: salesRows.length,
-    receiptCount,
+    categoriesWritten: outcome.factRowCount,
+    recordsReceived: outcome.salesRowCount,
+    receiptCount: outcome.receiptCount,
     nextMonth: upToDate ? null : next,
   })
 }
 
+const MONTH_KEY_PATTERN = /^\d{4}-\d{2}-01$/
+
 /**
- * Backfills exactly ONE month's receipt count per call — same one-unit-of-
- * work-per-invocation shape as handleSyncNext, for the same reason: 20+
- * sequential UMAG round trips in a single call risks the edge function's
- * own execution time limit. The frontend calls this in a loop, like sync_next.
+ * Explicit re-sync of one already-synced month — for when UMAG's category
+ * taxonomy was corrected after the fact (fixing a barcode's category today
+ * doesn't retroactively touch already-written facts; this does, by redoing
+ * the same fetch+aggregate+overwrite performMonthSync always does, just
+ * triggered on demand instead of "next after last success").
  */
+async function handleResyncMonth(
+  authz: Exclude<Awaited<ReturnType<typeof authorizeWorkforceRequest>>, Response>,
+  monthKey: unknown
+): Promise<Response> {
+  if (authz.permissions[PERMISSION_SYNC] !== true) {
+    return adminErrorResponse('forbidden', 403)
+  }
+  const monthKeyText = asText(monthKey)
+  if (!MONTH_KEY_PATTERN.test(monthKeyText)) {
+    return umagErrorResponse('VALIDATION_ERROR', 'Укажите monthKey в формате YYYY-MM-01.', 400)
+  }
+  if (monthKeyText > currentAlmatyMonthKey()) {
+    return umagErrorResponse('VALIDATION_ERROR', 'Нельзя пересинхронизировать будущий месяц.', 400)
+  }
+
+  await cleanupStaleSyncRuns(authz.serviceClient)
+
+  const acquired = await acquireSyncRun(authz.serviceClient, {
+    date_from: monthKeyText,
+    date_to: lastDayOfMonthKey(monthKeyText),
+  })
+  if (!acquired.ok) {
+    if (acquired.alreadyRunning) {
+      return umagErrorResponse(
+        'SYNC_ALREADY_RUNNING',
+        'Синхронизация продаж уже выполняется.',
+        409,
+        { startedAt: acquired.startedAt }
+      )
+    }
+    return acquired.response
+  }
+
+  const outcome = await performMonthSync(authz.serviceClient, acquired.runId, monthKeyText)
+  if (!outcome.ok) return outcome.response
+
+  return jsonResponse({
+    success: true,
+    monthSynced: monthKeyText,
+    categoriesWritten: outcome.factRowCount,
+    recordsReceived: outcome.salesRowCount,
+    receiptCount: outcome.receiptCount,
+  })
+}
+
 async function handleBackfillReceipts(
   authz: Exclude<Awaited<ReturnType<typeof authorizeWorkforceRequest>>, Response>
 ): Promise<Response> {
@@ -598,13 +679,18 @@ Deno.serve(async (req) => {
   }
 
   const action = asText(body.action) || 'sync_next'
-  if (action !== 'sync_next' && action !== 'backfill_receipts') {
-    return umagErrorResponse('VALIDATION_ERROR', 'Укажите action: sync_next или backfill_receipts.', 400)
+  if (action !== 'sync_next' && action !== 'backfill_receipts' && action !== 'resync_month') {
+    return umagErrorResponse(
+      'VALIDATION_ERROR',
+      'Укажите action: sync_next, backfill_receipts или resync_month.',
+      400
+    )
   }
 
   const authz = await authorizeWorkforceRequest(req, [PERMISSION_SYNC])
   if (authz instanceof Response) return authz
 
   if (action === 'backfill_receipts') return handleBackfillReceipts(authz)
+  if (action === 'resync_month') return handleResyncMonth(authz, body.monthKey)
   return handleSyncNext(authz)
 })
