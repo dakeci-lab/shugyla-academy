@@ -198,7 +198,7 @@ export default function SalesPage() {
       ) : mainTab === 'analysis' ? (
         <SalesAnalysisView facts={facts} latestMonthKey={latestMonthKey} receiptsByMonth={receiptsByMonth} />
       ) : mainTab === 'categories' ? (
-        <SalesCategoriesView facts={facts} latestMonthKey={latestMonthKey} />
+        <SalesCategoriesView facts={facts} latestMonthKey={latestMonthKey} receiptsByMonth={receiptsByMonth} />
       ) : (
         <SalesDigitizationView facts={facts} />
       )}

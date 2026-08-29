@@ -114,7 +114,7 @@ function DeltaRow({ label, series, kind, indent = false, toggle = null }) {
 }
 
 /** «Продажи»: показатель + год-к-году по месяцам, полосы 2026/2025/Δ — по образцу эталонного дашборда. */
-export default function SalesCategoriesView({ facts, latestMonthKey }) {
+export default function SalesCategoriesView({ facts, latestMonthKey, receiptsByMonth }) {
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(() => new Set())
   const [exporting, setExporting] = useState(false)
@@ -129,8 +129,11 @@ export default function SalesCategoriesView({ facts, latestMonthKey }) {
   )
 
   const kpiTable = useMemo(
-    () => (metric === 'kpi' ? buildSalesKpiBands(facts, null, { months, currentYear, priorYear }) : null),
-    [facts, months, currentYear, priorYear, metric]
+    () =>
+      metric === 'kpi'
+        ? buildSalesKpiBands(facts, receiptsByMonth, { months, currentYear, priorYear })
+        : null,
+    [facts, receiptsByMonth, months, currentYear, priorYear, metric]
   )
   const categoryTable = useMemo(
     () =>
