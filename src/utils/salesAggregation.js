@@ -523,3 +523,24 @@ export function buildSalesKpiBands(facts, receiptsByMonth, { months, currentYear
 
   return { months, currentYear, priorYear, rows }
 }
+
+/**
+ * Same 5 KPI rows as buildSalesKpiBands, but as one continuous series across
+ * whatever months are in `facts` — no year bands. Used by "Оцифровка", which
+ * shows the whole synced history (2025 → today) in a single row per metric.
+ */
+export function buildDigitizationKpiRows(facts, receiptsByMonth, months) {
+  const cellsByMonth = new Map()
+  for (const row of facts) {
+    if (!cellsByMonth.has(row.monthKey)) cellsByMonth.set(row.monthKey, emptyCell())
+    addCell(cellsByMonth.get(row.monthKey), row)
+  }
+
+  return KPI_ROW_DEFS.map(({ key, label }) => ({
+    key,
+    label,
+    values: months.map((monthKey) =>
+      kpiValueFromCell(key, cellsByMonth.get(monthKey), receiptsByMonth?.get(monthKey) ?? null)
+    ),
+  }))
+}

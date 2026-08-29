@@ -229,7 +229,7 @@ export default function SalesPage() {
       ) : mainTab === 'categories' ? (
         <SalesCategoriesView facts={facts} latestMonthKey={latestMonthKey} receiptsByMonth={receiptsByMonth} />
       ) : (
-        <SalesDigitizationView facts={facts} />
+        <SalesDigitizationView facts={facts} receiptsByMonth={receiptsByMonth} />
       )}
     </div>
   )
