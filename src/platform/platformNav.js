@@ -134,25 +134,6 @@ export const PLATFORM_NAV = [
     description: 'Выручка и маржа по категориям, аналитика и синхронизация с UMAG.',
   },
   {
-    id: 'products-group',
-    label: 'Товары',
-    routeKey: ROUTE_KEYS.PRODUCTS_GROUP,
-    title: 'Товары',
-    description: 'Ценники товаров.',
-    pathPrefixes: ['/platform/price-tags'],
-    children: [
-      {
-        id: 'price-tags',
-        path: '/platform/price-tags',
-        label: 'Печать ценников',
-        routeKey: ROUTE_KEYS.PRICE_TAGS,
-        title: 'Печать ценников',
-        description: 'Генератор и печать ценников (только WEB).',
-        webOnly: true,
-      },
-    ],
-  },
-  {
     id: 'settings',
     label: 'Настройки',
     routeKey: ROUTE_KEYS.SETTINGS,

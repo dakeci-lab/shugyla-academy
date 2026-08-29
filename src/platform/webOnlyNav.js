@@ -6,10 +6,7 @@
 /**
  * Ни один пункт «Закупок» здесь не значится: вся группа работает с телефона.
  */
-export const WEB_ONLY_NAV_IDS = new Set([
-  'employees-payroll',
-  'price-tags',
-])
+export const WEB_ONLY_NAV_IDS = new Set(['employees-payroll'])
 
 export function isWebOnlyNavEntry(item) {
   return Boolean(item?.webOnly) || WEB_ONLY_NAV_IDS.has(item?.id)

@@ -253,14 +253,7 @@ function stageMigrationExact() {
 }
 
 function stagePreserved() {
-  console.log('Stage 5: Price Tags and recruitment slugify preserved')
-
-  assert('PriceTagsPage still exists', exists('src/pages/platform/price-tags/PriceTagsPage.jsx'))
-  const app = read('src/App.jsx')
-  assert('price-tags route still wired', app.includes('path="price-tags"'))
-  const catalog = read('src/config/permissionCatalog.js')
-  assert('price_tags.view still in catalog', catalog.includes('price_tags.view'))
-  assert('price_tags.manage still in catalog', catalog.includes('price_tags.manage'))
+  console.log('Stage 5: recruitment slugify preserved')
 
   assert('shared slugify utility exists', exists('src/utils/slugify.js'))
   const recruitmentData = read('src/utils/recruitmentData.js')

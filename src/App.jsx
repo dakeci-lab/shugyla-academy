@@ -94,8 +94,6 @@ const ReceivingPage = lazy(() => import('./pages/platform/receiving/ReceivingPag
 const ReceivingDetailPage = lazy(
   () => import('./pages/platform/receiving/ReceivingDetailPage')
 )
-const PriceTagsPage = lazy(() => import('./pages/platform/price-tags/PriceTagsPage'))
-
 /**
  * Маршрутизация Shugyla Platform
  */
@@ -392,14 +390,6 @@ export default function App() {
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIER_FINANCE}>
                       <SupplierFinancePage />
-                    </PlatformRoute>
-                  }
-                />
-                <Route
-                  path="price-tags"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.PRICE_TAGS}>
-                      <PriceTagsPage />
                     </PlatformRoute>
                   }
                 />
