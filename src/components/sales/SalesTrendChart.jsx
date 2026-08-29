@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { formatMonthLabel } from '../../services/salesDataService'
-import { formatUmagMoney } from '../../services/umagSettlementsService'
+import { formatSalesMoneyWithUnit } from '../../utils/salesFormat'
 import './SalesShared.css'
 
 const WIDTH = 900
@@ -230,12 +230,12 @@ export default function SalesTrendChart({ points }) {
 
           <circle cx={14} cy={46} r={3} fill={REVENUE_COLOR_HOVER} />
           <text x={22} y={49} fontSize="10" fill="var(--color-text-secondary, #64748b)">
-            Выручка: <tspan fontWeight="600" fill="var(--color-text, #0f172a)">{formatUmagMoney(hovered.revenue)}</tspan>
+            Выручка: <tspan fontWeight="600" fill="var(--color-text, #0f172a)">{formatSalesMoneyWithUnit(hovered.revenue)}</tspan>
           </text>
 
           <circle cx={14} cy={59} r={3} fill={MARGIN_COLOR_HOVER} />
           <text x={22} y={62} fontSize="10" fill="var(--color-text-secondary, #64748b)">
-            Маржа: <tspan fontWeight="600" fill="var(--color-text, #0f172a)">{formatUmagMoney(hovered.grossMargin)}</tspan>
+            Маржа: <tspan fontWeight="600" fill="var(--color-text, #0f172a)">{formatSalesMoneyWithUnit(hovered.grossMargin)}</tspan>
           </text>
         </g>
       ) : null}

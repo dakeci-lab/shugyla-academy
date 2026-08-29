@@ -6,7 +6,7 @@ import {
   buildCategoryYoyRows,
 } from '../../utils/salesAggregation'
 import { heatColor } from '../../utils/salesHeat'
-import { formatUmagMoney } from '../../services/umagSettlementsService'
+import { formatSalesMoney } from '../../utils/salesFormat'
 import SalesTrendChart from './SalesTrendChart'
 import SalesFunnelRow from './SalesFunnelRow'
 import SalesRankList from './SalesRankList'
@@ -81,20 +81,20 @@ export default function SalesAnalysisView({ facts, latestMonthKey, receiptsByMon
         <SalesRankList
           title="Вклад в выручку, ₸"
           items={contribution.byRevenue}
-          formatValue={formatUmagMoney}
+          formatValue={formatSalesMoney}
           formatShare={formatShare}
         />
         <SalesRankList
           title="Вклад в валовую маржу, ₸"
           items={contribution.byMargin}
-          formatValue={formatUmagMoney}
+          formatValue={formatSalesMoney}
           formatShare={formatShare}
         />
       </div>
 
       <SalesSectionHeader index={4} title="Маржа vs Маржинальность" />
       <div className="sales-rank-grid">
-        <SalesRankList title="Валовая маржа по категориям, ₸" items={byMarginValue} formatValue={formatUmagMoney} />
+        <SalesRankList title="Валовая маржа по категориям, ₸" items={byMarginValue} formatValue={formatSalesMoney} />
         <SalesRankList
           title="Маржинальность по категориям, %"
           items={byMarginPct}

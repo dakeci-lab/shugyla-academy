@@ -1,10 +1,10 @@
-import { formatUmagMoney } from '../../services/umagSettlementsService'
+import { formatSalesMoneyWithUnit } from '../../utils/salesFormat'
 import './SalesShared.css'
 
 function formatStepValue(step) {
   if (step.value == null) return 'нет данных'
   if (step.unit === '%') return `${step.value.toFixed(1)}%`
-  if (step.unit === '₸') return formatUmagMoney(step.value)
+  if (step.unit === '₸') return formatSalesMoneyWithUnit(step.value)
   return step.value.toLocaleString('ru-KZ')
 }
 

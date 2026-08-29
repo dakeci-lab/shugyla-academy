@@ -5,7 +5,7 @@ import {
   buildSalesKpiBands,
   shortMonthLabel,
 } from '../../utils/salesAggregation'
-import { formatUmagMoney } from '../../services/umagSettlementsService'
+import { formatSalesMoney } from '../../utils/salesFormat'
 import { exportSalesCategoriesXlsx } from '../../utils/salesExport'
 import { heatCellStyle, deltaCellStyle } from '../../utils/salesHeat'
 import { ChevronRightIcon, DownloadIcon } from '../icons/PlatformIcons'
@@ -34,7 +34,7 @@ function formatByKind(value, kind) {
   if (kind === 'percent') return `${value.toFixed(1)}%`
   if (kind === 'ratio') return `×${value.toFixed(2)}`
   if (kind === 'count') return value.toLocaleString('ru-KZ', { maximumFractionDigits: 0 })
-  return formatUmagMoney(value)
+  return formatSalesMoney(value)
 }
 
 function formatDeltaByKind(value, kind) {

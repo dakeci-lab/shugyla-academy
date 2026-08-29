@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react'
 import { buildDigitizationMatrix, buildDigitizationKpiRows, shortMonthLabel } from '../../utils/salesAggregation'
 import { heatCellStyle } from '../../utils/salesHeat'
-import { formatUmagMoney } from '../../services/umagSettlementsService'
+import { formatSalesMoney } from '../../utils/salesFormat'
 import './SalesShared.css'
 
 const METRIC_OPTIONS = [
-  { key: 'revenue', label: 'Выручка' },
-  { key: 'profit', label: 'Маржа' },
-  { key: 'quantity', label: 'Количество' },
-  { key: 'markup', label: 'Наценка' },
+  { key: 'revenue', label: 'Выручка, ₸' },
+  { key: 'profit', label: 'Маржа, ₸' },
+  { key: 'quantity', label: 'Количество, шт' },
+  { key: 'markup', label: 'Наценка, ×' },
 ]
 
 const KPI_KIND = {
@@ -23,14 +23,14 @@ function formatCellValue(value, metric) {
   if (value == null) return '—'
   if (metric === 'quantity') return value.toLocaleString('ru-KZ', { maximumFractionDigits: 0 })
   if (metric === 'markup') return `×${value.toFixed(2)}`
-  return formatUmagMoney(value)
+  return formatSalesMoney(value)
 }
 
 function formatKpiValue(value, kind) {
   if (value == null) return '—'
   if (kind === 'percent') return `${value.toFixed(1)}%`
   if (kind === 'count') return value.toLocaleString('ru-KZ', { maximumFractionDigits: 0 })
-  return formatUmagMoney(value)
+  return formatSalesMoney(value)
 }
 
 function shortMonthYearLabel(monthKey) {
