@@ -247,9 +247,9 @@ export const ADMIN_PROTECTED_PERMISSIONS = [
 
 export const RBAC_SYSTEM_ROLES = [
   { code: 'admin', name: 'Администратор', description: 'Полный доступ ко всем разделам платформы.', isSystem: true },
-  { code: 'buyer', name: 'Закупщик', description: 'Закуп, приёмка, поставщики и ценники.', isSystem: true },
-  { code: 'receiver', name: 'Приёмщик', description: 'Приёмка товара и ценники.', isSystem: true },
-  { code: 'floor_admin', name: 'Администратор торгового зала', description: 'Рейтинг, ценники и график.', isSystem: true },
+  { code: 'buyer', name: 'Закупщик', description: 'Закуп, приёмка и поставщики.', isSystem: true },
+  { code: 'receiver', name: 'Приёмщик', description: 'Приёмка товара.', isSystem: true },
+  { code: 'floor_admin', name: 'Администратор торгового зала', description: 'Рейтинг и график.', isSystem: true },
   { code: 'cashier', name: 'Кассир', description: 'Рейтинг и личный график.', isSystem: true },
   { code: 'seller', name: 'Продавец', description: 'Рейтинг и личный график.', isSystem: true },
 ]
@@ -264,17 +264,15 @@ export const RBAC_DEFAULT_ROLE_PERMISSIONS = {
     P.PROCUREMENT_VIEW, P.PROCUREMENT_CREATE, P.PROCUREMENT_EDIT, P.PROCUREMENT_DELETE, P.PROCUREMENT_TRANSFER,
     P.RECEIVING_VIEW, P.RECEIVING_MANAGE,
     P.SUPPLIERS_VIEW, P.SUPPLIERS_CREATE, P.SUPPLIERS_EDIT, P.SUPPLIERS_DELETE,
-    P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE,
   ],
   receiver: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
     P.SCHEDULE_VIEW_OWN, P.RATING_VIEW,
-    P.RECEIVING_VIEW, P.RECEIVING_MANAGE, P.PRICE_TAGS_VIEW,
+    P.RECEIVING_VIEW, P.RECEIVING_MANAGE,
   ],
   floor_admin: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
     P.SCHEDULE_VIEW_OWN, P.SCHEDULE_VIEW_TEAM, P.SCHEDULE_EDIT, P.RATING_VIEW,
-    P.PRICE_TAGS_VIEW, P.PRICE_TAGS_MANAGE,
   ],
   cashier: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,

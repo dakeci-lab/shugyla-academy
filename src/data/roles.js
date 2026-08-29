@@ -84,19 +84,19 @@ export const ROLES = {
   [ROLE_IDS.BUYER]: {
     id: ROLE_IDS.BUYER,
     label: 'Закупщик',
-    description: 'Закуп, приёмка, поставщики и ценники.',
+    description: 'Закуп, приёмка и поставщики.',
     permissions: [],
   },
   [ROLE_IDS.RECEIVER]: {
     id: ROLE_IDS.RECEIVER,
     label: 'Приёмщик',
-    description: 'Приёмка товара и ценники.',
+    description: 'Приёмка товара.',
     permissions: [],
   },
   [ROLE_IDS.FLOOR_ADMIN]: {
     id: ROLE_IDS.FLOOR_ADMIN,
     label: 'Администратор торгового зала',
-    description: 'Рейтинг сотрудников и ценники.',
+    description: 'Рейтинг сотрудников.',
     permissions: [],
   },
   [ROLE_IDS.CASHIER]: {
