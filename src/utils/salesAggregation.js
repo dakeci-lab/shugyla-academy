@@ -102,40 +102,63 @@ export function buildCategoryYoyRows(facts, latestMonthKey) {
   return { currentYear, priorYear, cutoffMonth, rows }
 }
 
-/** Total revenue/cogs/profit per month across all categories, sorted oldest→newest. */
-export function buildMonthlyTotals(facts) {
+/**
+ * Total revenue/cogs/profit per month across all categories, sorted oldest→newest.
+ * `receiptsByMonth` (monthKey -> receipt count) is optional; when given, each
+ * month also gets `receiptCount` and `avgCheck` (revenue / receiptCount).
+ */
+export function buildMonthlyTotals(facts, receiptsByMonth = null) {
   const byMonth = new Map()
   for (const row of facts) {
     if (!byMonth.has(row.monthKey)) byMonth.set(row.monthKey, emptyTotals())
     addTotals(byMonth.get(row.monthKey), row)
   }
   return [...byMonth.entries()]
-    .map(([monthKey, totals]) => ({
-      monthKey,
-      revenue: totals.revenue,
-      cogs: totals.cogs,
-      profit: totals.profit,
-      margin: marginPct(totals),
-    }))
+    .map(([monthKey, totals]) => {
+      const receiptCount = receiptsByMonth?.get(monthKey) ?? null
+      return {
+        monthKey,
+        revenue: totals.revenue,
+        cogs: totals.cogs,
+        profit: totals.profit,
+        margin: marginPct(totals),
+        receiptCount,
+        avgCheck: receiptCount ? totals.revenue / receiptCount : null,
+      }
+    })
     .sort((a, b) => a.monthKey.localeCompare(b.monthKey))
 }
 
 /**
- * 5-step funnel for the last synced month vs the same month a year earlier —
- * Чеки/Средний чек have no UMAG source wired up yet (no receipts endpoint
- * in use), so they come back with value:null and are rendered as "нет
- * данных" rather than silently omitted.
+ * 5-step funnel for the last synced month vs the same month a year earlier.
+ * `receiptsByMonth` (monthKey -> receipt count, from sales_month_receipt_facts)
+ * is optional — Чеки/Средний чек render as "нет данных" until it's supplied
+ * (e.g. before the first receipts backfill has run).
  */
-export function buildFunnelSteps(facts, latestMonthKey) {
+export function buildFunnelSteps(facts, latestMonthKey, receiptsByMonth = null) {
   if (!latestMonthKey) return []
-  const monthly = buildMonthlyTotals(facts)
+  const monthly = buildMonthlyTotals(facts, receiptsByMonth)
   const priorKey = priorYearMonthKey(latestMonthKey)
   const current = monthly.find((m) => m.monthKey === latestMonthKey) || null
   const prior = monthly.find((m) => m.monthKey === priorKey) || null
 
   return [
-    { key: 'checks', label: 'Чеки', value: null, unit: '', deltaPct: null, unavailable: true },
-    { key: 'avgCheck', label: 'Средний чек', value: null, unit: '₸', deltaPct: null, unavailable: true },
+    {
+      key: 'checks',
+      label: 'Чеки',
+      value: current?.receiptCount ?? null,
+      unit: '',
+      deltaPct: current?.receiptCount && prior?.receiptCount ? deltaPct(current.receiptCount, prior.receiptCount) : null,
+      unavailable: current?.receiptCount == null,
+    },
+    {
+      key: 'avgCheck',
+      label: 'Средний чек',
+      value: current?.avgCheck ?? null,
+      unit: '₸',
+      deltaPct: current?.avgCheck && prior?.avgCheck ? deltaPct(current.avgCheck, prior.avgCheck) : null,
+      unavailable: current?.avgCheck == null,
+    },
     {
       key: 'revenue',
       label: 'Выручка',

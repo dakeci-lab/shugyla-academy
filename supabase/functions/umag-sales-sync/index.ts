@@ -28,7 +28,11 @@ const PERMISSION_SYNC = 'sales.sync'
 
 const STOCK_PATH = '/rest/cabinet/opr/stock/find'
 const SALES_PATH = '/rest/cabinet/report/list-product-report'
+/** Receipt list (one row per чек, not per product) — used only for its count/receipt_count per month. */
+const RECEIPT_PATH = '/rest/cabinet/opr/sale/list-without-products'
 const PAGE_SIZE = 50_000
+/** Receipts/month comfortably fits one page at this size (~20-25k/month observed). */
+const RECEIPT_PAGE_SIZE = 100_000
 const UMAG_FETCH_TIMEOUT_MS = 120_000
 const ALMATY_TZ = 'Asia/Almaty'
 const ALMATY_OFFSET_MS = 5 * 60 * 60 * 1000
@@ -202,6 +206,32 @@ async function fetchMonthSales(
   return page.rows as SalesRow[]
 }
 
+/**
+ * Receipt count for the month. list-without-products responds with a
+ * `sales` array (not `data`, unlike the other list endpoints), so this
+ * bypasses fetchUmagListPage and reads the raw body directly. Falls back to
+ * counting the array when no explicit count/total field is present — a
+ * single 100k-row page comfortably covers a month's receipts either way.
+ */
+async function fetchMonthReceiptCount(
+  storeId: string,
+  fromTime: number,
+  toTime: number
+): Promise<number | Response> {
+  const result = await umagFetchAuthed(
+    RECEIPT_PATH,
+    { first: 0, pageSize: RECEIPT_PAGE_SIZE, fromTime, toTime, storeId },
+    { timeoutMs: UMAG_FETCH_TIMEOUT_MS }
+  )
+  if ('error' in result) return mapUmagAuthError(result.error)
+  if (result.status < 200 || result.status >= 300) return mapUmagHttpError(result.status)
+
+  const body = result.json as { sales?: unknown[]; count?: number; total?: number } | null
+  const sales = Array.isArray(body?.sales) ? body.sales : []
+  const explicitCount = typeof body?.count === 'number' ? body.count : typeof body?.total === 'number' ? body.total : null
+  return explicitCount != null ? Math.max(explicitCount, sales.length) : sales.length
+}
+
 // ---------------------------------------------------------------------------
 // umag_sync_runs lock — identical machinery to umag-sync's (see that file's
 // comments); duplicated here rather than shared since neither side exports it.
@@ -362,9 +392,10 @@ async function handleSyncNext(
 
   const { fromTime, toTime } = almatyMonthBoundsMs(monthKey)
 
-  const [stockResult, salesResult] = await Promise.all([
+  const [stockResult, salesResult, receiptCountResult] = await Promise.all([
     fetchStockCategoryMap(storeId),
     fetchMonthSales(storeId, fromTime, toTime),
+    fetchMonthReceiptCount(storeId, fromTime, toTime),
   ])
 
   if (stockResult instanceof Response) {
@@ -444,6 +475,24 @@ async function handleSyncNext(
     }
   }
 
+  // Receipt count is a nice-to-have (Средний чек) — never fail the whole
+  // month's sync over it; log and move on if UMAG's receipt list errors.
+  let receiptCount: number | null = null
+  if (receiptCountResult instanceof Response) {
+    console.warn('umag_sales_sync_receipt_count_failed', { monthKey })
+  } else {
+    receiptCount = receiptCountResult
+    const { error: receiptErr } = await authz.serviceClient
+      .from('sales_month_receipt_facts')
+      .upsert(
+        { month_key: monthKey, receipt_count: receiptCount, synced_at: nowIso },
+        { onConflict: 'month_key' }
+      )
+    if (receiptErr) {
+      console.warn('umag_sales_sync_receipt_write_failed', { monthKey, message: receiptErr.message })
+    }
+  }
+
   await finishSyncRun(authz.serviceClient, runId, {
     status: 'success',
     records_received: salesRows.length,
@@ -459,7 +508,65 @@ async function handleSyncNext(
     monthSynced: monthKey,
     categoriesWritten: factRows.length,
     recordsReceived: salesRows.length,
+    receiptCount,
     nextMonth: upToDate ? null : next,
+  })
+}
+
+/** One-off backfill: fills sales_month_receipt_facts for months already in sales_category_month_facts that never got a receipt count (e.g. synced before this endpoint was wired up). */
+async function handleBackfillReceipts(
+  authz: Exclude<Awaited<ReturnType<typeof authorizeWorkforceRequest>>, Response>
+): Promise<Response> {
+  if (authz.permissions[PERMISSION_SYNC] !== true) {
+    return adminErrorResponse('forbidden', 403)
+  }
+
+  const session = await acquireUmagSession()
+  if ('error' in session) return mapUmagAuthError(session.error)
+  const storeId = session.storeId
+
+  const { data: factMonths, error: factMonthsErr } = await authz.serviceClient
+    .from('sales_category_month_facts')
+    .select('month_key')
+  if (factMonthsErr) {
+    return umagErrorResponse('SUPABASE_SELECT_FAILED', `Не удалось прочитать месяцы: ${factMonthsErr.message}`, 500)
+  }
+  const allMonths = [...new Set((factMonths || []).map((r: { month_key: string }) => r.month_key))].sort()
+
+  const { data: doneMonths, error: doneErr } = await authz.serviceClient
+    .from('sales_month_receipt_facts')
+    .select('month_key')
+  if (doneErr) {
+    return umagErrorResponse('SUPABASE_SELECT_FAILED', `Не удалось прочитать статус чеков: ${doneErr.message}`, 500)
+  }
+  const done = new Set((doneMonths || []).map((r: { month_key: string }) => r.month_key))
+
+  const MAX_PER_CALL = 60
+  const pending = allMonths.filter((m) => !done.has(m)).slice(0, MAX_PER_CALL)
+
+  let filled = 0
+  const nowIso = new Date().toISOString()
+  for (const monthKey of pending) {
+    const { fromTime, toTime } = almatyMonthBoundsMs(monthKey)
+    const count = await fetchMonthReceiptCount(storeId, fromTime, toTime)
+    if (count instanceof Response) {
+      console.warn('umag_sales_sync_receipt_backfill_month_failed', { monthKey })
+      continue
+    }
+    const { error: upsertErr } = await authz.serviceClient
+      .from('sales_month_receipt_facts')
+      .upsert({ month_key: monthKey, receipt_count: count, synced_at: nowIso }, { onConflict: 'month_key' })
+    if (upsertErr) {
+      console.warn('umag_sales_sync_receipt_backfill_write_failed', { monthKey, message: upsertErr.message })
+      continue
+    }
+    filled += 1
+  }
+
+  return jsonResponse({
+    success: true,
+    filled,
+    remaining: allMonths.length - done.size - filled,
   })
 }
 
@@ -475,12 +582,13 @@ Deno.serve(async (req) => {
   }
 
   const action = asText(body.action) || 'sync_next'
-  if (action !== 'sync_next') {
-    return umagErrorResponse('VALIDATION_ERROR', 'Укажите action: sync_next.', 400)
+  if (action !== 'sync_next' && action !== 'backfill_receipts') {
+    return umagErrorResponse('VALIDATION_ERROR', 'Укажите action: sync_next или backfill_receipts.', 400)
   }
 
   const authz = await authorizeWorkforceRequest(req, [PERMISSION_SYNC])
   if (authz instanceof Response) return authz
 
+  if (action === 'backfill_receipts') return handleBackfillReceipts(authz)
   return handleSyncNext(authz)
 })

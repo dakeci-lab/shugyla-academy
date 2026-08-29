@@ -13,12 +13,11 @@ function assertConfigured() {
   }
 }
 
-/** Syncs exactly one calendar month (the next unsynced one). Call in a loop until upToDate. */
-export async function syncNextSalesMonth() {
+async function invokeSalesSync(action) {
   assertConfigured()
   try {
     const { data, error } = await supabase.functions.invoke('umag-sales-sync', {
-      body: { action: 'sync_next' },
+      body: { action },
     })
     if (error) {
       const body = await extractFunctionErrorBody(error)
@@ -42,6 +41,16 @@ export async function syncNextSalesMonth() {
   } catch (err) {
     throw new Error(toUserErrorMessage(err, 'Не удалось синхронизировать продажи из UMAG.'))
   }
+}
+
+/** Syncs exactly one calendar month (the next unsynced one). Call in a loop until upToDate. */
+export function syncNextSalesMonth() {
+  return invokeSalesSync('sync_next')
+}
+
+/** Fills sales_month_receipt_facts for any already-synced month still missing a receipt count. */
+export function backfillSalesReceipts() {
+  return invokeSalesSync('backfill_receipts')
 }
 
 /** Latest sales_facts sync run — for "last synced" status and up-to-date checks. */
@@ -110,6 +119,20 @@ export async function fetchSalesCategoryMonthFacts({ monthFrom, monthTo } = {}) 
     profit: Number(row.profit) || 0,
     quantity: Number(row.quantity) || 0,
     skuCount: Number(row.sku_count) || 0,
+  }))
+}
+
+/** Receipt (чек) count per month — small table, one row per month, no pagination needed. */
+export async function fetchSalesMonthReceiptFacts() {
+  assertConfigured()
+  const { data, error } = await supabase
+    .from('sales_month_receipt_facts')
+    .select('month_key, receipt_count')
+    .order('month_key', { ascending: true })
+  if (error) throw new Error(toUserErrorMessage(error, 'Не удалось загрузить количество чеков.'))
+  return (data || []).map((row) => ({
+    monthKey: row.month_key,
+    receiptCount: Number(row.receipt_count) || 0,
   }))
 }
 

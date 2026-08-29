@@ -5,9 +5,12 @@ import SalesFunnelRow from './SalesFunnelRow'
 import './SalesShared.css'
 
 /** «Анализ» (по умолчанию): воронка последнего месяца, график тренда, «требует внимания». */
-export default function SalesAnalysisView({ facts, latestMonthKey }) {
-  const monthlyTotals = useMemo(() => buildMonthlyTotals(facts), [facts])
-  const funnelSteps = useMemo(() => buildFunnelSteps(facts, latestMonthKey), [facts, latestMonthKey])
+export default function SalesAnalysisView({ facts, latestMonthKey, receiptsByMonth }) {
+  const monthlyTotals = useMemo(() => buildMonthlyTotals(facts, receiptsByMonth), [facts, receiptsByMonth])
+  const funnelSteps = useMemo(
+    () => buildFunnelSteps(facts, latestMonthKey, receiptsByMonth),
+    [facts, latestMonthKey, receiptsByMonth]
+  )
   const attention = useMemo(
     () => findCategoriesNeedingAttention(facts, latestMonthKey),
     [facts, latestMonthKey]

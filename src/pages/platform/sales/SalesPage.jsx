@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '../../../context/SessionContext'
 import { canViewSales, canSyncSales } from '../../../config/permissions'
 import { isCloudMode } from '../../../lib/dataMode'
 import {
   fetchSalesCategoryMonthFacts,
+  fetchSalesMonthReceiptFacts,
   fetchLatestSalesSyncRun,
   syncNextSalesMonth,
+  backfillSalesReceipts,
   formatMonthLabel,
 } from '../../../services/salesDataService'
 import { DelayedLoadingSkeleton } from '../../../components/loading/LoadingSkeleton'
@@ -26,6 +28,7 @@ export default function SalesPage() {
 
   const [mainTab, setMainTab] = useState('analysis')
   const [facts, setFacts] = useState([])
+  const [receiptFacts, setReceiptFacts] = useState([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')
   const [syncRun, setSyncRun] = useState(null)
@@ -40,12 +43,14 @@ export default function SalesPage() {
     setLoading(true)
     setLoadError('')
     try {
-      const [rows, latestRun] = await Promise.all([
+      const [rows, receiptRows, latestRun] = await Promise.all([
         fetchSalesCategoryMonthFacts({ monthFrom: HISTORY_START_MONTH }),
+        fetchSalesMonthReceiptFacts(),
         fetchLatestSalesSyncRun(),
       ])
       if (requestId !== requestRef.current) return
       setFacts(rows)
+      setReceiptFacts(receiptRows)
       setSyncRun(latestRun)
     } catch (err) {
       if (requestId !== requestRef.current) return
@@ -74,6 +79,8 @@ export default function SalesPage() {
         result = await syncNextSalesMonth()
         setSyncProgressLabel(result.monthSynced ? formatMonthLabel(result.monthSynced) : '')
       }
+      setSyncProgressLabel('Чеки…')
+      await backfillSalesReceipts()
       await loadFacts()
     } catch (err) {
       setSyncError(err?.message || 'Не удалось синхронизировать продажи из UMAG.')
@@ -92,6 +99,10 @@ export default function SalesPage() {
   }
 
   const latestMonthKey = facts.length > 0 ? facts[facts.length - 1].monthKey : null
+  const receiptsByMonth = useMemo(
+    () => new Map(receiptFacts.map((row) => [row.monthKey, row.receiptCount])),
+    [receiptFacts]
+  )
 
   return (
     <div className="sales-page">
@@ -180,7 +191,7 @@ export default function SalesPage() {
             : ' Обратитесь к администратору для синхронизации с UMAG.'}
         </p>
       ) : mainTab === 'analysis' ? (
-        <SalesAnalysisView facts={facts} latestMonthKey={latestMonthKey} />
+        <SalesAnalysisView facts={facts} latestMonthKey={latestMonthKey} receiptsByMonth={receiptsByMonth} />
       ) : mainTab === 'categories' ? (
         <SalesCategoriesView facts={facts} latestMonthKey={latestMonthKey} />
       ) : (
