@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { buildDigitizationMatrix } from '../../utils/salesAggregation'
+import { heatCellStyle, deltaCellStyle } from '../../utils/salesHeat'
 import { formatUmagMoney } from '../../services/umagSettlementsService'
 import { formatMonthLabel } from '../../services/salesDataService'
 import './SalesShared.css'
@@ -8,23 +9,31 @@ const METRICS = [
   { key: 'revenue', label: 'Выручка' },
   { key: 'profit', label: 'Маржа' },
   { key: 'quantity', label: 'Кол-во' },
+  { key: 'markup', label: 'Наценка' },
 ]
 
-function heatBackground(value, max) {
-  if (!max || value <= 0) return 'transparent'
-  const intensity = Math.min(1, value / max)
-  return `rgba(5, 150, 105, ${0.06 + intensity * 0.34})`
-}
-
 function formatCellValue(value, metric) {
+  if (value == null) return '—'
   if (metric === 'quantity') return value.toLocaleString('ru-KZ', { maximumFractionDigits: 0 })
+  if (metric === 'markup') return `×${value.toFixed(2)}`
   return formatUmagMoney(value)
 }
 
-/** «Оцифровка»: категория × месяц, тепловая заливка, переключатель показателя. */
+function formatDeltaValue(value, metric) {
+  if (value == null) return '—'
+  const sign = value >= 0 ? '+' : ''
+  if (metric === 'markup') return `${sign}${value.toFixed(1)} пп`
+  return `${sign}${value.toFixed(1)}%`
+}
+
+/** «Оцифровка»: категория × месяц, тепловая заливка (как в эталонном дашборде), переключатель показателя и режима. */
 export default function SalesDigitizationView({ facts }) {
   const [metric, setMetric] = useState('revenue')
-  const { months, rows, max } = useMemo(() => buildDigitizationMatrix(facts, metric), [facts, metric])
+  const [mode, setMode] = useState('value')
+  const { months, rows } = useMemo(
+    () => buildDigitizationMatrix(facts, metric, mode),
+    [facts, metric, mode]
+  )
 
   return (
     <div className="sales-view">
@@ -42,6 +51,24 @@ export default function SalesDigitizationView({ facts }) {
             </button>
           ))}
         </div>
+        <div className="sales-heatmap-controls" role="tablist" aria-label="Режим отображения">
+          <button
+            type="button"
+            className={`btn btn--sm ${mode === 'value' ? 'btn--outline' : 'btn--ghost'}`}
+            aria-pressed={mode === 'value'}
+            onClick={() => setMode('value')}
+          >
+            Значения
+          </button>
+          <button
+            type="button"
+            className={`btn btn--sm ${mode === 'delta' ? 'btn--outline' : 'btn--ghost'}`}
+            aria-pressed={mode === 'delta'}
+            onClick={() => setMode('delta')}
+          >
+            Δ год
+          </button>
+        </div>
       </div>
 
       <div className="sales-view__wrap">
@@ -51,7 +78,7 @@ export default function SalesDigitizationView({ facts }) {
               <th>Категория</th>
               {months.map((monthKey) => (
                 <th key={monthKey} className="sales-view__col-num">
-                  {formatMonthLabel(monthKey).split(' ')[0]}
+                  {formatMonthLabel(monthKey)}
                 </th>
               ))}
             </tr>
@@ -71,9 +98,9 @@ export default function SalesDigitizationView({ facts }) {
                     <td
                       key={months[i]}
                       className="sales-heatmap-cell"
-                      style={{ background: heatBackground(value, max) }}
+                      style={mode === 'delta' ? deltaCellStyle(value) : heatCellStyle(value, row.values)}
                     >
-                      {value === 0 ? '—' : formatCellValue(value, metric)}
+                      {mode === 'delta' ? formatDeltaValue(value, metric) : formatCellValue(value, metric)}
                     </td>
                   ))}
                 </tr>

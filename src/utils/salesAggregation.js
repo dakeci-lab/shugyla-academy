@@ -121,6 +121,47 @@ export function buildMonthlyTotals(facts) {
 }
 
 /**
+ * 5-step funnel for the last synced month vs the same month a year earlier —
+ * Чеки/Средний чек have no UMAG source wired up yet (no receipts endpoint
+ * in use), so they come back with value:null and are rendered as "нет
+ * данных" rather than silently omitted.
+ */
+export function buildFunnelSteps(facts, latestMonthKey) {
+  if (!latestMonthKey) return []
+  const monthly = buildMonthlyTotals(facts)
+  const priorKey = priorYearMonthKey(latestMonthKey)
+  const current = monthly.find((m) => m.monthKey === latestMonthKey) || null
+  const prior = monthly.find((m) => m.monthKey === priorKey) || null
+
+  return [
+    { key: 'checks', label: 'Чеки', value: null, unit: '', deltaPct: null, unavailable: true },
+    { key: 'avgCheck', label: 'Средний чек', value: null, unit: '₸', deltaPct: null, unavailable: true },
+    {
+      key: 'revenue',
+      label: 'Выручка',
+      value: current?.revenue ?? null,
+      unit: '₸',
+      deltaPct: current && prior ? deltaPct(current.revenue, prior.revenue) : null,
+    },
+    {
+      key: 'marginPct',
+      label: 'Маржинальность',
+      value: current?.margin ?? null,
+      unit: '%',
+      deltaPct: current && prior ? current.margin - prior.margin : null,
+      isPoints: true,
+    },
+    {
+      key: 'margin',
+      label: 'Валовая маржа',
+      value: current?.profit ?? null,
+      unit: '₸',
+      deltaPct: current && prior ? deltaPct(current.profit, prior.profit) : null,
+    },
+  ]
+}
+
+/**
  * Categories whose revenue dropped the most (as %) in `latestMonthKey`
  * versus the same calendar month a year earlier. Only categories with some
  * revenue in either month are considered; brand-new/discontinued categories
@@ -155,39 +196,87 @@ export function findCategoriesNeedingAttention(facts, latestMonthKey, limit = 5)
   return results.sort((a, b) => a.deltaPct - b.deltaPct).slice(0, limit)
 }
 
-const DIGITIZATION_METRICS = {
-  revenue: (row) => row.revenue,
-  profit: (row) => row.profit,
-  quantity: (row) => row.quantity,
+function cellValue(cell, metric) {
+  if (!cell) return null
+  if (metric === 'revenue') return cell.revenue
+  if (metric === 'profit') return cell.profit
+  if (metric === 'quantity') return cell.quantity
+  if (metric === 'markup') return cell.cogs > 0 ? cell.revenue / cell.cogs : null
+  return cell.revenue
 }
 
-/** Category × month matrix for the "Оцифровка" heatmap. */
-export function buildDigitizationMatrix(facts, metric = 'revenue') {
-  const valueOf = DIGITIZATION_METRICS[metric] || DIGITIZATION_METRICS.revenue
+function categoryTotal(cat, metric) {
+  if (metric === 'revenue') return cat.totalRevenue
+  if (metric === 'profit') return cat.totalProfit
+  if (metric === 'quantity') return cat.totalQuantity
+  if (metric === 'markup') return cat.totalCogs > 0 ? cat.totalRevenue / cat.totalCogs : null
+  return cat.totalRevenue
+}
+
+function priorYearMonthKey(monthKey) {
+  const [y, m] = monthKey.split('-')
+  return `${Number(y) - 1}-${m}-01`
+}
+
+/** % change for revenue/profit/quantity, raw-unit difference for the markup ratio (matches the reference's isRatio() split). */
+function cellDelta(current, previous, metric) {
+  if (current == null || previous == null) return null
+  if (metric === 'markup') return previous === 0 ? null : (current - previous) * 100
+  if (previous === 0) return current === 0 ? 0 : null
+  return ((current - previous) / previous) * 100
+}
+
+/**
+ * Category × month matrix for "Оцифровка". `null` marks a category/month
+ * with no facts at all (as opposed to a real zero), so the heat scale and
+ * the '—' display can tell the two apart — matches the reference dashboard.
+ * `mode: 'delta'` returns % change vs the same calendar month a year
+ * earlier instead of raw values (null where no prior-year month exists).
+ */
+export function buildDigitizationMatrix(facts, metric = 'revenue', mode = 'value') {
   const months = [...new Set(facts.map((r) => r.monthKey))].sort()
   const categories = new Map()
 
   for (const row of facts) {
     const catKey = row.categoryName || 'Без категории'
-    if (!categories.has(catKey)) categories.set(catKey, { categoryName: catKey, valuesByMonth: new Map(), total: 0 })
+    if (!categories.has(catKey)) {
+      categories.set(catKey, {
+        categoryName: catKey,
+        cellsByMonth: new Map(),
+        totalRevenue: 0,
+        totalCogs: 0,
+        totalProfit: 0,
+        totalQuantity: 0,
+      })
+    }
     const cat = categories.get(catKey)
-    const value = valueOf(row)
-    cat.valuesByMonth.set(row.monthKey, (cat.valuesByMonth.get(row.monthKey) || 0) + value)
-    cat.total += value
+    const cell = cat.cellsByMonth.get(row.monthKey) || { revenue: 0, cogs: 0, profit: 0, quantity: 0 }
+    cell.revenue += row.revenue
+    cell.cogs += row.cogs
+    cell.profit += row.profit
+    cell.quantity += row.quantity
+    cat.cellsByMonth.set(row.monthKey, cell)
+    cat.totalRevenue += row.revenue
+    cat.totalCogs += row.cogs
+    cat.totalProfit += row.profit
+    cat.totalQuantity += row.quantity
   }
 
   const rows = [...categories.values()]
-    .sort((a, b) => b.total - a.total)
-    .map((cat) => ({
-      categoryName: cat.categoryName,
-      total: cat.total,
-      values: months.map((monthKey) => cat.valuesByMonth.get(monthKey) || 0),
-    }))
+    .sort((a, b) => b.totalRevenue - a.totalRevenue)
+    .map((cat) => {
+      const values = months.map((monthKey) => {
+        const current = cellValue(cat.cellsByMonth.get(monthKey), metric)
+        if (mode !== 'delta') return current
+        const previous = cellValue(cat.cellsByMonth.get(priorYearMonthKey(monthKey)), metric)
+        return cellDelta(current, previous, metric)
+      })
+      return {
+        categoryName: cat.categoryName,
+        total: mode === 'delta' ? null : categoryTotal(cat, metric),
+        values,
+      }
+    })
 
-  const max = rows.reduce(
-    (acc, row) => Math.max(acc, ...row.values.map((v) => Math.abs(v))),
-    0
-  )
-
-  return { months, rows, max }
+  return { months, rows, mode }
 }

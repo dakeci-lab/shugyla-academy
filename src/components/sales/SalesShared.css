@@ -149,35 +149,97 @@
   color: var(--color-text-secondary, #64748b);
 }
 
-/* --- KPI tiles (Анализ) --- */
+/* --- Funnel (Анализ) --- */
 
-.sales-kpi-grid {
+.sales-funnel {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
 }
 
-.sales-kpi-card {
+@media (max-width: 920px) {
+  .sales-funnel {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .sales-funnel {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sales-funnel__step {
+  position: relative;
   border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 12px;
-  padding: 14px 16px;
+  border-radius: 10px;
   background: var(--color-white, #fff);
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  padding: 16px 16px 14px;
+  overflow: hidden;
 }
 
-.sales-kpi-card__label {
-  font-size: 12px;
-  color: var(--color-text-secondary, #64748b);
+.sales-funnel__step::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--color-primary, #059669);
+}
+
+.sales-funnel__step--unavailable {
+  opacity: 0.6;
+}
+
+.sales-funnel__step--unavailable::before {
+  background: var(--color-border, #cbd5e1);
+}
+
+.sales-funnel__step-num {
+  position: absolute;
+  right: 12px;
+  top: 10px;
+  font-size: 22px;
   font-weight: 600;
+  color: var(--color-border, #e2e8f0);
 }
 
-.sales-kpi-card__value {
+.sales-funnel__label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.sales-funnel__value {
   font-size: 20px;
   font-weight: 700;
   color: var(--color-text, #0f172a);
+  margin: 8px 0 6px;
   font-variant-numeric: tabular-nums;
+}
+
+.sales-funnel__yoy {
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.sales-funnel__yoy--up {
+  color: #047857;
+}
+
+.sales-funnel__yoy--down {
+  color: #b91c1c;
+}
+
+.sales-funnel__yoy-label {
+  color: var(--color-text-secondary, #94a3b8);
+  font-weight: 500;
 }
 
 /* --- Attention list (Анализ) --- */

@@ -2,18 +2,21 @@ import { Fragment, useMemo, useState } from 'react'
 import { buildCategoryYoyRows } from '../../utils/salesAggregation'
 import { formatUmagMoney } from '../../services/umagSettlementsService'
 import { exportSalesCategoriesXlsx } from '../../utils/salesExport'
+import { deltaCellStyle } from '../../utils/salesHeat'
 import PlatformSearchToolbar from '../platform/PlatformSearchToolbar'
 import { ChevronRightIcon, DownloadIcon } from '../icons/PlatformIcons'
 import './SalesShared.css'
 
+/** Cell background follows the same 5-step Δ band as the reference dashboard, not a plain up/down tone. */
 function DeltaCell({ value }) {
-  if (value == null) return <span className="sales-view__delta sales-view__delta--flat">новое</span>
-  const tone = value > 0.5 ? 'up' : value < -0.5 ? 'down' : 'flat'
+  if (value == null) {
+    return <td className="sales-view__col-num sales-view__delta--flat">новое</td>
+  }
   const sign = value > 0 ? '▲' : value < 0 ? '▼' : '—'
   return (
-    <span className={`sales-view__delta sales-view__delta--${tone}`}>
+    <td className="sales-view__col-num" style={deltaCellStyle(value)}>
       {sign} {Math.abs(value).toFixed(1)}%
-    </span>
+    </td>
   )
 }
 
@@ -136,9 +139,7 @@ export default function SalesCategoriesView({ facts, latestMonthKey }) {
                       <td className="sales-view__col-num">{formatUmagMoney(row.revenue)}</td>
                       <td className="sales-view__col-num">{formatUmagMoney(row.profit)}</td>
                       <td className="sales-view__col-num">{markup.toFixed(1)}%</td>
-                      <td className="sales-view__col-num">
-                        <DeltaCell value={row.deltaPct} />
-                      </td>
+                      <DeltaCell value={row.deltaPct} />
                     </tr>
                     {isOpen
                       ? row.subRows.map((sub) => {
@@ -149,9 +150,7 @@ export default function SalesCategoriesView({ facts, latestMonthKey }) {
                               <td className="sales-view__col-num">{formatUmagMoney(sub.revenue)}</td>
                               <td className="sales-view__col-num">{formatUmagMoney(sub.profit)}</td>
                               <td className="sales-view__col-num">{subMarkup.toFixed(1)}%</td>
-                              <td className="sales-view__col-num">
-                                <DeltaCell value={sub.deltaPct} />
-                              </td>
+                              <DeltaCell value={sub.deltaPct} />
                             </tr>
                           )
                         })
