@@ -526,13 +526,20 @@ async function handleBackfillReceipts(
     return adminErrorResponse('forbidden', 403)
   }
 
-  const { data: factMonths, error: factMonthsErr } = await authz.serviceClient
-    .from('sales_category_month_facts')
-    .select('month_key')
-  if (factMonthsErr) {
-    return umagErrorResponse('SUPABASE_SELECT_FAILED', `Не удалось прочитать месяцы: ${factMonthsErr.message}`, 500)
+  // One row per successfully synced month — unlike sales_category_month_facts
+  // (thousands of rows, ~180/month), this needs no pagination to enumerate
+  // every month at all.
+  const { data: syncedRuns, error: syncedRunsErr } = await authz.serviceClient
+    .from('umag_sync_runs')
+    .select('date_from')
+    .eq('entity', 'sales_facts')
+    .eq('status', 'success')
+  if (syncedRunsErr) {
+    return umagErrorResponse('SUPABASE_SELECT_FAILED', `Не удалось прочитать месяцы: ${syncedRunsErr.message}`, 500)
   }
-  const allMonths = [...new Set((factMonths || []).map((r: { month_key: string }) => r.month_key))].sort()
+  const allMonths = [
+    ...new Set((syncedRuns || []).map((r: { date_from: string }) => r.date_from)),
+  ].sort()
 
   const { data: doneMonths, error: doneErr } = await authz.serviceClient
     .from('sales_month_receipt_facts')
