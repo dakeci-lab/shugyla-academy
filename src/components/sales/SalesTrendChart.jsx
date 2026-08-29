@@ -16,15 +16,11 @@ const MARGIN_COLOR = 'var(--color-primary, #059669)'
 const MARGIN_COLOR_HOVER = '#047857'
 const MARGIN_PCT_COLOR = '#f59e0b'
 
-const TICK_COUNT = 8
+const REVENUE_TICK_STEP = 10_000_000
+const PCT_TICK_UNIT = 5
+const MIN_TICK_COUNT = 4
 const TOOLTIP_W = 150
 const TOOLTIP_H = 70
-
-function niceMax(value) {
-  if (value <= 0) return 1
-  const magnitude = 10 ** Math.floor(Math.log10(value))
-  return Math.ceil(value / magnitude) * magnitude
-}
 
 function formatAxisMoney(value) {
   if (value <= 0) return '0'
@@ -58,10 +54,17 @@ export default function SalesTrendChart({ points }) {
   const plotW = WIDTH - PAD_LEFT - PAD_RIGHT
   const plotH = HEIGHT - PAD_TOP - PAD_BOTTOM
 
-  const maxRevenue = niceMax(Math.max(...points.map((p) => p.revenue), 1))
-  const maxPct = Math.max(10, niceMax(Math.max(...points.map((p) => p.marginPct || 0), 1)))
-  const revenueStep = maxRevenue / TICK_COUNT
-  const pctStep = maxPct / TICK_COUNT
+  const maxRevenueRaw = Math.max(...points.map((p) => p.revenue), 1)
+  const maxPctRaw = Math.max(...points.map((p) => p.marginPct || 0), 1)
+
+  // Revenue gets a fixed round step (10M ₸) — the number of gridlines follows
+  // from the data. The % axis is then snapped to the nearest multiple of 5
+  // across that same number of gridlines, so both axes stay on round numbers
+  // while sharing one set of horizontal gridlines.
+  const TICK_COUNT = Math.max(MIN_TICK_COUNT, Math.ceil(maxRevenueRaw / REVENUE_TICK_STEP))
+  const maxRevenue = TICK_COUNT * REVENUE_TICK_STEP
+  const pctStep = Math.max(PCT_TICK_UNIT, Math.ceil(maxPctRaw / TICK_COUNT / PCT_TICK_UNIT) * PCT_TICK_UNIT)
+  const maxPct = pctStep * TICK_COUNT
 
   const slotW = plotW / points.length
   const barGap = slotW * 0.14
@@ -121,7 +124,7 @@ export default function SalesTrendChart({ points }) {
 
       {gridTicks.map((i) => (
         <text key={`l-${i}`} x={2} y={yFromTick(i) + 3} fontSize="10" fill="var(--color-text-secondary, #94a3b8)">
-          {formatAxisMoney(i * revenueStep)}
+          {formatAxisMoney(i * REVENUE_TICK_STEP)}
         </text>
       ))}
       {gridTicks.map((i) => (
