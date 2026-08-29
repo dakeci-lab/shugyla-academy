@@ -79,8 +79,13 @@ export default function SalesPage() {
         result = await syncNextSalesMonth()
         setSyncProgressLabel(result.monthSynced ? formatMonthLabel(result.monthSynced) : '')
       }
-      setSyncProgressLabel('Чеки…')
-      await backfillSalesReceipts()
+      let receiptResult = await backfillSalesReceipts()
+      while (receiptResult?.success && !receiptResult.upToDate) {
+        setSyncProgressLabel(
+          receiptResult.monthFilled ? `Чеки: ${formatMonthLabel(receiptResult.monthFilled)}` : 'Чеки…'
+        )
+        receiptResult = await backfillSalesReceipts()
+      }
       await loadFacts()
     } catch (err) {
       setSyncError(err?.message || 'Не удалось синхронизировать продажи из UMAG.')

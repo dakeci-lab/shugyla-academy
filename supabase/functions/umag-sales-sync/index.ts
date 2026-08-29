@@ -513,17 +513,18 @@ async function handleSyncNext(
   })
 }
 
-/** One-off backfill: fills sales_month_receipt_facts for months already in sales_category_month_facts that never got a receipt count (e.g. synced before this endpoint was wired up). */
+/**
+ * Backfills exactly ONE month's receipt count per call — same one-unit-of-
+ * work-per-invocation shape as handleSyncNext, for the same reason: 20+
+ * sequential UMAG round trips in a single call risks the edge function's
+ * own execution time limit. The frontend calls this in a loop, like sync_next.
+ */
 async function handleBackfillReceipts(
   authz: Exclude<Awaited<ReturnType<typeof authorizeWorkforceRequest>>, Response>
 ): Promise<Response> {
   if (authz.permissions[PERMISSION_SYNC] !== true) {
     return adminErrorResponse('forbidden', 403)
   }
-
-  const session = await acquireUmagSession()
-  if ('error' in session) return mapUmagAuthError(session.error)
-  const storeId = session.storeId
 
   const { data: factMonths, error: factMonthsErr } = await authz.serviceClient
     .from('sales_category_month_facts')
@@ -541,32 +542,40 @@ async function handleBackfillReceipts(
   }
   const done = new Set((doneMonths || []).map((r: { month_key: string }) => r.month_key))
 
-  const MAX_PER_CALL = 60
-  const pending = allMonths.filter((m) => !done.has(m)).slice(0, MAX_PER_CALL)
+  const pending = allMonths.filter((m) => !done.has(m))
+  if (pending.length === 0) {
+    return jsonResponse({ success: true, monthFilled: null, remaining: 0, upToDate: true })
+  }
 
-  let filled = 0
-  const nowIso = new Date().toISOString()
-  for (const monthKey of pending) {
-    const { fromTime, toTime } = almatyMonthBoundsMs(monthKey)
-    const count = await fetchMonthReceiptCount(storeId, fromTime, toTime)
-    if (count instanceof Response) {
-      console.warn('umag_sales_sync_receipt_backfill_month_failed', { monthKey })
-      continue
-    }
-    const { error: upsertErr } = await authz.serviceClient
-      .from('sales_month_receipt_facts')
-      .upsert({ month_key: monthKey, receipt_count: count, synced_at: nowIso }, { onConflict: 'month_key' })
-    if (upsertErr) {
-      console.warn('umag_sales_sync_receipt_backfill_write_failed', { monthKey, message: upsertErr.message })
-      continue
-    }
-    filled += 1
+  const monthKey = pending[0]
+
+  const session = await acquireUmagSession()
+  if ('error' in session) return mapUmagAuthError(session.error)
+  const storeId = session.storeId
+
+  const { fromTime, toTime } = almatyMonthBoundsMs(monthKey)
+  const count = await fetchMonthReceiptCount(storeId, fromTime, toTime)
+  if (count instanceof Response) {
+    console.warn('umag_sales_sync_receipt_backfill_month_failed', { monthKey })
+    return umagErrorResponse('UMAG_RECEIPT_FETCH_FAILED', `Не удалось получить чеки за ${monthKey}.`, 502)
+  }
+
+  const { error: upsertErr } = await authz.serviceClient
+    .from('sales_month_receipt_facts')
+    .upsert(
+      { month_key: monthKey, receipt_count: count, synced_at: new Date().toISOString() },
+      { onConflict: 'month_key' }
+    )
+  if (upsertErr) {
+    return umagErrorResponse('SUPABASE_UPSERT_FAILED', `Не удалось сохранить чеки за ${monthKey}: ${upsertErr.message}`, 500)
   }
 
   return jsonResponse({
     success: true,
-    filled,
-    remaining: allMonths.length - done.size - filled,
+    monthFilled: monthKey,
+    receiptCount: count,
+    remaining: pending.length - 1,
+    upToDate: pending.length === 1,
   })
 }
 
