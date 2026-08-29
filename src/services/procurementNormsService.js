@@ -1,6 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import {
-  fetchLatestProcurementSnapshot,
+  fetchLatestReadyProcurementSnapshot,
   persistNormDaysForScope,
 } from './procurementPlanningService'
 import { buildProcurementNormHierarchy } from '../components/procurement/procurementNormsModel'
@@ -75,7 +75,11 @@ export async function loadProcurementNormsModel({
     : getLatestCachedProcurementNormsModel()
   if (seed?.model) onCached?.(seed.model)
 
-  const snapshot = suppliedSnapshot || (await fetchLatestProcurementSnapshot())
+  // fetchLatestReadyProcurementSnapshot skips a snapshot that is still mid-sync,
+  // so a background UMAG sync (started from the Планирование tab, or by someone
+  // else) doesn't bounce this tab from its last usable snapshot to an empty one
+  // that has no norms taxonomy loaded yet — see the function's doc comment.
+  const snapshot = suppliedSnapshot || (await fetchLatestReadyProcurementSnapshot())
   if (!snapshot?.id || snapshot.status === 'syncing' || snapshot.status === 'failed') {
     const empty = { snapshot, hierarchy: [] }
     onFresh?.(empty)

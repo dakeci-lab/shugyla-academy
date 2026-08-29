@@ -462,6 +462,34 @@ export async function fetchLatestProcurementSnapshot() {
 }
 
 /**
+ * Same as fetchLatestProcurementSnapshot, but skips a snapshot that is
+ * currently mid-sync. umag-procurement inserts the new procurement_snapshots
+ * row with status "syncing" *before* it fetches UMAG stock/sales (which can
+ * take many seconds) — so "the latest row" briefly means "an empty snapshot
+ * with no items yet". Read-only analysis tabs (Нормы, ABC — anything that
+ * just wants something to display, not the live editing view) should keep
+ * showing the last usable snapshot through that window instead of flashing
+ * an empty state, the same "don't blank the screen for an in-flight
+ * background reload" rule already applied to cloudStore's sticky
+ * moduleEverReady flag (see fix(platform): stop supplier list flashing
+ * empty during save). ProcurementPlannerView intentionally keeps using
+ * fetchLatestProcurementSnapshot() above — it needs to know about an
+ * in-progress sync to lock quantity editing.
+ */
+export async function fetchLatestReadyProcurementSnapshot() {
+  ensureClient()
+  const { data, error } = await supabase
+    .from('procurement_snapshots')
+    .select('*')
+    .neq('status', 'syncing')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error) throw new Error(error.message || 'Не удалось загрузить снимок')
+  return normalizeSnapshot(data)
+}
+
+/**
  * Склад — history of every past sync (procurement_snapshots is append-only,
  * see migration comment: "Refresh creates a new row"). Newest first.
  */

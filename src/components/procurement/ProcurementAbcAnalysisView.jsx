@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { isCloudMode } from '../../lib/dataMode'
 import {
   fetchAbcAnalysisPage,
-  fetchLatestProcurementSnapshot,
+  fetchLatestReadyProcurementSnapshot,
 } from '../../services/procurementPlanningService'
 import { formatUmagMoney } from '../../services/umagSettlementsService'
 import { DelayedLoadingSkeleton } from '../loading/LoadingSkeleton'
@@ -44,7 +44,11 @@ export default function ProcurementAbcAnalysisView() {
       return
     }
     let cancelled = false
-    fetchLatestProcurementSnapshot()
+    // Skips a snapshot that's still mid-sync (see the function's doc comment)
+    // so switching to this tab while a UMAG sync is running keeps showing the
+    // last completed snapshot's ranking instead of flashing "Нет товаров в
+    // снимке" for the few seconds/minutes the new snapshot has no items yet.
+    fetchLatestReadyProcurementSnapshot()
       .then((snap) => {
         if (!cancelled) setSnapshot(snap)
       })
