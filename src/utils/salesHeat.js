@@ -31,13 +31,13 @@ function median(values) {
 }
 
 /** Background + readable-on-heat text color for one value within a row of values. */
-export function heatCellStyle(value, rowValues, { bold = true } = {}) {
+export function heatCellStyle(value, rowValues) {
   const numeric = rowValues.filter((v) => v != null && !Number.isNaN(v))
   const lo = numeric.length ? Math.min(...numeric) : 0
   const hi = numeric.length ? Math.max(...numeric) : 0
   const mid = median(numeric)
   if (!(hi > lo) || value == null || Number.isNaN(value)) return {}
-  return { background: heatColor(value, lo, mid, hi), color: '#04243a', fontWeight: bold ? 600 : 400 }
+  return { background: heatColor(value, lo, mid, hi), color: '#04243a', fontWeight: 600 }
 }
 
 /**

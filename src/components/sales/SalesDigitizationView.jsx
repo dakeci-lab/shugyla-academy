@@ -70,7 +70,7 @@ export default function SalesDigitizationView({ facts, receiptsByMonth }) {
                   <td
                     key={months[i]}
                     className="sales-heatmap-cell"
-                    style={heatCellStyle(value, row.values, { bold: false })}
+                    style={heatCellStyle(value, row.values)}
                   >
                     {formatKpiValue(value, KPI_KIND[row.key])}
                   </td>
@@ -125,7 +125,7 @@ export default function SalesDigitizationView({ facts, receiptsByMonth }) {
                     <td
                       key={months[i]}
                       className="sales-heatmap-cell"
-                      style={heatCellStyle(value, row.values, { bold: false })}
+                      style={heatCellStyle(value, row.values)}
                     >
                       {formatCellValue(value, metric)}
                     </td>
