@@ -177,6 +177,15 @@ function toNumber(value) {
 }
 
 /**
+ * Client-side ceiling on the umag-sync request itself: the backend has no
+ * wall-clock guarantee, and a plain browser fetch never times out on its
+ * own. Comfortably below STALE_SYNC_THRESHOLD_MINUTES (5 min, see
+ * supabase/functions/_shared/umagConfig.ts) so a stalled request fails with
+ * a clear message instead of leaving the sync button spinning forever.
+ */
+const UMAG_SYNC_CLIENT_TIMEOUT_MS = 120_000
+
+/**
  * Invoke umag-sync and normalize transport / Edge errors into user messages.
  * Returns either `{ data }` on success or `{ failure }` ready to be surfaced.
  */
@@ -186,9 +195,15 @@ async function invokeUmagSync(requestBody) {
   }
 
   try {
-    const { data, error } = await supabase.functions.invoke('umag-sync', { body: requestBody })
+    const { data, error } = await supabase.functions.invoke('umag-sync', {
+      body: requestBody,
+      timeout: UMAG_SYNC_CLIENT_TIMEOUT_MS,
+    })
 
     if (error) {
+      if (error.context?.name === 'AbortError') {
+        return { failure: fail(UMAG_SETTLEMENTS_ERROR_CODES.UMAG_TIMEOUT) }
+      }
       const body = await extractFunctionErrorBody(error)
       if (body && typeof body === 'object') {
         if (body.success === false || body.ok === false) {

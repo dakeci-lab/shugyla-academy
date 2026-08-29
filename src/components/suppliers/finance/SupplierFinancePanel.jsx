@@ -132,37 +132,42 @@ export default function SupplierFinancePanel() {
   }, [loadSummary])
 
   async function handleSync() {
-    if (!canSync || syncing || lastSync?.status === 'running') return
+    if (!canSync || syncing) return
     setSyncing(true)
-    // Item 23/24: a neutral current-month range, never the Settlements VIEW
-    // PERIOD (SettlementsFilterPopover's dateFrom/dateTo never reach here —
-    // this component doesn't even import that period state). The Этап 2.2
-    // backend independently widens this to the real effective sync scope.
-    const todayKey = summary?.todayKey || toAqtobeDateKey()
-    const [year, month] = todayKey.split('-').map(Number)
-    const { dateFrom } = getMonthRangeKeys(year, month)
+    try {
+      // Item 23/24: a neutral current-month range, never the Settlements VIEW
+      // PERIOD (SettlementsFilterPopover's dateFrom/dateTo never reach here —
+      // this component doesn't even import that period state). The Этап 2.2
+      // backend independently widens this to the real effective sync scope.
+      const todayKey = summary?.todayKey || toAqtobeDateKey()
+      const [year, month] = todayKey.split('-').map(Number)
+      const { dateFrom } = getMonthRangeKeys(year, month)
 
-    const result = await syncUmagSettlements({ dateFrom, dateTo: todayKey, syncSuppliers: true })
-    setSyncing(false)
+      const result = await syncUmagSettlements({ dateFrom, dateTo: todayKey, syncSuppliers: true })
 
-    if (!result.success) {
-      if (result.code === UMAG_SETTLEMENTS_ERROR_CODES.SYNC_ALREADY_RUNNING) {
-        showWarning(result.message)
-        await loadSummary()
-      } else {
-        showError(result.message)
+      if (!result.success) {
+        if (result.code === UMAG_SETTLEMENTS_ERROR_CODES.SYNC_ALREADY_RUNNING) {
+          showWarning(result.message)
+          await loadSummary()
+        } else {
+          showError(result.message)
+        }
+        return
       }
-      return
-    }
 
-    if (result.status === 'partial' || result.warning) {
-      showWarning(result.warning || result.message)
-    } else {
-      showSuccess(result.message)
-    }
+      if (result.status === 'partial' || result.warning) {
+        showWarning(result.warning || result.message)
+      } else {
+        showSuccess(result.message)
+      }
 
-    await loadSummary()
-    setRefreshToken((token) => token + 1)
+      await loadSummary()
+      setRefreshToken((token) => token + 1)
+    } catch (err) {
+      showError(err?.message || 'Не удалось синхронизировать')
+    } finally {
+      setSyncing(false)
+    }
   }
 
   if (!canViewPayments && !canViewSettlements) {
@@ -234,8 +239,8 @@ export default function SupplierFinancePanel() {
           {canSync ? (
             <PlatformSyncButton
               onClick={() => void handleSync()}
-              syncing={syncing || lastSync?.status === 'running'}
-              disabled={!canSync || syncing || lastSync?.status === 'running'}
+              syncing={syncing}
+              disabled={!canSync || syncing}
               title="Синхронизация UMAG"
               aria-label="Синхронизация UMAG"
             />

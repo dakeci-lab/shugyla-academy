@@ -149,9 +149,23 @@ async function main() {
   ok('Case 16: a 409/SYNC_ALREADY_RUNNING result is shown via showWarning(result.message) — never funnelled into the generic showError("unknown") path')
 
   // --- Case 17/18/19: partial/running/failed compact states, never conflated ---
-  assert.match(panelSrc, /disabled=\{!canSync \|\| syncing \|\| lastSync\?\.status === 'running'\}/)
-  assert.match(panelSrc, /syncing=\{syncing \|\| lastSync\?\.status === 'running'\}/)
-  ok('Case 18: the sync button is disabled/shows the spinner both while this tab is syncing AND while lastSync.status is already running')
+  // The button's disabled/spinner state intentionally does NOT depend on
+  // lastSync.status === 'running' (that was the deadlock bug: a
+  // crashed/abandoned Edge Function run leaves umag_sync_runs stuck at
+  // 'running' forever, and every reload re-reads that same row — if the
+  // button also stayed disabled on that status, the user could never click
+  // again to let the backend's own stale-run cleanup self-heal it). Only the
+  // local `syncing` flag gates the button, matching the already-correct
+  // procurement pattern (ProcurementPlannerView / getSyncDisabledReason,
+  // which never reads snapshot.status for its click-disable). The DB status
+  // still drives the separate text badge (describeSyncStatus) — informational
+  // only, never a click-blocker.
+  assert.match(panelSrc, /disabled=\{!canSync \|\| syncing\}/)
+  assert.match(panelSrc, /syncing=\{syncing\}/)
+  assert.doesNotMatch(panelSrc, /disabled=\{[^}]*lastSync\?\.status === 'running'[^}]*\}/)
+  assert.doesNotMatch(panelSrc, /syncing=\{[^}]*lastSync\?\.status === 'running'[^}]*\}/)
+  assert.match(panelSrc, /try \{[\s\S]*await syncUmagSettlements\([\s\S]*\} catch \(err\) \{[\s\S]*\} finally \{\s*\n\s*setSyncing\(false\)/)
+  ok('Case 18: the sync button is disabled/shows the spinner only while this tab itself is syncing (local state, guaranteed reset via try/finally) — never permanently by a stuck DB-persisted lastSync.status')
 
   // --- Case 10/11: embedded panels wired, no duplicate shell -----------------
   assert.match(panelSrc, /<SupplierPaymentsPanel[\s\S]*embedded[\s\S]*externalSummaryProvided[\s\S]*obligations=\{obligations\}[\s\S]*refreshToken=\{refreshToken\}/)

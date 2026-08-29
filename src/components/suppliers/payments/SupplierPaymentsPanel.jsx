@@ -486,24 +486,29 @@ export default function SupplierPaymentsPanel({
   async function handleSync() {
     if (!canSync || syncing) return
     setSyncing(true)
-    const period = getMonthPeriodKeys()
-    const result = await syncUmagForPayments({
-      dateFrom: period.dateFrom,
-      dateTo: period.dateTo,
-    })
-    setSyncing(false)
-    if (!result.success) {
-      toast.error?.(result.message)
-      return
+    try {
+      const period = getMonthPeriodKeys()
+      const result = await syncUmagForPayments({
+        dateFrom: period.dateFrom,
+        dateTo: period.dateTo,
+      })
+      if (!result.success) {
+        toast.error?.(result.message)
+        return
+      }
+      if (result.status === 'partial' || result.warning) {
+        // Message carries the next action ("press again"), warning the diagnostics.
+        toast.warning?.([result.message, result.warning].filter(Boolean).join(' '))
+      } else {
+        toast.success?.(result.message || 'Синхронизация выполнена.')
+      }
+      setTabTouched(false)
+      await loadStandalone()
+    } catch (err) {
+      toast.error?.(err?.message || 'Не удалось синхронизировать')
+    } finally {
+      setSyncing(false)
     }
-    if (result.status === 'partial' || result.warning) {
-      // Message carries the next action ("press again"), warning the diagnostics.
-      toast.warning?.([result.message, result.warning].filter(Boolean).join(' '))
-    } else {
-      toast.success?.(result.message || 'Синхронизация выполнена.')
-    }
-    setTabTouched(false)
-    await loadStandalone()
   }
 
   function openConfigure(group) {
