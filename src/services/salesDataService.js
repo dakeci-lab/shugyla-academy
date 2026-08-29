@@ -67,26 +67,41 @@ export async function fetchLatestSalesSyncRun() {
   }
 }
 
+const FACTS_PAGE_SIZE = 1000
+
 /**
  * All category/subcategory month facts in [monthFrom, monthTo] (inclusive,
- * 'YYYY-MM-01' bounds). The table is a small aggregate (categories × months),
- * not per-SKU — fetching the whole range at once and aggregating client-side
- * is simpler and fast enough than paginating.
+ * 'YYYY-MM-01' bounds). The table is a small aggregate (categories × months,
+ * ~180 rows/month), but still grows past PostgREST's default 1000-row cap
+ * within a year — paginate with .range() rather than trusting a bare
+ * .select() to return everything.
  */
 export async function fetchSalesCategoryMonthFacts({ monthFrom, monthTo } = {}) {
   assertConfigured()
-  let query = supabase
-    .from('sales_category_month_facts')
-    .select('month_key, category_name, subcategory_name, revenue, cogs, profit, quantity, sku_count')
-    .order('month_key', { ascending: true })
 
-  if (monthFrom) query = query.gte('month_key', monthFrom)
-  if (monthTo) query = query.lte('month_key', monthTo)
+  const rows = []
+  let from = 0
+  for (;;) {
+    let query = supabase
+      .from('sales_category_month_facts')
+      .select('month_key, category_name, subcategory_name, revenue, cogs, profit, quantity, sku_count')
+      .order('month_key', { ascending: true })
+      .order('category_name', { ascending: true })
+      .order('subcategory_name', { ascending: true })
+      .range(from, from + FACTS_PAGE_SIZE - 1)
 
-  const { data, error } = await query
-  if (error) throw new Error(toUserErrorMessage(error, 'Не удалось загрузить данные продаж.'))
+    if (monthFrom) query = query.gte('month_key', monthFrom)
+    if (monthTo) query = query.lte('month_key', monthTo)
 
-  return (data || []).map((row) => ({
+    const { data, error } = await query
+    if (error) throw new Error(toUserErrorMessage(error, 'Не удалось загрузить данные продаж.'))
+
+    rows.push(...(data || []))
+    if (!data || data.length < FACTS_PAGE_SIZE) break
+    from += FACTS_PAGE_SIZE
+  }
+
+  return rows.map((row) => ({
     monthKey: row.month_key,
     categoryName: row.category_name || '',
     subcategoryName: row.subcategory_name || '',
