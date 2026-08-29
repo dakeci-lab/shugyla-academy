@@ -126,6 +126,14 @@ export const PLATFORM_NAV = [
     ],
   },
   {
+    id: 'sales',
+    path: '/platform/sales',
+    label: 'Продажи',
+    routeKey: ROUTE_KEYS.SALES,
+    title: 'Продажи',
+    description: 'Выручка и маржа по категориям, аналитика и синхронизация с UMAG.',
+  },
+  {
     id: 'products-group',
     label: 'Товары',
     routeKey: ROUTE_KEYS.PRODUCTS_GROUP,

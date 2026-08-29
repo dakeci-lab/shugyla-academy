@@ -1,0 +1,111 @@
+.sales-page__tabs-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.25rem 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.85rem;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  min-width: 0;
+}
+
+.sales-page__tabs {
+  display: flex;
+  gap: 0.25rem;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.sales-page__tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary, #6b7280);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+
+.sales-page__tab.is-active {
+  color: var(--color-text, #111827);
+  border-bottom-color: var(--color-primary, #059669);
+}
+
+.sales-page__tab:focus-visible {
+  outline: 2px solid var(--color-primary, #059669);
+  outline-offset: 2px;
+}
+
+.sales-page__sync {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  padding-bottom: 0.45rem;
+  min-width: 0;
+}
+
+.sales-page__sync-status {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary, #6b7280);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sales-page__sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+}
+
+.sales-page__sync-icon {
+  display: inline-flex;
+}
+
+.sales-page__sync-icon--spinning {
+  animation: sales-page-spin 1s linear infinite;
+}
+
+@keyframes sales-page-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sales-page__error {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  background: #fef2f2;
+  color: #991b1b;
+  border: 1px solid #fecaca;
+  margin-bottom: 12px;
+}
+
+.sales-page__empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--color-text-secondary, #64748b);
+  font-size: 14px;
+  border: 1px dashed var(--color-border, #e2e8f0);
+  border-radius: 12px;
+}
+
+@media (max-width: 720px) {
+  .sales-page__sync {
+    flex-basis: 100%;
+    justify-content: flex-start;
+    padding: 0 0 0.45rem;
+    flex-wrap: wrap;
+  }
+}

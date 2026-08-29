@@ -1,0 +1,254 @@
+.sales-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.sales-view__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+/* Indeterminate progress bar during Excel export, same treatment as Склад. */
+.sales-view__loading-bar {
+  position: relative;
+  height: 3px;
+  width: 100%;
+  overflow: hidden;
+  background: var(--color-border, #e2e8f0);
+  border-radius: 999px;
+}
+
+.sales-view__loading-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -35%;
+  height: 100%;
+  width: 35%;
+  background: var(--color-primary, #059669);
+  border-radius: 999px;
+  animation: sales-view-loading-slide 1.1s ease-in-out infinite;
+}
+
+@keyframes sales-view-loading-slide {
+  0% {
+    left: -35%;
+  }
+  100% {
+    left: 100%;
+  }
+}
+
+.sales-view__export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.sales-view__wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--color-white, #fff);
+}
+
+.sales-view__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 13px;
+}
+
+.sales-view__table th,
+.sales-view__table td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  white-space: nowrap;
+}
+
+.sales-view__table th {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary, #64748b);
+  background: #f8fafc;
+}
+
+.sales-view__table tr:last-child td {
+  border-bottom: none;
+}
+
+.sales-view__table tbody tr:hover td {
+  background: #f8fafc;
+}
+
+.sales-view__col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sales-view__empty-cell {
+  text-align: center;
+  color: var(--color-text-secondary, #64748b);
+  padding: 28px 16px !important;
+  white-space: normal;
+}
+
+.sales-view__row-toggle {
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-align: left;
+}
+
+.sales-view__row-chevron {
+  display: inline-flex;
+  transition: transform 0.15s ease;
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+.sales-view__row-chevron--open {
+  transform: rotate(90deg);
+}
+
+.sales-view__subrow td:first-child {
+  padding-left: 30px;
+  color: var(--color-text-secondary, #64748b);
+  font-weight: 400;
+}
+
+.sales-view__delta {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.sales-view__delta--up {
+  color: #047857;
+}
+
+.sales-view__delta--down {
+  color: #b91c1c;
+}
+
+.sales-view__delta--flat {
+  color: var(--color-text-secondary, #64748b);
+}
+
+/* --- KPI tiles (Анализ) --- */
+
+.sales-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.sales-kpi-card {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--color-white, #fff);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sales-kpi-card__label {
+  font-size: 12px;
+  color: var(--color-text-secondary, #64748b);
+  font-weight: 600;
+}
+
+.sales-kpi-card__value {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Attention list (Анализ) --- */
+
+.sales-attention {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--color-white, #fff);
+  overflow: hidden;
+}
+
+.sales-attention__head {
+  padding: 12px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.sales-attention__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid var(--color-border, #f1f5f9);
+}
+
+.sales-attention__row:last-child {
+  border-bottom: none;
+}
+
+.sales-attention__empty {
+  padding: 16px;
+  font-size: 13px;
+  color: var(--color-text-secondary, #64748b);
+}
+
+/* --- Trend chart (Анализ) --- */
+
+.sales-chart-card {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--color-white, #fff);
+  padding: 14px 16px;
+}
+
+.sales-chart-card__head {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+  margin-bottom: 8px;
+}
+
+.sales-chart-card svg {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+/* --- Digitization heatmap --- */
+
+.sales-heatmap-controls {
+  display: flex;
+  gap: 6px;
+}
+
+.sales-heatmap-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text, #0f172a);
+}

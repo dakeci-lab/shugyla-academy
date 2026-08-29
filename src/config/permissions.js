@@ -34,6 +34,7 @@ export const ROUTE_KEYS = {
   PROCUREMENT: 'procurement',
   RECEIVING: 'receiving',
   SUPPLIERS: 'suppliers',
+  SALES: 'sales',
   SETTLEMENTS: 'settlements',
   SUPPLIER_PAYMENTS: 'supplier_payments',
   // Этап 2.7 — hidden unified page, not yet in platformNav.js. Same access
@@ -86,6 +87,9 @@ const ROUTE_ACCESS = {
     ROLE_IDS.RECEIVER,
   ],
   [ROUTE_KEYS.SUPPLIERS]: [ROLE_IDS.ADMIN, ROLE_IDS.BUYER],
+  // Sales: permission-first (sales.view); role fallback admin-only, matching
+  // the sales.* permission grants seeded by 20260829120000_sales_category_month_facts.sql.
+  [ROUTE_KEYS.SALES]: [ROLE_IDS.ADMIN],
   // Settlements: permission-first (umag.settlements.view); role fallback admin-only.
   [ROUTE_KEYS.SETTLEMENTS]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SUPPLIER_PAYMENTS]: [ROLE_IDS.ADMIN],
@@ -231,6 +235,7 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.PROCUREMENT]: [P.PROCUREMENT_VIEW],
     [ROUTE_KEYS.RECEIVING]: [P.RECEIVING_VIEW],
     [ROUTE_KEYS.SUPPLIERS]: [P.SUPPLIERS_VIEW],
+    [ROUTE_KEYS.SALES]: [P.SALES_VIEW],
     [ROUTE_KEYS.SETTLEMENTS]: [P.UMAG_SETTLEMENTS_VIEW],
     [ROUTE_KEYS.SUPPLIER_PAYMENTS]: [P.SUPPLIER_PAYMENTS_VIEW],
     // Union of the two existing routes' permissions — access to the hidden
@@ -336,6 +341,14 @@ export function canArchiveSuppliers(user) {
 
 export function canDeleteSuppliers(user) {
   return canEditSuppliers(user)
+}
+
+export function canViewSales(user) {
+  return canAccessRoute(user, ROUTE_KEYS.SALES)
+}
+
+export function canSyncSales(user) {
+  return can(user, PERMISSION_CODES.SALES_SYNC)
 }
 
 export function canViewUmagSettlements(user) {
