@@ -96,6 +96,12 @@
   background: #f8fafc;
 }
 
+.proc-wh__totals-row td {
+  font-weight: 700;
+  background: #f8fafc;
+  border-top: 2px solid var(--color-border, #e2e8f0);
+}
+
 .proc-wh__col-num,
 .proc-wh__col-rank {
   text-align: right;

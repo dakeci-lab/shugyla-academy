@@ -80,6 +80,21 @@ function rowsToAoa(rows) {
   ]
 }
 
+/** Net sum across every row — negative-stock rows already carry a negative "Сумма ...", so this nets automatically. */
+function buildTotalsRow(rows) {
+  let totalPurchase = 0
+  let totalSelling = 0
+  for (const row of rows) {
+    totalPurchase += Number(row['Сумма закупки']) || 0
+    totalSelling += Number(row['Сумма продажи']) || 0
+  }
+  const arr = new Array(WAREHOUSE_EXPORT_COLUMNS.length).fill('')
+  arr[WAREHOUSE_EXPORT_COLUMNS.indexOf('Товар')] = 'Итого:'
+  arr[WAREHOUSE_EXPORT_COLUMNS.indexOf('Сумма закупки')] = round2(totalPurchase)
+  arr[WAREHOUSE_EXPORT_COLUMNS.indexOf('Сумма продажи')] = round2(totalSelling)
+  return arr
+}
+
 function buildFilename(syncedAt) {
   const key = syncedAt ? new Date(syncedAt).toISOString().slice(0, 16).replace(/[:T]/g, '-') : 'export'
   return `sklad_${safeFilenamePart(key)}.xlsx`
@@ -92,6 +107,7 @@ function buildFilename(syncedAt) {
 export async function exportWarehouseSnapshotXlsx(items, options = {}) {
   const rows = mapWarehouseItemsForExport(items)
   const aoa = rowsToAoa(rows)
+  if (rows.length > 0) aoa.push(buildTotalsRow(rows))
   const XLSX = await import('xlsx')
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.aoa_to_sheet(aoa)
@@ -118,6 +134,15 @@ export async function exportWarehouseSnapshotXlsx(items, options = {}) {
     const addr = XLSX.utils.encode_cell({ r: 0, c })
     if (!ws[addr]) continue
     ws[addr].s = { font: { bold: true } }
+  }
+
+  if (rows.length > 0) {
+    const totalsRowIndex = rows.length + 1
+    for (let c = 0; c < WAREHOUSE_EXPORT_COLUMNS.length; c += 1) {
+      const addr = XLSX.utils.encode_cell({ r: totalsRowIndex, c })
+      if (!ws[addr]) continue
+      ws[addr].s = { font: { bold: true }, border: { top: { style: 'thin' } } }
+    }
   }
 
   // Keep long numeric barcodes as text — otherwise Excel renders them in

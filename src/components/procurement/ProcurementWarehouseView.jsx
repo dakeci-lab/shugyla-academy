@@ -3,7 +3,9 @@ import { isCloudMode } from '../../lib/dataMode'
 import {
   exportSnapshotItemsCsv,
   fetchProcurementSnapshotsPage,
+  fetchProcurementSnapshotTotals,
   fetchSnapshotItemsPage,
+  fetchSnapshotItemsTotals,
 } from '../../services/procurementPlanningService'
 import { formatUmagDateTime, formatUmagMoney } from '../../services/umagSettlementsService'
 import { exportWarehouseSnapshotXlsx } from '../../utils/procurementWarehouseExport'
@@ -56,6 +58,8 @@ export default function ProcurementWarehouseView() {
   const [historyLoading, setHistoryLoading] = useState(true)
   const [historyError, setHistoryError] = useState('')
   const [exportingId, setExportingId] = useState(null)
+  const [historyTotalsById, setHistoryTotalsById] = useState(new Map())
+  const [historyTotalsLoading, setHistoryTotalsLoading] = useState(false)
 
   const [selected, setSelected] = useState(null)
   const [detailItems, setDetailItems] = useState([])
@@ -67,9 +71,13 @@ export default function ProcurementWarehouseView() {
   const [detailSearch, setDetailSearch] = useState('')
   const [debouncedDetailSearch, setDebouncedDetailSearch] = useState('')
   const [detailExporting, setDetailExporting] = useState(false)
+  const [detailTotals, setDetailTotals] = useState(null)
+  const [detailTotalsLoading, setDetailTotalsLoading] = useState(false)
 
   const historyRequestRef = useRef(0)
   const detailRequestRef = useRef(0)
+  const totalsRequestRef = useRef(0)
+  const historyTotalsRequestRef = useRef(0)
 
   const loadHistory = useCallback(async () => {
     const requestId = ++historyRequestRef.current
@@ -83,6 +91,8 @@ export default function ProcurementWarehouseView() {
       if (requestId !== historyRequestRef.current) return
       setSnapshots(result.items)
       setHistoryTotal(result.totalCount)
+      setHistoryTotalsById(new Map())
+      void loadHistoryTotals(requestId, result.items)
     } catch (err) {
       if (requestId !== historyRequestRef.current) return
       setHistoryError(toProcurementUserMessage(err, 'Не удалось загрузить историю склада'))
@@ -92,6 +102,20 @@ export default function ProcurementWarehouseView() {
       if (requestId === historyRequestRef.current) setHistoryLoading(false)
     }
   }, [historyPage])
+
+  const loadHistoryTotals = useCallback(async (historyRequestId, items) => {
+    const requestId = ++historyTotalsRequestRef.current
+    setHistoryTotalsLoading(true)
+    try {
+      const totals = await fetchProcurementSnapshotTotals(items.map((s) => s.id))
+      if (requestId !== historyTotalsRequestRef.current || historyRequestId !== historyRequestRef.current) return
+      setHistoryTotalsById(totals)
+    } catch {
+      // Non-critical — the row simply shows "—" for its totals; the history list itself already loaded fine.
+    } finally {
+      if (requestId === historyTotalsRequestRef.current) setHistoryTotalsLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (!isCloudMode()) {
@@ -139,6 +163,29 @@ export default function ProcurementWarehouseView() {
     void loadDetail()
   }, [loadDetail])
 
+  const loadDetailTotals = useCallback(async () => {
+    if (!selected?.id) return
+    const requestId = ++totalsRequestRef.current
+    setDetailTotalsLoading(true)
+    try {
+      const totals = await fetchSnapshotItemsTotals({
+        snapshotId: selected.id,
+        search: debouncedDetailSearch,
+      })
+      if (requestId !== totalsRequestRef.current) return
+      setDetailTotals(totals)
+    } catch {
+      if (requestId !== totalsRequestRef.current) return
+      setDetailTotals(null)
+    } finally {
+      if (requestId === totalsRequestRef.current) setDetailTotalsLoading(false)
+    }
+  }, [selected?.id, debouncedDetailSearch])
+
+  useEffect(() => {
+    void loadDetailTotals()
+  }, [loadDetailTotals])
+
   function openSnapshot(snapshot) {
     setSelected(snapshot)
     setDetailItems([])
@@ -146,11 +193,14 @@ export default function ProcurementWarehouseView() {
     setDetailPage(1)
     setDetailSearch('')
     setDebouncedDetailSearch('')
+    setDetailTotals(null)
   }
 
   function closeSnapshot() {
     setSelected(null)
     detailRequestRef.current += 1
+    totalsRequestRef.current += 1
+    setDetailTotals(null)
   }
 
   async function handleExportRow(snapshot) {
@@ -297,6 +347,25 @@ export default function ProcurementWarehouseView() {
                     })
                   )}
                 </tbody>
+                {detailItems.length > 0 ? (
+                  <tfoot>
+                    <tr className="proc-wh__totals-row">
+                      <td colSpan={7}>
+                        Итого{debouncedDetailSearch ? ' (по фильтру)' : ''}:
+                      </td>
+                      <td className="proc-wh__col-num">
+                        {detailTotalsLoading && !detailTotals
+                          ? '…'
+                          : formatUmagMoney(detailTotals?.totalPurchaseValue ?? 0)}
+                      </td>
+                      <td className="proc-wh__col-num">
+                        {detailTotalsLoading && !detailTotals
+                          ? '…'
+                          : formatUmagMoney(detailTotals?.totalSellingValue ?? 0)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                ) : null}
               </table>
             </div>
             <TablePagination
@@ -343,6 +412,8 @@ export default function ProcurementWarehouseView() {
                   <th className="proc-wh__col-num">Позиций</th>
                   <th className="proc-wh__col-num">Отриц. остатки</th>
                   <th className="proc-wh__col-num">К заказу</th>
+                  <th className="proc-wh__col-num">Сумма закуп.</th>
+                  <th className="proc-wh__col-num">Сумма прод.</th>
                   <th>Пользователь</th>
                   <th className="proc-wh__col-actions">Действия</th>
                 </tr>
@@ -350,13 +421,15 @@ export default function ProcurementWarehouseView() {
               <tbody>
                 {snapshots.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="proc-wh__empty-cell">
+                    <td colSpan={8} className="proc-wh__empty-cell">
                       История склада пока пуста — выполните синхронизацию на вкладке
                       «Планирование».
                     </td>
                   </tr>
                 ) : (
-                  snapshots.map((snapshot) => (
+                  snapshots.map((snapshot) => {
+                    const totals = historyTotalsById.get(snapshot.id)
+                    return (
                     <tr key={snapshot.id}>
                       <td>
                         <button
@@ -371,6 +444,12 @@ export default function ProcurementWarehouseView() {
                       <td className="proc-wh__col-num">{formatQty(snapshot.itemCount)}</td>
                       <td className="proc-wh__col-num">{formatQty(snapshot.negativeStockCount)}</td>
                       <td className="proc-wh__col-num">{formatQty(snapshot.orderableCount)}</td>
+                      <td className="proc-wh__col-num">
+                        {totals ? formatUmagMoney(totals.totalPurchaseValue) : historyTotalsLoading ? '…' : '—'}
+                      </td>
+                      <td className="proc-wh__col-num">
+                        {totals ? formatUmagMoney(totals.totalSellingValue) : historyTotalsLoading ? '…' : '—'}
+                      </td>
                       <td>{snapshot.createdByName || '—'}</td>
                       <td className="proc-wh__col-actions">
                         <button
@@ -385,7 +464,8 @@ export default function ProcurementWarehouseView() {
                         </button>
                       </td>
                     </tr>
-                  ))
+                    )
+                  })
                 )}
               </tbody>
             </table>

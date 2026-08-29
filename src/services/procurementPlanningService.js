@@ -482,6 +482,34 @@ export async function fetchProcurementSnapshotsPage({ page = 1, pageSize = 25 } 
   }
 }
 
+/**
+ * Net purchase/selling value per snapshot, for a page of history rows.
+ * One aggregate RPC round trip instead of re-fetching every item of every
+ * snapshot on the page — see get_procurement_snapshot_totals
+ * (20260830100000_procurement_snapshot_totals.sql). Returns a Map keyed by
+ * snapshot id; a snapshot with no items (or not in the DB result) is simply
+ * absent from the map — callers should treat a missing key as "0"/unknown.
+ */
+export async function fetchProcurementSnapshotTotals(snapshotIds) {
+  ensureClient()
+  const ids = (snapshotIds || []).filter(Boolean)
+  if (ids.length === 0) return new Map()
+
+  const { data, error } = await supabase.rpc('get_procurement_snapshot_totals', {
+    p_snapshot_ids: ids,
+  })
+  if (error) throw new Error(error.message || 'Не удалось посчитать суммы остатков')
+
+  const map = new Map()
+  for (const row of data || []) {
+    map.set(row.snapshot_id, {
+      totalPurchaseValue: finiteNumber(row.total_purchase_value, 0),
+      totalSellingValue: finiteNumber(row.total_selling_value, 0),
+    })
+  }
+  return map
+}
+
 export async function fetchProcurementSnapshotById(snapshotId) {
   ensureClient()
   const { data, error } = await supabase
@@ -850,6 +878,43 @@ export async function exportSnapshotItemsCsv(snapshotId, filters = {}) {
     if (rows.length >= result.totalCount) break
   }
   return rows
+}
+
+/**
+ * Net purchase/selling value across every item matching the filter, not just
+ * the current page — negative-stock rows subtract naturally since raw_stock
+ * is negative for them. Pulls only the three numeric columns needed, in
+ * batches, so it stays cheap even for large snapshots.
+ */
+export async function fetchSnapshotItemsTotals({ snapshotId, search = '' } = {}) {
+  ensureClient()
+  if (!snapshotId) return { totalPurchaseValue: 0, totalSellingValue: 0 }
+
+  const pageSize = 1000
+  let totalPurchaseValue = 0
+  let totalSellingValue = 0
+
+  for (let page = 1; page < 200; page += 1) {
+    const range = snapshotItemsPageRange(page, pageSize)
+    let query = supabase
+      .from('procurement_snapshot_items')
+      .select('raw_stock, purchase_price, selling_price', { count: 'exact' })
+    query = applySnapshotItemsPageQuery(query, { snapshotId, search })
+    query = query.range(range.from, range.to)
+
+    const { data, error, count } = await query
+    if (error) throw new Error(error.message || 'Не удалось посчитать сумму остатка')
+
+    for (const row of data || []) {
+      const stock = finiteNumber(row.raw_stock, 0)
+      totalPurchaseValue += stock * finiteNumber(row.purchase_price, 0)
+      totalSellingValue += stock * finiteNumber(row.selling_price, 0)
+    }
+
+    if ((page - 1) * pageSize + (data?.length || 0) >= (count ?? 0)) break
+  }
+
+  return { totalPurchaseValue, totalSellingValue }
 }
 
 export function recalculateRecommendationLocal(item, normDays) {
