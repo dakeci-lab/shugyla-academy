@@ -185,38 +185,53 @@ export function buildFunnelSteps(facts, latestMonthKey, receiptsByMonth = null) 
 }
 
 /**
- * Categories whose revenue dropped the most (as %) in `latestMonthKey`
- * versus the same calendar month a year earlier. Only categories with some
- * revenue in either month are considered; brand-new/discontinued categories
- * are not flagged as "attention" (nothing to compare against).
+ * Each category's share of total YTD revenue and total YTD margin (through
+ * the month of `latestMonthKey`, current year only) — two independently
+ * sorted rankings for the "Категории: вклад в выручку и маржу" section.
  */
-export function findCategoriesNeedingAttention(facts, latestMonthKey, limit = 5) {
-  if (!latestMonthKey) return []
-  const { year, month } = monthParts(latestMonthKey)
-  const priorMonthKey = `${year - 1}-${String(month).padStart(2, '0')}-01`
+export function buildCategoryContribution(facts, latestMonthKey, limit = 20) {
+  if (!latestMonthKey || facts.length === 0) return { byRevenue: [], byMargin: [] }
+  const { year: currentYear, month: cutoffMonth } = monthParts(latestMonthKey)
 
-  const current = new Map()
-  const prior = new Map()
+  const totals = new Map()
+  let totalRevenue = 0
+  let totalProfit = 0
   for (const row of facts) {
+    const { year, month } = monthParts(row.monthKey)
+    if (year !== currentYear || month > cutoffMonth) continue
     const catKey = row.categoryName || 'Без категории'
-    if (row.monthKey === latestMonthKey) {
-      current.set(catKey, (current.get(catKey) || 0) + row.revenue)
-    } else if (row.monthKey === priorMonthKey) {
-      prior.set(catKey, (prior.get(catKey) || 0) + row.revenue)
-    }
+    const t = totals.get(catKey) || emptyTotals()
+    addTotals(t, row)
+    totals.set(catKey, t)
+    totalRevenue += row.revenue
+    totalProfit += row.profit
   }
 
-  const results = []
-  for (const [catKey, priorRevenue] of prior) {
-    if (priorRevenue <= 0) continue
-    const currentRevenue = current.get(catKey) || 0
-    const pct = ((currentRevenue - priorRevenue) / priorRevenue) * 100
-    if (pct < 0) {
-      results.push({ categoryName: catKey, currentRevenue, priorRevenue, deltaPct: pct })
-    }
-  }
+  const rows = [...totals.entries()].map(([categoryName, t]) => ({
+    categoryName,
+    revenue: t.revenue,
+    profit: t.profit,
+  }))
 
-  return results.sort((a, b) => a.deltaPct - b.deltaPct).slice(0, limit)
+  const byRevenue = [...rows]
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, limit)
+    .map((r) => ({
+      categoryName: r.categoryName,
+      value: r.revenue,
+      share: totalRevenue > 0 ? (r.revenue / totalRevenue) * 100 : 0,
+    }))
+
+  const byMargin = [...rows]
+    .sort((a, b) => b.profit - a.profit)
+    .slice(0, limit)
+    .map((r) => ({
+      categoryName: r.categoryName,
+      value: r.profit,
+      share: totalProfit > 0 ? (r.profit / totalProfit) * 100 : 0,
+    }))
+
+  return { byRevenue, byMargin }
 }
 
 function cellValue(cell, metric) {

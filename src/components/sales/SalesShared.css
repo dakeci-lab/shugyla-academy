@@ -350,41 +350,103 @@
   font-weight: 500;
 }
 
-/* --- Attention list (Анализ) --- */
+/* --- Rank lists: "Вклад в выручку/маржу", "Маржа vs Маржинальность" (Анализ) --- */
 
-.sales-attention {
+.sales-rank-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .sales-rank-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.sales-rank {
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: 12px;
   background: var(--color-white, #fff);
-  overflow: hidden;
+  padding: 14px 16px;
 }
 
-.sales-attention__head {
-  padding: 12px 16px;
+.sales-rank__title {
   font-size: 13px;
   font-weight: 700;
   color: var(--color-text, #0f172a);
-  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  margin-bottom: 10px;
 }
 
-.sales-attention__row {
+.sales-rank__list {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sales-rank__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.sales-rank__num {
+  flex: 0 0 auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #94a3b8);
+  padding-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sales-rank__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sales-rank__row-head {
+  display: flex;
+  align-items: baseline;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 16px;
+  gap: 8px;
   font-size: 13px;
-  border-bottom: 1px solid var(--color-border, #f1f5f9);
 }
 
-.sales-attention__row:last-child {
-  border-bottom: none;
+.sales-rank__label {
+  color: var(--color-text, #0f172a);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.sales-attention__empty {
-  padding: 16px;
-  font-size: 13px;
-  color: var(--color-text-secondary, #64748b);
+.sales-rank__value {
+  flex: 0 0 auto;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--color-text, #0f172a);
+}
+
+.sales-rank__share {
+  margin-left: 6px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #94a3b8);
+}
+
+.sales-rank__bar-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--color-border-light, #f1f5f9);
+  overflow: hidden;
+}
+
+.sales-rank__bar-fill {
+  height: 100%;
+  border-radius: 999px;
 }
 
 /* --- Trend chart (Анализ) --- */
