@@ -22,6 +22,14 @@
   gap: 16px 28px;
 }
 
+.sales-bands__export-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  margin-left: auto;
+}
+
 .sales-bands__field {
   display: flex;
   flex-direction: column;
@@ -149,13 +157,6 @@
   100% {
     left: 100%;
   }
-}
-
-.sales-view__export-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  white-space: nowrap;
 }
 
 .sales-view__wrap {

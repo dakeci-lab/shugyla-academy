@@ -17,6 +17,7 @@ import { RefreshIcon } from '../../../components/icons/PlatformIcons'
 import SalesCategoriesView from '../../../components/sales/SalesCategoriesView'
 import SalesAnalysisView from '../../../components/sales/SalesAnalysisView'
 import SalesDigitizationView from '../../../components/sales/SalesDigitizationView'
+import SalesResyncMenu from '../../../components/sales/SalesResyncMenu'
 import './SalesPage.css'
 
 const HISTORY_START_MONTH = '2025-01-01'
@@ -36,7 +37,6 @@ export default function SalesPage() {
   const [syncing, setSyncing] = useState(false)
   const [syncProgressLabel, setSyncProgressLabel] = useState('')
   const [syncError, setSyncError] = useState('')
-  const [resyncMonth, setResyncMonth] = useState('')
   const [resyncing, setResyncing] = useState(false)
   const [resyncError, setResyncError] = useState('')
 
@@ -99,12 +99,12 @@ export default function SalesPage() {
     }
   }
 
-  async function handleResyncMonth() {
-    if (resyncing || !resyncMonth) return
+  async function handleResyncMonth(monthKey) {
+    if (resyncing || !monthKey) return
     setResyncing(true)
     setResyncError('')
     try {
-      await resyncSalesMonth(resyncMonth)
+      await resyncSalesMonth(monthKey)
       await loadFacts()
     } catch (err) {
       setResyncError(err?.message || 'Не удалось пересинхронизировать месяц.')
@@ -130,10 +130,6 @@ export default function SalesPage() {
     () => [...new Set(facts.map((row) => row.monthKey))].sort().reverse(),
     [facts]
   )
-
-  useEffect(() => {
-    if (!resyncMonth && availableMonths.length > 0) setResyncMonth(availableMonths[0])
-  }, [availableMonths, resyncMonth])
 
   return (
     <div className="sales-page">
@@ -198,6 +194,7 @@ export default function SalesPage() {
               </span>
               {syncing ? 'Синхронизация…' : 'Синхронизировать'}
             </button>
+            <SalesResyncMenu months={availableMonths} resyncing={resyncing} onResync={handleResyncMonth} />
           </div>
         ) : null}
       </div>
@@ -205,34 +202,6 @@ export default function SalesPage() {
       {syncError ? (
         <div className="sales-page__error" role="alert">
           {syncError}
-        </div>
-      ) : null}
-
-      {canSync && availableMonths.length > 0 ? (
-        <div className="sales-page__resync">
-          <span className="sales-page__resync-label">
-            Пересинхронизировать месяц (например, после исправления категорий в UMAG):
-          </span>
-          <select
-            className="sales-page__resync-select"
-            value={resyncMonth}
-            onChange={(e) => setResyncMonth(e.target.value)}
-            disabled={resyncing}
-          >
-            {availableMonths.map((monthKey) => (
-              <option key={monthKey} value={monthKey}>
-                {formatMonthLabel(monthKey)}
-              </option>
-            ))}
-          </select>
-          <button
-            type="button"
-            className="btn btn--ghost sales-page__resync-btn"
-            onClick={() => void handleResyncMonth()}
-            disabled={resyncing || syncing}
-          >
-            {resyncing ? 'Пересинхронизация…' : 'Пересинхронизировать'}
-          </button>
         </div>
       ) : null}
 

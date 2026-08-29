@@ -8,7 +8,6 @@ import {
 import { formatUmagMoney } from '../../services/umagSettlementsService'
 import { exportSalesCategoriesXlsx } from '../../utils/salesExport'
 import { heatCellStyle, deltaCellStyle } from '../../utils/salesHeat'
-import PlatformSearchToolbar from '../platform/PlatformSearchToolbar'
 import { ChevronRightIcon, DownloadIcon } from '../icons/PlatformIcons'
 import './SalesShared.css'
 
@@ -44,10 +43,6 @@ function formatDeltaByKind(value, kind) {
   if (kind === 'percent') return `${sign}${value.toFixed(1)} пп`
   if (kind === 'ratio') return `${sign}${value.toFixed(2)}`
   return `${sign}${value.toFixed(1)}%`
-}
-
-function matchesSearch(name, query) {
-  return name.toLowerCase().includes(query)
 }
 
 function BandHeaderRow({ label, tone, description, colSpan }) {
@@ -115,7 +110,6 @@ function DeltaRow({ label, series, kind, indent = false, toggle = null }) {
 
 /** «Продажи»: показатель + год-к-году по месяцам, полосы 2026/2025/Δ — по образцу эталонного дашборда. */
 export default function SalesCategoriesView({ facts, latestMonthKey, receiptsByMonth }) {
-  const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(() => new Set())
   const [exporting, setExporting] = useState(false)
   const [metric, setMetric] = useState('kpi')
@@ -143,16 +137,7 @@ export default function SalesCategoriesView({ facts, latestMonthKey, receiptsByM
     [facts, months, currentYear, priorYear, metric]
   )
 
-  const filteredCategoryRows = useMemo(() => {
-    if (!categoryTable) return []
-    const query = search.trim().toLowerCase()
-    if (!query) return categoryTable.rows
-    return categoryTable.rows.filter(
-      (row) =>
-        matchesSearch(row.categoryName, query) ||
-        row.subRows.some((sub) => matchesSearch(sub.subcategoryName, query))
-    )
-  }, [categoryTable, search])
+  const categoryRows = categoryTable?.rows || []
 
   function toggleRow(categoryName) {
     setExpanded((current) => {
@@ -224,25 +209,10 @@ export default function SalesCategoriesView({ facts, latestMonthKey, receiptsByM
             </label>
           </div>
         </div>
-      </div>
 
-      <div className="sales-view__head">
-        {metric !== 'kpi' ? (
-          <PlatformSearchToolbar
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onClear={() => setSearch('')}
-            showClear
-            placeholder="Категория или подкатегория…"
-            ariaLabel="Поиск по категориям"
-            flush
-          />
-        ) : (
-          <span />
-        )}
         <button
           type="button"
-          className="btn btn--outline sales-view__export-btn"
+          className="btn btn--outline sales-bands__export-btn"
           onClick={() => void handleExport()}
           disabled={exporting || metric === 'kpi' || !categoryTable || categoryTable.rows.length === 0}
         >
@@ -298,10 +268,10 @@ export default function SalesCategoriesView({ facts, latestMonthKey, receiptsByM
                   </>
                 ) : null}
               </>
-            ) : filteredCategoryRows.length === 0 ? (
+            ) : categoryRows.length === 0 ? (
               <tr>
                 <td colSpan={colSpan + 1} className="sales-view__empty-cell">
-                  {search ? 'По вашему запросу ничего не найдено.' : 'Нет данных за период.'}
+                  Нет данных за период.
                 </td>
               </tr>
             ) : (
@@ -314,7 +284,7 @@ export default function SalesCategoriesView({ facts, latestMonthKey, receiptsByM
                       description={`${METRIC_OPTIONS.find((m) => m.key === metric)?.label || ''}`}
                       colSpan={colSpan}
                     />
-                    {filteredCategoryRows.map((row) => (
+                    {categoryRows.map((row) => (
                       <Fragment key={row.categoryName}>
                         <ValueRow
                           label={row.categoryName}
@@ -349,7 +319,7 @@ export default function SalesCategoriesView({ facts, latestMonthKey, receiptsByM
                       description={`${METRIC_OPTIONS.find((m) => m.key === metric)?.label || ''}`}
                       colSpan={colSpan}
                     />
-                    {filteredCategoryRows.map((row) => (
+                    {categoryRows.map((row) => (
                       <Fragment key={row.categoryName}>
                         <ValueRow
                           label={row.categoryName}
@@ -379,7 +349,7 @@ export default function SalesCategoriesView({ facts, latestMonthKey, receiptsByM
                 {showDelta ? (
                   <>
                     <BandHeaderRow label="Δ %" tone="delta" description="Динамика год к году" colSpan={colSpan} />
-                    {filteredCategoryRows.map((row) => (
+                    {categoryRows.map((row) => (
                       <Fragment key={row.categoryName}>
                         <DeltaRow
                           label={row.categoryName}
