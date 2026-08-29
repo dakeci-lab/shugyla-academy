@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { formatMonthLabel } from '../../services/salesDataService'
+import { formatUmagMoney } from '../../services/umagSettlementsService'
+import './SalesShared.css'
 
 const WIDTH = 900
 const HEIGHT = 280
@@ -11,6 +14,9 @@ const REVENUE_COLOR = '#93c5fd'
 const MARGIN_COLOR = 'var(--color-primary, #059669)'
 const MARGIN_PCT_COLOR = '#f59e0b'
 
+const TOOLTIP_W = 176
+const TOOLTIP_H = 80
+
 function niceMax(value) {
   if (value <= 0) return 1
   const magnitude = 10 ** Math.floor(Math.log10(value))
@@ -21,13 +27,20 @@ function monthTick(monthKey) {
   return formatMonthLabel(monthKey).replace(' г.', '').split(' ')[0]
 }
 
+function monthTooltipTitle(monthKey) {
+  const label = formatMonthLabel(monthKey).replace(' г.', '')
+  return label.charAt(0).toUpperCase() + label.slice(1)
+}
+
 /**
  * Hand-rolled SVG combo chart — no charting dependency. Grouped bars for
  * revenue/valovaya marzha on the left (₸) axis, a line for marginPct on
  * the right (%) axis — mirrors the reference dashboard's "Динамика выручки
- * и маржи" over the whole synced history.
+ * и маржи" over the whole synced history, with a hover tooltip per month.
  */
 export default function SalesTrendChart({ points }) {
+  const [hoverIndex, setHoverIndex] = useState(null)
+
   if (!points || points.length < 2) {
     return <p className="sales-chart-card__empty">Недостаточно данных для графика.</p>
   }
@@ -60,6 +73,10 @@ export default function SalesTrendChart({ points }) {
   const tickIndices = []
   for (let i = 0; i < points.length; i += tickStep) tickIndices.push(i)
   if (tickIndices[tickIndices.length - 1] !== points.length - 1) tickIndices.push(points.length - 1)
+
+  const hovered = hoverIndex != null ? points[hoverIndex] : null
+  const hoverCenterX = hoverIndex != null ? xSlot(hoverIndex) + slotW / 2 : 0
+  const tooltipX = Math.min(Math.max(hoverCenterX - TOOLTIP_W / 2, PAD_LEFT), WIDTH - PAD_RIGHT - TOOLTIP_W)
 
   return (
     <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Выручка, валовая маржа и маржинальность по месяцам">
@@ -102,35 +119,61 @@ export default function SalesTrendChart({ points }) {
         0%
       </text>
 
-      {points.map((p, i) => (
-        <g key={p.monthKey}>
-          <rect
-            x={xSlot(i) + barGap}
-            y={yFromCurrency(p.revenue)}
-            width={barW}
-            height={Math.max(0, PAD_TOP + plotH - yFromCurrency(p.revenue))}
-            fill={REVENUE_COLOR}
-            rx="2"
-          />
-          <rect
-            x={xSlot(i) + barGap * 2 + barW}
-            y={yFromCurrency(p.grossMargin)}
-            width={barW}
-            height={Math.max(0, PAD_TOP + plotH - yFromCurrency(p.grossMargin))}
-            fill={MARGIN_COLOR}
-            rx="2"
-          />
+      {hoverIndex != null ? (
+        <g className="sales-combo-chart__guide" style={{ transform: `translateX(${hoverCenterX}px)` }}>
+          <line x1={0} y1={PAD_TOP} x2={0} y2={PAD_TOP + plotH} stroke="var(--color-text-secondary, #94a3b8)" strokeWidth="1" strokeDasharray="3 3" />
         </g>
-      ))}
+      ) : null}
+
+      {points.map((p, i) => {
+        const dimmed = hoverIndex != null && hoverIndex !== i
+        return (
+          <g key={p.monthKey} className="sales-combo-chart__bars" style={{ opacity: dimmed ? 0.45 : 1 }}>
+            <rect
+              x={xSlot(i) + barGap}
+              y={yFromCurrency(p.revenue)}
+              width={barW}
+              height={Math.max(0, PAD_TOP + plotH - yFromCurrency(p.revenue))}
+              fill={REVENUE_COLOR}
+              rx="2"
+            />
+            <rect
+              x={xSlot(i) + barGap * 2 + barW}
+              y={yFromCurrency(p.grossMargin)}
+              width={barW}
+              height={Math.max(0, PAD_TOP + plotH - yFromCurrency(p.grossMargin))}
+              fill={MARGIN_COLOR}
+              rx="2"
+            />
+          </g>
+        )
+      })}
 
       <path d={linePath} fill="none" stroke={MARGIN_PCT_COLOR} strokeWidth="2" />
       {points.map((p, i) => (
         <circle
           key={`dot-${p.monthKey}`}
+          className="sales-combo-chart__dot"
           cx={xSlot(i) + slotW / 2}
           cy={yFromPct(p.marginPct || 0)}
-          r={i === points.length - 1 ? 4 : 2.5}
+          r={hoverIndex === i ? 6 : i === points.length - 1 ? 4 : 2.5}
           fill={MARGIN_PCT_COLOR}
+          stroke={hoverIndex === i ? 'var(--color-white, #fff)' : 'none'}
+          strokeWidth={hoverIndex === i ? 2 : 0}
+        />
+      ))}
+
+      {points.map((p, i) => (
+        <rect
+          key={`hit-${p.monthKey}`}
+          x={xSlot(i)}
+          y={PAD_TOP}
+          width={slotW}
+          height={plotH}
+          fill="transparent"
+          onMouseEnter={() => setHoverIndex(i)}
+          onMouseLeave={() => setHoverIndex((cur) => (cur === i ? null : cur))}
+          style={{ cursor: 'pointer' }}
         />
       ))}
 
@@ -146,6 +189,39 @@ export default function SalesTrendChart({ points }) {
           {monthTick(points[i].monthKey)}
         </text>
       ))}
+
+      {hovered ? (
+        <g
+          className="sales-combo-chart__tooltip"
+          style={{ transform: `translate(${tooltipX}px, ${PAD_TOP + 4}px)` }}
+        >
+          <rect
+            width={TOOLTIP_W}
+            height={TOOLTIP_H}
+            rx="8"
+            fill="var(--color-white, #fff)"
+            stroke="var(--color-border, #e2e8f0)"
+          />
+          <text x={12} y={20} fontSize="12" fontWeight="700" fill="var(--color-text, #0f172a)">
+            {monthTooltipTitle(hovered.monthKey)}
+          </text>
+
+          <circle cx={17} cy={35} r={4} fill={MARGIN_PCT_COLOR} />
+          <text x={26} y={39} fontSize="11" fill="var(--color-text-secondary, #64748b)">
+            Маржинальность: <tspan fontWeight="700" fill="var(--color-text, #0f172a)">{(hovered.marginPct || 0).toFixed(1)}%</tspan>
+          </text>
+
+          <rect x={13} y={49} width={8} height={8} rx="2" fill={REVENUE_COLOR} />
+          <text x={26} y={57} fontSize="11" fill="var(--color-text-secondary, #64748b)">
+            Выручка: <tspan fontWeight="700" fill="var(--color-text, #0f172a)">{formatUmagMoney(hovered.revenue)}</tspan>
+          </text>
+
+          <rect x={13} y={64} width={8} height={8} rx="2" fill={MARGIN_COLOR} />
+          <text x={26} y={72} fontSize="11" fill="var(--color-text-secondary, #64748b)">
+            Маржа: <tspan fontWeight="700" fill="var(--color-text, #0f172a)">{formatUmagMoney(hovered.grossMargin)}</tspan>
+          </text>
+        </g>
+      ) : null}
     </svg>
   )
 }
