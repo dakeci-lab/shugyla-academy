@@ -284,6 +284,13 @@
   background: var(--color-white, #fff);
   padding: 16px 16px 14px;
   overflow: hidden;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.sales-funnel__step:hover {
+  border-color: var(--color-primary, #059669);
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.14);
+  transform: translateY(-2px);
 }
 
 .sales-funnel__step::before {
@@ -298,6 +305,12 @@
 
 .sales-funnel__step--unavailable {
   opacity: 0.6;
+}
+
+.sales-funnel__step--unavailable:hover {
+  border-color: var(--color-border, #cbd5e1);
+  box-shadow: none;
+  transform: none;
 }
 
 .sales-funnel__step--unavailable::before {
