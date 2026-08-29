@@ -13,6 +13,33 @@
   gap: 8px 16px;
 }
 
+/* --- Numbered section headings (Анализ): "01 Воронка прибыли", etc. --- */
+
+.sales-section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.sales-section-header:first-child {
+  margin-top: 0;
+}
+
+.sales-section-header__num {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary, #059669);
+  font-variant-numeric: tabular-nums;
+}
+
+.sales-section-header__title {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+}
+
 /* --- Metric/year-band controls (Продажи, Оцифровка) --- */
 
 .sales-bands__controls {
@@ -385,7 +412,7 @@
 }
 
 .sales-rank__title {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--color-text, #0f172a);
   margin-bottom: 10px;
@@ -479,13 +506,6 @@
   padding: 14px 16px;
 }
 
-.sales-chart-card__head {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--color-text, #0f172a);
-  margin-bottom: 8px;
-}
-
 .sales-chart-card svg {
   width: 100%;
   height: auto;
@@ -493,10 +513,10 @@
   overflow: visible;
 }
 
-/* --- Combo chart hover: guide line, tooltip, dimmed-others bars --- */
+/* --- Combo chart hover: guide line, tooltip, hovered-bar emphasis --- */
 
-.sales-combo-chart__bars {
-  transition: opacity 0.15s ease;
+.sales-combo-chart__bar {
+  transition: fill 0.12s ease;
 }
 
 .sales-combo-chart__dot {

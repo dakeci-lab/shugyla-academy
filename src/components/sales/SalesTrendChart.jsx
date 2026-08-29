@@ -11,16 +11,26 @@ const PAD_TOP = 36
 const PAD_BOTTOM = 30
 
 const REVENUE_COLOR = '#93c5fd'
+const REVENUE_COLOR_HOVER = '#3b82f6'
 const MARGIN_COLOR = 'var(--color-primary, #059669)'
+const MARGIN_COLOR_HOVER = '#047857'
 const MARGIN_PCT_COLOR = '#f59e0b'
 
-const TOOLTIP_W = 176
-const TOOLTIP_H = 80
+const TICK_COUNT = 8
+const TOOLTIP_W = 150
+const TOOLTIP_H = 70
 
 function niceMax(value) {
   if (value <= 0) return 1
   const magnitude = 10 ** Math.floor(Math.log10(value))
   return Math.ceil(value / magnitude) * magnitude
+}
+
+function formatAxisMoney(value) {
+  if (value <= 0) return '0'
+  const millions = value / 1_000_000
+  const rounded = Math.round(millions * 10) / 10
+  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)}М`
 }
 
 function monthTick(monthKey) {
@@ -50,6 +60,8 @@ export default function SalesTrendChart({ points }) {
 
   const maxRevenue = niceMax(Math.max(...points.map((p) => p.revenue), 1))
   const maxPct = Math.max(10, niceMax(Math.max(...points.map((p) => p.marginPct || 0), 1)))
+  const revenueStep = maxRevenue / TICK_COUNT
+  const pctStep = maxPct / TICK_COUNT
 
   const slotW = plotW / points.length
   const barGap = slotW * 0.14
@@ -58,6 +70,7 @@ export default function SalesTrendChart({ points }) {
   const xSlot = (i) => PAD_LEFT + i * slotW
   const yFromCurrency = (v) => PAD_TOP + plotH - (Math.max(v, 0) / maxRevenue) * plotH
   const yFromPct = (v) => PAD_TOP + plotH - (Math.max(v, 0) / maxPct) * plotH
+  const yFromTick = (i) => PAD_TOP + plotH - (i / TICK_COUNT) * plotH
 
   const linePath = points
     .map(
@@ -66,7 +79,7 @@ export default function SalesTrendChart({ points }) {
     )
     .join(' ')
 
-  const gridY = [0, 0.25, 0.5, 0.75, 1].map((t) => PAD_TOP + t * plotH)
+  const gridTicks = Array.from({ length: TICK_COUNT + 1 }, (_, i) => i)
 
   const tickCount = Math.min(8, points.length)
   const tickStep = Math.max(1, Math.round((points.length - 1) / (tickCount - 1)))
@@ -80,44 +93,48 @@ export default function SalesTrendChart({ points }) {
 
   return (
     <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label="Выручка, валовая маржа и маржинальность по месяцам">
-      <rect x={PAD_LEFT} y={7} width={10} height={10} fill={REVENUE_COLOR} rx="2" />
-      <text x={PAD_LEFT + 16} y={16} fontSize="11" fill="var(--color-text-secondary, #64748b)">
+      <circle cx={PAD_LEFT + 4} cy={12} r={4} fill={REVENUE_COLOR} />
+      <text x={PAD_LEFT + 14} y={16} fontSize="11" fill="var(--color-text-secondary, #64748b)">
         Выручка
       </text>
-      <rect x={PAD_LEFT + 92} y={7} width={10} height={10} fill={MARGIN_COLOR} rx="2" />
-      <text x={PAD_LEFT + 108} y={16} fontSize="11" fill="var(--color-text-secondary, #64748b)">
+      <circle cx={PAD_LEFT + 96} cy={12} r={4} fill={MARGIN_COLOR} />
+      <text x={PAD_LEFT + 106} y={16} fontSize="11" fill="var(--color-text-secondary, #64748b)">
         Валовая маржа
       </text>
-      <circle cx={PAD_LEFT + 228} cy={12} r={4} fill={MARGIN_PCT_COLOR} />
-      <text x={PAD_LEFT + 237} y={16} fontSize="11" fill="var(--color-text-secondary, #64748b)">
+      <circle cx={PAD_LEFT + 232} cy={12} r={4} fill={MARGIN_PCT_COLOR} />
+      <text x={PAD_LEFT + 242} y={16} fontSize="11" fill="var(--color-text-secondary, #64748b)">
         Маржинальность %
       </text>
 
-      {gridY.map((y) => (
+      {gridTicks.map((i) => (
         <line
-          key={y}
+          key={i}
           x1={PAD_LEFT}
-          y1={y}
+          y1={yFromTick(i)}
           x2={WIDTH - PAD_RIGHT}
-          y2={y}
+          y2={yFromTick(i)}
           stroke="var(--color-border, #e2e8f0)"
           strokeWidth="1"
+          opacity={i === 0 ? 1 : 0.6}
         />
       ))}
 
-      <text x={2} y={PAD_TOP + 4} fontSize="10" fill="var(--color-text-secondary, #94a3b8)">
-        {Math.round(maxRevenue).toLocaleString('ru-KZ')}
-      </text>
-      <text x={2} y={PAD_TOP + plotH} fontSize="10" fill="var(--color-text-secondary, #94a3b8)">
-        0
-      </text>
-
-      <text x={WIDTH - PAD_RIGHT + 6} y={PAD_TOP + 4} fontSize="10" fill="var(--color-text-secondary, #94a3b8)">
-        {Math.round(maxPct)}%
-      </text>
-      <text x={WIDTH - PAD_RIGHT + 6} y={PAD_TOP + plotH} fontSize="10" fill="var(--color-text-secondary, #94a3b8)">
-        0%
-      </text>
+      {gridTicks.map((i) => (
+        <text key={`l-${i}`} x={2} y={yFromTick(i) + 3} fontSize="10" fill="var(--color-text-secondary, #94a3b8)">
+          {formatAxisMoney(i * revenueStep)}
+        </text>
+      ))}
+      {gridTicks.map((i) => (
+        <text
+          key={`r-${i}`}
+          x={WIDTH - PAD_RIGHT + 6}
+          y={yFromTick(i) + 3}
+          fontSize="10"
+          fill="var(--color-text-secondary, #94a3b8)"
+        >
+          {Math.round(i * pctStep)}%
+        </text>
+      ))}
 
       {hoverIndex != null ? (
         <g className="sales-combo-chart__guide" style={{ transform: `translateX(${hoverCenterX}px)` }}>
@@ -125,29 +142,28 @@ export default function SalesTrendChart({ points }) {
         </g>
       ) : null}
 
-      {points.map((p, i) => {
-        const dimmed = hoverIndex != null && hoverIndex !== i
-        return (
-          <g key={p.monthKey} className="sales-combo-chart__bars" style={{ opacity: dimmed ? 0.45 : 1 }}>
-            <rect
-              x={xSlot(i) + barGap}
-              y={yFromCurrency(p.revenue)}
-              width={barW}
-              height={Math.max(0, PAD_TOP + plotH - yFromCurrency(p.revenue))}
-              fill={REVENUE_COLOR}
-              rx="2"
-            />
-            <rect
-              x={xSlot(i) + barGap * 2 + barW}
-              y={yFromCurrency(p.grossMargin)}
-              width={barW}
-              height={Math.max(0, PAD_TOP + plotH - yFromCurrency(p.grossMargin))}
-              fill={MARGIN_COLOR}
-              rx="2"
-            />
-          </g>
-        )
-      })}
+      {points.map((p, i) => (
+        <g key={p.monthKey}>
+          <rect
+            className="sales-combo-chart__bar"
+            x={xSlot(i) + barGap}
+            y={yFromCurrency(p.revenue)}
+            width={barW}
+            height={Math.max(0, PAD_TOP + plotH - yFromCurrency(p.revenue))}
+            fill={hoverIndex === i ? REVENUE_COLOR_HOVER : REVENUE_COLOR}
+            rx="2"
+          />
+          <rect
+            className="sales-combo-chart__bar"
+            x={xSlot(i) + barGap * 2 + barW}
+            y={yFromCurrency(p.grossMargin)}
+            width={barW}
+            height={Math.max(0, PAD_TOP + plotH - yFromCurrency(p.grossMargin))}
+            fill={hoverIndex === i ? MARGIN_COLOR_HOVER : MARGIN_COLOR}
+            rx="2"
+          />
+        </g>
+      ))}
 
       <path d={linePath} fill="none" stroke={MARGIN_PCT_COLOR} strokeWidth="2" />
       {points.map((p, i) => (
@@ -156,10 +172,8 @@ export default function SalesTrendChart({ points }) {
           className="sales-combo-chart__dot"
           cx={xSlot(i) + slotW / 2}
           cy={yFromPct(p.marginPct || 0)}
-          r={hoverIndex === i ? 6 : i === points.length - 1 ? 4 : 2.5}
+          r={hoverIndex === i ? 5 : i === points.length - 1 ? 4 : 2.5}
           fill={MARGIN_PCT_COLOR}
-          stroke={hoverIndex === i ? 'var(--color-white, #fff)' : 'none'}
-          strokeWidth={hoverIndex === i ? 2 : 0}
         />
       ))}
 
@@ -198,27 +212,27 @@ export default function SalesTrendChart({ points }) {
           <rect
             width={TOOLTIP_W}
             height={TOOLTIP_H}
-            rx="8"
+            rx="7"
             fill="var(--color-white, #fff)"
             stroke="var(--color-border, #e2e8f0)"
           />
-          <text x={12} y={20} fontSize="12" fontWeight="700" fill="var(--color-text, #0f172a)">
+          <text x={10} y={16} fontSize="11" fontWeight="600" fill="var(--color-text, #0f172a)">
             {monthTooltipTitle(hovered.monthKey)}
           </text>
 
-          <circle cx={17} cy={35} r={4} fill={MARGIN_PCT_COLOR} />
-          <text x={26} y={39} fontSize="11" fill="var(--color-text-secondary, #64748b)">
-            Маржинальность: <tspan fontWeight="700" fill="var(--color-text, #0f172a)">{(hovered.marginPct || 0).toFixed(1)}%</tspan>
+          <circle cx={14} cy={30} r={3} fill={MARGIN_PCT_COLOR} />
+          <text x={22} y={33} fontSize="10" fill="var(--color-text-secondary, #64748b)">
+            Маржинальность: <tspan fontWeight="600" fill="var(--color-text, #0f172a)">{(hovered.marginPct || 0).toFixed(1)}%</tspan>
           </text>
 
-          <rect x={13} y={49} width={8} height={8} rx="2" fill={REVENUE_COLOR} />
-          <text x={26} y={57} fontSize="11" fill="var(--color-text-secondary, #64748b)">
-            Выручка: <tspan fontWeight="700" fill="var(--color-text, #0f172a)">{formatUmagMoney(hovered.revenue)}</tspan>
+          <circle cx={14} cy={46} r={3} fill={REVENUE_COLOR_HOVER} />
+          <text x={22} y={49} fontSize="10" fill="var(--color-text-secondary, #64748b)">
+            Выручка: <tspan fontWeight="600" fill="var(--color-text, #0f172a)">{formatUmagMoney(hovered.revenue)}</tspan>
           </text>
 
-          <rect x={13} y={64} width={8} height={8} rx="2" fill={MARGIN_COLOR} />
-          <text x={26} y={72} fontSize="11" fill="var(--color-text-secondary, #64748b)">
-            Маржа: <tspan fontWeight="700" fill="var(--color-text, #0f172a)">{formatUmagMoney(hovered.grossMargin)}</tspan>
+          <circle cx={14} cy={59} r={3} fill={MARGIN_COLOR_HOVER} />
+          <text x={22} y={62} fontSize="10" fill="var(--color-text-secondary, #64748b)">
+            Маржа: <tspan fontWeight="600" fill="var(--color-text, #0f172a)">{formatUmagMoney(hovered.grossMargin)}</tspan>
           </text>
         </g>
       ) : null}

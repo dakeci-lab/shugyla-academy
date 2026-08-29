@@ -10,6 +10,7 @@ import { formatUmagMoney } from '../../services/umagSettlementsService'
 import SalesTrendChart from './SalesTrendChart'
 import SalesFunnelRow from './SalesFunnelRow'
 import SalesRankList from './SalesRankList'
+import SalesSectionHeader from './SalesSectionHeader'
 import './SalesShared.css'
 
 function formatShare(share) {
@@ -67,13 +68,15 @@ export default function SalesAnalysisView({ facts, latestMonthKey, receiptsByMon
 
   return (
     <div className="sales-view">
+      <SalesSectionHeader index={1} title="Воронка прибыли" />
       <SalesFunnelRow steps={funnelSteps} />
 
+      <SalesSectionHeader index={2} title="Динамика выручки и маржи" />
       <div className="sales-chart-card">
-        <div className="sales-chart-card__head">Динамика выручки и маржи</div>
         <SalesTrendChart points={chartPoints} />
       </div>
 
+      <SalesSectionHeader index={3} title="Категории: вклад в выручку и маржу" />
       <div className="sales-rank-grid">
         <SalesRankList
           title="Вклад в выручку, ₸"
@@ -89,6 +92,7 @@ export default function SalesAnalysisView({ facts, latestMonthKey, receiptsByMon
         />
       </div>
 
+      <SalesSectionHeader index={4} title="Маржа vs Маржинальность" />
       <div className="sales-rank-grid">
         <SalesRankList title="Валовая маржа по категориям, ₸" items={byMarginValue} formatValue={formatUmagMoney} />
         <SalesRankList
