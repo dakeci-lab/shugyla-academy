@@ -225,6 +225,7 @@ function cellValue(cell, metric) {
   if (metric === 'profit') return cell.profit
   if (metric === 'quantity') return cell.quantity
   if (metric === 'markup') return cell.cogs > 0 ? cell.revenue / cell.cogs : null
+  if (metric === 'marginPct') return cell.revenue > 0 ? (cell.profit / cell.revenue) * 100 : null
   return cell.revenue
 }
 
@@ -233,6 +234,7 @@ function categoryTotal(cat, metric) {
   if (metric === 'profit') return cat.totalProfit
   if (metric === 'quantity') return cat.totalQuantity
   if (metric === 'markup') return cat.totalCogs > 0 ? cat.totalRevenue / cat.totalCogs : null
+  if (metric === 'marginPct') return cat.totalRevenue > 0 ? (cat.totalProfit / cat.totalRevenue) * 100 : null
   return cat.totalRevenue
 }
 
@@ -241,10 +243,10 @@ function priorYearMonthKey(monthKey) {
   return `${Number(y) - 1}-${m}-01`
 }
 
-/** % change for revenue/profit/quantity, raw-unit difference for the markup ratio (matches the reference's isRatio() split). */
+/** % change for revenue/profit/quantity, pp difference for ratio metrics (markup, marginPct) — matches the reference's isRatio() split. */
 function cellDelta(current, previous, metric) {
   if (current == null || previous == null) return null
-  if (metric === 'markup') return previous === 0 ? null : (current - previous) * 100
+  if (metric === 'markup' || metric === 'marginPct') return previous === 0 ? null : current - previous
   if (previous === 0) return current === 0 ? 0 : null
   return ((current - previous) / previous) * 100
 }
@@ -302,4 +304,222 @@ export function buildDigitizationMatrix(facts, metric = 'revenue', mode = 'value
     })
 
   return { months, rows, mode }
+}
+
+const SHORT_MONTH_NAMES = [
+  'янв',
+  'фев',
+  'мар',
+  'апр',
+  'май',
+  'июн',
+  'июл',
+  'авг',
+  'сен',
+  'окт',
+  'ноя',
+  'дек',
+]
+
+export function shortMonthLabel(monthNumber) {
+  return SHORT_MONTH_NAMES[monthNumber - 1] || ''
+}
+
+/**
+ * Which calendar months to show as columns for a year-band comparison, and
+ * which two years to compare: months 1..cutoff (cutoff = the latest synced
+ * month's number), currentYear = its year, priorYear = currentYear - 1 —
+ * a like-for-like YTD window for both bands.
+ */
+export function resolveYearBandRange(latestMonthKey) {
+  if (!latestMonthKey) return { months: [], currentYear: null, priorYear: null }
+  const { year, month } = monthParts(latestMonthKey)
+  const months = []
+  for (let m = 1; m <= month; m += 1) months.push(m)
+  return { months, currentYear: year, priorYear: year - 1 }
+}
+
+function emptyCell() {
+  return { revenue: 0, cogs: 0, profit: 0, quantity: 0 }
+}
+
+function addCell(target, row) {
+  target.revenue += row.revenue
+  target.cogs += row.cogs
+  target.profit += row.profit
+  target.quantity += row.quantity
+}
+
+/**
+ * Category/subcategory × month table for the "Продажи" tab, banded by year
+ * (current vs prior, like-for-like months) plus a Δ band — mirrors the
+ * reference dashboard's stacked 2026/2025/Δ layout instead of a single
+ * flat YoY row. `metric`: revenue | profit | quantity | markup | marginPct.
+ */
+export function buildSalesCategoryBands(facts, { metric = 'revenue', months, currentYear, priorYear }) {
+  if (!months || months.length === 0 || !currentYear || !priorYear) {
+    return { months: [], currentYear, priorYear, rows: [] }
+  }
+
+  // category -> subcategory ('' = direct) -> year -> month -> cell
+  const tree = new Map()
+  for (const row of facts) {
+    const { year, month } = monthParts(row.monthKey)
+    if ((year !== currentYear && year !== priorYear) || !months.includes(month)) continue
+
+    const catKey = row.categoryName || 'Без категории'
+    if (!tree.has(catKey)) tree.set(catKey, new Map())
+    const subMap = tree.get(catKey)
+    const subKey = row.subcategoryName || ''
+    if (!subMap.has(subKey)) subMap.set(subKey, new Map())
+    const yearMap = subMap.get(subKey)
+    if (!yearMap.has(year)) yearMap.set(year, new Map())
+    const monthMap = yearMap.get(year)
+    const cell = monthMap.get(month) || emptyCell()
+    addCell(cell, row)
+    monthMap.set(month, cell)
+  }
+
+  function seriesFor(yearMap, year) {
+    const monthMap = yearMap.get(year)
+    const values = months.map((m) => cellValue(monthMap?.get(m), metric))
+    const agg = emptyCell()
+    let any = false
+    for (const m of months) {
+      const cell = monthMap?.get(m)
+      if (cell) {
+        any = true
+        addCell(agg, cell)
+      }
+    }
+    return { values, total: any ? cellValue(agg, metric) : null }
+  }
+
+  function bandsFor(yearMap) {
+    const current = seriesFor(yearMap, currentYear)
+    const prior = seriesFor(yearMap, priorYear)
+    const delta = {
+      values: months.map((_, i) => cellDelta(current.values[i], prior.values[i], metric)),
+      total: cellDelta(current.total, prior.total, metric),
+    }
+    return { current, prior, delta }
+  }
+
+  function sortKey(row) {
+    return row.current.total ?? 0
+  }
+
+  const rows = [...tree.entries()]
+    .map(([categoryName, subMap]) => {
+      // category-level totals = sum across all its subcategory buckets (including the '' direct bucket)
+      const categoryYearMap = new Map()
+      for (const [, yearMap] of subMap) {
+        for (const [year, monthMap] of yearMap) {
+          if (!categoryYearMap.has(year)) categoryYearMap.set(year, new Map())
+          const destMonthMap = categoryYearMap.get(year)
+          for (const [month, cell] of monthMap) {
+            const dest = destMonthMap.get(month) || emptyCell()
+            addCell(dest, cell)
+            destMonthMap.set(month, dest)
+          }
+        }
+      }
+
+      const subRows = [...subMap.entries()]
+        .filter(([subKey]) => subKey !== '')
+        .map(([subKey, yearMap]) => ({ subcategoryName: subKey, ...bandsFor(yearMap) }))
+        .sort((a, b) => sortKey(b) - sortKey(a))
+
+      return { categoryName, ...bandsFor(categoryYearMap), subRows }
+    })
+    .sort((a, b) => sortKey(b) - sortKey(a))
+
+  return { months, currentYear, priorYear, rows }
+}
+
+const KPI_ROW_DEFS = [
+  { key: 'checks', label: 'Чеки, шт' },
+  { key: 'avgCheck', label: 'Средний чек, ₸' },
+  { key: 'revenue', label: 'Выручка, ₸' },
+  { key: 'marginPct', label: 'Маржинальность, %' },
+  { key: 'margin', label: 'Валовая маржа, ₸' },
+]
+
+function kpiValueFromCell(key, cell, receiptCount) {
+  if (key === 'checks') return receiptCount ?? null
+  if (!cell) return null
+  if (key === 'avgCheck') return receiptCount ? cell.revenue / receiptCount : null
+  if (key === 'revenue') return cell.revenue
+  if (key === 'marginPct') return cell.revenue > 0 ? (cell.profit / cell.revenue) * 100 : null
+  if (key === 'margin') return cell.profit
+  return null
+}
+
+function kpiDelta(key, current, prior) {
+  if (current == null || prior == null) return null
+  if (key === 'marginPct') return current - prior
+  if (prior === 0) return current === 0 ? 0 : null
+  return ((current - prior) / prior) * 100
+}
+
+/**
+ * "Ключевые показатели" mode for the "Продажи" tab: fixed rows (Чеки/
+ * Средний чек/Выручка/Маржинальность/Валовая маржа) instead of categories,
+ * same year-banded shape as buildSalesCategoryBands. `receiptsByMonth`:
+ * Map<monthKey, receiptCount> from sales_month_receipt_facts.
+ */
+export function buildSalesKpiBands(facts, receiptsByMonth, { months, currentYear, priorYear }) {
+  if (!months || months.length === 0 || !currentYear || !priorYear) {
+    return { months: [], currentYear, priorYear, rows: [] }
+  }
+
+  const cellsByYearMonth = new Map()
+  for (const row of facts) {
+    const { year, month } = monthParts(row.monthKey)
+    if ((year !== currentYear && year !== priorYear) || !months.includes(month)) continue
+    if (!cellsByYearMonth.has(year)) cellsByYearMonth.set(year, new Map())
+    const monthMap = cellsByYearMonth.get(year)
+    const cell = monthMap.get(month) || emptyCell()
+    addCell(cell, row)
+    monthMap.set(month, cell)
+  }
+
+  function receiptsFor(year, month) {
+    return receiptsByMonth?.get(`${year}-${String(month).padStart(2, '0')}-01`) ?? null
+  }
+
+  function seriesFor(key, year) {
+    const monthMap = cellsByYearMonth.get(year)
+    const values = months.map((m) => kpiValueFromCell(key, monthMap?.get(m), receiptsFor(year, m)))
+    const agg = emptyCell()
+    let anyCell = false
+    let totalReceipts = 0
+    let anyReceipts = false
+    for (const m of months) {
+      const cell = monthMap?.get(m)
+      if (cell) {
+        anyCell = true
+        addCell(agg, cell)
+      }
+      const r = receiptsFor(year, m)
+      if (r != null) {
+        anyReceipts = true
+        totalReceipts += r
+      }
+    }
+    const total = kpiValueFromCell(key, anyCell ? agg : null, anyReceipts ? totalReceipts : null)
+    return { values, total }
+  }
+
+  const rows = KPI_ROW_DEFS.map(({ key, label }) => {
+    const current = seriesFor(key, currentYear)
+    const prior = seriesFor(key, priorYear)
+    const delta = {
+      values: months.map((_, i) => kpiDelta(key, current.values[i], prior.values[i])),
+      total: kpiDelta(key, current.total, prior.total),
+    }
+    return { key, label, current, prior, delta }
+  })
+
+  return { months, currentYear, priorYear, rows }
 }
