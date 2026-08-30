@@ -5,14 +5,6 @@
   min-width: 0;
 }
 
-.sfp-panel__title {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-  line-height: 1.25;
-  color: var(--color-text, #0f172a);
-}
-
 .sfp-panel__kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

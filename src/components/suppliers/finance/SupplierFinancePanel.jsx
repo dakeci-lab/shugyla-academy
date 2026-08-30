@@ -183,8 +183,6 @@ export default function SupplierFinancePanel() {
 
   return (
     <div className="sfp-panel">
-      <h1 className="sfp-panel__title">Расчёты</h1>
-
       <div className="sfp-panel__bar">
         <div className="sfp-panel__tabs" role="tablist" aria-label="Раздел">
           {TABS.filter((tab) => allowedTabs.includes(tab.id)).map((tab) => (
