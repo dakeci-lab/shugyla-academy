@@ -124,6 +124,7 @@
     "verify:umag-sync-runs-entity": "node scripts/verify-umag-sync-runs-entity.mjs",
     "verify:umag-open-obligations-sync": "node scripts/verify-umag-open-obligations-sync.mjs",
     "verify:supplier-payments": "node scripts/verify-supplier-payments.mjs",
+    "verify:supplier-retroactive-payment-terms": "node scripts/verify-supplier-retroactive-payment-terms.mjs",
     "verify:employees-list": "node scripts/verify-employees-list.mjs",
     "verify:loading-system": "node scripts/verify-loading-system.mjs",
     "verify:employee-create-fix": "node scripts/verify-employee-create-fix.mjs",

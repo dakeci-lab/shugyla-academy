@@ -16,11 +16,11 @@ import {
 import {
   buildPaymentScheduleView,
   buildSupplierPaymentSummary,
-  computeDueDateFromTerms,
   deriveObligationStatus,
   describeObligationsSyncResult,
   formatDaysUntilDue,
   formatPaymentTermsSnapshot,
+  resolveObligationTermsPatch,
   resolveSupplierPaymentTerms,
   toAqtobeDateKey,
 } from '../utils/supplierPaymentObligations'
@@ -142,47 +142,56 @@ export async function fetchSupplierPaymentsDashboard() {
 }
 
 /**
- * After supplier payment terms are first configured, fill snapshots for
- * obligations that still have due_date IS NULL. Never rewrite existing snapshots.
+ * Keep every still-open (current_debt > 0, not source-deleted) obligation of
+ * this supplier in sync with its CURRENT payment terms — called right after
+ * the supplier form saves. Previously this only filled obligations whose
+ * due_date was still NULL and left already-snapshotted ones stale forever
+ * (see docs/suppliers/retroactive-payment-terms.md): a receipt synced under
+ * old terms kept its original due date even after the supplier's terms were
+ * edited, with no way in the UI to fix it short of a manual DB update.
+ *
+ * Paid/closed obligations (current_debt <= 0) and source-deleted rows are
+ * never touched — they're historical record, not schedule.
  */
-export async function applyMissingObligationSnapshotsForSupplier(platformSupplierId, supplier) {
+export async function refreshObligationTermsForSupplier(platformSupplierId, supplier) {
   assertCloudReady()
   if (!platformSupplierId) return { updated: 0 }
 
   const terms = resolveSupplierPaymentTerms(supplier)
-  if (!terms.configured) return { updated: 0 }
 
   const { data: rows, error } = await supabase
     .from('supplier_payment_obligations')
     .select(
-      'id, supply_document_date, source_doc_time, due_date, terms_snapshot_created_at, payment_terms_type_snapshot'
+      'id, supply_document_date, source_doc_time, due_date, payment_terms_type_snapshot, deferment_days_snapshot'
     )
     .eq('platform_supplier_id', platformSupplierId)
     .eq('is_source_deleted', false)
     .gt('current_debt', 0)
-    .is('due_date', null)
 
   if (error) throw new Error(error.message || 'Не удалось обновить сроки оплаты')
 
   const now = new Date().toISOString()
   let updated = 0
   for (const row of rows || []) {
-    if (row.due_date != null || row.terms_snapshot_created_at != null) continue
     const docDate =
       row.supply_document_date ||
       (row.source_doc_time ? toAqtobeDateKey(new Date(row.source_doc_time)) : null)
-    if (!docDate) continue
-    const dueDate = computeDueDateFromTerms(docDate, terms)
+
+    const patch = resolveObligationTermsPatch(
+      {
+        paymentTermsTypeSnapshot: row.payment_terms_type_snapshot,
+        defermentDaysSnapshot: row.deferment_days_snapshot,
+        dueDate: row.due_date,
+      },
+      terms,
+      docDate
+    )
+    if (!patch) continue
+
     const { error: updError } = await supabase
       .from('supplier_payment_obligations')
-      .update({
-        payment_terms_type_snapshot: terms.type,
-        deferment_days_snapshot: terms.days,
-        due_date: dueDate,
-        terms_snapshot_created_at: now,
-      })
+      .update({ ...patch, terms_snapshot_created_at: now })
       .eq('id', row.id)
-      .is('due_date', null)
     if (updError) throw new Error(updError.message || 'Не удалось сохранить срок оплаты')
     updated += 1
   }

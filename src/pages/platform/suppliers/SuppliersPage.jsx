@@ -36,7 +36,7 @@ import SupplierForm, {
   formToSupplierUpdatePayload,
   validateSupplierDeferralDays,
 } from '../../../components/suppliers/SupplierForm'
-import { applyMissingObligationSnapshotsForSupplier } from '../../../services/supplierPaymentObligationsService'
+import { refreshObligationTermsForSupplier } from '../../../services/supplierPaymentObligationsService'
 import SupplierFilterPopover from '../../../components/suppliers/SupplierFilterPopover'
 import SupplierTable from '../../../components/suppliers/SupplierTable'
 import { PlusIcon } from '../../../components/icons/PlatformIcons'
@@ -202,9 +202,9 @@ export function SuppliersListPage() {
       if (editId) {
         await updateSupplier(editId, payload)
         try {
-          await applyMissingObligationSnapshotsForSupplier(editId, payload)
+          await refreshObligationTermsForSupplier(editId, payload)
         } catch {
-          // Calendar first-fill is best-effort; supplier save already succeeded.
+          // Recomputing due dates is best-effort; supplier save already succeeded.
         }
       } else {
         await createSupplier(payload)

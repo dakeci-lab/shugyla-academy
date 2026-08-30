@@ -176,7 +176,7 @@ async function main() {
   const suppliersPage = read('src/pages/platform/suppliers/SuppliersPage.jsx')
   assert.match(suppliersPage, /focusSection/)
   assert.match(suppliersPage, /returnTo/)
-  assert.match(suppliersPage, /applyMissingObligationSnapshotsForSupplier/)
+  assert.match(suppliersPage, /refreshObligationTermsForSupplier/)
   ok('supplier edit opens payment-terms focus and refreshes obligations')
 
   const settlements = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')

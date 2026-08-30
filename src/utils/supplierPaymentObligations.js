@@ -86,6 +86,38 @@ export function computeDueDateFromTerms(docDateKey, terms) {
   return addCalendarDays(docDateKey, terms.days ?? 0)
 }
 
+/**
+ * What an obligation's terms snapshot should be, given the supplier's
+ * CURRENT terms — used to keep still-open obligations in sync when a
+ * supplier's payment terms change after the obligation was first seen
+ * (previously the snapshot was write-once and silently went stale; see
+ * docs/suppliers/retroactive-payment-terms.md).
+ *
+ * Returns null when the current snapshot already matches (nothing to write).
+ */
+export function resolveObligationTermsPatch(currentSnapshot, terms, docDateKey) {
+  const nextType = terms?.configured ? terms.type : null
+  const nextDays = terms?.configured ? terms.days : null
+  const nextDueDate = computeDueDateFromTerms(docDateKey, terms)
+
+  const currentType = currentSnapshot?.paymentTermsTypeSnapshot ?? null
+  const currentDays =
+    currentSnapshot?.defermentDaysSnapshot == null
+      ? null
+      : Number(currentSnapshot.defermentDaysSnapshot)
+  const currentDueDate = currentSnapshot?.dueDate ?? null
+
+  if (currentType === nextType && currentDays === nextDays && currentDueDate === nextDueDate) {
+    return null
+  }
+
+  return {
+    payment_terms_type_snapshot: nextType,
+    deferment_days_snapshot: nextDays,
+    due_date: nextDueDate,
+  }
+}
+
 export function deriveObligationStatus(obligation, todayKey = toAqtobeDateKey()) {
   const debt = Number(obligation?.currentDebt ?? obligation?.current_debt ?? 0)
   if (!Number.isFinite(debt) || debt <= 0) return OBLIGATION_STATUS.PAID
