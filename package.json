@@ -139,6 +139,7 @@
     "verify:time-tracker-settings-page": "node scripts/verify-time-tracker-settings-page.mjs",
     "verify:home-workforce-summary": "node scripts/verify-home-workforce-summary.mjs",
     "verify:supplier-form-focus": "node scripts/verify-supplier-form-focus.mjs",
+    "verify:supplier-form-single-payment-terms-field": "node scripts/verify-supplier-form-single-payment-terms-field.mjs",
     "verify:home-dashboard": "node scripts/verify-home-dashboard.mjs",
     "verify:hidden-scrollbars": "node scripts/verify-hidden-scrollbars.mjs",
     "verify:pwa-zoom-guard": "node scripts/verify-pwa-zoom-guard.mjs",

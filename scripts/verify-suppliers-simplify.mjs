@@ -86,8 +86,12 @@ function main() {
   assert('form keeps manager phone', form.includes('Телефон менеджера'))
   assert('form keeps order days', form.includes('Дни заказа'))
   assert('form keeps delivery days', form.includes('Дни поставки'))
-  assert('form keeps payment type', form.includes('Условия оплаты'))
-  assert('form keeps deferral days', form.includes('Срок отсрочки'))
+  // 2026-08-30: the 4-value «Условия оплаты» dropdown (Наличными/Перевод/
+  // Отсрочка/Смешанная оплата) was collapsed into a single «Срок оплаты
+  // (дней)» field — all 4 types already reduced to just {0 days, N days} in
+  // every due-date calculation, so the dropdown carried no distinct behavior.
+  assert('form keeps single payment-terms days field', form.includes('Срок оплаты (дней)'))
+  assert('form no separate payment-type dropdown', !form.includes('Условия оплаты'))
   assert('form keeps status', form.includes('Статус'))
 
   console.log('Stage 6: Payload whitelist')
