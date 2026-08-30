@@ -812,6 +812,31 @@ async function reconcileCanonicalSuppliers(
     status: string
   }> = []
 
+  // Decision pass — pure, no I/O per row. Every row's UPDATE-vs-INSERT choice
+  // depends only on the byUmagId/unlinkedByBin/umagBinCounts maps built above
+  // from data already fetched, never on another row's outcome: a given BIN
+  // can only ever match one UMAG row per run (umagBinCounts.get(bin) === 1
+  // is required to even consider the BIN-match branch), so there is no
+  // cross-row ordering to preserve by writing one row at a time. This used
+  // to be one awaited UPDATE or INSERT per supplier — hundreds of sequential
+  // round trips on every sync click, for a catalog that rarely changes
+  // (docs/performance/... N+1 in reconcileCanonicalSuppliers). Now it's one
+  // batched write per 100 rows.
+  const CANONICAL_CHUNK_SIZE = 100
+  type UpdateDecision = {
+    umagId: number
+    platformId: string
+    umagOwned: Record<string, unknown>
+    linkMethod: 'external' | 'bin'
+  }
+  type InsertDecision = {
+    umagId: number
+    insertRow: Record<string, unknown>
+    nameKey: string
+  }
+  const updateDecisions: UpdateDecision[] = []
+  const insertDecisions: InsertDecision[] = []
+
   for (const umag of umagRows || []) {
     const umagId = Number(umag.umag_supplier_id)
     if (!Number.isFinite(umagId)) {
@@ -832,7 +857,7 @@ async function reconcileCanonicalSuppliers(
     }
 
     let platformId = byUmagId.get(umagId)?.id || null
-    let linkMethod: 'external' | 'bin' | 'create' | null = platformId ? 'external' : null
+    let linkMethod: 'external' | 'bin' | null = platformId ? 'external' : null
 
     if (!platformId && umagOwned.bin && umagBinCounts.get(umagOwned.bin) === 1) {
       const candidates = unlinkedByBin.get(umagOwned.bin) || []
@@ -843,19 +868,8 @@ async function reconcileCanonicalSuppliers(
     }
 
     if (platformId) {
-      const { error } = await serviceClient
-        .from('platform_suppliers')
-        .update(umagOwned)
-        .eq('id', platformId)
-      if (error) {
-        console.error('canonical_update_failed', { umagId, message: error.message })
-        stats.mappingErrors += 1
-        continue
-      }
-      stats.updated += 1
-      if (linkMethod === 'external') stats.linkedByExternalId += 1
+      updateDecisions.push({ umagId, platformId, umagOwned, linkMethod: linkMethod as 'external' | 'bin' })
       if (linkMethod === 'bin') {
-        stats.linkedByBin += 1
         byUmagId.set(umagId, { id: platformId, name: umagOwned.name, bin: umagOwned.bin })
         // prevent reuse of this BIN for another create
         unlinkedByBin.delete(umagOwned.bin || '')
@@ -874,31 +888,78 @@ async function reconcileCanonicalSuppliers(
         status: umagOwned.is_umag_active ? 'active' : 'inactive',
         comment: null,
       }
-      const { data: created, error } = await serviceClient
-        .from('platform_suppliers')
-        .insert(insertRow)
-        .select('id')
-        .single()
-      if (error || !created?.id) {
-        console.error('canonical_create_failed', { umagId, message: error?.message })
+      insertDecisions.push({
+        umagId,
+        insertRow,
+        nameKey: umagOwned.name.trim().toLowerCase(),
+      })
+    }
+  }
+
+  // Batched UPDATE — upsert-on-id, since each row needs different values
+  // (a plain .update() applies one payload to every matched row).
+  for (let i = 0; i < updateDecisions.length; i += CANONICAL_CHUNK_SIZE) {
+    const chunk = updateDecisions.slice(i, i + CANONICAL_CHUNK_SIZE)
+    const { error } = await serviceClient
+      .from('platform_suppliers')
+      .upsert(
+        chunk.map((d) => ({ id: d.platformId, ...d.umagOwned })),
+        { onConflict: 'id' }
+      )
+    if (error) {
+      console.error('canonical_update_batch_failed', { message: error.message, count: chunk.length })
+      stats.mappingErrors += chunk.length
+      continue
+    }
+    for (const d of chunk) {
+      stats.updated += 1
+      if (d.linkMethod === 'external') stats.linkedByExternalId += 1
+      else stats.linkedByBin += 1
+    }
+  }
+
+  // Batched INSERT. Every insert row carries umag_supplier_id, so returned
+  // rows map back to their originating decision without depending on
+  // Postgres preserving insert order.
+  for (let i = 0; i < insertDecisions.length; i += CANONICAL_CHUNK_SIZE) {
+    const chunk = insertDecisions.slice(i, i + CANONICAL_CHUNK_SIZE)
+    const { data: created, error } = await serviceClient
+      .from('platform_suppliers')
+      .insert(chunk.map((d) => d.insertRow))
+      .select('id, umag_supplier_id')
+    if (error) {
+      console.error('canonical_create_batch_failed', { message: error.message, count: chunk.length })
+      stats.mappingErrors += chunk.length
+      continue
+    }
+    const createdIdByUmagId = new Map<number, string>()
+    for (const row of created || []) {
+      createdIdByUmagId.set(Number(row.umag_supplier_id), row.id)
+    }
+    for (const d of chunk) {
+      const createdId = createdIdByUmagId.get(d.umagId)
+      if (!createdId) {
         stats.mappingErrors += 1
         continue
       }
       stats.created += 1
-      stats.platformMap.set(umagId, created.id)
-      byUmagId.set(umagId, { id: created.id, name: umagOwned.name, bin: umagOwned.bin })
+      stats.platformMap.set(d.umagId, createdId)
+      byUmagId.set(d.umagId, {
+        id: createdId,
+        name: String(d.insertRow.name),
+        bin: d.insertRow.bin as string | null,
+      })
 
-      const nameKey = umagOwned.name.trim().toLowerCase()
       if (
-        nameKey &&
-        nameCountsPlatform.get(nameKey) === 1 &&
-        nameCountsUmag.get(nameKey) === 1
+        d.nameKey &&
+        nameCountsPlatform.get(d.nameKey) === 1 &&
+        nameCountsUmag.get(d.nameKey) === 1
       ) {
-        const existingIds = platformByName.get(nameKey) || []
+        const existingIds = platformByName.get(d.nameKey) || []
         for (const existingId of existingIds) {
-          if (existingId === created.id) continue
+          if (existingId === createdId) continue
           candidateRows.push({
-            umag_supplier_id: umagId,
+            umag_supplier_id: d.umagId,
             platform_supplier_id: existingId,
             match_reason: 'exact_name',
             status: 'open',

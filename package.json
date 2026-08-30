@@ -104,6 +104,7 @@
     "verify:supplier-reconciliations": "node scripts/verify-supplier-reconciliations.mjs",
     "verify:canonical-supplier-debt": "node scripts/verify-canonical-supplier-debt.mjs",
     "verify:supplier-finance-sync-scope": "node scripts/verify-supplier-finance-sync-scope.mjs",
+    "verify:umag-sync-canonical-batch": "node scripts/verify-umag-sync-canonical-batch.mjs",
     "verify:umag-sync-lock": "node scripts/verify-umag-sync-lock.mjs",
     "verify:supplier-finance-summary": "node scripts/verify-supplier-finance-summary.mjs",
     "verify:settlements-canonical-debt": "node scripts/verify-settlements-canonical-debt.mjs",

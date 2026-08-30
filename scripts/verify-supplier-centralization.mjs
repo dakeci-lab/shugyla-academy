@@ -41,12 +41,15 @@ function main() {
   assert.match(edge, /platform_supplier_id/)
   assert.match(edge, /Shugyla operational fields are never written/)
   assert.match(edge, /CANONICAL_SUPPLIER_RECONCILE_FAILED/)
+  // 2026-08-31: batched (upsert-on-id, chunked) to fix the N+1 of one
+  // UPDATE per supplier on every sync click — still writes only `umagOwned`
+  // fields (plus the id conflict target), never Shugyla operational fields.
   assert.match(
     edge,
-    /\.from\('platform_suppliers'\)\s*\n\s*\.update\(umagOwned\)/
+    /\.upsert\(\s*\n\s*chunk\.map\(\(d\) => \(\{ id: d\.platformId, \.\.\.d\.umagOwned \}\)\),\s*\n\s*\{ onConflict: 'id' \}/
   )
   assert.match(edge, /order_days: ''/)
-  ok('umag-sync reconciles canonical; updates use umagOwned only')
+  ok('umag-sync reconciles canonical; batched updates still write umagOwned fields only')
 
   const adapter = read('src/services/suppliersSupabaseAdapter.js')
   assert.match(adapter, /supplierToOperationalRow/)
