@@ -74,8 +74,20 @@ function main() {
   assert.match(opSheetSrc, /import \{ createPortal \} from 'react-dom'/)
   assert.match(opSheetSrc, /return createPortal\(/)
   assert.match(opSheetSrc, /umag-op-detail__backdrop/)
-  assert.match(opSheetSrc, /,\s*\n\s*document\.body\s*\n\s*\)/)
-  ok('Case 4: OperationDetailSheet (operation detail in «Взаиморасчёты») returns createPortal(..., document.body)')
+  assert.match(opSheetSrc, /,\s*\n[\s\S]{0,160}window\.document\.body\s*\n\s*\)/)
+  ok('Case 4: OperationDetailSheet (operation detail in «Взаиморасчёты») returns createPortal(..., window.document.body)')
+
+  // --- Case 4b: regression guard — this file shadows `document` with local
+  // state (the fetched UMAG document object), so a bare `document.body` in
+  // the portal call silently resolves to that state (null on first render)
+  // instead of the DOM, throwing "Cannot read properties of null" on every
+  // open. This shipped once (2026-08-30) and was caught by the owner
+  // clicking through the real UI, not by this script — assert the local
+  // state still exists so the next person touching this file knows why
+  // `window.document.body` (not `document.body`) is required here.
+  assert.match(opSheetSrc, /const \[document, setDocument\] = useState\(/)
+  assert.doesNotMatch(opSheetSrc, /createPortal\([\s\S]*?,\s*\n\s*document\.body/)
+  ok('Case 4b: local `document` state (shadowing) confirmed present — portal target correctly qualifies window.document.body, not bare document.body')
 
   // --- Case 5: no behavior/content change, only the render target -----------
   assert.match(paymentsSrc, /role="dialog"[\s\S]{0,40}aria-modal="true"[\s\S]{0,40}aria-label=\{group\.name\}/)

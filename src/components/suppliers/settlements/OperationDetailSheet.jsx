@@ -412,6 +412,8 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
         )}
       </div>
     </div>,
-    document.body
+    // window.document, not the local `document` state above (the fetched
+    // UMAG document object) — that shadowing made this crash on every open.
+    window.document.body
   )
 }
