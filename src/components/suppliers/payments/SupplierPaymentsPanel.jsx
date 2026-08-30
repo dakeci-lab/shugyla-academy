@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
@@ -377,7 +378,11 @@ function GroupDetail({ group, todayKey, canEditTerms, onClose, onConfigure }) {
   const isMissing = group.status === OBLIGATION_STATUS.TERMS_MISSING
   const mapped = Boolean(group.platformSupplierId)
 
-  return (
+  // Portalled to document.body: rendered inline, this "fixed" backdrop would
+  // actually be contained by PullToRefresh's always-on `will-change:
+  // transform` wrapper (a page-length box), centering the sheet in the
+  // middle of the whole scrollable page instead of the viewport.
+  return createPortal(
     <div className="spo-panel__sheet-backdrop" role="presentation" onClick={onClose}>
       <div
         className="spo-panel__sheet"
@@ -449,7 +454,8 @@ function GroupDetail({ group, todayKey, canEditTerms, onClose, onConfigure }) {
           ))}
         </ul>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 

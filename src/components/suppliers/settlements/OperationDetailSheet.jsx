@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   buildItemTotals,
   fetchOperationDetails,
@@ -177,7 +178,12 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
   const visibleItems = useMemo(() => filterOperationItems(items, query), [items, query])
   const displayTotals = totals || buildItemTotals(items, headerFromHistory.amount)
 
-  return (
+  // Portalled to document.body — see the same note in
+  // SupplierPaymentsPanel.jsx's GroupDetail: rendered inline, this "fixed"
+  // backdrop would be contained by PullToRefresh's always-on
+  // will-change:transform wrapper and center in the middle of the whole
+  // page instead of the viewport.
+  return createPortal(
     <div className="umag-op-detail__backdrop" role="presentation" onClick={onClose}>
       <div
         className="umag-op-detail"
@@ -405,6 +411,7 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
