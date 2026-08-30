@@ -31,6 +31,7 @@ import { getMonthPeriodKeys } from '../../../services/umagSettlementsService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
 import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
+import { ChevronDownIcon } from '../../icons/PlatformIcons'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './SupplierPaymentsPanel.css'
 
@@ -45,12 +46,17 @@ const TABS = [
   },
 ]
 
-/** Этап 2.8: vertical groups for embedded «К оплате» — presentation only. */
+/**
+ * Этап 2.8: vertical groups for embedded «К оплате» — presentation only.
+ * «Без срока» is deliberately not one of these: it's a setup gap (supplier has
+ * no payment terms configured), not a point on the urgency timeline, so it
+ * renders as a separate banner instead of a same-tier section — see
+ * MissingTermsBanner.
+ */
 const COMPACT_SECTIONS = [
   { id: 'overdue', label: 'Просрочено', summaryKey: 'overdue' },
   { id: 'today', label: 'Сегодня', summaryKey: 'dueToday' },
   { id: 'upcoming', label: 'Предстоящие', summaryKey: 'deferredNotYetDue' },
-  { id: 'termsMissing', label: 'Без срока', summaryKey: 'termsMissing' },
 ]
 
 function formatCompactDueDate(dateKey) {
@@ -114,6 +120,58 @@ function CompactObligationRow({ group, todayKey, canEditTerms, onOpen, onConfigu
   )
 }
 
+function pluralizeSupplier(count) {
+  const mod10 = count % 10
+  const mod100 = count % 100
+  if (mod10 === 1 && mod100 !== 11) return 'поставщик'
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return 'поставщика'
+  return 'поставщиков'
+}
+
+/**
+ * Setup-gap banner, not an urgency section: suppliers with no configured
+ * payment terms don't belong on the same timeline as Просрочено/Сегодня/
+ * Предстоящие — collapsed by default, expands to the same row list.
+ */
+function MissingTermsBanner({ groups, amount, expanded, onToggle, todayKey, canEditTerms, onOpen, onConfigure }) {
+  if (!groups.length) return null
+  return (
+    <div className="spo-compact__missing-banner-wrap">
+      <button
+        type="button"
+        className="spo-compact__missing-toggle"
+        aria-expanded={expanded}
+        onClick={onToggle}
+      >
+        <span className="spo-compact__missing-text">
+          {groups.length} {pluralizeSupplier(groups.length)} без срока оплаты — настройте условия
+        </span>
+        <span className="spo-compact__missing-amount">{formatUmagMoney(amount)}</span>
+        <span
+          className={`spo-compact__missing-chevron${expanded ? ' spo-compact__missing-chevron--open' : ''}`}
+          aria-hidden="true"
+        >
+          <ChevronDownIcon size={16} />
+        </span>
+      </button>
+      {expanded ? (
+        <div className="spo-compact__missing-rows">
+          {groups.map((group) => (
+            <CompactObligationRow
+              key={group.key}
+              group={group}
+              todayKey={todayKey}
+              canEditTerms={canEditTerms}
+              onOpen={onOpen}
+              onConfigure={onConfigure}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
 function CompactColumnsHead() {
   return (
     <div className="spo-compact__head" role="row">
@@ -136,6 +194,8 @@ function CompactPaymentSchedule({
   onOpen,
   onConfigure,
 }) {
+  const [missingExpanded, setMissingExpanded] = useState(false)
+
   if (loading && !view) {
     return <DelayedLoadingSkeleton variant="cards" count={4} />
   }
@@ -158,7 +218,15 @@ function CompactPaymentSchedule({
     return { section, groups: filtered }
   }).filter(({ groups }) => groups.length > 0)
 
-  if (filteredSections.length === 0) {
+  const missingGroups = lists.termsMissing || []
+  const filteredMissingGroups = query
+    ? missingGroups.filter((group) => (group.name || '').toLowerCase().includes(query))
+    : missingGroups
+  const missingAmount = query
+    ? filteredMissingGroups.reduce((sum, group) => sum + (group.amount || 0), 0)
+    : summaries.termsMissing || 0
+
+  if (filteredSections.length === 0 && filteredMissingGroups.length === 0) {
     return (
       <div className="spo-compact__empty">
         {query ? 'По вашему запросу ничего не найдено.' : 'Нет обязательств к оплате'}
@@ -167,35 +235,50 @@ function CompactPaymentSchedule({
   }
 
   return (
-    <div className="spo-compact__wrap">
-      <CompactColumnsHead />
-      <div className="spo-compact">
-        {filteredSections.map(({ section, groups }) => {
-          const count = query ? groups.length : tabCounts[section.id] || 0
-          const amount = query
-            ? groups.reduce((sum, group) => sum + (group.amount || 0), 0)
-            : summaries[section.summaryKey] || 0
-          return (
-            <section key={section.id} className="spo-compact__section">
-              <h3 className="spo-compact__section-head">
-                {section.label} · {count} · {formatUmagMoney(amount)}
-              </h3>
-              <div className="spo-compact__rows">
-                {groups.map((group) => (
-                  <CompactObligationRow
-                    key={group.key}
-                    group={group}
-                    todayKey={todayKey}
-                    canEditTerms={canEditTerms}
-                    onOpen={onOpen}
-                    onConfigure={onConfigure}
-                  />
-                ))}
-              </div>
-            </section>
-          )
-        })}
-      </div>
+    <div className="spo-compact__stack">
+      <MissingTermsBanner
+        groups={filteredMissingGroups}
+        amount={missingAmount}
+        expanded={missingExpanded}
+        onToggle={() => setMissingExpanded((open) => !open)}
+        todayKey={todayKey}
+        canEditTerms={canEditTerms}
+        onOpen={onOpen}
+        onConfigure={onConfigure}
+      />
+
+      {filteredSections.length > 0 ? (
+        <div className="spo-compact__wrap">
+          <CompactColumnsHead />
+          <div className="spo-compact">
+            {filteredSections.map(({ section, groups }) => {
+              const count = query ? groups.length : tabCounts[section.id] || 0
+              const amount = query
+                ? groups.reduce((sum, group) => sum + (group.amount || 0), 0)
+                : summaries[section.summaryKey] || 0
+              return (
+                <section key={section.id} className="spo-compact__section">
+                  <h3 className="spo-compact__section-head">
+                    {section.label} · {count} · {formatUmagMoney(amount)}
+                  </h3>
+                  <div className="spo-compact__rows">
+                    {groups.map((group) => (
+                      <CompactObligationRow
+                        key={group.key}
+                        group={group}
+                        todayKey={todayKey}
+                        canEditTerms={canEditTerms}
+                        onOpen={onOpen}
+                        onConfigure={onConfigure}
+                      />
+                    ))}
+                  </div>
+                </section>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

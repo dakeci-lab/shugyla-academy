@@ -208,6 +208,19 @@ async function main() {
   assert.doesNotMatch(shellCss, /(?<!max-)(?<!min-)width:\s*\d{3,}px;/)
   ok('Case 22: KPI grid collapses to 2 columns under 900px, the tabs/sync bar wraps (flex-wrap), and no large fixed pixel width was introduced that could force horizontal overflow')
 
+  // --- Case 23: KPI row moved below the tabs bar, and only for «К оплате» ---
+  // The KPI tiles summarize supplier_payment_obligations (fetchSupplierFinancePageData),
+  // which «Взаиморасчёты» doesn't use — showing them there was a stale total,
+  // not a second view of the same number. They now render under the active
+  // tab, after the bar, instead of unconditionally above it.
+  const barIndex = panelSrc.indexOf('sfp-panel__bar')
+  const kpisIndex = panelSrc.indexOf('sfp-panel__kpis', barIndex)
+  assert.ok(barIndex > -1 && kpisIndex > barIndex, 'sfp-panel__kpis must render after sfp-panel__bar in source order')
+  assert.match(panelSrc, /const showKpis = canViewPayments && activeTabMeta\?\.id === 'payments'/)
+  assert.match(panelSrc, /\{showKpis \? \(\s*\n\s*<div className="sfp-panel__kpis"/)
+  assert.match(panelSrc, /\{showKpis && summaryError && !summary \? \(/)
+  ok('Case 23: KPI tiles (and their load-error banner) render after the tabs bar and only while «К оплате» is the active tab — hidden on «Взаиморасчёты»')
+
   console.log(`\n${checks} checks passed`)
   console.log(
     '\nNOTE: no live Supabase/session was available in this environment (no .env.local) to click\n' +

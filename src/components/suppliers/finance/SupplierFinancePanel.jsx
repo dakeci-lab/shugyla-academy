@@ -179,39 +179,11 @@ export default function SupplierFinancePanel() {
   const syncStatus = describeSyncStatus(lastSync)
   const activeTabMeta = TABS.find((tab) => tab.id === activeTab)
 
+  const showKpis = canViewPayments && activeTabMeta?.id === 'payments'
+
   return (
     <div className="sfp-panel">
       <h1 className="sfp-panel__title">Расчёты</h1>
-
-      {canViewPayments && (
-        <div className="sfp-panel__kpis" aria-label="Сводные показатели">
-          <KpiTile label="Долг" value={summary?.debt} loading={summaryLoading && !summary} />
-          <KpiTile
-            label="Просрочено"
-            value={summary?.overdue?.amount}
-            tone="overdue"
-            loading={summaryLoading && !summary}
-          />
-          <KpiTile
-            label="Сегодня"
-            value={summary?.dueToday?.amount}
-            tone="today"
-            loading={summaryLoading && !summary}
-          />
-          <KpiTile
-            label={monthLabel ? `Оплачено · ${monthLabel}` : 'Оплачено'}
-            value={summary?.paidThisMonth?.amount}
-            loading={summaryLoading && !summary}
-            unavailable={paidUnavailable}
-          />
-        </div>
-      )}
-
-      {summaryError && !summary ? (
-        <div className="sfp-panel__error" role="alert">
-          {summaryError}
-        </div>
-      ) : null}
 
       <div className="sfp-panel__bar">
         <div className="sfp-panel__tabs" role="tablist" aria-label="Раздел">
@@ -247,6 +219,40 @@ export default function SupplierFinancePanel() {
           ) : null}
         </div>
       </div>
+
+      {/* Item: КПИ и её ошибка загрузки относятся к сводке «К оплате»
+          (fetchSupplierFinancePageData) — «Взаиморасчёты» её не использует
+          и самостоятельно тянет свои итоги, поэтому обе привязаны к
+          активной вкладке, а не показываются на обеих постоянно. */}
+      {showKpis && summaryError && !summary ? (
+        <div className="sfp-panel__error" role="alert">
+          {summaryError}
+        </div>
+      ) : null}
+
+      {showKpis ? (
+        <div className="sfp-panel__kpis" aria-label="Сводные показатели">
+          <KpiTile label="Долг" value={summary?.debt} loading={summaryLoading && !summary} />
+          <KpiTile
+            label="Просрочено"
+            value={summary?.overdue?.amount}
+            tone="overdue"
+            loading={summaryLoading && !summary}
+          />
+          <KpiTile
+            label="Сегодня"
+            value={summary?.dueToday?.amount}
+            tone="today"
+            loading={summaryLoading && !summary}
+          />
+          <KpiTile
+            label={monthLabel ? `Оплачено · ${monthLabel}` : 'Оплачено'}
+            value={summary?.paidThisMonth?.amount}
+            loading={summaryLoading && !summary}
+            unavailable={paidUnavailable}
+          />
+        </div>
+      ) : null}
 
       {activeTabMeta?.id === 'payments' ? (
         <SupplierPaymentsPanel
