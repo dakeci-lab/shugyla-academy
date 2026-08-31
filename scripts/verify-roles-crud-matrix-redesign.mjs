@@ -41,6 +41,7 @@ const TEAM_UTILS = 'src/components/admin/team/teamManagementUtils.js'
 const TEAM_CSS = 'src/components/admin/team/TeamManagementPage.css'
 const POSITIONS_WORKSPACE = 'src/components/admin/team/PositionsWorkspace.jsx'
 const POSITION_GROUPS_WORKSPACE = 'src/components/admin/team/PositionGroupsWorkspace.jsx'
+const TEAM_PAGE = 'src/components/admin/team/TeamManagementPage.jsx'
 
 const REMOVED_FILES = [
   'src/components/admin/team/RolesSidebar.jsx',
@@ -313,6 +314,41 @@ async function stageSharedCssSurvives() {
   )
 }
 
+async function stagePageChromeRemoved() {
+  console.log('Stage 7: page title/description removed, tab switcher matches Закупки style')
+
+  const page = read(TEAM_PAGE)
+  assert(
+    'TeamManagementPage no longer renders a page title ("Управление командой")',
+    !/Управление командой/.test(page),
+  )
+  assert(
+    'TeamManagementPage no longer renders the page subtitle',
+    !/Настройка ролей, доступов и организационной структуры/.test(page),
+  )
+  assert(
+    'team-mgmt__title / team-mgmt__subtitle classes are gone from the page',
+    !/team-mgmt__title|team-mgmt__subtitle/.test(page),
+  )
+
+  const css = read(TEAM_CSS)
+  assert(
+    'tab bar uses an underline style (border-bottom), not the old rounded-pill style',
+    css.includes('.team-mgmt__tab {') &&
+      /\.team-mgmt__tab\s*\{[^}]*border-bottom:\s*2px solid transparent/.test(css) &&
+      !/\.team-mgmt__tab\s*\{[^}]*border-radius:\s*999px/.test(css),
+  )
+  assert(
+    'active tab is marked by border-bottom-color, not a filled background (matches Закупки)',
+    /\.team-mgmt__tab--active\s*\{[^}]*border-bottom-color:\s*var\(--color-primary\)/.test(css) &&
+      !/\.team-mgmt__tab--active\s*\{[^}]*background:\s*var\(--color-primary-light\)/.test(css),
+  )
+  assert(
+    'tabs row sits on a bottom border, same structure as .procurement-page__tabs-row',
+    css.includes('.team-mgmt__tabs-row'),
+  )
+}
+
 async function main() {
   console.log('Verifying: Roles & Permissions CRUD-matrix redesign\n')
   await stageOldUiRemoved()
@@ -321,6 +357,7 @@ async function main() {
   await stagePanelMarkup()
   await stageWorkspaceBehaviourPreserved()
   await stageSharedCssSurvives()
+  await stagePageChromeRemoved()
   console.log(`\n✅ All ${checks} checks passed`)
 }
 

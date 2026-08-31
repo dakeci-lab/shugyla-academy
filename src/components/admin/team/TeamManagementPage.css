@@ -20,32 +20,17 @@
   box-sizing: border-box;
 }
 
-.team-mgmt__header {
+.team-mgmt__tabs-row {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.team-mgmt__title {
-  margin: 0;
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--color-text);
-  line-height: 1.25;
-}
-
-.team-mgmt__subtitle {
-  margin: 6px 0 0;
-  color: var(--color-text-secondary);
-  font-size: 0.95rem;
-  line-height: 1.4;
-  max-width: 52rem;
+  align-items: flex-end;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 0.15rem;
 }
 
 .team-mgmt__tabs {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0.25rem;
   overflow-x: auto;
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
@@ -53,25 +38,25 @@
 
 .team-mgmt__tab {
   appearance: none;
-  border: 1px solid var(--color-border);
-  background: var(--color-white);
-  color: var(--color-text-secondary);
-  border-radius: 999px;
-  padding: 8px 14px;
-  font-size: 0.9rem;
+  border: none;
+  background: transparent;
+  padding: 0.55rem 0.9rem;
+  font: inherit;
+  font-size: 0.875rem;
   font-weight: 600;
+  color: var(--color-text-secondary);
   cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
 }
 
 .team-mgmt__tab:hover {
-  border-color: var(--color-primary);
   color: var(--color-primary-dark);
 }
 
 .team-mgmt__tab--active {
-  background: var(--color-primary-light);
-  border-color: var(--color-primary);
-  color: var(--color-primary-dark);
+  color: var(--color-text);
+  border-bottom-color: var(--color-primary);
 }
 
 .team-mgmt__tab--disabled,

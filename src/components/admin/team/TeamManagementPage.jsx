@@ -70,19 +70,13 @@ export default function TeamManagementPage() {
 
   return (
     <div className="team-mgmt">
-      <header className="team-mgmt__header">
-        <div>
-          <h2 className="team-mgmt__title">Управление командой</h2>
-          <p className="team-mgmt__subtitle">
-            Настройка ролей, доступов и организационной структуры сотрудников
-          </p>
-        </div>
+      <div className="team-mgmt__tabs-row">
         <TeamManagementTabs
           tabs={tabs}
           activeTab={resolved.activeTab}
           onChange={handleTabChange}
         />
-      </header>
+      </div>
 
       <div
         className="team-mgmt__panel"
