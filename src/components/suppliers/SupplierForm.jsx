@@ -355,7 +355,7 @@ export default function SupplierForm({
         <p className="admin-form__hint">0 — оплата сразу при поступлении товара</p>
       </div>
 
-      {!isCreate ? <SupplierPaymentsSummary supplierId={supplierId} form={form} /> : null}
+      <SupplierPaymentsSummary supplierId={supplierId} form={form} />
 
       {error && <p className="admin-form__error">{error}</p>}
     </div>

@@ -92,6 +92,10 @@ function main() {
   // every due-date calculation, so the dropdown carried no distinct behavior.
   assert('form keeps single payment-terms days field', form.includes('Срок оплаты (дней)'))
   assert('form no separate payment-type dropdown', !form.includes('Условия оплаты'))
+  assert(
+    'no leftover isCreate reference (removed prop, would throw ReferenceError on render)',
+    !form.includes('isCreate'),
+  )
   assert('form keeps status', form.includes('Статус'))
 
   console.log('Stage 6: Payload whitelist')
