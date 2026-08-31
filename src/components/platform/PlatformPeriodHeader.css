@@ -11,10 +11,10 @@
   box-sizing: border-box;
   padding: 0.55rem 0.65rem;
   margin: 0 0 0.65rem;
-  background: var(--color-primary, #2a9d5c);
+  background: var(--color-primary, #059669);
   color: #fff;
   border-radius: var(--radius-md, 14px);
-  box-shadow: 0 2px 10px var(--color-primary-soft, rgba(42, 157, 92, 0.12));
+  box-shadow: 0 2px 10px var(--color-primary-soft, rgba(5, 150, 105, 0.12));
 }
 
 .platform-period-header__main {

@@ -258,7 +258,7 @@
 }
 
 .payroll-table__money-btn--link {
-  color: var(--color-primary-dark, #1f7a47);
+  color: var(--color-primary-dark, #047857);
   text-decoration: underline;
   text-decoration-color: rgba(31, 122, 71, 0.35);
   text-underline-offset: 2px;
@@ -373,8 +373,8 @@
 }
 
 .payroll-table__comment-btn--filled {
-  color: var(--color-primary-dark, #1f7a47);
-  background: var(--color-primary-light, #e6f5ec);
+  color: var(--color-primary-dark, #047857);
+  background: var(--color-primary-light, #ecfdf5);
 }
 
 .payroll-table__comment-btn--filled svg {

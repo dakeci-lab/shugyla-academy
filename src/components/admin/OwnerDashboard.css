@@ -28,7 +28,7 @@
   margin: 0;
   font-size: 1rem;
   font-weight: 800;
-  color: var(--color-text, #141414);
+  color: var(--color-text, #0f172a);
 }
 
 .owner-dashboard__summary-subtitle {
@@ -55,7 +55,7 @@
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: #f8fafc;
-  color: var(--color-text, #141414);
+  color: var(--color-text, #0f172a);
   text-align: left;
   font-family: inherit;
   cursor: pointer;
@@ -64,7 +64,7 @@
 
 .owner-dashboard__metric:hover {
   transform: translateY(-1px);
-  border-color: rgba(42, 157, 92, 0.28);
+  border-color: rgba(5, 150, 105, 0.28);
   background: #ffffff;
 }
 
@@ -80,11 +80,11 @@
   font-size: 1.7rem;
   font-weight: 850;
   line-height: 1;
-  color: var(--color-text, #141414);
+  color: var(--color-text, #0f172a);
 }
 
 .owner-dashboard__metric--success .owner-dashboard__metric-value {
-  color: var(--color-primary, #2a9d5c);
+  color: var(--color-primary, #059669);
 }
 
 .owner-dashboard__metric--warning .owner-dashboard__metric-value {
@@ -135,7 +135,7 @@
   white-space: nowrap;
   font-size: 0.95rem;
   font-weight: 800;
-  color: var(--color-text, #141414);
+  color: var(--color-text, #0f172a);
 }
 
 .owner-dashboard__person-position {
@@ -195,7 +195,7 @@
   font-size: 2rem;
   font-weight: 850;
   line-height: 1;
-  color: var(--color-text, #141414);
+  color: var(--color-text, #0f172a);
 }
 
 .company-health-gauge__label {

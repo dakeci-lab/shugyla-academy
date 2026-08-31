@@ -50,7 +50,7 @@
 }
 
 .employee-docs__row-status--ok {
-  color: var(--color-primary-dark, #1f7a47);
+  color: var(--color-primary-dark, #047857);
 }
 
 .employee-docs__row-actions {

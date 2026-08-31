@@ -73,7 +73,6 @@ const MIGRATED = [
   ['src/components/admin/TimeTrackerViolationsJournal.jsx', 'table'],
   ['src/components/admin/roles/RolesListTab.jsx', 'table'],
   ['src/components/admin/roles/RoleAccessMatrixTab.jsx', 'table'],
-  ['src/components/admin/team/RolesSidebar.jsx', 'list'],
   ['src/components/admin/team/RolesWorkspace.jsx', 'cards'],
   ['src/components/admin/team/PositionsWorkspace.jsx', 'cards'],
   ['src/components/admin/team/PositionGroupsWorkspace.jsx', 'list'],

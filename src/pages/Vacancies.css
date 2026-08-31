@@ -45,7 +45,7 @@
 
 .vacancies-page__card:hover {
   box-shadow: var(--shadow-md);
-  border-color: rgba(42, 157, 92, 0.25);
+  border-color: rgba(5, 150, 105, 0.25);
 }
 
 .vacancies-page__card h2 {

@@ -142,7 +142,7 @@
 }
 
 .candidate-person-history__row:hover {
-  border-color: var(--color-primary, #2a9d5c);
+  border-color: var(--color-primary, #059669);
 }
 
 .candidate-person-history__vacancy {

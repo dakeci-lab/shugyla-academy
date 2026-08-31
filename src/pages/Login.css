@@ -16,7 +16,7 @@
   align-items: center;
   justify-content: center;
   padding: 48px 40px;
-  background: linear-gradient(145deg, #1f7a47 0%, #2a9d5c 45%, #3cb371 100%);
+  background: linear-gradient(145deg, #047857 0%, #059669 45%, #3cb371 100%);
   color: var(--color-white);
   overflow: hidden;
 }
@@ -264,7 +264,7 @@
 
 .login-page__submit:hover:not(:disabled) {
   background: var(--color-primary-dark);
-  box-shadow: 0 4px 14px rgba(42, 157, 92, 0.28);
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.28);
 }
 
 .login-page__submit:disabled {

@@ -136,7 +136,7 @@
 
   .sidebar__link--active {
     box-shadow: none;
-    border: 1px solid rgba(42, 157, 92, 0.3);
+    border: 1px solid rgba(5, 150, 105, 0.3);
   }
 
   .sidebar__footer {

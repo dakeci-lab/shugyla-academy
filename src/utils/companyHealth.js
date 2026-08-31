@@ -17,7 +17,7 @@ export function getCompanyHealthColor(score) {
   if (value <= 30) return '#dc2626'
   if (value <= 60) return '#ea580c'
   if (value <= 80) return '#ca8a04'
-  return '#2a9d5c'
+  return '#059669'
 }
 
 function hasRecordedCheckIn(shift) {

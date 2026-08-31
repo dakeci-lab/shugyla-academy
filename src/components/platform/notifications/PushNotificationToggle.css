@@ -36,7 +36,7 @@
 }
 
 .push-notification-toggle input:checked + .push-notification-toggle__ui {
-  background: var(--color-primary, #2a9d5c);
+  background: var(--color-primary, #059669);
 }
 
 .push-notification-toggle input:checked + .push-notification-toggle__ui::after {
@@ -49,6 +49,6 @@
 }
 
 .push-notification-toggle input:focus-visible + .push-notification-toggle__ui {
-  outline: 2px solid var(--color-primary, #2a9d5c);
+  outline: 2px solid var(--color-primary, #059669);
   outline-offset: 2px;
 }

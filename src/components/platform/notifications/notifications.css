@@ -99,7 +99,7 @@
 }
 
 .notification-list-item--unread:hover {
-  background: rgba(42, 157, 92, 0.14);
+  background: rgba(5, 150, 105, 0.14);
 }
 
 .notification-list-item--priority-high,
@@ -284,7 +284,7 @@
   bottom: 0;
   max-height: min(85vh, 720px);
   border-radius: 18px 18px 0 0;
-  box-shadow: 0 -12px 40px rgba(20, 40, 28, 0.16);
+  box-shadow: 0 -12px 40px rgba(15, 23, 42, 0.16);
   z-index: 500;
   padding-bottom: env(safe-area-inset-bottom, 0);
 }

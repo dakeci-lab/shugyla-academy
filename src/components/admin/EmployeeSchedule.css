@@ -79,7 +79,7 @@
   gap: 0.12rem;
   overflow: hidden;
   background: var(--color-white, #fff);
-  box-shadow: inset 0 0 0 1px var(--color-border, #dde5df);
+  box-shadow: inset 0 0 0 1px var(--color-border, #e2e8f0);
   transition: box-shadow 0.15s ease, background 0.15s ease;
 }
 
@@ -89,32 +89,32 @@
 
 .shift-day--interactive:hover {
   box-shadow:
-    inset 0 0 0 1px var(--color-border, #dde5df),
-    0 2px 8px rgba(20, 40, 28, 0.06);
+    inset 0 0 0 1px var(--color-border, #e2e8f0),
+    0 2px 8px rgba(15, 23, 42, 0.06);
 }
 
 .shift-day--interactive:focus-visible {
-  outline: 2px solid var(--color-primary, #2a9d5c);
+  outline: 2px solid var(--color-primary, #059669);
   outline-offset: 1px;
 }
 
 .shift-day--today {
-  box-shadow: inset 0 0 0 1.5px var(--color-primary, #2a9d5c);
+  box-shadow: inset 0 0 0 1.5px var(--color-primary, #059669);
 }
 
 .shift-day--working {
-  background: var(--color-primary-light, #e6f5ec);
-  color: var(--color-text, #141414);
-  box-shadow: inset 0 0 0 1px rgba(42, 157, 92, 0.28);
+  background: var(--color-primary-light, #ecfdf5);
+  color: var(--color-text, #0f172a);
+  box-shadow: inset 0 0 0 1px rgba(5, 150, 105, 0.28);
 }
 
 .shift-day--working.shift-day--today {
-  box-shadow: inset 0 0 0 1.5px var(--color-primary, #2a9d5c);
+  box-shadow: inset 0 0 0 1.5px var(--color-primary, #059669);
 }
 
 .shift-day--day-off {
   background: #f5f6f5;
-  color: var(--color-text-muted, #7a857c);
+  color: var(--color-text-muted, #94a3b8);
 }
 
 .shift-day--vacation {
@@ -137,8 +137,8 @@
 
 .shift-day--empty {
   background: #fafafa;
-  color: var(--color-text-muted, #7a857c);
-  box-shadow: inset 0 0 0 1px dashed var(--color-border, #dde5df);
+  color: var(--color-text-muted, #94a3b8);
+  box-shadow: inset 0 0 0 1px dashed var(--color-border, #e2e8f0);
 }
 
 .shift-day--employment-locked {
@@ -218,7 +218,7 @@
 
 .shift-day__edit:hover {
   opacity: 1;
-  background: rgba(20, 40, 28, 0.06);
+  background: rgba(15, 23, 42, 0.06);
 }
 
 .shift-day__retry {
@@ -352,7 +352,7 @@
   border: none;
   background: none;
   padding: 0;
-  color: var(--color-text, #141414);
+  color: var(--color-text, #0f172a);
   cursor: pointer;
   font: inherit;
   font-weight: 600;
@@ -364,13 +364,13 @@
 }
 
 .team-schedule-table__employee-btn:hover {
-  color: var(--color-text-secondary, #4a524d);
+  color: var(--color-text-secondary, #64748b);
   text-decoration: underline;
   text-underline-offset: 2px;
 }
 
 .team-schedule-table__employee-btn:focus-visible {
-  outline: 2px solid var(--color-primary, #2a9d5c);
+  outline: 2px solid var(--color-primary, #059669);
   outline-offset: 2px;
   border-radius: 2px;
 }
@@ -397,11 +397,11 @@
 }
 
 .team-schedule-table__day-btn:hover {
-  background: var(--color-primary-light, #e6f5ec);
+  background: var(--color-primary-light, #ecfdf5);
 }
 
 .team-schedule-table__day-btn:focus-visible {
-  outline: 2px solid var(--color-primary, #2a9d5c);
+  outline: 2px solid var(--color-primary, #059669);
   outline-offset: 1px;
 }
 
@@ -428,7 +428,7 @@
   gap: 0.05rem;
   min-width: 2.35rem;
   padding: 0.28rem 0.55rem;
-  background: var(--color-primary, #2a9d5c);
+  background: var(--color-primary, #059669);
   color: #fff;
   border-radius: var(--radius-sm, 8px);
 }
@@ -474,11 +474,11 @@
 
 .team-schedule-cell__comment-btn:hover {
   background: #e5e7eb;
-  color: var(--color-text, #141414);
+  color: var(--color-text, #0f172a);
 }
 
 .team-schedule-cell__comment-btn:focus-visible {
-  outline: 2px solid var(--color-primary, #2a9d5c);
+  outline: 2px solid var(--color-primary, #059669);
   outline-offset: 1px;
 }
 
@@ -505,20 +505,20 @@
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
-  color: var(--color-text, #141414);
+  color: var(--color-text, #0f172a);
 }
 
 .team-schedule-cell__status {
   font-weight: 600;
   font-size: 0.68rem;
-  color: var(--color-text-secondary, #4a524d);
+  color: var(--color-text-secondary, #64748b);
 }
 
 .team-schedule-comment-preview {
   margin: 0;
   line-height: 1.55;
   white-space: pre-wrap;
-  color: var(--color-text, #141414);
+  color: var(--color-text, #0f172a);
 }
 
 .team-schedule-badge {
@@ -867,11 +867,11 @@
 }
 
 .team-schedule-wrap--desktop .team-schedule-table thead th.team-schedule-table__day--today {
-  background: #e6f5ec;
+  background: #ecfdf5;
 }
 
 .team-schedule-wrap--desktop .team-schedule-table tbody td.team-schedule-table__day--today {
-  background: rgba(42, 157, 92, 0.06);
+  background: rgba(5, 150, 105, 0.06);
 }
 
 .team-schedule-wrap--desktop
@@ -879,7 +879,7 @@
   tbody
   tr:nth-child(even)
   td.team-schedule-table__day--today {
-  background: rgba(42, 157, 92, 0.09);
+  background: rgba(5, 150, 105, 0.09);
 }
 
 .team-schedule-wrap--desktop
@@ -887,7 +887,7 @@
   tbody
   tr:hover
   td.team-schedule-table__day--today {
-  background: rgba(42, 157, 92, 0.12);
+  background: rgba(5, 150, 105, 0.12);
 }
 
 .team-schedule-wrap--desktop .team-schedule-cell {
@@ -920,7 +920,7 @@
 
 .team-schedule-wrap--desktop .team-schedule-cell__status {
   font-size: 11.5px;
-  color: var(--color-text-secondary, #4a524d);
+  color: var(--color-text-secondary, #64748b);
 }
 
 .team-schedule-wrap--desktop .team-schedule-cell__status--empty {

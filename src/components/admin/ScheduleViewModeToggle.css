@@ -23,16 +23,16 @@
 }
 
 .schedule-view-toggle__btn:hover {
-  color: var(--color-primary, #2a9d5c);
+  color: var(--color-primary, #059669);
 }
 
 .schedule-view-toggle__btn:focus-visible {
-  outline: 2px solid var(--color-primary, #2a9d5c);
+  outline: 2px solid var(--color-primary, #059669);
   outline-offset: 1px;
 }
 
 .schedule-view-toggle__btn--active {
-  background: var(--color-primary, #2a9d5c);
+  background: var(--color-primary, #059669);
   color: #fff;
 }
 

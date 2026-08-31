@@ -13,7 +13,7 @@
   margin: 0;
   padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0)
     env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
-  background: #f4f6f4;
+  background: #f8fafc;
   opacity: 1;
   transition: opacity 280ms ease;
 }

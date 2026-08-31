@@ -160,6 +160,7 @@ export const PERMISSION_ACTION_LABELS = {
   calculate: 'Расчёт',
   manage_settings: 'Настройки модуля',
   sync: 'Синхронизация',
+  resolve: 'Закрытие расхождений',
   settlements: 'Взаиморасчёты',
 }
 
@@ -312,6 +313,51 @@ export function parsePermissionAction(code) {
   if (!code) return 'access'
   const parts = String(code).split('.')
   return parts[parts.length - 1] || 'access'
+}
+
+/**
+ * Middle segment(s) of a code between the module and the action, e.g.
+ * 'umag.reconciliations.resolve' → 'reconciliations'; 'employees.view' → ''
+ * (a plain module.action code has no separate resource — the module itself
+ * is the one resource, see getPermissionResourceLabel).
+ */
+export function getPermissionResourceKey(code) {
+  const parts = String(code || '').split('.')
+  return parts.slice(1, -1).join('.')
+}
+
+/** Russian labels for the (currently few) multi-resource modules — e.g.
+ * 'umag' has both 'settlements' and 'reconciliations' permissions. Extend
+ * here if a new module.resource.action code is added to PERMISSION_CODES. */
+const PERMISSION_RESOURCE_LABELS = {
+  settlements: 'Взаиморасчёты',
+  reconciliations: 'Акты сверки',
+}
+
+export function getPermissionResourceLabel(resourceKey, moduleLabel) {
+  if (!resourceKey) return moduleLabel
+  return PERMISSION_RESOURCE_LABELS[resourceKey] || resourceKey.replace(/_/g, ' ')
+}
+
+/**
+ * Splits one module's permission group into matrix rows — one row per
+ * resource (the module itself for plain module.action codes, or the code's
+ * middle segment for module.resource.action codes) — each row listing its
+ * permissions so the caller can render one action-column per permission.
+ */
+export function groupModulePermissionsIntoRows(group) {
+  const byResource = new Map()
+  group.items.forEach((permission) => {
+    const resourceKey = getPermissionResourceKey(permission.code)
+    const list = byResource.get(resourceKey) || []
+    list.push(permission)
+    byResource.set(resourceKey, list)
+  })
+  return [...byResource.entries()].map(([resourceKey, items]) => ({
+    resourceKey,
+    label: getPermissionResourceLabel(resourceKey, group.label),
+    items,
+  }))
 }
 
 export function groupPermissionsForMatrix(permissions, moduleFilter = null) {
