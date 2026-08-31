@@ -20,29 +20,10 @@ const HISTORY_PAGE_SIZE = 20
 const DETAIL_PAGE_SIZE_OPTIONS = [25, 50, 100, 200]
 const SEARCH_DEBOUNCE_MS = 300
 
-const STATUS_LABELS = {
-  ready: 'Готов',
-  syncing: 'Синхронизация…',
-  failed: 'Ошибка',
-  generated: 'Заказы сформированы',
-  partially_generated: 'Заказы частично сформированы',
-}
-
-function statusTone(status) {
-  if (status === 'ready' || status === 'generated' || status === 'partially_generated') return 'ok'
-  if (status === 'failed') return 'error'
-  return 'pending'
-}
-
 function formatQty(value) {
   const n = Number(value)
   if (!Number.isFinite(n)) return '—'
   return n.toLocaleString('ru-KZ', { maximumFractionDigits: 3 })
-}
-
-function formatPeriod(snapshot) {
-  if (!snapshot?.periodFrom || !snapshot?.periodTo) return '—'
-  return `${snapshot.periodFrom} — ${snapshot.periodTo}`
 }
 
 /**
@@ -251,20 +232,7 @@ export default function ProcurementWarehouseView() {
             <span className="proc-wh__detail-title">
               Синхронизация от {formatUmagDateTime(selected.syncedAt || selected.createdAt)}
             </span>
-            <span className={`proc-wh__status proc-wh__status--${statusTone(selected.status)}`}>
-              {STATUS_LABELS[selected.status] || selected.status}
-            </span>
-            <span className="proc-wh__detail-period">Период: {formatPeriod(selected)}</span>
           </div>
-          <button
-            type="button"
-            className="btn btn--outline proc-wh__export-btn"
-            onClick={() => void handleExportDetail()}
-            disabled={detailExporting}
-          >
-            <DownloadIcon size={18} />
-            {detailExporting ? 'Экспорт…' : 'Скачать Excel'}
-          </button>
         </div>
         {detailExporting ? <div className="proc-wh__loading-bar" aria-hidden="true" /> : null}
 
@@ -276,6 +244,17 @@ export default function ProcurementWarehouseView() {
           placeholder="Товар или штрихкод…"
           ariaLabel="Поиск по товарам снимка"
           flush
+          actions={
+            <button
+              type="button"
+              className="btn btn--outline proc-wh__export-btn"
+              onClick={() => void handleExportDetail()}
+              disabled={detailExporting}
+            >
+              <DownloadIcon size={18} />
+              {detailExporting ? 'Экспорт…' : 'Скачать Excel'}
+            </button>
+          }
         />
 
         {detailError ? (

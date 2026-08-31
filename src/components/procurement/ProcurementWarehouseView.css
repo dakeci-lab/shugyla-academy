@@ -144,30 +144,6 @@
   white-space: normal;
 }
 
-.proc-wh__status {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.proc-wh__status--ok {
-  background: #ecfdf5;
-  color: #047857;
-}
-
-.proc-wh__status--error {
-  background: #fef2f2;
-  color: #b91c1c;
-}
-
-.proc-wh__status--pending {
-  background: #fffbeb;
-  color: #b45309;
-}
-
 .proc-wh__date-link {
   appearance: none;
   border: none;
@@ -254,11 +230,6 @@
   font-size: 14px;
   font-weight: 700;
   color: var(--color-text, #0f172a);
-}
-
-.proc-wh__detail-period {
-  font-size: 13px;
-  color: var(--color-text-secondary, #64748b);
 }
 
 .proc-wh__export-btn {

@@ -100,6 +100,7 @@
     "verify:payroll-monthly-work": "node scripts/verify-payroll-monthly-work.mjs",
     "verify:mobile-shell": "node scripts/verify-mobile-shell.mjs",
     "verify:suppliers-simplify": "node scripts/verify-suppliers-simplify.mjs",
+    "verify:procurement-warehouse-header": "node scripts/verify-procurement-warehouse-header.mjs",
     "verify:suppliers-toolbar": "node scripts/verify-suppliers-toolbar.mjs",
     "verify:supplier-reconciliations": "node scripts/verify-supplier-reconciliations.mjs",
     "verify:canonical-supplier-debt": "node scripts/verify-canonical-supplier-debt.mjs",
