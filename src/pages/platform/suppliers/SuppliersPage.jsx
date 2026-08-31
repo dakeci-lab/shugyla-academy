@@ -3,7 +3,6 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import {
   getSuppliers,
   getSupplierById,
-  createSupplier,
   updateSupplier,
   deleteSupplier,
 } from '../../../services/platformDataService'
@@ -13,8 +12,7 @@ import { usePlatformData } from '../../../context/PlatformDataContext'
 import { DelayedLoadingSkeleton } from '../../../components/loading/LoadingSkeleton'
 import {
   filterSuppliers,
-  SUPPLIER_CATALOG_FILTER,
-  SUPPLIER_LIST_DEFAULT_STATUS,
+  SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED,
 } from '../../../utils/supplierData'
 import { countPendingSupplierMatchCandidates } from '../../../services/suppliersSupabaseAdapter'
 import { useSession } from '../../../context/SessionContext'
@@ -32,18 +30,15 @@ import PlatformAccessDenied from '../../../components/platform/PlatformAccessDen
 import SupplierForm, {
   EMPTY_SUPPLIER_FORM,
   supplierToForm,
-  formToSupplierCreatePayload,
   formToSupplierUpdatePayload,
   validateSupplierDeferralDays,
 } from '../../../components/suppliers/SupplierForm'
 import { refreshObligationTermsForSupplier } from '../../../services/supplierPaymentObligationsService'
 import SupplierFilterPopover from '../../../components/suppliers/SupplierFilterPopover'
 import SupplierTable from '../../../components/suppliers/SupplierTable'
-import { PlusIcon } from '../../../components/icons/PlatformIcons'
 import PlatformSearchToolbar, {
   PlatformFilterButton,
   PlatformToolbarActionWrap,
-  PlatformToolbarIconButton,
 } from '../../../components/platform/PlatformSearchToolbar'
 import '../../../components/admin/admin-shared.css'
 import './SuppliersPage.css'
@@ -61,8 +56,8 @@ export function SuppliersListPage() {
   const filterButtonRef = useRef(null)
   const isNarrowSearch = useMediaQuery(NARROW_SEARCH_QUERY)
   const [search, setSearch] = useState('')
-  const [appliedStatus, setAppliedStatus] = useState(SUPPLIER_LIST_DEFAULT_STATUS)
-  const [draftStatus, setDraftStatus] = useState(SUPPLIER_LIST_DEFAULT_STATUS)
+  const [appliedShowArchived, setAppliedShowArchived] = useState(SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED)
+  const [draftShowArchived, setDraftShowArchived] = useState(SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED)
   const [filterOpen, setFilterOpen] = useState(false)
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
@@ -88,14 +83,10 @@ export function SuppliersListPage() {
   if (suppliersReady) hasLoadedOnce.current = true
   const showInitialSkeleton = isCloudMode() && !suppliersReady && !hasLoadedOnce.current
   const filtered = useMemo(
-    () => filterSuppliers(suppliers, { search, status: appliedStatus }),
-    [suppliers, search, appliedStatus, version, dataVersion]
+    () => filterSuppliers(suppliers, { search, showArchived: appliedShowArchived }),
+    [suppliers, search, appliedShowArchived, version, dataVersion]
   )
-  const filterPreviewCount = useMemo(
-    () => filterSuppliers(suppliers, { search, status: draftStatus }).length,
-    [suppliers, search, draftStatus, version, dataVersion]
-  )
-  const filtersActive = appliedStatus !== SUPPLIER_LIST_DEFAULT_STATUS
+  const filtersActive = appliedShowArchived !== SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED
 
   useEffect(() => {
     if (!canView || !canEdit) {
@@ -132,15 +123,6 @@ export function SuppliersListPage() {
     navigate(location.pathname, { replace: true, state: null })
   }, [location.state?.openEditId, canEdit, location.pathname, navigate])
 
-  function openCreate() {
-    setEditId(null)
-    setForm(EMPTY_SUPPLIER_FORM)
-    setFormError('')
-    setFocusSection(null)
-    returnToRef.current = null
-    setShowForm(true)
-  }
-
   function openEdit(supplier) {
     setEditId(supplier.id)
     setForm(supplierToForm(supplier))
@@ -163,7 +145,7 @@ export function SuppliersListPage() {
       closeFilter()
       return
     }
-    setDraftStatus(appliedStatus)
+    setDraftShowArchived(appliedShowArchived)
     setFilterOpen(true)
   }
 
@@ -172,13 +154,13 @@ export function SuppliersListPage() {
   }
 
   function applyFilter() {
-    setAppliedStatus(draftStatus)
+    setAppliedShowArchived(draftShowArchived)
     setFilterOpen(false)
   }
 
   function resetFilter() {
-    setDraftStatus(SUPPLIER_LIST_DEFAULT_STATUS)
-    setAppliedStatus(SUPPLIER_LIST_DEFAULT_STATUS)
+    setDraftShowArchived(SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED)
+    setAppliedShowArchived(SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED)
     setFilterOpen(false)
   }
 
@@ -196,21 +178,15 @@ export function SuppliersListPage() {
 
     setSaving(true)
     try {
-      const payload = editId
-        ? formToSupplierUpdatePayload(form)
-        : formToSupplierCreatePayload(form)
-      if (editId) {
-        await updateSupplier(editId, payload)
-        try {
-          await refreshObligationTermsForSupplier(editId, payload)
-        } catch {
-          // Recomputing due dates is best-effort; supplier save already succeeded.
-        }
-      } else {
-        await createSupplier(payload)
+      const payload = formToSupplierUpdatePayload(form)
+      await updateSupplier(editId, payload)
+      try {
+        await refreshObligationTermsForSupplier(editId, payload)
+      } catch {
+        // Recomputing due dates is best-effort; supplier save already succeeded.
       }
-      // updateSupplier/createSupplier already reload cloud data internally — a
-      // second full refresh() here just duplicated the same fetch.
+      // updateSupplier already reloads cloud data internally — a second full
+      // refresh() here would just duplicate the same fetch.
       const returnTo = returnToRef.current
       const cameFromPayments = Boolean(returnTo)
       closeForm()
@@ -290,17 +266,9 @@ export function SuppliersListPage() {
 
   const emptyMessage = (() => {
     if (search.trim()) return 'По вашему запросу ничего не найдено.'
-    if (appliedStatus === SUPPLIER_CATALOG_FILTER.UMAG_ACTIVE) {
-      return 'Нет действующих поставщиков UMAG. Создайте контрагента в UMAG и выполните синхронизацию.'
-    }
-    if (appliedStatus === SUPPLIER_CATALOG_FILTER.LOCAL_ONLY) {
-      return 'Нет поставщиков без связи с UMAG.'
-    }
-    if (appliedStatus === SUPPLIER_CATALOG_FILTER.ARCHIVED) {
-      return 'Архивных поставщиков нет.'
-    }
+    if (appliedShowArchived) return 'Удалённых поставщиков нет.'
     return suppliers.length === 0
-      ? 'Поставщики ещё не добавлены.'
+      ? 'Поставщики ещё не синхронизированы. Выполните синхронизацию с UMAG.'
       : 'По вашему запросу ничего не найдено.'
   })()
 
@@ -312,38 +280,25 @@ export function SuppliersListPage() {
         placeholder={searchPlaceholder}
         ariaLabel="Поиск поставщиков"
         actions={
-          <>
-            <PlatformToolbarActionWrap>
-              <PlatformFilterButton
-                buttonRef={filterButtonRef}
-                active={filtersActive}
-                onClick={toggleFilter}
-                ariaExpanded={filterOpen}
-                ariaLabel="Фильтр"
-                title="Фильтр"
-              />
-              <SupplierFilterPopover
-                open={filterOpen}
-                draftStatus={draftStatus}
-                onChange={setDraftStatus}
-                resultCount={filterPreviewCount}
-                onApply={applyFilter}
-                onReset={resetFilter}
-                onClose={closeFilter}
-                anchorRef={filterButtonRef}
-              />
-            </PlatformToolbarActionWrap>
-            {canEdit && (
-              <PlatformToolbarIconButton
-                create
-                onClick={openCreate}
-                aria-label="Добавить поставщика"
-                title="Добавить поставщика"
-              >
-                <PlusIcon size={20} />
-              </PlatformToolbarIconButton>
-            )}
-          </>
+          <PlatformToolbarActionWrap>
+            <PlatformFilterButton
+              buttonRef={filterButtonRef}
+              active={filtersActive}
+              onClick={toggleFilter}
+              ariaExpanded={filterOpen}
+              ariaLabel="Фильтр"
+              title="Фильтр"
+            />
+            <SupplierFilterPopover
+              open={filterOpen}
+              draftShowArchived={draftShowArchived}
+              onChange={setDraftShowArchived}
+              onApply={applyFilter}
+              onReset={resetFilter}
+              onClose={closeFilter}
+              anchorRef={filterButtonRef}
+            />
+          </PlatformToolbarActionWrap>
         }
       />
 
@@ -375,7 +330,7 @@ export function SuppliersListPage() {
 
       {showForm && canEdit && (
         <AdminModal
-          title={editId ? 'Редактировать поставщика' : 'Добавить поставщика'}
+          title="Редактировать поставщика"
           onClose={closeForm}
           wide
           autoFocusClose={false}
@@ -385,7 +340,6 @@ export function SuppliersListPage() {
             form={form}
             onChange={setForm}
             error={formError}
-            isCreate={!editId}
             supplierId={editId}
             focusSection={focusSection}
           />

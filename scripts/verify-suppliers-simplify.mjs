@@ -96,10 +96,12 @@ function main() {
 
   console.log('Stage 6: Payload whitelist')
 
-  assert('create payload helper', form.includes('formToSupplierCreatePayload'))
   assert('update payload helper', form.includes('formToSupplierUpdatePayload'))
   assert('update uses patch helper in page', page.includes('formToSupplierUpdatePayload'))
-  assert('create uses create helper in page', page.includes('formToSupplierCreatePayload'))
+  assert(
+    'create payload helper removed (suppliers are UMAG-sync-only, manual create was dropped)',
+    !form.includes('formToSupplierCreatePayload') && !page.includes('formToSupplierCreatePayload'),
+  )
   assert('payload excludes categories', !form.match(/buildVisibleSupplierPayload[\s\S]*productCategories/))
   assert('payload excludes whatsapp', !form.match(/buildVisibleSupplierPayload[\s\S]*whatsapp/))
   assert('categories garbage filter', supplierData.includes('isGarbageCategory'))

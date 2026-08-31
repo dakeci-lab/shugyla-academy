@@ -23,54 +23,19 @@
   border: 0;
 }
 
-.supplier-filter-popover__section {
-  margin-bottom: 12px;
-}
-
-.supplier-filter-popover__label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-secondary);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.supplier-filter-popover__options {
+.supplier-filter-popover__checkbox-row {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.supplier-filter-popover__option {
-  padding: 6px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: 999px;
-  background: var(--color-white);
-  font-size: 13px;
-  font-weight: 500;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
   color: var(--color-text);
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
 }
 
-.supplier-filter-popover__option:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary-dark);
-}
-
-.supplier-filter-popover__option--active {
-  border-color: var(--color-primary);
-  background: var(--color-primary-light);
-  color: var(--color-primary-dark);
-}
-
-.supplier-filter-popover__count {
-  margin: 0;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--color-text-secondary);
+.supplier-filter-popover__checkbox-row input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
 }
 
 .supplier-filter-popover__actions {

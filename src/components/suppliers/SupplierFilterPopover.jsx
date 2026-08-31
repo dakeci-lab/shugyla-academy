@@ -1,50 +1,28 @@
 import { useEffect, useRef } from 'react'
 import AdminModal from '../admin/AdminModal'
 import useMediaQuery from '../../hooks/useMediaQuery'
-import {
-  SUPPLIER_LIST_DEFAULT_STATUS,
-  SUPPLIER_LIST_STATUS_FILTER_OPTIONS,
-  formatSupplierFilterCount,
-} from '../../utils/supplierData'
+import { SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED } from '../../utils/supplierData'
 import './SupplierFilterPopover.css'
 
 const MOBILE_QUERY = '(max-width: 900px)'
 
-function SupplierFilterFields({ draftStatus, onChange, resultCount }) {
+function SupplierFilterFields({ draftShowArchived, onChange }) {
   return (
-    <>
-      <div className="supplier-filter-popover__section">
-        <span className="supplier-filter-popover__label">Каталог</span>
-        <div className="supplier-filter-popover__options" role="radiogroup" aria-label="Каталог поставщиков">
-          {SUPPLIER_LIST_STATUS_FILTER_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              role="radio"
-              aria-checked={draftStatus === option.id}
-              className={`supplier-filter-popover__option${
-                draftStatus === option.id ? ' supplier-filter-popover__option--active' : ''
-              }`}
-              onClick={() => onChange?.(option.id)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <p className="supplier-filter-popover__count">
-        {formatSupplierFilterCount(draftStatus, resultCount)}
-      </p>
-    </>
+    <label className="supplier-filter-popover__checkbox-row">
+      <input
+        type="checkbox"
+        checked={draftShowArchived}
+        onChange={(e) => onChange?.(e.target.checked)}
+      />
+      <span>Показать удалённых поставщиков</span>
+    </label>
   )
 }
 
 export default function SupplierFilterPopover({
   open,
-  draftStatus,
+  draftShowArchived,
   onChange,
-  resultCount,
   onApply,
   onReset,
   onClose,
@@ -83,7 +61,7 @@ export default function SupplierFilterPopover({
   if (!open) return null
 
   function handleReset() {
-    onChange?.(SUPPLIER_LIST_DEFAULT_STATUS)
+    onChange?.(SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED)
     onReset?.()
   }
 
@@ -106,11 +84,7 @@ export default function SupplierFilterPopover({
         returnFocusRef={anchorRef}
         footer={actions}
       >
-        <SupplierFilterFields
-          draftStatus={draftStatus}
-          onChange={onChange}
-          resultCount={resultCount}
-        />
+        <SupplierFilterFields draftShowArchived={draftShowArchived} onChange={onChange} />
       </AdminModal>
     )
   }
@@ -126,11 +100,7 @@ export default function SupplierFilterPopover({
       <h2 id="supplier-filter-popover-title" className="supplier-filter-popover__sr-title">
         Фильтр поставщиков
       </h2>
-      <SupplierFilterFields
-        draftStatus={draftStatus}
-        onChange={onChange}
-        resultCount={resultCount}
-      />
+      <SupplierFilterFields draftShowArchived={draftShowArchived} onChange={onChange} />
       <div className="supplier-filter-popover__actions">{actions}</div>
     </div>
   )

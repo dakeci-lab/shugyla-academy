@@ -53,42 +53,57 @@ function main() {
   console.log('Stage 2: Actions')
 
   assert('filter icon button', page.includes('PlatformFilterButton'))
-  assert('create icon button', page.includes('PlusIcon'))
   assert('filter aria-label', page.includes('ariaLabel="Фильтр"'))
-  assert('create aria-label', page.includes('aria-label="Добавить поставщика"'))
-  assert('large text create removed', !page.includes('Добавить поставщика</'))
-  assert('create uses openCreate', page.includes('onClick={openCreate}'))
+  assert(
+    'manual create removed — suppliers are UMAG-sync-only',
+    !page.includes('PlusIcon') &&
+      !page.includes('openCreate') &&
+      !page.includes('aria-label="Добавить поставщика"'),
+  )
 
-  console.log('Stage 3: Status filter')
+  console.log('Stage 3: Archived filter')
 
   assert('filter popover component', page.includes('SupplierFilterPopover'))
-  assert('filter catalog field', filter.includes('Каталог') && !filter.includes('SearchableSupplierSelect'))
-  assert('default catalog status', page.includes('SUPPLIER_LIST_DEFAULT_STATUS'))
   assert(
-    'default catalog is UMAG-active',
-    supplierData.includes('SUPPLIER_LIST_DEFAULT_STATUS = SUPPLIER_CATALOG_FILTER.UMAG_ACTIVE')
+    'single show-archived checkbox, no old multi-option catalog radiogroup',
+    filter.includes('Показать удалённых поставщиков') &&
+      !filter.includes('Каталог') &&
+      !filter.includes('SearchableSupplierSelect'),
   )
-  assert('local-only option', supplierData.includes("label: 'Не связаны с UMAG'"))
-  assert('archived option', supplierData.includes("label: 'Архивные'"))
-  assert('reset returns default catalog', page.includes('setAppliedStatus(SUPPLIER_LIST_DEFAULT_STATUS)'))
-  assert('shared applied and draft state', page.includes('appliedStatus') && page.includes('draftStatus'))
-  assert('search plus status filtering', page.match(/filterSuppliers\(suppliers,\s*\{\s*search,\s*status:\s*appliedStatus/))
-  assert('count uses search and draft status', page.includes('filterPreviewCount'))
-  assert('umag-first catalog helper', supplierData.includes('matchesSupplierCatalogFilter'))
+  assert('default show-archived state', page.includes('SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED'))
+  assert(
+    'default is unchecked (active suppliers shown first)',
+    supplierData.includes('SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED = false'),
+  )
+  assert('reset returns default state', page.includes('setAppliedShowArchived(SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED)'))
+  assert('shared applied and draft state', page.includes('appliedShowArchived') && page.includes('draftShowArchived'))
+  assert(
+    'search plus archived filtering',
+    page.match(/filterSuppliers\(suppliers,\s*\{\s*search,\s*showArchived:\s*appliedShowArchived/),
+  )
+  assert(
+    'archive filter grounded in the real umag-sync deletion signal',
+    supplierData.includes('matchesSupplierArchiveFilter') && supplierData.includes('isSupplierDeleted'),
+  )
+  assert('old 4-way catalog filter fully removed', !supplierData.includes('SUPPLIER_CATALOG_FILTER'))
 
   console.log('Stage 4: Filter UX')
 
   assert('mobile filter uses AdminModal', filter.includes('AdminModal'))
   assert('desktop filter popover', filter.includes('supplier-filter-popover'))
-  assert('filter count label helper', supplierData.includes('formatSupplierFilterCount'))
   assert('active filter indicator', page.includes('active={filtersActive}'))
   assert('focus returns to filter button', filter.includes('returnFocusRef={anchorRef}'))
   assert('apply closes filter', page.includes('setFilterOpen(false)'))
 
-  console.log('Stage 5: Unchanged list UI')
+  console.log('Stage 5: List UI — status column and UMAG badge removed, row density tightened')
 
-  assert('supplier table unchanged entry', page.includes('<SupplierTable'))
+  assert('supplier table entry point unchanged', page.includes('<SupplierTable'))
   assert('mobile card edit preserved', table.includes('supplier-card-item--clickable'))
+  assert('no Статус column header', !table.includes('<th>Статус</th>'))
+  assert('no per-row UMAG badge component', !table.includes('UmagLinkBadge'))
+  const tableCss = read('src/components/suppliers/SupplierTable.css')
+  assert('no leftover UMAG badge styles', !tableCss.includes('.supplier-table__umag'))
+  assert('row uses compact padding, not a tall fixed height', tableCss.includes('.supplier-table td') && !tableCss.match(/\.supplier-table td\s*\{[^}]*height:\s*60px/))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

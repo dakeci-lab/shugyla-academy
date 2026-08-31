@@ -116,23 +116,6 @@ export async function countPendingSupplierMatchCandidates() {
   return Number(count) || 0
 }
 
-export async function createSupplier(data) {
-  const name = data.name?.trim()
-  if (!name) throw new Error('Укажите название поставщика')
-
-  const existing = getAllSuppliersSync().find(
-    (s) => s.name.trim().toLowerCase() === name.toLowerCase()
-  )
-  if (existing) throw new Error('Поставщик с таким названием уже существует')
-
-  const row = {
-    id: data.id || crypto.randomUUID(),
-    ...supplierToRow(data),
-  }
-  await throwIfError(await supabase.from('platform_suppliers').insert(row), 'Создание поставщика')
-  return row.id
-}
-
 export async function updateSupplier(supplierId, updates) {
   const current = getAllSuppliersSync().find((s) => s.id === supplierId)
   if (!current) throw new Error('Поставщик не найден')

@@ -1,10 +1,5 @@
-import StatusBadge from '../admin/StatusBadge'
 import IconActionButton from '../admin/IconActionButton'
 import { PencilIcon } from '../icons/PlatformIcons'
-import {
-  SUPPLIER_STATUS_LABELS,
-  SUPPLIER_STATUS_BADGE,
-} from '../../utils/supplierData'
 import '../admin/IconActionButton.css'
 import './SupplierTable.css'
 
@@ -26,31 +21,6 @@ function SupplierActions({ supplier, canEdit, onEdit }) {
         <PencilIcon />
       </IconActionButton>
     </div>
-  )
-}
-
-function SupplierStatusBadge({ status }) {
-  return (
-    <StatusBadge
-      label={SUPPLIER_STATUS_LABELS[status] || status}
-      type={SUPPLIER_STATUS_BADGE[status] || 'idle'}
-    />
-  )
-}
-
-function UmagLinkBadge({ supplier }) {
-  if (!supplier?.linkedToUmag) return null
-  return (
-    <span
-      className={`supplier-table__umag${supplier.isUmagActive === false ? ' supplier-table__umag--inactive' : ''}`}
-      title={
-        supplier.isUmagActive === false
-          ? 'Связан с UMAG, сейчас неактивен в UMAG'
-          : 'Синхронизировано с UMAG'
-      }
-    >
-      UMAG
-    </span>
   )
 }
 
@@ -85,7 +55,6 @@ export default function SupplierTable({
                 <th>Телефон</th>
                 <th>Дни заказа</th>
                 <th>Дни доставки</th>
-                <th>Статус</th>
                 <th className="supplier-table__actions-col">Действия</th>
               </tr>
             </thead>
@@ -94,28 +63,22 @@ export default function SupplierTable({
                 <tr key={supplier.id} className="supplier-table__row">
                   <td className="supplier-table__num">{index + 1}</td>
                   <td className="supplier-table__name">
-                    <div className="supplier-table__name-wrap">
-                      {canEdit && onEdit ? (
-                        <button
-                          type="button"
-                          className="supplier-name-link"
-                          onClick={(event) => openEdit(supplier, event)}
-                        >
-                          {supplier.name}
-                        </button>
-                      ) : (
-                        <span>{supplier.name}</span>
-                      )}
-                      <UmagLinkBadge supplier={supplier} />
-                    </div>
+                    {canEdit && onEdit ? (
+                      <button
+                        type="button"
+                        className="supplier-name-link"
+                        onClick={(event) => openEdit(supplier, event)}
+                      >
+                        {supplier.name}
+                      </button>
+                    ) : (
+                      <span>{supplier.name}</span>
+                    )}
                   </td>
                   <td>{displayValue(supplier.managerName)}</td>
                   <td>{displayValue(supplier.managerPhone)}</td>
                   <td>{displayValue(supplier.orderDays)}</td>
                   <td>{displayValue(supplier.deliveryDays)}</td>
-                  <td>
-                    <SupplierStatusBadge status={supplier.status} />
-                  </td>
                   <td>
                     <SupplierActions
                       supplier={supplier}
@@ -149,10 +112,7 @@ export default function SupplierTable({
                 : {})}
             >
               <div className="supplier-card-item__head">
-                <h3 className="supplier-card-item__title">
-                  {supplier.name} <UmagLinkBadge supplier={supplier} />
-                </h3>
-                <SupplierStatusBadge status={supplier.status} />
+                <h3 className="supplier-card-item__title">{supplier.name}</h3>
               </div>
 
               <div className="supplier-card-item__meta">

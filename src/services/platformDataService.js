@@ -894,13 +894,6 @@ export function getSupplierById(id) {
   return getSupplierByIdSync(id)
 }
 
-export async function createSupplier(supplierData) {
-  if (!supplierData.name?.trim()) throw new Error('Укажите название поставщика')
-  const id = await getSuppliersAdapter().createSupplier(supplierData)
-  if (isCloudMode()) await refreshData()
-  return id
-}
-
 export async function updateSupplier(supplierId, updates) {
   await getSuppliersAdapter().updateSupplier(supplierId, updates)
   if (isCloudMode()) await refreshData()

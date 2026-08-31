@@ -53,67 +53,23 @@ export const SUPPLIER_STATUS_FILTER_OPTIONS = [
   { id: SUPPLIER_STATUS.ARCHIVED, label: SUPPLIER_STATUS_LABELS.archived },
 ]
 
-/** Каталог списка поставщиков (UMAG-first) */
-export const SUPPLIER_CATALOG_FILTER = {
-  UMAG_ACTIVE: 'umag_active',
-  LOCAL_ONLY: 'local_only',
-  ARCHIVED: 'archived',
-  ALL: 'all',
+/** Значение фильтра списка поставщиков по умолчанию — показываем действующих */
+export const SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED = false
+
+/**
+ * Поставщик считается «удалённым» тем же способом, каким umag-sync сам
+ * помечает контрагента, удалённого/деактивированного в UMAG:
+ * is_umag_active=false (см. supabase/functions/umag-sync/index.ts, где это
+ * поле и status='inactive' выставляются вместе при is_umag_active=false).
+ * status===ARCHIVED добавлен для ручного архивирования не-UMAG записей.
+ */
+export function isSupplierDeleted(supplier) {
+  return supplier?.isUmagActive === false || supplier?.status === SUPPLIER_STATUS.ARCHIVED
 }
 
-/** Значение фильтра списка поставщиков по умолчанию — действующие UMAG-linked */
-export const SUPPLIER_LIST_DEFAULT_STATUS = SUPPLIER_CATALOG_FILTER.UMAG_ACTIVE
-
-/** Варианты фильтра каталога на странице поставщиков */
-export const SUPPLIER_LIST_STATUS_FILTER_OPTIONS = [
-  { id: SUPPLIER_CATALOG_FILTER.UMAG_ACTIVE, label: 'UMAG' },
-  { id: SUPPLIER_CATALOG_FILTER.LOCAL_ONLY, label: 'Не связаны с UMAG' },
-  { id: SUPPLIER_CATALOG_FILTER.ARCHIVED, label: 'Архивные' },
-  { id: SUPPLIER_CATALOG_FILTER.ALL, label: 'Все' },
-]
-
-/** Компактная подпись количества в фильтре поставщиков */
-export function formatSupplierFilterCount(status, count) {
-  const total = Number(count) || 0
-  if (status === SUPPLIER_CATALOG_FILTER.UMAG_ACTIVE) {
-    return `UMAG-поставщиков: ${total}`
-  }
-  if (status === SUPPLIER_CATALOG_FILTER.LOCAL_ONLY) {
-    return `Не связаны с UMAG: ${total}`
-  }
-  if (status === SUPPLIER_CATALOG_FILTER.ARCHIVED) return `Архивных поставщиков: ${total}`
-  if (status === SUPPLIER_CATALOG_FILTER.ALL || status === 'all') return `Найдено: ${total}`
-  // legacy status filters
-  if (status === SUPPLIER_STATUS.ACTIVE) return `Активных поставщиков: ${total}`
-  if (status === SUPPLIER_STATUS.INACTIVE) return `Деактивированных поставщиков: ${total}`
-  return `Найдено: ${total}`
-}
-
-export function matchesSupplierCatalogFilter(supplier, catalog = SUPPLIER_CATALOG_FILTER.ALL) {
+export function matchesSupplierArchiveFilter(supplier, showArchived = SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED) {
   if (!supplier || supplier.isMerged) return false
-
-  if (catalog === SUPPLIER_CATALOG_FILTER.UMAG_ACTIVE) {
-    return (
-      Boolean(supplier.linkedToUmag) &&
-      supplier.isUmagActive !== false &&
-      supplier.status !== SUPPLIER_STATUS.ARCHIVED
-    )
-  }
-
-  if (catalog === SUPPLIER_CATALOG_FILTER.LOCAL_ONLY) {
-    return !supplier.linkedToUmag && supplier.status !== SUPPLIER_STATUS.ARCHIVED
-  }
-
-  if (catalog === SUPPLIER_CATALOG_FILTER.ARCHIVED) {
-    return supplier.status === SUPPLIER_STATUS.ARCHIVED
-  }
-
-  if (catalog === SUPPLIER_CATALOG_FILTER.ALL || catalog === 'all') {
-    return true
-  }
-
-  // Backward-compatible status filter
-  return supplier.status === catalog
+  return showArchived ? isSupplierDeleted(supplier) : !isSupplierDeleted(supplier)
 }
 
 /** Дни недели для расписания поставщика (ISO: пн → вс) */
@@ -369,11 +325,11 @@ export function formatMinOrderAmount(amount) {
   return `${Number(amount).toLocaleString('ru-RU')} ₸`
 }
 
-export function filterSuppliers(suppliers, { search = '', status = 'all' } = {}) {
+export function filterSuppliers(suppliers, { search = '', showArchived = SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED } = {}) {
   const q = search.trim().toLowerCase()
 
   return suppliers.filter((supplier) => {
-    if (!matchesSupplierCatalogFilter(supplier, status)) return false
+    if (!matchesSupplierArchiveFilter(supplier, showArchived)) return false
 
     if (!q) return true
 

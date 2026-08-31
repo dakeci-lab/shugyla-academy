@@ -161,22 +161,17 @@ function buildVisibleSupplierPayload(form) {
   }
 }
 
-/** Payload для создания — только поля, видимые в форме */
-export function formToSupplierCreatePayload(form) {
-  return buildVisibleSupplierPayload(form)
-}
-
 /** Patch для обновления — не затрагивает скрытые поля (категории, WhatsApp и т.д.) */
 export function formToSupplierUpdatePayload(form) {
   return buildVisibleSupplierPayload(form)
 }
 
-/** @deprecated используйте formToSupplierCreatePayload / formToSupplierUpdatePayload */
+/** @deprecated используйте formToSupplierUpdatePayload */
 export function formToSupplierPayload(form) {
   return buildVisibleSupplierPayload(form)
 }
 
-/** Форма добавления / редактирования поставщика */
+/** Форма редактирования поставщика (создание — только через синхронизацию с UMAG) */
 function displayOrUnset(value) {
   const text = String(value ?? '').trim()
   return text || 'Не настроено'
@@ -186,7 +181,6 @@ export default function SupplierForm({
   form,
   onChange,
   error,
-  isCreate = false,
   supplierId = null,
   focusSection = null,
 }) {
@@ -225,17 +219,8 @@ export default function SupplierForm({
         </div>
       ) : (
         <div className="supplier-form__local-hint" role="note">
-          {isCreate ? (
-            <>
-              Рекомендуемый процесс: создайте контрагента в UMAG и синхронизируйте — он появится в
-              основном списке. Ручное создание будет без связи с UMAG.
-            </>
-          ) : (
-            <>
-              Не связан с UMAG. Для участия в синхронизации поставщик должен быть создан или связан в
-              UMAG.
-            </>
-          )}
+          Не связан с UMAG. Для участия в синхронизации поставщик должен быть создан или связан в
+          UMAG.
         </div>
       )}
 

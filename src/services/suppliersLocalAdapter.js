@@ -151,25 +151,6 @@ export async function fetchSuppliersData() {
   return getLocalSuppliersBundle()
 }
 
-export async function createSupplier(data) {
-  const rows = loadRows()
-  const nameKey = normalizeNameKey(data.name)
-  if (rows.some((r) => normalizeNameKey(r.name) === nameKey)) {
-    throw new Error('Поставщик с таким названием уже существует')
-  }
-
-  const now = new Date().toISOString()
-  const supplier = normalizeSupplier({
-    id: genId(),
-    ...data,
-    created_at: now,
-    updated_at: now,
-  })
-  rows.push(rowFromSupplier(supplier))
-  saveRows(rows)
-  return supplier.id
-}
-
 export async function updateSupplier(supplierId, updates) {
   const rows = loadRows()
   const idx = rows.findIndex((r) => r.id === supplierId)
