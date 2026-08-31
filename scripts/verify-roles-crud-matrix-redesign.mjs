@@ -350,6 +350,42 @@ async function stagePageChromeRemoved() {
   )
 }
 
+async function stageSalesModuleVisible() {
+  console.log('Stage 9: sales.view/sales.sync module is editable in the roles matrix')
+
+  const {
+    PERMISSION_MODULES,
+    RBAC_MATRIX_MODULES,
+    PERMISSION_CATALOG,
+    groupPermissionsForMatrix,
+    groupModulePermissionsIntoRows,
+  } = await load(CATALOG)
+
+  assert(
+    'PERMISSION_MODULES has a Russian label for "sales"',
+    PERMISSION_MODULES.sales === 'Продажи',
+  )
+  assert(
+    'RBAC_MATRIX_MODULES includes "sales" (module tabs render it)',
+    RBAC_MATRIX_MODULES.includes('sales'),
+  )
+
+  const groups = groupPermissionsForMatrix(PERMISSION_CATALOG)
+  const salesGroup = groups.find((g) => g.module === 'sales')
+  assert('sales module group is produced by groupPermissionsForMatrix', Boolean(salesGroup))
+  assert(
+    'sales group carries both sales.view and sales.sync',
+    salesGroup.items.some((p) => p.code === 'sales.view') &&
+      salesGroup.items.some((p) => p.code === 'sales.sync'),
+  )
+
+  const salesRows = groupModulePermissionsIntoRows(salesGroup)
+  assert(
+    'sales permissions collapse into a single row (2-part codes, no resource segment)',
+    salesRows.length === 1 && salesRows[0].label === 'Продажи',
+  )
+}
+
 async function stageNoCheckboxCountHints() {
   console.log('Stage 8: no "checked/total" checkbox-count hints anywhere in the roles UI')
 
@@ -381,6 +417,7 @@ async function main() {
   await stageWorkspaceBehaviourPreserved()
   await stageSharedCssSurvives()
   await stagePageChromeRemoved()
+  await stageSalesModuleVisible()
   await stageNoCheckboxCountHints()
   console.log(`\n✅ All ${checks} checks passed`)
 }
