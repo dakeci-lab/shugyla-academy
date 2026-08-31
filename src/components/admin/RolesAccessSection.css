@@ -153,13 +153,6 @@
   flex-wrap: wrap;
 }
 
-.roles-access__module-count {
-  margin-left: 6px;
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--color-text-muted, #6b7280);
-}
-
 .roles-access__permission-desc {
   grid-column: 2;
   font-size: 11px;

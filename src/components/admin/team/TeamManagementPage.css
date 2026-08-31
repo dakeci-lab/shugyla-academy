@@ -370,16 +370,6 @@
   border-bottom-color: var(--color-primary);
 }
 
-.team-matrix-tab__count {
-  font-size: 0.7rem;
-  font-weight: 700;
-  color: var(--color-text-muted);
-}
-
-.team-matrix-tab[aria-selected='true'] .team-matrix-tab__count {
-  color: var(--color-primary-dark);
-}
-
 /* permission matrix — one row per resource, one column per action, instead
    of a flat checkbox per fully-worded permission name */
 

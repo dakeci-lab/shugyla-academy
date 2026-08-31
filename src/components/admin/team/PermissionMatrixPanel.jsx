@@ -55,23 +55,18 @@ export default function PermissionMatrixPanel({
   return (
     <>
       <div className="team-matrix-tabs" role="tablist" aria-label="Модуль">
-        {groups.map((group) => {
-          const total = group.items.length
-          const checked = group.items.filter((item) => selectedSet.has(item.id)).length
-          return (
-            <button
-              key={group.module}
-              type="button"
-              className="team-matrix-tab"
-              role="tab"
-              aria-selected={group.module === activeGroup.module}
-              onClick={() => onModuleChange(group.module)}
-            >
-              {group.label}
-              <span className="team-matrix-tab__count">{checked}/{total}</span>
-            </button>
-          )
-        })}
+        {groups.map((group) => (
+          <button
+            key={group.module}
+            type="button"
+            className="team-matrix-tab"
+            role="tab"
+            aria-selected={group.module === activeGroup.module}
+            onClick={() => onModuleChange(group.module)}
+          >
+            {group.label}
+          </button>
+        ))}
       </div>
 
       <div className="team-matrix-wrap">

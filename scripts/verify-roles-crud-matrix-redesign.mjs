@@ -42,6 +42,7 @@ const TEAM_CSS = 'src/components/admin/team/TeamManagementPage.css'
 const POSITIONS_WORKSPACE = 'src/components/admin/team/PositionsWorkspace.jsx'
 const POSITION_GROUPS_WORKSPACE = 'src/components/admin/team/PositionGroupsWorkspace.jsx'
 const TEAM_PAGE = 'src/components/admin/team/TeamManagementPage.jsx'
+const ROLE_EDITOR_MODAL = 'src/components/admin/roles/RoleEditorModal.jsx'
 
 const REMOVED_FILES = [
   'src/components/admin/team/RolesSidebar.jsx',
@@ -349,6 +350,28 @@ async function stagePageChromeRemoved() {
   )
 }
 
+async function stageNoCheckboxCountHints() {
+  console.log('Stage 8: no "checked/total" checkbox-count hints anywhere in the roles UI')
+
+  const panel = read(MATRIX_PANEL)
+  assert(
+    'PermissionMatrixPanel module tabs render no checked/total count',
+    !/team-matrix-tab__count/.test(panel),
+  )
+
+  const editorModal = read(ROLE_EDITOR_MODAL)
+  assert(
+    'RoleEditorModal module checklist renders no checked/total count',
+    !/roles-access__module-count/.test(editorModal),
+  )
+
+  const css = read(TEAM_CSS)
+  assert(
+    'team-matrix-tab__count CSS rule removed (dead after the count was dropped)',
+    !css.includes('team-matrix-tab__count'),
+  )
+}
+
 async function main() {
   console.log('Verifying: Roles & Permissions CRUD-matrix redesign\n')
   await stageOldUiRemoved()
@@ -358,6 +381,7 @@ async function main() {
   await stageWorkspaceBehaviourPreserved()
   await stageSharedCssSurvives()
   await stagePageChromeRemoved()
+  await stageNoCheckboxCountHints()
   console.log(`\n✅ All ${checks} checks passed`)
 }
 

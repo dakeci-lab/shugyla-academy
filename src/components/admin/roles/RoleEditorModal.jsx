@@ -157,9 +157,6 @@ export default function RoleEditorModal({
                           onChange={(e) => onToggleModule(groupIds, e.target.checked)}
                         />
                         <span>{group.label}</span>
-                        <span className="roles-access__module-count">
-                          {checkedCount}/{groupIds.length}
-                        </span>
                       </label>
                     </summary>
                     <div className="roles-access__module-items">
