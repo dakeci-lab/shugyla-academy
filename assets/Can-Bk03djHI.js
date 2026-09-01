@@ -1,0 +1,1 @@
+import{co as l}from"./index-CKvNnsD-.js";function h({permission:o,anyOf:e,allOf:t,fallback:s=null,children:i}){const{can:r,canAny:c,canAll:u}=l();let n=!1;return o?n=r(o):e!=null&&e.length?n=c(e):t!=null&&t.length&&(n=u(t)),n?i:s}export{h as C};

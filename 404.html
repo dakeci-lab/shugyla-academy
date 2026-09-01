@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <script>
+      (function () {
+        try {
+          var standalone =
+            (window.matchMedia &&
+              (window.matchMedia('(display-mode: standalone)').matches ||
+                window.matchMedia('(display-mode: fullscreen)').matches)) ||
+            window.navigator.standalone === true
+
+          if (!standalone) return
+
+          document.documentElement.classList.add('pwa-standalone')
+
+          var viewport = document.querySelector('meta[name="viewport"]')
+          if (viewport) {
+            viewport.setAttribute(
+              'content',
+              'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover'
+            )
+          }
+        } catch (error) {
+          console.warn('Early PWA setup failed', error)
+        }
+      })()
+    </script>
+    <meta
+      name="description"
+      content="Внутренняя платформа Shugyla Market — обучение, товары, закуп и операции магазина"
+    />
+    <meta name="theme-color" content="#2a9d5c" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Shugyla" />
+    <title>Shugyla Platform</title>
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-icons/icon-192.png" />
+    <link rel="apple-touch-icon" href="/pwa-icons/apple-touch-icon.png" />
+    <script>
+      (function () {
+        var host = String(window.location.hostname || '').toLowerCase()
+        var isCorporate = host === 'shugyla-market.kz' || host === 'www.shugyla-market.kz'
+        var isCareers = host === 'jobs.shugyla-market.kz'
+
+        if (!isCorporate && !isCareers) return
+
+        var description = document.querySelector('meta[name="description"]')
+        var manifest = document.querySelector('link[rel="manifest"]')
+        var mobileCapable = document.querySelector('meta[name="mobile-web-app-capable"]')
+        var appleCapable = document.querySelector('meta[name="apple-mobile-web-app-capable"]')
+        var appleTitle = document.querySelector('meta[name="apple-mobile-web-app-title"]')
+
+        document.title = isCareers ? 'Работа в Shugyla Market' : 'Shugyla Market'
+        if (description) {
+          description.setAttribute(
+            'content',
+            isCareers
+              ? 'Актуальные вакансии Shugyla Market и простая форма отклика.'
+              : 'Официальный сайт Shugyla Market.'
+          )
+        }
+
+        manifest?.remove()
+        mobileCapable?.remove()
+        appleCapable?.remove()
+        appleTitle?.remove()
+      })()
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      /* Critical pre-React launch — keep in sync with AuthLoadingScreen.css */
+      html,
+      body {
+        margin: 0;
+        background: #f4f6f4;
+      }
+
+      #root {
+        min-height: 100vh;
+        min-height: 100dvh;
+      }
+
+      .app-launch {
+        position: fixed;
+        inset: 0;
+        z-index: 9990;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-sizing: border-box;
+        min-height: 100vh;
+        min-height: 100dvh;
+        width: 100%;
+        margin: 0;
+        padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0)
+          env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+        background: #f4f6f4;
+        opacity: 1;
+        transition: opacity 280ms ease;
+      }
+
+      .app-launch__logo {
+        display: block;
+        width: 88px;
+        height: 88px;
+        object-fit: contain;
+        user-select: none;
+        -webkit-user-drag: none;
+        flex-shrink: 0;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .app-launch {
+          transition: none;
+        }
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/index-CKvNnsD-.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-B0hkVyYu.css">
+  </head>
+  <body>
+    <div id="root">
+      <div class="app-launch" role="status" aria-live="polite" aria-label="Загрузка">
+        <img
+          class="app-launch__logo"
+          src="/pwa-icons/icon-192.png"
+          alt=""
+          width="88"
+          height="88"
+          decoding="async"
+          draggable="false"
+        />
+      </div>
+    </div>
+  </body>
+</html>
