@@ -50,7 +50,7 @@ export default function PayrollCommentModal({
 
   return (
     <AdminModal
-      title="Комментарий и статус расчёта"
+      title="Комментарий и участие в ведомости"
       onClose={onClose}
       footer={
         <>
@@ -72,7 +72,7 @@ export default function PayrollCommentModal({
         <p className="admin-form__hint">{employeeName}</p>
 
         <label className="admin-form__label">
-          Статус расчёта
+          Участие в ведомости
           <select
             className="admin-form__select"
             value={participation}

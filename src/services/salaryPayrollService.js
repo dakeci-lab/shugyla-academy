@@ -495,26 +495,3 @@ export async function upsertSalaryAdvance(recordId, amount) {
   if (error) throw new Error(error.message || 'Не удалось загрузить расчёт')
   return normalizeRecord(data)
 }
-
-export async function saveSalaryRecordFull(recordId, {
-  status,
-  baseSalary,
-  workHours,
-  workShifts,
-  notes,
-}) {
-  assertCloudReady()
-  const { error } = await supabase
-    .from('salary_records')
-    .update({
-      status,
-      base_salary: toMoneyNumber(baseSalary),
-      work_hours: toMoneyNumber(workHours),
-      work_shifts: toMoneyNumber(workShifts),
-      notes: notes?.trim() || null,
-    })
-    .eq('id', recordId)
-
-  if (error) throw new Error(error.message || 'Не удалось сохранить расчёт')
-  return recalculateAndPersistTotals(recordId)
-}

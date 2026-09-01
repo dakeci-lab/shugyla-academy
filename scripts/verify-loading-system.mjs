@@ -51,7 +51,6 @@ const MIGRATED = [
   ['src/components/admin/OwnerDashboard.jsx', 'dashboard'],
   ['src/pages/platform/PlatformEmployeeDocuments.jsx', 'list'],
   ['src/components/admin/payroll/PayrollSection.jsx', 'table'],
-  ['src/components/admin/payroll/PayrollRecordSection.jsx', 'cards'],
   ['src/components/admin/sections/EmployeeScheduleSection.jsx', 'cards'],
   ['src/components/admin/sections/EmployeeProfileSection.jsx', 'cards'],
   ['src/components/admin/RolesAccessSection.jsx', 'table'],

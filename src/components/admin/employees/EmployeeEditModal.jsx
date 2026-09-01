@@ -845,7 +845,7 @@ export default function EmployeeEditModal({
             </div>
 
             <label className="admin-form__label">
-              Статус расчёта
+              Участие в ведомости
               <select
                 className="admin-form__select"
                 value={form.payrollParticipation}

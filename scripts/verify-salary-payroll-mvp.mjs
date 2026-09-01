@@ -39,7 +39,9 @@ function main() {
   const service = read('src/services/salaryPayrollService.js')
   const list = read('src/components/admin/payroll/PayrollSection.jsx')
   const filter = read('src/components/admin/payroll/PayrollFilterPopover.jsx')
-  const detail = read('src/components/admin/payroll/PayrollRecordSection.jsx')
+  const commentModal = read('src/components/admin/payroll/PayrollCommentModal.jsx')
+  const employeeData = read('src/utils/employeeData.js')
+  const employeeEditModal = read('src/components/admin/employees/EmployeeEditModal.jsx')
   const app = read('src/App.jsx')
   const pkg = read('package.json')
 
@@ -52,7 +54,11 @@ function main() {
   assert('payroll.calculate RLS', migration.includes("payroll.calculate"))
 
   console.log('\nStage 2: Domain / service')
-  assert('status catalog', utils.includes('draft') && utils.includes('paid'))
+  assert(
+    'calculation-stage catalog removed (dead — every record stuck at draft, no reachable transition)',
+    !utils.includes('SALARY_RECORD_STATUSES') && !utils.includes('getSalaryStatusMeta'),
+  )
+  assert('legacy paid-status fallback kept (harmless read for pre-paid_amount records)', utils.includes("record.status === 'paid'"))
   assert('compute totals', utils.includes('computeSalaryTotals'))
   assert('ensure period', service.includes('ensureSalaryPeriod'))
   assert('ensure record', service.includes('ensureSalaryRecord'))
@@ -104,6 +110,49 @@ function main() {
 
   const recordPage = read('src/pages/platform/PlatformPayrollRecord.jsx')
   assert('record page redirects to ledger', recordPage.includes('Navigate') && recordPage.includes('getPayrollListPath'))
+
+  console.log('\nStage 3b: Dead record-card component and its only writer removed')
+  assert(
+    'PayrollRecordSection.jsx/.css deleted (unreachable since the ledger-only refactor)',
+    !fs.existsSync(path.join(ROOT, 'src/components/admin/payroll/PayrollRecordSection.jsx')) &&
+      !fs.existsSync(path.join(ROOT, 'src/components/admin/payroll/PayrollRecordSection.css')),
+  )
+  assert(
+    'saveSalaryRecordFull removed (its only caller was PayrollRecordSection.jsx)',
+    !service.includes('saveSalaryRecordFull'),
+  )
+  assert(
+    'getPayrollRecordPath removed (zero callers anywhere)',
+    !utils.includes('getPayrollRecordPath'),
+  )
+
+  console.log('\nStage 3c: "Этап расчёта" filter removed, "Статус расчёта" simplified to one checkbox')
+  assert(
+    'no calculation-stage filter section left in the popover',
+    !filter.includes('Этап расчёта') && !filter.includes('Без расчёта') && !filter.includes('SALARY_RECORD_STATUSES'),
+  )
+  assert(
+    'old 3-way participation radiogroup replaced by a single checkbox',
+    filter.includes('Показать исключённых из ведомости') &&
+      !filter.includes('PAYROLL_PARTICIPATION_FILTER_OPTIONS') &&
+      !filter.includes('Статус расчёта'),
+  )
+  assert(
+    'boolean show-excluded default constant defined',
+    employeeData.includes('PAYROLL_LIST_DEFAULT_SHOW_EXCLUDED = false'),
+  )
+  assert(
+    'list filtering uses the real participation helper, not a 3-way string enum',
+    list.includes('isPayrollExcluded') && !list.includes('appliedParticipation') && !list.includes('appliedStatus'),
+  )
+  assert(
+    'participation label renamed to avoid confusion with the removed calculation stage',
+    commentModal.includes('Участие в ведомости') && !commentModal.includes('Статус расчёта'),
+  )
+  assert(
+    'employee edit modal label renamed too',
+    employeeEditModal.includes('Участие в ведомости') && !employeeEditModal.includes('Статус расчёта'),
+  )
 
   assert('no time-tracker import in payroll', !list.includes('timeTracker'))
   assert('verify script registered', pkg.includes('verify:salary-payroll-mvp'))

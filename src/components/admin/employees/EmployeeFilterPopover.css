@@ -70,6 +70,21 @@
   width: 100%;
 }
 
+.employee-filter-popover__checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.employee-filter-popover__checkbox-row input {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
 .employee-filter-popover--payroll {
   width: min(360px, calc(100vw - 32px));
   right: 0;

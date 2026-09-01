@@ -30,6 +30,8 @@ import {
 } from '../../../services/employeeAdminService'
 import {
   PAYROLL_PARTICIPATION,
+  PAYROLL_LIST_DEFAULT_SHOW_EXCLUDED,
+  isPayrollExcluded,
   normalizePayrollParticipation,
 } from '../../../utils/employeeData'
 import { updateEmployee } from '../../../services/platformDataService'
@@ -195,30 +197,20 @@ export default function PayrollSection() {
       ? restoredUiRef.current.appliedRoleId
       : '',
   )
-  const [appliedStatus, setAppliedStatus] = useState(() =>
-    typeof restoredUiRef.current?.appliedStatus === 'string'
-      ? restoredUiRef.current.appliedStatus
-      : 'all',
-  )
-  const [appliedParticipation, setAppliedParticipation] = useState(() =>
-    typeof restoredUiRef.current?.appliedParticipation === 'string'
-      ? restoredUiRef.current.appliedParticipation
-      : 'active',
+  const [appliedShowExcluded, setAppliedShowExcluded] = useState(() =>
+    typeof restoredUiRef.current?.appliedShowExcluded === 'boolean'
+      ? restoredUiRef.current.appliedShowExcluded
+      : PAYROLL_LIST_DEFAULT_SHOW_EXCLUDED,
   )
   const [draftRoleId, setDraftRoleId] = useState(() =>
     typeof restoredUiRef.current?.appliedRoleId === 'string'
       ? restoredUiRef.current.appliedRoleId
       : '',
   )
-  const [draftStatus, setDraftStatus] = useState(() =>
-    typeof restoredUiRef.current?.appliedStatus === 'string'
-      ? restoredUiRef.current.appliedStatus
-      : 'all',
-  )
-  const [draftParticipation, setDraftParticipation] = useState(() =>
-    typeof restoredUiRef.current?.appliedParticipation === 'string'
-      ? restoredUiRef.current.appliedParticipation
-      : 'active',
+  const [draftShowExcluded, setDraftShowExcluded] = useState(() =>
+    typeof restoredUiRef.current?.appliedShowExcluded === 'boolean'
+      ? restoredUiRef.current.appliedShowExcluded
+      : PAYROLL_LIST_DEFAULT_SHOW_EXCLUDED,
   )
   const [filterOpen, setFilterOpen] = useState(false)
 
@@ -352,13 +344,12 @@ export default function PayrollSection() {
         month,
         search,
         appliedRoleId,
-        appliedStatus,
-        appliedParticipation,
+        appliedShowExcluded,
         scrollY: typeof window !== 'undefined' ? window.scrollY : 0,
         ...overrides,
       })
     },
-    [year, month, search, appliedRoleId, appliedStatus, appliedParticipation],
+    [year, month, search, appliedRoleId, appliedShowExcluded],
   )
 
   useEffect(() => {
@@ -424,15 +415,8 @@ export default function PayrollSection() {
         ) {
           return false
         }
-        const participation = normalizePayrollParticipation(emp.payrollParticipation)
-        if (appliedParticipation !== 'all' && participation !== appliedParticipation) {
+        if (isPayrollExcluded(emp) !== appliedShowExcluded) {
           return false
-        }
-        const record = recordsByEmployee.get(Number(emp.id))
-        if (appliedStatus === 'none') {
-          if (record) return false
-        } else if (appliedStatus !== 'all') {
-          if (!record || record.status !== appliedStatus) return false
         }
         if (!q) return true
         return String(emp.name || '').toLowerCase().includes(q)
@@ -453,8 +437,7 @@ export default function PayrollSection() {
     shiftStatsByEmployee,
     search,
     appliedRoleId,
-    appliedStatus,
-    appliedParticipation,
+    appliedShowExcluded,
   ])
 
   // Single source for table ИТОГО — summed from visible (search/filter) row.amounts.
@@ -471,30 +454,21 @@ export default function PayrollSection() {
       ) {
         return false
       }
-      const participation = normalizePayrollParticipation(emp.payrollParticipation)
-      if (draftParticipation !== 'all' && participation !== draftParticipation) {
+      if (isPayrollExcluded(emp) !== draftShowExcluded) {
         return false
-      }
-      const record = recordsByEmployee.get(Number(emp.id))
-      if (draftStatus === 'none') {
-        if (record) return false
-      } else if (draftStatus !== 'all') {
-        if (!record || record.status !== draftStatus) return false
       }
       if (!q) return true
       return String(emp.name || '').toLowerCase().includes(q)
     }).length
   }, [
     employees,
-    recordsByEmployee,
     search,
     draftRoleId,
-    draftStatus,
-    draftParticipation,
+    draftShowExcluded,
   ])
 
   const filtersActive =
-    Boolean(appliedRoleId) || appliedStatus !== 'all' || appliedParticipation !== 'active'
+    Boolean(appliedRoleId) || appliedShowExcluded !== PAYROLL_LIST_DEFAULT_SHOW_EXCLUDED
 
   function toggleFilter() {
     if (filterOpen) {
@@ -504,16 +478,14 @@ export default function PayrollSection() {
     setDraftYear(year)
     setDraftMonth(month)
     setDraftRoleId(appliedRoleId)
-    setDraftStatus(appliedStatus)
-    setDraftParticipation(appliedParticipation)
+    setDraftShowExcluded(appliedShowExcluded)
     setFilterOpen(true)
   }
 
   function applyFilters() {
     setMonthState({ year: Number(draftYear), month: Number(draftMonth) })
     setAppliedRoleId(draftRoleId)
-    setAppliedStatus(draftStatus)
-    setAppliedParticipation(draftParticipation)
+    setAppliedShowExcluded(draftShowExcluded)
     setFilterOpen(false)
   }
 
@@ -522,12 +494,10 @@ export default function PayrollSection() {
     setDraftYear(current.year)
     setDraftMonth(current.month)
     setDraftRoleId('')
-    setDraftStatus('all')
-    setDraftParticipation('active')
+    setDraftShowExcluded(PAYROLL_LIST_DEFAULT_SHOW_EXCLUDED)
     setMonthState(current)
     setAppliedRoleId('')
-    setAppliedStatus('all')
-    setAppliedParticipation('active')
+    setAppliedShowExcluded(PAYROLL_LIST_DEFAULT_SHOW_EXCLUDED)
     setFilterOpen(false)
   }
 
@@ -754,11 +724,9 @@ export default function PayrollSection() {
                 setDraftMonth(nextMonth)
               }}
               draftRoleId={draftRoleId}
-              draftStatus={draftStatus}
-              draftParticipation={draftParticipation}
+              draftShowExcluded={draftShowExcluded}
               onRoleChange={setDraftRoleId}
-              onStatusChange={setDraftStatus}
-              onParticipationChange={setDraftParticipation}
+              onShowExcludedChange={setDraftShowExcluded}
               resultCount={draftPreviewCount}
               onApply={applyFilters}
               onReset={resetFilters}

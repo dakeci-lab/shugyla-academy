@@ -2,9 +2,7 @@ import { useEffect, useRef } from 'react'
 import AdminModal from '../AdminModal'
 import useMediaQuery from '../../../hooks/useMediaQuery'
 import { EMPLOYEE_FORM_ROLES, getRoleLabel } from '../../../data/roles'
-import { PAYROLL_PARTICIPATION_FILTER_OPTIONS } from '../../../utils/employeeData'
 import {
-  SALARY_RECORD_STATUSES,
   changePayrollMonth,
   getPayrollCurrentMonthState,
   parsePayrollMonthInputValue,
@@ -19,11 +17,9 @@ function PayrollFilterFields({
   draftMonth,
   onMonthChange,
   draftRoleId,
-  draftStatus,
-  draftParticipation,
+  draftShowExcluded,
   onRoleChange,
-  onStatusChange,
-  onParticipationChange,
+  onShowExcludedChange,
   resultCount,
 }) {
   const current = getPayrollCurrentMonthState()
@@ -94,73 +90,14 @@ function PayrollFilterFields({
       </div>
 
       <div className="employee-filter-popover__section">
-        <span className="employee-filter-popover__label">Статус расчёта</span>
-        <div
-          className="employee-filter-popover__options"
-          role="radiogroup"
-          aria-label="Статус расчёта"
-        >
-          {PAYROLL_PARTICIPATION_FILTER_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              role="radio"
-              aria-checked={draftParticipation === option.id}
-              className={`employee-filter-popover__option${
-                draftParticipation === option.id ? ' employee-filter-popover__option--active' : ''
-              }`}
-              onClick={() => onParticipationChange?.(option.id)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="employee-filter-popover__section">
-        <span className="employee-filter-popover__label">Этап расчёта</span>
-        <div
-          className="employee-filter-popover__options"
-          role="radiogroup"
-          aria-label="Этап расчёта"
-        >
-          <button
-            type="button"
-            role="radio"
-            aria-checked={draftStatus === 'all'}
-            className={`employee-filter-popover__option${
-              draftStatus === 'all' ? ' employee-filter-popover__option--active' : ''
-            }`}
-            onClick={() => onStatusChange?.('all')}
-          >
-            Все
-          </button>
-          <button
-            type="button"
-            role="radio"
-            aria-checked={draftStatus === 'none'}
-            className={`employee-filter-popover__option${
-              draftStatus === 'none' ? ' employee-filter-popover__option--active' : ''
-            }`}
-            onClick={() => onStatusChange?.('none')}
-          >
-            Без расчёта
-          </button>
-          {SALARY_RECORD_STATUSES.map((status) => (
-            <button
-              key={status.id}
-              type="button"
-              role="radio"
-              aria-checked={draftStatus === status.id}
-              className={`employee-filter-popover__option${
-                draftStatus === status.id ? ' employee-filter-popover__option--active' : ''
-              }`}
-              onClick={() => onStatusChange?.(status.id)}
-            >
-              {status.label}
-            </button>
-          ))}
-        </div>
+        <label className="employee-filter-popover__checkbox-row">
+          <input
+            type="checkbox"
+            checked={draftShowExcluded}
+            onChange={(e) => onShowExcludedChange?.(e.target.checked)}
+          />
+          <span>Показать исключённых из ведомости</span>
+        </label>
       </div>
 
       <p className="employee-filter-popover__count">Найдено: {resultCount}</p>
@@ -168,18 +105,16 @@ function PayrollFilterFields({
   )
 }
 
-/** Фильтр списка зарплаты — период + роль / статус */
+/** Фильтр списка зарплаты — период + роль / участие в ведомости */
 export default function PayrollFilterPopover({
   open,
   draftYear,
   draftMonth,
   onMonthChange,
   draftRoleId,
-  draftStatus,
-  draftParticipation,
+  draftShowExcluded,
   onRoleChange,
-  onStatusChange,
-  onParticipationChange,
+  onShowExcludedChange,
   resultCount,
   onApply,
   onReset,
@@ -235,11 +170,9 @@ export default function PayrollFilterPopover({
       draftMonth={draftMonth}
       onMonthChange={onMonthChange}
       draftRoleId={draftRoleId}
-      draftStatus={draftStatus}
-      draftParticipation={draftParticipation}
+      draftShowExcluded={draftShowExcluded}
       onRoleChange={onRoleChange}
-      onStatusChange={onStatusChange}
-      onParticipationChange={onParticipationChange}
+      onShowExcludedChange={onShowExcludedChange}
       resultCount={resultCount}
     />
   )

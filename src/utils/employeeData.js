@@ -117,11 +117,8 @@ export const PAYROLL_PARTICIPATION_OPTIONS = [
   { value: PAYROLL_PARTICIPATION.EXCLUDED, label: PAYROLL_PARTICIPATION_LABELS.excluded },
 ]
 
-export const PAYROLL_PARTICIPATION_FILTER_OPTIONS = [
-  { id: 'all', label: 'Все' },
-  { id: 'active', label: 'Активные' },
-  { id: 'excluded', label: 'Исключённые' },
-]
+/** Список ведомости по умолчанию показывает участвующих сотрудников */
+export const PAYROLL_LIST_DEFAULT_SHOW_EXCLUDED = false
 
 export const SALARY_CALCULATION_TYPE_LABELS = {
   shift_based: 'По сменам',

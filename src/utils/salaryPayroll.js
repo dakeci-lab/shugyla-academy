@@ -11,13 +11,6 @@ import {
   isShiftEligibleForMonthlyWork,
 } from './employeeMonthlyWorkSummary'
 
-export const SALARY_RECORD_STATUSES = [
-  { id: 'draft', label: 'Черновик', badge: 'draft' },
-  { id: 'review', label: 'На проверке', badge: 'progress' },
-  { id: 'confirmed', label: 'Подтверждено', badge: 'done' },
-  { id: 'paid', label: 'Выплачено', badge: 'passed' },
-]
-
 export const SALARY_ALLOWANCE_PRESETS = [
   { kind: 'premium', title: 'Премия' },
   { kind: 'bonus', title: 'Бонус' },
@@ -29,13 +22,6 @@ export const SALARY_DEDUCTION_PRESETS = [
   { kind: 'advance', title: 'Аванс' },
   { kind: 'deduction', title: 'Удержание' },
 ]
-
-export function getSalaryStatusMeta(statusId) {
-  return (
-    SALARY_RECORD_STATUSES.find((item) => item.id === statusId) ||
-    SALARY_RECORD_STATUSES[0]
-  )
-}
 
 export function toMoneyNumber(value) {
   const n = Number(value)
@@ -420,10 +406,6 @@ export function computeSalaryTotals({
 
 export function getPayrollListPath() {
   return '/platform/employees/payroll'
-}
-
-export function getPayrollRecordPath(recordId) {
-  return `/platform/employees/payroll/records/${recordId}`
 }
 
 export function changePayrollMonth(year, month, delta) {
