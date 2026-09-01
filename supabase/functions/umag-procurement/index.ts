@@ -11,11 +11,17 @@
  * Never writes back to UMAG. Never returns UMAG secrets to the client.
  */
 
+import { createClient } from '@supabase/supabase-js'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
 import {
   adminErrorResponse,
   authorizeWorkforceRequest,
+  createDbCallCounter,
 } from '../_shared/employeeAuthorization.ts'
+import {
+  isSchedulerSecretConfigured,
+  verifySchedulerRequest,
+} from '../_shared/schedulerRequestAuth.ts'
 import { maskStoreId } from '../_shared/umagConfig.ts'
 import {
   acquireUmagSession,
@@ -32,6 +38,17 @@ import {
 const PERMISSION_EDIT = 'procurement.edit'
 const PERMISSION_CREATE = 'procurement.create'
 const PERMISSION_TRANSFER = 'procurement.transfer'
+
+/**
+ * Sentinel caller.id for the daily 07:00 (Aqtobe) cron sync — no real employee
+ * triggers it, see the HMAC-verified branch in Deno.serve below.
+ */
+const SCHEDULER_CALLER_ID = 0
+
+function isProcurementSyncSchedulerEnabled(): boolean {
+  if (Deno.env.get('PROCUREMENT_SYNC_SCHEDULER_ENABLED') !== 'true') return false
+  return isSchedulerSecretConfigured(Deno.env.get('PROCUREMENT_SYNC_SCHEDULER_SECRET_CURRENT'))
+}
 
 const STOCK_PATH = '/rest/cabinet/opr/stock/find'
 const SALES_PATH = '/rest/cabinet/report/list-product-report'
@@ -334,8 +351,11 @@ async function handleSync(
   console.log('umag_procurement_sync_start', { storeId: maskStoreId(storeId) })
 
   const { weeks, periodFrom, periodTo } = buildEightWeekRanges()
-  const createdBy = String(authz.caller.id)
-  const createdByName = await fetchCallerDisplayName(authz.serviceClient, authz.caller.id)
+  const isScheduledRun = authz.caller.id === SCHEDULER_CALLER_ID
+  const createdBy = isScheduledRun ? 'system' : String(authz.caller.id)
+  const createdByName = isScheduledRun
+    ? 'Автосинхронизация (07:00)'
+    : await fetchCallerDisplayName(authz.serviceClient, authz.caller.id)
 
   const { data: snapshot, error: snapErr } = await authz.serviceClient
     .from('procurement_snapshots')
@@ -907,9 +927,49 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return corsPreflightResponse()
   if (req.method !== 'POST') return adminErrorResponse('method_not_allowed', 405)
 
+  const rawBody = new Uint8Array(await req.arrayBuffer())
+
+  // Daily 07:00 (Aqtobe) cron sync — HMAC-signed system caller, no employee
+  // JWT. Checked before the normal auth path since it carries none of the
+  // headers authorizeWorkforceRequest expects. See docs/procurement/
+  // planning-daily-auto-sync.md for the pg_cron wrapper that calls this.
+  if (req.headers.get('x-shugyla-scheduler-signature')) {
+    if (!isProcurementSyncSchedulerEnabled()) {
+      return adminErrorResponse('scheduler_disabled', 503)
+    }
+    const authorized = await verifySchedulerRequest({
+      request: req,
+      rawBody,
+      currentSecret: Deno.env.get('PROCUREMENT_SYNC_SCHEDULER_SECRET_CURRENT'),
+      previousSecret: Deno.env.get('PROCUREMENT_SYNC_SCHEDULER_SECRET_PREVIOUS'),
+    })
+    if (!authorized) return adminErrorResponse('unauthorized', 401)
+
+    const serviceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    )
+    return handleSync({
+      serviceClient,
+      caller: {
+        id: SCHEDULER_CALLER_ID,
+        status: 'active',
+        role: 'system',
+        role_id: null,
+        auth_user_id: null,
+      },
+      authUserId: 'scheduler',
+      authMethod: 'getUser',
+      permissions: { [PERMISSION_EDIT]: true },
+      dbCalls: createDbCallCounter(),
+      timings: { tokenMs: 0, authMs: 0, authorizationDbMs: 0, authorizationMs: 0 },
+    })
+  }
+
   let body: Record<string, unknown> = {}
   try {
-    body = (await req.json()) as Record<string, unknown>
+    body = JSON.parse(new TextDecoder().decode(rawBody)) as Record<string, unknown>
   } catch {
     return umagErrorResponse('VALIDATION_ERROR', 'Некорректный JSON в теле запроса.', 400)
   }

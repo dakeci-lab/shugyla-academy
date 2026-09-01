@@ -158,6 +158,7 @@
     "verify:web-push-vapid-consistency": "node scripts/verify-web-push-vapid-consistency.mjs",
     "verify:procurement-cross-device-sync": "node scripts/verify-procurement-cross-device-sync.mjs",
     "verify:procurement-sync-button-topbar": "node scripts/verify-procurement-sync-button-topbar.mjs",
+    "verify:procurement-daily-auto-sync": "node scripts/verify-procurement-daily-auto-sync.mjs",
     "verify:employee-self-edit": "node scripts/verify-employee-self-edit.mjs",
     "verify:position-structure-data-layer": "node scripts/verify-position-structure-data-layer.mjs",
     "verify:profile-position-access-hotfix": "node scripts/verify-profile-position-access-hotfix.mjs",
