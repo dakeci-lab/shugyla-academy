@@ -425,15 +425,18 @@ export default function WorkScheduleSection() {
         nextLabel={viewMode === 'day' ? 'Следующий день' : 'Следующая неделя'}
       />
 
-      <ScheduleViewModeToggle value={viewMode} onChange={setViewMode} />
-
-      {viewTeam && (
+      {viewTeam ? (
         <PlatformSearchToolbar
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Поиск по ФИО"
           ariaLabel="Поиск по ФИО"
+          actions={<ScheduleViewModeToggle value={viewMode} onChange={setViewMode} />}
         />
+      ) : (
+        <div className="schedule-view-toggle-standalone">
+          <ScheduleViewModeToggle value={viewMode} onChange={setViewMode} />
+        </div>
       )}
 
       {error && (
