@@ -21,16 +21,15 @@ import {
 import { loadPositionCatalogByIds } from '../_shared/employeePositions.ts'
 
 const ALLOWED_BODY_KEYS = new Set(['date_from', 'date_to', 'timezone', 'view', 'employee_id'])
-const ALLOWED_VIEWS = new Set(['dashboard', 'schedule', 'rating', 'home-summary', 'payroll'])
+const ALLOWED_VIEWS = new Set(['dashboard', 'schedule', 'home-summary', 'payroll'])
 const ALLOWED_TIMEZONE = 'Asia/Almaty'
 const MAX_RANGE_DAYS = 62
 
 const PERMISSION_SCHEDULE_TEAM = 'schedule.view_team'
 const PERMISSION_SCHEDULE_OWN = 'schedule.view_own'
-const PERMISSION_RATING_VIEW = 'rating.view'
 const PERMISSION_PAYROLL_VIEW = 'payroll.view'
 
-type WorkforceView = 'dashboard' | 'schedule' | 'rating' | 'home-summary' | 'payroll'
+type WorkforceView = 'dashboard' | 'schedule' | 'home-summary' | 'payroll'
 
 /** Server-fixed permission codes per view — never taken from request body. */
 function permissionCodesForView(view: WorkforceView): string[] {
@@ -40,9 +39,6 @@ function permissionCodesForView(view: WorkforceView): string[] {
       return [PERMISSION_SCHEDULE_TEAM]
     case 'schedule':
       return [PERMISSION_SCHEDULE_TEAM, PERMISSION_SCHEDULE_OWN]
-    case 'rating':
-      // Team leaderboard is visible to anyone with rating.view (not tied to schedule.view_team).
-      return [PERMISSION_RATING_VIEW]
     case 'payroll':
       // Payroll UI is team-scoped; schedule.view_team covers admins who already load team shifts.
       return [PERMISSION_PAYROLL_VIEW, PERMISSION_SCHEDULE_TEAM]
@@ -93,7 +89,6 @@ function resolveWorkforceScope(
 ): { teamScope: boolean } | Response {
   const hasTeam = perms[PERMISSION_SCHEDULE_TEAM] === true
   const hasOwn = perms[PERMISSION_SCHEDULE_OWN] === true
-  const hasRating = perms[PERMISSION_RATING_VIEW] === true
   const hasPayroll = perms[PERMISSION_PAYROLL_VIEW] === true
 
   switch (view) {
@@ -105,10 +100,6 @@ function resolveWorkforceScope(
       if (hasTeam) return { teamScope: true }
       if (hasOwn) return { teamScope: false }
       return adminErrorResponse('forbidden', 403)
-    case 'rating':
-      // Product rule: every role with rating.view sees the full store leaderboard.
-      if (!hasRating) return adminErrorResponse('forbidden', 403)
-      return { teamScope: true }
     case 'payroll':
       // Mid-month terminations must still load shifts for the selected period.
       if (hasPayroll || hasTeam) return { teamScope: true }
@@ -317,7 +308,7 @@ Deno.serve(async (req) => {
     )
   }
 
-  // Profile / Schedule / dashboard / rating: employees with outer nested shifts.
+  // Profile / Schedule / dashboard: employees with outer nested shifts.
   let scopedEmployeeId: number | null = null
   if (requestedEmployeeId != null) {
     if (!scopeResult.teamScope && requestedEmployeeId !== caller.id) {
@@ -354,7 +345,7 @@ Deno.serve(async (req) => {
       .lte('hired_at', dateTo)
       .or(`terminated_at.is.null,terminated_at.gte.${dateFrom}`)
   } else if (scopedEmployeeId == null) {
-    // Team schedule / dashboard / rating: only currently active offline staff.
+    // Team schedule / dashboard: only currently active offline staff.
     employeeQuery = employeeQuery.eq('status', 'active')
   }
   // Scoped profile/own schedule: keep historical shifts for terminated/inactive staff.
@@ -364,7 +355,7 @@ Deno.serve(async (req) => {
     // Single-employee profile/own lookup keeps online staff (card still loads).
     employeeQuery = employeeQuery.eq('id', scopedEmployeeId)
   } else {
-    // Team schedule / dashboard / rating / payroll: online (remote) staff are not in store presence.
+    // Team schedule / dashboard / payroll: online (remote) staff are not in store presence.
     employeeQuery = employeeQuery.eq('work_mode', 'offline')
   }
 

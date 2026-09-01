@@ -21,7 +21,7 @@ const EMPTY_LOCATION = {
   isActive: true,
 }
 
-/** Настройки тайм-трекера: рабочая территория и штрафные баллы */
+/** Настройки тайм-трекера: рабочая территория и допуски по времени */
 export default function AttendanceSettingsPanel() {
   const { user } = useSession()
   const [location, setLocation] = useState(EMPTY_LOCATION)
@@ -87,7 +87,7 @@ export default function AttendanceSettingsPanel() {
     try {
       const saved = await saveAttendanceSettings(settings, user?.id || null)
       setSettings(saved)
-      setSettingsSuccess('Штрафные баллы сохранены')
+      setSettingsSuccess('Настройки сохранены')
     } catch (err) {
       setSettingsError(err.message || 'Не удалось сохранить настройки')
     } finally {
@@ -190,89 +190,12 @@ export default function AttendanceSettingsPanel() {
       </section>
 
       <section className="admin-panel-card platform-settings__section">
-        <h2 className="admin-panel-card__title">Штрафные баллы</h2>
+        <h2 className="admin-panel-card__title">Допуски по времени</h2>
         <p className="admin-panel-card__desc">
-          Баллы и штрафы за отметки прихода и ухода в рейтинге сотрудников.
+          Влияют на дневную статистику посещаемости на Главной.
         </p>
 
         <div className="admin-form">
-          <div className="admin-form__row">
-            <label className="admin-form__label">
-              Баллы за своевременный приход
-              <input
-                className="admin-form__input"
-                type="number"
-                value={settings.onTimePoints}
-                onChange={(e) => setSettings({ ...settings, onTimePoints: Number(e.target.value) })}
-              />
-            </label>
-            <label className="admin-form__label">
-              Баллы за отработанную смену
-              <input
-                className="admin-form__input"
-                type="number"
-                value={settings.completedShiftPoints}
-                onChange={(e) =>
-                  setSettings({ ...settings, completedShiftPoints: Number(e.target.value) })
-                }
-              />
-            </label>
-          </div>
-          <div className="admin-form__row">
-            <label className="admin-form__label">
-              Штраф за опоздание
-              <input
-                className="admin-form__input"
-                type="number"
-                value={settings.latePenalty}
-                onChange={(e) => setSettings({ ...settings, latePenalty: Number(e.target.value) })}
-              />
-            </label>
-            <label className="admin-form__label">
-              Штраф за ранний уход
-              <input
-                className="admin-form__input"
-                type="number"
-                value={settings.earlyLeavePenalty}
-                onChange={(e) =>
-                  setSettings({ ...settings, earlyLeavePenalty: Number(e.target.value) })
-                }
-              />
-            </label>
-          </div>
-          <div className="admin-form__row">
-            <label className="admin-form__label">
-              Штраф за неявку
-              <input
-                className="admin-form__input"
-                type="number"
-                value={settings.absencePenalty}
-                onChange={(e) => setSettings({ ...settings, absencePenalty: Number(e.target.value) })}
-              />
-            </label>
-            <label className="admin-form__label">
-              Штраф без отметки прихода
-              <input
-                className="admin-form__input"
-                type="number"
-                value={settings.missingCheckInPenalty}
-                onChange={(e) =>
-                  setSettings({ ...settings, missingCheckInPenalty: Number(e.target.value) })
-                }
-              />
-            </label>
-          </div>
-          <label className="admin-form__label">
-            Штраф без отметки ухода
-            <input
-              className="admin-form__input"
-              type="number"
-              value={settings.missingCheckOutPenalty}
-              onChange={(e) =>
-                setSettings({ ...settings, missingCheckOutPenalty: Number(e.target.value) })
-              }
-            />
-          </label>
           <div className="admin-form__row">
             <label className="admin-form__label">
               Допустимое опоздание, мин

@@ -5,7 +5,7 @@ import {
   getScheduleEligibleEmployees,
   participatesInStoreSchedule,
 } from '../../utils/employeeData'
-import { RATING_UPDATED_EVENT } from '../../utils/attendanceData'
+import { ATTENDANCE_UPDATED_EVENT } from '../../utils/attendanceData'
 import { APP_TIMEZONE, addDaysToDateKey, toDateKeyInAppTimezone } from '../../utils/timezone'
 import {
   formatTimeRange,
@@ -341,11 +341,11 @@ export default function OwnerDashboard() {
   }, [selectedDateKey, todayKey])
 
   useEffect(() => {
-    function handleRatingUpdated() {
+    function handleAttendanceUpdated() {
       loadData()
     }
-    window.addEventListener(RATING_UPDATED_EVENT, handleRatingUpdated)
-    return () => window.removeEventListener(RATING_UPDATED_EVENT, handleRatingUpdated)
+    window.addEventListener(ATTENDANCE_UPDATED_EVENT, handleAttendanceUpdated)
+    return () => window.removeEventListener(ATTENDANCE_UPDATED_EVENT, handleAttendanceUpdated)
   }, [loadData])
 
   const dailyMetrics = useMemo(

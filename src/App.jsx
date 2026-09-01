@@ -58,9 +58,6 @@ const PlatformEmployeeSchedule = lazy(
 const PlatformEmployeeProfile = lazy(
   () => import('./pages/platform/PlatformEmployeeProfile')
 )
-const PlatformEmployeeRating = lazy(
-  () => import('./pages/platform/PlatformEmployeeRating')
-)
 const PlatformPayroll = lazy(() => import('./pages/platform/PlatformPayroll'))
 const PlatformPayrollRecord = lazy(() => import('./pages/platform/PlatformPayrollRecord'))
 const PlatformTimeTracker = lazy(() => import('./pages/platform/PlatformTimeTracker'))
@@ -229,17 +226,9 @@ export default function App() {
                   }
                 />
                 <Route
-                  path="employees/rating"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_RATING}>
-                      <PlatformEmployeeRating />
-                    </PlatformRoute>
-                  }
-                />
-                <Route
                   path="time-tracker"
                   element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_RATING}>
+                    <PlatformRoute routeKey={ROUTE_KEYS.HOME}>
                       <PlatformTimeTracker />
                     </PlatformRoute>
                   }

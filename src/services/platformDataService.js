@@ -54,12 +54,8 @@ import {
 } from '../utils/supplierData'
 import {
   parseYearMonthFromDateKey,
-  notifyRatingUpdated,
+  notifyAttendanceUpdated,
   getCurrentMonthState,
-  calculateRatingsByEmployee,
-  isRatingDebugEnabled,
-  debugLogShiftRating,
-  debugLogEmployeeMonthRating,
 } from '../utils/attendanceData'
 
 function getAdapter() {
@@ -930,7 +926,7 @@ export async function getTeamShiftsForMonth(year, month, employeeIds = null) {
 export async function saveEmployeeShift(employeeId, payload, createdBy = null) {
   const saved = await getShiftAdapter().upsertEmployeeShift(Number(employeeId), payload, createdBy)
   const { year, month } = parseYearMonthFromDateKey(saved.shiftDate)
-  notifyRatingUpdated(year, month)
+  notifyAttendanceUpdated(year, month)
   return saved
 }
 
@@ -945,7 +941,7 @@ export async function applyBulkEmployeeShifts(employeeId, entries, options = {})
     )
     for (const key of months) {
       const [year, month] = key.split('-').map(Number)
-      notifyRatingUpdated(year, month)
+      notifyAttendanceUpdated(year, month)
     }
   }
   return count
@@ -954,7 +950,7 @@ export async function applyBulkEmployeeShifts(employeeId, entries, options = {})
 export async function deleteEmployeeShiftDay(employeeId, shiftDate) {
   const result = await getShiftAdapter().deleteEmployeeShift(Number(employeeId), shiftDate)
   const { year, month } = parseYearMonthFromDateKey(shiftDate)
-  notifyRatingUpdated(year, month)
+  notifyAttendanceUpdated(year, month)
   return result
 }
 
@@ -964,7 +960,7 @@ export async function clearEmployeeShiftsFromDate(employeeId, fromDate) {
     fromDate
   )
   const { year, month } = parseYearMonthFromDateKey(fromDate)
-  notifyRatingUpdated(year, month)
+  notifyAttendanceUpdated(year, month)
   return result
 }
 
@@ -983,46 +979,22 @@ export async function getAttendanceSettings() {
 export async function saveAttendanceSettings(settings, updatedBy = null) {
   const saved = await getAttendanceAdapter().saveAttendanceSettings(settings, updatedBy)
   const { year, month } = getCurrentMonthState()
-  notifyRatingUpdated(year, month)
+  notifyAttendanceUpdated(year, month)
   return saved
 }
 
-/** Вычисляет рейтинг сотрудников за месяц по сменам (без записи в БД) */
-export async function computeEmployeeRatingsForMonth(year, month, employeeIds = null) {
-  const ids = employeeIds?.map(Number) || []
-  const [settings, shifts] = await Promise.all([
-    getAttendanceSettings(),
-    getTeamShiftsForMonth(year, month, ids.length ? ids : null),
-  ])
-  const now = new Date()
-  const ratings = calculateRatingsByEmployee(shifts, ids, settings, now)
-
-  if (isRatingDebugEnabled()) {
-    ratings.forEach((result, employeeId) => {
-      const employeeName = getEmployeeById(Number(employeeId))?.name || `Сотрудник #${employeeId}`
-      const shiftsByEmployee = shifts.filter((shift) => Number(shift.employeeId) === Number(employeeId))
-      shiftsByEmployee.forEach((shift) => {
-        const dayEntries = result.entries.filter((entry) => entry.shiftId === shift.id)
-        debugLogShiftRating(employeeName, shift, settings, dayEntries)
-      })
-      debugLogEmployeeMonthRating(employeeName, result.entries, result.stats.totalPoints)
-    })
-  }
-
-  return ratings
-}
 
 export async function checkInEmployee(employeeId, coords) {
   const saved = await getAttendanceAdapter().checkInEmployee(Number(employeeId), coords)
   const { year, month } = parseYearMonthFromDateKey(saved.shiftDate)
-  notifyRatingUpdated(year, month)
+  notifyAttendanceUpdated(year, month)
   return saved
 }
 
 export async function checkOutEmployee(employeeId, coords) {
   const saved = await getAttendanceAdapter().checkOutEmployee(Number(employeeId), coords)
   const { year, month } = parseYearMonthFromDateKey(saved.shiftDate)
-  notifyRatingUpdated(year, month)
+  notifyAttendanceUpdated(year, month)
   return saved
 }
 

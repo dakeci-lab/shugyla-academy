@@ -10,10 +10,7 @@ const ALLOWED_KEYS = new Set([
   'run_at',
   'run_id',
   'rule_codes',
-  'recipient_employee_ids',
   'suppress_employee_push',
-  'escalation_only',
-  'escalation_events',
 ])
 
 export type ControlledSchedulerRun = {
@@ -23,10 +20,7 @@ export type ControlledSchedulerRun = {
   runAt: Date
   runId: string
   ruleCodes: string[] | null
-  recipientEmployeeIds: number[] | null
   suppressEmployeePush: boolean
-  escalationOnly: boolean
-  escalationEvents: Array<'admin_clock_in_escalation' | 'admin_clock_out_escalation'> | null
 }
 
 export function isControlledRunEnabled(): boolean {
@@ -78,25 +72,10 @@ function parseRuleCodes(value: unknown): string[] | null | string {
   return [...new Set(out)]
 }
 
-function parseEscalationEvents(
-  value: unknown
-): Array<'admin_clock_in_escalation' | 'admin_clock_out_escalation'> | null | string {
-  if (value === undefined) return null
-  if (!Array.isArray(value) || value.length === 0) return 'escalation_events_invalid'
-  const out: Array<'admin_clock_in_escalation' | 'admin_clock_out_escalation'> = []
-  for (const item of value) {
-    if (item !== 'admin_clock_in_escalation' && item !== 'admin_clock_out_escalation') {
-      return 'escalation_events_invalid'
-    }
-    out.push(item)
-  }
-  return [...new Set(out)]
-}
-
 /**
  * Cron body must remain `{}`.
  * Controlled body requires enabled flag + shift_ids + run_at + run_id.
- * recipient_employee_ids / suppress_employee_push only valid here (never in cron).
+ * suppress_employee_push only valid here (never in cron).
  */
 export function parseSchedulerRequestBody(
   rawBody: Uint8Array
@@ -144,19 +123,9 @@ export function parseSchedulerRequestBody(
     return { mode: 'error', code: employeeIds }
   }
 
-  const recipientEmployeeIdsRaw = parseEmployeeIds(parsed.recipient_employee_ids, true)
-  if (typeof recipientEmployeeIdsRaw === 'string') {
-    return { mode: 'error', code: 'recipient_employee_ids_invalid' }
-  }
-
   const ruleCodes = parseRuleCodes(parsed.rule_codes)
   if (typeof ruleCodes === 'string') {
     return { mode: 'error', code: ruleCodes }
-  }
-
-  const escalationEvents = parseEscalationEvents(parsed.escalation_events)
-  if (typeof escalationEvents === 'string') {
-    return { mode: 'error', code: escalationEvents }
   }
 
   if (typeof parsed.run_at !== 'string' || !parsed.run_at.trim()) {
@@ -174,15 +143,12 @@ export function parseSchedulerRequestBody(
   if (
     runId.length < 8 ||
     runId.length > 80 ||
-    !/^(TT-PUSH-E2E|TT-ADMIN-ESC-E2E)-[A-Za-z0-9:_-]+$/.test(runId)
+    !/^TT-PUSH-E2E-[A-Za-z0-9:_-]+$/.test(runId)
   ) {
     return { mode: 'error', code: 'run_id_invalid' }
   }
 
   if (parsed.suppress_employee_push != null && typeof parsed.suppress_employee_push !== 'boolean') {
-    return { mode: 'error', code: 'validation_error' }
-  }
-  if (parsed.escalation_only != null && typeof parsed.escalation_only !== 'boolean') {
     return { mode: 'error', code: 'validation_error' }
   }
 
@@ -195,10 +161,7 @@ export function parseSchedulerRequestBody(
       runAt,
       runId,
       ruleCodes,
-      recipientEmployeeIds: recipientEmployeeIdsRaw.length ? recipientEmployeeIdsRaw : null,
       suppressEmployeePush: parsed.suppress_employee_push === true,
-      escalationOnly: parsed.escalation_only === true,
-      escalationEvents,
     },
   }
 }

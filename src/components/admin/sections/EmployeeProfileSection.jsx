@@ -11,11 +11,6 @@ import {
   getEmployeeForAdmin,
 } from '../../../services/employeeAdminService'
 import { fetchEmployeeWorkforceBundle } from '../../../services/workforceAdminService'
-import { getAttendanceSettings } from '../../../services/platformDataService'
-import {
-  calculateEmployeeRatingFromShifts,
-  RATING_STATUS,
-} from '../../../utils/attendanceData'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
@@ -23,7 +18,6 @@ import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import {
   canEditEmployees,
   canManageEmployees,
-  canViewEmployeeRating,
   canViewTeamSchedule,
   PERMISSION_CODES,
 } from '../../../config/permissions'
@@ -77,10 +71,6 @@ export default function EmployeeProfileSection({ employeeId }) {
   const [periodShifts, setPeriodShifts] = useState([])
   const [scheduleLoading, setScheduleLoading] = useState(true)
   const [scheduleError, setScheduleError] = useState('')
-
-  const [rating, setRating] = useState(null)
-  const [ratingLoading, setRatingLoading] = useState(false)
-  const showRating = canViewEmployeeRating(user)
 
   const [showEdit, setShowEdit] = useState(false)
   const [deactivateTarget, setDeactivateTarget] = useState(null)
@@ -256,57 +246,10 @@ export default function EmployeeProfileSection({ employeeId }) {
   // every pass and re-trigger this effect (infinite render loop → frozen navigation).
   useEffect(() => {
     if (showStoreSchedule) return
-    setRating(null)
-    setRatingLoading(false)
     setPeriodShifts((current) => (current.length === 0 ? current : []))
     setScheduleLoading(false)
     setScheduleError('')
   }, [showStoreSchedule])
-
-  useEffect(() => {
-    if (!showStoreSchedule) return undefined
-
-    if (!showRating || scheduleLoading) {
-      if (!showRating) {
-        setRating(null)
-        setRatingLoading(false)
-      }
-      return undefined
-    }
-
-    let cancelled = false
-    setRatingLoading(true)
-
-    ;(async () => {
-      try {
-        const settings = await getAttendanceSettings()
-        const result = calculateEmployeeRatingFromShifts(periodShifts, settings)
-        if (cancelled || !mountedRef.current) return
-
-        if (
-          !result ||
-          result.ratingStatus === RATING_STATUS.NO_SCHEDULE ||
-          result.ratingStatus === RATING_STATUS.NO_COMPLETED
-        ) {
-          setRating(null)
-        } else {
-          setRating(result.score ?? null)
-        }
-      } catch {
-        if (!cancelled && mountedRef.current) {
-          setRating(null)
-        }
-      } finally {
-        if (!cancelled && mountedRef.current) {
-          setRatingLoading(false)
-        }
-      }
-    })()
-
-    return () => {
-      cancelled = true
-    }
-  }, [showStoreSchedule, showRating, scheduleLoading, periodShifts])
 
   const handleSchedulePeriodChange = useCallback(({ year, month, shifts, loading, error }) => {
     setPeriod({ year, month })
@@ -423,9 +366,6 @@ export default function EmployeeProfileSection({ employeeId }) {
             month={period.month}
             shifts={periodShifts}
             loading={scheduleLoading}
-            rating={rating}
-            ratingLoading={ratingLoading}
-            showRating={showRating}
           />
 
           {scheduleError && (

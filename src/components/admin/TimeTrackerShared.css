@@ -1,0 +1,113 @@
+.time-tracker-card {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.25rem;
+  background: var(--color-white);
+  margin-bottom: 1rem;
+}
+
+.time-tracker-card--home {
+  padding: 1.5rem;
+}
+
+.time-tracker-card__welcome {
+  margin-bottom: 1rem;
+}
+
+.time-tracker-card__welcome-title {
+  margin: 0;
+  font-size: clamp(1.25rem, 3vw, 1.5rem);
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.time-tracker-card__section-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.time-tracker-card__date {
+  margin-bottom: 0.25rem;
+}
+
+.time-tracker-card__status {
+  font-size: 1rem;
+}
+
+.time-tracker-card__clock {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.time-tracker-card__meta p {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+}
+
+.time-tracker-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.time-tracker-card__cooldown {
+  margin: 0.5rem 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-tracker-card__action-btn {
+  min-height: 48px;
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.time-tracker-card__load-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+}
+
+.time-tracker-card__load-error p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.95rem;
+}
+
+@media (max-width: 600px) {
+  .time-tracker-card__actions .btn,
+  .time-tracker-card__action-btn {
+    width: 100%;
+  }
+
+  .time-tracker-card--home {
+    padding: 1.25rem 1rem;
+  }
+}
+
+.shift-day--sync-error {
+  outline: 2px solid #dc2626;
+  outline-offset: -2px;
+}
+
+.shift-day__sync-status {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.shift-day__retry {
+  margin-top: 0.25rem;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid #dc2626;
+  border-radius: 4px;
+  background: transparent;
+  color: #dc2626;
+  font-size: 0.65rem;
+  cursor: pointer;
+}

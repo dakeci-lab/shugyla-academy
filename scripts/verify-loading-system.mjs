@@ -47,7 +47,6 @@ const ALLOWED_VARIANTS = ['list', 'table', 'cards', 'dashboard']
 const MIGRATED = [
   ['src/components/admin/employees/EmployeeListTable.jsx', 'list'],
   ['src/components/admin/sections/WorkScheduleSection.jsx', 'table'],
-  ['src/components/admin/sections/EmployeeRatingSection.jsx', 'list'],
   ['src/components/admin/OwnerDashboard.jsx', 'dashboard'],
   ['src/pages/platform/PlatformEmployeeDocuments.jsx', 'list'],
   ['src/components/admin/payroll/PayrollSection.jsx', 'table'],
@@ -68,14 +67,11 @@ const MIGRATED = [
   ['src/components/admin/sections/TimeTrackerHomeCard.jsx', 'cards'],
   ['src/components/admin/NotificationSettingsPanel.jsx', 'cards'],
   ['src/components/admin/AttendanceSettingsPanel.jsx', 'cards'],
-  ['src/components/admin/TimeTrackerEscalationSettingsPanel.jsx', 'cards'],
-  ['src/components/admin/TimeTrackerViolationsJournal.jsx', 'table'],
   ['src/components/admin/roles/RolesListTab.jsx', 'table'],
   ['src/components/admin/roles/RoleAccessMatrixTab.jsx', 'table'],
   ['src/components/admin/team/RolesWorkspace.jsx', 'cards'],
   ['src/components/admin/team/PositionsWorkspace.jsx', 'cards'],
   ['src/components/admin/team/PositionGroupsWorkspace.jsx', 'list'],
-  ['src/components/admin/EmployeeRatingDetailModal.jsx', 'list'],
 ]
 
 const FORBIDDEN_TEXT_BY_FILE = {
@@ -88,10 +84,6 @@ const FORBIDDEN_TEXT_BY_FILE = {
     'Загрузка разрешений роли…',
     '>Загрузка…</p>',
   ],
-  'src/components/admin/EmployeeRatingDetailModal.jsx': ['Загрузка…</p>'],
-  'src/components/admin/TimeTrackerEscalationSettingsPanel.jsx': ['Загрузка…</p>'],
-  'src/components/admin/TimeTrackerViolationsJournal.jsx': ['Загрузка…</p>'],
-  'src/components/admin/sections/EmployeeRatingSection.jsx': ['Загрузка рейтинга…'],
   'src/components/admin/sections/WorkScheduleSection.jsx': ['Загрузка графика…'],
   'src/components/admin/OwnerDashboard.jsx': ['Загрузка дашборда…'],
 }
@@ -166,7 +158,7 @@ function main() {
   assert('no notification-panel skeleton CSS', !read('src/components/platform/notifications/notifications.css').includes('notification-panel__skeleton'))
   assert('no team-mgmt skeleton CSS', !read('src/components/admin/team/TeamManagementPage.css').includes('team-mgmt__skeleton'))
   assert('no tt-home-skeleton CSS', !read('src/components/admin/sections/TimeTrackerHome.css').includes('tt-home-skeleton'))
-  assert('no time-tracker-card skeleton CSS', !read('src/components/admin/EmployeeRating.css').includes('time-tracker-card__skeleton'))
+  assert('no time-tracker-card skeleton CSS', !read('src/components/admin/TimeTrackerShared.css').includes('time-tracker-card__skeleton'))
 
   console.log('Stage 6: Unified launch / AuthLoadingScreen')
   const indexHtml = read('index.html')

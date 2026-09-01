@@ -25,7 +25,6 @@ export const ROUTE_KEYS = {
   EMPLOYEES_GROUP: 'employees_group',
   EMPLOYEES_LIST: 'employees_list',
   EMPLOYEES_SCHEDULE: 'employees_schedule',
-  EMPLOYEES_RATING: 'employees_rating',
   EMPLOYEES_PAYROLL: 'employees_payroll',
   HR_GROUP: 'hr_group',
   HR_VACANCIES: 'hr_vacancies',
@@ -68,7 +67,6 @@ const ROUTE_ACCESS = {
   [ROUTE_KEYS.EMPLOYEES_GROUP]: [ROLE_IDS.ADMIN, ...STAFF_EMPLOYEES_ROLES],
   [ROUTE_KEYS.EMPLOYEES_LIST]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.EMPLOYEES_SCHEDULE]: [ROLE_IDS.ADMIN, ...STAFF_EMPLOYEES_ROLES],
-  [ROUTE_KEYS.EMPLOYEES_RATING]: [ROLE_IDS.ADMIN, ...STAFF_EMPLOYEES_ROLES],
   [ROUTE_KEYS.EMPLOYEES_PAYROLL]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.HR_GROUP]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.HR_VACANCIES]: [ROLE_IDS.ADMIN],
@@ -214,7 +212,6 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.HOME]: [P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW],
     [ROUTE_KEYS.EMPLOYEES_LIST]: [P.EMPLOYEES_VIEW],
     [ROUTE_KEYS.EMPLOYEES_SCHEDULE]: [P.SCHEDULE_VIEW_TEAM, P.SCHEDULE_VIEW_OWN],
-    [ROUTE_KEYS.EMPLOYEES_RATING]: [P.RATING_VIEW],
     [ROUTE_KEYS.EMPLOYEES_PAYROLL]: [P.PAYROLL_VIEW],
     [ROUTE_KEYS.HR_VACANCIES]: [P.RECRUITMENT_VIEW, P.RECRUITMENT_MANAGE_VACANCIES],
     [ROUTE_KEYS.HR_CANDIDATES]: [P.RECRUITMENT_VIEW, P.RECRUITMENT_MANAGE_CANDIDATES],
@@ -295,15 +292,6 @@ function adaptEmployeesNavItem(item, user, group) {
       label: 'Мой график',
       title: 'Мой график',
       description: 'Ваш график работы и фактические отметки.',
-    }
-  }
-
-  if (item.routeKey === ROUTE_KEYS.EMPLOYEES_RATING) {
-    return {
-      ...item,
-      label: 'Рейтинг сотрудников',
-      title: 'Рейтинг сотрудников',
-      description: 'Общий рейтинг компании и ваше место в списке.',
     }
   }
 
@@ -438,10 +426,6 @@ export function canEditEmployees(user) {
 export function canViewEmployeeProfile(user, employeeId) {
   if (canManageEmployees(user)) return true
   return canViewEmployeeSchedule(user, employeeId)
-}
-
-export function canViewEmployeeRating(user) {
-  return can(user, PERMISSION_CODES.RATING_VIEW)
 }
 
 export function canCreateEmployees(user) {

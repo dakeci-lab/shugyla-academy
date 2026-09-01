@@ -28,8 +28,6 @@ export const PERMISSION_CODES = {
   ATTENDANCE_CHECK_IN: 'attendance.check_in',
   ATTENDANCE_CHECK_OUT: 'attendance.check_out',
 
-  RATING_VIEW: 'rating.view',
-
   RECRUITMENT_VIEW: 'recruitment.view',
   RECRUITMENT_MANAGE_VACANCIES: 'recruitment.manage_vacancies',
   RECRUITMENT_MANAGE_CANDIDATES: 'recruitment.manage_candidates',
@@ -84,7 +82,6 @@ export const LEGACY_PERMISSION_ALIASES = {
   'employees.schedule.view_team': PERMISSION_CODES.SCHEDULE_VIEW_TEAM,
   'employees.schedule.view_own': PERMISSION_CODES.SCHEDULE_VIEW_OWN,
   'employees.schedule.edit': PERMISSION_CODES.SCHEDULE_EDIT,
-  'employees.rating.view': PERMISSION_CODES.RATING_VIEW,
   'employees.payroll.view': PERMISSION_CODES.PAYROLL_VIEW,
   'hr.vacancies.view': PERMISSION_CODES.RECRUITMENT_VIEW,
   'hr.vacancies.edit': PERMISSION_CODES.RECRUITMENT_MANAGE_VACANCIES,
@@ -102,7 +99,6 @@ export const PERMISSION_MODULES = {
   roles: 'Роли и доступы',
   schedule: 'График работы',
   attendance: 'Тайм-трекер',
-  rating: 'Рейтинг',
   recruitment: 'HR',
   procurement: 'Закупки',
   receiving: 'Приёмка',
@@ -121,7 +117,6 @@ export const RBAC_MATRIX_MODULES = [
   'employees',
   'schedule',
   'attendance',
-  'rating',
   'payroll',
   'recruitment',
   'procurement',
@@ -189,7 +184,6 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.ATTENDANCE_VIEW, name: 'Просмотр посещаемости', module: 'attendance', sortOrder: 50 },
   { code: PERMISSION_CODES.ATTENDANCE_CHECK_IN, name: 'Отметка прихода', module: 'attendance', sortOrder: 51 },
   { code: PERMISSION_CODES.ATTENDANCE_CHECK_OUT, name: 'Отметка ухода', module: 'attendance', sortOrder: 52 },
-  { code: PERMISSION_CODES.RATING_VIEW, name: 'Рейтинг сотрудников', module: 'rating', sortOrder: 60 },
   { code: PERMISSION_CODES.RECRUITMENT_VIEW, name: 'Раздел HR', module: 'recruitment', sortOrder: 70 },
   { code: PERMISSION_CODES.RECRUITMENT_MANAGE_VACANCIES, name: 'Управление вакансиями', module: 'recruitment', sortOrder: 71 },
   { code: PERMISSION_CODES.RECRUITMENT_MANAGE_CANDIDATES, name: 'Управление кандидатами', module: 'recruitment', sortOrder: 72 },
@@ -252,9 +246,9 @@ export const RBAC_SYSTEM_ROLES = [
   { code: 'admin', name: 'Администратор', description: 'Полный доступ ко всем разделам платформы.', isSystem: true },
   { code: 'buyer', name: 'Закупщик', description: 'Закуп, приёмка и поставщики.', isSystem: true },
   { code: 'receiver', name: 'Приёмщик', description: 'Приёмка товара.', isSystem: true },
-  { code: 'floor_admin', name: 'Администратор торгового зала', description: 'Рейтинг и график.', isSystem: true },
-  { code: 'cashier', name: 'Кассир', description: 'Рейтинг и личный график.', isSystem: true },
-  { code: 'seller', name: 'Продавец', description: 'Рейтинг и личный график.', isSystem: true },
+  { code: 'floor_admin', name: 'Администратор торгового зала', description: 'График работы.', isSystem: true },
+  { code: 'cashier', name: 'Кассир', description: 'Личный график.', isSystem: true },
+  { code: 'seller', name: 'Продавец', description: 'Личный график.', isSystem: true },
 ]
 
 const P = PERMISSION_CODES
@@ -263,27 +257,27 @@ export const RBAC_DEFAULT_ROLE_PERMISSIONS = {
   admin: ALL_PERMISSION_CODES,
   buyer: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN, P.RATING_VIEW,
+    P.SCHEDULE_VIEW_OWN,
     P.PROCUREMENT_VIEW, P.PROCUREMENT_CREATE, P.PROCUREMENT_EDIT, P.PROCUREMENT_DELETE, P.PROCUREMENT_TRANSFER,
     P.RECEIVING_VIEW, P.RECEIVING_MANAGE,
     P.SUPPLIERS_VIEW, P.SUPPLIERS_CREATE, P.SUPPLIERS_EDIT, P.SUPPLIERS_DELETE,
   ],
   receiver: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN, P.RATING_VIEW,
+    P.SCHEDULE_VIEW_OWN,
     P.RECEIVING_VIEW, P.RECEIVING_MANAGE,
   ],
   floor_admin: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN, P.SCHEDULE_VIEW_TEAM, P.SCHEDULE_EDIT, P.RATING_VIEW,
+    P.SCHEDULE_VIEW_OWN, P.SCHEDULE_VIEW_TEAM, P.SCHEDULE_EDIT,
   ],
   cashier: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN, P.RATING_VIEW,
+    P.SCHEDULE_VIEW_OWN,
   ],
   seller: [
     P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN, P.RATING_VIEW,
+    P.SCHEDULE_VIEW_OWN,
   ],
 }
 

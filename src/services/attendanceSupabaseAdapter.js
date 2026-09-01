@@ -110,7 +110,7 @@ export async function saveWorkLocation(location) {
 export async function getAttendanceSettings() {
   const rows = await throwIfError(
     await supabase.from('platform_attendance_settings').select('*').order('updated_at', { ascending: false }).limit(1),
-    'Загрузка настроек рейтинга'
+    'Загрузка настроек тайм-трекера'
   )
   if (!rows.length) return normalizeAttendanceSettings(DEFAULT_ATTENDANCE_SETTINGS)
   return normalizeAttendanceSettings(rows[0])
@@ -120,13 +120,6 @@ export async function saveAttendanceSettings(settings, updatedBy = null) {
   const current = await getAttendanceSettings()
   const row = {
     id: current.id || settings.id,
-    on_time_points: settings.onTimePoints,
-    completed_shift_points: settings.completedShiftPoints,
-    late_penalty: settings.latePenalty,
-    early_leave_penalty: settings.earlyLeavePenalty,
-    absence_penalty: settings.absencePenalty,
-    missing_check_in_penalty: settings.missingCheckInPenalty,
-    missing_check_out_penalty: settings.missingCheckOutPenalty,
     late_grace_minutes: settings.lateGraceMinutes,
     early_leave_grace_minutes: settings.earlyLeaveGraceMinutes,
     checkout_wait_minutes: settings.checkoutWaitMinutes,
@@ -135,7 +128,7 @@ export async function saveAttendanceSettings(settings, updatedBy = null) {
   }
   const saved = await throwIfError(
     await supabase.from('platform_attendance_settings').upsert(row).select().single(),
-    'Сохранение настроек рейтинга'
+    'Сохранение настроек тайм-трекера'
   )
   return normalizeAttendanceSettings(saved)
 }

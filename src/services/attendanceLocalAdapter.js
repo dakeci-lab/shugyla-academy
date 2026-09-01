@@ -81,13 +81,6 @@ export function getAttendanceSettings() {
 export function saveAttendanceSettings(settings, updatedBy = null) {
   const row = {
     id: settings.id || genId(),
-    on_time_points: settings.onTimePoints,
-    completed_shift_points: settings.completedShiftPoints,
-    late_penalty: settings.latePenalty,
-    early_leave_penalty: settings.earlyLeavePenalty,
-    absence_penalty: settings.absencePenalty,
-    missing_check_in_penalty: settings.missingCheckInPenalty,
-    missing_check_out_penalty: settings.missingCheckOutPenalty,
     late_grace_minutes: settings.lateGraceMinutes,
     early_leave_grace_minutes: settings.earlyLeaveGraceMinutes,
     checkout_wait_minutes: settings.checkoutWaitMinutes,

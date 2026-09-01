@@ -36,7 +36,7 @@ import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import TimeTrackerHomeCard from './TimeTrackerHomeCard'
 import '../admin-shared.css'
-import '../EmployeeRating.css'
+import '../TimeTrackerShared.css'
 
 function TimeTrackerLegacyCard({
   isHome,

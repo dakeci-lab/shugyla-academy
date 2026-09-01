@@ -35,14 +35,6 @@ export const PLATFORM_NAV = [
         description: 'Настройки графика персонала магазина.',
       },
       {
-        id: 'employees-rating',
-        path: '/platform/employees/rating',
-        label: 'Рейтинг',
-        routeKey: ROUTE_KEYS.EMPLOYEES_RATING,
-        title: 'Рейтинг сотрудников',
-        description: 'Итоговые баллы за выбранный период.',
-      },
-      {
         id: 'employees-payroll',
         path: '/platform/employees/payroll',
         label: 'Подсчёт зарплаты',

@@ -107,9 +107,6 @@ Deno.serve(async (req) => {
         controlledRunId: parsedBody.run.runId,
         ruleCodesFilter: parsedBody.run.ruleCodes ?? undefined,
         suppressEmployeePush: parsedBody.run.suppressEmployeePush,
-        controlledRecipientIds: parsedBody.run.recipientEmployeeIds,
-        escalationEventFilter: parsedBody.run.escalationEvents ?? undefined,
-        escalationOnly: parsedBody.run.escalationOnly,
       })
 
       return jsonResponse({
@@ -120,7 +117,6 @@ Deno.serve(async (req) => {
         runAt: result.runAt,
         enabledRules: result.enabledRules,
         shiftIds: parsedBody.run.shiftIds,
-        recipientOverride: Boolean(parsedBody.run.recipientEmployeeIds?.length),
         suppressEmployeePush: parsedBody.run.suppressEmployeePush,
         vapid: {
           configured: vapid.configured,
@@ -133,7 +129,6 @@ Deno.serve(async (req) => {
           private_key_fingerprint: vapid.privateKeyFingerprint,
         },
         result: result.result,
-        escalation: result.escalation,
       })
     }
 
@@ -153,7 +148,6 @@ Deno.serve(async (req) => {
       runAt: result.runAt,
       enabledRules: result.enabledRules,
       result: result.result,
-      escalation: result.escalation,
     })
   } catch {
     return adminErrorResponse('internal_error', 500)

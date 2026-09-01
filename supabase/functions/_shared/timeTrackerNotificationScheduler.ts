@@ -4,10 +4,6 @@ import {
   type DispatchResult,
   type TimeTrackerRule,
 } from './timeTrackerNotificationDispatch.ts'
-import {
-  dispatchAdminEscalations,
-  type EscalationDispatchResult,
-} from './adminEscalationDispatch.ts'
 import type { WebPushSenderFn } from './notificationDelivery.ts'
 
 export const WHITELIST_RULE_CODES = [
@@ -29,7 +25,6 @@ export type SchedulerResult = {
   dryRun: boolean
   enabledRules: number
   result: DispatchResult
-  escalation?: EscalationDispatchResult
 }
 
 function zeroCounts(): DispatchResult {
@@ -71,9 +66,6 @@ export async function runTimeTrackerNotificationScheduler(params: {
   controlledRunId?: string
   ruleCodesFilter?: string[]
   suppressEmployeePush?: boolean
-  controlledRecipientIds?: number[] | null
-  escalationEventFilter?: Array<'admin_clock_in_escalation' | 'admin_clock_out_escalation'>
-  escalationOnly?: boolean
 }): Promise<SchedulerResult> {
   const dryRun = params.dryRun ?? false
   const runAtIso = params.runAt.toISOString()
@@ -85,7 +77,7 @@ export async function runTimeTrackerNotificationScheduler(params: {
   }
 
   let result = zeroCounts()
-  if (!params.escalationOnly && !params.suppressEmployeePush && rules.length) {
+  if (!params.suppressEmployeePush && rules.length) {
     result = await dispatchTimeTrackerNotifications({
       serviceClient: params.serviceClient,
       runAt: params.runAt,
@@ -98,30 +90,12 @@ export async function runTimeTrackerNotificationScheduler(params: {
     })
   }
 
-  const escalation = await dispatchAdminEscalations({
-    serviceClient: params.serviceClient,
-    runAt: params.runAt,
-    dryRun,
-    shiftIds: params.shiftIds,
-    employeeIds: params.employeeIds,
-    controlledRunId: params.controlledRunId,
-    controlledRecipientIds: params.controlledRecipientIds,
-    eventFilter: params.escalationEventFilter,
-  })
-
-  const hasWork =
-    rules.length > 0 ||
-    escalation.matchedEscalations > 0 ||
-    escalation.createdViolations > 0 ||
-    Boolean(params.escalationOnly)
-
   return {
     ok: true,
-    status: hasWork || escalation.scannedShifts >= 0 ? 'completed' : 'no_enabled_rules',
+    status: rules.length > 0 ? 'completed' : 'no_enabled_rules',
     runAt: runAtIso,
     dryRun,
     enabledRules: rules.length,
     result,
-    escalation,
   }
 }

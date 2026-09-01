@@ -225,10 +225,6 @@ function stageStaticFrontend() {
     path.join(ROOT, 'src/components/admin/sections/WorkScheduleSection.jsx'),
     'utf8'
   )
-  const rating = fs.readFileSync(
-    path.join(ROOT, 'src/components/admin/sections/EmployeeRatingSection.jsx'),
-    'utf8'
-  )
 
   assert('workforce service uses functions.invoke', workforce.includes("supabase.functions.invoke('admin-team-workforce-data'"))
   assert('workforce service has no service_role', !workforce.includes('SERVICE_ROLE'))
@@ -243,10 +239,8 @@ function stageStaticFrontend() {
     'utf8'
   )
   assert('EmployeeScheduleSection uses fetchEmployeeWorkforceBundle', editor.includes('fetchEmployeeWorkforceBundle'))
-  assert('EmployeeRatingSection uses fetchTeamWorkforceForMonth', rating.includes('fetchTeamWorkforceForMonth'))
   assert('OwnerDashboard cloud path avoids direct team cache only', owner.includes('isCloudMode()'))
   assert('schedule error does not masquerade as empty list', schedule.includes('!error && employees.length === 0'))
-  assert('rating error does not masquerade as empty list', rating.includes('!error && rows.length === 0'))
   console.log('')
 }
 
@@ -429,9 +423,9 @@ async function stageDtoSecurity() {
 
   const res = await invoke(state.workforceUrl, {
     token: state.tokens.admin,
-    body: defaultBody({ view: 'rating' }),
+    body: defaultBody({ view: 'schedule' }),
   })
-  assert('rating view -> 200', res.status === 200 && res.json?.ok === true)
+  assert('schedule view -> 200', res.status === 200 && res.json?.ok === true)
 
   const serialized = JSON.stringify(res.json)
   for (const forbidden of FORBIDDEN_RESPONSE_KEYS) {
@@ -470,13 +464,6 @@ async function stageWorkforceData() {
   })
   assert('dashboard view -> 200', dashboard.status === 200)
   assert('dashboard includes shift on selected day', (dashboard.json?.shifts?.length ?? 0) >= 1)
-
-  const rating = await invoke(state.workforceUrl, {
-    token: state.tokens.admin,
-    body: defaultBody({ view: 'rating' }),
-  })
-  assert('rating view -> 200', rating.status === 200)
-  assert('rating includes employees', (rating.json?.employees?.length ?? 0) >= 2)
 
   console.log('')
 }

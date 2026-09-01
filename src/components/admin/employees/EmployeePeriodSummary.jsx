@@ -23,20 +23,10 @@ export default function EmployeePeriodSummary({
   month,
   shifts = [],
   loading = false,
-  rating = null,
-  ratingLoading = false,
-  showRating = false,
 }) {
   const stats = summarizeEmployeePeriod(shifts, { year, month })
   const periodLabel =
     year && month ? formatMonthYearLabel(year, month) : 'выбранный период'
-
-  const ratingValue =
-    !showRating || ratingLoading
-      ? null
-      : rating == null || Number.isNaN(Number(rating))
-        ? '—'
-        : String(rating)
 
   return (
     <section className="employee-period-summary" aria-label={`Статистика за ${periodLabel}`}>
@@ -62,13 +52,6 @@ export default function EmployeePeriodSummary({
           value={String(stats.earlyLeaveCount)}
           loading={loading}
         />
-        {showRating && (
-          <StatCard
-            label="Рейтинг"
-            value={ratingValue ?? '—'}
-            loading={loading || ratingLoading}
-          />
-        )}
       </div>
     </section>
   )

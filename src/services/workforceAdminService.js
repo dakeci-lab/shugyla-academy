@@ -145,7 +145,7 @@ export async function fetchHomeWorkforceSummary(dateKey) {
  * @param {{
  *   dateFrom: string,
  *   dateTo: string,
- *   view: 'dashboard'|'schedule'|'rating'|'home-summary'|'payroll',
+ *   view: 'dashboard'|'schedule'|'home-summary'|'payroll',
  *   employeeId?: number|null,
  * }} params
  */
@@ -213,7 +213,7 @@ export async function fetchEmployeeWorkforceBundle(employeeId, year, month, view
   }
 
   // Schedule calendar shows adjacent-month days in the grid — load that full range once.
-  // Rating/other views stay on strict calendar-month bounds.
+  // Other views stay on strict calendar-month bounds.
   const { dateFrom, dateTo } =
     view === 'schedule' ? getMonthCalendarRange(year, month) : monthToDateRange(year, month)
 

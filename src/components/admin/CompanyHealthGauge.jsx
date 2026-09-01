@@ -1,9 +1,9 @@
-import { clampRatingScore } from '../../utils/attendanceData'
+import { clampPercentScore } from '../../utils/attendanceData'
 import { getCompanyHealthColor } from '../../utils/companyHealth'
 
 /** Круговой индикатор здоровья компании 0–100% */
 export default function CompanyHealthGauge({ score, size = 220 }) {
-  const value = clampRatingScore(score)
+  const value = clampPercentScore(score)
   const color = getCompanyHealthColor(value)
   const stroke = 14
   const radius = (size - stroke) / 2
