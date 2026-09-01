@@ -55,6 +55,8 @@
 
 .employee-docs__row-actions {
   flex-shrink: 0;
+  display: flex;
+  gap: 8px;
 }
 
 .employee-docs__row-empty {
@@ -82,6 +84,6 @@
   }
 
   .employee-docs__row-actions .btn {
-    width: 100%;
+    flex: 1;
   }
 }

@@ -157,3 +157,27 @@ export async function uploadEmployeeDocument(employeeId, documentType, file) {
 
   return normalizeEmployeeDocument(data)
 }
+
+/**
+ * Удаление документа — своего или, при наличии employees.edit, любого
+ * сотрудника (см. RLS в 20260901130000_employee_documents_admin_write_access.sql).
+ */
+export async function deleteEmployeeDocument(document) {
+  assertCloudReady()
+  if (!document?.id || !document?.storagePath) {
+    throw new Error('Документ не найден')
+  }
+
+  const { error: dbError } = await supabase
+    .from('employee_documents')
+    .delete()
+    .eq('id', document.id)
+
+  if (dbError) {
+    throw new Error(dbError.message || 'Не удалось удалить документ')
+  }
+
+  // Best-effort cleanup: DB row is already gone, an orphaned storage object
+  // is harmless (private bucket, unreachable without a matching row/signed URL).
+  await supabase.storage.from(EMPLOYEE_DOCUMENT_BUCKET).remove([document.storagePath])
+}

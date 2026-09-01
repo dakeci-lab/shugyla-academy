@@ -35,6 +35,7 @@ function main() {
   console.log('=== Employee documents verification ===\n')
 
   const migration = read('supabase/migrations/20260718240000_employee_documents.sql')
+  const adminMigration = read('supabase/migrations/20260901130000_employee_documents_admin_write_access.sql')
   const service = read('src/services/employeeDocumentService.js')
   const page = read('src/pages/platform/PlatformEmployeeDocuments.jsx')
   const catalog = read('src/utils/employeeDocuments.js')
@@ -53,8 +54,31 @@ function main() {
       (migration.includes('public = false') || migration.includes('public,\n  false') || migration.includes('false,'))
   )
   assert('RLS own or admin select', migration.includes('employee_documents_select_own_or_admin'))
-  assert('no delete policy for documents table', !migration.includes('for delete'))
   assert('permission helper', migration.includes('current_user_has_permission'))
+
+  console.log('\nStage 1b: Admin write access (owner reported: could not manage others\' documents)')
+  assert(
+    'insert/update RLS has employees.edit bypass (table)',
+    adminMigration.includes('employee_documents_insert_own_or_admin') &&
+      adminMigration.includes('employee_documents_update_own_or_admin') &&
+      (adminMigration.match(/current_user_has_permission\('employees\.edit'\)/g) || []).length >= 4,
+  )
+  assert(
+    'delete policy exists (table) — self or employees.edit',
+    adminMigration.includes('employee_documents_delete_own_or_admin') &&
+      adminMigration.includes('grant delete on table public.employee_documents'),
+  )
+  assert(
+    'storage insert/update RLS has employees.edit bypass',
+    (adminMigration.match(/employees\.edit/g) || []).length >= 6,
+  )
+  assert('storage delete policy exists', adminMigration.includes('employee_documents_storage_delete'))
+  assert('delete service function exists', service.includes('export async function deleteEmployeeDocument'))
+  assert(
+    'page gates upload/delete on isOwn OR canEditEmployees, not isOwn alone',
+    page.includes('canEditEmployees(user)') && !page.includes('const canUpload = isOwn'),
+  )
+  assert('delete button rendered when canManage', page.includes('onDeleteClick') && page.includes('Удалить'))
 
   console.log('\nStage 2: App wiring')
   assert('extensible document types', catalog.includes('identity_card') && catalog.includes('EMPLOYEE_DOCUMENT_TYPES'))

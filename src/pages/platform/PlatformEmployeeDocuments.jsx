@@ -5,6 +5,7 @@ import { useToast } from '../../context/ToastContext'
 import { usePlatformPageTitle } from '../../context/PlatformPageTitleContext'
 import {
   canManageEmployees,
+  canEditEmployees,
   getEmployeeProfilePath,
 } from '../../config/permissions'
 import {
@@ -13,20 +14,24 @@ import {
 } from '../../utils/employeeDocuments'
 import {
   createEmployeeDocumentSignedUrl,
+  deleteEmployeeDocument,
   listEmployeeDocuments,
   uploadEmployeeDocument,
 } from '../../services/employeeDocumentService'
 import { isCloudMode } from '../../lib/dataMode'
 import { DelayedLoadingSkeleton } from '../../components/loading/LoadingSkeleton'
+import ConfirmDialog from '../../components/admin/ConfirmDialog'
+import '../../components/admin/admin-shared.css'
 import './PlatformEmployeeDocuments.css'
 
 function DocumentRow({
   type,
   document,
-  canUpload,
+  canManage,
   uploading,
   onUploadClick,
   onView,
+  onDeleteClick,
 }) {
   const uploaded = Boolean(document)
   return (
@@ -43,14 +48,25 @@ function DocumentRow({
       </div>
       <div className="employee-docs__row-actions">
         {uploaded ? (
-          <button
-            type="button"
-            className="btn btn--outline btn--sm"
-            onClick={() => onView(document)}
-          >
-            Открыть
-          </button>
-        ) : canUpload ? (
+          <>
+            <button
+              type="button"
+              className="btn btn--outline btn--sm"
+              onClick={() => onView(document)}
+            >
+              Открыть
+            </button>
+            {canManage ? (
+              <button
+                type="button"
+                className="btn btn--outline btn--sm admin-table__danger"
+                onClick={() => onDeleteClick(document)}
+              >
+                Удалить
+              </button>
+            ) : null}
+          </>
+        ) : canManage ? (
           <button
             type="button"
             className="btn btn--primary btn--sm"
@@ -80,7 +96,9 @@ export default function PlatformEmployeeDocuments() {
   const isOwn = Number(user?.id) === employeeId
   const canAdminView = canManageEmployees(user)
   const canAccess = isOwn || canAdminView
-  const canUpload = isOwn
+  // Own documents, or admin/owner with employees.edit — matches the RLS
+  // bypass in 20260901130000_employee_documents_admin_write_access.sql.
+  const canManage = isOwn || canEditEmployees(user)
 
   const backPath = isOwn
     ? '/platform/profile'
@@ -95,6 +113,8 @@ export default function PlatformEmployeeDocuments() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [uploadingType, setUploadingType] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting] = useState(false)
 
   const docsByType = useMemo(() => {
     const map = new Map()
@@ -130,7 +150,7 @@ export default function PlatformEmployeeDocuments() {
   }, [canAccess, loadDocuments])
 
   function handleUploadClick(typeId) {
-    if (!canUpload || uploadingType) return
+    if (!canManage || uploadingType) return
     pendingTypeRef.current = typeId
     fileInputRef.current?.click()
   }
@@ -163,6 +183,26 @@ export default function PlatformEmployeeDocuments() {
       window.open(url, '_blank', 'noopener,noreferrer')
     } catch (err) {
       showWarning(err?.message || 'Не удалось открыть документ')
+    }
+  }
+
+  function handleDeleteClick(document) {
+    if (!canManage) return
+    setDeleteTarget(document)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    try {
+      await deleteEmployeeDocument(deleteTarget)
+      setDocuments((prev) => prev.filter((item) => item.id !== deleteTarget.id))
+      showSuccess('Документ удалён')
+      setDeleteTarget(null)
+    } catch (err) {
+      showWarning(err?.message || 'Не удалось удалить документ')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -203,13 +243,25 @@ export default function PlatformEmployeeDocuments() {
               key={type.id}
               type={type}
               document={docsByType.get(type.id) || null}
-              canUpload={canUpload}
+              canManage={canManage}
               uploading={uploadingType === type.id}
               onUploadClick={handleUploadClick}
               onView={handleView}
+              onDeleteClick={handleDeleteClick}
             />
           ))}
         </div>
+      )}
+
+      {deleteTarget && (
+        <ConfirmDialog
+          title="Удалить документ?"
+          message="Файл будет удалён без возможности восстановления. Это действие нельзя отменить."
+          confirmLabel="Удалить"
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={confirmDelete}
+          loading={deleting}
+        />
       )}
     </div>
   )
