@@ -89,8 +89,9 @@ function main() {
 
   // Profile
   assert('profile shows должность meta', header.includes('Должность'))
-  assert('profile shows группа', header.includes('Группа должности'))
-  assert('profile shows роль в системе', header.includes('Роль в системе'))
+  assert('profile no longer shows separate группа row', !header.includes('Группа должности'))
+  assert('profile no longer shows separate роль в системе row', !header.includes('Роль в системе'))
+  assert('profile subtitle under name shows role, not position', header.includes('employee-profile-header__role">{systemRoleLabel}'))
   assert('profile uses structured position label', header.includes('getEmployeePositionLabel'))
   assert('profile role label not from position', !profile.includes('nextEmployee.position || getRoleLabel'))
   assert('unlinked position helper', employeeData.includes('isEmployeePositionUnlinked'))

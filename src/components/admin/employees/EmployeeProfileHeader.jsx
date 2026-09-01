@@ -10,7 +10,6 @@ import {
   getWorkModeLabel,
   getSalaryCalculationTypeLabel,
   getEmployeePositionLabel,
-  getEmployeePositionGroupLabel,
   isEmployeePositionUnlinked,
 } from '../../../utils/employeeData'
 import { getRoleLabel } from '../../../data/roles'
@@ -34,7 +33,6 @@ export default function EmployeeProfileHeader({
   if (!employee) return null
 
   const positionLabel = getEmployeePositionLabel(employee)
-  const groupLabel = getEmployeePositionGroupLabel(employee)
   const unlinked = isEmployeePositionUnlinked(employee)
   const headerPosition =
     positionLabel ||
@@ -66,7 +64,7 @@ export default function EmployeeProfileHeader({
               type={getEmploymentStatusBadgeType(employee.employmentStatus)}
             />
           </div>
-          <p className="employee-profile-header__role">{headerPosition}</p>
+          <p className="employee-profile-header__role">{systemRoleLabel}</p>
           {unlinked && employee.position ? (
             <p className="employee-profile-header__legacy-position">{employee.position}</p>
           ) : null}
@@ -78,17 +76,6 @@ export default function EmployeeProfileHeader({
                 {positionArchived ? ' (архивная)' : ''}
                 {unlinked ? ' (не привязана к справочнику)' : ''}
               </span>
-            </p>
-            <p className="employee-profile-header__date-row">
-              <span className="employee-profile-header__meta-label">Группа должности</span>
-              <span>
-                {displayValue(groupLabel)}
-                {employee.positionGroupIsActive === false ? ' (архивная)' : ''}
-              </span>
-            </p>
-            <p className="employee-profile-header__date-row">
-              <span className="employee-profile-header__meta-label">Роль в системе</span>
-              <span>{displayValue(systemRoleLabel)}</span>
             </p>
             {formatEmployeeDateRu(employee.hiredAt) && (
               <p className="employee-profile-header__date-row">
