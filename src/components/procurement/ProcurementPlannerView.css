@@ -36,6 +36,11 @@
   opacity: 1;
 }
 
+.proc-planner__tip-wrap--topbar[data-tooltip]::after {
+  bottom: auto;
+  top: calc(100% + 6px);
+}
+
 .proc-planner__create-btn {
   display: inline-flex;
   align-items: center;

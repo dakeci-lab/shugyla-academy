@@ -2321,6 +2321,17 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
           ))}
         </span>
       ) : null}
+      <PlatformToolbarActionWrap>
+        <span className="proc-planner__tip-wrap proc-planner__tip-wrap--topbar" data-tooltip={syncTooltip}>
+          <PlatformSyncButton
+            onClick={() => void handleSync()}
+            syncing={syncing}
+            disabled={Boolean(syncDisabledReason)}
+            title={syncTooltip}
+            aria-label={syncAria}
+          />
+        </span>
+      </PlatformToolbarActionWrap>
     </div>
   )
 
@@ -2419,17 +2430,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                 </span>
               ) : null}
             </button>
-            <PlatformToolbarActionWrap>
-              <span className="proc-planner__tip-wrap" data-tooltip={syncTooltip}>
-                <PlatformSyncButton
-                  onClick={() => void handleSync()}
-                  syncing={syncing}
-                  disabled={Boolean(syncDisabledReason)}
-                  title={syncTooltip}
-                  aria-label={syncAria}
-                />
-              </span>
-            </PlatformToolbarActionWrap>
             <PlatformToolbarActionWrap>
               <PlannerTooltipButton
                 className="proc-planner__create-btn"
