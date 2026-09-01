@@ -59,7 +59,8 @@ function main() {
   console.log('Stage 2: Filter')
 
   assert('filter popover component', section.includes('EmployeeFilterPopover'))
-  assert('filter contains status', filter.includes('Статус'))
+  assert('filter has show-terminated checkbox', filter.includes('Показать уволенных сотрудников'))
+  assert('filter checkbox is boolean, not a status radiogroup', !filter.includes('role="radiogroup"'))
   assert('filter contains role select', filter.includes('Все роли'))
   assert('default active status', section.includes('EMPLOYEE_LIST_DEFAULT_STATUS'))
   assert('default status is active', employeeData.includes("EMPLOYEE_LIST_DEFAULT_STATUS = 'active'"))
@@ -161,6 +162,14 @@ function main() {
   assert('mobile cards breakpoint', tableCss.includes('max-width: 900px') || tableCss.includes('max-width: 768px'))
   assert('cloud list preserved', section.includes('listEmployeesForAdmin'))
   assert('neutral hover accent', tableCss.includes('#f4faf6') || tableCss.includes('#F4FAF6'))
+
+  console.log('Stage 7: Status badge next to name, no status column in list')
+
+  assert('name and status badge share one row', header.includes('employee-profile-header__name-row'))
+  assert('no standalone status block in header', !header.includes('employee-profile-header__status'))
+  assert('no status column header in table', !table.includes('<th scope="col">Статус</th>'))
+  assert('no status column width rule', !tableCss.includes('employee-list-table__col-status'))
+  assert('no StatusBadge import left in table', !table.includes("from '../StatusBadge'"))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

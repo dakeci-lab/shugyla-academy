@@ -1,15 +1,10 @@
 import Can from '../../auth/Can'
 import { PERMISSION_CODES } from '../../../config/permissions'
-import StatusBadge from '../StatusBadge'
 import IconActionButton from '../IconActionButton'
 import EmployeeAvatar from '../../EmployeeAvatar'
 import { PencilIcon } from '../../icons/PlatformIcons'
 import LoadingSkeleton from '../../loading/LoadingSkeleton'
 import useDelayedLoading from '../../loading/useDelayedLoading'
-import {
-  getEmploymentStatusLabel,
-  getEmploymentStatusBadgeType,
-} from '../../../utils/employeeData'
 import '../IconActionButton.css'
 import './EmployeeListTable.css'
 
@@ -118,7 +113,6 @@ export default function EmployeeListTable({
               <col className="employee-list-table__col-login" />
               <col className="employee-list-table__col-group" />
               <col className="employee-list-table__col-role" />
-              <col className="employee-list-table__col-status" />
               <col className="employee-list-table__col-actions" />
             </colgroup>
             <thead>
@@ -128,7 +122,6 @@ export default function EmployeeListTable({
                 <th scope="col">Логин</th>
                 <th scope="col">Группа должностей</th>
                 <th scope="col">Роль</th>
-                <th scope="col">Статус</th>
                 <th scope="col" className="employee-list-table__actions-head">
                   <span className="visually-hidden">Действия</span>
                 </th>
@@ -200,12 +193,6 @@ export default function EmployeeListTable({
                         {roleLabel}
                       </span>
                     </td>
-                    <td>
-                      <StatusBadge
-                        label={getEmploymentStatusLabel(employee.employmentStatus)}
-                        type={getEmploymentStatusBadgeType(employee.employmentStatus)}
-                      />
-                    </td>
                     <td
                       className="employee-list-table__actions"
                       onClick={(event) => event.stopPropagation()}
@@ -261,10 +248,6 @@ export default function EmployeeListTable({
                   <h3 className="employee-card-item__title">{employee.name}</h3>
                 </div>
                 <div className="employee-card-item__head-actions">
-                  <StatusBadge
-                    label={getEmploymentStatusLabel(employee.employmentStatus)}
-                    type={getEmploymentStatusBadgeType(employee.employmentStatus)}
-                  />
                   <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
                     {canEdit && onEdit ? (
                       <IconActionButton

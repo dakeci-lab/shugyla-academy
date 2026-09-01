@@ -72,9 +72,7 @@ const CLOUD_PAGE_SIZE = ADMIN_LIST_DEFAULT_PAGE_SIZE
 const NARROW_SEARCH_QUERY = '(max-width: 480px)'
 
 function mapFilterToListStatus(filter) {
-  if (filter === 'all') return 'all'
-  if (filter === 'deactivated') return 'deactivated'
-  return 'active'
+  return filter === 'deactivated' ? 'deactivated' : 'active'
 }
 
 function mapListLoadError(err) {

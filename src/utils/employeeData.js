@@ -284,20 +284,11 @@ export function getScheduleEligibleEmployees(filter = 'active') {
 /** Значение фильтра списка сотрудников по умолчанию */
 export const EMPLOYEE_LIST_DEFAULT_STATUS = 'active'
 
-/** Варианты фильтра статуса на странице списка сотрудников */
-export const EMPLOYEE_LIST_STATUS_FILTER_OPTIONS = [
-  { id: 'all', label: 'Все' },
-  { id: 'active', label: 'Работает' },
-  { id: 'deactivated', label: 'Уволен' },
-]
-
 /** Компактная подпись количества в фильтре сотрудников */
 export function formatEmployeeFilterCount(status, count) {
   const total = Number(count) || 0
-  if (status === 'all') return `Найдено: ${total}`
-  if (status === 'active') return `Работает: ${total}`
   if (status === 'deactivated') return `Уволен: ${total}`
-  return `Найдено: ${total}`
+  return `Работает: ${total}`
 }
 
 /** Клиентская фильтрация списка сотрудников по статусу, роли и поиску */

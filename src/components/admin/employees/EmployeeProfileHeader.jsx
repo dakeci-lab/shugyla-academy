@@ -59,17 +59,17 @@ export default function EmployeeProfileHeader({
           size="lg"
         />
         <div className="employee-profile-header__info">
-          <h1 className="employee-profile-header__name">{employee.name}</h1>
-          <p className="employee-profile-header__role">{headerPosition}</p>
-          {unlinked && employee.position ? (
-            <p className="employee-profile-header__legacy-position">{employee.position}</p>
-          ) : null}
-          <div className="employee-profile-header__status">
+          <div className="employee-profile-header__name-row">
+            <h1 className="employee-profile-header__name">{employee.name}</h1>
             <StatusBadge
               label={getEmploymentStatusLabel(employee.employmentStatus)}
               type={getEmploymentStatusBadgeType(employee.employmentStatus)}
             />
           </div>
+          <p className="employee-profile-header__role">{headerPosition}</p>
+          {unlinked && employee.position ? (
+            <p className="employee-profile-header__legacy-position">{employee.position}</p>
+          ) : null}
           <div className="employee-profile-header__dates">
             <p className="employee-profile-header__date-row">
               <span className="employee-profile-header__meta-label">Должность</span>

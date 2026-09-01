@@ -23,6 +23,13 @@
   flex: 1;
 }
 
+.employee-profile-header__name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+
 .employee-profile-header__name {
   margin: 0;
   font-size: 1.35rem;
@@ -45,10 +52,6 @@
   color: var(--color-text-secondary, #64748b);
   font-size: 0.85rem;
   overflow-wrap: anywhere;
-}
-
-.employee-profile-header__status {
-  margin-top: 10px;
 }
 
 .employee-profile-header__dates {

@@ -4,7 +4,6 @@ import useMediaQuery from '../../../hooks/useMediaQuery'
 import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
 import {
   EMPLOYEE_LIST_DEFAULT_STATUS,
-  EMPLOYEE_LIST_STATUS_FILTER_OPTIONS,
   formatEmployeeFilterCount,
 } from '../../../utils/employeeData'
 import './EmployeeFilterPopover.css'
@@ -22,30 +21,6 @@ function EmployeeFilterFields({
   return (
     <>
       <div className="employee-filter-popover__section">
-        <span className="employee-filter-popover__label">Статус</span>
-        <div
-          className="employee-filter-popover__options"
-          role="radiogroup"
-          aria-label="Статус сотрудника"
-        >
-          {EMPLOYEE_LIST_STATUS_FILTER_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              role="radio"
-              aria-checked={draftStatus === option.id}
-              className={`employee-filter-popover__option${
-                draftStatus === option.id ? ' employee-filter-popover__option--active' : ''
-              }`}
-              onClick={() => onStatusChange?.(option.id)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="employee-filter-popover__section">
         <span className="employee-filter-popover__label">Роль</span>
         <select
           className="admin-form__select employee-filter-popover__role-select"
@@ -60,6 +35,17 @@ function EmployeeFilterFields({
             </option>
           ))}
         </select>
+      </div>
+
+      <div className="employee-filter-popover__section">
+        <label className="employee-filter-popover__checkbox-row">
+          <input
+            type="checkbox"
+            checked={draftStatus === 'deactivated'}
+            onChange={(event) => onStatusChange?.(event.target.checked ? 'deactivated' : 'active')}
+          />
+          <span>Показать уволенных сотрудников</span>
+        </label>
       </div>
 
       <p className="employee-filter-popover__count">
