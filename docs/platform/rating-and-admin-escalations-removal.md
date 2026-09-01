@@ -1,6 +1,6 @@
 # Полное удаление «Рейтинга» и админского слоя эскалаций тайм-трекера
 
-## 0. Статус: реализовано, verify зелёный (54/54), build чистый; **миграция БД написана, но НЕ применена — ждёт отдельного «гоу»**
+## 0. Статус: реализовано и полностью применено — код запушен в `main`, 3 Edge Functions передеплоены, миграция БД применена и подтверждена постчеком (2026-09-01)
 
 ## 1. Контекст
 
@@ -143,12 +143,23 @@
 же метод, что использовался в этой сессии для предыдущих миграций) —
 **только после явного подтверждения**, отдельно от написания файла.
 
-**Постчек** после применения — те же запросы, что и preflight, ожидаемый
-результат: `permissions`/`role_permissions`/`time_tracker_violations`/
-`time_tracker_escalation_settings`/`notification_templates`/`notification_rules`
-по эскалациям — 0 строк или таблица не существует;
-`platform_attendance_settings` — 6 колонок (id, 3 допуска по времени,
-updated_by, updated_at), без баллов.
+**Постчек — выполнен, подтверждено:**
+
+| Проверка | Результат |
+|---|---|
+| `permissions` (`rating.view`) | 0 строк |
+| `notification_templates` (эскалации) | 0 строк |
+| `notification_rules` (эскалации) | 0 строк |
+| `time_tracker_violations` | таблица не существует |
+| `time_tracker_escalation_settings` | таблица не существует |
+| `platform_attendance_settings` колонок | 6 (id, 3 допуска, updated_by, updated_at) |
+
+Применено через `npx supabase db query --linked --file ...` +
+`npx supabase migration repair --linked --status applied 20260901120000`.
+Все три Edge Function (`admin-team-workforce-data`,
+`admin-notification-settings`, `run-time-tracker-notification-scheduler`)
+передеплоены тем же способом, что и раньше в этой сессии
+(`npx supabase functions deploy <имя> --project-ref cxadzerxndlscwvdaymk`).
 
 ## 5. Verify
 
