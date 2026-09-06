@@ -46,7 +46,7 @@ import {
 } from '../../../utils/paymentsColumnSettingsMerge'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
-import { PlatformFilterButton, PlatformToolbarIconButton } from '../../platform/PlatformSearchToolbar'
+import { PlatformFilterButton } from '../../platform/PlatformSearchToolbar'
 import { ChevronDownIcon, SearchIcon } from '../../icons/PlatformIcons'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './SupplierPaymentsPanel.css'
@@ -237,19 +237,17 @@ function MissingTermsBanner({
 
 function PaymentsColumnSettingsIcon({ size = 18 }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <circle cx="12" cy="12" r="3" />
-      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path
+        d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61
+        l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81
+        c-0.04-0.24-0.24-0.41-0.48-0.41h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33
+        c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12
+        s0.02,0.64,0.07,0.94l-2.03,1.58c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96
+        c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54
+        c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61
+        L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"
+      />
     </svg>
   )
 }
@@ -330,6 +328,7 @@ function CompactPaymentSchedule({
   onColumnDrop,
   onColumnDragEnd,
   onColumnResizePointerDown,
+  columnSettingsGear,
 }) {
   const [missingExpanded, setMissingExpanded] = useState(false)
 
@@ -388,17 +387,20 @@ function CompactPaymentSchedule({
 
       {filteredSections.length > 0 ? (
         <div className="spo-compact__wrap">
-          <CompactColumnsHead
-            visibleColumns={visibleColumns}
-            gridStyle={gridStyle}
-            dragColumnName={dragColumnName}
-            dropColumnName={dropColumnName}
-            onColumnDragStart={onColumnDragStart}
-            onColumnDragOver={onColumnDragOver}
-            onColumnDrop={onColumnDrop}
-            onColumnDragEnd={onColumnDragEnd}
-            onColumnResizePointerDown={onColumnResizePointerDown}
-          />
+          <div className="spo-compact__head-row">
+            <CompactColumnsHead
+              visibleColumns={visibleColumns}
+              gridStyle={gridStyle}
+              dragColumnName={dragColumnName}
+              dropColumnName={dropColumnName}
+              onColumnDragStart={onColumnDragStart}
+              onColumnDragOver={onColumnDragOver}
+              onColumnDrop={onColumnDrop}
+              onColumnDragEnd={onColumnDragEnd}
+              onColumnResizePointerDown={onColumnResizePointerDown}
+            />
+            {columnSettingsGear}
+          </div>
           <div className="spo-compact">
             {filteredSections.map(({ section, groups }) => {
               const count = filterActive ? groups.length : tabCounts[section.id] || 0
@@ -1237,55 +1239,6 @@ export default function SupplierPaymentsPanel({
                 </button>
               </div>
             ) : null}
-            <div className="spo-compact__toolbar">
-              <div className="spo-compact__column-settings" ref={columnSettingsPopoverRef}>
-                <PlatformToolbarIconButton
-                  active={columnSettingsOpen}
-                  aria-expanded={columnSettingsOpen}
-                  aria-controls="spo-compact-column-settings-panel"
-                  aria-label="Настройки столбцов таблицы"
-                  title="Настройки столбцов"
-                  onClick={() => setColumnSettingsOpen((open) => !open)}
-                >
-                  <PaymentsColumnSettingsIcon size={20} />
-                </PlatformToolbarIconButton>
-                {columnSettingsOpen ? (
-                  <div
-                    id="spo-compact-column-settings-panel"
-                    className="spo-compact__column-settings-popover"
-                    role="dialog"
-                    aria-label="Видимость столбцов"
-                  >
-                    <div className="spo-compact__column-settings-head">
-                      <strong>Видимость столбцов</strong>
-                      <p>Настройте таблицу под себя — выбор сохранится</p>
-                    </div>
-                    <div className="spo-compact__column-settings-list">
-                      {[...columnSettings.columns]
-                        .sort((a, b) => a.columnOrdinalNumber - b.columnOrdinalNumber)
-                        .filter((col) => getTogglablePaymentsColumnNames().includes(col.columnName))
-                        .map((col) => (
-                          <label key={col.columnName} className="spo-compact__column-settings-item">
-                            <input
-                              type="checkbox"
-                              checked={col.visible !== false}
-                              onChange={() => handleColumnVisibilityToggle(col.columnName)}
-                            />
-                            <span>{getPaymentsColumnDef(col.columnName)?.label || col.columnName}</span>
-                          </label>
-                        ))}
-                    </div>
-                    <button
-                      type="button"
-                      className="spo-compact__column-settings-reset btn btn--ghost"
-                      onClick={handleResetColumnSettings}
-                    >
-                      По умолчанию
-                    </button>
-                  </div>
-                ) : null}
-              </div>
-            </div>
             <CompactPaymentSchedule
               view={view}
               todayKey={todayKey}
@@ -1305,6 +1258,56 @@ export default function SupplierPaymentsPanel({
               onColumnDrop={handleColumnDrop}
               onColumnDragEnd={handleColumnDragEnd}
               onColumnResizePointerDown={handleColumnResizePointerDown}
+              columnSettingsGear={
+                <div className="spo-compact__column-settings" ref={columnSettingsPopoverRef}>
+                  <button
+                    type="button"
+                    className="spo-compact__column-settings-btn"
+                    aria-expanded={columnSettingsOpen}
+                    aria-controls="spo-compact-column-settings-panel"
+                    aria-label="Настройки столбцов таблицы"
+                    title="Настройки столбцов"
+                    onClick={() => setColumnSettingsOpen((open) => !open)}
+                  >
+                    <PaymentsColumnSettingsIcon size={18} />
+                  </button>
+                  {columnSettingsOpen ? (
+                    <div
+                      id="spo-compact-column-settings-panel"
+                      className="spo-compact__column-settings-popover"
+                      role="dialog"
+                      aria-label="Видимость столбцов"
+                    >
+                      <div className="spo-compact__column-settings-head">
+                        <strong>Видимость столбцов</strong>
+                        <p>Настройте таблицу под себя — выбор сохранится</p>
+                      </div>
+                      <div className="spo-compact__column-settings-list">
+                        {[...columnSettings.columns]
+                          .sort((a, b) => a.columnOrdinalNumber - b.columnOrdinalNumber)
+                          .filter((col) => getTogglablePaymentsColumnNames().includes(col.columnName))
+                          .map((col) => (
+                            <label key={col.columnName} className="spo-compact__column-settings-item">
+                              <input
+                                type="checkbox"
+                                checked={col.visible !== false}
+                                onChange={() => handleColumnVisibilityToggle(col.columnName)}
+                              />
+                              <span>{getPaymentsColumnDef(col.columnName)?.label || col.columnName}</span>
+                            </label>
+                          ))}
+                      </div>
+                      <button
+                        type="button"
+                        className="spo-compact__column-settings-reset btn btn--ghost"
+                        onClick={handleResetColumnSettings}
+                      >
+                        По умолчанию
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+              }
             />
           </>
         ) : (

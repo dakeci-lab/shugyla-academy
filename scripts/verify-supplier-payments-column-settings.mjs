@@ -157,10 +157,34 @@ async function main() {
   assert.match(panelSrc, /reorderTogglablePaymentsColumns\(/)
   ok('pointer-resize and native-drag-reorder handlers wired, backed by the merge utility (not ad hoc state mutation)')
 
-  console.log('\nStage 7: Mobile is unaffected — column settings are a desktop-only affordance')
+  console.log('\nStage 7: Gear icon — plain button, same position/size as the UMAG reference')
+
+  assert.match(panelSrc, /function PaymentsColumnSettingsIcon/)
+  assert.match(panelSrc, /fill="currentColor"/)
+  assert.doesNotMatch(
+    panelSrc.match(/function PaymentsColumnSettingsIcon[\s\S]*?\n\}/)[0],
+    /stroke="currentColor"/
+  )
+  ok('the icon is a solid filled cog (fill-based), not the old sun-like stroke/spoke icon')
+
+  assert.match(panelSrc, /className="spo-compact__column-settings-btn"/)
+  assert.doesNotMatch(panelSrc, /PlatformToolbarIconButton/)
+  ok('gear trigger is a plain unstyled button, not the 44px bordered PlatformToolbarIconButton')
+
+  assert.match(panelSrc, /<div className="spo-compact__head-row">[\s\S]*?<CompactColumnsHead/)
+  assert.match(panelSrc, /<CompactColumnsHead[\s\S]*?\/>\s*\{columnSettingsGear\}\s*<\/div>/)
+  ok('gear renders as a sibling right after the column headers, inside the same header row')
+
+  const cssSrc0 = read('src/components/suppliers/payments/SupplierPaymentsPanel.css')
+  assert.match(cssSrc0, /\.spo-compact__column-settings-btn \{[^}]*width: 20px/)
+  assert.doesNotMatch(cssSrc0, /\.spo-compact__column-settings-btn \{[^}]*border: 1px/)
+  assert.doesNotMatch(cssSrc0, /\.spo-compact__column-settings-btn[^{]*\{[^}]*transition/)
+  ok('button is small (20px) with no border box and no transition/animation — a plain icon, per the owner-supplied reference')
+
+  console.log('\nStage 8: Mobile is unaffected — column settings are a desktop-only affordance')
 
   const cssSrc = read('src/components/suppliers/payments/SupplierPaymentsPanel.css')
-  assert.match(cssSrc, /@media \(max-width: 640px\)[\s\S]*\.spo-compact__toolbar[\s\S]*display: none/)
+  assert.match(cssSrc, /@media \(max-width: 640px\)[\s\S]*\.spo-compact__head-row[\s\S]*display: none/)
   assert.match(cssSrc, /grid-template-columns: minmax\(0, 1fr\) auto;/)
   assert.doesNotMatch(
     cssSrc.match(/@media \(max-width: 640px\)[\s\S]*/)[0],
