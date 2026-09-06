@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
@@ -29,9 +29,24 @@ import {
 } from '../../../services/supplierPaymentObligationsService'
 import { fetchSupplierFinanceSummary } from '../../../services/supplierFinanceSummaryService'
 import { getMonthPeriodKeys } from '../../../services/umagSettlementsService'
+import { getTableSettings, saveTableSettings } from '../../../services/tableSettingsService'
+import {
+  PAYMENTS_COLUMN_RESIZE_MIN_WIDTH,
+  SUPPLIER_PAYMENTS_TABLE_NAME,
+  getDefaultPaymentsColumnSettings,
+  getPaymentsColumnDef,
+  isPaymentsColumnReorderable,
+  getTogglablePaymentsColumnNames,
+} from '../../../utils/paymentsColumnRegistry'
+import {
+  getVisiblePaymentsColumns,
+  mergePaymentsColumnSettings,
+  normalizePaymentsColumnSettingsForSave,
+  reorderTogglablePaymentsColumns,
+} from '../../../utils/paymentsColumnSettingsMerge'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
-import { PlatformFilterButton } from '../../platform/PlatformSearchToolbar'
+import { PlatformFilterButton, PlatformToolbarIconButton } from '../../platform/PlatformSearchToolbar'
 import { ChevronDownIcon, SearchIcon } from '../../icons/PlatformIcons'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './SupplierPaymentsPanel.css'
@@ -88,7 +103,42 @@ function formatCompactStatusText(group, todayKey) {
   }
 }
 
-function CompactObligationRow({ group, todayKey, canEditTerms, onOpen, onConfigure }) {
+/** Reception date — a compact row can aggregate several receipts sharing one
+ * due date (see the «N приёмок» sheet), so an exact date only makes sense
+ * for a single-obligation group; otherwise fall back to the same count
+ * label already used elsewhere (formatReceptionCount). */
+function formatReceivedAt(group) {
+  if (!group.count) return '—'
+  if (group.count > 1) return formatReceptionCount(group.count)
+  const ob = group.obligations?.[0]
+  const raw = ob?.sourceDocTime || (ob?.supplyDocumentDate ? `${ob.supplyDocumentDate}T12:00:00+05:00` : null)
+  return raw ? formatUmagDate(raw) : '—'
+}
+
+function renderPaymentsCell(columnName, group, todayKey) {
+  switch (columnName) {
+    case 'supplier':
+      return <span className="spo-compact__supplier">{group.name || 'Без названия'}</span>
+    case 'receivedAt':
+      return <span className="spo-compact__received">{formatReceivedAt(group)}</span>
+    case 'status': {
+      const tone = statusTone(group.status)
+      return (
+        <span className={`spo-compact__status spo-compact__status--${tone}`}>
+          {formatCompactStatusText(group, todayKey)}
+        </span>
+      )
+    }
+    case 'dueDate':
+      return <span className="spo-compact__due">{formatCompactDueDate(group.dueDate)}</span>
+    case 'amount':
+      return <span className="spo-compact__amount">{formatUmagMoney(group.amount)}</span>
+    default:
+      return null
+  }
+}
+
+function CompactObligationRow({ group, todayKey, canEditTerms, onOpen, onConfigure, visibleColumns, gridStyle }) {
   const tone = statusTone(group.status)
   const isMissing = group.status === OBLIGATION_STATUS.TERMS_MISSING
   const mapped = Boolean(group.platformSupplierId)
@@ -96,11 +146,10 @@ function CompactObligationRow({ group, todayKey, canEditTerms, onOpen, onConfigu
 
   return (
     <div className={`spo-compact__row spo-compact__row--${tone}`}>
-      <button type="button" className="spo-compact__row-main" onClick={() => onOpen(group)}>
-        <span className="spo-compact__supplier">{group.name || 'Без названия'}</span>
-        <span className="spo-compact__due">{formatCompactDueDate(group.dueDate)}</span>
-        <span className={`spo-compact__status spo-compact__status--${tone}`}>{statusText}</span>
-        <span className="spo-compact__amount">{formatUmagMoney(group.amount)}</span>
+      <button type="button" className="spo-compact__row-main" style={gridStyle} onClick={() => onOpen(group)}>
+        {visibleColumns.map((col) => (
+          <Fragment key={col.columnName}>{renderPaymentsCell(col.columnName, group, todayKey)}</Fragment>
+        ))}
         <span className="spo-compact__mobile-meta">
           {formatCompactDueDate(group.dueDate)} · {statusText}
         </span>
@@ -134,7 +183,18 @@ function pluralizeSupplier(count) {
  * payment terms don't belong on the same timeline as Просрочено/Сегодня/
  * Предстоящие — collapsed by default, expands to the same row list.
  */
-function MissingTermsBanner({ groups, amount, expanded, onToggle, todayKey, canEditTerms, onOpen, onConfigure }) {
+function MissingTermsBanner({
+  groups,
+  amount,
+  expanded,
+  onToggle,
+  todayKey,
+  canEditTerms,
+  onOpen,
+  onConfigure,
+  visibleColumns,
+  gridStyle,
+}) {
   if (!groups.length) return null
   return (
     <div className="spo-compact__missing-banner-wrap">
@@ -165,6 +225,8 @@ function MissingTermsBanner({ groups, amount, expanded, onToggle, todayKey, canE
               canEditTerms={canEditTerms}
               onOpen={onOpen}
               onConfigure={onConfigure}
+              visibleColumns={visibleColumns}
+              gridStyle={gridStyle}
             />
           ))}
         </div>
@@ -173,13 +235,78 @@ function MissingTermsBanner({ groups, amount, expanded, onToggle, todayKey, canE
   )
 }
 
-function CompactColumnsHead() {
+function PaymentsColumnSettingsIcon({ size = 18 }) {
   return (
-    <div className="spo-compact__head" role="row">
-      <span role="columnheader">Поставщик</span>
-      <span role="columnheader">Срок</span>
-      <span role="columnheader">Статус</span>
-      <span role="columnheader">Сумма</span>
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+    </svg>
+  )
+}
+
+function CompactColumnsHead({
+  visibleColumns,
+  gridStyle,
+  dragColumnName,
+  dropColumnName,
+  onColumnDragStart,
+  onColumnDragOver,
+  onColumnDrop,
+  onColumnDragEnd,
+  onColumnResizePointerDown,
+}) {
+  return (
+    <div className="spo-compact__head" role="row" style={gridStyle}>
+      {visibleColumns.map((col) => {
+        const def = getPaymentsColumnDef(col.columnName)
+        const reorderable = isPaymentsColumnReorderable(col.columnName)
+        const resizable = col.columnName !== 'supplier'
+        const headClassName = [
+          'spo-compact__col',
+          dragColumnName === col.columnName ? 'is-dragging' : '',
+          dropColumnName === col.columnName && dragColumnName ? 'is-drag-over' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+        return (
+          <span
+            key={col.columnName}
+            role="columnheader"
+            data-col={col.columnName}
+            className={headClassName}
+            onDragOver={(event) => onColumnDragOver(event, col.columnName)}
+            onDrop={(event) => onColumnDrop(event, col.columnName)}
+          >
+            <span
+              className={`spo-compact__col-drag-handle${reorderable ? ' is-reorderable' : ''}`}
+              draggable={reorderable || undefined}
+              onDragStart={(event) => onColumnDragStart(event, col.columnName)}
+              onDragEnd={onColumnDragEnd}
+            >
+              {def?.label || col.columnName}
+            </span>
+            {resizable ? (
+              <span
+                className="spo-compact__col-resizer"
+                role="separator"
+                aria-orientation="vertical"
+                aria-label={`Изменить ширину столбца ${def?.label || col.columnName}`}
+                onPointerDown={(event) => onColumnResizePointerDown(event, col.columnName)}
+              />
+            ) : null}
+          </span>
+        )
+      })}
     </div>
   )
 }
@@ -194,6 +321,15 @@ function CompactPaymentSchedule({
   canEditTerms,
   onOpen,
   onConfigure,
+  visibleColumns,
+  gridStyle,
+  dragColumnName,
+  dropColumnName,
+  onColumnDragStart,
+  onColumnDragOver,
+  onColumnDrop,
+  onColumnDragEnd,
+  onColumnResizePointerDown,
 }) {
   const [missingExpanded, setMissingExpanded] = useState(false)
 
@@ -246,11 +382,23 @@ function CompactPaymentSchedule({
         canEditTerms={canEditTerms}
         onOpen={onOpen}
         onConfigure={onConfigure}
+        visibleColumns={visibleColumns}
+        gridStyle={gridStyle}
       />
 
       {filteredSections.length > 0 ? (
         <div className="spo-compact__wrap">
-          <CompactColumnsHead />
+          <CompactColumnsHead
+            visibleColumns={visibleColumns}
+            gridStyle={gridStyle}
+            dragColumnName={dragColumnName}
+            dropColumnName={dropColumnName}
+            onColumnDragStart={onColumnDragStart}
+            onColumnDragOver={onColumnDragOver}
+            onColumnDrop={onColumnDrop}
+            onColumnDragEnd={onColumnDragEnd}
+            onColumnResizePointerDown={onColumnResizePointerDown}
+          />
           <div className="spo-compact">
             {filteredSections.map(({ section, groups }) => {
               const count = filterActive ? groups.length : tabCounts[section.id] || 0
@@ -275,6 +423,8 @@ function CompactPaymentSchedule({
                         canEditTerms={canEditTerms}
                         onOpen={onOpen}
                         onConfigure={onConfigure}
+                        visibleColumns={visibleColumns}
+                        gridStyle={gridStyle}
                       />
                     ))}
                   </div>
@@ -593,6 +743,175 @@ export default function SupplierPaymentsPanel({
   const [filterSearch, setFilterSearch] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
   const filterButtonRef = useRef(null)
+
+  const [columnSettings, setColumnSettings] = useState(() => getDefaultPaymentsColumnSettings())
+  const [columnSettingsOpen, setColumnSettingsOpen] = useState(false)
+  const [dragColumnName, setDragColumnName] = useState(null)
+  const [dropColumnName, setDropColumnName] = useState(null)
+  const columnSettingsRefState = useRef(columnSettings)
+  const columnSettingsPopoverRef = useRef(null)
+  const resizeStateRef = useRef(null)
+
+  useEffect(() => {
+    columnSettingsRefState.current = columnSettings
+  }, [columnSettings])
+
+  useEffect(() => {
+    if (!embedded) return undefined
+    let cancelled = false
+    void (async () => {
+      try {
+        const saved = await getTableSettings(SUPPLIER_PAYMENTS_TABLE_NAME)
+        if (cancelled) return
+        setColumnSettings(mergePaymentsColumnSettings(saved, getDefaultPaymentsColumnSettings()))
+      } catch {
+        if (!cancelled) setColumnSettings(getDefaultPaymentsColumnSettings())
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [embedded])
+
+  useEffect(() => {
+    if (!columnSettingsOpen) return undefined
+    function handlePointerDown(event) {
+      if (!(event.target instanceof Node)) return
+      if (columnSettingsPopoverRef.current?.contains(event.target)) return
+      setColumnSettingsOpen(false)
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    return () => document.removeEventListener('mousedown', handlePointerDown)
+  }, [columnSettingsOpen])
+
+  const persistColumnSettings = useCallback(async (nextSettings) => {
+    const normalized = normalizePaymentsColumnSettingsForSave(nextSettings)
+    setColumnSettings(normalized)
+    try {
+      await saveTableSettings(normalized)
+    } catch {
+      // best-effort persistence — local state already reflects the change
+    }
+  }, [])
+
+  const handleColumnResizePointerMove = useCallback((event) => {
+    const state = resizeStateRef.current
+    if (!state) return
+    const delta = event.clientX - state.startX
+    const minWidth = getPaymentsColumnDef(state.columnName)?.minWidth ?? PAYMENTS_COLUMN_RESIZE_MIN_WIDTH
+    const nextWidth = Math.max(minWidth, Math.round(state.startWidth + delta))
+    setColumnSettings((current) => ({
+      ...current,
+      columns: current.columns.map((col) =>
+        col.columnName === state.columnName ? { ...col, width: nextWidth } : col
+      ),
+    }))
+  }, [])
+
+  const handleColumnResizePointerUp = useCallback(() => {
+    window.removeEventListener('pointermove', handleColumnResizePointerMove)
+    window.removeEventListener('pointerup', handleColumnResizePointerUp)
+    if (!resizeStateRef.current) return
+    resizeStateRef.current = null
+    void persistColumnSettings(columnSettingsRefState.current)
+  }, [handleColumnResizePointerMove, persistColumnSettings])
+
+  const handleColumnResizePointerDown = useCallback(
+    (event, columnName) => {
+      event.preventDefault()
+      event.stopPropagation()
+      const col = columnSettingsRefState.current.columns.find((item) => item.columnName === columnName)
+      if (!col) return
+      const headerCell = event.currentTarget.closest('.spo-compact__col')
+      const measuredWidth = headerCell ? headerCell.getBoundingClientRect().width : col.width
+      resizeStateRef.current = { columnName, startX: event.clientX, startWidth: measuredWidth }
+      window.addEventListener('pointermove', handleColumnResizePointerMove)
+      window.addEventListener('pointerup', handleColumnResizePointerUp)
+    },
+    [handleColumnResizePointerMove, handleColumnResizePointerUp]
+  )
+
+  useEffect(
+    () => () => {
+      window.removeEventListener('pointermove', handleColumnResizePointerMove)
+      window.removeEventListener('pointerup', handleColumnResizePointerUp)
+    },
+    [handleColumnResizePointerMove, handleColumnResizePointerUp]
+  )
+
+  const handleColumnDragStart = useCallback((event, columnName) => {
+    if (!isPaymentsColumnReorderable(columnName)) {
+      event.preventDefault()
+      return
+    }
+    setDragColumnName(columnName)
+    event.dataTransfer.effectAllowed = 'move'
+    event.dataTransfer.setData('text/plain', columnName)
+  }, [])
+
+  const handleColumnDragOver = useCallback(
+    (event, columnName) => {
+      if (!isPaymentsColumnReorderable(columnName) || !dragColumnName) return
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'move'
+      setDropColumnName(columnName)
+    },
+    [dragColumnName]
+  )
+
+  const handleColumnDrop = useCallback(
+    (event, columnName) => {
+      event.preventDefault()
+      if (!dragColumnName || !isPaymentsColumnReorderable(columnName)) return
+      if (dragColumnName === columnName) return
+      const reordered = reorderTogglablePaymentsColumns(
+        columnSettingsRefState.current,
+        dragColumnName,
+        columnName
+      )
+      void persistColumnSettings(reordered)
+      setDragColumnName(null)
+      setDropColumnName(null)
+    },
+    [dragColumnName, persistColumnSettings]
+  )
+
+  const handleColumnDragEnd = useCallback(() => {
+    setDragColumnName(null)
+    setDropColumnName(null)
+  }, [])
+
+  const handleColumnVisibilityToggle = useCallback(
+    (columnName) => {
+      const current = columnSettingsRefState.current.columns.find((col) => col.columnName === columnName)
+      const willHide = current?.visible !== false
+      void persistColumnSettings({
+        ...columnSettingsRefState.current,
+        columns: columnSettingsRefState.current.columns.map((col) =>
+          col.columnName === columnName ? { ...col, visible: !willHide } : col
+        ),
+      })
+    },
+    [persistColumnSettings]
+  )
+
+  const handleResetColumnSettings = useCallback(() => {
+    void persistColumnSettings(getDefaultPaymentsColumnSettings())
+    setColumnSettingsOpen(false)
+  }, [persistColumnSettings])
+
+  const visiblePaymentsColumns = useMemo(
+    () => getVisiblePaymentsColumns(columnSettings),
+    [columnSettings]
+  )
+  const paymentsGridStyle = useMemo(
+    () => ({
+      '--spo-compact-cols': visiblePaymentsColumns
+        .map((col) => (col.columnName === 'supplier' ? 'minmax(0, 1fr)' : `${col.width}px`))
+        .join(' '),
+    }),
+    [visiblePaymentsColumns]
+  )
 
   const loadStandalone = useCallback(async () => {
     setLoading(true)
@@ -918,6 +1237,55 @@ export default function SupplierPaymentsPanel({
                 </button>
               </div>
             ) : null}
+            <div className="spo-compact__toolbar">
+              <div className="spo-compact__column-settings" ref={columnSettingsPopoverRef}>
+                <PlatformToolbarIconButton
+                  active={columnSettingsOpen}
+                  aria-expanded={columnSettingsOpen}
+                  aria-controls="spo-compact-column-settings-panel"
+                  aria-label="Настройки столбцов таблицы"
+                  title="Настройки столбцов"
+                  onClick={() => setColumnSettingsOpen((open) => !open)}
+                >
+                  <PaymentsColumnSettingsIcon size={20} />
+                </PlatformToolbarIconButton>
+                {columnSettingsOpen ? (
+                  <div
+                    id="spo-compact-column-settings-panel"
+                    className="spo-compact__column-settings-popover"
+                    role="dialog"
+                    aria-label="Видимость столбцов"
+                  >
+                    <div className="spo-compact__column-settings-head">
+                      <strong>Видимость столбцов</strong>
+                      <p>Настройте таблицу под себя — выбор сохранится</p>
+                    </div>
+                    <div className="spo-compact__column-settings-list">
+                      {[...columnSettings.columns]
+                        .sort((a, b) => a.columnOrdinalNumber - b.columnOrdinalNumber)
+                        .filter((col) => getTogglablePaymentsColumnNames().includes(col.columnName))
+                        .map((col) => (
+                          <label key={col.columnName} className="spo-compact__column-settings-item">
+                            <input
+                              type="checkbox"
+                              checked={col.visible !== false}
+                              onChange={() => handleColumnVisibilityToggle(col.columnName)}
+                            />
+                            <span>{getPaymentsColumnDef(col.columnName)?.label || col.columnName}</span>
+                          </label>
+                        ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="spo-compact__column-settings-reset btn btn--ghost"
+                      onClick={handleResetColumnSettings}
+                    >
+                      По умолчанию
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            </div>
             <CompactPaymentSchedule
               view={view}
               todayKey={todayKey}
@@ -928,6 +1296,15 @@ export default function SupplierPaymentsPanel({
               canEditTerms={canEditTerms}
               onOpen={setSelectedGroup}
               onConfigure={openConfigure}
+              visibleColumns={visiblePaymentsColumns}
+              gridStyle={paymentsGridStyle}
+              dragColumnName={dragColumnName}
+              dropColumnName={dropColumnName}
+              onColumnDragStart={handleColumnDragStart}
+              onColumnDragOver={handleColumnDragOver}
+              onColumnDrop={handleColumnDrop}
+              onColumnDragEnd={handleColumnDragEnd}
+              onColumnResizePointerDown={handleColumnResizePointerDown}
             />
           </>
         ) : (

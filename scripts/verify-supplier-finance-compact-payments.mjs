@@ -55,9 +55,17 @@ async function main() {
   const utilsSrc = read(UTILS)
 
   // --- Case 1: embedded uses compact mode -----------------------------------
-  // Этап 2.9: the embedded branch now also portals the supplier filter
-  // button/popover before the schedule itself, so allow content in between.
-  assert.match(panelSrc, /embedded \? \([\s\S]{0,3000}<CompactPaymentSchedule/)
+  // Index-based, not a char-count regex budget: the embedded branch keeps
+  // growing (Этап 2.9 added the supplier filter + column-settings portals
+  // before the schedule itself), so assert ordering against the else-branch
+  // marker instead of guessing a window size.
+  {
+    const embeddedTernaryIdx = panelSrc.indexOf('embedded ? (')
+    const scheduleIdx = panelSrc.indexOf('<CompactPaymentSchedule', embeddedTernaryIdx)
+    const elseBranchIdx = panelSrc.indexOf('<div className="spo-panel__tabs"', embeddedTernaryIdx)
+    assert.ok(embeddedTernaryIdx >= 0 && scheduleIdx > embeddedTernaryIdx, 'embedded ternary/CompactPaymentSchedule not found')
+    assert.ok(scheduleIdx < elseBranchIdx, 'CompactPaymentSchedule must render inside the embedded branch, before the standalone tabs branch')
+  }
   assert.match(panelSrc, /function CompactPaymentSchedule\(/)
   ok('Case 1: embedded SupplierPaymentsPanel renders CompactPaymentSchedule')
 

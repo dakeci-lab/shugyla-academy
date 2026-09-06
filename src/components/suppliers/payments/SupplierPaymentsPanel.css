@@ -691,7 +691,7 @@
 
 .spo-compact__head {
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) 52px minmax(72px, 0.7fr) minmax(88px, auto);
+  grid-template-columns: var(--spo-compact-cols, minmax(0, 1fr) 130px 120px 96px 130px);
   gap: 8px 12px;
   padding: 10px 12px;
   font-size: 13px;
@@ -701,16 +701,144 @@
   border-bottom: 1px solid var(--color-border, #e2e8f0);
 }
 
-.spo-compact__head span:last-child {
-  text-align: right;
+.spo-compact__col {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
 }
 
-.spo-compact__head span:nth-child(2) {
+.spo-compact__col-drag-handle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding-right: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spo-compact__col-drag-handle.is-reorderable {
+  cursor: grab;
+}
+
+.spo-compact__col-drag-handle.is-reorderable:active {
+  cursor: grabbing;
+}
+
+.spo-compact__col.is-dragging .spo-compact__col-drag-handle {
+  opacity: 0.55;
+}
+
+.spo-compact__col.is-drag-over {
+  box-shadow: inset 0 -2px 0 var(--color-primary, #059669);
+}
+
+.spo-compact__col-resizer {
+  position: absolute;
+  top: 0;
+  right: -6px;
+  width: 12px;
+  height: 100%;
+  cursor: col-resize;
+  touch-action: none;
+  user-select: none;
+  z-index: 2;
+}
+
+.spo-compact__col-resizer::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 5px;
+  width: 1px;
+  height: 100%;
+  background: var(--color-border, #e2e8f0);
+  pointer-events: none;
+}
+
+.spo-compact__col-resizer:hover::after,
+.spo-compact__col-resizer:active::after {
+  width: 2px;
+  right: 4.5px;
+  background: var(--color-primary, #059669);
+}
+
+.spo-compact__col-resizer:hover,
+.spo-compact__col-resizer:active {
+  background: rgba(5, 150, 105, 0.08);
+}
+
+/* Header alignment is per logical column, not position — columns can be
+   reordered by the user, so nth-child would silently follow the wrong cell. */
+.spo-compact__col[data-col='receivedAt'] .spo-compact__col-drag-handle,
+.spo-compact__col[data-col='status'] .spo-compact__col-drag-handle,
+.spo-compact__col[data-col='dueDate'] .spo-compact__col-drag-handle {
+  justify-content: center;
   text-align: center;
 }
 
-.spo-compact__head span:nth-child(3) {
+.spo-compact__col[data-col='amount'] .spo-compact__col-drag-handle {
+  justify-content: flex-end;
   text-align: right;
+}
+
+.spo-compact__column-settings {
+  position: relative;
+}
+
+.spo-compact__column-settings-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 30;
+  width: min(18rem, calc(100vw - 2rem));
+  padding: 0.85rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--color-white, #fff);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12);
+}
+
+.spo-compact__column-settings-head strong {
+  display: block;
+  font-size: 0.875rem;
+  margin-bottom: 0.25rem;
+}
+
+.spo-compact__column-settings-head p {
+  margin: 0 0 0.65rem;
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #64748b);
+  line-height: 1.35;
+}
+
+.spo-compact__column-settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  max-height: 14rem;
+  overflow: auto;
+  margin-bottom: 0.75rem;
+}
+
+.spo-compact__column-settings-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.spo-compact__column-settings-reset {
+  width: 100%;
+}
+
+.spo-compact__toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 8px;
 }
 
 .spo-compact {
@@ -782,7 +910,7 @@
 .spo-compact__row-main {
   appearance: none;
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) 52px minmax(72px, 0.7fr) minmax(88px, auto);
+  grid-template-columns: var(--spo-compact-cols, minmax(0, 1fr) 130px 120px 96px 130px);
   gap: 8px 12px;
   align-items: center;
   width: 100%;
@@ -808,6 +936,16 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   min-width: 0;
+}
+
+.spo-compact__received {
+  font-size: 13px;
+  color: var(--color-text-secondary, #64748b);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .spo-compact__due {
@@ -886,6 +1024,10 @@
 }
 
 @media (max-width: 640px) {
+  .spo-compact__toolbar {
+    display: none;
+  }
+
   .spo-compact__head {
     display: none;
   }
@@ -899,7 +1041,8 @@
   }
 
   .spo-compact__due,
-  .spo-compact__status {
+  .spo-compact__status,
+  .spo-compact__received {
     display: none;
   }
 

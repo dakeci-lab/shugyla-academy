@@ -73,7 +73,17 @@ function main() {
     /embedded[\s\S]{0,40}<section className="spo-panel__plan"|<section className="spo-panel__plan"[\s\S]{0,10}\{!embedded/
   )
   assert.match(paymentsSrc, /<section className="spo-panel__plan" aria-label="К оплате">/)
-  assert.match(paymentsSrc, /embedded \? \([\s\S]{0,3000}<CompactPaymentSchedule/)
+  // Index-based, not a char-count regex budget: the embedded branch keeps
+  // growing (Этап 2.9 added the supplier filter + column-settings portals
+  // before the schedule itself), so assert ordering against the else-branch
+  // marker instead of guessing a window size.
+  {
+    const embeddedTernaryIdx = paymentsSrc.indexOf('embedded ? (')
+    const scheduleIdx = paymentsSrc.indexOf('<CompactPaymentSchedule', embeddedTernaryIdx)
+    const elseBranchIdx = paymentsSrc.indexOf('<div className="spo-panel__tabs"', embeddedTernaryIdx)
+    assert.ok(embeddedTernaryIdx >= 0 && scheduleIdx > embeddedTernaryIdx, 'embedded ternary/CompactPaymentSchedule not found')
+    assert.ok(scheduleIdx < elseBranchIdx, 'CompactPaymentSchedule must render inside the embedded branch, before the standalone tabs branch')
+  }
   ok('the payment-schedule section always renders; embedded uses CompactPaymentSchedule, standalone keeps tabs + ObligationCard')
 
   assert.match(paymentsSrc, /\{selectedGroup \? \(\s*\n\s*<GroupDetail/)
