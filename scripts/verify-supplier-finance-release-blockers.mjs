@@ -131,9 +131,18 @@ async function main() {
   assert.doesNotMatch(migration, /^grant /im)
   ok('F-2: migration aligns supplier_payments.view for document_payments + sync_runs SELECT — sync permission not granted')
 
+  // Owner request (2026-09-06) removed the «Оплачено · месяц» KPI tile from
+  // SupplierFinancePanel entirely — the RLS-safety fix this case guards
+  // lives one layer down (the migration + this service's own
+  // status:'unavailable' branch), so it survives even though the panel no
+  // longer consumes summary.paidThisMonth at all. Assert that removal is
+  // clean (no dangling half-reference), not that the dead UI branch remains.
   assert.match(summarySrc, /status: 'unavailable'/)
-  assert.match(read('src/components/suppliers/finance/SupplierFinancePanel.jsx'), /paidUnavailable/)
-  ok('F-2: explicit unavailable UI path preserved for paidThisMonth when status=unavailable')
+  assert.doesNotMatch(
+    read('src/components/suppliers/finance/SupplierFinancePanel.jsx'),
+    /paidUnavailable|summary\?\.paidThisMonth/
+  )
+  ok('F-2: unavailable-status guard preserved in the summary service; panel cleanly dropped the (now unused) paidThisMonth KPI, no dangling reference')
 
   // --- F-2: sync read for payments-only (policy allows read, not sync) -------
   assert.match(migration, /umag_sync_runs_select_view[\s\S]*supplier_payments\.view/)

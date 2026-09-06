@@ -87,24 +87,26 @@ async function main() {
   assert.match(pageSrc, /canViewSupplierPayments\(user\) && !canViewUmagSettlements\(user\)/.source ? /!canViewSupplierPayments\(user\) && !canViewUmagSettlements\(user\)/ : /x/)
   ok('page-level gate is exactly canViewSupplierPayments(user) OR canViewUmagSettlements(user) — the union of the two existing routes, no service_role/RLS bypass')
 
-  // --- Case 3/4: exactly 4 KPIs, all summary-sourced ------------------------
+  // --- Case 3/4: exactly 3 KPIs, all summary-sourced ------------------------
+  // Owner request (2026-09-06): drop «Оплачено · месяц» — it duplicated info
+  // and cluttered the row; the remaining 3 map 1:1 to the payments-list flag
+  // colors (Долг=green, Просрочено=red, Сегодня=orange).
   const kpiTileCount = (panelSrc.match(/<KpiTile\b/g) || []).length
-  assert.equal(kpiTileCount, 4, `expected exactly 4 <KpiTile> usages, found ${kpiTileCount}`)
-  ok('Case 3: exactly 4 KpiTile renders — no 5th/6th card (Предстоящие/Без срока/counts excluded)')
+  assert.equal(kpiTileCount, 3, `expected exactly 3 <KpiTile> usages, found ${kpiTileCount}`)
+  ok('Case 3: exactly 3 KpiTile renders — Оплачено removed, no 5th/6th card either (Предстоящие/Без срока/counts excluded)')
 
-  assert.match(panelSrc, /<KpiTile label="Долг" value=\{summary\?\.debt\}/)
+  assert.match(panelSrc, /<KpiTile\s+label="Долг"\s+value=\{summary\?\.debt\}\s+tone="debt"/)
   assert.match(panelSrc, /value=\{summary\?\.overdue\?\.amount\}/)
   assert.match(panelSrc, /value=\{summary\?\.dueToday\?\.amount\}/)
-  assert.match(panelSrc, /value=\{summary\?\.paidThisMonth\?\.amount\}/)
-  assert.doesNotMatch(panelSrc, /summary\?\.upcoming|summary\?\.termsMissing|openObligationsCount/)
-  ok('Case 4: all 4 KPI values are summary.debt / summary.overdue.amount / summary.dueToday.amount / summary.paidThisMonth.amount — no new query, no re-derivation, no upcoming/termsMissing/count leaking into the top row')
+  assert.doesNotMatch(panelSrc, /summary\?\.paidThisMonth|summary\?\.upcoming|summary\?\.termsMissing|openObligationsCount/)
+  ok('Case 4: all 3 KPI values are summary.debt / summary.overdue.amount / summary.dueToday.amount — no new query, no re-derivation, no paidThisMonth/upcoming/termsMissing/count leaking into the top row')
 
-  // --- Case 5: paid-unavailable never renders as 0 --------------------------
-  assert.match(panelSrc, /const paidUnavailable = summary\?\.paidThisMonth\?\.status === 'unavailable'/)
-  assert.match(panelSrc, /unavailable=\{paidUnavailable\}/)
+  // --- Case 5: KpiTile still has an "unavailable" escape hatch for callers ---
+  // (paidThisMonth was the only caller passing it; no current KpiTile call
+  // does, but the component itself keeps the safe branch for future use.)
   const kpiTileFn = panelSrc.slice(panelSrc.indexOf('function KpiTile'), panelSrc.indexOf('export default function'))
   assert.match(kpiTileFn, /unavailable \? '—' : formatUmagMoney\(value\)/)
-  ok("Case 5: paidThisMonth.status==='unavailable' renders '—', never formatUmagMoney(null) (which would silently show '0 ₸' — Number(null)===0)")
+  ok("Case 5: KpiTile's unavailable branch renders '—', never formatUmagMoney(null) (which would silently show '0 ₸' — Number(null)===0)")
 
   console.log('\n--- Real imports: pure logic exercised with fixture data ---\n')
   await runRealCases()

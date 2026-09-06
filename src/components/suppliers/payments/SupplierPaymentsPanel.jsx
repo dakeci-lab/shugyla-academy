@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
@@ -31,8 +31,8 @@ import { fetchSupplierFinanceSummary } from '../../../services/supplierFinanceSu
 import { getMonthPeriodKeys } from '../../../services/umagSettlementsService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
-import PlatformSearchToolbar from '../../platform/PlatformSearchToolbar'
-import { ChevronDownIcon } from '../../icons/PlatformIcons'
+import { PlatformFilterButton } from '../../platform/PlatformSearchToolbar'
+import { ChevronDownIcon, SearchIcon } from '../../icons/PlatformIcons'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './SupplierPaymentsPanel.css'
 
@@ -190,7 +190,7 @@ function CompactPaymentSchedule({
   tabCounts,
   loading,
   error,
-  search,
+  supplierFilter,
   canEditTerms,
   onOpen,
   onConfigure,
@@ -210,27 +210,27 @@ function CompactPaymentSchedule({
 
   const summaries = view?.summaries || {}
   const lists = view?.lists || {}
-  const query = search?.trim().toLowerCase() || ''
+  const filterActive = supplierFilter.size > 0
   const filteredSections = COMPACT_SECTIONS.map((section) => {
     const groups = lists[section.id] || []
-    const filtered = query
-      ? groups.filter((group) => (group.name || '').toLowerCase().includes(query))
+    const filtered = filterActive
+      ? groups.filter((group) => supplierFilter.has(group.name || 'Без названия'))
       : groups
     return { section, groups: filtered }
   }).filter(({ groups }) => groups.length > 0)
 
   const missingGroups = lists.termsMissing || []
-  const filteredMissingGroups = query
-    ? missingGroups.filter((group) => (group.name || '').toLowerCase().includes(query))
+  const filteredMissingGroups = filterActive
+    ? missingGroups.filter((group) => supplierFilter.has(group.name || 'Без названия'))
     : missingGroups
-  const missingAmount = query
+  const missingAmount = filterActive
     ? filteredMissingGroups.reduce((sum, group) => sum + (group.amount || 0), 0)
     : summaries.termsMissing || 0
 
   if (filteredSections.length === 0 && filteredMissingGroups.length === 0) {
     return (
       <div className="spo-compact__empty">
-        {query ? 'По вашему запросу ничего не найдено.' : 'Нет обязательств к оплате'}
+        {filterActive ? 'По выбранным поставщикам обязательств не найдено.' : 'Нет обязательств к оплате'}
       </div>
     )
   }
@@ -253,14 +253,18 @@ function CompactPaymentSchedule({
           <CompactColumnsHead />
           <div className="spo-compact">
             {filteredSections.map(({ section, groups }) => {
-              const count = query ? groups.length : tabCounts[section.id] || 0
-              const amount = query
+              const count = filterActive ? groups.length : tabCounts[section.id] || 0
+              const amount = filterActive
                 ? groups.reduce((sum, group) => sum + (group.amount || 0), 0)
                 : summaries[section.summaryKey] || 0
               return (
                 <section key={section.id} className="spo-compact__section">
-                  <h3 className="spo-compact__section-head">
-                    {section.label} · {count} · {formatUmagMoney(amount)}
+                  <h3 className={`spo-compact__section-head spo-compact__section-head--${section.id}`}>
+                    <span className="spo-compact__section-left">
+                      <span className="spo-compact__section-label">{section.label}</span>
+                      <span className="spo-compact__section-count">· {count}</span>
+                    </span>
+                    <span className="spo-compact__section-amount">{formatUmagMoney(amount)}</span>
                   </h3>
                   <div className="spo-compact__rows">
                     {groups.map((group) => (
@@ -459,8 +463,92 @@ function GroupDetail({ group, todayKey, canEditTerms, onClose, onConfigure }) {
   )
 }
 
+/** Popover: search + checkbox list of suppliers, «Применить» commits the filter. */
+function SupplierFilterPopover({
+  open,
+  suppliers,
+  draft,
+  onToggleSupplier,
+  onSearchChange,
+  searchValue,
+  onApply,
+  onReset,
+  onClose,
+  anchorRef,
+}) {
+  const popoverRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+    function handlePointerDown(event) {
+      if (popoverRef.current?.contains(event.target)) return
+      if (anchorRef.current?.contains(event.target)) return
+      onClose()
+    }
+    function handleEscape(event) {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [open, onClose, anchorRef])
+
+  if (!open) return null
+
+  const query = searchValue.trim().toLowerCase()
+  const matches = query
+    ? suppliers.filter((name) => name.toLowerCase().includes(query))
+    : suppliers
+
+  return (
+    <div ref={popoverRef} className="spo-filter-pop" role="dialog" aria-label="Фильтр по поставщику">
+      <div className="spo-filter-pop__head">Фильтр по поставщику</div>
+      <label className="spo-filter-pop__search">
+        <SearchIcon size={15} />
+        <input
+          type="text"
+          placeholder="Поиск поставщика…"
+          value={searchValue}
+          onChange={(e) => onSearchChange(e.target.value)}
+          autoComplete="off"
+        />
+      </label>
+      <div className="spo-filter-pop__list">
+        {matches.length === 0 ? (
+          <div className="spo-filter-pop__empty">Поставщик не найден</div>
+        ) : (
+          matches.map((name) => (
+            <label key={name} className="spo-filter-pop__item">
+              <input
+                type="checkbox"
+                checked={draft.has(name)}
+                onChange={() => onToggleSupplier(name)}
+              />
+              <span>{name}</span>
+            </label>
+          ))
+        )}
+      </div>
+      <div className="spo-filter-pop__actions">
+        <button type="button" className="btn btn--ghost btn--sm" onClick={onReset}>
+          Сбросить
+        </button>
+        <button type="button" className="btn btn--primary btn--sm" onClick={onApply}>
+          Применить
+        </button>
+      </div>
+    </div>
+  )
+}
+
 /**
- * @param {{ embedded?: boolean, externalSummaryProvided?: boolean, summary?: object|null, summaryLoading?: boolean, obligations?: object[]|null, refreshToken?: unknown }} [props]
+ * @param {{ embedded?: boolean, externalSummaryProvided?: boolean, summary?: object|null, summaryLoading?: boolean, obligations?: object[]|null, refreshToken?: unknown, filterSlot?: HTMLElement|null }} [props]
+ *   filterSlot — Этап 2.9: DOM node in the shared finance topbar (next to the
+ *     ↻ button) where the supplier filter button + popover are portalled,
+ *     replacing the old free-text search row.
  *   embedded — Этап 2.6: hides the standalone shell (title, sync status,
  *     ↻ button, global KPIs) so this can render as pure payment-schedule
  *     content under a future shared header. The content itself — tabs,
@@ -481,6 +569,7 @@ export default function SupplierPaymentsPanel({
   summaryLoading = false,
   obligations: obligationsProp = null,
   refreshToken = null,
+  filterSlot = null,
 } = {}) {
   const { user } = useSession()
   const toast = useToast()
@@ -499,7 +588,11 @@ export default function SupplierPaymentsPanel({
   const [selectedGroup, setSelectedGroup] = useState(null)
   const [activeTab, setActiveTab] = useState('overdue')
   const [tabTouched, setTabTouched] = useState(false)
-  const [compactSearch, setCompactSearch] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState(() => new Set())
+  const [filterDraft, setFilterDraft] = useState(() => new Set())
+  const [filterSearch, setFilterSearch] = useState('')
+  const [filterOpen, setFilterOpen] = useState(false)
+  const filterButtonRef = useRef(null)
 
   const loadStandalone = useCallback(async () => {
     setLoading(true)
@@ -623,6 +716,39 @@ export default function SupplierPaymentsPanel({
   const visibleGroups = view?.lists?.[activeTab] || []
   const activeTabMeta = TABS.find((tab) => tab.id === activeTab) || TABS[0]
 
+  const allSupplierNames = useMemo(() => {
+    if (!view?.lists) return []
+    const names = new Set()
+    for (const section of COMPACT_SECTIONS) {
+      for (const group of view.lists[section.id] || []) names.add(group.name || 'Без названия')
+    }
+    for (const group of view.lists.termsMissing || []) names.add(group.name || 'Без названия')
+    return [...names].sort((a, b) => a.localeCompare(b, 'ru'))
+  }, [view])
+
+  function openFilterPopover() {
+    setFilterDraft(new Set(supplierFilter))
+    setFilterSearch('')
+    setFilterOpen(true)
+  }
+  function toggleFilterSupplier(name) {
+    setFilterDraft((current) => {
+      const next = new Set(current)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
+  function applyFilter() {
+    setSupplierFilter(new Set(filterDraft))
+    setFilterOpen(false)
+  }
+  function resetFilter() {
+    setFilterDraft(new Set())
+    setSupplierFilter(new Set())
+    setFilterOpen(false)
+  }
+
   const syncCoverage = useMemo(
     () => formatSyncCoverage(lastRun?.date_from, lastRun?.date_to),
     [lastRun]
@@ -734,23 +860,71 @@ export default function SupplierPaymentsPanel({
 
         {embedded ? (
           <>
-            <PlatformSearchToolbar
-              value={compactSearch}
-              onChange={(e) => setCompactSearch(e.target.value)}
-              onClear={() => setCompactSearch('')}
-              showClear
-              placeholder="Поиск по поставщику"
-              ariaLabel="Поиск по поставщику"
-              flush
-              className="spo-compact__search-toolbar"
-            />
+            {filterSlot
+              ? createPortal(
+                  <div className="spo-filter-anchor">
+                    <PlatformFilterButton
+                      buttonRef={filterButtonRef}
+                      active={supplierFilter.size > 0}
+                      count={supplierFilter.size > 0 ? supplierFilter.size : null}
+                      ariaLabel="Фильтр по поставщику"
+                      title="Фильтр по поставщику"
+                      ariaExpanded={filterOpen}
+                      onClick={() => (filterOpen ? setFilterOpen(false) : openFilterPopover())}
+                    />
+                    <SupplierFilterPopover
+                      open={filterOpen}
+                      suppliers={allSupplierNames}
+                      draft={filterDraft}
+                      onToggleSupplier={toggleFilterSupplier}
+                      searchValue={filterSearch}
+                      onSearchChange={setFilterSearch}
+                      onApply={applyFilter}
+                      onReset={resetFilter}
+                      onClose={() => setFilterOpen(false)}
+                      anchorRef={filterButtonRef}
+                    />
+                  </div>,
+                  filterSlot
+                )
+              : null}
+            {supplierFilter.size > 0 ? (
+              <div className="spo-compact__filter-strip">
+                <span>Поставщики:</span>
+                {[...supplierFilter].map((name) => (
+                  <span key={name} className="spo-compact__filter-chip">
+                    {name}
+                    <button
+                      type="button"
+                      aria-label={`Убрать ${name}`}
+                      onClick={() =>
+                        setSupplierFilter((current) => {
+                          const next = new Set(current)
+                          next.delete(name)
+                          return next
+                        })
+                      }
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+                <button
+                  type="button"
+                  className="spo-compact__filter-clear"
+                  onClick={() => setSupplierFilter(new Set())}
+                >
+                  Очистить всё
+                </button>
+              </div>
+            ) : null}
             <CompactPaymentSchedule
               view={view}
               todayKey={todayKey}
               tabCounts={tabCounts}
               loading={loading}
               error={error}
-              search={compactSearch}
+              supplierFilter={supplierFilter}
               canEditTerms={canEditTerms}
               onOpen={setSelectedGroup}
               onConfigure={openConfigure}

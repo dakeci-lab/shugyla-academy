@@ -73,7 +73,7 @@ function main() {
     /embedded[\s\S]{0,40}<section className="spo-panel__plan"|<section className="spo-panel__plan"[\s\S]{0,10}\{!embedded/
   )
   assert.match(paymentsSrc, /<section className="spo-panel__plan" aria-label="К оплате">/)
-  assert.match(paymentsSrc, /embedded \? \(\s*\n\s*<CompactPaymentSchedule/)
+  assert.match(paymentsSrc, /embedded \? \([\s\S]{0,3000}<CompactPaymentSchedule/)
   ok('the payment-schedule section always renders; embedded uses CompactPaymentSchedule, standalone keeps tabs + ObligationCard')
 
   assert.match(paymentsSrc, /\{selectedGroup \? \(\s*\n\s*<GroupDetail/)

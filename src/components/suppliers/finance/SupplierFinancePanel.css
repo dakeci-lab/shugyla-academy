@@ -7,7 +7,7 @@
 
 .sfp-panel__kpis {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -36,12 +36,16 @@
   color: var(--color-text, #0f172a);
 }
 
+.sfp-panel__kpi--debt .sfp-panel__kpi-value {
+  color: #2cbe60;
+}
+
 .sfp-panel__kpi--overdue .sfp-panel__kpi-value {
-  color: #b91c1c;
+  color: #f61046;
 }
 
 .sfp-panel__kpi--today .sfp-panel__kpi-value {
-  color: #b45309;
+  color: #ffae1e;
 }
 
 .sfp-panel__error {
@@ -104,6 +108,11 @@
   padding-bottom: 0.4rem;
 }
 
+.sfp-panel__filter-slot {
+  display: flex;
+  align-items: center;
+}
+
 .sfp-panel__sync-status {
   font-size: 13px;
   color: var(--color-text-secondary, #64748b);
@@ -127,6 +136,10 @@
 @media (max-width: 900px) {
   .sfp-panel__kpis {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .sfp-panel__kpis > :last-child {
+    grid-column: 1 / -1;
   }
 }
 

@@ -27,7 +27,6 @@ import { toAqtobeDateKey } from '../../../utils/supplierPaymentObligations'
 import { getMonthRangeKeys } from '../../../utils/settlementsPeriod'
 import {
   describeSyncStatus,
-  monthLabelFromDateKey,
   resolveActiveTab,
 } from '../../../utils/supplierFinancePagePresentation'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
@@ -96,6 +95,7 @@ export default function SupplierFinancePanel() {
   const [summaryError, setSummaryError] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
+  const [paymentsFilterSlot, setPaymentsFilterSlot] = useState(null)
 
   const loadSummary = useCallback(async () => {
     setSummaryLoading(true)
@@ -174,8 +174,6 @@ export default function SupplierFinancePanel() {
     return null
   }
 
-  const monthLabel = monthLabelFromDateKey(summary?.todayKey)
-  const paidUnavailable = summary?.paidThisMonth?.status === 'unavailable'
   const syncStatus = describeSyncStatus(lastSync)
   const activeTabMeta = TABS.find((tab) => tab.id === activeTab)
 
@@ -206,6 +204,9 @@ export default function SupplierFinancePanel() {
           >
             {syncStatus.text}
           </span>
+          {activeTabMeta?.id === 'payments' ? (
+            <div className="sfp-panel__filter-slot" ref={setPaymentsFilterSlot} />
+          ) : null}
           {canSync ? (
             <PlatformSyncButton
               onClick={() => void handleSync()}
@@ -230,7 +231,12 @@ export default function SupplierFinancePanel() {
 
       {showKpis ? (
         <div className="sfp-panel__kpis" aria-label="Сводные показатели">
-          <KpiTile label="Долг" value={summary?.debt} loading={summaryLoading && !summary} />
+          <KpiTile
+            label="Долг"
+            value={summary?.debt}
+            tone="debt"
+            loading={summaryLoading && !summary}
+          />
           <KpiTile
             label="Просрочено"
             value={summary?.overdue?.amount}
@@ -243,12 +249,6 @@ export default function SupplierFinancePanel() {
             tone="today"
             loading={summaryLoading && !summary}
           />
-          <KpiTile
-            label={monthLabel ? `Оплачено · ${monthLabel}` : 'Оплачено'}
-            value={summary?.paidThisMonth?.amount}
-            loading={summaryLoading && !summary}
-            unavailable={paidUnavailable}
-          />
         </div>
       ) : null}
 
@@ -260,6 +260,7 @@ export default function SupplierFinancePanel() {
           summaryLoading={summaryLoading}
           obligations={obligations}
           refreshToken={refreshToken}
+          filterSlot={paymentsFilterSlot}
         />
       ) : null}
 

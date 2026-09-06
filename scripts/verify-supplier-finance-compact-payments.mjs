@@ -55,7 +55,9 @@ async function main() {
   const utilsSrc = read(UTILS)
 
   // --- Case 1: embedded uses compact mode -----------------------------------
-  assert.match(panelSrc, /embedded \? \(\s*\n\s*<CompactPaymentSchedule/)
+  // Этап 2.9: the embedded branch now also portals the supplier filter
+  // button/popover before the schedule itself, so allow content in between.
+  assert.match(panelSrc, /embedded \? \([\s\S]{0,3000}<CompactPaymentSchedule/)
   assert.match(panelSrc, /function CompactPaymentSchedule\(/)
   ok('Case 1: embedded SupplierPaymentsPanel renders CompactPaymentSchedule')
 
@@ -65,14 +67,24 @@ async function main() {
   assert.match(panelSrc, /<ObligationCard/)
   ok('Case 2: non-embedded path keeps legacy tabs + ObligationCard list')
 
-  // --- Case 3: four groups in order -----------------------------------------
-  assert.match(panelSrc, /const COMPACT_SECTIONS = \[[\s\S]*?id: 'overdue'[\s\S]*?id: 'today'[\s\S]*?id: 'upcoming'[\s\S]*?id: 'termsMissing'/)
-  ok('Case 3: COMPACT_SECTIONS order is overdue → today → upcoming → termsMissing')
+  // --- Case 3: three urgency groups in order, termsMissing is a separate banner ---
+  // Pre-existing drift fixed in passing: termsMissing was never a 4th
+  // COMPACT_SECTIONS entry — it's a setup-gap banner (MissingTermsBanner),
+  // not a point on the urgency timeline (see the doc comment above it).
+  assert.match(panelSrc, /const COMPACT_SECTIONS = \[[\s\S]*?id: 'overdue'[\s\S]*?id: 'today'[\s\S]*?id: 'upcoming'/)
+  assert.doesNotMatch(panelSrc, /const COMPACT_SECTIONS = \[[\s\S]*?id: 'termsMissing'/)
+  assert.match(panelSrc, /function MissingTermsBanner/)
+  ok('Case 3: COMPACT_SECTIONS order is overdue → today → upcoming; termsMissing is the separate banner')
 
   // --- Case 4: group header uses view count + amount ------------------------
+  // Этап 2.9: section header is now a gray divider with the label/count and
+  // amount split into their own spans (for per-status label coloring +
+  // right-aligned total), not one plain text node — same underlying data.
   assert.match(panelSrc, /tabCounts\[section\.id\]/)
   assert.match(panelSrc, /summaries\[section\.summaryKey\]/)
-  assert.match(panelSrc, /\{section\.label\} · \{count\} · \{formatUmagMoney\(amount\)\}/)
+  assert.match(panelSrc, /spo-compact__section-label">\{section\.label\}/)
+  assert.match(panelSrc, /spo-compact__section-count">· \{count\}/)
+  assert.match(panelSrc, /spo-compact__section-amount">\{formatUmagMoney\(amount\)\}/)
   ok('Case 4: section headers use tabCounts + summaries from payment schedule view')
 
   // --- Case 5: no new status formula in compact presentation ----------------
@@ -193,7 +205,7 @@ async function main() {
   ok('SupplierPaymentsPanel still uses buildPaymentScheduleView; standalone self-loads obligations')
 
   // --- Empty sections hidden ------------------------------------------------
-  assert.match(panelSrc, /if \(groups\.length === 0\) return null/)
+  assert.match(panelSrc, /if \(!groups\.length\) return null/)
   ok('empty compact sections are omitted (not four «нет платежей» blocks)')
 
   // --- Nav / routes (source) ------------------------------------------------
