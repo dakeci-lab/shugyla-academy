@@ -1330,9 +1330,14 @@ export function plannerSubcategoryTreeKey(categoryName = '', subcategoryName = '
   return `s:${categoryName || ''}\u0000${subcategoryName || ''}`
 }
 
-/** Tree when idle; flat SKU list when searching or ABC-sorting. */
-export function isPlannerTreeViewMode({ search = '', abcSortField = '' } = {}) {
-  return !String(search || '').trim() && !abcSortField
+/**
+ * Tree when idle; flat SKU list when searching, ABC-sorting, or a stock-health
+ * bucket is active (a bucket click from ProcurementStockHealthWidget answers
+ * "which SKUs exactly", which the tree's per-category counts — cached and
+ * unaware of reserve_status — can't honestly reflect).
+ */
+export function isPlannerTreeViewMode({ search = '', abcSortField = '', reserveStatus = '' } = {}) {
+  return !String(search || '').trim() && !abcSortField && !reserveStatus
 }
 
 /**

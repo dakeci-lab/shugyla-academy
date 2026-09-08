@@ -1484,24 +1484,55 @@ a.proc-planner__qty-history:hover {
   margin-bottom: 0.85rem;
 }
 
+/* Bucket colors: exact codes from the "К оплате" KPI tiles
+   (SupplierFinancePanel.css: --debt/--overdue/--today), owner-approved —
+   Недостаток=green, Перезатарка=red, Точно=amber, Нет данных=grey.
+   Bar segments use each color softened ~20% toward white (a flat solid
+   fill read as too high-contrast across a wide strip); dots/legend use
+   the colors at full strength. */
 .proc-stock-health__bar-seg {
   height: 100%;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  transition: filter 0.15s ease, opacity 0.15s ease;
+}
+
+.proc-stock-health__bar-seg:disabled {
+  cursor: default;
+}
+
+.proc-stock-health__bar-seg:not(:disabled):hover {
+  filter: brightness(0.94);
+}
+
+.proc-stock-health__bar-seg:focus-visible {
+  outline: 2px solid var(--primary, #059669);
+  outline-offset: -2px;
+}
+
+.proc-stock-health__bar-seg.is-active {
+  box-shadow: inset 0 0 0 2px rgba(15, 23, 42, 0.35);
+}
+
+.proc-stock-health__bar-seg.is-dimmed {
+  opacity: 0.55;
 }
 
 .proc-stock-health__bar-seg.is-onNorm {
-  background: #eef1f4;
+  background: #ffbe4b;
 }
 
 .proc-stock-health__bar-seg.is-overNorm {
-  background: #f6bcbc;
+  background: #f8406b;
 }
 
 .proc-stock-health__bar-seg.is-underNorm {
-  background: #c2ecd0;
+  background: #56cb80;
 }
 
 .proc-stock-health__bar-seg.is-no-demand {
-  background: #f3f4f6;
+  background: #8390a2;
 }
 
 .proc-stock-health__legend {
@@ -1512,6 +1543,31 @@ a.proc-planner__qty-history:hover {
 
 .proc-stock-health__legend-item {
   min-width: 0;
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 6px 8px;
+  margin: -6px -8px;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.proc-stock-health__legend-item:disabled {
+  cursor: default;
+}
+
+.proc-stock-health__legend-item:not(:disabled):hover {
+  background: var(--bg, #f8fafc);
+}
+
+.proc-stock-health__legend-item.is-active {
+  border-color: var(--border-strong, #cbd5e1);
+  background: var(--bg, #f8fafc);
 }
 
 .proc-stock-health__legend-label {
@@ -1531,19 +1587,19 @@ a.proc-planner__qty-history:hover {
 }
 
 .proc-stock-health__dot.is-onNorm {
-  background: #cbd2d9;
+  background: #ffae1e;
 }
 
 .proc-stock-health__dot.is-overNorm {
-  background: #e07a7a;
+  background: #f61046;
 }
 
 .proc-stock-health__dot.is-underNorm {
-  background: #6ec895;
+  background: #2cbe60;
 }
 
 .proc-stock-health__dot.is-no-demand {
-  background: #d1d5db;
+  background: #64748b;
 }
 
 .proc-stock-health__legend-value {
@@ -1575,6 +1631,37 @@ a.proc-planner__qty-history:hover {
   .proc-stock-health__legend {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+}
+
+.proc-planner__reserve-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--border-strong, #cbd5e1);
+  border-radius: 8px;
+  background: var(--bg, #f8fafc);
+  font-size: 0.8125rem;
+  color: var(--text, #111827);
+}
+
+.proc-planner__reserve-filter-clear {
+  appearance: none;
+  border: 1px solid var(--border-strong, #cbd5e1);
+  background: var(--surface, #fff);
+  border-radius: 6px;
+  padding: 0.25rem 0.6rem;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary, #6b7280);
+  cursor: pointer;
+}
+
+.proc-planner__reserve-filter-clear:hover {
+  background: var(--bg, #f8fafc);
+  color: var(--text, #111827);
 }
 
 .proc-stock-health__skeleton-block {

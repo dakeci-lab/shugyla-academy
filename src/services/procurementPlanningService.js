@@ -580,6 +580,9 @@ export async function fetchProcurementSnapshotStockHealth(snapshotId) {
  * Server-side paginated items with filters.
  * @returns {{ items, totalCount, page, pageSize }}
  */
+/** Whitelisted values for reserve_status — a generated column, always exactly one of these. */
+export const RESERVE_STATUS_VALUES = ['no_demand', 'under_norm', 'on_norm', 'over_norm']
+
 export async function fetchSnapshotItemsPage({
   snapshotId,
   page = 1,
@@ -591,6 +594,7 @@ export async function fetchSnapshotItemsPage({
   warningsOnly = false,
   orderableOnly = false,
   unassignedOnly = false,
+  reserveStatus = '',
   abcQty = [],
   abcRevenue = [],
   abcProfit = [],
@@ -615,6 +619,7 @@ export async function fetchSnapshotItemsPage({
     warningsOnly,
     orderableOnly,
     unassignedOnly,
+    reserveStatus,
     abcQty,
     abcRevenue,
     abcProfit,
@@ -654,6 +659,7 @@ export function applySnapshotItemsPageQuery(query, {
   warningsOnly = false,
   orderableOnly = false,
   unassignedOnly = false,
+  reserveStatus = '',
   abcQty = [],
   abcRevenue = [],
   abcProfit = [],
@@ -672,6 +678,9 @@ export function applySnapshotItemsPageQuery(query, {
   if (unassignedOnly) query = query.is('platform_supplier_id', null)
   if (warningsOnly) query = query.eq('negative_stock', true)
   if (orderableOnly) query = query.gt('final_order_qty', 0)
+  if (reserveStatus && RESERVE_STATUS_VALUES.includes(reserveStatus)) {
+    query = query.eq('reserve_status', reserveStatus)
+  }
 
   const abcQuery = describeSnapshotItemsAbcQuery({
     abcQty,

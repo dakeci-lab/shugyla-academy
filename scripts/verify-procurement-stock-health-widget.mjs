@@ -98,7 +98,10 @@ assert(
 // Widget component
 // ---------------------------------------------------------------------------
 
-assert('widget renders nothing until stockHealth resolves to a summary', widgetSrc.includes('if (!summary) return null'))
+assert(
+  'widget renders nothing (or a skeleton while loading) until stockHealth resolves to a summary',
+  widgetSrc.includes('if (!summary) return loading ? <StockHealthSkeleton /> : null')
+)
 assert('widget uses buildStockHealthSummary from the shared ux module', widgetSrc.includes('buildStockHealthSummary'))
 assert('widget shows all three buckets plus the no-demand bucket', ['onNorm', 'overNorm', 'underNorm', 'no-demand'].every((key) => widgetSrc.includes(key)))
 assert('off-target values get a distinct class for styling', widgetSrc.includes('is-off-target'))
@@ -109,10 +112,18 @@ assert('bar has an accessible text alternative (role=img + aria-label)', widgetS
 // ---------------------------------------------------------------------------
 
 assert(
-  'overstock (red) and understock (green) use the owner-supplied hex shades',
-  plannerCss.includes('#f6bcbc') && plannerCss.includes('#c2ecd0')
+  'bucket dots use the exact hex codes from the "К оплате" KPI tiles (SupplierFinancePanel.css)',
+  plannerCss.includes('#ffae1e') && plannerCss.includes('#f61046') && plannerCss.includes('#2cbe60')
+)
+assert(
+  'bar segments use the same hues softened toward white, not the full-strength dot colors',
+  plannerCss.includes('#ffbe4b') && plannerCss.includes('#f8406b') && plannerCss.includes('#56cb80')
 )
 assert('stock-health block styles exist', plannerCss.includes('.proc-stock-health'))
+assert(
+  'bar segments and legend cards are real buttons, not decorative spans',
+  widgetSrc.includes('<button') && plannerCss.includes('.proc-stock-health__bar-seg {')
+)
 
 // ---------------------------------------------------------------------------
 // Wiring into the planner

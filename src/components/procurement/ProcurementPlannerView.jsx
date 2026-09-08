@@ -320,6 +320,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
      * Set by alert chip «Без поставщика».
      */
     unassignedOnly: false,
+    /** Set by a bucket click on the «Соответствие норме запаса» widget. */
+    reserveStatus: '',
     abcQty: [],
     abcRevenue: [],
     abcProfit: [],
@@ -578,6 +580,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   const treeMode = isPlannerTreeViewMode({
     search: debouncedSearch,
     abcSortField: abcSort.field,
+    reserveStatus: filters.reserveStatus,
   })
 
   useEffect(() => {
@@ -696,6 +699,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     const treeMode = isPlannerTreeViewMode({
       search: debouncedSearch,
       abcSortField: abcSort.field,
+      reserveStatus: filters.reserveStatus,
     })
     if (treeMode) {
       itemsRequestIdRef.current += 1
@@ -773,6 +777,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     filters.orderableOnly,
     filters.warningsOnly,
     filters.unassignedOnly,
+    filters.reserveStatus,
     filters.abcQty,
     filters.abcRevenue,
     filters.abcProfit,
@@ -784,11 +789,12 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       isPlannerTreeViewMode({
         search: debouncedSearch,
         abcSortField: abcSort.field,
+        reserveStatus: filters.reserveStatus,
       })
     ) {
       resetTreeState()
     }
-  }, [debouncedSearch, abcSort.field, resetTreeState])
+  }, [debouncedSearch, abcSort.field, filters.reserveStatus, resetTreeState])
 
   /**
    * An attempt key is bound to the payload it was minted for. As soon as any part of
@@ -2202,6 +2208,38 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     )
   }
 
+  /**
+   * ProcurementStockHealthWidget bucket key <-> procurement_snapshot_items.reserve_status.
+   * Same four values as get_procurement_snapshot_stock_health() and the
+   * generated column (20260908140000_procurement_snapshot_items_reserve_status.sql).
+   */
+  const RESERVE_STATUS_BY_BUCKET = {
+    onNorm: 'on_norm',
+    overNorm: 'over_norm',
+    underNorm: 'under_norm',
+    noDemand: 'no_demand',
+  }
+  const RESERVE_STATUS_LABELS = {
+    on_norm: 'Точно',
+    over_norm: 'Перезатарка',
+    under_norm: 'Недостаток',
+    no_demand: 'Нет данных',
+  }
+  const activeReserveBucket =
+    Object.entries(RESERVE_STATUS_BY_BUCKET).find(
+      ([, value]) => value === filters.reserveStatus
+    )?.[0] || null
+
+  /** Clicking an already-active bucket clears the filter — same toggle as the approved prototype. */
+  function handleStockHealthBucketClick(bucketKey) {
+    const value = RESERVE_STATUS_BY_BUCKET[bucketKey]
+    if (!value) return
+    setFilters((current) => ({
+      ...current,
+      reserveStatus: current.reserveStatus === value ? '' : value,
+    }))
+  }
+
   /** Chips navigate to the matching filter; they never just report a number. */
   function handleAlertChipClick(chip) {
     if (chip.id === 'unassigned') {
@@ -2348,7 +2386,23 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         stockHealth={stockHealth}
         loading={stockHealthLoading}
         asOfLabel={snapshot?.syncedAt ? formatSyncedAt(snapshot.syncedAt) : null}
+        activeBucket={activeReserveBucket}
+        onBucketClick={handleStockHealthBucketClick}
       />
+      {filters.reserveStatus ? (
+        <div className="proc-planner__reserve-filter" role="status">
+          <span>
+            Показаны позиции: <strong>{RESERVE_STATUS_LABELS[filters.reserveStatus]}</strong>
+          </span>
+          <button
+            type="button"
+            className="proc-planner__reserve-filter-clear"
+            onClick={() => setFilters((current) => ({ ...current, reserveStatus: '' }))}
+          >
+            Сбросить фильтр ✕
+          </button>
+        </div>
+      ) : null}
       <PlatformSearchToolbar
         value={search}
         onChange={(e) => setSearch(e.target.value)}

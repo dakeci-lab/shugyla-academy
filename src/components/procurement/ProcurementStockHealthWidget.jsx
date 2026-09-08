@@ -57,10 +57,27 @@ function StockHealthSkeleton() {
  * While `stockHealth` is still loading, renders a same-sized skeleton
  * instead of nothing, so the toolbar/table below don't jump once the data
  * (and the widget's real content) lands.
+ *
+ * Every bucket (bar segment + legend card, including «Нет данных») is
+ * clickable — `onBucketClick(key)` where key is 'onNorm' | 'overNorm' |
+ * 'underNorm' | 'noDemand'. `activeBucket` highlights the currently
+ * filtered-to bucket and dims the rest of the bar.
  */
-export default function ProcurementStockHealthWidget({ stockHealth, asOfLabel, loading = false }) {
+export default function ProcurementStockHealthWidget({
+  stockHealth,
+  asOfLabel,
+  loading = false,
+  activeBucket = null,
+  onBucketClick = null,
+}) {
   const summary = buildStockHealthSummary(stockHealth)
   if (!summary) return loading ? <StockHealthSkeleton /> : null
+
+  const clickable = typeof onBucketClick === 'function'
+
+  function handleClick(key) {
+    if (clickable) onBucketClick(key)
+  }
 
   return (
     <div className="proc-stock-health">
@@ -79,21 +96,44 @@ export default function ProcurementStockHealthWidget({ stockHealth, asOfLabel, l
 
       <div className="proc-stock-health__bar" role="img" aria-label={`Точно ${summary.buckets[0].pct}%, перезатарка ${summary.buckets[1].pct}%, недостаток ${summary.buckets[2].pct}%, нет данных ${summary.noDemand.pct}%`}>
         {summary.buckets.map((bucket) => (
-          <span
+          <button
             key={bucket.key}
-            className={`proc-stock-health__bar-seg is-${bucket.key}`}
+            type="button"
+            className={`proc-stock-health__bar-seg is-${bucket.key}${
+              activeBucket === bucket.key ? ' is-active' : ''
+            }${activeBucket && activeBucket !== bucket.key ? ' is-dimmed' : ''}`}
             style={{ width: `${bucket.pct}%` }}
+            disabled={!clickable}
+            aria-pressed={activeBucket === bucket.key}
+            title={`${bucket.label} — нажмите, чтобы показать эти позиции в таблице`}
+            onClick={() => handleClick(bucket.key)}
           />
         ))}
-        <span
-          className="proc-stock-health__bar-seg is-no-demand"
+        <button
+          type="button"
+          className={`proc-stock-health__bar-seg is-no-demand${
+            activeBucket === 'noDemand' ? ' is-active' : ''
+          }${activeBucket && activeBucket !== 'noDemand' ? ' is-dimmed' : ''}`}
           style={{ width: `${summary.noDemand.pct}%` }}
+          disabled={!clickable}
+          aria-pressed={activeBucket === 'noDemand'}
+          title="Нет данных — нажмите, чтобы показать эти позиции в таблице"
+          onClick={() => handleClick('noDemand')}
         />
       </div>
 
       <div className="proc-stock-health__legend">
         {summary.buckets.map((bucket) => (
-          <div key={bucket.key} className="proc-stock-health__legend-item">
+          <button
+            key={bucket.key}
+            type="button"
+            className={`proc-stock-health__legend-item${
+              activeBucket === bucket.key ? ' is-active' : ''
+            }`}
+            disabled={!clickable}
+            aria-pressed={activeBucket === bucket.key}
+            onClick={() => handleClick(bucket.key)}
+          >
             <div className="proc-stock-health__legend-label">
               <span className={`proc-stock-health__dot is-${bucket.key}`} aria-hidden="true" />
               {bucket.label}
@@ -107,9 +147,17 @@ export default function ProcurementStockHealthWidget({ stockHealth, asOfLabel, l
               {bucket.count.toLocaleString('ru-RU')} SKU
             </div>
             <DeviationLabel bucket={bucket} />
-          </div>
+          </button>
         ))}
-        <div className="proc-stock-health__legend-item is-muted">
+        <button
+          type="button"
+          className={`proc-stock-health__legend-item is-muted${
+            activeBucket === 'noDemand' ? ' is-active' : ''
+          }`}
+          disabled={!clickable}
+          aria-pressed={activeBucket === 'noDemand'}
+          onClick={() => handleClick('noDemand')}
+        >
           <div className="proc-stock-health__legend-label">
             <span className="proc-stock-health__dot is-no-demand" aria-hidden="true" />
             Нет данных
@@ -119,7 +167,7 @@ export default function ProcurementStockHealthWidget({ stockHealth, asOfLabel, l
             {summary.noDemand.count.toLocaleString('ru-RU')} SKU
           </div>
           <span className="proc-stock-health__legend-meta">не входит в 80/10/10</span>
-        </div>
+        </button>
       </div>
     </div>
   )
