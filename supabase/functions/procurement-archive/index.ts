@@ -89,11 +89,15 @@ async function fetchAllItemsCsv(
   let rowCount = 0
 
   for (;;) {
+    // Order by barcode, not id: idx_psi_snapshot_barcode covers
+    // (snapshot_id, barcode) so this filter+sort is a single index scan.
+    // Ordering by id had no matching index for this filter, forcing a slow
+    // sort that blew the PostgREST statement timeout on an 8k-row snapshot.
     const { data, error } = await serviceClient
       .from('procurement_snapshot_items')
       .select(ITEM_COLUMNS.join(','))
       .eq('snapshot_id', snapshotId)
-      .order('id', { ascending: true })
+      .order('barcode', { ascending: true })
       .range(from, from + ITEMS_PAGE_SIZE - 1)
     if (error) throw new Error(`fetch_items_failed: ${error.message}`)
 
