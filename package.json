@@ -72,6 +72,7 @@
     "supabase:local:verify-procurement-snapshot-stock-health": "node scripts/verify-procurement-snapshot-stock-health.mjs",
     "verify:procurement-stock-health-widget": "node scripts/verify-procurement-stock-health-widget.mjs",
     "verify:procurement-reserve-status-drilldown": "node scripts/verify-procurement-reserve-status-drilldown.mjs",
+    "verify:procurement-snapshot-archival": "node scripts/verify-procurement-snapshot-archival.mjs",
     "verify:procurement-partial-generation": "node scripts/verify-procurement-partial-generation.mjs",
     "verify:procurement-repeat-analytics-orders": "node scripts/verify-procurement-repeat-analytics-orders.mjs --static-only",
     "verify:procurement-abc-analysis": "node scripts/verify-procurement-abc-analysis.mjs",

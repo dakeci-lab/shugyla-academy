@@ -4,6 +4,7 @@ import {
   exportSnapshotItemsCsv,
   fetchProcurementSnapshotsPage,
   fetchProcurementSnapshotTotals,
+  fetchSnapshotArchiveUrl,
   fetchSnapshotItemsPage,
   fetchSnapshotItemsTotals,
 } from '../../services/procurementPlanningService'
@@ -188,10 +189,15 @@ export default function ProcurementWarehouseView() {
     if (exportingId) return
     setExportingId(snapshot.id)
     try {
+      if (snapshot.archivedAt && snapshot.archivePath) {
+        const url = await fetchSnapshotArchiveUrl(snapshot.archivePath)
+        if (url) window.open(url, '_blank', 'noopener')
+        return
+      }
       const items = await exportSnapshotItemsCsv(snapshot.id, {})
       await exportWarehouseSnapshotXlsx(items, { syncedAt: snapshot.syncedAt || snapshot.createdAt })
     } catch (err) {
-      setHistoryError(toProcurementUserMessage(err, 'Не удалось выгрузить Excel'))
+      setHistoryError(toProcurementUserMessage(err, 'Не удалось выгрузить архив'))
     } finally {
       setExportingId(null)
     }
@@ -201,12 +207,17 @@ export default function ProcurementWarehouseView() {
     if (!selected?.id || detailExporting) return
     setDetailExporting(true)
     try {
+      if (selected.archivedAt && selected.archivePath) {
+        const url = await fetchSnapshotArchiveUrl(selected.archivePath)
+        if (url) window.open(url, '_blank', 'noopener')
+        return
+      }
       const items = await exportSnapshotItemsCsv(selected.id, {})
       await exportWarehouseSnapshotXlsx(items, {
         syncedAt: selected.syncedAt || selected.createdAt,
       })
     } catch (err) {
-      setDetailError(toProcurementUserMessage(err, 'Не удалось выгрузить Excel'))
+      setDetailError(toProcurementUserMessage(err, 'Не удалось выгрузить архив'))
     } finally {
       setDetailExporting(false)
     }
@@ -232,6 +243,11 @@ export default function ProcurementWarehouseView() {
             <span className="proc-wh__detail-title">
               Синхронизация от {formatUmagDateTime(selected.syncedAt || selected.createdAt)}
             </span>
+            {selected.archivedAt ? (
+              <span className="proc-wh__archived-badge" title="Товарные позиции выгружены в архив и удалены из базы.">
+                в архиве
+              </span>
+            ) : null}
           </div>
         </div>
         {detailExporting ? <div className="proc-wh__loading-bar" aria-hidden="true" /> : null}
@@ -252,7 +268,7 @@ export default function ProcurementWarehouseView() {
               disabled={detailExporting}
             >
               <DownloadIcon size={18} />
-              {detailExporting ? 'Экспорт…' : 'Скачать Excel'}
+              {detailExporting ? 'Экспорт…' : selected.archivedAt ? 'Скачать архив' : 'Скачать Excel'}
             </button>
           }
         />
@@ -288,9 +304,11 @@ export default function ProcurementWarehouseView() {
                   ) : detailItems.length === 0 ? (
                     <tr>
                       <td colSpan={9} className="proc-wh__empty-cell">
-                        {debouncedDetailSearch
-                          ? 'По вашему запросу ничего не найдено.'
-                          : 'В этом снимке нет товаров.'}
+                        {selected.archivedAt
+                          ? 'Товарные позиции этого снимка в архиве — нажмите «Скачать архив» выше.'
+                          : debouncedDetailSearch
+                            ? 'По вашему запросу ничего не найдено.'
+                            : 'В этом снимке нет товаров.'}
                       </td>
                     </tr>
                   ) : (
@@ -419,6 +437,14 @@ export default function ProcurementWarehouseView() {
                         >
                           {formatUmagDateTime(snapshot.syncedAt || snapshot.createdAt)}
                         </button>
+                        {snapshot.archivedAt ? (
+                          <span
+                            className="proc-wh__archived-badge"
+                            title="Товарные позиции этого снимка выгружены в архив и удалены из базы — счётчики и суммы сохранены."
+                          >
+                            в архиве
+                          </span>
+                        ) : null}
                       </td>
                       <td className="proc-wh__col-num">{formatQty(snapshot.itemCount)}</td>
                       <td className="proc-wh__col-num">{formatQty(snapshot.negativeStockCount)}</td>
@@ -436,8 +462,8 @@ export default function ProcurementWarehouseView() {
                           className="proc-wh__icon-btn"
                           onClick={() => void handleExportRow(snapshot)}
                           disabled={exportingId === snapshot.id || snapshot.status === 'syncing'}
-                          title="Скачать Excel"
-                          aria-label="Скачать Excel"
+                          title={snapshot.archivedAt ? 'Скачать архив (CSV)' : 'Скачать Excel'}
+                          aria-label={snapshot.archivedAt ? 'Скачать архив' : 'Скачать Excel'}
                         >
                           <DownloadIcon size={18} />
                         </button>

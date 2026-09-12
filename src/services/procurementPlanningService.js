@@ -154,6 +154,9 @@ function normalizeSnapshot(row) {
     error: row.error,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    /** Set once procurement-archive has exported+deleted this snapshot's items — see 20260912090000. */
+    archivedAt: row.archived_at ?? null,
+    archivePath: row.archive_path ?? null,
   }
 }
 
@@ -508,6 +511,20 @@ export async function fetchProcurementSnapshotsPage({ page = 1, pageSize = 25 } 
     page,
     pageSize,
   }
+}
+
+/**
+ * Signed URL for an archived snapshot's raw-item export (gzipped CSV) — see
+ * 20260912090000_procurement_snapshot_archival.sql. Only meaningful once
+ * procurement-archive has run for that snapshot (snapshot.archivePath set).
+ */
+export async function fetchSnapshotArchiveUrl(archivePath) {
+  ensureClient()
+  const { data, error } = await supabase.storage
+    .from('procurement-snapshot-archives')
+    .createSignedUrl(archivePath, 60)
+  if (error) throw new Error(error.message || 'Не удалось получить ссылку на архив')
+  return data?.signedUrl || null
 }
 
 /**
