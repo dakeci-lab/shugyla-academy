@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 /**
  * Verifies the procurement snapshot archival system: the migration's safety
- * guarantees (never touches the latest ready/generated snapshot, never
- * partially_generated/syncing, only deletes items after a successful
- * archive upload), and the Edge Function's shape (rollup -> export -> prune
- * order, pagination past PostgREST's 1000-row cap, scheduler auth).
+ * guarantees (never touches the single latest snapshot, never
+ * syncing/failed, only deletes items after a successful archive upload),
+ * the follow-up migration that widened eligibility to partially_generated
+ * (still never the latest one, still 7-day-old rule), and the Edge
+ * Function's shape (rollup -> export -> prune order, pagination past
+ * PostgREST's 1000-row cap, scheduler auth).
  *
  * Usage:
  *   npm run verify:procurement-snapshot-archival
@@ -108,8 +110,37 @@ function stageMigration() {
   console.log('')
 }
 
+function findFollowupMigration() {
+  const dir = path.join(ROOT, 'supabase/migrations')
+  const match = fs.readdirSync(dir).find((name) => name.includes('procurement_archive_include_partially_generated'))
+  if (!match) fail('partially_generated follow-up migration file not found in supabase/migrations')
+  return `supabase/migrations/${match}`
+}
+
+function stagePartiallyGeneratedFollowup() {
+  console.log('Stage 2: follow-up migration — widen eligibility to partially_generated')
+
+  const sql = read(findFollowupMigration())
+
+  assert(
+    'eligibility now includes partially_generated alongside ready/generated',
+    /status in \('ready', 'generated', 'partially_generated'\)/.test(sql)
+  )
+  assert(
+    "the 'latest to exclude' check spans all three statuses too, not just ready/generated",
+    /latest_any as \([\s\S]{0,150}status in \('ready', 'generated', 'partially_generated'\)/.test(sql)
+  )
+  assert(
+    'still respects a cutoff_days parameter (doesn\'t archive everything indiscriminately)',
+    /coalesce\(s\.synced_at, s\.created_at\) < now\(\) - make_interval\(days => greatest\(p_cutoff_days, 1\)\)/.test(sql)
+  )
+  assert('is a plain create or replace, not a new function (same name/signature as the original)', /create or replace function public\.get_procurement_snapshots_eligible_for_archive/.test(sql))
+
+  console.log('')
+}
+
 function stageEdgeFunction() {
-  console.log('Stage 2: Edge Function — rollup-before-export-before-prune, pagination, auth')
+  console.log('Stage 3: Edge Function — rollup-before-export-before-prune, pagination, auth')
 
   const fn = read('supabase/functions/procurement-archive/index.ts')
 
@@ -151,6 +182,7 @@ function stageEdgeFunction() {
 function main() {
   try {
     stageMigration()
+    stagePartiallyGeneratedFollowup()
     stageEdgeFunction()
     console.log(`=== All ${testsPassed}/${testsRun} checks passed ===`)
   } catch (err) {
