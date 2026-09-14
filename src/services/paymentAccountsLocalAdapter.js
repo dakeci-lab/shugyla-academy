@@ -2,8 +2,11 @@ import { normalizePaymentAccount } from '../utils/paymentAccountsData'
 
 const STORAGE_KEY = 'shugyla_payment_accounts_v1'
 
+/** Stable id of the seeded «Наличные» account — the default for new local suppliers. */
+export const DEFAULT_CASH_ACCOUNT_ID = 'pa-cash'
+
 const DEFAULT_ACCOUNTS = [
-  { id: 'pa-cash', name: 'Наличные', description: '', isActive: true, sortOrder: 10 },
+  { id: DEFAULT_CASH_ACCOUNT_ID, name: 'Наличные', description: '', isActive: true, sortOrder: 10 },
   { id: 'pa-transfer', name: 'Перевод', description: '', isActive: true, sortOrder: 20 },
 ]
 

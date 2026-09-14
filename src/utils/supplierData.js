@@ -1,6 +1,7 @@
 import { isCloudMode } from '../lib/dataMode'
 import { getCloudSuppliers } from '../lib/cloudStore'
 import { getLocalSuppliersBundle } from '../services/suppliersLocalAdapter'
+import { getPaymentAccountName } from '../services/paymentAccountsService'
 
 export const SUPPLIER_STATUS = {
   ACTIVE: 'active',
@@ -18,20 +19,6 @@ export const SUPPLIER_STATUS_BADGE = {
   active: 'done',
   inactive: 'idle',
   archived: 'idle',
-}
-
-export const PAYMENT_TYPE = {
-  CASH: 'cash',
-  TRANSFER: 'transfer',
-  DEFERRAL: 'deferral',
-  MIXED: 'mixed',
-}
-
-export const PAYMENT_TYPE_LABELS = {
-  cash: 'Наличными',
-  transfer: 'Перевод',
-  deferral: 'Отсрочка',
-  mixed: 'Смешанная оплата',
 }
 
 export const RETURN_POLICY = {
@@ -241,7 +228,7 @@ export function normalizeSupplier(raw) {
         : raw.min_order_amount != null
           ? Number(raw.min_order_amount)
           : null,
-    paymentType: raw.paymentType ?? raw.payment_type ?? PAYMENT_TYPE.CASH,
+    paymentAccountId: raw.paymentAccountId ?? raw.payment_account_id ?? null,
     deferralDays:
       raw.deferralDays != null
         ? Number(raw.deferralDays)
@@ -300,24 +287,19 @@ export function formatSupplierCategories(categories) {
   return categories.join(', ')
 }
 
-/** Текст условий оплаты для списков и карточек */
+/** Срок оплаты сам по себе: «сразу» / «N дней» / «Не настроено» */
+export function formatDeferralDaysTerm(deferralDays) {
+  if (deferralDays === '' || deferralDays == null) return 'Не настроено'
+  const days = Number(deferralDays)
+  if (!Number.isFinite(days) || days < 0) return 'Не настроено'
+  return days === 0 ? 'сразу' : `${days} дней`
+}
+
+/** Комбинированный текст «способ — срок» для компактных мест (список приёмки и т.п.) */
 export function formatSupplierPaymentTerms(supplier) {
-  if (!supplier?.paymentType) return '—'
-
-  const baseLabel = PAYMENT_TYPE_LABELS[supplier.paymentType]
-  if (!baseLabel) return '—'
-
-  const deferralDays = Number(supplier.deferralDays)
-  if (
-    (supplier.paymentType === PAYMENT_TYPE.DEFERRAL ||
-      supplier.paymentType === PAYMENT_TYPE.MIXED) &&
-    Number.isFinite(deferralDays) &&
-    deferralDays > 0
-  ) {
-    return `${baseLabel} ${deferralDays} дней`
-  }
-
-  return baseLabel
+  if (!supplier) return '—'
+  const methodLabel = getPaymentAccountName(supplier.paymentAccountId) || 'Не настроено'
+  return `${methodLabel} — ${formatDeferralDaysTerm(supplier.deferralDays)}`
 }
 
 export function formatMinOrderAmount(amount) {

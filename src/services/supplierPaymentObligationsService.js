@@ -19,7 +19,8 @@ import {
   deriveObligationStatus,
   describeObligationsSyncResult,
   formatDaysUntilDue,
-  formatPaymentTermsSnapshot,
+  formatPaymentAccountSnapshot,
+  formatPaymentTermsDaysSnapshot,
   resolveObligationTermsPatch,
   resolveSupplierPaymentTerms,
   toAqtobeDateKey,
@@ -35,7 +36,7 @@ const OBLIGATION_SELECT = `
   original_supply_amount,
   current_payment_amount,
   current_debt,
-  payment_terms_type_snapshot,
+  payment_account_id_snapshot,
   deferment_days_snapshot,
   due_date,
   terms_snapshot_created_at,
@@ -45,7 +46,7 @@ const OBLIGATION_SELECT = `
   paid_at,
   created_at,
   updated_at,
-  supplier:platform_suppliers!platform_supplier_id(id, name, payment_type, deferral_days)
+  supplier:platform_suppliers!platform_supplier_id(id, name, payment_account_id, deferral_days)
 `
 
 function assertCloudReady() {
@@ -72,7 +73,7 @@ export function normalizeObligation(row) {
     originalSupplyAmount: toNumber(row.original_supply_amount),
     currentPaymentAmount: toNumber(row.current_payment_amount),
     currentDebt: toNumber(row.current_debt),
-    paymentTermsTypeSnapshot: row.payment_terms_type_snapshot,
+    paymentAccountIdSnapshot: row.payment_account_id_snapshot,
     defermentDaysSnapshot:
       row.deferment_days_snapshot == null ? null : Number(row.deferment_days_snapshot),
     dueDate: row.due_date,
@@ -84,7 +85,7 @@ export function normalizeObligation(row) {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     supplierName: supplierJoin?.name || 'Без названия',
-    supplierPaymentType: supplierJoin?.payment_type || null,
+    supplierPaymentAccountId: supplierJoin?.payment_account_id || null,
     supplierDeferralDays:
       supplierJoin?.deferral_days == null ? null : Number(supplierJoin.deferral_days),
   }
@@ -162,7 +163,7 @@ export async function refreshObligationTermsForSupplier(platformSupplierId, supp
   const { data: rows, error } = await supabase
     .from('supplier_payment_obligations')
     .select(
-      'id, supply_document_date, source_doc_time, due_date, payment_terms_type_snapshot, deferment_days_snapshot'
+      'id, supply_document_date, source_doc_time, due_date, payment_account_id_snapshot, deferment_days_snapshot'
     )
     .eq('platform_supplier_id', platformSupplierId)
     .eq('is_source_deleted', false)
@@ -179,7 +180,7 @@ export async function refreshObligationTermsForSupplier(platformSupplierId, supp
 
     const patch = resolveObligationTermsPatch(
       {
-        paymentTermsTypeSnapshot: row.payment_terms_type_snapshot,
+        paymentAccountIdSnapshot: row.payment_account_id_snapshot,
         defermentDaysSnapshot: row.deferment_days_snapshot,
         dueDate: row.due_date,
       },
@@ -207,7 +208,8 @@ export {
   buildSupplierPaymentSummary,
   deriveObligationStatus,
   formatDaysUntilDue,
-  formatPaymentTermsSnapshot,
+  formatPaymentAccountSnapshot,
+  formatPaymentTermsDaysSnapshot,
   formatUmagDate,
   formatUmagDateTime,
   formatUmagMoney,

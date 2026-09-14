@@ -1,10 +1,10 @@
 import {
   normalizeSupplier,
   SUPPLIER_STATUS,
-  PAYMENT_TYPE,
   RETURN_POLICY,
   serializeSupplierWeekdays,
 } from '../utils/supplierData'
+import { DEFAULT_CASH_ACCOUNT_ID } from './paymentAccountsLocalAdapter'
 import umagSeed from '../data/umagSuppliersSeed.json'
 
 const STORAGE_KEY = 'shugyla_suppliers'
@@ -49,7 +49,7 @@ export function getLocalSuppliersBundle() {
       order_days: row.order_days,
       delivery_days: row.delivery_days,
       min_order_amount: row.min_order_amount,
-      payment_type: row.payment_type,
+      payment_account_id: row.payment_account_id,
       deferral_days: row.deferral_days,
       return_policy: row.return_policy,
       return_comment: row.return_comment,
@@ -92,7 +92,7 @@ export function importUmagSuppliersOnce() {
       order_days: item.order_days || '',
       delivery_days: item.delivery_days || '',
       min_order_amount: item.min_order_amount ?? 0,
-      payment_type: item.payment_type || PAYMENT_TYPE.CASH,
+      payment_account_id: item.payment_account_id || DEFAULT_CASH_ACCOUNT_ID,
       deferral_days: item.deferral_days ?? 0,
       return_policy: item.return_policy || RETURN_POLICY.NO,
       return_comment: item.return_comment || null,
@@ -134,7 +134,7 @@ function rowFromSupplier(supplier) {
     order_days: serializeSupplierWeekdays(supplier.orderWeekdays ?? supplier.orderDays),
     delivery_days: serializeSupplierWeekdays(supplier.deliveryWeekdays ?? supplier.deliveryDays),
     min_order_amount: supplier.minOrderAmount,
-    payment_type: supplier.paymentType || PAYMENT_TYPE.CASH,
+    payment_account_id: supplier.paymentAccountId || DEFAULT_CASH_ACCOUNT_ID,
     deferral_days: supplier.deferralDays,
     return_policy: supplier.returnPolicy || RETURN_POLICY.NO,
     return_comment: supplier.returnComment || null,

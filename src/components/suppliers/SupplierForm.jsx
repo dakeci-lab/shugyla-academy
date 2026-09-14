@@ -1,14 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  PAYMENT_TYPE,
   SUPPLIER_STATUS,
   SUPPLIER_STATUS_LABELS,
-  formatSupplierPaymentTerms,
+  formatDeferralDaysTerm,
   parseSupplierWeekdays,
   serializeSupplierWeekdays,
 } from '../../utils/supplierData'
-import { resolveSupplierPaymentTerms } from '../../utils/supplierPaymentObligations'
+import {
+  getPaymentAccountName,
+  getPaymentAccountsForAssignment,
+} from '../../services/paymentAccountsService'
 import {
   buildSupplierPaymentSummary,
   formatUmagMoney,
@@ -19,13 +21,9 @@ import '../../components/admin/admin-shared.css'
 import './SupplierForm.css'
 
 /**
- * Единственное поле формы — «срок оплаты, дней». `paymentType` в БД остаётся
- * (cash/deferral), но пользователь его больше не выбирает: 0 → cash,
- * N > 0 → deferral, пусто → deferral без deferral_days («Требует настройки»,
- * так же как раньше для «Отсрочка» с пустым сроком). resolveSupplierPaymentTerms()
- * из supplierPaymentObligations.js уже одинаково сворачивает cash/transfer → 0
- * и deferral/mixed → deferral_days — это та же редукция, только в обратную
- * сторону (форма → БД).
+ * Способ оплаты (счёт из справочника «Счета оплаты») и срок оплаты — две
+ * независимые оси: любой счёт можно скомбинировать с любым сроком, включая
+ * 0 (сразу). См. docs/suppliers/payment-accounts-module.md.
  */
 export function validateSupplierDeferralDays(form) {
   // Empty is allowed → obligation stays in «Требует настройки».
@@ -35,16 +33,6 @@ export function validateSupplierDeferralDays(form) {
     return 'Срок оплаты должен быть целым числом от 0 до 365'
   }
   return null
-}
-
-function derivePaymentTypeFromDays(daysRaw) {
-  const hasDays = daysRaw !== '' && daysRaw != null
-  const days = hasDays ? Number(daysRaw) : null
-  const validDays = hasDays && Number.isInteger(days) && days >= 0 && days <= 365
-  return {
-    paymentType: validDays && days === 0 ? PAYMENT_TYPE.CASH : PAYMENT_TYPE.DEFERRAL,
-    deferralDays: validDays ? days : null,
-  }
 }
 
 function SupplierPaymentsSummary({ supplierId, form }) {
@@ -74,8 +62,10 @@ function SupplierPaymentsSummary({ supplierId, form }) {
     <section className="supplier-form__payments" aria-label="Оплаты">
       <h3 className="supplier-form__payments-title">Оплаты</h3>
       <div className="supplier-form__payments-grid">
-        <span>Тип</span>
-        <strong>{formatSupplierPaymentTerms(derivePaymentTypeFromDays(form.deferralDays))}</strong>
+        <span>Способ</span>
+        <strong>{getPaymentAccountName(form.paymentAccountId) || 'Не настроено'}</strong>
+        <span>Срок</span>
+        <strong>{formatDeferralDaysTerm(form.deferralDays)}</strong>
         <span>Текущая задолженность</span>
         <strong>{summary ? formatUmagMoney(summary.totalDebt) : '…'}</strong>
         <span>Сегодня к оплате</span>
@@ -106,9 +96,9 @@ export const EMPTY_SUPPLIER_FORM = {
   managerPhone: '',
   orderWeekdays: [],
   deliveryWeekdays: [],
-  paymentType: PAYMENT_TYPE.CASH,
+  paymentAccountId: '',
   // '0' — same default a brand-new supplier got before this field existed
-  // (paymentType defaulted to cash = configured, 0 days), not '' (unconfigured).
+  // (способ по умолчанию «Наличные», срок настроен — 0 дней), not '' (unconfigured).
   deferralDays: '0',
   status: SUPPLIER_STATUS.ACTIVE,
 }
@@ -129,14 +119,8 @@ export function supplierToForm(supplier) {
     managerPhone: supplier.managerPhone || '',
     orderWeekdays: parseSupplierWeekdays(supplier.orderWeekdays ?? supplier.orderDays),
     deliveryWeekdays: parseSupplierWeekdays(supplier.deliveryWeekdays ?? supplier.deliveryDays),
-    paymentType: supplier.paymentType || PAYMENT_TYPE.CASH,
-    deferralDays: (() => {
-      const terms = resolveSupplierPaymentTerms({
-        paymentType: supplier.paymentType,
-        deferralDays: supplier.deferralDays,
-      })
-      return terms.configured ? String(terms.days) : ''
-    })(),
+    paymentAccountId: supplier.paymentAccountId || '',
+    deferralDays: supplier.deferralDays == null ? '' : String(supplier.deferralDays),
     status: supplier.status || SUPPLIER_STATUS.ACTIVE,
   }
 }
@@ -144,7 +128,9 @@ export function supplierToForm(supplier) {
 function buildVisibleSupplierPayload(form) {
   const orderWeekdays = parseSupplierWeekdays(form.orderWeekdays)
   const deliveryWeekdays = parseSupplierWeekdays(form.deliveryWeekdays)
-  const paymentTerms = derivePaymentTypeFromDays(form.deferralDays)
+  const hasDays = form.deferralDays !== '' && form.deferralDays != null
+  const days = hasDays ? Number(form.deferralDays) : null
+  const validDays = hasDays && Number.isInteger(days) && days >= 0 && days <= 365
 
   return {
     name: form.name.trim(),
@@ -155,8 +141,8 @@ function buildVisibleSupplierPayload(form) {
     deliveryWeekdays,
     orderDays: serializeSupplierWeekdays(orderWeekdays),
     deliveryDays: serializeSupplierWeekdays(deliveryWeekdays),
-    paymentType: paymentTerms.paymentType,
-    deferralDays: paymentTerms.deferralDays,
+    paymentAccountId: form.paymentAccountId || null,
+    deferralDays: validDays ? days : null,
     status: form.status,
   }
 }
@@ -186,6 +172,22 @@ export default function SupplierForm({
 }) {
   const umagLocked = Boolean(form.linkedToUmag)
   const paymentTermsRef = useRef(null)
+  const [paymentAccounts, setPaymentAccounts] = useState([])
+
+  useEffect(() => {
+    let cancelled = false
+    void getPaymentAccountsForAssignment(form.paymentAccountId || null)
+      .then((accounts) => {
+        if (!cancelled) setPaymentAccounts(accounts)
+      })
+      .catch(() => {
+        if (!cancelled) setPaymentAccounts([])
+      })
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per opened supplier, not on every keystroke
+  }, [supplierId])
 
   useEffect(() => {
     if (focusSection !== 'payment-terms') return
@@ -325,6 +327,21 @@ export default function SupplierForm({
       >
         <div className="admin-form__row">
           <label className="admin-form__label">
+            Способ оплаты
+            <select
+              className="admin-form__input"
+              value={form.paymentAccountId || ''}
+              onChange={(e) => setField('paymentAccountId', e.target.value)}
+            >
+              <option value="">Не выбрано</option>
+              {paymentAccounts.map((account) => (
+                <option key={account.id} value={account.id}>
+                  {account.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="admin-form__label">
             Срок оплаты (дней)
             <input
               className="admin-form__input"
@@ -337,6 +354,12 @@ export default function SupplierForm({
               onChange={(e) => setField('deferralDays', e.target.value)}
             />
           </label>
+        </div>
+        <p className="admin-form__hint">
+          Способ и срок настраиваются независимо друг от друга. 0 — оплата сразу при поступлении
+          товара.
+        </p>
+        <div className="admin-form__row">
           <label className="admin-form__label">
             Статус
             <select
@@ -352,7 +375,6 @@ export default function SupplierForm({
             </select>
           </label>
         </div>
-        <p className="admin-form__hint">0 — оплата сразу при поступлении товара</p>
       </div>
 
       <SupplierPaymentsSummary supplierId={supplierId} form={form} />

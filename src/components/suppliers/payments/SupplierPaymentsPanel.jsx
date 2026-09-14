@@ -13,7 +13,8 @@ import {
   OBLIGATION_STATUS_LABELS,
   diffCalendarDays,
   formatDaysUntilDue,
-  formatPaymentTermsSnapshot,
+  formatPaymentAccountSnapshot,
+  formatPaymentTermsDaysSnapshot,
   formatReceptionCount,
   formatSyncCoverage,
   pickDefaultPaymentTab,
@@ -601,8 +602,10 @@ function GroupDetail({ group, todayKey, canEditTerms, onClose, onConfigure }) {
                     ? formatUmagDate(`${ob.dueDate}T12:00:00+05:00`)
                     : 'Не настроен'}
                 </strong>
-                <span>Условия</span>
-                <strong>{formatPaymentTermsSnapshot(ob)}</strong>
+                <span>Способ</span>
+                <strong>{formatPaymentAccountSnapshot(ob)}</strong>
+                <span>Срок</span>
+                <strong>{formatPaymentTermsDaysSnapshot(ob)}</strong>
                 <span>Статус</span>
                 <strong>{OBLIGATION_STATUS_LABELS[group.status] || '—'}</strong>
               </div>

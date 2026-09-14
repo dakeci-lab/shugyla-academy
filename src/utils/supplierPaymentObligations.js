@@ -3,7 +3,7 @@
  * Status is derived from current_debt + due_date + Asia/Aqtobe today — not stored.
  */
 
-import { PAYMENT_TYPE, PAYMENT_TYPE_LABELS } from './supplierData'
+import { getPaymentAccountName } from '../services/paymentAccountsService'
 
 export const OBLIGATION_STATUS = {
   PAID: 'paid',
@@ -53,32 +53,20 @@ export function diffCalendarDays(fromKey, toKey) {
   return Math.round((toUtc - fromUtc) / 86_400_000)
 }
 
-export function isImmediatePaymentType(paymentType) {
-  return paymentType === PAYMENT_TYPE.CASH || paymentType === PAYMENT_TYPE.TRANSFER
-}
-
-export function isDeferralPaymentType(paymentType) {
-  return paymentType === PAYMENT_TYPE.DEFERRAL || paymentType === PAYMENT_TYPE.MIXED
-}
-
 /**
  * Resolve whether supplier terms can produce a due_date snapshot.
- * Uses existing platform_suppliers.payment_type + deferral_days.
+ * accountId (способ оплаты) and days (срок) are independent axes: an account
+ * can be set with no configured days (due_date stays null → «Требует
+ * настройки»), and days can be configured with no account chosen yet.
  */
 export function resolveSupplierPaymentTerms(supplier) {
-  const type = supplier?.paymentType || supplier?.payment_type || null
-  if (isImmediatePaymentType(type)) {
-    return { type, days: 0, configured: true, kind: 'immediate' }
+  const accountId = supplier?.paymentAccountId ?? supplier?.payment_account_id ?? null
+  const raw = supplier?.deferralDays ?? supplier?.deferral_days
+  const days = raw == null || raw === '' ? null : Number(raw)
+  if (Number.isInteger(days) && days >= 0 && days <= 365) {
+    return { accountId, days, configured: true }
   }
-  if (isDeferralPaymentType(type)) {
-    const raw = supplier?.deferralDays ?? supplier?.deferral_days
-    const days = raw == null || raw === '' ? null : Number(raw)
-    if (Number.isInteger(days) && days >= 0 && days <= 365) {
-      return { type, days, configured: true, kind: 'deferment' }
-    }
-    return { type, days: null, configured: false, kind: 'deferment' }
-  }
-  return { type: null, days: null, configured: false, kind: 'unknown' }
+  return { accountId, days: null, configured: false }
 }
 
 export function computeDueDateFromTerms(docDateKey, terms) {
@@ -96,23 +84,29 @@ export function computeDueDateFromTerms(docDateKey, terms) {
  * Returns null when the current snapshot already matches (nothing to write).
  */
 export function resolveObligationTermsPatch(currentSnapshot, terms, docDateKey) {
-  const nextType = terms?.configured ? terms.type : null
+  // Account (способ) snapshots whatever the supplier currently has regardless
+  // of whether days are configured — it's an independent axis from due_date.
+  const nextAccountId = terms?.accountId ?? null
   const nextDays = terms?.configured ? terms.days : null
   const nextDueDate = computeDueDateFromTerms(docDateKey, terms)
 
-  const currentType = currentSnapshot?.paymentTermsTypeSnapshot ?? null
+  const currentAccountId = currentSnapshot?.paymentAccountIdSnapshot ?? null
   const currentDays =
     currentSnapshot?.defermentDaysSnapshot == null
       ? null
       : Number(currentSnapshot.defermentDaysSnapshot)
   const currentDueDate = currentSnapshot?.dueDate ?? null
 
-  if (currentType === nextType && currentDays === nextDays && currentDueDate === nextDueDate) {
+  if (
+    currentAccountId === nextAccountId &&
+    currentDays === nextDays &&
+    currentDueDate === nextDueDate
+  ) {
     return null
   }
 
   return {
-    payment_terms_type_snapshot: nextType,
+    payment_account_id_snapshot: nextAccountId,
     deferment_days_snapshot: nextDays,
     due_date: nextDueDate,
   }
@@ -140,19 +134,19 @@ export function formatDaysUntilDue(dueDate, todayKey = toAqtobeDateKey()) {
   return `Просрочено на ${Math.abs(delta)} дней`
 }
 
-export function formatPaymentTermsSnapshot(obligation) {
-  const type =
-    obligation?.paymentTermsTypeSnapshot || obligation?.payment_terms_type_snapshot || null
+/** Способ оплаты снапшота обязательства — имя счёта на момент последнего пересчёта. */
+export function formatPaymentAccountSnapshot(obligation) {
+  const accountId =
+    obligation?.paymentAccountIdSnapshot ?? obligation?.payment_account_id_snapshot ?? null
+  if (!accountId) return 'Не настроено'
+  return getPaymentAccountName(accountId) || 'Не настроено'
+}
+
+/** Срок снапшота обязательства — независимо от способа оплаты. */
+export function formatPaymentTermsDaysSnapshot(obligation) {
   const days = obligation?.defermentDaysSnapshot ?? obligation?.deferment_days_snapshot
-  if (!type) return 'Не настроено'
-  const label = PAYMENT_TYPE_LABELS[type] || type
-  if (isDeferralPaymentType(type) && days != null) {
-    return `${label} — ${days} дн.`
-  }
-  if (isImmediatePaymentType(type)) {
-    return `${label} (сразу)`
-  }
-  return label
+  if (days == null) return 'Не настроено'
+  return Number(days) === 0 ? 'Сразу' : `${days} дн.`
 }
 
 export function isActiveOpenObligation(obligation) {

@@ -746,6 +746,17 @@ async function reconcileCanonicalSuppliers(
     )
   }
 
+  // Default способ оплаты for brand-new suppliers created from the UMAG feed
+  // (UMAG itself has no concept of payment method) — «Наличные» is seeded by
+  // 20260914120000_payment_accounts.sql and never hard-deleted, only null if
+  // that migration hasn't run yet on this environment.
+  const { data: defaultAccountRow } = await serviceClient
+    .from('payment_accounts')
+    .select('id')
+    .eq('name', 'Наличные')
+    .maybeSingle()
+  const defaultPaymentAccountId: string | null = defaultAccountRow?.id ?? null
+
   const { data: platformRows, error: platformError } = await serviceClient
     .from('platform_suppliers')
     .select('id, name, umag_supplier_id, bin, is_merged')
@@ -883,7 +894,12 @@ async function reconcileCanonicalSuppliers(
         order_days: '',
         delivery_days: '',
         product_categories: [],
-        payment_type: 'cash',
+        payment_account_id: defaultPaymentAccountId,
+        // Previously left unset (→ null), which silently meant "Требует
+        // настройки" for a supplier that was actually just never configured.
+        // Method and term are independent now — default term to 0 same as
+        // the account defaults to «Наличные».
+        deferral_days: 0,
         return_policy: 'no',
         status: umagOwned.is_umag_active ? 'active' : 'inactive',
         comment: null,
@@ -1619,37 +1635,30 @@ function startOfMonthKey(dateKey: string): string {
   return `${y}-${String(m).padStart(2, '0')}-01`
 }
 
+/**
+ * payment_account_id (способ) and deferral_days (срок) are independent axes —
+ * account is snapshotted whatever it is, days only feed due_date when valid.
+ * See docs/suppliers/payment-accounts-module.md.
+ */
 function resolveTermsSnapshot(supplier: {
-  payment_type?: string | null
+  payment_account_id?: string | null
   deferral_days?: number | null
 } | null): {
-  type: string | null
+  accountId: string | null
   days: number | null
   configured: boolean
-  legacy: boolean
 } {
-  const raw = supplier?.payment_type == null ? '' : String(supplier.payment_type).trim()
-  const type = raw || null
-  if (type === 'cash' || type === 'transfer') {
-    return { type, days: 0, configured: true, legacy: false }
+  const accountId = supplier?.payment_account_id ?? null
+  const days = supplier?.deferral_days == null ? null : Number(supplier.deferral_days)
+  if (days != null && Number.isInteger(days) && days >= 0 && days <= 365) {
+    return { accountId, days, configured: true }
   }
-  if (type === 'deferral' || type === 'mixed') {
-    const days = supplier?.deferral_days == null ? null : Number(supplier.deferral_days)
-    if (days != null && Number.isInteger(days) && days >= 0 && days <= 365) {
-      return { type, days, configured: true, legacy: false }
-    }
-    return { type, days: null, configured: false, legacy: false }
-  }
-  if (type) {
-    // Legacy / unknown payment type — keep obligation, mark terms missing.
-    return { type: null, days: null, configured: false, legacy: true }
-  }
-  return { type: null, days: null, configured: false, legacy: false }
+  return { accountId, days: null, configured: false }
 }
 
 type SupplierTermsRow = {
   id: string
-  payment_type: string | null
+  payment_account_id: string | null
   deferral_days: number | null
   is_merged: boolean | null
   merged_into_supplier_id: string | null
@@ -2007,7 +2016,7 @@ async function refreshPaymentObligations(
     const fetched = await fetchRowsByIdsInChunks(
       serviceClient,
       'platform_suppliers',
-      'id, payment_type, deferral_days, is_merged, merged_into_supplier_id',
+      'id, payment_account_id, deferral_days, is_merged, merged_into_supplier_id',
       'id',
       pendingIds
     )
@@ -2026,7 +2035,7 @@ async function refreshPaymentObligations(
     for (const row of fetched.rows as SupplierTermsRow[]) {
       suppliersById.set(row.id, {
         id: row.id,
-        payment_type: row.payment_type ?? null,
+        payment_account_id: row.payment_account_id ?? null,
         deferral_days: row.deferral_days ?? null,
         is_merged: row.is_merged ?? false,
         merged_into_supplier_id: row.merged_into_supplier_id ?? null,
@@ -2045,7 +2054,7 @@ async function refreshPaymentObligations(
   const existingFetched = await fetchRowsByIdsInChunks(
     serviceClient,
     'supplier_payment_obligations',
-    'id, umag_supply_id, payment_terms_type_snapshot, deferment_days_snapshot, due_date, terms_snapshot_created_at, paid_at, is_source_deleted, current_debt, first_seen_at, platform_supplier_id',
+    'id, umag_supply_id, payment_account_id_snapshot, deferment_days_snapshot, due_date, terms_snapshot_created_at, paid_at, is_source_deleted, current_debt, first_seen_at, platform_supplier_id',
     'umag_supply_id',
     umagIds
   )
@@ -2096,29 +2105,25 @@ async function refreshPaymentObligations(
     const terms = resolveTermsSnapshot(
       canonicalSupplierId ? suppliersById.get(canonicalSupplierId) || null : null
     )
-    if (terms.legacy) {
-      console.warn('spo_legacy_payment_type', {
-        umag_supply_id: umagSupplyId,
-        platform_supplier_id: canonicalSupplierId,
-      })
-    }
 
     const docDate = aqtobeDateKeyFromIso(supply.doc_time as string | null)
     const hasSnapshot = existing?.due_date != null || existing?.terms_snapshot_created_at != null
-    let paymentTermsType = (existing?.payment_terms_type_snapshot as string | null) ?? null
+    let paymentAccountIdSnapshot = (existing?.payment_account_id_snapshot as string | null) ?? null
     let defermentDays = (existing?.deferment_days_snapshot as number | null) ?? null
     let dueDate = (existing?.due_date as string | null) ?? null
     let termsSnapshotCreatedAt =
       (existing?.terms_snapshot_created_at as string | null) ?? null
 
-    // First snapshot only when missing; later supplier term changes do not rewrite.
+    // First snapshot only when missing; later supplier term changes do not rewrite
+    // here (the client-side refreshObligationTermsForSupplier does that after
+    // the supplier form saves — see docs/suppliers/retroactive-payment-terms.md).
     if (!hasSnapshot && terms.configured && docDate) {
-      paymentTermsType = terms.type
+      paymentAccountIdSnapshot = terms.accountId
       defermentDays = terms.days
       dueDate = addCalendarDays(docDate, terms.days ?? 0)
       termsSnapshotCreatedAt = now
     } else if (!hasSnapshot && !terms.configured) {
-      paymentTermsType = terms.type
+      paymentAccountIdSnapshot = terms.accountId
       defermentDays = null
       dueDate = null
       termsSnapshotCreatedAt = null
@@ -2156,7 +2161,7 @@ async function refreshPaymentObligations(
       original_supply_amount: asNumber(supply.amount),
       current_payment_amount: asNumber(supply.payment_amount),
       current_debt: debt,
-      payment_terms_type_snapshot: paymentTermsType,
+      payment_account_id_snapshot: paymentAccountIdSnapshot,
       deferment_days_snapshot: defermentDays,
       due_date: dueDate,
       terms_snapshot_created_at: termsSnapshotCreatedAt,
