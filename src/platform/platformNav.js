@@ -160,6 +160,15 @@ export const PLATFORM_NAV = [
         title: 'Настройки уведомлений',
         description: 'Автоматические уведомления тайм-трекера по графику смен.',
       },
+      {
+        id: 'settings-payment-accounts',
+        path: '/platform/settings/payment-accounts',
+        label: 'Счета оплаты',
+        end: true,
+        routeKey: ROUTE_KEYS.SETTINGS_PAYMENT_ACCOUNTS,
+        title: 'Счета оплаты',
+        description: 'Справочник способов оплаты поставщикам: наличные, переводы, счета.',
+      },
     ],
   },
 ]

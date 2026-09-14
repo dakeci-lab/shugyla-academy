@@ -71,6 +71,9 @@ export const PERMISSION_CODES = {
 
   POSITIONS_VIEW: 'positions.view',
   POSITIONS_MANAGE: 'positions.manage',
+
+  PAYMENT_ACCOUNTS_VIEW: 'payment_accounts.view',
+  PAYMENT_ACCOUNTS_MANAGE: 'payment_accounts.manage',
 }
 
 /** @deprecated используйте PERMISSION_CODES */
@@ -109,6 +112,7 @@ export const PERMISSION_MODULES = {
   payroll: 'Зарплата',
   positions: 'Организационная структура',
   settings: 'Настройки',
+  payment_accounts: 'Счета оплаты',
 }
 
 /** Модули для вкладок матрицы доступа (только реальные разделы платформы) */
@@ -128,6 +132,7 @@ export const RBAC_MATRIX_MODULES = [
   'positions',
   'settings',
   'roles',
+  'payment_accounts',
 ]
 
 /** Visible RBAC matrix modules (catalog order). */
@@ -230,6 +235,14 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.SETTINGS_VIEW, name: 'Просмотр настроек', module: 'settings', sortOrder: 160 },
   { code: PERMISSION_CODES.SETTINGS_MANAGE, name: 'Управление настройками', module: 'settings', sortOrder: 161 },
   { code: PERMISSION_CODES.NOTIFICATIONS_MANAGE, name: 'Управление уведомлениями', module: 'settings', sortOrder: 162 },
+  { code: PERMISSION_CODES.PAYMENT_ACCOUNTS_VIEW, name: 'Просмотр счетов оплаты', module: 'payment_accounts', sortOrder: 163 },
+  {
+    code: PERMISSION_CODES.PAYMENT_ACCOUNTS_MANAGE,
+    name: 'Управление счетами оплаты',
+    description: 'Создание, переименование и деактивация счетов оплаты (справочник поставщиков)',
+    module: 'payment_accounts',
+    sortOrder: 164,
+  },
 ]
 
 export const ALL_PERMISSION_CODES = PERMISSION_CATALOG.map((item) => item.code)

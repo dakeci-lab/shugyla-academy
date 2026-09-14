@@ -187,6 +187,7 @@
     "verify:careers-restyle-c4": "node scripts/verify-careers-restyle-c4.mjs",
     "verify:recruitment-vacancy-public-fields": "node scripts/verify-recruitment-vacancy-public-fields.mjs",
     "verify:recruitment-candidate-dedupe": "node scripts/verify-recruitment-candidate-dedupe.mjs",
+    "verify:payment-accounts-module": "node scripts/verify-payment-accounts-module.mjs",
     "verify:recruitment": "npm run verify:recruitment-public-apply && npm run verify:recruitment-private-photos && npm run verify:recruitment-vacancy-positions && npm run verify:recruitment-apply-hub && npm run verify:recruitment-flexible-form && npm run verify:recruitment-form-hardening && npm run verify:recruitment-public-careers-ui && npm run verify:recruitment-vacancy-public-fields",
     "test:e2e:recruitment": "E2E_SUITE=smoke playwright test -c tests/e2e/playwright.config.mjs",
     "test:e2e:recruitment:smoke": "E2E_SUITE=smoke playwright test -c tests/e2e/playwright.config.mjs",

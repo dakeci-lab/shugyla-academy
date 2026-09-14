@@ -41,6 +41,9 @@ const PlatformSettingsRoles = lazy(() => import('./pages/platform/PlatformSettin
 const PlatformSettingsNotifications = lazy(
   () => import('./pages/platform/PlatformSettingsNotifications')
 )
+const PlatformSettingsPaymentAccounts = lazy(
+  () => import('./pages/platform/PlatformSettingsPaymentAccounts')
+)
 const PlatformNotificationsInbox = lazy(
   () => import('./pages/platform/PlatformNotificationsInbox')
 )
@@ -407,6 +410,14 @@ export default function App() {
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SETTINGS_NOTIFICATIONS}>
                       <PlatformSettingsNotifications />
+                    </PlatformRoute>
+                  }
+                />
+                <Route
+                  path="settings/payment-accounts"
+                  element={
+                    <PlatformRoute routeKey={ROUTE_KEYS.SETTINGS_PAYMENT_ACCOUNTS}>
+                      <PlatformSettingsPaymentAccounts />
                     </PlatformRoute>
                   }
                 />

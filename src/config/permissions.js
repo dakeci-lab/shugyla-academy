@@ -43,6 +43,7 @@ export const ROUTE_KEYS = {
   SETTINGS_GENERAL: 'settings_general',
   SETTINGS_ROLES: 'settings_roles',
   SETTINGS_NOTIFICATIONS: 'settings_notifications',
+  SETTINGS_PAYMENT_ACCOUNTS: 'settings_payment_accounts',
 }
 
 const ALL_PLATFORM_ROLES = [
@@ -94,6 +95,7 @@ const ROUTE_ACCESS = {
   [ROUTE_KEYS.SETTINGS_GENERAL]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SETTINGS_ROLES]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SETTINGS_NOTIFICATIONS]: [ROLE_IDS.ADMIN],
+  [ROUTE_KEYS.SETTINGS_PAYMENT_ACCOUNTS]: [ROLE_IDS.ADMIN],
 }
 
 /** Определение роли пользователя с учётом legacy, RBAC role_id и admin по умолчанию */
@@ -228,6 +230,7 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.SETTINGS_GENERAL]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],
     [ROUTE_KEYS.SETTINGS_ROLES]: [P.ROLES_VIEW, P.ROLES_EDIT, P.ROLES_ASSIGN_PERMISSIONS],
     [ROUTE_KEYS.SETTINGS_NOTIFICATIONS]: [P.NOTIFICATIONS_MANAGE],
+    [ROUTE_KEYS.SETTINGS_PAYMENT_ACCOUNTS]: [P.PAYMENT_ACCOUNTS_VIEW, P.PAYMENT_ACCOUNTS_MANAGE],
   }
 
   const permissions = routePermissionMap[routeKey]
