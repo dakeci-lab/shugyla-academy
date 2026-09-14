@@ -15,14 +15,29 @@ select pg_advisory_xact_lock(202609141300);
 alter table public.platform_suppliers
   add column if not exists payment_account_id uuid references public.payment_accounts(id);
 
--- Backfill: historical data is 100% 'cash' (see single-payment-terms-field.md
--- audit — 0 real suppliers ever had transfer/deferral/mixed). cash -> Наличные,
--- anything else (transfer/deferral/mixed/unknown) -> Перевод.
+-- Backfill: cash -> Наличные, anything else (transfer/deferral/mixed/unknown)
+-- -> Перевод. (Earlier audit against a smaller seed data set suggested this
+-- was 100% cash; production has since grown and genuinely has transfer/
+-- deferral suppliers too — the mapping still holds, it's just not vacuous.)
 update public.platform_suppliers ps
 set payment_account_id = pa.id
 from public.payment_accounts pa
 where ps.payment_account_id is null
   and pa.name = (case when ps.payment_type = 'cash' then 'Наличные' else 'Перевод' end);
+
+-- cash/transfer previously ALWAYS resolved to 0 days for due-date purposes
+-- regardless of what this column held (isImmediatePaymentType short-circuit
+-- in the old resolveSupplierPaymentTerms) — so a supplier with deferral_days
+-- left NULL was still treated as fully configured, due immediately. Now that
+-- deferral_days is read directly with no type override, a NULL here would
+-- newly and incorrectly show as "Требует настройки" for that supplier's next
+-- delivery. Backfill preserves the old effective behavior; deferral/mixed
+-- suppliers with NULL days are untouched — they were already unconfigured
+-- before this migration, that's their genuine state.
+update public.platform_suppliers
+set deferral_days = 0
+where deferral_days is null
+  and payment_type in ('cash', 'transfer');
 
 alter table public.platform_suppliers drop column if exists payment_type;
 
