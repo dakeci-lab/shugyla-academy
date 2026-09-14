@@ -74,11 +74,6 @@ const SupplierDetailPage = lazy(() =>
     default: m.SupplierDetailPage,
   }))
 )
-const SettlementsPage = lazy(() => import('./pages/platform/settlements/SettlementsPage'))
-const SupplierPaymentsPage = lazy(
-  () => import('./pages/platform/supplier-payments/SupplierPaymentsPage')
-)
-// Этап 2.7: hidden unified successor — not linked from platformNav.js yet.
 const SupplierFinancePage = lazy(
   () => import('./pages/platform/supplier-finance/SupplierFinancePage')
 )
@@ -360,23 +355,18 @@ export default function App() {
                     </PlatformRoute>
                   }
                 />
+                {/* Both old standalone pages are replaced by supplier-finance's tabs (same
+                    UmagSettlementsPanel/SupplierPaymentsPanel, now tabbed together). Neither
+                    was in platformNav.js or linked from anywhere in the app — kept as
+                    redirects only so a stale bookmark/tab still lands somewhere. */}
                 <Route
                   path="settlements"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.SETTLEMENTS}>
-                      <SettlementsPage />
-                    </PlatformRoute>
-                  }
+                  element={<Navigate to="/platform/supplier-finance?tab=settlements" replace />}
                 />
                 <Route
                   path="supplier-payments"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIER_PAYMENTS}>
-                      <SupplierPaymentsPage />
-                    </PlatformRoute>
-                  }
+                  element={<Navigate to="/platform/supplier-finance?tab=payments" replace />}
                 />
-                {/* Этап 2.7: hidden — reachable by direct URL, no nav entry yet. */}
                 <Route
                   path="supplier-finance"
                   element={

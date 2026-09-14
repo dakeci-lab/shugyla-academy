@@ -34,10 +34,6 @@ export const ROUTE_KEYS = {
   RECEIVING: 'receiving',
   SUPPLIERS: 'suppliers',
   SALES: 'sales',
-  SETTLEMENTS: 'settlements',
-  SUPPLIER_PAYMENTS: 'supplier_payments',
-  // Этап 2.7 — hidden unified page, not yet in platformNav.js. Same access
-  // as the union of the two existing routes below, nothing broader.
   SUPPLIER_FINANCE: 'supplier_finance',
   SETTINGS: 'settings',
   SETTINGS_GENERAL: 'settings_general',
@@ -87,9 +83,6 @@ const ROUTE_ACCESS = {
   // Sales: permission-first (sales.view); role fallback admin-only, matching
   // the sales.* permission grants seeded by 20260829120000_sales_category_month_facts.sql.
   [ROUTE_KEYS.SALES]: [ROLE_IDS.ADMIN],
-  // Settlements: permission-first (umag.settlements.view); role fallback admin-only.
-  [ROUTE_KEYS.SETTLEMENTS]: [ROLE_IDS.ADMIN],
-  [ROUTE_KEYS.SUPPLIER_PAYMENTS]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SUPPLIER_FINANCE]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SETTINGS]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SETTINGS_GENERAL]: [ROLE_IDS.ADMIN],
@@ -221,10 +214,8 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.RECEIVING]: [P.RECEIVING_VIEW],
     [ROUTE_KEYS.SUPPLIERS]: [P.SUPPLIERS_VIEW],
     [ROUTE_KEYS.SALES]: [P.SALES_VIEW],
-    [ROUTE_KEYS.SETTLEMENTS]: [P.UMAG_SETTLEMENTS_VIEW],
-    [ROUTE_KEYS.SUPPLIER_PAYMENTS]: [P.SUPPLIER_PAYMENTS_VIEW],
-    // Union of the two existing routes' permissions — access to the hidden
-    // combined page never exceeds what a user can already reach separately.
+    // «Расчёты» — either umag.settlements.view (Взаиморасчёты tab) or
+    // supplier_payments.view (К оплате tab) is enough; each tab gates itself.
     [ROUTE_KEYS.SUPPLIER_FINANCE]: [P.UMAG_SETTLEMENTS_VIEW, P.SUPPLIER_PAYMENTS_VIEW],
     [ROUTE_KEYS.SETTINGS]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],
     [ROUTE_KEYS.SETTINGS_GENERAL]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],

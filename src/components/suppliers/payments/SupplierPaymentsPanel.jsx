@@ -1029,9 +1029,7 @@ export default function SupplierPaymentsPanel({
       state: {
         openEditId: group.platformSupplierId,
         focusSection: 'payment-terms',
-        returnTo: embedded
-          ? '/platform/supplier-finance?tab=payments'
-          : '/platform/supplier-payments',
+        returnTo: '/platform/supplier-finance?tab=payments',
       },
     })
   }

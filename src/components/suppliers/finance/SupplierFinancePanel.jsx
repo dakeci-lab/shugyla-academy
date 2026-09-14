@@ -1,7 +1,7 @@
 /**
- * Расчёты — Этап 2.7: hidden unified shell over the existing embedded panels.
+ * Расчёты — Этап 2.7: unified shell over the existing embedded panels.
  *
- * Owns exactly what the future page needs to own once: the 4 KPIs + lastSync
+ * Owns exactly what the page needs to own once: the 4 KPIs + lastSync
  * (fetchSupplierFinanceSummary(), Этап 2.4 — not reinvented), the tab/URL
  * state, and the single ↻ action (existing syncUmagSettlements() pipeline).
  * Everything else is delegated to the already-embeddable panels (Этап 2.6).

@@ -8,10 +8,10 @@ import './SupplierFinancePage.css'
 /**
  * Расчёты (UMAG) — /platform/supplier-finance
  *
- * Этап 2.7: hidden unified successor to /platform/settlements and
- * /platform/supplier-payments — not yet linked from platformNav.js.
- * Access is the union of both existing pages' view permissions, never
- * broader than what a user can already reach separately.
+ * Этап 2.7: unified successor to the old /platform/settlements and
+ * /platform/supplier-payments pages (the latter now just redirects here).
+ * Access is the union of both former pages' view permissions, never
+ * broader than what a user could already reach separately.
  */
 export default function SupplierFinancePage() {
   const { user } = useSession()

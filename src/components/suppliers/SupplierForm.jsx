@@ -75,7 +75,7 @@ function SupplierPaymentsSummary({ supplierId, form }) {
         <span>Просрочено</span>
         <strong>{summary ? formatUmagMoney(summary.overdue) : '…'}</strong>
       </div>
-      <Link className="supplier-form__payments-link" to="/platform/supplier-payments">
+      <Link className="supplier-form__payments-link" to="/platform/supplier-finance?tab=payments">
         Открыть календарь оплат
       </Link>
     </section>
