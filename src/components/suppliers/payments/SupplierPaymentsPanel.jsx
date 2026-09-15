@@ -5,6 +5,7 @@ import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
 import {
   canEditSuppliers,
+  canManageSupplierPayments,
   canSyncUmagSettlements,
   canViewSupplierPayments,
 } from '../../../config/permissions'
@@ -15,8 +16,10 @@ import {
   formatDaysUntilDue,
   formatPaymentAccountSnapshot,
   formatPaymentTermsDaysSnapshot,
+  formatPlatformPaymentMark,
   formatReceptionCount,
   formatSyncCoverage,
+  isPlatformMarkedPaid,
   pickDefaultPaymentTab,
 } from '../../../utils/supplierPaymentObligations'
 import {
@@ -25,8 +28,10 @@ import {
   formatUmagDateTime,
   formatUmagMoney,
   listPaymentObligations,
+  markObligationPaid,
   syncUmagForPayments,
   toAqtobeDateKey,
+  unmarkObligationPaid,
 } from '../../../services/supplierPaymentObligationsService'
 import { fetchSupplierFinanceSummary } from '../../../services/supplierFinanceSummaryService'
 import { getMonthPeriodKeys } from '../../../services/umagSettlementsService'
@@ -530,7 +535,17 @@ function ObligationCard({ group, todayKey, canEditTerms, onOpen, onConfigure }) 
   )
 }
 
-function GroupDetail({ group, todayKey, canEditTerms, onClose, onConfigure }) {
+function GroupDetail({
+  group,
+  todayKey,
+  canEditTerms,
+  canManagePayments,
+  markingId,
+  onClose,
+  onConfigure,
+  onMarkPaid,
+  onUnmarkPaid,
+}) {
   if (!group) return null
   const isMissing = group.status === OBLIGATION_STATUS.TERMS_MISSING
   const mapped = Boolean(group.platformSupplierId)
@@ -584,33 +599,49 @@ function GroupDetail({ group, todayKey, canEditTerms, onClose, onConfigure }) {
         ) : null}
 
         <ul className="spo-panel__ob-list">
-          {(group.obligations || []).map((ob) => (
-            <li key={ob.id} className="spo-panel__ob-item">
-              <div className="spo-panel__ob-title">
-                {formatUmagDate(ob.sourceDocTime || `${ob.supplyDocumentDate}T12:00:00+05:00`)}
-              </div>
-              <div className="spo-panel__ob-grid">
-                <span>Сумма приёмки</span>
-                <strong>{formatUmagMoney(ob.originalSupplyAmount)}</strong>
-                <span>Оплачено</span>
-                <strong>{formatUmagMoney(ob.currentPaymentAmount)}</strong>
-                <span>Остаток</span>
-                <strong>{formatUmagMoney(ob.currentDebt)}</strong>
-                <span>Срок</span>
-                <strong>
-                  {ob.dueDate
-                    ? formatUmagDate(`${ob.dueDate}T12:00:00+05:00`)
-                    : 'Не настроен'}
-                </strong>
-                <span>Способ</span>
-                <strong>{formatPaymentAccountSnapshot(ob)}</strong>
-                <span>Срок</span>
-                <strong>{formatPaymentTermsDaysSnapshot(ob)}</strong>
-                <span>Статус</span>
-                <strong>{OBLIGATION_STATUS_LABELS[group.status] || '—'}</strong>
-              </div>
-            </li>
-          ))}
+          {(group.obligations || []).map((ob) => {
+            const markedPaid = isPlatformMarkedPaid(ob)
+            const isMarking = markingId === ob.id
+            return (
+              <li key={ob.id} className="spo-panel__ob-item">
+                <div className="spo-panel__ob-title">
+                  {formatUmagDate(ob.sourceDocTime || `${ob.supplyDocumentDate}T12:00:00+05:00`)}
+                </div>
+                <div className="spo-panel__ob-grid">
+                  <span>Сумма приёмки</span>
+                  <strong>{formatUmagMoney(ob.originalSupplyAmount)}</strong>
+                  <span>Оплачено</span>
+                  <strong>{formatUmagMoney(ob.currentPaymentAmount)}</strong>
+                  <span>Остаток</span>
+                  <strong>{formatUmagMoney(ob.currentDebt)}</strong>
+                  <span>Срок</span>
+                  <strong>
+                    {ob.dueDate
+                      ? formatUmagDate(`${ob.dueDate}T12:00:00+05:00`)
+                      : 'Не настроен'}
+                  </strong>
+                  <span>Способ</span>
+                  <strong>{formatPaymentAccountSnapshot(ob)}</strong>
+                  <span>Срок</span>
+                  <strong>{formatPaymentTermsDaysSnapshot(ob)}</strong>
+                  <span>Статус</span>
+                  <strong>
+                    {markedPaid ? formatPlatformPaymentMark(ob) : OBLIGATION_STATUS_LABELS[group.status] || '—'}
+                  </strong>
+                </div>
+                {canManagePayments ? (
+                  <button
+                    type="button"
+                    className={`btn btn--sm spo-panel__mark-paid-btn${markedPaid ? ' btn--ghost' : ' btn--primary'}`}
+                    disabled={isMarking}
+                    onClick={() => (markedPaid ? onUnmarkPaid(ob) : onMarkPaid(ob))}
+                  >
+                    {isMarking ? 'Сохранение…' : markedPaid ? 'Отменить оплату' : 'Оплачено'}
+                  </button>
+                ) : null}
+              </li>
+            )
+          })}
         </ul>
       </div>
     </div>,
@@ -732,6 +763,7 @@ export default function SupplierPaymentsPanel({
   const canView = canViewSupplierPayments(user)
   const canSync = canSyncUmagSettlements(user)
   const canEditTerms = canEditSuppliers(user)
+  const canManagePayments = canManageSupplierPayments(user)
 
   const [loading, setLoading] = useState(true)
   const [syncing, setSyncing] = useState(false)
@@ -741,6 +773,7 @@ export default function SupplierPaymentsPanel({
   const [todayKey, setTodayKey] = useState(() => toAqtobeDateKey())
   const [lastRun, setLastRun] = useState(null)
   const [selectedGroup, setSelectedGroup] = useState(null)
+  const [markingId, setMarkingId] = useState(null)
   const [activeTab, setActiveTab] = useState('overdue')
   const [tabTouched, setTabTouched] = useState(false)
   const [supplierFilter, setSupplierFilter] = useState(() => new Set())
@@ -939,6 +972,83 @@ export default function SupplierPaymentsPanel({
       setLoading(false)
     }
   }, [])
+
+  /**
+   * Quiet re-fetch after marking/unmarking a payment — same data as
+   * loadStandalone, but without toggling the full-page loading skeleton
+   * (the action already gave instant feedback via markingId/local patch).
+   * Refetches directly regardless of embedded/standalone: this panel's own
+   * view must reflect the mark immediately even when a parent owns
+   * obligationsProp — the parent's own cache catches up on its next refresh.
+   */
+  const reloadAfterMutation = useCallback(async () => {
+    try {
+      const [summaryData, obligations] = await Promise.all([
+        fetchSupplierFinanceSummary(),
+        listPaymentObligations({ includePaid: false }),
+      ])
+      const nextView = buildPaymentScheduleView(obligations, summaryData.todayKey)
+      setSummary(summaryData)
+      setView(nextView)
+      setTodayKey(summaryData.todayKey)
+      setLastRun(summaryData.lastSync)
+    } catch {
+      // Best-effort — the mark itself already succeeded; the visible lists
+      // just won't drop the row until the next natural reload.
+    }
+  }, [])
+
+  function patchSelectedGroupObligation(obligationId, patch) {
+    setSelectedGroup((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        obligations: (prev.obligations || []).map((item) =>
+          item.id === obligationId ? { ...item, ...patch } : item
+        ),
+      }
+    })
+  }
+
+  async function handleMarkPaid(ob) {
+    if (!canManagePayments || markingId) return
+    setMarkingId(ob.id)
+    try {
+      await markObligationPaid(ob.id, {
+        paidByEmployeeId: user?.id ?? null,
+        accountId: ob.supplierPaymentAccountId ?? null,
+      })
+      patchSelectedGroupObligation(ob.id, {
+        platformPaidAt: new Date().toISOString(),
+        platformPaymentAccountId: ob.supplierPaymentAccountId ?? null,
+      })
+      toast.success?.('Отмечено оплаченным')
+      void reloadAfterMutation()
+    } catch (err) {
+      toast.error?.(err.message || 'Не удалось отметить оплату')
+    } finally {
+      setMarkingId(null)
+    }
+  }
+
+  async function handleUnmarkPaid(ob) {
+    if (!canManagePayments || markingId) return
+    setMarkingId(ob.id)
+    try {
+      await unmarkObligationPaid(ob.id)
+      patchSelectedGroupObligation(ob.id, {
+        platformPaidAt: null,
+        platformPaidBy: null,
+        platformPaymentAccountId: null,
+      })
+      toast.success?.('Отметка оплаты снята')
+      void reloadAfterMutation()
+    } catch (err) {
+      toast.error?.(err.message || 'Не удалось отменить отметку')
+    } finally {
+      setMarkingId(null)
+    }
+  }
 
   const applyExternalPageData = useCallback(() => {
     if (summaryLoading) {
@@ -1369,8 +1479,12 @@ export default function SupplierPaymentsPanel({
           group={selectedGroup}
           todayKey={todayKey}
           canEditTerms={canEditTerms}
+          canManagePayments={canManagePayments}
+          markingId={markingId}
           onClose={() => setSelectedGroup(null)}
           onConfigure={openConfigure}
+          onMarkPaid={handleMarkPaid}
+          onUnmarkPaid={handleUnmarkPaid}
         />
       ) : null}
     </div>

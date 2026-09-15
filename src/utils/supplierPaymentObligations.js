@@ -112,7 +112,18 @@ export function resolveObligationTermsPatch(currentSnapshot, terms, docDateKey) 
   }
 }
 
+/**
+ * True once marked paid natively in Shugyla — independent of UMAG's own
+ * current_debt mirror. Set by a single instant click (see
+ * markObligationPaid/unmarkObligationPaid); a later UMAG sync can never
+ * clear it, only an explicit "Отменить оплату" can.
+ */
+export function isPlatformMarkedPaid(obligation) {
+  return Boolean(obligation?.platformPaidAt ?? obligation?.platform_paid_at)
+}
+
 export function deriveObligationStatus(obligation, todayKey = toAqtobeDateKey()) {
+  if (isPlatformMarkedPaid(obligation)) return OBLIGATION_STATUS.PAID
   const debt = Number(obligation?.currentDebt ?? obligation?.current_debt ?? 0)
   if (!Number.isFinite(debt) || debt <= 0) return OBLIGATION_STATUS.PAID
   if (obligation?.isSourceDeleted || obligation?.is_source_deleted) return OBLIGATION_STATUS.PAID
@@ -149,9 +160,21 @@ export function formatPaymentTermsDaysSnapshot(obligation) {
   return Number(days) === 0 ? 'Сразу' : `${days} дн.`
 }
 
+/** «Оплачено вручную 12.09 — Наличные» — null when not marked paid natively. */
+export function formatPlatformPaymentMark(obligation) {
+  if (!isPlatformMarkedPaid(obligation)) return null
+  const paidAt = obligation?.platformPaidAt ?? obligation?.platform_paid_at
+  const accountId =
+    obligation?.platformPaymentAccountId ?? obligation?.platform_payment_account_id ?? null
+  const dateLabel = formatDateKeyRu(toAqtobeDateKey(new Date(paidAt))) || ''
+  const accountName = accountId ? getPaymentAccountName(accountId) : null
+  return `Оплачено вручную${dateLabel ? ` ${dateLabel}` : ''}${accountName ? ` — ${accountName}` : ''}`
+}
+
 export function isActiveOpenObligation(obligation) {
   if (!obligation) return false
   if (obligation.isSourceDeleted || obligation.is_source_deleted) return false
+  if (isPlatformMarkedPaid(obligation)) return false
   return Number(obligation.currentDebt ?? obligation.current_debt ?? 0) > 0
 }
 

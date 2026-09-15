@@ -21,6 +21,8 @@ import {
   formatDaysUntilDue,
   formatPaymentAccountSnapshot,
   formatPaymentTermsDaysSnapshot,
+  formatPlatformPaymentMark,
+  isPlatformMarkedPaid,
   resolveObligationTermsPatch,
   resolveSupplierPaymentTerms,
   toAqtobeDateKey,
@@ -44,6 +46,9 @@ const OBLIGATION_SELECT = `
   first_seen_at,
   last_synced_at,
   paid_at,
+  platform_paid_at,
+  platform_paid_by,
+  platform_payment_account_id,
   created_at,
   updated_at,
   supplier:platform_suppliers!platform_supplier_id(id, name, payment_account_id, deferral_days)
@@ -82,6 +87,9 @@ export function normalizeObligation(row) {
     firstSeenAt: row.first_seen_at,
     lastSyncedAt: row.last_synced_at,
     paidAt: row.paid_at,
+    platformPaidAt: row.platform_paid_at,
+    platformPaidBy: row.platform_paid_by,
+    platformPaymentAccountId: row.platform_payment_account_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     supplierName: supplierJoin?.name || 'Без названия',
@@ -103,7 +111,7 @@ export async function listPaymentObligations({ includePaid = false } = {}) {
       .order('id', { ascending: true })
 
     if (!includePaid) {
-      query = query.gt('current_debt', 0)
+      query = query.gt('current_debt', 0).is('platform_paid_at', null)
     }
 
     return query
@@ -168,6 +176,7 @@ export async function refreshObligationTermsForSupplier(platformSupplierId, supp
     .eq('platform_supplier_id', platformSupplierId)
     .eq('is_source_deleted', false)
     .gt('current_debt', 0)
+    .is('platform_paid_at', null)
 
   if (error) throw new Error(error.message || 'Не удалось обновить сроки оплаты')
 
@@ -203,6 +212,40 @@ export async function syncUmagForPayments({ dateFrom, dateTo }) {
   return syncUmagSettlements({ dateFrom, dateTo, syncSuppliers: true })
 }
 
+/**
+ * Mark an obligation paid natively — instant, no UMAG round trip. Once set,
+ * it stays "Оплачено" regardless of what the next UMAG sync writes to
+ * current_debt (see deriveObligationStatus/isPlatformMarkedPaid); only
+ * unmarkObligationPaid clears it.
+ */
+export async function markObligationPaid(obligationId, { paidByEmployeeId, accountId } = {}) {
+  assertCloudReady()
+  if (!obligationId) throw new Error('Обязательство не указано')
+  const { error } = await supabase
+    .from('supplier_payment_obligations')
+    .update({
+      platform_paid_at: new Date().toISOString(),
+      platform_paid_by: paidByEmployeeId ?? null,
+      platform_payment_account_id: accountId ?? null,
+    })
+    .eq('id', obligationId)
+  if (error) throw new Error(error.message || 'Не удалось отметить оплату')
+}
+
+export async function unmarkObligationPaid(obligationId) {
+  assertCloudReady()
+  if (!obligationId) throw new Error('Обязательство не указано')
+  const { error } = await supabase
+    .from('supplier_payment_obligations')
+    .update({
+      platform_paid_at: null,
+      platform_paid_by: null,
+      platform_payment_account_id: null,
+    })
+    .eq('id', obligationId)
+  if (error) throw new Error(error.message || 'Не удалось отменить отметку оплаты')
+}
+
 export {
   buildPaymentScheduleView,
   buildSupplierPaymentSummary,
@@ -210,9 +253,11 @@ export {
   formatDaysUntilDue,
   formatPaymentAccountSnapshot,
   formatPaymentTermsDaysSnapshot,
+  formatPlatformPaymentMark,
   formatUmagDate,
   formatUmagDateTime,
   formatUmagMoney,
+  isPlatformMarkedPaid,
   resolveSupplierPaymentTerms,
   toAqtobeDateKey,
 }

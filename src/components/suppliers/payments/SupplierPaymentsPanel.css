@@ -431,6 +431,11 @@
   color: var(--color-text-secondary, #64748b);
 }
 
+.spo-panel__mark-paid-btn {
+  margin-top: 10px;
+  width: 100%;
+}
+
 @media (min-width: 901px) {
   .spo-panel__sheet-backdrop {
     align-items: center;
