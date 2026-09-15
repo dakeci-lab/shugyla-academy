@@ -24,6 +24,7 @@ import {
   formatPlatformPaymentMark,
   isPlatformMarkedPaid,
   resolveObligationTermsPatch,
+  resolveOwedAmount,
   resolveSupplierPaymentTerms,
   toAqtobeDateKey,
 } from '../utils/supplierPaymentObligations'
@@ -111,7 +112,9 @@ export async function listPaymentObligations({ includePaid = false } = {}) {
       .order('id', { ascending: true })
 
     if (!includePaid) {
-      query = query.gt('current_debt', 0).is('platform_paid_at', null)
+      // Not current_debt — UMAG's debt is no longer trusted (staff zero it out
+      // in UMAG immediately at receiving time). Unpaid = not natively marked.
+      query = query.is('platform_paid_at', null)
     }
 
     return query
@@ -151,16 +154,17 @@ export async function fetchSupplierPaymentsDashboard() {
 }
 
 /**
- * Keep every still-open (current_debt > 0, not source-deleted) obligation of
- * this supplier in sync with its CURRENT payment terms — called right after
- * the supplier form saves. Previously this only filled obligations whose
- * due_date was still NULL and left already-snapshotted ones stale forever
- * (see docs/suppliers/retroactive-payment-terms.md): a receipt synced under
- * old terms kept its original due date even after the supplier's terms were
- * edited, with no way in the UI to fix it short of a manual DB update.
+ * Keep every still-open (not natively marked paid, not source-deleted)
+ * obligation of this supplier in sync with its CURRENT payment terms — called
+ * right after the supplier form saves. Previously this only filled
+ * obligations whose due_date was still NULL and left already-snapshotted ones
+ * stale forever (see docs/suppliers/retroactive-payment-terms.md): a receipt
+ * synced under old terms kept its original due date even after the
+ * supplier's terms were edited, with no way in the UI to fix it short of a
+ * manual DB update.
  *
- * Paid/closed obligations (current_debt <= 0) and source-deleted rows are
- * never touched — they're historical record, not schedule.
+ * Platform-marked-paid and source-deleted rows are never touched — they're
+ * historical record, not schedule.
  */
 export async function refreshObligationTermsForSupplier(platformSupplierId, supplier) {
   assertCloudReady()
@@ -175,7 +179,6 @@ export async function refreshObligationTermsForSupplier(platformSupplierId, supp
     )
     .eq('platform_supplier_id', platformSupplierId)
     .eq('is_source_deleted', false)
-    .gt('current_debt', 0)
     .is('platform_paid_at', null)
 
   if (error) throw new Error(error.message || 'Не удалось обновить сроки оплаты')
@@ -258,6 +261,7 @@ export {
   formatUmagDateTime,
   formatUmagMoney,
   isPlatformMarkedPaid,
+  resolveOwedAmount,
   resolveSupplierPaymentTerms,
   toAqtobeDateKey,
 }

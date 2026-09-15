@@ -1,6 +1,10 @@
 /**
  * Pure helpers for supplier payment obligations (календарь оплат).
- * Status is derived from current_debt + due_date + Asia/Aqtobe today — not stored.
+ * Status is derived from platform_paid_at (native mark) + due_date + Asia/Aqtobe
+ * today — NOT from UMAG's current_debt, which staff are instructed to zero out
+ * in UMAG immediately at receiving time regardless of real payment status (see
+ * docs/suppliers/native-payment-status-independence.md). current_debt stays
+ * synced for reference only; owed amount is resolveOwedAmount().
  */
 
 import { getPaymentAccountName } from '../services/paymentAccountsService'
@@ -122,11 +126,23 @@ export function isPlatformMarkedPaid(obligation) {
   return Boolean(obligation?.platformPaidAt ?? obligation?.platform_paid_at)
 }
 
+/**
+ * The amount actually owed per OUR OWN tracking — ignores UMAG's current_debt
+ * entirely (the owner instructed staff to mark every UMAG document paid at
+ * receiving time regardless of real payment status, so current_debt is no
+ * longer a meaningful signal: it reads 0 even for genuinely unpaid consignment
+ * deliveries). Full invoice amount until natively marked paid, then 0 — v1 is
+ * full-payment-only, no partial tracking.
+ */
+export function resolveOwedAmount(obligation) {
+  if (isPlatformMarkedPaid(obligation)) return 0
+  const amount = Number(obligation?.originalSupplyAmount ?? obligation?.original_supply_amount ?? 0)
+  return Number.isFinite(amount) ? amount : 0
+}
+
 export function deriveObligationStatus(obligation, todayKey = toAqtobeDateKey()) {
-  if (isPlatformMarkedPaid(obligation)) return OBLIGATION_STATUS.PAID
-  const debt = Number(obligation?.currentDebt ?? obligation?.current_debt ?? 0)
-  if (!Number.isFinite(debt) || debt <= 0) return OBLIGATION_STATUS.PAID
   if (obligation?.isSourceDeleted || obligation?.is_source_deleted) return OBLIGATION_STATUS.PAID
+  if (isPlatformMarkedPaid(obligation)) return OBLIGATION_STATUS.PAID
 
   const due = obligation?.dueDate ?? obligation?.due_date ?? null
   if (!due) return OBLIGATION_STATUS.TERMS_MISSING
@@ -174,8 +190,7 @@ export function formatPlatformPaymentMark(obligation) {
 export function isActiveOpenObligation(obligation) {
   if (!obligation) return false
   if (obligation.isSourceDeleted || obligation.is_source_deleted) return false
-  if (isPlatformMarkedPaid(obligation)) return false
-  return Number(obligation.currentDebt ?? obligation.current_debt ?? 0) > 0
+  return !isPlatformMarkedPaid(obligation)
 }
 
 /**
@@ -200,7 +215,7 @@ export function buildPaymentScheduleView(obligations, todayKey = toAqtobeDateKey
   const termsMissingGroups = new Map()
 
   for (const ob of active) {
-    const debt = Number(ob.currentDebt ?? ob.current_debt ?? 0)
+    const debt = resolveOwedAmount(ob)
     summaries.totalActiveDebt += debt
     const status = deriveObligationStatus(ob, todayKey)
     const due = ob.dueDate ?? ob.due_date ?? null
@@ -399,7 +414,7 @@ export function buildSupplierPaymentSummary(obligations, todayKey = toAqtobeDate
     nearestDueDate: null,
   }
   for (const ob of active) {
-    const debt = Number(ob.currentDebt ?? ob.current_debt ?? 0)
+    const debt = resolveOwedAmount(ob)
     summary.totalDebt += debt
     const status = deriveObligationStatus(ob, todayKey)
     const due = ob.dueDate ?? ob.due_date ?? null

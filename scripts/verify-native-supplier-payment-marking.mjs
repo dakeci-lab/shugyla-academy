@@ -42,6 +42,7 @@ async function stagePureLogic() {
     deriveObligationStatus,
     OBLIGATION_STATUS,
     formatPlatformPaymentMark,
+    resolveOwedAmount,
   } = await import(pathToFileURL(path.join(ROOT, 'src/utils/supplierPaymentObligations.js')).href)
 
   assert('unmarked obligation is not platform-paid', isPlatformMarkedPaid({}) === false)
@@ -76,6 +77,24 @@ async function stagePureLogic() {
     'un-marked obligation with debt > 0 is still active/open',
     isActiveOpenObligation({ currentDebt: 50000 }) === true
   )
+  assert(
+    'CRITICAL: un-marked obligation with debt = 0 is STILL active/open — UMAG debt is fully untrusted',
+    isActiveOpenObligation({ currentDebt: 0, originalSupplyAmount: 30000 }) === true
+  )
+  assert(
+    'CRITICAL: un-marked obligation with debt = 0 does NOT derive as PAID',
+    deriveObligationStatus({ currentDebt: 0, dueDate: '2026-01-01' }, '2026-09-15') !==
+      OBLIGATION_STATUS.PAID
+  )
+
+  assert(
+    'resolveOwedAmount ignores current_debt entirely, uses original_supply_amount',
+    resolveOwedAmount({ currentDebt: 0, originalSupplyAmount: 42000 }) === 42000
+  )
+  assert(
+    'resolveOwedAmount is 0 once platform-marked paid, regardless of amount',
+    resolveOwedAmount({ platformPaidAt: '2026-09-15T00:00:00Z', originalSupplyAmount: 42000 }) === 0
+  )
 
   assert('formatPlatformPaymentMark returns null when not marked', formatPlatformPaymentMark({}) === null)
   const marked = formatPlatformPaymentMark({
@@ -85,6 +104,49 @@ async function stagePureLogic() {
   assert(
     'formatPlatformPaymentMark returns a non-empty label when marked',
     typeof marked === 'string' && marked.length > 0 && marked.includes('Оплачено вручную')
+  )
+  console.log('')
+}
+
+function stageBackfillMigration() {
+  console.log('Stage 1b: backfill migration — every supply gets tracked, old ones auto-resolved')
+  const sql = read('supabase/migrations/20260915110000_native_payment_status_backfill.sql')
+
+  assert(
+    'auto-marks existing obligations already at debt <= 0',
+    /update public\.supplier_payment_obligations[\s\S]{0,200}set platform_paid_at = now\(\)/.test(sql) &&
+      sql.includes('and current_debt <= 0')
+  )
+  assert(
+    'never re-marks an obligation that already has a native mark',
+    /update public\.supplier_payment_obligations[\s\S]{0,150}where platform_paid_at is null/.test(sql)
+  )
+  assert(
+    'backfills missing rows from umag_supplies with not exists guard (idempotent)',
+    sql.includes('not exists (') && sql.includes('o.umag_supply_id = s.umag_supply_id')
+  )
+  assert('backfilled rows are also auto-marked paid', /insert into public\.supplier_payment_obligations[\s\S]*now\(\)\s*$/m.test(sql.split('from public.umag_supplies')[0]) || sql.includes('  now(),\n  now()\nfrom public.umag_supplies'))
+  assert('skips already-deleted UMAG supplies when backfilling', sql.includes('s.is_source_deleted = false'))
+  assert('upsert-safe (on conflict do nothing, never overwrites a native mark)', sql.includes('on conflict (umag_supply_id) do nothing'))
+  console.log('')
+}
+
+function stageServerSync() {
+  console.log('Stage 1c: umag-sync creates an obligation for every supply, never touches platform_* columns')
+  const sync = read('supabase/functions/umag-sync/index.ts')
+  const fn = sync.slice(
+    sync.indexOf('async function refreshPaymentObligations'),
+    sync.indexOf('async function refreshPaymentObligations') + 6000
+  )
+
+  assert(
+    'no longer skips creating an obligation because debt <= 0',
+    !/if \(!existing && \(isDeleted \|\| debt <= 0\)\) continue/.test(fn)
+  )
+  assert('still skips only for already-deleted supplies', /if \(!existing && isDeleted\) continue/.test(fn))
+  assert(
+    'the upsert payload never sets platform_paid_at/platform_paid_by/platform_payment_account_id',
+    !/upsertRows\.push\(\{[\s\S]*?platform_paid/.test(fn)
   )
   console.log('')
 }
@@ -126,8 +188,9 @@ function stageService() {
     )
   )
   assert(
-    'listPaymentObligations excludes platform-paid rows at the SQL level too',
-    service.includes(".gt('current_debt', 0).is('platform_paid_at', null)")
+    'listPaymentObligations excludes platform-paid rows at the SQL level, NOT by current_debt',
+    service.includes("query.is('platform_paid_at', null)") &&
+      !service.includes(".gt('current_debt', 0).is('platform_paid_at', null)")
   )
   assert('OBLIGATION_SELECT reads the 3 new columns', service.includes('platform_paid_at,') && service.includes('platform_paid_by,') && service.includes('platform_payment_account_id,'))
   assert('normalizeObligation maps all 3 new columns', service.includes('platformPaidAt: row.platform_paid_at') && service.includes('platformPaidBy: row.platform_paid_by') && service.includes('platformPaymentAccountId: row.platform_payment_account_id'))
@@ -148,6 +211,10 @@ function stageUi() {
   )
   assert('passes the current employee id as paidByEmployeeId', /paidByEmployeeId: user\?\.id/.test(panel))
   assert('optimistically patches the open sheet without waiting for reload', panel.includes('patchSelectedGroupObligation'))
+  assert(
+    'per-document amount owed comes from resolveOwedAmount, not raw UMAG debt',
+    panel.includes('resolveOwedAmount(ob)') && !panel.includes('formatUmagMoney(ob.currentDebt)')
+  )
   console.log('')
 }
 
@@ -155,6 +222,8 @@ async function main() {
   try {
     console.log('=== Native supplier payment marking ===\n')
     await stagePureLogic()
+    stageBackfillMigration()
+    stageServerSync()
     stageMigration()
     stageService()
     stageUi()

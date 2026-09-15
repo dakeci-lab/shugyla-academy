@@ -2093,8 +2093,12 @@ async function refreshPaymentObligations(
     const existing = existingByUmagId.get(umagSupplyId) || null
     const isDeleted = Boolean(supply.is_source_deleted)
 
-    // Never create obligations for supplies that never carried open debt.
-    if (!existing && (isDeleted || debt <= 0)) continue
+    // Owner instructed staff to mark every UMAG document paid at receiving
+    // time regardless of real payment status, so debt is no longer a signal
+    // of whether this platform should track it — every non-deleted supply
+    // gets an obligation row; "paid" here is decided purely by
+    // platform_paid_at (see src/utils/supplierPaymentObligations.js).
+    if (!existing && isDeleted) continue
 
     if (!isDeleted && debt > 0) suppliesWithOpenDebt += 1
 

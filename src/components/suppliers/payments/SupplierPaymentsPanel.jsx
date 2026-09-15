@@ -21,6 +21,7 @@ import {
   formatSyncCoverage,
   isPlatformMarkedPaid,
   pickDefaultPaymentTab,
+  resolveOwedAmount,
 } from '../../../utils/supplierPaymentObligations'
 import {
   buildPaymentScheduleView,
@@ -610,10 +611,8 @@ function GroupDetail({
                 <div className="spo-panel__ob-grid">
                   <span>Сумма приёмки</span>
                   <strong>{formatUmagMoney(ob.originalSupplyAmount)}</strong>
-                  <span>Оплачено</span>
-                  <strong>{formatUmagMoney(ob.currentPaymentAmount)}</strong>
-                  <span>Остаток</span>
-                  <strong>{formatUmagMoney(ob.currentDebt)}</strong>
+                  <span>К оплате</span>
+                  <strong>{formatUmagMoney(resolveOwedAmount(ob))}</strong>
                   <span>Срок</span>
                   <strong>
                     {ob.dueDate
