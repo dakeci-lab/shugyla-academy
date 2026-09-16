@@ -68,17 +68,26 @@ async function stagePureLogic() {
 }
 
 function stageEdgeFunction() {
-  console.log('Stage 2: umag-sync stops writing supplier_payment ledger events from UMAG')
+  console.log('Stage 2: umag-sync skips a UMAG payment only when its supply has an attributed native mark')
   const src = read('supabase/functions/_shared/umagDocumentPayments.ts')
   const fn = src.slice(src.indexOf('export async function rebuildLedgerEventsForPeriod'))
 
   assert(
-    'the payment-loop event push is now gated on isRefund',
-    /if \(isRefund\) \{\s*\n\s*events\.push\(\{/.test(fn)
+    'fetches attributedSupplyIds (obligations with platform_paid_by set) before the payment loop',
+    /const attributedSupplyIds = new Set<number>\(\)/.test(fn) &&
+      fn.indexOf('const attributedSupplyIds') < fn.indexOf('for (const payment of paymentsRes.data')
   )
   assert(
-    'balance_delta for the (refund-only) push is 0, matching supplier_refund semantics',
-    /if \(isRefund\) \{[\s\S]{0,400}balance_delta: 0,/.test(fn)
+    "attributedSupplyIds query filters not('platform_paid_by', 'is', null)",
+    /attributedSupplyIds[\s\S]{0,400}not\('platform_paid_by', 'is', null\)/.test(fn)
+  )
+  assert(
+    'a non-refund event is pushed only when the supply has NO attributed native mark; refunds are always pushed',
+    /if \(isRefund \|\| !hasNativeAttributedMark\) \{\s*\n\s*events\.push\(\{/.test(fn)
+  )
+  assert(
+    'balance_delta is 0 for refunds and -abs for kept (non-superseded) real payments',
+    /balance_delta: isRefund \? 0 : -abs,/.test(fn)
   )
   console.log('')
 }
@@ -122,21 +131,38 @@ function stageCaller() {
 }
 
 function stageSettlementsQuery() {
-  console.log('Stage 5: fetchUmagSettlementsBySupplier sources payments natively, refunds from UMAG')
+  console.log('Stage 5: fetchUmagSettlementsBySupplier — attributed native marks win, real UMAG history survives')
   const service = read('src/services/umagSettlementsService.js')
 
   assert('imports buildNativeSettlementPaymentRows', service.includes('buildNativeSettlementPaymentRows'))
   assert(
-    'queries supplier_payment_obligations for the period (native marks)',
-    /from\('supplier_payment_obligations'\)[\s\S]{0,300}not\('platform_paid_at', 'is', null\)/.test(service)
+    'native-marks query requires BOTH platform_paid_at and platform_paid_by — the 2026-09-15 backfill batch (no employee) is excluded',
+    /from\('supplier_payment_obligations'\)[\s\S]{0,400}not\('platform_paid_at', 'is', null\)[\s\S]{0,100}not\('platform_paid_by', 'is', null\)/.test(
+      service
+    )
   )
   assert(
-    'raw UMAG payments loop is skipped for non-refunds',
-    /for \(const payment of payments\) \{\s*\n\s*const isRefund = isUmagPaymentRefund\(payment\)\s*\n\s*if \(!isRefund\) continue/.test(service)
+    'computes attributedSupplyIds (supplies whose obligation has platform_paid_by set) from the linked supplies actually present in this period\'s payments',
+    service.includes('let attributedSupplyIds = new Set()') &&
+      /not\('platform_paid_by', 'is', null\)[\s\S]{0,200}\.in\('umag_supply_id', linkedSupplyIdsInPayments\)/.test(
+        service
+      )
   )
   assert(
-    'nativePaymentRows feed row.documentPaymentAmount / row.payments, not the raw UMAG feed',
+    'a raw UMAG payment is skipped ONLY when non-refund AND its supply is in attributedSupplyIds — refunds and non-attributed supplies still count',
+    /if \(!isRefund\) \{\s*\n[\s\S]{0,200}attributedSupplyIds\.has\(linkedSupplyId\)\) continue/.test(service)
+  )
+  assert(
+    'kept UMAG payments still accumulate into row.documentPaymentAmount/row.documentRefundAmount and row.payments',
+    /if \(isRefund\) row\.documentRefundAmount[\s\S]{0,100}else row\.documentPaymentAmount/.test(service)
+  )
+  assert(
+    'nativePaymentRows (attributed marks only) additionally feed row.documentPaymentAmount / row.payments',
     /for \(const payment of nativePaymentRows\) \{[\s\S]{0,300}row\.documentPaymentAmount/.test(service)
+  )
+  assert(
+    'documentNumber never falls back to the internal payment.id (would leak "platform-paid:<uuid>") — null when there is no real umag_payment_id',
+    /documentNumber: payment\.umag_payment_id != null \? String\(payment\.umag_payment_id\) : null,/.test(service)
   )
   console.log('')
 }
@@ -151,6 +177,13 @@ function stageUi() {
     'shows a distinct empty-state note for platform-sourced entries instead of the UMAG one',
     sheet.includes("Отмечено оплаченным вручную на платформе") &&
       /externalSource === 'platform'\s*\n\s*\? 'Отмечено оплаченным вручную/.test(sheet)
+  )
+
+  const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
+  assert(
+    "'UMAG' fallback label is only used for genuinely UMAG-sourced payments — a platform-sourced mark with no account falls back to a dash instead",
+    /const isPlatformSourced = op\.source\?\.external_source === 'platform'/.test(panel) &&
+      /\|\| \(isPlatformSourced \? '—' : 'UMAG'\)/.test(panel)
   )
   console.log('')
 }

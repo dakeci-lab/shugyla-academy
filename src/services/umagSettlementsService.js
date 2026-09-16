@@ -527,7 +527,10 @@ export function buildSupplierOperationHistory(
       debt: null,
       paymentStatus: null,
       balanceDelta: isRefund ? 0 : -abs,
-      documentNumber: String(payment.umag_payment_id || payment.id || ''),
+      // umag_payment_id is the only real document number here — payment.id
+      // is an internal row id (a synthetic "platform-paid:<uuid>" for native
+      // marks) that must never be shown to the user as a document number.
+      documentNumber: payment.umag_payment_id != null ? String(payment.umag_payment_id) : null,
       statusLabel: ledgerEventStatusLabel(eventType, 'posted'),
       signedAmount: isRefund ? abs : -abs,
       details: [payment.user_name, payment.account_name, payment.note]
@@ -622,10 +625,14 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
         .lt('occurred_at', fromIso)
         .order('occurred_at', { ascending: true })
     ),
-    // Natively-marked payments ("Оплачено" in «К оплате») — this, not
-    // umag_document_payments, is the source of truth for supplier_payment
-    // events once staff mark documents paid in UMAG immediately at receiving
-    // time (see buildNativeSettlementPaymentRows).
+    // Natively-marked payments ("Оплачено" in «К оплате») with a real
+    // employee attached — the trustworthy source once staff mark documents
+    // paid in UMAG immediately at receiving time (see
+    // buildNativeSettlementPaymentRows). platform_paid_by IS NULL means this
+    // obligation was closed by the one-time 2026-09-15 backfill migration
+    // (mass-marking pre-existing debt with no real payment moment recorded)
+    // — those fall back to their real historical UMAG document-payment
+    // record instead (see attributedSupplyIds below), never a fabricated one.
     fetchAllSupabaseRows(() =>
       supabase
         .from('supplier_payment_obligations')
@@ -633,6 +640,7 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
           'id, platform_supplier_id, umag_supply_id, original_supply_amount, platform_paid_at, platform_paid_by, platform_payment_account_id, supplier:platform_suppliers!platform_supplier_id(name)'
         )
         .not('platform_paid_at', 'is', null)
+        .not('platform_paid_by', 'is', null)
         .gte('platform_paid_at', fromIso)
         .lte('platform_paid_at', toIso)
     ),
@@ -674,6 +682,29 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
       employeeNameById.set(row.id, row.full_name || null)
     }
   }
+  // Supplies whose obligation has a real attributed native mark
+  // (platform_paid_by set) — their raw UMAG document-payment record (if any)
+  // is superseded by the native mark below and must not also be rendered as
+  // a second, duplicate payment line. Every other supply's real UMAG payment
+  // record (if any) still stands as-is — it predates the "mark paid in UMAG
+  // immediately at receiving" policy and is genuine history.
+  const linkedSupplyIdsInPayments = [
+    ...new Set(
+      payments
+        .filter((p) => !isUmagPaymentRefund(p) && p.linked_umag_supply_id != null)
+        .map((p) => Number(p.linked_umag_supply_id))
+    ),
+  ]
+  let attributedSupplyIds = new Set()
+  if (linkedSupplyIdsInPayments.length > 0) {
+    const { data: attributedRows } = await supabase
+      .from('supplier_payment_obligations')
+      .select('umag_supply_id')
+      .not('platform_paid_by', 'is', null)
+      .in('umag_supply_id', linkedSupplyIdsInPayments)
+    attributedSupplyIds = new Set((attributedRows || []).map((row) => Number(row.umag_supply_id)))
+  }
+
   await ensurePaymentAccountsLoaded()
   const accountNameById = {
     get: (accountId) => (accountId ? getPaymentAccountName(accountId) : null),
@@ -732,20 +763,27 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
     row.returns.push(ret)
   }
 
-  // Only refunds still come from UMAG's own document-payment feed — refund
-  // timing isn't affected by the receiving-time "mark paid in UMAG" policy.
-  // Real payments ("Оплата поставщику") come exclusively from
-  // nativePaymentRows below; the raw UMAG payment rows are skipped here.
+  // Refunds always come from UMAG's own feed (unaffected by the receiving-
+  // time marking policy). Non-refund UMAG payments are skipped only when
+  // their linked supply now has a real attributed native mark — that mark
+  // is this supply's trustworthy payment record instead (see
+  // attributedSupplyIds above); every other UMAG payment is genuine history
+  // and still counts.
   for (const payment of payments) {
     const isRefund = isUmagPaymentRefund(payment)
-    if (!isRefund) continue
+    if (!isRefund) {
+      const linkedSupplyId =
+        payment.linked_umag_supply_id != null ? Number(payment.linked_umag_supply_id) : null
+      if (linkedSupplyId != null && attributedSupplyIds.has(linkedSupplyId)) continue
+    }
     const row = ensureSettlementRow(byKey, {
       platformSupplierId: payment.platform_supplier_id,
       umagSupplierId: payment.umag_supplier_id,
       name: payment.supplier_name,
     })
     const abs = Math.abs(toNumber(payment.amount))
-    row.documentRefundAmount = (row.documentRefundAmount || 0) + abs
+    if (isRefund) row.documentRefundAmount = (row.documentRefundAmount || 0) + abs
+    else row.documentPaymentAmount = (row.documentPaymentAmount || 0) + abs
     row.payments = row.payments || []
     row.payments.push(payment)
   }

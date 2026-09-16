@@ -273,10 +273,15 @@ function operationDetailsLabel(op) {
     )
   }
   if (op.kind === 'payment') {
+    // 'UMAG' is only a truthful fallback for a genuine UMAG-sourced record
+    // with no recorded user/account. A native mark (external_source
+    // 'platform') that's merely missing a configured payment account is not
+    // "from UMAG" — show a plain dash instead of mislabeling its source.
+    const isPlatformSourced = op.source?.external_source === 'platform'
     return (
       [op.source?.user_name, op.source?.account_name, op.source?.note]
         .filter(Boolean)
-        .join(' · ') || 'UMAG'
+        .join(' · ') || (isPlatformSourced ? '—' : 'UMAG')
     )
   }
   return (

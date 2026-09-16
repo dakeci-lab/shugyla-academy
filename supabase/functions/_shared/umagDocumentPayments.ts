@@ -493,6 +493,28 @@ export async function rebuildLedgerEventsForPeriod(
     supplier_name: string | null
   }> = []
 
+  // Supplies whose obligation has a real attributed native mark
+  // (platform_paid_by set) — their raw UMAG document-payment record is
+  // superseded by that mark (written directly by markObligationPaid) and
+  // must not also produce a duplicate ledger event here. Every other
+  // supply's UMAG payment record predates the "mark paid in UMAG
+  // immediately at receiving" policy and is genuine history — kept as-is.
+  const attributedSupplyIds = new Set<number>()
+  for (let from = 0; from < 500_000; from += 1000) {
+    const { data, error } = await serviceClient
+      .from('supplier_payment_obligations')
+      .select('umag_supply_id')
+      .not('platform_paid_by', 'is', null)
+      .not('umag_supply_id', 'is', null)
+      .range(from, from + 999)
+    if (error) {
+      console.error('ledger_rebuild_attributed_supply_ids_failed', { message: error.message })
+      break
+    }
+    for (const row of data || []) attributedSupplyIds.add(Number(row.umag_supply_id))
+    if (!data || data.length < 1000) break
+  }
+
   for (const payment of paymentsRes.data || []) {
     const amount = asNumber(payment.amount)
     const type = String(payment.payment_type || '').toUpperCase()
@@ -532,16 +554,15 @@ export async function rebuildLedgerEventsForPeriod(
         supplier_name: supplierName,
       })
     }
-    // supplier_payment (non-refund) events are deliberately NOT pushed here
-    // anymore. Once staff started marking UMAG documents paid immediately at
-    // receiving time (to skip UMAG's own payment flow entirely), UMAG's
-    // payment_time stopped reflecting a real payment moment. The native
-    // "Оплачено" click in «К оплате» (markObligationPaid,
-    // supplierPaymentObligationsService.js) now writes the equivalent
-    // external_source='platform' event directly. Refunds are unaffected —
-    // they're a separate real-money event, not touched by the receiving-time
-    // marking policy — so they still come from this feed.
-    if (isRefund) {
+    // A non-refund event is skipped only when its linked supply now has a
+    // real attributed native mark (markObligationPaid already wrote the
+    // equivalent external_source='platform' event for it — pushing this one
+    // too would double it). Refunds are always kept — they're a separate
+    // real-money event, unaffected by the receiving-time marking policy.
+    const hasNativeAttributedMark =
+      payment.linked_umag_supply_id != null &&
+      attributedSupplyIds.has(Number(payment.linked_umag_supply_id))
+    if (isRefund || !hasNativeAttributedMark) {
       events.push({
         platform_supplier_id: platformSupplierId,
         umag_supplier_id: umagSupplierId,
@@ -552,7 +573,7 @@ export async function rebuildLedgerEventsForPeriod(
         occurred_at: payment.payment_time,
         document_number: String(payment.umag_payment_id),
         amount: abs,
-        balance_delta: 0,
+        balance_delta: isRefund ? 0 : -abs,
         currency: 'KZT',
         status: 'posted',
         linked_umag_supply_id: payment.linked_umag_supply_id,
