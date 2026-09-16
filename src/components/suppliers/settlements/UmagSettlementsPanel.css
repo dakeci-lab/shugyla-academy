@@ -13,19 +13,6 @@
   padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
 }
 
-.umag-settlements__source-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 1px 7px;
-  border-radius: 999px;
-  border: 1px solid #d1d5db;
-  background: #f8fafc;
-  color: #475569;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-}
-
 .umag-settlements__period-chip {
   display: inline-flex;
   align-items: center;
@@ -101,28 +88,10 @@
   min-width: 0;
 }
 
-.umag-settlements__tfoot-meta-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-}
-
 .umag-settlements__tfoot-period {
   font-size: 12px;
   font-weight: 700;
   color: #0f172a;
-}
-
-.umag-settlements__tfoot-updated {
-  font-size: 12px;
-  color: var(--color-text-secondary, #64748b);
-}
-
-.umag-settlements__tfoot-hint {
-  margin-top: 2px;
-  font-size: 11px;
-  color: #94a3b8;
 }
 
 .umag-settlements__tfoot-label {

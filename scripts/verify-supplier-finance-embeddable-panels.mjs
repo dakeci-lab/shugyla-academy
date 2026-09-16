@@ -110,7 +110,10 @@ function main() {
   // Этап 2.7 additively threads a second prop (refreshToken) through the same
   // destructuring — the invariant that still matters is that embedded keeps
   // its original default, not the exact prop list.
-  assert.match(settlementsSrc, /export default function UmagSettlementsPanel\(\{ embedded = false, refreshToken = null \} = \{\}\)/)
+  assert.match(
+    settlementsSrc,
+    /export default function UmagSettlementsPanel\(\{\s*\n\s*embedded = false,\s*\n\s*refreshToken = null,\s*\n\s*filterSlot = null,\s*\n\} = \{\}\)/
+  )
   ok('Case 3: UmagSettlementsPanel defaults to embedded=false — standalone usage (<UmagSettlementsPanel />) is unchanged')
 
   assert.match(settlementsSrc, /\{canSync && !embedded \? \(/)
@@ -168,7 +171,7 @@ function main() {
   assert.match(paymentsSrc, /export default function SupplierPaymentsPanel\(\{/)
   assert.match(paymentsSrc, /embedded = false,/)
   assert.match(paymentsSrc, /function CompactPaymentSchedule\(/)
-  assert.match(settlementsSrc, /export default function UmagSettlementsPanel\(\{ embedded = false/)
+  assert.match(settlementsSrc, /export default function UmagSettlementsPanel\(\{\s*\n\s*embedded = false,/)
   ok('Case 5: SupplierPaymentsPanel + UmagSettlementsPanel exist in source with embedded prop — no forked duplicate implementation')
 
   // --- Case 10: nav hidden, legacy routes preserved (source, not working-tree diff) ---
@@ -178,12 +181,14 @@ function main() {
   assert.doesNotMatch(navSrc, /label: 'Оплаты поставщикам'/)
   ok('Case 10: platformNav.js shows «Расчёты»; legacy nav labels removed; App.jsx keeps all three routes')
 
-  // --- Case 11: settlements CSS untouched; payments CSS may gain compact rules ---
-  const settlementsCssStatus = gitStatus(['src/components/suppliers/settlements/UmagSettlementsPanel.css'])
-  assert.equal(settlementsCssStatus, '', `unexpected settlements CSS changes: ${settlementsCssStatus}`)
+  // --- Case 11: payments CSS may gain compact rules (Этап 2.8+) --------------
+  // The original "settlements CSS untouched" half of this check was a
+  // one-time PR-scope proof for that specific stage, not a lasting
+  // invariant — settlements CSS legitimately changes in later work (e.g.
+  // the shared PlatformFilterTrigger unification).
   const paymentsCss = read('src/components/suppliers/payments/SupplierPaymentsPanel.css')
   assert.match(paymentsCss, /\.spo-compact__/)
-  ok('Case 11: settlements CSS untouched; payments CSS may include spo-compact__ rules for embedded mode (Этап 2.8+)')
+  ok('Case 11: payments CSS includes spo-compact__ rules for embedded mode (Этап 2.8+)')
 
   // --- Case 12: permissions not removed -------------------------------------
   for (const gate of [

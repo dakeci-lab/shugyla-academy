@@ -1,0 +1,47 @@
+/* Shared «Фильтр ⌄» trigger button — icon + label + optional count + chevron.
+   Originally built for «К оплате», now the one design every page's filter
+   button should use (see PlatformFilterTrigger.jsx). */
+
+.pf-filter-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.pf-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 10px;
+  background: var(--color-white, #fff);
+  color: var(--color-text, #0f172a);
+  font-size: 13.5px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.pf-trigger:hover {
+  background: #f8fafc;
+}
+
+.pf-trigger--active {
+  border-color: var(--color-primary, #059669);
+  color: var(--color-primary-dark, #047857);
+}
+
+.pf-trigger__count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-primary, #059669);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}

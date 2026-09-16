@@ -56,6 +56,7 @@ import {
   reorderTogglablePaymentsColumns,
 } from '../../../utils/paymentsColumnSettingsMerge'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
+import PlatformFilterTrigger from '../../platform/PlatformFilterTrigger'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
 import { ChevronDownIcon, FilterIcon } from '../../icons/PlatformIcons'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
@@ -1450,26 +1451,14 @@ export default function SupplierPaymentsPanel({
           <>
             {filterSlot
               ? createPortal(
-                  <div className="spo-filter-anchor">
-                    <button
-                      type="button"
+                  <div className="pf-filter-anchor">
+                    <PlatformFilterTrigger
                       ref={filterButtonRef}
-                      className={`pf-trigger${
-                        supplierFilter.size + accountFilter.size > 0 ? ' pf-trigger--active' : ''
-                      }`}
-                      aria-expanded={filterOpen}
-                      aria-haspopup="dialog"
+                      active={supplierFilter.size + accountFilter.size > 0}
+                      count={supplierFilter.size + accountFilter.size}
+                      open={filterOpen}
                       onClick={() => (filterOpen ? setFilterOpen(false) : openFilterPopover())}
-                    >
-                      <FilterIcon size={18} />
-                      <span>Фильтр</span>
-                      {supplierFilter.size + accountFilter.size > 0 ? (
-                        <span className="pf-trigger__count">
-                          {supplierFilter.size + accountFilter.size}
-                        </span>
-                      ) : null}
-                      <ChevronDownIcon size={14} />
-                    </button>
+                    />
                     <PaymentsFilterPopover
                       open={filterOpen}
                       accountOptions={accountOptions}

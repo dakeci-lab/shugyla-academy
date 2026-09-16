@@ -95,7 +95,7 @@ export default function SupplierFinancePanel() {
   const [summaryError, setSummaryError] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
-  const [paymentsFilterSlot, setPaymentsFilterSlot] = useState(null)
+  const [filterSlot, setFilterSlot] = useState(null)
 
   const loadSummary = useCallback(async () => {
     setSummaryLoading(true)
@@ -204,9 +204,7 @@ export default function SupplierFinancePanel() {
           >
             {syncStatus.text}
           </span>
-          {activeTabMeta?.id === 'payments' ? (
-            <div className="sfp-panel__filter-slot" ref={setPaymentsFilterSlot} />
-          ) : null}
+          <div className="sfp-panel__filter-slot" ref={setFilterSlot} />
           {canSync ? (
             <PlatformSyncButton
               onClick={() => void handleSync()}
@@ -260,12 +258,12 @@ export default function SupplierFinancePanel() {
           summaryLoading={summaryLoading}
           obligations={obligations}
           refreshToken={refreshToken}
-          filterSlot={paymentsFilterSlot}
+          filterSlot={filterSlot}
         />
       ) : null}
 
       {activeTabMeta?.id === 'settlements' ? (
-        <UmagSettlementsPanel embedded refreshToken={refreshToken} />
+        <UmagSettlementsPanel embedded refreshToken={refreshToken} filterSlot={filterSlot} />
       ) : null}
     </div>
   )

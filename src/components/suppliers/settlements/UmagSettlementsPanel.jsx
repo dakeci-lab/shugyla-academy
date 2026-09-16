@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
 import {
@@ -15,7 +16,6 @@ import {
   filterSupplierOperations,
   formatSignedUmagMoney,
   formatUmagDate,
-  formatUmagDateTime,
   formatUmagMoney,
   getMonthPeriodKeys,
   supplyPaymentStatusLabel,
@@ -29,10 +29,8 @@ import {
   reconciliationStatusLabel,
 } from '../../../services/supplierReconciliationService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
-import PlatformSearchToolbar, {
-  PlatformFilterButton,
-  PlatformToolbarActionWrap,
-} from '../../platform/PlatformSearchToolbar'
+import PlatformFilterTrigger from '../../platform/PlatformFilterTrigger'
+import PlatformSearchToolbar, { PlatformToolbarActionWrap } from '../../platform/PlatformSearchToolbar'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import CreateReconciliationModal from './CreateReconciliationModal'
@@ -48,44 +46,14 @@ import {
 } from '../../../utils/settlementsPeriod'
 import './UmagSettlementsPanel.css'
 
-function statusLabel(status) {
-  switch (status) {
-    case 'success':
-      return 'успешно'
-    case 'partial':
-      return 'частично'
-    case 'failed':
-      return 'ошибка'
-    case 'running':
-      return 'выполняется'
-    default:
-      return status
-  }
-}
-
-function formatLastUpdated(lastRun) {
-  const at = lastRun?.finished_at || lastRun?.started_at
-  if (!at) return 'ещё не выполнялась'
-  const base = formatUmagDateTime(at)
-  if (lastRun?.status && lastRun.status !== 'success') {
-    return `${base} (${statusLabel(lastRun.status)})`
-  }
-  return base
-}
-
-function TotalsMetaBlock({ periodLabel, lastRun }) {
+function TotalsMetaBlock() {
+  // Source chip + period + "Обновлено:" used to repeat here — that's already
+  // shown once at the top of the page (next to the sync button). Only the
+  // totals-row label remains, now in the same bold style the period label
+  // used to have.
   return (
     <div className="umag-settlements__tfoot-meta">
-      <div className="umag-settlements__tfoot-meta-line">
-        <span className="umag-settlements__source-chip" title="Источник данных">
-          UMAG
-        </span>
-        <span className="umag-settlements__tfoot-period">{periodLabel}</span>
-      </div>
-      <div className="umag-settlements__tfoot-updated">
-        Обновлено: {formatLastUpdated(lastRun)}
-      </div>
-      <div className="umag-settlements__tfoot-hint">Итого за выбранный период</div>
+      <div className="umag-settlements__tfoot-period">Итого за выбранный период</div>
     </div>
   )
 }
@@ -123,18 +91,12 @@ function TotalsMetricContent({ label, value, loading, isCount, tone, unavailable
 }
 
 /** Desktop: true table footer aligned to column grid. */
-function SettlementsTableFoot({
-  totals,
-  loading,
-  periodLabel,
-  lastRun,
-  canViewRecon,
-}) {
+function SettlementsTableFoot({ totals, loading, canViewRecon }) {
   return (
     <tfoot className="umag-settlements__tfoot">
       <tr>
         <td className="umag-settlements__tfoot-meta-cell">
-          <TotalsMetaBlock periodLabel={periodLabel} lastRun={lastRun} />
+          <TotalsMetaBlock />
         </td>
         <td className="umag-settlements__tfoot-metric-cell">
           <TotalsMetricContent
@@ -184,10 +146,10 @@ function SettlementsTableFoot({
 }
 
 /** Mobile: compact sticky strip under card list (same aggregates). */
-function SettlementsMobileTotals({ totals, loading, periodLabel, lastRun }) {
+function SettlementsMobileTotals({ totals, loading }) {
   return (
     <div className="umag-settlements__mobile-totals" aria-label="Итоги списка">
-      <TotalsMetaBlock periodLabel={periodLabel} lastRun={lastRun} />
+      <TotalsMetaBlock />
       <div className="umag-settlements__mobile-totals-grid">
         <div className="umag-settlements__mobile-totals-cell">
           <TotalsMetricContent
@@ -700,7 +662,11 @@ function UmagSupplierDetail({
  *     embedded instance reload without remounting/losing local state
  *     (selected supplier, open filter, etc.). Ignored in standalone use.
  */
-export default function UmagSettlementsPanel({ embedded = false, refreshToken = null } = {}) {
+export default function UmagSettlementsPanel({
+  embedded = false,
+  refreshToken = null,
+  filterSlot = null,
+} = {}) {
   const { user } = useSession()
   const toast = useToast()
   const showSuccess = toast.success
@@ -867,8 +833,41 @@ export default function UmagSettlementsPanel({ embedded = false, refreshToken = 
     )
   }
 
+  const filterTrigger = (
+    <PlatformFilterTrigger
+      ref={filterButtonRef}
+      active={filterActive}
+      open={filterOpen}
+      onClick={openFilter}
+      aria-label={filterActive ? `Фильтр, ${periodLabel}` : 'Фильтр периода'}
+      title={filterActive ? `Фильтр · ${periodLabel}` : 'Фильтр'}
+    />
+  )
+  const filterPopover = (
+    <SettlementsFilterPopover
+      open={filterOpen}
+      draft={draftFilter}
+      onChange={setDraftFilter}
+      onApply={applyFilter}
+      onReset={resetFilter}
+      onClose={() => setFilterOpen(false)}
+      anchorRef={filterButtonRef}
+    />
+  )
+
   return (
     <div className="umag-settlements umag-settlements--list">
+      {/* Same shared filter trigger as «К оплате» — portaled next to the sync
+          button in SupplierFinancePanel's shared bar when embedded there. */}
+      {filterSlot
+        ? createPortal(
+            <div className="pf-filter-anchor">
+              {filterTrigger}
+              {filterPopover}
+            </div>,
+            filterSlot
+          )
+        : null}
       <PlatformSearchToolbar
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -880,27 +879,14 @@ export default function UmagSettlementsPanel({ embedded = false, refreshToken = 
         className="umag-settlements__search-toolbar"
         actions={
           <>
-            <PlatformToolbarActionWrap>
-              <PlatformFilterButton
-                buttonRef={filterButtonRef}
-                active={filterActive || filterOpen}
-                onClick={openFilter}
-                ariaExpanded={filterOpen}
-                ariaLabel={
-                  filterActive ? `Фильтр, ${periodLabel}` : 'Фильтр периода'
-                }
-                title={filterActive ? `Фильтр · ${periodLabel}` : 'Фильтр'}
-              />
-              <SettlementsFilterPopover
-                open={filterOpen}
-                draft={draftFilter}
-                onChange={setDraftFilter}
-                onApply={applyFilter}
-                onReset={resetFilter}
-                onClose={() => setFilterOpen(false)}
-                anchorRef={filterButtonRef}
-              />
-            </PlatformToolbarActionWrap>
+            {!filterSlot ? (
+              <PlatformToolbarActionWrap>
+                <div className="pf-filter-anchor">
+                  {filterTrigger}
+                  {filterPopover}
+                </div>
+              </PlatformToolbarActionWrap>
+            ) : null}
             {canSync && !embedded ? (
               <PlatformToolbarActionWrap>
                 <PlatformSyncButton
@@ -978,13 +964,7 @@ export default function UmagSettlementsPanel({ embedded = false, refreshToken = 
                   ))
                 )}
               </tbody>
-              <SettlementsTableFoot
-                totals={totals}
-                loading={false}
-                periodLabel={periodLabel}
-                lastRun={lastRun}
-                canViewRecon={canViewRecon}
-              />
+              <SettlementsTableFoot totals={totals} loading={false} canViewRecon={canViewRecon} />
             </table>
           </div>
 
@@ -1026,12 +1006,7 @@ export default function UmagSettlementsPanel({ embedded = false, refreshToken = 
             </div>
           )}
 
-          <SettlementsMobileTotals
-            totals={totals}
-            loading={false}
-            periodLabel={periodLabel}
-            lastRun={lastRun}
-          />
+          <SettlementsMobileTotals totals={totals} loading={false} />
         </div>
       )}
     </div>

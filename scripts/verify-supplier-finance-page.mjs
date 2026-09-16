@@ -171,7 +171,10 @@ async function main() {
 
   // --- Case 10/11: embedded panels wired, no duplicate shell -----------------
   assert.match(panelSrc, /<SupplierPaymentsPanel[\s\S]*embedded[\s\S]*externalSummaryProvided[\s\S]*obligations=\{obligations\}[\s\S]*refreshToken=\{refreshToken\}/)
-  assert.match(panelSrc, /<UmagSettlementsPanel embedded refreshToken=\{refreshToken\} \/>/)
+  assert.match(
+    panelSrc,
+    /<UmagSettlementsPanel embedded refreshToken=\{refreshToken\} filterSlot=\{filterSlot\} \/>/
+  )
   ok('Case 10/11: both content panels are rendered with embedded (hides their own shell/KPIs/second ↻) — confirmed structurally in Этап 2.6')
 
   // Item 18: the payment schedule's own duplicate "К оплате" section title is
@@ -186,7 +189,7 @@ async function main() {
   assert.match(paymentsSrc, /externalSummaryProvided = false,/)
   assert.match(paymentsSrc, /\[canView, externalSummaryProvided, applyExternalPageData, loadStandalone, refreshToken\]/)
   const settlementsSrc = read(SETTLEMENTS_PANEL)
-  assert.match(settlementsSrc, /refreshToken = null \} = \{\}\)/)
+  assert.match(settlementsSrc, /refreshToken = null,\s*\n\s*filterSlot = null,\s*\n\} = \{\}\)/)
   assert.match(settlementsSrc, /\[canView, loadData, refreshToken\]/)
   ok('refreshToken is threaded into both panels\' existing load-triggering effect — reload without remount, standalone (refreshToken=null, no-op) unaffected')
 
