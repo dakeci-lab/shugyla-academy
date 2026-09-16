@@ -88,6 +88,7 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
         linkedSupplyId: source.linked_umag_supply_id || null,
         linkedReturnId: source.linked_umag_return_id || null,
         paymentStatus: null,
+        externalSource: source.external_source || 'umag',
       }
     }
     if (kind === 'return') {
@@ -226,18 +227,22 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
           </div>
           {isPaymentDoc ? (
             <>
-              <div>
-                <span>Документ UMAG</span>
-                <strong>{headerFromHistory.documentNumber || '—'}</strong>
-              </div>
+              {headerFromHistory.externalSource === 'platform' ? null : (
+                <div>
+                  <span>Документ UMAG</span>
+                  <strong>{headerFromHistory.documentNumber || '—'}</strong>
+                </div>
+              )}
               <div>
                 <span>Связанная приёмка</span>
                 <strong>{headerFromHistory.linkedSupplyId || '—'}</strong>
               </div>
-              <div>
-                <span>Связанный возврат</span>
-                <strong>{headerFromHistory.linkedReturnId || '—'}</strong>
-              </div>
+              {headerFromHistory.externalSource === 'platform' ? null : (
+                <div>
+                  <span>Связанный возврат</span>
+                  <strong>{headerFromHistory.linkedReturnId || '—'}</strong>
+                </div>
+              )}
               <div>
                 <span>Счёт</span>
                 <strong>{headerFromHistory.account || '—'}</strong>
@@ -312,8 +317,9 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
 
         {isPaymentDoc ? (
           <div className="umag-op-detail__empty">
-            Платёжный документ UMAG. Состав товарных позиций для этого типа операции не
-            загружается.
+            {headerFromHistory.externalSource === 'platform'
+              ? 'Отмечено оплаченным вручную на платформе, в разделе «К оплате». Состав товарных позиций для этого типа записи не отслеживается.'
+              : 'Платёжный документ UMAG. Состав товарных позиций для этого типа операции не загружается.'}
           </div>
         ) : (
           <>

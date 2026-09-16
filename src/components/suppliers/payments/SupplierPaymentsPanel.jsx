@@ -1133,9 +1133,11 @@ export default function SupplierPaymentsPanel({
     if (!canManagePayments || markingId) return
     setMarkingId(ob.id)
     try {
-      await markObligationPaid(ob.id, {
+      await markObligationPaid(ob, {
         paidByEmployeeId: user?.id ?? null,
         accountId: ob.supplierPaymentAccountId ?? null,
+        employeeName: user?.name ?? null,
+        accountName: getPaymentAccountName(ob.supplierPaymentAccountId ?? null),
       })
       patchSelectedGroupObligation(ob.id, {
         platformPaidAt: new Date().toISOString(),

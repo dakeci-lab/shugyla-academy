@@ -194,6 +194,48 @@ export function isActiveOpenObligation(obligation) {
 }
 
 /**
+ * Shape natively-marked obligations as umag_document_payments-like rows so
+ * they can drop straight into buildSupplierOperationHistory()/isUmagPaymentRefund()
+ * in umagSettlementsService.js — replacing UMAG's own document-payment feed
+ * as the source for «Оплата поставщику» entries in «Взаиморасчёты». UMAG's
+ * payment dates became untrustworthy once staff started marking documents
+ * paid in UMAG immediately at receiving time (to skip the manual UMAG
+ * payment flow entirely); the real payment moment is now the "Оплачено"
+ * click tracked here, not a UMAG timestamp.
+ */
+export function buildNativeSettlementPaymentRows(
+  obligations,
+  { accountNameById, employeeNameById } = {}
+) {
+  const rows = []
+  for (const ob of obligations || []) {
+    const paidAt = ob?.platformPaidAt ?? ob?.platform_paid_at
+    if (!paidAt) continue
+    const amount = Math.abs(Number(ob?.originalSupplyAmount ?? ob?.original_supply_amount ?? 0)) || 0
+    const accountId = ob?.platformPaymentAccountId ?? ob?.platform_payment_account_id ?? null
+    const employeeId = ob?.platformPaidBy ?? ob?.platform_paid_by ?? null
+    rows.push({
+      id: `platform-paid:${ob.id}`,
+      umag_payment_id: null,
+      platform_supplier_id: ob.platformSupplierId ?? ob.platform_supplier_id ?? null,
+      umag_supplier_id: null,
+      supplier_name: ob.supplierName ?? ob.supplier_name ?? null,
+      payment_time: paidAt,
+      amount,
+      payment_type: 'PLATFORM_MARK',
+      class_name: null,
+      linked_umag_supply_id: ob.umagSupplyId ?? ob.umag_supply_id ?? null,
+      linked_umag_return_id: null,
+      account_name: (accountNameById && accountNameById.get(accountId)) || null,
+      user_name: (employeeNameById && employeeNameById.get(employeeId)) || null,
+      note: null,
+      external_source: 'platform',
+    })
+  }
+  return rows
+}
+
+/**
  * Build dashboard summaries + date groups from active open obligations.
  */
 export function buildPaymentScheduleView(obligations, todayKey = toAqtobeDateKey()) {

@@ -532,31 +532,42 @@ export async function rebuildLedgerEventsForPeriod(
         supplier_name: supplierName,
       })
     }
-    events.push({
-      platform_supplier_id: platformSupplierId,
-      umag_supplier_id: umagSupplierId,
-      supplier_name: supplierName,
-      external_source: 'umag',
-      external_id: String(payment.umag_payment_id),
-      event_type: eventType,
-      occurred_at: payment.payment_time,
-      document_number: String(payment.umag_payment_id),
-      amount: abs,
-      balance_delta: isRefund ? 0 : -abs,
-      currency: 'KZT',
-      status: 'posted',
-      linked_umag_supply_id: payment.linked_umag_supply_id,
-      linked_umag_return_id: payment.linked_umag_return_id,
-      linked_umag_payment_id: payment.umag_payment_id,
-      details:
-        [payment.user_name, payment.account_name, payment.note].filter(Boolean).join(' · ') ||
-        null,
-      metadata: {
-        umag_payment_type: payment.payment_type,
-        signed_amount: amount,
-      },
-      synced_at: nowIso,
-    })
+    // supplier_payment (non-refund) events are deliberately NOT pushed here
+    // anymore. Once staff started marking UMAG documents paid immediately at
+    // receiving time (to skip UMAG's own payment flow entirely), UMAG's
+    // payment_time stopped reflecting a real payment moment. The native
+    // "Оплачено" click in «К оплате» (markObligationPaid,
+    // supplierPaymentObligationsService.js) now writes the equivalent
+    // external_source='platform' event directly. Refunds are unaffected —
+    // they're a separate real-money event, not touched by the receiving-time
+    // marking policy — so they still come from this feed.
+    if (isRefund) {
+      events.push({
+        platform_supplier_id: platformSupplierId,
+        umag_supplier_id: umagSupplierId,
+        supplier_name: supplierName,
+        external_source: 'umag',
+        external_id: String(payment.umag_payment_id),
+        event_type: eventType,
+        occurred_at: payment.payment_time,
+        document_number: String(payment.umag_payment_id),
+        amount: abs,
+        balance_delta: 0,
+        currency: 'KZT',
+        status: 'posted',
+        linked_umag_supply_id: payment.linked_umag_supply_id,
+        linked_umag_return_id: payment.linked_umag_return_id,
+        linked_umag_payment_id: payment.umag_payment_id,
+        details:
+          [payment.user_name, payment.account_name, payment.note].filter(Boolean).join(' · ') ||
+          null,
+        metadata: {
+          umag_payment_type: payment.payment_type,
+          signed_amount: amount,
+        },
+        synced_at: nowIso,
+      })
+    }
   }
 
   for (let i = 0; i < paymentRemapRows.length; i += 200) {

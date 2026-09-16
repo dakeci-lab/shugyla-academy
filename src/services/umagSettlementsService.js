@@ -18,6 +18,8 @@ import {
   sortLedgerNewestFirst,
 } from '../utils/supplierLedger'
 import { fetchAllSupabaseRows } from '../utils/supabasePagination'
+import { buildNativeSettlementPaymentRows } from '../utils/supplierPaymentObligations'
+import { ensurePaymentAccountsLoaded, getPaymentAccountName } from './paymentAccountsService'
 import {
   fetchCanonicalSupplierDebts,
   resolvePlatformSupplierIdsByUmagIds,
@@ -579,7 +581,7 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
   const fromIso = `${dateFrom}T00:00:00+05:00`
   const toIso = `${dateTo}T23:59:59.999+05:00`
 
-  const [suppliesRes, returnsRes, paymentsRes, openingRes] = await Promise.all([
+  const [suppliesRes, returnsRes, paymentsRes, openingRes, nativePaidRes] = await Promise.all([
     fetchAllSupabaseRows(() =>
       supabase
         .from('umag_supplies')
@@ -620,6 +622,20 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
         .lt('occurred_at', fromIso)
         .order('occurred_at', { ascending: true })
     ),
+    // Natively-marked payments ("Оплачено" in «К оплате») — this, not
+    // umag_document_payments, is the source of truth for supplier_payment
+    // events once staff mark documents paid in UMAG immediately at receiving
+    // time (see buildNativeSettlementPaymentRows).
+    fetchAllSupabaseRows(() =>
+      supabase
+        .from('supplier_payment_obligations')
+        .select(
+          'id, platform_supplier_id, umag_supply_id, original_supply_amount, platform_paid_at, platform_paid_by, platform_payment_account_id, supplier:platform_suppliers!platform_supplier_id(name)'
+        )
+        .not('platform_paid_at', 'is', null)
+        .gte('platform_paid_at', fromIso)
+        .lte('platform_paid_at', toIso)
+    ),
   ])
 
   if (suppliesRes.error) {
@@ -639,6 +655,42 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
   // Payments / opening ledger may be absent before migration — treat as empty.
   const payments = paymentsRes.error ? [] : paymentsRes.data || []
   const openingRows = openingRes.error ? [] : openingRes.data || []
+  const nativePaidObligations = nativePaidRes.error ? [] : nativePaidRes.data || []
+
+  const employeeIds = [
+    ...new Set(
+      nativePaidObligations
+        .map((row) => row.platform_paid_by)
+        .filter((id) => id != null)
+    ),
+  ]
+  const employeeNameById = new Map()
+  if (employeeIds.length > 0) {
+    const { data: employeeRows } = await supabase
+      .from('academy_users')
+      .select('id, full_name')
+      .in('id', employeeIds)
+    for (const row of employeeRows || []) {
+      employeeNameById.set(row.id, row.full_name || null)
+    }
+  }
+  await ensurePaymentAccountsLoaded()
+  const accountNameById = {
+    get: (accountId) => (accountId ? getPaymentAccountName(accountId) : null),
+  }
+  const nativePaymentRows = buildNativeSettlementPaymentRows(
+    nativePaidObligations.map((row) => ({
+      id: row.id,
+      platformSupplierId: row.platform_supplier_id,
+      umagSupplyId: row.umag_supply_id,
+      originalSupplyAmount: row.original_supply_amount,
+      platformPaidAt: row.platform_paid_at,
+      platformPaidBy: row.platform_paid_by,
+      platformPaymentAccountId: row.platform_payment_account_id,
+      supplierName: (Array.isArray(row.supplier) ? row.supplier[0] : row.supplier)?.name || null,
+    })),
+    { accountNameById, employeeNameById }
+  )
 
   const supplies = suppliesRes.data || []
   const returns = returnsRes.data || []
@@ -680,20 +732,31 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
     row.returns.push(ret)
   }
 
+  // Only refunds still come from UMAG's own document-payment feed — refund
+  // timing isn't affected by the receiving-time "mark paid in UMAG" policy.
+  // Real payments ("Оплата поставщику") come exclusively from
+  // nativePaymentRows below; the raw UMAG payment rows are skipped here.
   for (const payment of payments) {
+    const isRefund = isUmagPaymentRefund(payment)
+    if (!isRefund) continue
     const row = ensureSettlementRow(byKey, {
       platformSupplierId: payment.platform_supplier_id,
       umagSupplierId: payment.umag_supplier_id,
       name: payment.supplier_name,
     })
-    const signed = toNumber(payment.amount)
-    const abs = Math.abs(signed)
-    const isRefund = isUmagPaymentRefund(payment)
-    if (!isRefund) {
-      row.documentPaymentAmount = (row.documentPaymentAmount || 0) + abs
-    } else {
-      row.documentRefundAmount = (row.documentRefundAmount || 0) + abs
-    }
+    const abs = Math.abs(toNumber(payment.amount))
+    row.documentRefundAmount = (row.documentRefundAmount || 0) + abs
+    row.payments = row.payments || []
+    row.payments.push(payment)
+  }
+
+  for (const payment of nativePaymentRows) {
+    const row = ensureSettlementRow(byKey, {
+      platformSupplierId: payment.platform_supplier_id,
+      umagSupplierId: payment.umag_supplier_id,
+      name: payment.supplier_name,
+    })
+    row.documentPaymentAmount = (row.documentPaymentAmount || 0) + Math.abs(toNumber(payment.amount))
     row.payments = row.payments || []
     row.payments.push(payment)
   }

@@ -220,19 +220,56 @@ export async function syncUmagForPayments({ dateFrom, dateTo }) {
  * it stays "Оплачено" regardless of what the next UMAG sync writes to
  * current_debt (see deriveObligationStatus/isPlatformMarkedPaid); only
  * unmarkObligationPaid clears it.
+ *
+ * Also writes the matching entry to platform_supplier_ledger_events
+ * (external_source='platform') so «Взаиморасчёты» reflects this click as the
+ * payment moment instead of UMAG's own (now untrustworthy, see
+ * rebuildLedgerEventsForPeriod) document-payment timestamp.
  */
-export async function markObligationPaid(obligationId, { paidByEmployeeId, accountId } = {}) {
+export async function markObligationPaid(obligation, { paidByEmployeeId, accountId, employeeName, accountName } = {}) {
   assertCloudReady()
+  const obligationId = obligation?.id
   if (!obligationId) throw new Error('Обязательство не указано')
+  const paidAt = new Date().toISOString()
   const { error } = await supabase
     .from('supplier_payment_obligations')
     .update({
-      platform_paid_at: new Date().toISOString(),
+      platform_paid_at: paidAt,
       platform_paid_by: paidByEmployeeId ?? null,
       platform_payment_account_id: accountId ?? null,
     })
     .eq('id', obligationId)
   if (error) throw new Error(error.message || 'Не удалось отметить оплату')
+
+  const amount = Math.abs(Number(obligation?.originalSupplyAmount ?? 0)) || 0
+  const { error: ledgerError } = await supabase
+    .from('platform_supplier_ledger_events')
+    .upsert(
+      {
+        platform_supplier_id: obligation?.platformSupplierId ?? null,
+        umag_supplier_id: null,
+        supplier_name: obligation?.supplierName ?? null,
+        external_source: 'platform',
+        external_id: String(obligationId),
+        event_type: 'supplier_payment',
+        occurred_at: paidAt,
+        document_number: null,
+        amount,
+        balance_delta: -amount,
+        currency: 'KZT',
+        status: 'posted',
+        linked_umag_supply_id: obligation?.umagSupplyId ?? null,
+        linked_umag_return_id: null,
+        linked_umag_payment_id: null,
+        details: [employeeName, accountName].filter(Boolean).join(' · ') || null,
+        metadata: {},
+        synced_at: paidAt,
+      },
+      { onConflict: 'external_source,event_type,external_id' }
+    )
+  if (ledgerError) {
+    throw new Error(ledgerError.message || 'Не удалось записать операцию во взаиморасчёты')
+  }
 }
 
 export async function unmarkObligationPaid(obligationId) {
@@ -247,6 +284,16 @@ export async function unmarkObligationPaid(obligationId) {
     })
     .eq('id', obligationId)
   if (error) throw new Error(error.message || 'Не удалось отменить отметку оплаты')
+
+  const { error: deleteError } = await supabase
+    .from('platform_supplier_ledger_events')
+    .delete()
+    .eq('external_source', 'platform')
+    .eq('event_type', 'supplier_payment')
+    .eq('external_id', String(obligationId))
+  if (deleteError) {
+    throw new Error(deleteError.message || 'Не удалось удалить запись из взаиморасчётов')
+  }
 }
 
 export {

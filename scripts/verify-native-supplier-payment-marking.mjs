@@ -171,7 +171,7 @@ function stageService() {
   assert('exports unmarkObligationPaid', service.includes('export async function unmarkObligationPaid'))
   assert(
     'markObligationPaid writes platform_paid_at/by/account in one update',
-    /markObligationPaid[\s\S]{0,400}platform_paid_at: new Date\(\)\.toISOString\(\)/.test(service) &&
+    /markObligationPaid[\s\S]{0,400}platform_paid_at: paidAt/.test(service) &&
       /markObligationPaid[\s\S]{0,400}platform_paid_by/.test(service) &&
       /markObligationPaid[\s\S]{0,400}platform_payment_account_id/.test(service)
   )
