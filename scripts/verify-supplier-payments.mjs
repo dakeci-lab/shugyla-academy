@@ -210,9 +210,12 @@ async function main() {
   ok('nav item «Расчёты» under Закупки')
 
   const app = read('src/App.jsx')
-  assert.match(app, /SupplierPaymentsPage/)
-  assert.match(app, /supplier-payments/)
-  ok('route wired')
+  // The standalone page is retired (docs/suppliers/... cleanup): the old
+  // /platform/supplier-payments path now redirects into supplier-finance's
+  // «К оплате» tab instead of rendering its own page component.
+  assert.match(app, /path="supplier-payments"/)
+  assert.match(app, /supplier-finance\?tab=payments/)
+  ok('route wired (redirect into supplier-finance)')
 
   assert.equal(addCalendarDays('2026-07-28', 7), '2026-08-04')
   assert.equal(addCalendarDays('2026-07-28', 0), '2026-07-28')

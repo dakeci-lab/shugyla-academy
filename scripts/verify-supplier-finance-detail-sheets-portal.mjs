@@ -60,9 +60,14 @@ function main() {
   // --- Case 3: GroupDetail (К оплате) portals to document.body --------------
   const paymentsSrc = read(PAYMENTS_PANEL)
   assert.match(paymentsSrc, /import \{ createPortal \} from 'react-dom'/)
+  // Bounded by the next top-level function declaration, not the first bare
+  // "\n}" — GroupDetail's destructured param list can itself span multiple
+  // lines and close with "\n})", which a naive "\n}" search matches too early.
+  const groupDetailStart = paymentsSrc.indexOf('function GroupDetail')
+  const groupDetailNextFn = paymentsSrc.indexOf('\nfunction ', groupDetailStart + 1)
   const groupDetailFn = paymentsSrc.slice(
-    paymentsSrc.indexOf('function GroupDetail'),
-    paymentsSrc.indexOf('\n}', paymentsSrc.indexOf('function GroupDetail')) + 2
+    groupDetailStart,
+    groupDetailNextFn > -1 ? groupDetailNextFn : undefined
   )
   assert.match(groupDetailFn, /return createPortal\(/)
   assert.match(groupDetailFn, /spo-panel__sheet-backdrop/)

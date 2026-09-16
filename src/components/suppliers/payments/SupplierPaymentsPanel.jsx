@@ -38,6 +38,10 @@ import { fetchSupplierFinanceSummary } from '../../../services/supplierFinanceSu
 import { getMonthPeriodKeys } from '../../../services/umagSettlementsService'
 import { getTableSettings, saveTableSettings } from '../../../services/tableSettingsService'
 import {
+  ensurePaymentAccountsLoaded,
+  getPaymentAccountName,
+} from '../../../services/paymentAccountsService'
+import {
   PAYMENTS_COLUMN_RESIZE_MIN_WIDTH,
   SUPPLIER_PAYMENTS_TABLE_NAME,
   getDefaultPaymentsColumnSettings,
@@ -53,8 +57,7 @@ import {
 } from '../../../utils/paymentsColumnSettingsMerge'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
-import { PlatformFilterButton } from '../../platform/PlatformSearchToolbar'
-import { ChevronDownIcon, SearchIcon } from '../../icons/PlatformIcons'
+import { ChevronDownIcon, FilterIcon } from '../../icons/PlatformIcons'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './SupplierPaymentsPanel.css'
 
@@ -323,6 +326,7 @@ function CompactPaymentSchedule({
   loading,
   error,
   supplierFilter,
+  accountFilter,
   canEditTerms,
   onOpen,
   onConfigure,
@@ -352,19 +356,27 @@ function CompactPaymentSchedule({
 
   const summaries = view?.summaries || {}
   const lists = view?.lists || {}
-  const filterActive = supplierFilter.size > 0
+  const supplierFilterActive = supplierFilter.size > 0
+  const accountFilterActive = accountFilter.size > 0
+  const filterActive = supplierFilterActive || accountFilterActive
+
+  function matchesFilters(group) {
+    if (supplierFilterActive && !supplierFilter.has(group.name || 'Без названия')) return false
+    if (accountFilterActive) {
+      const key = accountFilterKey(group.obligations?.[0]?.supplierPaymentAccountId ?? null)
+      if (!accountFilter.has(key)) return false
+    }
+    return true
+  }
+
   const filteredSections = COMPACT_SECTIONS.map((section) => {
     const groups = lists[section.id] || []
-    const filtered = filterActive
-      ? groups.filter((group) => supplierFilter.has(group.name || 'Без названия'))
-      : groups
+    const filtered = filterActive ? groups.filter(matchesFilters) : groups
     return { section, groups: filtered }
   }).filter(({ groups }) => groups.length > 0)
 
   const missingGroups = lists.termsMissing || []
-  const filteredMissingGroups = filterActive
-    ? missingGroups.filter((group) => supplierFilter.has(group.name || 'Без названия'))
-    : missingGroups
+  const filteredMissingGroups = filterActive ? missingGroups.filter(matchesFilters) : missingGroups
   const missingAmount = filterActive
     ? filteredMissingGroups.reduce((sum, group) => sum + (group.amount || 0), 0)
     : summaries.termsMissing || 0
@@ -372,7 +384,7 @@ function CompactPaymentSchedule({
   if (filteredSections.length === 0 && filteredMissingGroups.length === 0) {
     return (
       <div className="spo-compact__empty">
-        {filterActive ? 'По выбранным поставщикам обязательств не найдено.' : 'Нет обязательств к оплате'}
+        {filterActive ? 'По выбранным фильтрам обязательств не найдено.' : 'Нет обязательств к оплате'}
       </div>
     )
   }
@@ -648,20 +660,113 @@ function GroupDetail({
   )
 }
 
-/** Popover: search + checkbox list of suppliers, «Применить» commits the filter. */
-function SupplierFilterPopover({
-  open,
-  suppliers,
-  draft,
-  onToggleSupplier,
+const NO_ACCOUNT_FILTER_KEY = '__none__'
+
+/** Normalizes a supplier's payment_account_id for filter-set membership (null → sentinel key). */
+function accountFilterKey(accountId) {
+  return accountId || NO_ACCOUNT_FILTER_KEY
+}
+
+/**
+ * One collapsible combobox row inside PaymentsFilterPopover — «Счёт оплаты» и
+ * «Поставщик» are both this, just with searchable on/off. Collapsed by
+ * default (per владелец: opening the filter must not immediately dump the
+ * full list on screen — only expands on click/typing).
+ */
+function FilterComboField({
+  label,
+  searchable = false,
+  placeholder = 'Введите название',
+  searchValue = '',
   onSearchChange,
+  summaryText,
+  options,
+  draft,
+  onToggle,
+  expanded,
+  onToggleExpanded,
+  emptyText = 'Ничего не найдено',
+}) {
+  const query = searchValue.trim().toLowerCase()
+  const matches = query
+    ? options.filter((opt) => opt.label.toLowerCase().includes(query))
+    : options
+
+  return (
+    <div className="pf-field">
+      <div className="pf-field__label">{label}:</div>
+      <div className={`pf-field__control${expanded ? ' pf-field__control--open' : ''}`}>
+        {searchable ? (
+          <input
+            type="text"
+            className="pf-field__input"
+            placeholder={placeholder}
+            value={searchValue}
+            onChange={(e) => {
+              onSearchChange(e.target.value)
+              if (!expanded) onToggleExpanded()
+            }}
+            onFocus={() => {
+              if (!expanded) onToggleExpanded()
+            }}
+            autoComplete="off"
+          />
+        ) : (
+          <button
+            type="button"
+            className="pf-field__display"
+            onClick={onToggleExpanded}
+            aria-expanded={expanded}
+          >
+            {summaryText}
+          </button>
+        )}
+        <button
+          type="button"
+          className="pf-field__chevron"
+          aria-label={`Показать список: ${label}`}
+          aria-expanded={expanded}
+          onClick={onToggleExpanded}
+        >
+          <ChevronDownIcon size={16} />
+        </button>
+      </div>
+      {expanded ? (
+        <div className="pf-field__list">
+          {matches.length === 0 ? (
+            <div className="pf-field__empty">{emptyText}</div>
+          ) : (
+            matches.map((opt) => (
+              <label key={opt.id} className="pf-field__item">
+                <input type="checkbox" checked={draft.has(opt.id)} onChange={() => onToggle(opt.id)} />
+                <span>{opt.label}</span>
+              </label>
+            ))
+          )}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/** Combined «Фильтр» popover: Счёт оплаты (checkbox list) + Поставщик (search + checkbox list). */
+function PaymentsFilterPopover({
+  open,
+  accountOptions,
+  accountDraft,
+  onToggleAccount,
+  supplierOptions,
+  supplierDraft,
+  onToggleSupplier,
   searchValue,
+  onSearchChange,
   onApply,
   onReset,
   onClose,
   anchorRef,
 }) {
   const popoverRef = useRef(null)
+  const [expandedField, setExpandedField] = useState(null)
 
   useEffect(() => {
     if (!open) return undefined
@@ -681,42 +786,44 @@ function SupplierFilterPopover({
     }
   }, [open, onClose, anchorRef])
 
+  useEffect(() => {
+    if (!open) setExpandedField(null)
+  }, [open])
+
   if (!open) return null
 
-  const query = searchValue.trim().toLowerCase()
-  const matches = query
-    ? suppliers.filter((name) => name.toLowerCase().includes(query))
-    : suppliers
+  const accountSummary =
+    accountDraft.size === 0
+      ? 'Все'
+      : accountDraft.size === 1
+        ? accountOptions.find((opt) => accountDraft.has(opt.id))?.label || 'Выбран 1'
+        : `Выбрано: ${accountDraft.size}`
 
   return (
-    <div ref={popoverRef} className="spo-filter-pop" role="dialog" aria-label="Фильтр по поставщику">
-      <div className="spo-filter-pop__head">Фильтр по поставщику</div>
-      <label className="spo-filter-pop__search">
-        <SearchIcon size={15} />
-        <input
-          type="text"
-          placeholder="Поиск поставщика…"
-          value={searchValue}
-          onChange={(e) => onSearchChange(e.target.value)}
-          autoComplete="off"
-        />
-      </label>
-      <div className="spo-filter-pop__list">
-        {matches.length === 0 ? (
-          <div className="spo-filter-pop__empty">Поставщик не найден</div>
-        ) : (
-          matches.map((name) => (
-            <label key={name} className="spo-filter-pop__item">
-              <input
-                type="checkbox"
-                checked={draft.has(name)}
-                onChange={() => onToggleSupplier(name)}
-              />
-              <span>{name}</span>
-            </label>
-          ))
-        )}
-      </div>
+    <div ref={popoverRef} className="spo-filter-pop" role="dialog" aria-label="Фильтр">
+      <FilterComboField
+        label="Счёт оплаты"
+        summaryText={accountSummary}
+        options={accountOptions}
+        draft={accountDraft}
+        onToggle={onToggleAccount}
+        expanded={expandedField === 'account'}
+        onToggleExpanded={() => setExpandedField((f) => (f === 'account' ? null : 'account'))}
+        emptyText="Счета не найдены"
+      />
+      <FilterComboField
+        label="Поставщик"
+        searchable
+        placeholder="Введите название"
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        options={supplierOptions}
+        draft={supplierDraft}
+        onToggle={onToggleSupplier}
+        expanded={expandedField === 'supplier'}
+        onToggleExpanded={() => setExpandedField((f) => (f === 'supplier' ? null : 'supplier'))}
+        emptyText="Поставщик не найден"
+      />
       <div className="spo-filter-pop__actions">
         <button type="button" className="btn btn--ghost btn--sm" onClick={onReset}>
           Сбросить
@@ -778,8 +885,21 @@ export default function SupplierPaymentsPanel({
   const [supplierFilter, setSupplierFilter] = useState(() => new Set())
   const [filterDraft, setFilterDraft] = useState(() => new Set())
   const [filterSearch, setFilterSearch] = useState('')
+  const [accountFilter, setAccountFilter] = useState(() => new Set())
+  const [accountFilterDraft, setAccountFilterDraft] = useState(() => new Set())
   const [filterOpen, setFilterOpen] = useState(false)
   const filterButtonRef = useRef(null)
+  const [accountsCacheVersion, setAccountsCacheVersion] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    void ensurePaymentAccountsLoaded().then(() => {
+      if (!cancelled) setAccountsCacheVersion((v) => v + 1)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const [columnSettings, setColumnSettings] = useState(() => getDefaultPaymentsColumnSettings())
   const [columnSettingsOpen, setColumnSettingsOpen] = useState(false)
@@ -1147,18 +1267,42 @@ export default function SupplierPaymentsPanel({
   const visibleGroups = view?.lists?.[activeTab] || []
   const activeTabMeta = TABS.find((tab) => tab.id === activeTab) || TABS[0]
 
-  const allSupplierNames = useMemo(() => {
+  const allFilterableGroups = useMemo(() => {
     if (!view?.lists) return []
-    const names = new Set()
-    for (const section of COMPACT_SECTIONS) {
-      for (const group of view.lists[section.id] || []) names.add(group.name || 'Без названия')
-    }
-    for (const group of view.lists.termsMissing || []) names.add(group.name || 'Без названия')
-    return [...names].sort((a, b) => a.localeCompare(b, 'ru'))
+    const groups = []
+    for (const section of COMPACT_SECTIONS) groups.push(...(view.lists[section.id] || []))
+    groups.push(...(view.lists.termsMissing || []))
+    return groups
   }, [view])
+
+  const allSupplierNames = useMemo(() => {
+    const names = new Set()
+    for (const group of allFilterableGroups) names.add(group.name || 'Без названия')
+    return [...names].sort((a, b) => a.localeCompare(b, 'ru'))
+  }, [allFilterableGroups])
+
+  // eslint-disable-next-line no-unused-vars -- accountsCacheVersion forces recompute once the
+  // payment-accounts name cache warms up, so options don't stay stuck on the id fallback.
+  const accountOptions = useMemo(() => {
+    const keys = new Set()
+    for (const group of allFilterableGroups) {
+      keys.add(accountFilterKey(group.obligations?.[0]?.supplierPaymentAccountId ?? null))
+    }
+    const options = [...keys].map((key) => ({
+      id: key,
+      label: key === NO_ACCOUNT_FILTER_KEY ? 'Без счёта' : getPaymentAccountName(key) || 'Счёт',
+    }))
+    options.sort((a, b) => {
+      if (a.id === NO_ACCOUNT_FILTER_KEY) return 1
+      if (b.id === NO_ACCOUNT_FILTER_KEY) return -1
+      return a.label.localeCompare(b.label, 'ru')
+    })
+    return options
+  }, [allFilterableGroups, accountsCacheVersion])
 
   function openFilterPopover() {
     setFilterDraft(new Set(supplierFilter))
+    setAccountFilterDraft(new Set(accountFilter))
     setFilterSearch('')
     setFilterOpen(true)
   }
@@ -1170,13 +1314,24 @@ export default function SupplierPaymentsPanel({
       return next
     })
   }
+  function toggleFilterAccount(key) {
+    setAccountFilterDraft((current) => {
+      const next = new Set(current)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
   function applyFilter() {
     setSupplierFilter(new Set(filterDraft))
+    setAccountFilter(new Set(accountFilterDraft))
     setFilterOpen(false)
   }
   function resetFilter() {
     setFilterDraft(new Set())
+    setAccountFilterDraft(new Set())
     setSupplierFilter(new Set())
+    setAccountFilter(new Set())
     setFilterOpen(false)
   }
 
@@ -1294,19 +1449,32 @@ export default function SupplierPaymentsPanel({
             {filterSlot
               ? createPortal(
                   <div className="spo-filter-anchor">
-                    <PlatformFilterButton
-                      buttonRef={filterButtonRef}
-                      active={supplierFilter.size > 0}
-                      count={supplierFilter.size > 0 ? supplierFilter.size : null}
-                      ariaLabel="Фильтр по поставщику"
-                      title="Фильтр по поставщику"
-                      ariaExpanded={filterOpen}
+                    <button
+                      type="button"
+                      ref={filterButtonRef}
+                      className={`pf-trigger${
+                        supplierFilter.size + accountFilter.size > 0 ? ' pf-trigger--active' : ''
+                      }`}
+                      aria-expanded={filterOpen}
+                      aria-haspopup="dialog"
                       onClick={() => (filterOpen ? setFilterOpen(false) : openFilterPopover())}
-                    />
-                    <SupplierFilterPopover
+                    >
+                      <FilterIcon size={18} />
+                      <span>Фильтр</span>
+                      {supplierFilter.size + accountFilter.size > 0 ? (
+                        <span className="pf-trigger__count">
+                          {supplierFilter.size + accountFilter.size}
+                        </span>
+                      ) : null}
+                      <ChevronDownIcon size={14} />
+                    </button>
+                    <PaymentsFilterPopover
                       open={filterOpen}
-                      suppliers={allSupplierNames}
-                      draft={filterDraft}
+                      accountOptions={accountOptions}
+                      accountDraft={accountFilterDraft}
+                      onToggleAccount={toggleFilterAccount}
+                      supplierOptions={allSupplierNames.map((name) => ({ id: name, label: name }))}
+                      supplierDraft={filterDraft}
                       onToggleSupplier={toggleFilterSupplier}
                       searchValue={filterSearch}
                       onSearchChange={setFilterSearch}
@@ -1319,31 +1487,61 @@ export default function SupplierPaymentsPanel({
                   filterSlot
                 )
               : null}
-            {supplierFilter.size > 0 ? (
+            {supplierFilter.size > 0 || accountFilter.size > 0 ? (
               <div className="spo-compact__filter-strip">
-                <span>Поставщики:</span>
-                {[...supplierFilter].map((name) => (
-                  <span key={name} className="spo-compact__filter-chip">
-                    {name}
-                    <button
-                      type="button"
-                      aria-label={`Убрать ${name}`}
-                      onClick={() =>
-                        setSupplierFilter((current) => {
-                          const next = new Set(current)
-                          next.delete(name)
-                          return next
-                        })
-                      }
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
+                {accountFilter.size > 0 ? (
+                  <>
+                    <span>Счета:</span>
+                    {[...accountFilter].map((key) => (
+                      <span key={key} className="spo-compact__filter-chip">
+                        {accountOptions.find((opt) => opt.id === key)?.label || 'Счёт'}
+                        <button
+                          type="button"
+                          aria-label="Убрать счёт из фильтра"
+                          onClick={() =>
+                            setAccountFilter((current) => {
+                              const next = new Set(current)
+                              next.delete(key)
+                              return next
+                            })
+                          }
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </>
+                ) : null}
+                {supplierFilter.size > 0 ? (
+                  <>
+                    <span>Поставщики:</span>
+                    {[...supplierFilter].map((name) => (
+                      <span key={name} className="spo-compact__filter-chip">
+                        {name}
+                        <button
+                          type="button"
+                          aria-label={`Убрать ${name}`}
+                          onClick={() =>
+                            setSupplierFilter((current) => {
+                              const next = new Set(current)
+                              next.delete(name)
+                              return next
+                            })
+                          }
+                        >
+                          ×
+                        </button>
+                      </span>
+                    ))}
+                  </>
+                ) : null}
                 <button
                   type="button"
                   className="spo-compact__filter-clear"
-                  onClick={() => setSupplierFilter(new Set())}
+                  onClick={() => {
+                    setSupplierFilter(new Set())
+                    setAccountFilter(new Set())
+                  }}
                 >
                   Очистить всё
                 </button>
@@ -1356,6 +1554,7 @@ export default function SupplierPaymentsPanel({
               loading={loading}
               error={error}
               supplierFilter={supplierFilter}
+              accountFilter={accountFilter}
               canEditTerms={canEditTerms}
               onOpen={setSelectedGroup}
               onConfigure={openConfigure}
