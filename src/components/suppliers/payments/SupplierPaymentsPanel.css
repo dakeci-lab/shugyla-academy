@@ -726,10 +726,18 @@
 
 .spo-compact__wrap {
   width: 100%;
-  overflow: hidden;
+  /* No overflow scrollport — same as UmagSettlementsPanel's
+     .umag-settlements__table-wrap — so the sticky footer below can pin to
+     the page's own scroll instead of being clipped to this box's height. */
+  overflow: visible;
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: 12px;
   background: var(--color-white, #fff);
+  /* .spo-compact__head-row reserves 20px gear button + 8px gap + 10px own
+     padding-right = 38px that .spo-compact__head's grid never spans — rows
+     below (in a plain full-width container) must reserve the same 38px or
+     their fixed-width columns render 38px right of the matching header. */
+  --spo-compact-gear-reserve: 38px;
 }
 
 .spo-compact__head-row {
@@ -820,20 +828,6 @@
 .spo-compact__col-resizer:hover,
 .spo-compact__col-resizer:active {
   background: rgba(5, 150, 105, 0.08);
-}
-
-/* Header alignment is per logical column, not position — columns can be
-   reordered by the user, so nth-child would silently follow the wrong cell. */
-.spo-compact__col[data-col='receivedAt'] .spo-compact__col-drag-handle,
-.spo-compact__col[data-col='status'] .spo-compact__col-drag-handle,
-.spo-compact__col[data-col='dueDate'] .spo-compact__col-drag-handle {
-  justify-content: center;
-  text-align: center;
-}
-
-.spo-compact__col[data-col='amount'] .spo-compact__col-drag-handle {
-  justify-content: flex-end;
-  text-align: right;
 }
 
 .spo-compact__column-settings {
@@ -961,6 +955,77 @@
 .spo-compact__rows {
   display: flex;
   flex-direction: column;
+  padding-right: var(--spo-compact-gear-reserve, 0);
+}
+
+.spo-compact__day-total {
+  display: grid;
+  grid-template-columns: var(--spo-compact-cols, minmax(0, 1fr) 130px 120px 96px 130px);
+  gap: 8px 12px;
+  align-items: center;
+  margin: 0;
+  margin-right: var(--spo-compact-gear-reserve, 0px);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-text-secondary, #64748b);
+  background: #f1f5f9;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  font-variant-numeric: tabular-nums;
+}
+
+.spo-compact__day-total-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.spo-compact__day-total-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.spo-compact__day-total-amount {
+  color: var(--color-text, #0f172a);
+  white-space: nowrap;
+}
+
+/* Grand-total footer — same column grid as the rows, mirroring
+   UmagSettlementsPanel's SettlementsTableFoot (see PaymentsScheduleFoot). */
+.spo-compact__tfoot {
+  display: grid;
+  grid-template-columns: var(--spo-compact-cols, minmax(0, 1fr) 130px 120px 96px 130px);
+  gap: 8px 12px;
+  align-items: center;
+  padding: 10px 12px;
+  margin-right: var(--spo-compact-gear-reserve, 0px);
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  background: #fff;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  font-variant-numeric: tabular-nums;
+}
+
+.spo-compact__tfoot-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.spo-compact__tfoot-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+}
+
+.spo-compact__tfoot-amount {
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--color-text, #0f172a);
 }
 
 .spo-compact__row {
@@ -1007,7 +1072,7 @@
   font-size: 13px;
   color: var(--color-text-secondary, #64748b);
   font-variant-numeric: tabular-nums;
-  text-align: center;
+  text-align: left;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1017,7 +1082,7 @@
   font-size: 13px;
   color: var(--color-text-secondary, #64748b);
   font-variant-numeric: tabular-nums;
-  text-align: center;
+  text-align: left;
 }
 
 .spo-compact__status {
@@ -1030,7 +1095,7 @@
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
-  justify-self: end;
+  justify-self: start;
 }
 
 .spo-compact__status--overdue {
@@ -1058,7 +1123,7 @@
   font-size: 14px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  text-align: right;
+  text-align: left;
   color: var(--color-text, #0f172a);
   white-space: nowrap;
 }

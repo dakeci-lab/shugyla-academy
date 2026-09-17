@@ -79,12 +79,16 @@ function main() {
   // marker instead of guessing a window size.
   {
     const embeddedTernaryIdx = paymentsSrc.indexOf('embedded ? (')
-    const scheduleIdx = paymentsSrc.indexOf('<CompactPaymentSchedule', embeddedTernaryIdx)
+    // ReceivedDatePaymentSchedule (Этап: дата-приёмки ordering, 2026-09-17)
+    // replaced CompactPaymentSchedule as the embedded renderer — the older
+    // component is still defined in source (dead code, not yet pruned) but
+    // no longer has a JSX call site.
+    const scheduleIdx = paymentsSrc.indexOf('<ReceivedDatePaymentSchedule', embeddedTernaryIdx)
     const elseBranchIdx = paymentsSrc.indexOf('<div className="spo-panel__tabs"', embeddedTernaryIdx)
-    assert.ok(embeddedTernaryIdx >= 0 && scheduleIdx > embeddedTernaryIdx, 'embedded ternary/CompactPaymentSchedule not found')
-    assert.ok(scheduleIdx < elseBranchIdx, 'CompactPaymentSchedule must render inside the embedded branch, before the standalone tabs branch')
+    assert.ok(embeddedTernaryIdx >= 0 && scheduleIdx > embeddedTernaryIdx, 'embedded ternary/ReceivedDatePaymentSchedule not found')
+    assert.ok(scheduleIdx < elseBranchIdx, 'ReceivedDatePaymentSchedule must render inside the embedded branch, before the standalone tabs branch')
   }
-  ok('the payment-schedule section always renders; embedded uses CompactPaymentSchedule, standalone keeps tabs + ObligationCard')
+  ok('the payment-schedule section always renders; embedded uses ReceivedDatePaymentSchedule, standalone keeps tabs + ObligationCard')
 
   assert.match(paymentsSrc, /\{selectedGroup \? \(\s*\n\s*<GroupDetail/)
   ok('the obligation detail sheet (GroupDetail) is unconditional — kept in embedded mode (item 6)')

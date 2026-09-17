@@ -384,6 +384,104 @@ export function buildPaymentScheduleView(obligations, todayKey = toAqtobeDateKey
   }
 }
 
+/** Calendar date a document belongs to — same input `buildDueDateFromTerms` uses. */
+export function resolveReceivedDateKey(obligation) {
+  const docDate = obligation?.supplyDocumentDate ?? obligation?.supply_document_date ?? null
+  if (docDate) return docDate
+  const sourceTime = obligation?.sourceDocTime ?? obligation?.source_doc_time ?? null
+  if (!sourceTime) return null
+  return toAqtobeDateKey(new Date(sourceTime))
+}
+
+/** Exact receiving instant when known, else noon on the calendar date — only used to order same-day rows. */
+function resolveReceivedTimestampMs(obligation) {
+  const sourceTime = obligation?.sourceDocTime ?? obligation?.source_doc_time ?? null
+  if (sourceTime) {
+    const ms = new Date(sourceTime).getTime()
+    if (Number.isFinite(ms)) return ms
+  }
+  const docDate = obligation?.supplyDocumentDate ?? obligation?.supply_document_date ?? null
+  if (docDate) {
+    const ms = new Date(`${docDate}T12:00:00+05:00`).getTime()
+    if (Number.isFinite(ms)) return ms
+  }
+  return 0
+}
+
+/**
+ * Flat, receiving-date-ordered schedule — one row per obligation (document),
+ * newest приёмка first, grouped into day buckets with a per-day subtotal.
+ * Mirrors UMAG's own «Список приёмок» ordering (owner's reference), replacing
+ * buildPaymentScheduleView()'s urgency-based sections/tabs for the embedded
+ * «К оплате» table.
+ */
+export function buildPaymentScheduleByReceivedDate(obligations, todayKey = toAqtobeDateKey()) {
+  const active = (obligations || []).filter(isActiveOpenObligation)
+  const byDate = new Map()
+  const noDateRows = []
+  let totalAmount = 0
+
+  for (const ob of active) {
+    const debt = resolveOwedAmount(ob)
+    totalAmount += debt
+    const supplierKey = ob.platformSupplierId || ob.platform_supplier_id || 'unknown'
+    const row = {
+      key: `ob:${ob.id}`,
+      platformSupplierId: supplierKey === 'unknown' ? null : supplierKey,
+      name: ob.supplierName || ob.supplier_name || 'Без названия',
+      dueDate: ob.dueDate ?? ob.due_date ?? null,
+      amount: debt,
+      count: 1,
+      obligations: [ob],
+      status: deriveObligationStatus(ob, todayKey),
+      receivedTimeMs: resolveReceivedTimestampMs(ob),
+    }
+    const receivedKey = resolveReceivedDateKey(ob)
+    if (!receivedKey) {
+      noDateRows.push(row)
+      continue
+    }
+    let bucket = byDate.get(receivedKey)
+    if (!bucket) {
+      bucket = { date: receivedKey, rows: [], total: 0 }
+      byDate.set(receivedKey, bucket)
+    }
+    bucket.rows.push(row)
+    bucket.total += debt
+  }
+
+  const dateGroups = [...byDate.values()]
+    .map((bucket) => ({
+      ...bucket,
+      rows: [...bucket.rows].sort(
+        (a, b) => b.receivedTimeMs - a.receivedTimeMs || a.name.localeCompare(b.name)
+      ),
+    }))
+    .sort((a, b) => b.date.localeCompare(a.date))
+
+  noDateRows.sort((a, b) => a.name.localeCompare(b.name))
+
+  return {
+    dateGroups,
+    noDateRows,
+    noDateTotal: noDateRows.reduce((sum, row) => sum + row.amount, 0),
+    totalAmount,
+    activeCount: active.length,
+  }
+}
+
+/** «17 сентября» — day+month label for a per-date subtotal row. */
+export function formatReceivedDateGroupLabel(dateKey) {
+  if (!dateKey) return 'без даты приёмки'
+  const [y, m, d] = String(dateKey).split('-').map(Number)
+  if (!y || !m || !d) return dateKey
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString('ru-RU', {
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  })
+}
+
 /** Default tab: overdue → today → upcoming → termsMissing. */
 export function pickDefaultPaymentTab(tabCounts = {}) {
   if ((tabCounts.overdue || 0) > 0) return 'overdue'

@@ -44,19 +44,29 @@ async function main() {
     pathToFileURL(path.join(ROOT, 'src/utils/paymentsColumnSettingsMerge.js')).href
   )
 
-  console.log('Stage 1: Registry — 5 columns, supplier/amount locked at the ends')
+  console.log('Stage 1: Registry — 5 columns, only «Сумма» locked at the end')
 
+  // Owner request (2026-09-17): «Поставщик» stops being a pinned-first
+  // special case — it's an ordinary reorderable/togglable column like the
+  // rest, and «Дата приёмки» leads by default instead (matching the ordered-
+  // by-received-date list it heads). Only «Сумма» stays locked, trailing.
   const defaults = registry.getDefaultPaymentsColumnSettings()
   assert.deepEqual(
     defaults.columns.map((c) => c.columnName),
-    ['supplier', 'receivedAt', 'status', 'dueDate', 'amount']
+    ['receivedAt', 'supplier', 'status', 'dueDate', 'amount']
   )
-  ok('default order: Поставщик → Дата приёмки → Статус → Срок → Сумма')
+  ok('default order: Дата приёмки → Поставщик → Статус → Срок → Сумма')
 
-  assert.deepEqual(registry.getReorderablePaymentsColumnNames(), ['receivedAt', 'status', 'dueDate'])
-  assert.equal(registry.isPaymentsColumnReorderable('supplier'), false)
+  assert.deepEqual(registry.getReorderablePaymentsColumnNames(), [
+    'receivedAt',
+    'supplier',
+    'status',
+    'dueDate',
+  ])
+  assert.equal(registry.isPaymentsColumnReorderable('supplier'), true)
   assert.equal(registry.isPaymentsColumnReorderable('amount'), false)
-  ok('supplier/amount are not reorderable; the middle 3 are')
+  assert.equal(registry.PAYMENTS_LOCKED_FIRST_COLUMN, undefined)
+  ok('only amount is locked (trailing, non-reorderable/non-hideable); supplier is an ordinary middle column — no locked-first column exists any more')
 
   console.log('\nStage 2: Merge — hide, reorder, resize, stale-column cleanup')
 
@@ -66,7 +76,7 @@ async function main() {
   })
   assert.deepEqual(
     merge.getVisiblePaymentsColumns(hidden).map((c) => c.columnName),
-    ['supplier', 'receivedAt', 'dueDate', 'amount']
+    ['receivedAt', 'supplier', 'dueDate', 'amount']
   )
   ok('hiding a togglable column removes it from the visible list, keeps the rest')
 
@@ -76,23 +86,23 @@ async function main() {
       c.columnName === 'supplier' || c.columnName === 'amount' ? { ...c, visible: false } : c
     ),
   })
-  assert.ok(lockedStillVisible.columns.find((c) => c.columnName === 'supplier').visible)
+  assert.equal(lockedStillVisible.columns.find((c) => c.columnName === 'supplier').visible, false)
   assert.ok(lockedStillVisible.columns.find((c) => c.columnName === 'amount').visible)
-  ok('locked columns (supplier, amount) cannot be hidden even if a caller tries')
+  ok('supplier CAN now be hidden like any ordinary column; amount (still locked) cannot')
 
   const reordered = merge.reorderTogglablePaymentsColumns(defaults, 'dueDate', 'receivedAt')
   assert.deepEqual(
     reordered.columns.sort((a, b) => a.columnOrdinalNumber - b.columnOrdinalNumber).map((c) => c.columnName),
-    ['supplier', 'dueDate', 'receivedAt', 'status', 'amount']
+    ['dueDate', 'receivedAt', 'supplier', 'status', 'amount']
   )
-  ok('dragging «Срок» before «Дата приёмки» reorders the middle block')
+  ok('dragging «Срок» before «Дата приёмки» reorders the middle block; amount stays trailing')
 
-  const tryMoveLocked = merge.reorderTogglablePaymentsColumns(defaults, 'supplier', 'amount')
+  const tryMoveLocked = merge.reorderTogglablePaymentsColumns(defaults, 'amount', 'supplier')
   assert.deepEqual(
     tryMoveLocked.columns.sort((a, b) => a.columnOrdinalNumber - b.columnOrdinalNumber).map((c) => c.columnName),
     defaults.columns.map((c) => c.columnName)
   )
-  ok('dragging a locked column onto another is a no-op — order unchanged')
+  ok('dragging the locked amount column onto another is a no-op — order unchanged')
 
   const resized = merge.normalizePaymentsColumnSettingsForSave({
     ...defaults,

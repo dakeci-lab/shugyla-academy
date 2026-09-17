@@ -75,10 +75,9 @@
   padding: 10px 12px;
   vertical-align: top;
   background: #fff;
-  border-top: 2px solid #cbd5e1;
+  border-top: 1px solid var(--color-border, #e2e8f0);
   border-bottom: none;
   white-space: normal;
-  box-shadow: 0 -1px 0 #e2e8f0;
 }
 
 .umag-settlements__tfoot-meta {

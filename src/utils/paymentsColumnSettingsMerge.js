@@ -1,5 +1,4 @@
 import {
-  PAYMENTS_LOCKED_FIRST_COLUMN,
   PAYMENTS_LOCKED_LAST_COLUMN,
   SUPPLIER_PAYMENTS_TABLE_NAME,
   getDefaultPaymentsColumnSettings,
@@ -69,7 +68,7 @@ export function mergePaymentsColumnSettings(saved, defaults) {
   })
 }
 
-/** Pin supplier first, amount last; reorderable middle keeps its saved order. */
+/** Pin amount last; every other (reorderable) column keeps its saved order. */
 export function enforceLockedPaymentsColumnOrdinals(settings) {
   const reorderable = getReorderablePaymentsColumnNames()
   const sorted = [...(settings?.columns || [])].sort(
@@ -77,12 +76,10 @@ export function enforceLockedPaymentsColumnOrdinals(settings) {
   )
   const byName = new Map(sorted.map((col) => [col.columnName, col]))
 
-  const first = byName.get(PAYMENTS_LOCKED_FIRST_COLUMN)
   const middle = sorted.filter((col) => reorderable.includes(col.columnName))
   const last = byName.get(PAYMENTS_LOCKED_LAST_COLUMN)
 
   const combined = []
-  if (first) combined.push(first)
   combined.push(...middle)
   if (last) combined.push(last)
 
@@ -126,11 +123,9 @@ export function reorderTogglablePaymentsColumns(settings, draggedName, targetNam
   nextMiddle.splice(toIdx, 0, removed)
 
   const byName = new Map(base.columns.map((col) => [col.columnName, col]))
-  const first = byName.get(PAYMENTS_LOCKED_FIRST_COLUMN)
   const last = byName.get(PAYMENTS_LOCKED_LAST_COLUMN)
 
   const combined = []
-  if (first) combined.push(first)
   combined.push(...nextMiddle)
   if (last) combined.push(last)
 

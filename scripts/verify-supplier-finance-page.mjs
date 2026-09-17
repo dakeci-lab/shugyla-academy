@@ -87,26 +87,19 @@ async function main() {
   assert.match(pageSrc, /canViewSupplierPayments\(user\) && !canViewUmagSettlements\(user\)/.source ? /!canViewSupplierPayments\(user\) && !canViewUmagSettlements\(user\)/ : /x/)
   ok('page-level gate is exactly canViewSupplierPayments(user) OR canViewUmagSettlements(user) — the union of the two existing routes, no service_role/RLS bypass')
 
-  // --- Case 3/4: exactly 3 KPIs, all summary-sourced ------------------------
-  // Owner request (2026-09-06): drop «Оплачено · месяц» — it duplicated info
-  // and cluttered the row; the remaining 3 map 1:1 to the payments-list flag
-  // colors (Долг=green, Просрочено=red, Сегодня=orange).
-  const kpiTileCount = (panelSrc.match(/<KpiTile\b/g) || []).length
-  assert.equal(kpiTileCount, 3, `expected exactly 3 <KpiTile> usages, found ${kpiTileCount}`)
-  ok('Case 3: exactly 3 KpiTile renders — Оплачено removed, no 5th/6th card either (Предстоящие/Без срока/counts excluded)')
+  // --- Case 3/4/5: KPI tiles removed entirely (owner request, 2026-09-17) ---
+  // Долг/Просрочено/Сегодня as floating cards above the table were replaced
+  // by a sticky grand-total footer inside SupplierPaymentsPanel's own table
+  // (PaymentsScheduleFoot) — the same number, now anchored to the «Сумма»
+  // column it actually sums, instead of a separate summary row.
+  assert.doesNotMatch(panelSrc, /KpiTile/)
+  assert.doesNotMatch(panelSrc, /sfp-panel__kpis/)
+  ok('Case 3/4/5: KpiTile component and the sfp-panel__kpis block are fully removed from the shell — no floating Долг/Просрочено/Сегодня cards')
 
-  assert.match(panelSrc, /<KpiTile\s+label="Долг"\s+value=\{summary\?\.debt\}\s+tone="debt"/)
-  assert.match(panelSrc, /value=\{summary\?\.overdue\?\.amount\}/)
-  assert.match(panelSrc, /value=\{summary\?\.dueToday\?\.amount\}/)
-  assert.doesNotMatch(panelSrc, /summary\?\.paidThisMonth|summary\?\.upcoming|summary\?\.termsMissing|openObligationsCount/)
-  ok('Case 4: all 3 KPI values are summary.debt / summary.overdue.amount / summary.dueToday.amount — no new query, no re-derivation, no paidThisMonth/upcoming/termsMissing/count leaking into the top row')
-
-  // --- Case 5: KpiTile still has an "unavailable" escape hatch for callers ---
-  // (paidThisMonth was the only caller passing it; no current KpiTile call
-  // does, but the component itself keeps the safe branch for future use.)
-  const kpiTileFn = panelSrc.slice(panelSrc.indexOf('function KpiTile'), panelSrc.indexOf('export default function'))
-  assert.match(kpiTileFn, /unavailable \? '—' : formatUmagMoney\(value\)/)
-  ok("Case 5: KpiTile's unavailable branch renders '—', never formatUmagMoney(null) (which would silently show '0 ₸' — Number(null)===0)")
+  const paymentsPanelSrcForFoot = read(PAYMENTS_PANEL)
+  assert.match(paymentsPanelSrcForFoot, /function PaymentsScheduleFoot/)
+  assert.match(paymentsPanelSrcForFoot, /spo-compact__tfoot/)
+  ok('Case 3b: the removed Долг total now lives in PaymentsScheduleFoot — a sticky grand-total row under the «Сумма» column, mirroring UmagSettlementsPanel\'s own tfoot')
 
   console.log('\n--- Real imports: pure logic exercised with fixture data ---\n')
   await runRealCases()
@@ -205,26 +198,20 @@ async function main() {
 
   // --- Case 22: responsive — no obvious horizontal-overflow risk ------------
   const shellCss = read('src/components/suppliers/finance/SupplierFinancePanel.css')
-  assert.match(shellCss, /@media \(max-width: 900px\) \{\s*\n\s*\.sfp-panel__kpis \{\s*\n\s*grid-template-columns: 1fr 1fr;/)
   assert.match(shellCss, /\.sfp-panel__bar \{\s*\n\s*display: flex;\s*\n\s*flex-wrap: wrap;/)
   // Exclude the intentional @media (max-width:…)/(min-width:…) breakpoints —
   // only a fixed *declaration* like `width: 900px;` on an element would risk
   // horizontal overflow.
   assert.doesNotMatch(shellCss, /(?<!max-)(?<!min-)width:\s*\d{3,}px;/)
-  ok('Case 22: KPI grid collapses to 2 columns under 900px, the tabs/sync bar wraps (flex-wrap), and no large fixed pixel width was introduced that could force horizontal overflow')
+  ok('Case 22: the tabs/sync bar wraps (flex-wrap) and no large fixed pixel width was introduced that could force horizontal overflow')
 
-  // --- Case 23: KPI row moved below the tabs bar, and only for «К оплате» ---
-  // The KPI tiles summarize supplier_payment_obligations (fetchSupplierFinancePageData),
-  // which «Взаиморасчёты» doesn't use — showing them there was a stale total,
-  // not a second view of the same number. They now render under the active
-  // tab, after the bar, instead of unconditionally above it.
-  const barIndex = panelSrc.indexOf('sfp-panel__bar')
-  const kpisIndex = panelSrc.indexOf('sfp-panel__kpis', barIndex)
-  assert.ok(barIndex > -1 && kpisIndex > barIndex, 'sfp-panel__kpis must render after sfp-panel__bar in source order')
-  assert.match(panelSrc, /const showKpis = canViewPayments && activeTabMeta\?\.id === 'payments'/)
-  assert.match(panelSrc, /\{showKpis \? \(\s*\n\s*<div className="sfp-panel__kpis"/)
-  assert.match(panelSrc, /\{showKpis && summaryError && !summary \? \(/)
-  ok('Case 23: KPI tiles (and their load-error banner) render after the tabs bar and only while «К оплате» is the active tab — hidden on «Взаиморасчёты»')
+  // --- Case 23: the surviving load-error banner is still tab-scoped --------
+  // KPI tiles themselves are gone (Case 3/4/5), but fetchSupplierFinancePageData's
+  // error banner is kept — it's still meaningless on «Взаиморасчёты», which
+  // doesn't call that function.
+  assert.match(panelSrc, /const isPaymentsTab = canViewPayments && activeTabMeta\?\.id === 'payments'/)
+  assert.match(panelSrc, /\{isPaymentsTab && summaryError && !summary \? \(/)
+  ok('Case 23: the summary load-error banner still renders only while «К оплате» is the active tab — hidden on «Взаиморасчёты»')
 
   console.log(`\n${checks} checks passed`)
   console.log(

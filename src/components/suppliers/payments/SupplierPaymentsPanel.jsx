@@ -12,11 +12,13 @@ import {
 import {
   OBLIGATION_STATUS,
   OBLIGATION_STATUS_LABELS,
+  buildPaymentScheduleByReceivedDate,
   diffCalendarDays,
   formatDaysUntilDue,
   formatPaymentAccountSnapshot,
   formatPaymentTermsDaysSnapshot,
   formatPlatformPaymentMark,
+  formatReceivedDateGroupLabel,
   formatReceptionCount,
   formatSyncCoverage,
   isPlatformMarkedPaid,
@@ -279,7 +281,7 @@ function CompactColumnsHead({
       {visibleColumns.map((col) => {
         const def = getPaymentsColumnDef(col.columnName)
         const reorderable = isPaymentsColumnReorderable(col.columnName)
-        const resizable = col.columnName !== 'supplier'
+        const resizable = true
         const headClassName = [
           'spo-compact__col',
           dragColumnName === col.columnName ? 'is-dragging' : '',
@@ -456,6 +458,203 @@ function CompactPaymentSchedule({
           </div>
         </div>
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * Per-day subtotal — same column grid as the rows above it (label in the
+ * first visible cell, sum under «Сумма»), not a free-floating right-aligned
+ * pair, so it visually lines up with the amount column like PaymentsScheduleFoot.
+ */
+function ReceivedDateGroupTotal({ label, amount, visibleColumns, gridStyle }) {
+  return (
+    <div className="spo-compact__day-total" style={gridStyle} role="row">
+      {visibleColumns.map((col, index) => (
+        <span key={col.columnName} className="spo-compact__day-total-cell">
+          {index === 0 && col.columnName !== 'amount' ? (
+            <span className="spo-compact__day-total-label">Итого {label}</span>
+          ) : null}
+          {col.columnName === 'amount' ? (
+            <span className="spo-compact__day-total-amount">{formatUmagMoney(amount)}</span>
+          ) : null}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Grand-total footer, mirroring UmagSettlementsPanel's SettlementsTableFoot —
+ * same column grid as the rows above it, «Итого» in the first visible cell,
+ * a bold sum in «amount» (the only summable column here; the rest have no
+ * numeric meaning to total).
+ */
+function PaymentsScheduleFoot({ total, visibleColumns, gridStyle }) {
+  return (
+    <div className="spo-compact__tfoot" style={gridStyle} role="row">
+      {visibleColumns.map((col, index) => (
+        <span key={col.columnName} className="spo-compact__tfoot-cell">
+          {index === 0 && col.columnName !== 'amount' ? (
+            <span className="spo-compact__tfoot-label">Итого</span>
+          ) : null}
+          {col.columnName === 'amount' ? (
+            <strong className="spo-compact__tfoot-amount">{formatUmagMoney(total)}</strong>
+          ) : null}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * «К оплате» ordered by дата приёмки (newest first, UMAG-style), replacing
+ * the urgency-section layout of CompactPaymentSchedule — see owner's
+ * reference screenshots of UMAG's «Список приёмок».
+ */
+function ReceivedDatePaymentSchedule({
+  view,
+  todayKey,
+  loading,
+  error,
+  supplierFilter,
+  accountFilter,
+  canEditTerms,
+  onOpen,
+  onConfigure,
+  visibleColumns,
+  gridStyle,
+  dragColumnName,
+  dropColumnName,
+  onColumnDragStart,
+  onColumnDragOver,
+  onColumnDrop,
+  onColumnDragEnd,
+  onColumnResizePointerDown,
+  columnSettingsGear,
+}) {
+  if (loading && !view) {
+    return <DelayedLoadingSkeleton variant="cards" count={4} />
+  }
+  if (error && !view) {
+    return (
+      <div className="spo-panel__error" role="alert">
+        {error}
+      </div>
+    )
+  }
+
+  const supplierFilterActive = supplierFilter.size > 0
+  const accountFilterActive = accountFilter.size > 0
+  const filterActive = supplierFilterActive || accountFilterActive
+
+  function matchesFilters(row) {
+    if (supplierFilterActive && !supplierFilter.has(row.name || 'Без названия')) return false
+    if (accountFilterActive) {
+      const key = accountFilterKey(row.obligations?.[0]?.supplierPaymentAccountId ?? null)
+      if (!accountFilter.has(key)) return false
+    }
+    return true
+  }
+
+  const dateGroups = (view?.dateGroups || [])
+    .map((group) => ({
+      ...group,
+      rows: filterActive ? group.rows.filter(matchesFilters) : group.rows,
+    }))
+    .filter((group) => group.rows.length > 0)
+
+  const noDateRows = filterActive
+    ? (view?.noDateRows || []).filter(matchesFilters)
+    : view?.noDateRows || []
+
+  const grandTotal =
+    dateGroups.reduce(
+      (sum, group) =>
+        sum + (filterActive ? group.rows.reduce((s, row) => s + row.amount, 0) : group.total),
+      0
+    ) + noDateRows.reduce((sum, row) => sum + row.amount, 0)
+
+  if (dateGroups.length === 0 && noDateRows.length === 0) {
+    return (
+      <div className="spo-compact__empty">
+        {filterActive ? 'По выбранным фильтрам обязательств не найдено.' : 'Нет обязательств к оплате'}
+      </div>
+    )
+  }
+
+  return (
+    <div className="spo-compact__wrap">
+      <div className="spo-compact__head-row">
+        <CompactColumnsHead
+          visibleColumns={visibleColumns}
+          gridStyle={gridStyle}
+          dragColumnName={dragColumnName}
+          dropColumnName={dropColumnName}
+          onColumnDragStart={onColumnDragStart}
+          onColumnDragOver={onColumnDragOver}
+          onColumnDrop={onColumnDrop}
+          onColumnDragEnd={onColumnDragEnd}
+          onColumnResizePointerDown={onColumnResizePointerDown}
+        />
+        {columnSettingsGear}
+      </div>
+      <div className="spo-compact">
+        {dateGroups.map((group) => {
+          const total = filterActive
+            ? group.rows.reduce((sum, row) => sum + row.amount, 0)
+            : group.total
+          return (
+            <section key={group.date} className="spo-compact__section">
+              <div className="spo-compact__rows">
+                {group.rows.map((row) => (
+                  <CompactObligationRow
+                    key={row.key}
+                    group={row}
+                    todayKey={todayKey}
+                    canEditTerms={canEditTerms}
+                    onOpen={onOpen}
+                    onConfigure={onConfigure}
+                    visibleColumns={visibleColumns}
+                    gridStyle={gridStyle}
+                  />
+                ))}
+              </div>
+              <ReceivedDateGroupTotal
+                label={formatReceivedDateGroupLabel(group.date)}
+                amount={total}
+                visibleColumns={visibleColumns}
+                gridStyle={gridStyle}
+              />
+            </section>
+          )
+        })}
+        {noDateRows.length > 0 ? (
+          <section className="spo-compact__section">
+            <div className="spo-compact__rows">
+              {noDateRows.map((row) => (
+                <CompactObligationRow
+                  key={row.key}
+                  group={row}
+                  todayKey={todayKey}
+                  canEditTerms={canEditTerms}
+                  onOpen={onOpen}
+                  onConfigure={onConfigure}
+                  visibleColumns={visibleColumns}
+                  gridStyle={gridStyle}
+                />
+              ))}
+            </div>
+            <ReceivedDateGroupTotal
+              label="без даты приёмки"
+              amount={noDateRows.reduce((sum, row) => sum + row.amount, 0)}
+              visibleColumns={visibleColumns}
+              gridStyle={gridStyle}
+            />
+          </section>
+        ) : null}
+      </div>
+      <PaymentsScheduleFoot total={grandTotal} visibleColumns={visibleColumns} gridStyle={gridStyle} />
     </div>
   )
 }
@@ -877,6 +1076,7 @@ export default function SupplierPaymentsPanel({
   const [error, setError] = useState('')
   const [summary, setSummary] = useState(summaryProp)
   const [view, setView] = useState(null)
+  const [rawObligations, setRawObligations] = useState(null)
   const [todayKey, setTodayKey] = useState(() => toAqtobeDateKey())
   const [lastRun, setLastRun] = useState(null)
   const [selectedGroup, setSelectedGroup] = useState(null)
@@ -1065,7 +1265,7 @@ export default function SupplierPaymentsPanel({
   const paymentsGridStyle = useMemo(
     () => ({
       '--spo-compact-cols': visiblePaymentsColumns
-        .map((col) => (col.columnName === 'supplier' ? 'minmax(0, 1fr)' : `${col.width}px`))
+        .map((col) => (col.columnName === 'supplier' ? `minmax(${col.width}px, 1fr)` : `${col.width}px`))
         .join(' '),
     }),
     [visiblePaymentsColumns]
@@ -1082,12 +1282,14 @@ export default function SupplierPaymentsPanel({
       const nextView = buildPaymentScheduleView(obligations, summaryData.todayKey)
       setSummary(summaryData)
       setView(nextView)
+      setRawObligations(obligations)
       setTodayKey(summaryData.todayKey)
       setLastRun(summaryData.lastSync)
     } catch (err) {
       setError(err.message || 'Не удалось загрузить оплаты поставщикам')
       setSummary(null)
       setView(null)
+      setRawObligations(null)
     } finally {
       setLoading(false)
     }
@@ -1110,6 +1312,7 @@ export default function SupplierPaymentsPanel({
       const nextView = buildPaymentScheduleView(obligations, summaryData.todayKey)
       setSummary(summaryData)
       setView(nextView)
+      setRawObligations(obligations)
       setTodayKey(summaryData.todayKey)
       setLastRun(summaryData.lastSync)
     } catch {
@@ -1185,6 +1388,7 @@ export default function SupplierPaymentsPanel({
     const nextView = buildPaymentScheduleView(obligationsProp, summaryProp.todayKey)
     setSummary(summaryProp)
     setView(nextView)
+    setRawObligations(obligationsProp)
     setTodayKey(summaryProp.todayKey)
     setLastRun(summaryProp.lastSync)
     setLoading(false)
@@ -1269,6 +1473,11 @@ export default function SupplierPaymentsPanel({
   const tabCounts = view?.tabCounts || {}
   const visibleGroups = view?.lists?.[activeTab] || []
   const activeTabMeta = TABS.find((tab) => tab.id === activeTab) || TABS[0]
+
+  const receivedView = useMemo(
+    () => buildPaymentScheduleByReceivedDate(rawObligations || [], todayKey),
+    [rawObligations, todayKey]
+  )
 
   const allFilterableGroups = useMemo(() => {
     if (!view?.lists) return []
@@ -1538,10 +1747,9 @@ export default function SupplierPaymentsPanel({
                 </button>
               </div>
             ) : null}
-            <CompactPaymentSchedule
-              view={view}
+            <ReceivedDatePaymentSchedule
+              view={receivedView}
               todayKey={todayKey}
-              tabCounts={tabCounts}
               loading={loading}
               error={error}
               supplierFilter={supplierFilter}

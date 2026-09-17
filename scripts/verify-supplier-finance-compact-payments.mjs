@@ -59,15 +59,19 @@ async function main() {
   // growing (Этап 2.9 added the supplier filter + column-settings portals
   // before the schedule itself), so assert ordering against the else-branch
   // marker instead of guessing a window size.
+  // ReceivedDatePaymentSchedule (дата-приёмки ordering, 2026-09-17) replaced
+  // CompactPaymentSchedule as the embedded renderer; the older component is
+  // still defined in source (dead code, not yet pruned) but has no more JSX
+  // call site — see Case 3/4/5 below for what actually changed.
   {
     const embeddedTernaryIdx = panelSrc.indexOf('embedded ? (')
-    const scheduleIdx = panelSrc.indexOf('<CompactPaymentSchedule', embeddedTernaryIdx)
+    const scheduleIdx = panelSrc.indexOf('<ReceivedDatePaymentSchedule', embeddedTernaryIdx)
     const elseBranchIdx = panelSrc.indexOf('<div className="spo-panel__tabs"', embeddedTernaryIdx)
-    assert.ok(embeddedTernaryIdx >= 0 && scheduleIdx > embeddedTernaryIdx, 'embedded ternary/CompactPaymentSchedule not found')
-    assert.ok(scheduleIdx < elseBranchIdx, 'CompactPaymentSchedule must render inside the embedded branch, before the standalone tabs branch')
+    assert.ok(embeddedTernaryIdx >= 0 && scheduleIdx > embeddedTernaryIdx, 'embedded ternary/ReceivedDatePaymentSchedule not found')
+    assert.ok(scheduleIdx < elseBranchIdx, 'ReceivedDatePaymentSchedule must render inside the embedded branch, before the standalone tabs branch')
   }
-  assert.match(panelSrc, /function CompactPaymentSchedule\(/)
-  ok('Case 1: embedded SupplierPaymentsPanel renders CompactPaymentSchedule')
+  assert.match(panelSrc, /function ReceivedDatePaymentSchedule\(/)
+  ok('Case 1: embedded SupplierPaymentsPanel renders ReceivedDatePaymentSchedule')
 
   // --- Case 2: standalone unchanged -----------------------------------------
   assert.match(panelSrc, /embedded = false,/)
@@ -75,25 +79,36 @@ async function main() {
   assert.match(panelSrc, /<ObligationCard/)
   ok('Case 2: non-embedded path keeps legacy tabs + ObligationCard list')
 
-  // --- Case 3: three urgency groups in order, termsMissing is a separate banner ---
-  // Pre-existing drift fixed in passing: termsMissing was never a 4th
-  // COMPACT_SECTIONS entry — it's a setup-gap banner (MissingTermsBanner),
-  // not a point on the urgency timeline (see the doc comment above it).
-  assert.match(panelSrc, /const COMPACT_SECTIONS = \[[\s\S]*?id: 'overdue'[\s\S]*?id: 'today'[\s\S]*?id: 'upcoming'/)
-  assert.doesNotMatch(panelSrc, /const COMPACT_SECTIONS = \[[\s\S]*?id: 'termsMissing'/)
-  assert.match(panelSrc, /function MissingTermsBanner/)
-  ok('Case 3: COMPACT_SECTIONS order is overdue → today → upcoming; termsMissing is the separate banner')
+  // --- Case 3: urgency sections replaced by дата-приёмки day groups ----------
+  // Owner request (2026-09-17): stop grouping/sorting «К оплате» by urgency
+  // (Просрочено/Сегодня/Предстоящие) — one flat list ordered by receiving
+  // date instead, newest first, mirroring UMAG's own «Список приёмок». A
+  // terms-missing obligation is no longer pulled into a separate banner —
+  // it just renders inline in its date group with a "Без срока" badge, same
+  // as any other row (CompactObligationRow already branched on group.status).
+  // COMPACT_SECTIONS itself may still be declared (only CompactPaymentSchedule,
+  // now dead code, still references it) — what matters is that the ACTIVE
+  // renderer never uses it.
+  const receivedScheduleFnSrc = panelSrc.slice(
+    panelSrc.indexOf('function ReceivedDatePaymentSchedule('),
+    panelSrc.indexOf('function KpiCard(')
+  )
+  assert.doesNotMatch(receivedScheduleFnSrc, /COMPACT_SECTIONS/)
+  assert.match(utilsSrc, /export function buildPaymentScheduleByReceivedDate/)
+  assert.match(panelSrc, /buildPaymentScheduleByReceivedDate\(rawObligations \|\| \[\], todayKey\)/)
+  ok('Case 3: ReceivedDatePaymentSchedule never touches COMPACT_SECTIONS/urgency grouping — it sources rows from buildPaymentScheduleByReceivedDate')
 
-  // --- Case 4: group header uses view count + amount ------------------------
-  // Этап 2.9: section header is now a gray divider with the label/count and
-  // amount split into their own spans (for per-status label coloring +
-  // right-aligned total), not one plain text node — same underlying data.
-  assert.match(panelSrc, /tabCounts\[section\.id\]/)
-  assert.match(panelSrc, /summaries\[section\.summaryKey\]/)
-  assert.match(panelSrc, /spo-compact__section-label">\{section\.label\}/)
-  assert.match(panelSrc, /spo-compact__section-count">· \{count\}/)
-  assert.match(panelSrc, /spo-compact__section-amount">\{formatUmagMoney\(amount\)\}/)
-  ok('Case 4: section headers use tabCounts + summaries from payment schedule view')
+  // --- Case 4: per-day subtotal + grand-total footer, both grid-aligned -----
+  // Replaces the old section header's count+amount: a "Итого <day>" row after
+  // each date group, and a sticky "Итого" footer under the whole table —
+  // both use the SAME --spo-compact-cols grid as the data rows (not a
+  // free-floating right-aligned pair) so the sum lines up under «Сумма».
+  assert.match(panelSrc, /function ReceivedDateGroupTotal\(/)
+  assert.match(panelSrc, /function PaymentsScheduleFoot\(/)
+  assert.match(panelSrc, /spo-compact__day-total["'][\s\S]{0,40}style=\{gridStyle\}/)
+  assert.match(panelSrc, /spo-compact__tfoot["'][\s\S]{0,40}style=\{gridStyle\}/)
+  assert.match(panelSrc, /Итого \{label\}/)
+  ok('Case 4: per-day subtotal and grand-total footer both render on the shared column grid, not a standalone right-aligned label/amount pair')
 
   // --- Case 5: no new status formula in compact presentation ----------------
   assert.doesNotMatch(panelSrc, /CompactPaymentSchedule[\s\S]{0,800}deriveObligationStatus/)
@@ -181,8 +196,8 @@ async function main() {
   ok('Case 13: KPI cards remain gated behind !embedded')
 
   // --- Case 14: no internal status tabs in embedded --------------------------
-  assert.match(panelSrc, /embedded \? \([\s\S]*CompactPaymentSchedule[\s\S]*\) : \([\s\S]*spo-panel__tabs/)
-  ok('Case 14: embedded branch renders CompactPaymentSchedule; legacy branch keeps spo-panel__tabs')
+  assert.match(panelSrc, /embedded \? \([\s\S]*ReceivedDatePaymentSchedule[\s\S]*\) : \([\s\S]*spo-panel__tabs/)
+  ok('Case 14: embedded branch renders ReceivedDatePaymentSchedule; legacy branch keeps spo-panel__tabs')
 
   // --- Case 15: desktop row structure ---------------------------------------
   assert.match(cssSrc, /\.spo-compact__supplier/)

@@ -19,7 +19,6 @@ import {
 import {
   UMAG_SETTLEMENTS_ERROR_CODES,
   fetchLastUmagSyncRun,
-  formatUmagMoney,
   syncUmagSettlements,
 } from '../../../services/umagSettlementsService'
 import { fetchSupplierFinancePageData } from '../../../services/supplierFinanceSummaryService'
@@ -38,16 +37,6 @@ const TABS = [
   { id: 'payments', label: 'К оплате' },
   { id: 'settlements', label: 'Взаиморасчёты' },
 ]
-
-function KpiTile({ label, value, tone, loading, unavailable }) {
-  const display = loading ? '…' : unavailable ? '—' : formatUmagMoney(value)
-  return (
-    <div className={`sfp-panel__kpi${tone ? ` sfp-panel__kpi--${tone}` : ''}`}>
-      <div className="sfp-panel__kpi-label">{label}</div>
-      <div className="sfp-panel__kpi-value">{display}</div>
-    </div>
-  )
-}
 
 export default function SupplierFinancePanel() {
   const { user } = useSession()
@@ -177,7 +166,7 @@ export default function SupplierFinancePanel() {
   const syncStatus = describeSyncStatus(lastSync)
   const activeTabMeta = TABS.find((tab) => tab.id === activeTab)
 
-  const showKpis = canViewPayments && activeTabMeta?.id === 'payments'
+  const isPaymentsTab = canViewPayments && activeTabMeta?.id === 'payments'
 
   return (
     <div className="sfp-panel">
@@ -217,36 +206,15 @@ export default function SupplierFinancePanel() {
         </div>
       </div>
 
-      {/* Item: КПИ и её ошибка загрузки относятся к сводке «К оплате»
+      {/* Item: эта ошибка загрузки относится к сводке «К оплате»
           (fetchSupplierFinancePageData) — «Взаиморасчёты» её не использует
-          и самостоятельно тянет свои итоги, поэтому обе привязаны к
-          активной вкладке, а не показываются на обеих постоянно. */}
-      {showKpis && summaryError && !summary ? (
+          и самостоятельно тянет свои итоги, поэтому привязана к активной
+          вкладке, а не показывается на обеих постоянно. Долг/Просрочено/
+          Сегодня как KPI-плитки убраны — итог теперь виден в подвале
+          таблицы «К оплате» (SupplierPaymentsPanel). */}
+      {isPaymentsTab && summaryError && !summary ? (
         <div className="sfp-panel__error" role="alert">
           {summaryError}
-        </div>
-      ) : null}
-
-      {showKpis ? (
-        <div className="sfp-panel__kpis" aria-label="Сводные показатели">
-          <KpiTile
-            label="Долг"
-            value={summary?.debt}
-            tone="debt"
-            loading={summaryLoading && !summary}
-          />
-          <KpiTile
-            label="Просрочено"
-            value={summary?.overdue?.amount}
-            tone="overdue"
-            loading={summaryLoading && !summary}
-          />
-          <KpiTile
-            label="Сегодня"
-            value={summary?.dueToday?.amount}
-            tone="today"
-            loading={summaryLoading && !summary}
-          />
         </div>
       ) : null}
 
