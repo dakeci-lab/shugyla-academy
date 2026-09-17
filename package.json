@@ -191,6 +191,7 @@
     "verify:supplier-payment-accounts-link": "node scripts/verify-supplier-payment-accounts-link.mjs",
     "verify:native-supplier-payment-marking": "node scripts/verify-native-supplier-payment-marking.mjs",
     "verify:native-settlement-ledger-source": "node scripts/verify-native-settlement-ledger-source.mjs",
+    "verify:settlements-unmark-payment": "node scripts/verify-settlements-unmark-payment.mjs",
     "verify:recruitment": "npm run verify:recruitment-public-apply && npm run verify:recruitment-private-photos && npm run verify:recruitment-vacancy-positions && npm run verify:recruitment-apply-hub && npm run verify:recruitment-flexible-form && npm run verify:recruitment-form-hardening && npm run verify:recruitment-public-careers-ui && npm run verify:recruitment-vacancy-public-fields",
     "test:e2e:recruitment": "E2E_SUITE=smoke playwright test -c tests/e2e/playwright.config.mjs",
     "test:e2e:recruitment:smoke": "E2E_SUITE=smoke playwright test -c tests/e2e/playwright.config.mjs",

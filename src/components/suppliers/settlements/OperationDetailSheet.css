@@ -190,6 +190,11 @@
   color: #64748b;
 }
 
+.umag-op-detail__unmark {
+  margin-top: 12px;
+  width: 100%;
+}
+
 .umag-op-detail__list {
   list-style: none;
   margin: 0;

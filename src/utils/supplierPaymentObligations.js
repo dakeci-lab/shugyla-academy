@@ -216,6 +216,7 @@ export function buildNativeSettlementPaymentRows(
     const employeeId = ob?.platformPaidBy ?? ob?.platform_paid_by ?? null
     rows.push({
       id: `platform-paid:${ob.id}`,
+      obligation_id: ob.id,
       umag_payment_id: null,
       platform_supplier_id: ob.platformSupplierId ?? ob.platform_supplier_id ?? null,
       umag_supplier_id: null,

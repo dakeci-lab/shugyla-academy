@@ -5,6 +5,7 @@ import { useToast } from '../../../context/ToastContext'
 import {
   canCreateUmagReconciliations,
   canEditUmagReconciliations,
+  canManageSupplierPayments,
   canResolveUmagReconciliations,
   canSyncUmagSettlements,
   canViewUmagReconciliations,
@@ -28,6 +29,7 @@ import {
   listSupplierReconciliations,
   reconciliationStatusLabel,
 } from '../../../services/supplierReconciliationService'
+import { unmarkObligationPaid } from '../../../services/supplierPaymentObligationsService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformFilterTrigger from '../../platform/PlatformFilterTrigger'
 import PlatformSearchToolbar, { PlatformToolbarActionWrap } from '../../platform/PlatformSearchToolbar'
@@ -287,6 +289,7 @@ function UmagSupplierDetail({
   periodDateTo,
   lastRun,
   canSync,
+  canManagePayments,
   canViewRecon,
   canCreateRecon,
   userId,
@@ -308,6 +311,21 @@ function UmagSupplierDetail({
     () => filterSupplierOperations(operations, opsFilter),
     [operations, opsFilter]
   )
+
+  // Same pattern as handleSync()/applyFilter() below: a mutation here backs
+  // out to the supplier list and reloads it, rather than trying to patch
+  // this drilldown's own locally-cached operations/history in place.
+  async function handleUnmarkPayment(obligationId) {
+    try {
+      await unmarkObligationPaid(obligationId)
+      showSuccess?.('Отметка оплаты снята')
+      setSelectedOperation(null)
+      onBack()
+      onSyncComplete?.()
+    } catch (err) {
+      showError?.(err.message || 'Не удалось отменить отметку оплаты')
+    }
+  }
 
   const loadHistory = useCallback(async () => {
     if (!canViewRecon) {
@@ -624,6 +642,8 @@ function UmagSupplierDetail({
           operation={selectedOperation}
           supplierName={supplier.name}
           onClose={() => setSelectedOperation(null)}
+          canManage={canManagePayments}
+          onUnmark={handleUnmarkPayment}
         />
       ) : null}
 
@@ -675,6 +695,7 @@ export default function UmagSettlementsPanel({
 
   const canView = canViewUmagSettlements(user)
   const canSync = canSyncUmagSettlements(user)
+  const canManagePayments = canManageSupplierPayments(user)
   const canViewRecon = canViewUmagReconciliations(user)
   const canCreateRecon = canCreateUmagReconciliations(user)
   const canEditRecon = canEditUmagReconciliations(user)
@@ -818,6 +839,7 @@ export default function UmagSettlementsPanel({
         periodDateTo={dateTo}
         lastRun={lastRun}
         canSync={canSync}
+        canManagePayments={canManagePayments}
         canViewRecon={canViewRecon}
         canCreateRecon={canCreateRecon}
         userId={userId}

@@ -61,7 +61,13 @@ function PaymentStatusBadge({ status }) {
   )
 }
 
-export default function OperationDetailSheet({ operation, supplierName, onClose }) {
+export default function OperationDetailSheet({
+  operation,
+  supplierName,
+  onClose,
+  canManage = false,
+  onUnmark,
+}) {
   const kind = operation?.kind
   const isPaymentDoc = kind === 'payment' || kind === 'refund'
   const operationType = kind === 'return' ? 'supply_return' : 'supply'
@@ -89,6 +95,7 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
         linkedReturnId: source.linked_umag_return_id || null,
         paymentStatus: null,
         externalSource: source.external_source || 'umag',
+        obligationId: source.obligation_id || null,
       }
     }
     if (kind === 'return') {
@@ -129,6 +136,7 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
 
   const [loading, setLoading] = useState(!isPaymentDoc)
   const [refreshing, setRefreshing] = useState(false)
+  const [unmarking, setUnmarking] = useState(false)
   const [error, setError] = useState('')
   const [cacheStatus, setCacheStatus] = useState(null)
   const [document, setDocument] = useState(null)
@@ -178,6 +186,22 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
 
   const visibleItems = useMemo(() => filterOperationItems(items, query), [items, query])
   const displayTotals = totals || buildItemTotals(items, headerFromHistory.amount)
+
+  const canUnmark =
+    canManage &&
+    kind === 'payment' &&
+    headerFromHistory.externalSource === 'platform' &&
+    headerFromHistory.obligationId != null
+
+  async function handleUnmark() {
+    if (!canUnmark || unmarking) return
+    setUnmarking(true)
+    try {
+      await onUnmark?.(headerFromHistory.obligationId)
+    } finally {
+      setUnmarking(false)
+    }
+  }
 
   // Portalled to document.body — see the same note in
   // SupplierPaymentsPanel.jsx's GroupDetail: rendered inline, this "fixed"
@@ -316,11 +340,23 @@ export default function OperationDetailSheet({ operation, supplierName, onClose 
         </div>
 
         {isPaymentDoc ? (
-          <div className="umag-op-detail__empty">
-            {headerFromHistory.externalSource === 'platform'
-              ? 'Отмечено оплаченным вручную на платформе, в разделе «К оплате». Состав товарных позиций для этого типа записи не отслеживается.'
-              : 'Платёжный документ UMAG. Состав товарных позиций для этого типа операции не загружается.'}
-          </div>
+          <>
+            <div className="umag-op-detail__empty">
+              {headerFromHistory.externalSource === 'platform'
+                ? 'Отмечено оплаченным вручную на платформе, в разделе «К оплате». Состав товарных позиций для этого типа записи не отслеживается.'
+                : 'Платёжный документ UMAG. Состав товарных позиций для этого типа операции не загружается.'}
+            </div>
+            {canUnmark ? (
+              <button
+                type="button"
+                className="btn btn-secondary umag-op-detail__unmark"
+                onClick={() => void handleUnmark()}
+                disabled={unmarking}
+              >
+                {unmarking ? 'Отмена оплаты…' : 'Отменить оплату'}
+              </button>
+            ) : null}
+          </>
         ) : (
           <>
         {(headerFromHistory.comment || headerFromHistory.note || document?.comment || document?.note) ? (
