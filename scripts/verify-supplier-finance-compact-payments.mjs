@@ -102,9 +102,10 @@ async function main() {
   assert.match(panelSrc, /switch \(group\.status\)/)
   ok('Case 5: compact status text branches on group.status from view, not deriveObligationStatus')
 
-  // --- Case 6: canonical debt untouched -------------------------------------
-  const debtSrc = read(DEBT_SERVICE)
-  assert.match(debtSrc, /export async function fetchCanonicalSupplierDebts/)
+  // --- Case 6: К оплате's own debt logic untouched --------------------------
+  // fetchCanonicalSupplierDebts() (UMAG current_debt-based) was later removed
+  // entirely from supplierDebtService.js — «К оплате» never used it anyway;
+  // what matters here is that debt still comes from view.summaries.totalActiveDebt.
   const summarySrc = read(SUMMARY_SERVICE)
   assert.match(summarySrc, /debt: view\.summaries\.totalActiveDebt/)
   assert.doesNotMatch(panelSrc, /fetchCanonicalSupplierDebts/)
@@ -196,11 +197,12 @@ async function main() {
   assert.match(cssSrc, /\.spo-compact__mobile-meta[\s\S]*display: none/)
   ok('Case 16: mobile layout uses spo-compact__mobile-meta without horizontal overflow table')
 
-  // --- Case 17: canonical debt / summary formulas still present in source ---
+  // --- Case 17: native debt / summary formulas still present in source ------
+  const debtSrc = read(DEBT_SERVICE)
   assert.match(debtSrc, /fetchAllSupabaseRows/)
-  assert.match(debtSrc, /\.gt\('current_debt', 0\)/)
+  assert.match(debtSrc, /\.is\('platform_paid_at', null\)/)
   assert.match(summarySrc, /fetchAllSupabaseRows/)
-  ok('Case 17: canonical debt + summary formulas intact; financial reads use pagination helper')
+  ok('Case 17: native debt + summary formulas intact; financial reads use pagination helper')
 
   // --- Case 18: settlements untouched (source sentinel) -------------------
   assert.doesNotMatch(settlementsSrc, /spo-compact__/)

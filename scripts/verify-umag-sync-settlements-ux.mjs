@@ -368,7 +368,6 @@ function stageSyncButton() {
     'src/components/procurement/ProcurementPlannerView.jsx',
     'src/components/suppliers/settlements/UmagSettlementsPanel.jsx',
     'src/components/suppliers/payments/SupplierPaymentsPanel.jsx',
-    'src/components/suppliers/settlements/CreateReconciliationModal.jsx',
   ]
   for (const rel of sites) {
     const src = read(rel)
@@ -390,12 +389,8 @@ function stageSyncButton() {
       'umag-settlements__sync-btn'
     )
   )
-  assert(
-    'unused recon sync-btn css removed',
-    !read('src/components/suppliers/settlements/CreateReconciliationModal.css').includes(
-      'recon-create__sync-btn'
-    )
-  )
+  // CreateReconciliationModal (and its CSS) — the «Акт сверки» reconciliation
+  // feature this used to check — was retired in full; nothing left to check here.
 }
 
 async function main() {

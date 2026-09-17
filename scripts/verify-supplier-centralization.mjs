@@ -77,10 +77,9 @@ function main() {
   assert.match(settlements, /platformSupplierId/)
   ok('settlements aggregate by canonical supplier')
 
-  const recon = read('src/services/supplierReconciliationService.js')
-  assert.match(recon, /platform_supplier_id/)
-  assert.match(recon, /platformSupplierId/)
-  ok('reconciliations use canonical supplier id')
+  // The «Акт сверки» reconciliation feature (supplierReconciliationService.js)
+  // was retired — settlements aggregation by canonical supplier id, checked
+  // above, is the surviving concern this case cared about.
 
   console.log(`\n${passed} checks passed`)
 }

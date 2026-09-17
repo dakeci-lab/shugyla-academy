@@ -283,11 +283,18 @@ async function stageFinanceAndAccountant() {
   )
 
   // Every code the accountant gets must exist in the catalog, or the migration
-  // would fail on production instead of here.
+  // would fail on production instead of here. umag.reconciliations.view is a
+  // deliberate, documented exception: this migration (already applied to
+  // production, immutable history) granted it, but the whole «Акт сверки»
+  // feature it gated was later retired in full — zero acts were ever created
+  // — so the code no longer exists in the catalog on purpose, not by typo.
   const catalogCodes = new Set(PERMISSION_CATALOG.map((entry) => entry.code))
   const granted = [...sql.matchAll(/'([a-z_]+(?:\.[a-z_]+)+)'/g)]
     .map((match) => match[1])
-    .filter((code) => !code.startsWith('finance.') && code.includes('.'))
+    .filter(
+      (code) =>
+        !code.startsWith('finance.') && code !== 'umag.reconciliations.view' && code.includes('.')
+    )
   assert(
     'granted codes all exist in the catalog',
     granted.every((code) => catalogCodes.has(code)),

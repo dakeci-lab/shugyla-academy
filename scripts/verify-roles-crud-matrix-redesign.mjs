@@ -168,7 +168,7 @@ async function stageMatrixGrouping() {
 
   assert(
     'getPermissionResourceKey extracts the middle segment of a 3-part code',
-    getPermissionResourceKey('umag.reconciliations.resolve') === 'reconciliations',
+    getPermissionResourceKey('umag.invoices.resolve') === 'invoices',
   )
   assert(
     'getPermissionResourceKey returns empty for a plain 2-part code',
@@ -179,19 +179,34 @@ async function stageMatrixGrouping() {
   const umagGroup = groups.find((g) => g.module === 'umag')
   assert('umag module group exists in the real catalog', Boolean(umagGroup))
 
-  const umagRows = groupModulePermissionsIntoRows(umagGroup)
+  // The real catalog no longer has a second umag resource (the «Акт сверки»
+  // reconciliations resource was retired in full, zero acts ever created) —
+  // so the "a module can split into multiple resource rows" behavior is now
+  // verified against a synthetic fixture instead of real data, decoupled
+  // from any specific feature's lifetime.
+  const syntheticUmagGroup = {
+    module: 'umag',
+    label: umagGroup.label,
+    items: [
+      { code: 'umag.settlements.view', module: 'umag' },
+      { code: 'umag.settlements.sync', module: 'umag' },
+      { code: 'umag.invoices.view', module: 'umag' },
+      { code: 'umag.invoices.resolve', module: 'umag' },
+    ],
+  }
+  const syntheticRows = groupModulePermissionsIntoRows(syntheticUmagGroup)
   assert(
-    'umag module splits into 2 resource rows (settlements + reconciliations)',
-    umagRows.length === 2,
+    'a module with two distinct middle segments splits into 2 resource rows',
+    syntheticRows.length === 2,
   )
-  const reconciliationsRow = umagRows.find((r) => r.resourceKey === 'reconciliations')
+  const invoicesRow = syntheticRows.find((r) => r.resourceKey === 'invoices')
   assert(
-    'reconciliations row picks up the Russian resource label',
-    reconciliationsRow?.label === 'Акты сверки',
+    'a resource key with no Russian label falls back to the raw key (never blank, never crashes)',
+    invoicesRow?.label === 'invoices',
   )
   assert(
-    'reconciliations row carries the resolve permission',
-    reconciliationsRow.items.some((p) => p.code.endsWith('.resolve')),
+    'the invoices row carries the resolve permission',
+    invoicesRow.items.some((p) => p.code.endsWith('.resolve')),
   )
 
   assert(
@@ -200,7 +215,8 @@ async function stageMatrixGrouping() {
   )
 
   // Reproduce PermissionMatrixPanel's own column-ordering logic against the
-  // real umag group, the module with the messiest action mix in the catalog.
+  // same synthetic fixture (view/sync/resolve — the messiest action mix the
+  // real umag module used to have before reconciliations was retired).
   const panelSource = read(MATRIX_PANEL)
   assert(
     'PermissionMatrixPanel defines a canonical CRUD action order',
@@ -210,7 +226,7 @@ async function stageMatrixGrouping() {
   )
 
   const actionsEncountered = []
-  umagRows.forEach((row) => {
+  syntheticRows.forEach((row) => {
     row.items.forEach((permission) => {
       const action = parsePermissionAction(permission.code)
       if (!actionsEncountered.includes(action)) actionsEncountered.push(action)

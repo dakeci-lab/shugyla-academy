@@ -68,11 +68,9 @@ function main() {
   assert.match(settlements, /debt/)
   ok('settlements service aggregates returns and builds history')
 
-  const recon = read('src/services/supplierReconciliationService.js')
-  assert.match(recon, /umagSupplyReturnCount/)
-  assert.match(recon, /umag_supply_return_amount/)
-  assert.match(recon, /umag_supply_returns/)
-  ok('reconciliation snapshot includes returns without rewriting debt')
+  // The «Акт сверки» reconciliation feature (and supplierReconciliationService.js,
+  // which used to snapshot these return fields) was retired — returns are still
+  // aggregated correctly by the settlements service checked above.
 
   const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
   assert.match(panel, /Возвраты поставщикам/)

@@ -175,16 +175,14 @@ function main() {
   assert.match(edge, /timeZone: 'Asia\/Aqtobe'/)
   ok("todayKey reuses the existing aqtobeDateKeyFromIso() helper (Asia/Aqtobe via Intl.DateTimeFormat) — no new/raw UTC-midnight date math")
 
-  // --- 10. Stage 2.1 canonical debt untouched -----------------------------
-  const debtService = read('src/services/supplierDebtService.js')
-  assert.match(debtService, /from\('supplier_payment_obligations'\)/)
-  assert.match(debtService, /\.gt\('current_debt',\s*0\)/)
-  assert.doesNotMatch(debtService, /\.gte\(|\.lte\(/)
-  ok('Этап 2.1 fetchCanonicalSupplierDebt() formula still has no date filter — untouched')
-
-  const reconService = read('src/services/supplierReconciliationService.js')
-  assert.match(reconService, /snapshot\.umagDebt = canonicalDebt\.debt/)
-  ok('Этап 2.1 reconciliation snapshot still sources umagDebt from the canonical helper')
+  // --- 10. (removed) The «Акт сверки» reconciliation feature and its
+  // canonical (UMAG current_debt-based) debt formula were both retired —
+  // supplierReconciliationService.js is gone, and supplierDebtService.js's
+  // debt formula now agrees with «К оплате» (see fetchNativeSupplierDebts,
+  // which never reads current_debt). fetchOpenObligationDatePoints() in the
+  // edge function (checked above, item 7) is unrelated and untouched — it
+  // still uses current_debt for its own purpose (auto-widening the sync
+  // date range), not for any displayed debt figure.
 
   // --- 11. No reconciliation-flag scope creep (item 20) -------------------
   // Item 17's "no lock this stage" was Этап 2.2's own boundary — Этап 2.3

@@ -1,38 +1,15 @@
 /**
- * Canonical current supplier debt — single source of truth (Этап 2.1),
- * with a batch path (Этап 2.5) so callers with many suppliers on screen
- * never issue one query per supplier.
- *
- * debt = SUM(supplier_payment_obligations.current_debt)
- *        WHERE is_source_deleted = false AND current_debt > 0
- *
- * No date filter: this is the live open debt, independent of when the
- * underlying приёмка was created. Every screen/flow that needs "how much do
- * we owe this supplier right now" must call fetchCanonicalSupplierDebt()
- * (one supplier) or fetchCanonicalSupplierDebts() (many, one bulk query)
- * instead of re-deriving its own SUM — both share the exact same predicate
- * via fetchOpenObligationRows() below, so there is one formula, not two.
+ * Native current supplier debt — single source of truth, agreeing with
+ * «К оплате» (see fetchNativeSupplierDebts() below): a supply's amount owed
+ * is its original_supply_amount unless platform_paid_at is set, full stop.
+ * UMAG's own current_debt field is never consulted — the old "Этап 2.1
+ * canonical debt" formula built on it was retired once staff started
+ * marking documents paid in UMAG immediately at receiving time, which made
+ * current_debt stop meaning "still owed" at all.
  */
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { fetchAllSupabaseRows } from '../utils/supabasePagination'
-import { isActiveOpenObligation } from '../utils/supplierPaymentObligations'
-
-/**
- * Raised when a supplier is only known by its UMAG id and has no canonical
- * platform_suppliers link yet — supplier_payment_obligations has no
- * umag_supplier_id column, so its debt genuinely cannot be resolved.
- * Callers must surface this, never treat it as a debt of 0.
- */
-export class UnresolvedSupplierDebtError extends Error {
-  constructor(umagSupplierId) {
-    super(
-      `Поставщик UMAG #${umagSupplierId} ещё не сопоставлен с карточкой поставщика — канонический долг недоступен`
-    )
-    this.name = 'UnresolvedSupplierDebtError'
-    this.umagSupplierId = umagSupplierId
-  }
-}
 
 function toNumber(value) {
   const n = typeof value === 'number' ? value : Number(value)
@@ -70,110 +47,6 @@ export async function resolvePlatformSupplierIdsByUmagIds(umagSupplierIds) {
   const map = new Map()
   for (const row of data || []) {
     if (row.umag_supplier_id != null) map.set(Number(row.umag_supplier_id), row.id)
-  }
-  return map
-}
-
-async function resolvePlatformSupplierIdByUmagId(umagSupplierId) {
-  const map = await resolvePlatformSupplierIdsByUmagIds([umagSupplierId])
-  return map.get(umagSupplierId) ?? null
-}
-
-/**
- * The one canonical read: every open obligation row for the given canonical
- * platformSupplierIds (or all suppliers, if omitted entirely). Both
- * fetchCanonicalSupplierDebt() and fetchCanonicalSupplierDebts() build on
- * this — the predicate lives in exactly one place.
- *
- * @param {string[]} [platformSupplierIds] — omit for every open obligation;
- *   pass an array (possibly empty) to scope to exactly those suppliers.
- */
-async function fetchOpenObligationRows(platformSupplierIds) {
-  assertSupabaseReady()
-
-  if (Array.isArray(platformSupplierIds) && platformSupplierIds.length === 0) {
-    return []
-  }
-
-  const { data, error } = await fetchAllSupabaseRows(() => {
-    let query = supabase
-      .from('supplier_payment_obligations')
-      .select('id, platform_supplier_id, current_debt, is_source_deleted')
-      .eq('is_source_deleted', false)
-      .gt('current_debt', 0)
-      .order('id', { ascending: true })
-
-    if (Array.isArray(platformSupplierIds)) {
-      query = query.in('platform_supplier_id', platformSupplierIds)
-    }
-
-    return query
-  })
-
-  if (error) {
-    throw new Error(error.message || 'Не удалось рассчитать текущую задолженность поставщиков')
-  }
-  return (data || []).filter(isActiveOpenObligation)
-}
-
-/**
- * Canonical current open debt for one supplier.
- *
- * @param {{ platformSupplierId?: string|null, umagSupplierId?: number|null }} params
- * @returns {Promise<{ platformSupplierId: string, debt: number, openObligationCount: number }>}
- */
-export async function fetchCanonicalSupplierDebt({
-  platformSupplierId = null,
-  umagSupplierId = null,
-} = {}) {
-  assertSupabaseReady()
-
-  let canonicalId = platformSupplierId || null
-
-  if (!canonicalId) {
-    if (umagSupplierId == null) {
-      throw new Error('Не указан поставщик для расчёта текущей задолженности')
-    }
-    canonicalId = await resolvePlatformSupplierIdByUmagId(umagSupplierId)
-    if (!canonicalId) {
-      throw new UnresolvedSupplierDebtError(umagSupplierId)
-    }
-  }
-
-  const rows = await fetchOpenObligationRows([canonicalId])
-  const debt = rows.reduce((sum, row) => sum + toNumber(row.current_debt), 0)
-
-  return {
-    platformSupplierId: canonicalId,
-    debt,
-    openObligationCount: rows.length,
-  }
-}
-
-/**
- * Canonical current open debt for MANY suppliers in ONE bulk query — no
- * per-supplier round-trip. Rows with platform_supplier_id = NULL (no
- * canonical link at all) are excluded from the map rather than lumped under
- * one key — conflating unrelated unmapped suppliers' debt under a single
- * bucket would misattribute money to whichever row happens to look it up.
- * Callers that need those totals (e.g. a global KPI) should use
- * listPaymentObligations()/buildPaymentScheduleView() instead, which already
- * include them correctly in an aggregate that isn't attributed per-row.
- *
- * @param {{ platformSupplierIds?: string[] }} [params] — omit (or undefined)
- *   for every open obligation company-wide; pass an array to scope the query.
- * @returns {Promise<Map<string, number>>} platformSupplierId -> debt
- */
-export async function fetchCanonicalSupplierDebts({ platformSupplierIds } = {}) {
-  const rows = await fetchOpenObligationRows(
-    Array.isArray(platformSupplierIds) ? platformSupplierIds.filter(Boolean) : undefined
-  )
-
-  const map = new Map()
-  for (const row of rows) {
-    if (!row.platform_supplier_id) continue
-    const id = row.platform_supplier_id
-    map.set(id, (map.get(id) || 0) + toNumber(row.current_debt))
   }
   return map
 }
@@ -216,11 +89,12 @@ async function fetchOpenNativeObligationRows(platformSupplierIds) {
 }
 
 /**
- * Native current open debt for MANY suppliers in ONE bulk query — the
- * «Взаиморасчёты» counterpart to fetchCanonicalSupplierDebts(), but agreeing
- * with «К оплате» instead of UMAG's current_debt. Same
- * unmapped-supplier-exclusion rule as fetchCanonicalSupplierDebts() (see its
- * comment above) applies here too.
+ * Native current open debt for MANY suppliers in ONE bulk query — powers the
+ * «Взаиморасчёты» list's debt column, agreeing with «К оплате». Rows with
+ * platform_supplier_id = NULL (no canonical link at all) are excluded from
+ * the map rather than lumped under one key — conflating unrelated unmapped
+ * suppliers' debt under a single bucket would misattribute money to
+ * whichever row happens to look it up.
  *
  * @param {{ platformSupplierIds?: string[] }} [params]
  * @returns {Promise<Map<string, number>>} platformSupplierId -> debt

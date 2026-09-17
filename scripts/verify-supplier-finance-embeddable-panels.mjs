@@ -134,8 +134,7 @@ function main() {
   ok('the settlements table itself is NOT gated by embedded — always renders')
 
   assert.match(settlementsSrc, /if \(selected\) \{\s*\n\s*return \(\s*\n\s*<UmagSupplierDetail/)
-  assert.match(settlementsSrc, /if \(selectedReconciliationId\) \{\s*\n\s*return \(/)
-  ok('supplier drill-down (UmagSupplierDetail) and reconciliation detail (ReconciliationDetailView) branches are untouched — not gated by embedded')
+  ok('supplier drill-down (UmagSupplierDetail) branch is untouched — not gated by embedded')
 
   // --- Case 7: embedded settlements calls fetchUmagSettlementsBySupplier() the same way regardless of embedded ---
   assert.match(settlementsSrc, /fetchUmagSettlementsBySupplier\(\{ dateFrom, dateTo, search \}\)/)
@@ -144,17 +143,11 @@ function main() {
   assert.match(umagServiceSrc, /fetchNativeSupplierDebts,\s*\n\s*resolvePlatformSupplierIdsByUmagIds,/)
   ok('Case 7: loadData() calls fetchUmagSettlementsBySupplier() unconditionally (embedded or not) — debt source itself (fetchNativeSupplierDebts, unified with «К оплате») is unaffected by embedded/not')
 
-  // --- Case 6: reconciliation flow wiring untouched -------------------------
-  assert.match(settlementsSrc, /import CreateReconciliationModal from '\.\/CreateReconciliationModal'/)
-  assert.match(settlementsSrc, /import ReconciliationDetailView from '\.\/ReconciliationDetailView'/)
   assert.match(settlementsSrc, /import OperationDetailSheet from '\.\/OperationDetailSheet'/)
-  assert.match(settlementsSrc, /\{canCreateRecon \? \(\s*\n\s*<button/)
-  assert.match(settlementsSrc, /Создать сверку/)
-  ok('Case 6: create/open/edit/resolve reconciliation wiring (modal, detail view, permission gates) is untouched')
-
-  const reconSrc = read('src/services/supplierReconciliationService.js')
-  assert.match(reconSrc, /snapshot\.umagDebt = canonicalDebt\.debt/)
-  ok('Этап 2.1 computeUmagSnapshotForSupplier()/fetchCanonicalSupplierDebt() sentinel intact — not touched this stage')
+  // Case 6 (reconciliation flow wiring) and its Этап 2.1 sentinel are gone —
+  // the «Акт сверки» feature (CreateReconciliationModal, ReconciliationDetailView,
+  // supplierReconciliationService.js, canCreateRecon/"Создать сверку") was
+  // retired in full: zero acts were ever created in production before removal.
 
   // --- Case 5/9: no business-logic fork, no duplicate component files -----
   const newFileNames = execFileSync('git', ['status', '--porcelain'], { cwd: ROOT, encoding: 'utf8' })
@@ -204,15 +197,13 @@ function main() {
   for (const gate of [
     'canViewUmagSettlements',
     'canSyncUmagSettlements',
-    'canViewUmagReconciliations',
-    'canCreateUmagReconciliations',
-    'canEditUmagReconciliations',
-    'canResolveUmagReconciliations',
+    'canManageSupplierPayments',
   ]) {
     assert.ok(settlementsSrc.includes(gate), `${gate} missing from UmagSettlementsPanel.jsx`)
   }
   assert.match(settlementsSrc, /if \(!canView\) \{\s*\n\s*return <PlatformAccessDenied/)
-  ok('Case 12: UmagSettlementsPanel permission gates (view/sync/reconciliation create-edit-resolve) all still present')
+  assert.doesNotMatch(settlementsSrc, /UmagReconciliations/)
+  ok('Case 12: UmagSettlementsPanel permission gates (view/sync/manage) all still present; reconciliation gates fully removed, not just unused')
 
   assert.doesNotMatch(paymentsSrc, /embedded[\s\S]{0,40}canView|canView[\s\S]{0,20}\|\|\s*embedded/)
   assert.doesNotMatch(settlementsSrc, /embedded[\s\S]{0,40}canView|canView[\s\S]{0,20}\|\|\s*embedded/)
@@ -225,8 +216,8 @@ function main() {
   assert.match(edgeFn, /MAX_AUTO_SYNC_LOOKBACK_MONTHS/)
   assert.match(edgeFn, /umag_sync_runs_entity_running_lock/)
   const debtServiceSrc = read('src/services/supplierDebtService.js')
-  assert.match(debtServiceSrc, /export async function fetchCanonicalSupplierDebts/)
-  ok('Этап 2.2/2.3/2.4/2.5 sentinels (sync scope, sync lock, Financial Summary formula, canonical batch debt) intact')
+  assert.match(debtServiceSrc, /export async function fetchNativeSupplierDebts/)
+  ok('Этап 2.2/2.3/2.4/2.5 sentinels (sync scope, sync lock, Financial Summary formula, native batch debt) intact')
 
   console.log(`\n${checks} checks passed`)
 }

@@ -53,10 +53,6 @@ export const PERMISSION_CODES = {
 
   UMAG_SETTLEMENTS_VIEW: 'umag.settlements.view',
   UMAG_SETTLEMENTS_SYNC: 'umag.settlements.sync',
-  UMAG_RECONCILIATIONS_VIEW: 'umag.reconciliations.view',
-  UMAG_RECONCILIATIONS_CREATE: 'umag.reconciliations.create',
-  UMAG_RECONCILIATIONS_EDIT: 'umag.reconciliations.edit',
-  UMAG_RECONCILIATIONS_RESOLVE: 'umag.reconciliations.resolve',
 
   SUPPLIER_PAYMENTS_VIEW: 'supplier_payments.view',
   SUPPLIER_PAYMENTS_MANAGE: 'supplier_payments.manage',
@@ -209,10 +205,6 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.SALES_SYNC, name: 'Синхронизация продаж из UMAG', module: 'sales', sortOrder: 181 },
   { code: PERMISSION_CODES.UMAG_SETTLEMENTS_VIEW, name: 'Просмотр взаиморасчётов UMAG', module: 'umag', sortOrder: 170 },
   { code: PERMISSION_CODES.UMAG_SETTLEMENTS_SYNC, name: 'Синхронизация UMAG', module: 'umag', sortOrder: 171 },
-  { code: PERMISSION_CODES.UMAG_RECONCILIATIONS_VIEW, name: 'Просмотр актов сверки', module: 'umag', sortOrder: 180 },
-  { code: PERMISSION_CODES.UMAG_RECONCILIATIONS_CREATE, name: 'Создание актов сверки', module: 'umag', sortOrder: 181 },
-  { code: PERMISSION_CODES.UMAG_RECONCILIATIONS_EDIT, name: 'Редактирование актов сверки', module: 'umag', sortOrder: 182 },
-  { code: PERMISSION_CODES.UMAG_RECONCILIATIONS_RESOLVE, name: 'Закрытие расхождений сверки', module: 'umag', sortOrder: 183 },
   { code: PERMISSION_CODES.SUPPLIER_PAYMENTS_VIEW, name: 'Просмотр оплат поставщикам', module: 'supplier_payments', sortOrder: 190 },
   { code: PERMISSION_CODES.SUPPLIER_PAYMENTS_MANAGE, name: 'Управление календарём оплат поставщикам', module: 'supplier_payments', sortOrder: 191 },
   { code: PERMISSION_CODES.PAYROLL_VIEW, name: 'Просмотр зарплат', module: 'payroll', sortOrder: 140 },
@@ -326,7 +318,7 @@ export function parsePermissionAction(code) {
 
 /**
  * Middle segment(s) of a code between the module and the action, e.g.
- * 'umag.reconciliations.resolve' → 'reconciliations'; 'employees.view' → ''
+ * 'umag.settlements.sync' → 'settlements'; 'employees.view' → ''
  * (a plain module.action code has no separate resource — the module itself
  * is the one resource, see getPermissionResourceLabel).
  */
@@ -336,11 +328,10 @@ export function getPermissionResourceKey(code) {
 }
 
 /** Russian labels for the (currently few) multi-resource modules — e.g.
- * 'umag' has both 'settlements' and 'reconciliations' permissions. Extend
- * here if a new module.resource.action code is added to PERMISSION_CODES. */
+ * 'umag' has 'settlements' permissions. Extend here if a new
+ * module.resource.action code is added to PERMISSION_CODES. */
 const PERMISSION_RESOURCE_LABELS = {
   settlements: 'Взаиморасчёты',
-  reconciliations: 'Акты сверки',
 }
 
 export function getPermissionResourceLabel(resourceKey, moduleLabel) {
