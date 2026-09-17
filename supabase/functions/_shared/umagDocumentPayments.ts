@@ -122,6 +122,11 @@ export async function fetchDocumentPaymentsForPeriod(
     })
 
     if ('error' in result) {
+      console.error('umag_document_payments_fetch_failed', {
+        code: result.error,
+        first,
+        pageSize,
+      })
       return {
         ok: false,
         response: Response.json(
@@ -131,6 +136,12 @@ export async function fetchDocumentPaymentsForPeriod(
       }
     }
     if (result.status < 200 || result.status >= 300) {
+      console.error('umag_document_payments_http_error', {
+        status: result.status,
+        body: result.json,
+        first,
+        pageSize,
+      })
       return {
         ok: false,
         response: Response.json(
