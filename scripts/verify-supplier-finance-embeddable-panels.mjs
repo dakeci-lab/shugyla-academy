@@ -137,12 +137,12 @@ function main() {
   assert.match(settlementsSrc, /if \(selectedReconciliationId\) \{\s*\n\s*return \(/)
   ok('supplier drill-down (UmagSupplierDetail) and reconciliation detail (ReconciliationDetailView) branches are untouched — not gated by embedded')
 
-  // --- Case 7: embedded settlements still uses fetchCanonicalSupplierDebts (via umagSettlementsService) ---
+  // --- Case 7: embedded settlements calls fetchUmagSettlementsBySupplier() the same way regardless of embedded ---
   assert.match(settlementsSrc, /fetchUmagSettlementsBySupplier\(\{ dateFrom, dateTo, search \}\)/)
   assert.doesNotMatch(settlementsSrc, /embedded[\s\S]{0,80}fetchUmagSettlementsBySupplier/)
   const umagServiceSrc = read('src/services/umagSettlementsService.js')
-  assert.match(umagServiceSrc, /fetchCanonicalSupplierDebts,\s*\n\s*resolvePlatformSupplierIdsByUmagIds,/)
-  ok('Case 7: loadData() calls fetchUmagSettlementsBySupplier() unconditionally (embedded or not), which still sources debt from fetchCanonicalSupplierDebts() (Этап 2.5, unchanged)')
+  assert.match(umagServiceSrc, /fetchNativeSupplierDebts,\s*\n\s*resolvePlatformSupplierIdsByUmagIds,/)
+  ok('Case 7: loadData() calls fetchUmagSettlementsBySupplier() unconditionally (embedded or not) — debt source itself (fetchNativeSupplierDebts, unified with «К оплате») is unaffected by embedded/not')
 
   // --- Case 6: reconciliation flow wiring untouched -------------------------
   assert.match(settlementsSrc, /import CreateReconciliationModal from '\.\/CreateReconciliationModal'/)

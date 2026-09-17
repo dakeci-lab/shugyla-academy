@@ -174,12 +174,16 @@ async function main() {
   assert(
     // Этап 2.5 deliberately replaces this exact fallback expression with the
     // canonical bulk debt lookup — see verify:settlements-canonical-debt for
-    // the full depth of that change. What must survive is that it now goes
-    // through THIS module's own canonical helper, not a reinvented formula.
+    // the full depth of that change. Later, that lookup itself switched from
+    // fetchCanonicalSupplierDebts() (UMAG's own current_debt) to
+    // fetchNativeSupplierDebts() (platform_paid_at-based) so this number can
+    // never again disagree with «К оплате»'s Долг tile — what must survive
+    // is that it still goes through THIS module's own shared helper, not a
+    // reinvented formula.
     'umagSettlementsService.js (Взаиморасчёты) now sources debt from supplierDebtService — the old ledger/SUM(debt) fallback is gone',
     !/history\.operations\.length > 0 \? history\.closingBalance : row\.debt/.test(umagService) &&
       /from '\.\/supplierDebtService'/.test(umagService) &&
-      /fetchCanonicalSupplierDebts/.test(umagService)
+      /fetchNativeSupplierDebts/.test(umagService)
   )
   const ledgerUtil = read('src/utils/supplierLedger.js')
   assert(

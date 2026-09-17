@@ -21,7 +21,7 @@ import { fetchAllSupabaseRows } from '../utils/supabasePagination'
 import { buildNativeSettlementPaymentRows } from '../utils/supplierPaymentObligations'
 import { ensurePaymentAccountsLoaded, getPaymentAccountName } from './paymentAccountsService'
 import {
-  fetchCanonicalSupplierDebts,
+  fetchNativeSupplierDebts,
   resolvePlatformSupplierIdsByUmagIds,
 } from './supplierDebtService'
 
@@ -395,8 +395,11 @@ function ensureSettlementRow(byKey, seed) {
 }
 
 /**
- * Pure (Этап 2.5): a settlement row's canonical current debt from already
- * bulk-fetched lookup maps — split out from fetchUmagSettlementsBySupplier()
+ * Pure: a settlement row's current debt from an already bulk-fetched
+ * lookup map (canonicalDebtByPlatformId — despite the name, now built by
+ * fetchNativeSupplierDebts(), the same formula «К оплате» uses; "canonical"
+ * here refers to resolving to one deduplicated supplier, not to the old
+ * UMAG-current_debt formula) — split out from fetchUmagSettlementsBySupplier()
  * so it's directly testable without a live Supabase connection.
  *
  * A row only known by umagSupplierId that never resolves to a canonical
@@ -799,11 +802,14 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
     row.payments.push(payment)
   }
 
-  // Этап 2.5: «Задолженность» = canonical current debt (Этап 2.1), never the
-  // ledger closing balance and never a SUM(umag_supplies.debt)-for-period
-  // fallback — those formulas are gone from this path entirely. Bulk, not
-  // per-row: one resolve query for rows only known by umagSupplierId, one
-  // debt query for every canonical supplier this period's rows touch.
+  // «Задолженность» = native current debt (same formula as «К оплате» —
+  // resolveOwedAmount/isActiveOpenObligation), never UMAG's own current_debt
+  // (Этап 2.1's canonical-debt formula — retired here so this number can
+  // never again disagree with «К оплате»'s Долг tile), never the ledger
+  // closing balance, never a SUM(umag_supplies.debt)-for-period fallback.
+  // Bulk, not per-row: one resolve query for rows only known by
+  // umagSupplierId, one debt query for every canonical supplier this
+  // period's rows touch.
   const rowsList = [...byKey.values()]
   let resolvedPlatformIdByUmagId
   let canonicalDebtByPlatformId
@@ -823,7 +829,7 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
         ...resolvedPlatformIdByUmagId.values(),
       ]),
     ]
-    canonicalDebtByPlatformId = await fetchCanonicalSupplierDebts({ platformSupplierIds: canonicalIds })
+    canonicalDebtByPlatformId = await fetchNativeSupplierDebts({ platformSupplierIds: canonicalIds })
   } catch (err) {
     return {
       rows: [],
