@@ -98,8 +98,15 @@ function main() {
   assert('targeted supply link maps', shared.includes('buildPaymentSupplierLinkMaps'))
 
   const sync = read('supabase/functions/umag-sync/index.ts')
-  assert('sync imports payments', sync.includes('fetchDocumentPaymentsForPeriod'))
-  assert('sync uses targeted payment maps', sync.includes('buildPaymentSupplierLinkMaps'))
+  // fetchDocumentPaymentsForPeriod/buildPaymentSupplierLinkMaps: disabled
+  // 2026-09-18 — zero new UMAG payment/refund postings since native
+  // "Оплачено" marking took over, confirmed against prod data; its only
+  // effect left was an occasional 30s UMAG timeout that turned the whole
+  // sync "Частично" for no benefit. rebuildLedgerEventsForPeriod still runs
+  // unconditionally, rebuilding from whatever payments/refunds are already
+  // stored (a DB read, not a fresh UMAG call).
+  assert('sync no longer fetches document-payments live', !sync.includes('await fetchDocumentPaymentsForPeriod('))
+  assert('sync no longer builds targeted payment maps', !sync.includes('buildPaymentSupplierLinkMaps('))
   assert('sync rebuilds ledger', sync.includes('rebuildLedgerEventsForPeriod'))
 
   const service = read('src/services/umagSettlementsService.js')

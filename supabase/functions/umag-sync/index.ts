@@ -8,9 +8,11 @@
  * - GET /rest/cabinet/org/agent/list (agentType=SUPPLIER)
  * - GET /rest/cabinet/opr/supplies/all
  * - GET /rest/cabinet/opr/supply-returns/list
- * - GET /rest/cabinet/fin/document-payment/list-all
  *
  * Does NOT call supply/return product lines or N+1 detail endpoints.
+ * Also does NOT call /rest/cabinet/fin/document-payment/list-all any more
+ * (disabled 2026-09-18 — see the comment above rebuildLedgerEventsForPeriod()
+ * below for why).
  */
 
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
@@ -33,12 +35,7 @@ import {
   umagFetchAuthed,
   type UmagSession,
 } from '../_shared/umagAuth.ts'
-import {
-  buildPaymentSupplierLinkMaps,
-  fetchDocumentPaymentsForPeriod,
-  rebuildLedgerEventsForPeriod,
-  upsertDocumentPayments,
-} from '../_shared/umagDocumentPayments.ts'
+import { rebuildLedgerEventsForPeriod } from '../_shared/umagDocumentPayments.ts'
 
 const PERMISSION_SYNC = 'umag.settlements.sync'
 const ALLOWED_BODY_KEYS = new Set(['action', 'dateFrom', 'dateTo', 'syncSuppliers'])
@@ -2710,69 +2707,35 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Document payments (real payment dates from UMAG fin/document-payment)
-    let paymentsStats = {
-      received: 0,
-      created: 0,
-      updated: 0,
-      reactivated: 0,
-      pages: 0,
-      totalCount: null as number | null,
-    }
+    // Document payments (UMAG fin/document-payment) — fetch disabled 2026-09-18.
+    // Since native "Оплачено" marking took over (~2026-09-15), accountants
+    // stopped posting payments/refunds through UMAG's own flow: confirmed
+    // against prod data, zero new document-payment rows have appeared since
+    // that date across every sync run in between. The only effect of still
+    // calling this endpoint was an occasional slow UMAG response (30s
+    // timeout) that turned the whole sync "Частично" for no benefit — the
+    // owed-amount/status logic never reads this feed for anything still
+    // open (see docs/suppliers/native-payment-status-independence.md).
+    // «Возвраты поставщикам» (goods returns) is a separate endpoint/table
+    // (fetchAllSupplyReturns/umag_supply_returns, above) and is unaffected.
+    // rebuildLedgerEventsForPeriod still runs — it rebuilds from whatever is
+    // already stored in umag_document_payments (a DB read, not a fresh UMAG
+    // call), which still matters for opening-balance carry-forward. If UMAG
+    // payment postings ever resume, restore the fetchDocumentPaymentsForPeriod
+    // + upsertDocumentPayments calls that used to sit here (still exported
+    // from _shared/umagDocumentPayments.ts, just unused by this file now).
     let ledgerUpserted = 0
     let paymentsWarning: string | null = null
 
-    const paymentsResult = await fetchDocumentPaymentsForPeriod(
-      session,
-      bounds.fromTime,
-      bounds.toTime
+    const ledgerResult = await rebuildLedgerEventsForPeriod(
+      authz.serviceClient,
+      effectiveFrom,
+      effectiveTo
     )
-    if (!paymentsResult.ok) {
-      paymentsWarning = 'Не удалось загрузить оплаты UMAG (document-payment).'
-      console.error('umag_sync_payments_fetch_failed')
+    if (ledgerResult instanceof Response) {
+      paymentsWarning = 'Ledger events не обновлены.'
     } else {
-      const { supplyToSupplier, returnToSupplier } = await buildPaymentSupplierLinkMaps(
-        authz.serviceClient,
-        paymentsResult.payments
-      )
-
-      const platformByUmag = new Map<number, string>()
-      for (const [umagId, platformId] of platformMap.entries()) {
-        platformByUmag.set(Number(umagId), String(platformId))
-      }
-
-      const paymentsUpsert = await upsertDocumentPayments(
-        authz.serviceClient,
-        paymentsResult.payments,
-        platformByUmag,
-        supplyToSupplier,
-        returnToSupplier
-      )
-      if (paymentsUpsert instanceof Response) {
-        paymentsWarning = 'Оплаты UMAG получены, но не сохранились.'
-      } else {
-        paymentsStats = {
-          received: paymentsResult.payments.length,
-          created: paymentsUpsert.created,
-          updated: paymentsUpsert.updated,
-          reactivated: paymentsUpsert.reactivated,
-          pages: paymentsResult.pages,
-          totalCount: paymentsResult.totalCount,
-        }
-      }
-
-      const ledgerResult = await rebuildLedgerEventsForPeriod(
-        authz.serviceClient,
-        effectiveFrom,
-        effectiveTo
-      )
-      if (ledgerResult instanceof Response) {
-        paymentsWarning = [paymentsWarning, 'Ledger events не обновлены.']
-          .filter(Boolean)
-          .join(' ')
-      } else {
-        ledgerUpserted = ledgerResult.upserted
-      }
+      ledgerUpserted = ledgerResult.upserted
     }
 
     // Этап 2.2: a cap-truncated or date-unresolved old debt means this run
@@ -2864,7 +2827,7 @@ Deno.serve(async (req) => {
       },
       paymentObligations: obligationsRefresh,
       payments: {
-        ...paymentsStats,
+        fetchDisabled: true,
         ledgerUpserted,
       },
       returns: {

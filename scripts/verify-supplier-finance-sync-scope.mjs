@@ -8,9 +8,10 @@
  *
  *   1. Structural checks on the real source: confirm effectiveFrom/effectiveTo
  *      actually reach fetchAllSupplies / fetchAllSupplyReturns /
- *      fetchDocumentPaymentsForPeriod / rebuildLedgerEventsForPeriod /
- *      refreshPaymentObligations / reconcileMissingSupplies /
- *      reconcileMissingSupplyReturns — not just computed and unused.
+ *      rebuildLedgerEventsForPeriod / refreshPaymentObligations /
+ *      reconcileMissingSupplies / reconcileMissingSupplyReturns — not just
+ *      computed and unused. fetchDocumentPaymentsForPeriod is confirmed
+ *      NOT called at all (disabled 2026-09-18).
  *   2. A faithful line-for-line mirror of computeEffectiveSyncScope()'s pure
  *      math, exercised against all 12 cases from the Этап 2.2 spec. Any drift
  *      between the mirror and the real file should be caught by (1)'s regexes
@@ -94,13 +95,22 @@ function main() {
   ok('UMAG fetch bounds are built from effectiveFrom/effectiveTo, not the raw request')
 
   // --- 4. effectiveFrom/effectiveTo actually reach every pipeline step ---
+  // fetchDocumentPaymentsForPeriod is no longer called at all (disabled
+  // 2026-09-18 — zero new UMAG payment/refund postings since native
+  // "Оплачено" marking took over, confirmed against prod data; its only
+  // remaining effect was an occasional 30s UMAG timeout that turned the
+  // whole sync "Частично" for no benefit). rebuildLedgerEventsForPeriod
+  // still runs unconditionally, off already-stored data — see its own
+  // effectiveRangeCalls check below.
+  // The identifier can still appear in an explanatory comment (how to
+  // re-enable it later) — what matters is that it's not imported/called.
+  assert.doesNotMatch(edge, /await fetchDocumentPaymentsForPeriod\(/)
+  assert.doesNotMatch(edge, /import \{[^}]*fetchDocumentPaymentsForPeriod/)
+  ok('fetchDocumentPaymentsForPeriod is neither imported nor called — the UMAG document-payment fetch is disabled entirely')
+
   const wiredCalls = [
     ['fetchAllSupplies(session, bounds.fromTime, bounds.toTime)', 'fetchAllSupplies'],
     ['fetchAllSupplyReturns(session, bounds.fromTime, bounds.toTime)', 'fetchAllSupplyReturns'],
-    [
-      'fetchDocumentPaymentsForPeriod(\n      session,\n      bounds.fromTime,\n      bounds.toTime\n    )',
-      'fetchDocumentPaymentsForPeriod',
-    ],
   ]
   for (const [needle, label] of wiredCalls) {
     assert.ok(edge.includes(needle), `${label} does not use bounds derived from effectiveFrom/effectiveTo`)
@@ -111,7 +121,7 @@ function main() {
     'reconcileMissingSupplies(\n        authz.serviceClient,\n        effectiveFrom,\n        effectiveTo,',
     'refreshPaymentObligations(\n      authz.serviceClient,\n      effectiveFrom,\n      effectiveTo\n    )',
     'reconcileMissingSupplyReturns(\n          authz.serviceClient,\n          effectiveFrom,\n          effectiveTo,',
-    'rebuildLedgerEventsForPeriod(\n        authz.serviceClient,\n        effectiveFrom,\n        effectiveTo\n      )',
+    'rebuildLedgerEventsForPeriod(\n      authz.serviceClient,\n      effectiveFrom,\n      effectiveTo\n    )',
   ]
   for (const needle of effectiveRangeCalls) {
     const fnName = needle.split('(')[0]
