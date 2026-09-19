@@ -173,20 +173,20 @@ async function main() {
   assert.match(form, /focusSection/)
   ok('supplier form validates deferral days and shows payments summary')
 
-  const suppliersPage = read('src/pages/platform/suppliers/SuppliersPage.jsx')
-  assert.match(suppliersPage, /focusSection/)
-  assert.match(suppliersPage, /returnTo/)
-  assert.match(suppliersPage, /refreshObligationTermsForSupplier/)
-  ok('supplier edit opens payment-terms focus and refreshes obligations')
-
+  // 2026-09-19: the standalone «Поставщики» directory (SuppliersPage.jsx) was
+  // merged into this file, which is now THE supplier list — payment-terms
+  // deep-linking (focusSection/returnTo) and obligation-term refresh moved
+  // here with it. SuppliersPage.jsx itself is now unreached (routes redirect
+  // here), so it's no longer worth asserting on.
   const settlements = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
+  assert.match(settlements, /focusSection/)
+  assert.match(settlements, /returnTo/)
+  assert.match(settlements, /refreshObligationTermsForSupplier/)
+  ok('merged «Поставщики» screen opens payment-terms focus and refreshes obligations')
+
   assert.doesNotMatch(settlements, /По данным UMAG/)
-  assert.match(settlements, /Обновлено:/)
   assert.match(settlements, /PlatformSearchToolbar/)
   assert.match(settlements, /SettlementsFilterPopover/)
-  assert.match(settlements, /SettlementsTableFoot/)
-  assert.match(settlements, /umag-settlements__tfoot/)
-  assert.match(settlements, /SettlementsMobileTotals/)
   assert.doesNotMatch(settlements, /umag-settlements__presets/)
   assert.doesNotMatch(settlements, /umag-settlements__meta/)
   assert.doesNotMatch(settlements, /footer-totals/)

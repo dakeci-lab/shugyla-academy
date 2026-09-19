@@ -82,7 +82,13 @@ async function main() {
 
   // --- Case 15 (permission scope): union of existing permissions, not broader ---
   assert.match(permsSrc, /SUPPLIER_FINANCE: 'supplier_finance'/)
-  assert.match(permsSrc, /\[ROUTE_KEYS\.SUPPLIER_FINANCE\]: \[P\.UMAG_SETTLEMENTS_VIEW, P\.SUPPLIER_PAYMENTS_VIEW\]/)
+  // 2026-09-19: SUPPLIERS_VIEW added as a third alternative when the old
+  // standalone directory merged into this route's «Поставщики» tab — still a
+  // union, not a broadening of what any single permission alone could reach.
+  assert.match(
+    permsSrc,
+    /\[ROUTE_KEYS\.SUPPLIER_FINANCE\]: \[P\.UMAG_SETTLEMENTS_VIEW, P\.SUPPLIER_PAYMENTS_VIEW, P\.SUPPLIERS_VIEW\]/
+  )
   assert.doesNotMatch(pageSrc, /service_role|supabaseAdmin/i)
   assert.match(pageSrc, /canViewSupplierPayments\(user\) && !canViewUmagSettlements\(user\)/.source ? /!canViewSupplierPayments\(user\) && !canViewUmagSettlements\(user\)/ : /x/)
   ok('page-level gate is exactly canViewSupplierPayments(user) OR canViewUmagSettlements(user) — the union of the two existing routes, no service_role/RLS bypass')
@@ -183,8 +189,16 @@ async function main() {
   assert.match(paymentsSrc, /\[canView, externalSummaryProvided, applyExternalPageData, loadStandalone, refreshToken\]/)
   const settlementsSrc = read(SETTLEMENTS_PANEL)
   assert.match(settlementsSrc, /refreshToken = null,\s*\n\s*filterSlot = null,\s*\n\} = \{\}\)/)
-  assert.match(settlementsSrc, /\[canView, loadData, refreshToken\]/)
-  ok('refreshToken is threaded into both panels\' existing load-triggering effect — reload without remount, standalone (refreshToken=null, no-op) unaffected')
+  // 2026-09-19: the merged «Поставщики» list itself is getSuppliers() (a
+  // synchronous cache read, reactive to dataVersion/version already) — the
+  // one piece that genuinely needs an explicit refetch after a sync is the
+  // debt map, so refreshToken now sits in loadDebts' own dependency array
+  // instead of a single monolithic loadData().
+  assert.match(
+    settlementsSrc,
+    /\[canViewFinance, suppliersReady, allSuppliers\.length, version, dataVersion, refreshToken\]/
+  )
+  ok('refreshToken is threaded into the panel\'s debt-reload effect — reload without remount, standalone (refreshToken=null, no-op) unaffected')
 
   // --- Case 9/20: legacy pages/routes still present and unmodified ----------
   const legacyStatus = gitStatus([

@@ -84,7 +84,9 @@ function stagePanelWiring() {
 
   assert(
     'imports unmarkObligationPaid from the obligations service (not a reinvented mutation)',
-    panel.includes("import { unmarkObligationPaid } from '../../../services/supplierPaymentObligationsService'")
+    /import \{\s*\n\s*refreshObligationTermsForSupplier,\s*\n\s*unmarkObligationPaid,\s*\n\} from '\.\.\/\.\.\/\.\.\/services\/supplierPaymentObligationsService'/.test(
+      panel
+    )
   )
   assert(
     'imports canManageSupplierPayments and computes canManagePayments at the top level',

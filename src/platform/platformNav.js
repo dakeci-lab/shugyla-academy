@@ -100,20 +100,13 @@ export const PLATFORM_NAV = [
         description: 'Приёмка товара и сверка с накладными.',
       },
       {
-        id: 'suppliers',
-        path: '/platform/suppliers',
-        label: 'Поставщики',
-        routeKey: ROUTE_KEYS.SUPPLIERS,
-        title: 'Поставщики',
-        description: 'База поставщиков и контактная информация.',
-      },
-      {
         id: 'supplier-finance',
         path: '/platform/supplier-finance',
         label: 'Расчёты',
         routeKey: ROUTE_KEYS.SUPPLIER_FINANCE,
         title: 'Расчёты',
-        description: 'Сроки оплаты и взаиморасчёты с поставщиками по данным UMAG.',
+        description:
+          'Справочник поставщиков, сроки оплаты и взаиморасчёты по данным UMAG.',
       },
     ],
   },

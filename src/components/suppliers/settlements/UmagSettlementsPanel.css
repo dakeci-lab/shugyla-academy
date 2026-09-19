@@ -13,17 +13,6 @@
   padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
 }
 
-.umag-settlements__period-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #ecfdf5;
-  color: #047857;
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .umag-settlements__search-toolbar {
   width: 100%;
 }
@@ -48,12 +37,6 @@
   border: 1px solid #fecaca;
 }
 
-.umag-settlements__totals {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 10px;
-}
-
 .umag-settlements__empty-cell {
   text-align: center;
   color: var(--color-text-secondary, #64748b);
@@ -63,95 +46,6 @@
 
 .umag-settlements__empty--mobile {
   display: none;
-}
-
-.umag-settlements__tfoot {
-  position: sticky;
-  bottom: 0;
-  z-index: 3;
-}
-
-.umag-settlements__tfoot td {
-  padding: 10px 12px;
-  vertical-align: top;
-  background: #fff;
-  border-top: 1px solid var(--color-border, #e2e8f0);
-  border-bottom: none;
-  white-space: normal;
-}
-
-.umag-settlements__tfoot-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.umag-settlements__tfoot-period {
-  font-size: 12px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.umag-settlements__tfoot-label {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--color-text-secondary, #64748b);
-  margin-bottom: 2px;
-}
-
-.umag-settlements__tfoot-value {
-  display: block;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-  color: var(--color-text, #0f172a);
-}
-
-.umag-settlements__tfoot-value--paid {
-  color: #047857;
-}
-
-.umag-settlements__tfoot-value--returns {
-  color: #c2410c;
-}
-
-.umag-settlements__tfoot-value--debt {
-  color: #b91c1c;
-}
-
-.umag-settlements__mobile-totals {
-  display: none;
-}
-
-.umag-settlements__summary {
-  padding: 12px 14px;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 12px;
-  background: var(--color-white, #fff);
-  min-width: 0;
-}
-
-.umag-settlements__summary--debt {
-  border-color: #fecaca;
-  background: #fff7f7;
-}
-
-.umag-settlements__summary-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--color-text-secondary, #64748b);
-}
-
-.umag-settlements__summary-value {
-  margin-top: 4px;
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--color-text, #0f172a);
-  word-break: break-word;
 }
 
 .umag-settlements__empty {
@@ -293,6 +187,66 @@
   gap: 12px;
   align-items: flex-start;
   justify-content: space-between;
+}
+
+.umag-settlements__identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--color-white, #fff);
+}
+
+.umag-settlements__identity-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.umag-settlements__identity-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.umag-settlements__identity-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 14px 24px;
+  flex: 1 1 480px;
+  min-width: 0;
+  margin: 0;
+}
+
+.umag-settlements__identity-grid dt {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.umag-settlements__identity-grid dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+}
+
+.umag-settlements__list-foot td {
+  padding: 10px 12px;
+  font-weight: 700;
+  font-size: 13px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  background: #f8fafc;
 }
 
 .umag-settlements__section-title {
@@ -584,10 +538,6 @@
     justify-content: flex-start;
   }
 
-  .umag-settlements__totals {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .umag-settlements__table-wrap {
     display: none;
   }
@@ -607,36 +557,4 @@
     padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
   }
 
-  .umag-settlements__mobile-totals {
-    display: block;
-    position: sticky;
-    bottom: 0;
-    z-index: 12;
-    margin-top: 8px;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
-    border-top: 2px solid #cbd5e1;
-    background: #fff;
-  }
-
-  .umag-settlements__mobile-totals-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px 12px;
-    margin-top: 10px;
-  }
-
-  .umag-settlements__mobile-totals-cell {
-    min-width: 0;
-  }
-}
-
-@media (max-width: 480px) {
-  .umag-settlements__totals {
-    grid-template-columns: 1fr;
-  }
-
-  .umag-settlements__tfoot-value,
-  .umag-settlements__mobile-totals .umag-settlements__tfoot-value {
-    font-size: 13px;
-  }
 }

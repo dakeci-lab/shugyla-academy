@@ -62,7 +62,6 @@ const MIGRATED = [
   ['src/pages/platform/procurement/ProcurementPage.jsx', 'list'],
   ['src/pages/platform/procurement/AnalyticsProcurementPage.jsx', 'table'],
   ['src/pages/platform/receiving/ReceivingPage.jsx', 'cards'],
-  ['src/pages/platform/suppliers/SuppliersPage.jsx', 'table'],
   ['src/components/admin/sections/TimeTrackerSection.jsx', 'cards'],
   ['src/components/admin/sections/TimeTrackerHomeCard.jsx', 'cards'],
   ['src/components/admin/NotificationSettingsPanel.jsx', 'cards'],

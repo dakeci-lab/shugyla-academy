@@ -35,7 +35,7 @@ import './SupplierFinancePanel.css'
 
 const TABS = [
   { id: 'payments', label: 'К оплате' },
-  { id: 'settlements', label: 'Взаиморасчёты' },
+  { id: 'settlements', label: 'Поставщики' },
 ]
 
 export default function SupplierFinancePanel() {

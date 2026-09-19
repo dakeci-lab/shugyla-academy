@@ -74,14 +74,6 @@ const PROCUREMENT_GROUP = [
     paths: ['/platform/receiving', '/platform/receiving/doc-1'],
   },
   {
-    id: 'suppliers',
-    label: 'Поставщики',
-    navPath: '/platform/suppliers',
-    routeKey: 'ROUTE_KEYS.SUPPLIERS',
-    routes: ['suppliers', 'suppliers/:id'],
-    paths: ['/platform/suppliers', '/platform/suppliers/sup-1'],
-  },
-  {
     id: 'supplier-finance',
     label: 'Расчёты',
     navPath: '/platform/supplier-finance',
@@ -100,6 +92,20 @@ const LEGACY_PROCUREMENT_ROUTES = [
     routeKey: 'ROUTE_KEYS.SETTLEMENTS',
     routes: ['settlements'],
     paths: ['/platform/settlements', '/platform/settlements/act-1'],
+  },
+  // 2026-09-19: the standalone «Поставщики» directory nav item was merged
+  // into «Расчёты» (UmagSettlementsPanel now doubles as the supplier list).
+  // The route stays reachable — SupplierPaymentsPanel's "open payment terms"
+  // deep link and old bookmarks redirect through it — it's just no longer a
+  // nav-linked destination of its own, same shape as settlements/
+  // supplier-payments above.
+  {
+    id: 'suppliers',
+    label: 'Поставщики (legacy redirect)',
+    navPath: '/platform/suppliers',
+    routeKey: 'ROUTE_KEYS.SUPPLIERS',
+    routes: ['suppliers', 'suppliers/:id'],
+    paths: ['/platform/suppliers', '/platform/suppliers/sup-1'],
   },
   {
     id: 'supplier-payments',
@@ -140,14 +146,10 @@ const MOBILE_LAYOUTS = [
       /\.unified-receiving-card\s*\{[\s\S]*?display:\s*grid/.test(css) &&
       /@media \(max-width: 640px\)[\s\S]*?\.unified-receiving-card\s*\{/.test(css),
   },
-  {
-    id: 'suppliers',
-    file: 'src/components/suppliers/SupplierTable.css',
-    what: 'the supplier table becomes cards below 769px',
-    test: (css) =>
-      /@media \(max-width: 768px\)[\s\S]*?\.supplier-table-desktop\s*\{\s*display:\s*none/.test(css) &&
-      /@media \(max-width: 768px\)[\s\S]*?\.supplier-cards\s*\{\s*display:\s*flex/.test(css),
-  },
+  // 'suppliers' (SupplierTable.css) removed 2026-09-19: the standalone
+  // directory was deleted along with its table, merged into the
+  // 'settlements-legacy' entry below (same mobile card layout now serves
+  // both the supplier list and the settlements drilldown).
   {
     id: 'supplier-finance',
     file: 'src/components/suppliers/finance/SupplierFinancePanel.css',
@@ -234,7 +236,7 @@ async function stageNavModel() {
   }
 
   assert(
-    'the group has no other children beyond the four known nav items',
+    'the group has no other children beyond the three known nav items',
     group.children.map((child) => child.id).join(',') ===
       PROCUREMENT_GROUP.map((section) => section.id).join(','),
     'a new module must be covered here before it ships'
@@ -258,7 +260,7 @@ async function stageNavModel() {
   const mobileGroup = mobileNav.find((item) => item.id === 'procurement-group')
   assert('«Закупки» is present in the mobile drawer', Boolean(mobileGroup))
   assert(
-    'the mobile drawer shows all four nav modules in order',
+    'the mobile drawer shows all three nav modules in order',
     mobileGroup.children.map((child) => child.id).join(',') ===
       PROCUREMENT_GROUP.map((section) => section.id).join(',')
   )
@@ -443,13 +445,15 @@ function stageMobileBackNavigation() {
     receiving.includes('receiving-detail__back')
   )
 
-  // The supplier card is a redirect into the list modal, so it has no header
-  // of its own — but its route still has to be reachable.
-  const suppliers = read('src/pages/platform/suppliers/SuppliersPage.jsx')
+  // 2026-09-19: the standalone directory (and its own SupplierDetailPage
+  // redirect-shim) was merged away — /platform/suppliers and
+  // /platform/suppliers/:id are now both handled by one App.jsx-level
+  // redirect component with no header of its own, but the route still has
+  // to be reachable and forward location.state through the hop.
   assert(
-    'the supplier detail route still redirects into the list',
-    /export function SupplierDetailPage\(\)[\s\S]{0,320}navigate\('\/platform\/suppliers'/.test(
-      suppliers
+    'the supplier directory route still redirects into the merged screen',
+    /function SupplierDirectoryRedirect\(\)[\s\S]{0,320}Navigate to="\/platform\/supplier-finance\?tab=settlements"/.test(
+      read(APP)
     )
   )
 
@@ -467,8 +471,10 @@ function stageUntouchedNeighbours() {
     'the pages behind the routes are unchanged',
     app.includes('<ReceivingPage />') &&
       app.includes('<ReceivingDetailPage />') &&
-      app.includes('<SuppliersPage />') &&
-      app.includes('<SupplierDetailPage />') &&
+      // 2026-09-19: SuppliersPage/SupplierDetailPage were retired along with
+      // the standalone directory — both suppliers routes now render the one
+      // App.jsx-level SupplierDirectoryRedirect (asserted in Stage 5 above).
+      (app.match(/<SupplierDirectoryRedirect \/>/g) || []).length === 2 &&
       app.includes('<SettlementsPage />') &&
       app.includes('<SupplierPaymentsPage />') &&
       app.includes('<SupplierFinancePage />')

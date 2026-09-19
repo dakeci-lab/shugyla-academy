@@ -83,7 +83,10 @@ const ROUTE_ACCESS = {
   // Sales: permission-first (sales.view); role fallback admin-only, matching
   // the sales.* permission grants seeded by 20260829120000_sales_category_month_facts.sql.
   [ROUTE_KEYS.SALES]: [ROLE_IDS.ADMIN],
-  [ROUTE_KEYS.SUPPLIER_FINANCE]: [ROLE_IDS.ADMIN],
+  // «Поставщики» tab merged the old standalone suppliers directory in here
+  // (2026-09-19) — BUYER needs this route for supplier contacts, same as
+  // ROUTE_KEYS.SUPPLIERS used to grant directly.
+  [ROUTE_KEYS.SUPPLIER_FINANCE]: [ROLE_IDS.ADMIN, ROLE_IDS.BUYER],
   [ROUTE_KEYS.SETTINGS]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SETTINGS_GENERAL]: [ROLE_IDS.ADMIN],
   [ROUTE_KEYS.SETTINGS_ROLES]: [ROLE_IDS.ADMIN],
@@ -214,9 +217,11 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.RECEIVING]: [P.RECEIVING_VIEW],
     [ROUTE_KEYS.SUPPLIERS]: [P.SUPPLIERS_VIEW],
     [ROUTE_KEYS.SALES]: [P.SALES_VIEW],
-    // «Расчёты» — either umag.settlements.view (Взаиморасчёты tab) or
-    // supplier_payments.view (К оплате tab) is enough; each tab gates itself.
-    [ROUTE_KEYS.SUPPLIER_FINANCE]: [P.UMAG_SETTLEMENTS_VIEW, P.SUPPLIER_PAYMENTS_VIEW],
+    // «Расчёты» — any of umag.settlements.view (Поставщики tab, merged with
+    // the old standalone suppliers directory 2026-09-19), supplier_payments.view
+    // (К оплате tab), or suppliers.view (directory-only access) is enough;
+    // each tab/section gates its own content further.
+    [ROUTE_KEYS.SUPPLIER_FINANCE]: [P.UMAG_SETTLEMENTS_VIEW, P.SUPPLIER_PAYMENTS_VIEW, P.SUPPLIERS_VIEW],
     [ROUTE_KEYS.SETTINGS]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],
     [ROUTE_KEYS.SETTINGS_GENERAL]: [P.SETTINGS_VIEW, P.SETTINGS_MANAGE],
     [ROUTE_KEYS.SETTINGS_ROLES]: [P.ROLES_VIEW, P.ROLES_EDIT, P.ROLES_ASSIGN_PERMISSIONS],

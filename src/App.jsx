@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
 import { getRouterBasename } from './router/basename'
 import { LanguageProvider } from './context/LanguageContext'
 import { SessionProvider } from './context/SessionContext'
@@ -66,14 +66,6 @@ const PlatformPayrollRecord = lazy(() => import('./pages/platform/PlatformPayrol
 const PlatformTimeTracker = lazy(() => import('./pages/platform/PlatformTimeTracker'))
 const PlatformHrVacancies = lazy(() => import('./pages/platform/PlatformHrVacancies'))
 const PlatformHrCandidates = lazy(() => import('./pages/platform/PlatformHrCandidates'))
-const SuppliersPage = lazy(() =>
-  import('./pages/platform/suppliers/SuppliersPage').then((m) => ({ default: m.default }))
-)
-const SupplierDetailPage = lazy(() =>
-  import('./pages/platform/suppliers/SuppliersPage').then((m) => ({
-    default: m.SupplierDetailPage,
-  }))
-)
 const SupplierFinancePage = lazy(
   () => import('./pages/platform/supplier-finance/SupplierFinancePage')
 )
@@ -95,6 +87,19 @@ const ReceivingDetailPage = lazy(
 
 function PlatformSuspense({ children }) {
   return <Suspense fallback={<AuthLoadingScreen />}>{children}</Suspense>
+}
+
+/**
+ * /platform/suppliers and /platform/suppliers/:id → supplier-finance's
+ * «Поставщики» tab (2026-09-19 merge). Preserves location.state so
+ * SupplierPaymentsPanel's "open payment terms" deep link
+ * (openEditId/focusSection/returnTo) still opens the edit modal there.
+ */
+function SupplierDirectoryRedirect() {
+  const location = useLocation()
+  const { id } = useParams()
+  const state = id ? { ...(location.state || {}), openEditId: id } : location.state
+  return <Navigate to="/platform/supplier-finance?tab=settlements" replace state={state} />
 }
 
 export default function App() {
@@ -331,11 +336,18 @@ export default function App() {
                     </PlatformRoute>
                   }
                 />
+                {/* 2026-09-19: the standalone directory was merged into
+                    supplier-finance's «Поставщики» tab (formerly
+                    «Взаиморасчёты» — see UmagSettlementsPanel). These two
+                    routes are kept only as redirects for old links/bookmarks
+                    and for SupplierPaymentsPanel's "open payment terms"
+                    deep link, which relies on location.state surviving the
+                    hop (openEditId/focusSection/returnTo). */}
                 <Route
                   path="suppliers"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIERS}>
-                      <SuppliersPage />
+                      <SupplierDirectoryRedirect />
                     </PlatformRoute>
                   }
                 />
@@ -343,7 +355,7 @@ export default function App() {
                   path="suppliers/:id"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIERS}>
-                      <SupplierDetailPage />
+                      <SupplierDirectoryRedirect />
                     </PlatformRoute>
                   }
                 />

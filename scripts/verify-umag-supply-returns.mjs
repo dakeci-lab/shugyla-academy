@@ -61,7 +61,12 @@ function main() {
   assert.match(settlements, /umag_supply_returns/)
   assert.match(settlements, /buildSupplierOperationHistory/)
   assert.match(settlements, /formatSignedUmagMoney/)
-  assert.match(settlements, /returnAmount/)
+  // 2026-09-19b: the standalone returnAmount period-aggregate was removed
+  // (the card's 5-tile summary block it fed was dropped as redundant with
+  // the operation history rows) — returns are still folded into that same
+  // history, one row per return with its own signed amount/balanceDelta.
+  assert.match(settlements, /for \(const ret of returns\)/)
+  assert.match(settlements, /kind: 'return'/)
   assert.match(settlements, /deriveSupplyPaymentStatus/)
   assert.match(settlements, /SUPPLY_PAYMENT_EPSILON/)
   assert.match(settlements, /paymentStatus/)
@@ -73,11 +78,15 @@ function main() {
   // aggregated correctly by the settlements service checked above.
 
   const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
-  assert.match(panel, /Возвраты поставщикам/)
+  // 2026-09-19b: "Возвраты поставщикам"/"Оплачено" as standalone tile labels
+  // were removed with the 5-tile summary block; returns/payments still show
+  // up as history rows (ops filter tab "Возвраты", status label "Оплачено"
+  // sourced from the service's SUPPLY_PAYMENT_STATUS_LABELS, checked below).
+  assert.match(panel, /'Возвраты'/)
+  assert.match(settlements, /'Оплачено'/)
   assert.match(panel, /История операций/)
   assert.match(panel, /filterSupplierOperations/)
   assert.match(panel, /OperationDetailSheet/)
-  assert.match(panel, /Оплачено/)
   assert.match(panel, /Сальдо/)
   assert.match(panel, /Увеличение/)
   assert.match(panel, /Уменьшение/)

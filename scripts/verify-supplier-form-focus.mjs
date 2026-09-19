@@ -2,6 +2,10 @@
 /**
  * Verification for supplier edit form focus stability (no remount on keystroke).
  *
+ * 2026-09-19: the standalone «Поставщики» directory (SuppliersPage.jsx) that
+ * this used to read was merged into UmagSettlementsPanel.jsx — the edit
+ * modal/form wiring moved there verbatim, so this now reads that file.
+ *
  * Usage:
  *   npm run verify:supplier-form-focus
  */
@@ -34,16 +38,19 @@ function read(relPath) {
 function main() {
   console.log('=== Supplier form focus verification ===\n')
 
-  const page = read('src/pages/platform/suppliers/SuppliersPage.jsx')
+  const page = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
   const form = read('src/components/suppliers/SupplierForm.jsx')
   const modal = read('src/components/admin/AdminModal.jsx')
 
   console.log('Stage 1: Stable keys and structure')
 
   assert('no form key from formData', !page.includes('key={JSON.stringify(form') && !page.includes('key={form'))
-  assert('no modal key from formData', !page.match(/AdminModal[\s\S]*key=\{/))
-  assert('SupplierForm is imported component', page.includes("import SupplierForm"))
-  assert('no nested SupplierForm in render', !page.match(/function SuppliersListPage[\s\S]*function SupplierForm/))
+  assert('no modal key from formData', !page.match(/<AdminModal[^>]*key=\{/))
+  assert('SupplierForm is imported component', page.includes('import SupplierForm'))
+  assert(
+    'no nested SupplierForm definition in the merged screen',
+    !page.match(/export default function UmagSettlementsPanel[\s\S]*function SupplierForm\(/)
+  )
   assert('editId state is stable identifier', page.includes('editId'))
 
   console.log('Stage 2: Local form state')
@@ -70,7 +77,10 @@ function main() {
   console.log('Stage 4: No list refresh on keypress')
 
   assert('suppliers list not updated in setField', !form.includes('updateSupplier'))
-  assert('filter uses version not form', page.includes('[suppliers, search, appliedStatus, version]'))
+  assert(
+    'filter uses version/dataVersion, not form',
+    page.includes('[allSuppliers, search, appliedShowArchived, version, dataVersion]')
+  )
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

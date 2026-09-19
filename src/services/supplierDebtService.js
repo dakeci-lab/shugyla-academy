@@ -23,35 +23,6 @@ function assertSupabaseReady() {
 }
 
 /**
- * Bulk resolve umagSupplierId -> canonical platform_supplier_id using the
- * same link umag-sync itself relies on (platform_suppliers.umag_supplier_id,
- * is_merged = false). Mirrors loadPlatformSupplierMap() in
- * supabase/functions/umag-sync/index.ts — not a new matching strategy.
- * One query regardless of how many ids are requested.
- */
-export async function resolvePlatformSupplierIdsByUmagIds(umagSupplierIds) {
-  const ids = [...new Set((umagSupplierIds || []).filter((id) => id != null))]
-  if (ids.length === 0) return new Map()
-
-  assertSupabaseReady()
-  const { data, error } = await supabase
-    .from('platform_suppliers')
-    .select('id, umag_supplier_id')
-    .in('umag_supplier_id', ids)
-    .eq('is_merged', false)
-
-  if (error) {
-    throw new Error(error.message || 'Не удалось сопоставить поставщиков UMAG с карточками поставщиков')
-  }
-
-  const map = new Map()
-  for (const row of data || []) {
-    if (row.umag_supplier_id != null) map.set(Number(row.umag_supplier_id), row.id)
-  }
-  return map
-}
-
-/**
  * Every open obligation by the NATIVE formula — is_source_deleted = false AND
  * platform_paid_at IS NULL — never UMAG's own current_debt. This is the same
  * predicate «К оплате» uses (see isActiveOpenObligation/resolveOwedAmount in

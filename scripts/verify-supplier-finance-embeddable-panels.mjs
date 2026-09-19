@@ -137,19 +137,22 @@ function main() {
   )
   ok('the settlements table itself is NOT gated by embedded — always renders')
 
-  assert.match(settlementsSrc, /if \(selected\) \{\s*\n\s*return \(\s*\n\s*<UmagSupplierDetail/)
+  assert.match(settlementsSrc, /\{selected \? \(\s*\n\s*<UmagSupplierDetail/)
   ok('supplier drill-down (UmagSupplierDetail) branch is untouched — not gated by embedded')
 
-  // --- Case 7: embedded settlements calls fetchUmagSettlementsSupplierTotals() the same way regardless of embedded ---
-  // Renamed 2026-09-18 (Взаиморасчёты perf) — the list load is now a single
-  // SQL aggregate (fetchUmagSettlementsSupplierTotals), not the old
-  // fetchUmagSettlementsBySupplier() that fetched every raw document for
-  // every supplier just to render the list.
-  assert.match(settlementsSrc, /fetchUmagSettlementsSupplierTotals\(\{ dateFrom, dateTo, search \}\)/)
-  assert.doesNotMatch(settlementsSrc, /embedded[\s\S]{0,80}fetchUmagSettlementsSupplierTotals/)
+  // --- Case 7: the merged «Поставщики» list loads getSuppliers()+debt the
+  // same way regardless of embedded ---
+  // 2026-09-19: the list no longer has a period at all (owner decision — see
+  // UmagSettlementsPanel's file header comment) and no longer calls the
+  // umag_settlements_supplier_totals() RPC; it reads the already-cached
+  // supplier directory (getSuppliers()) and attaches lifetime debt
+  // (fetchNativeSupplierDebts), same source «К оплате» uses.
+  assert.match(settlementsSrc, /const allSuppliers = suppliersReady \? getSuppliers\(\) : \[\]/)
+  assert.doesNotMatch(settlementsSrc, /embedded[\s\S]{0,120}getSuppliers\(\)/)
+  assert.doesNotMatch(settlementsSrc, /fetchUmagSettlementsSupplierTotals/)
   const umagServiceSrc = read('src/services/umagSettlementsService.js')
-  assert.match(umagServiceSrc, /fetchNativeSupplierDebts,\s*\n\s*resolvePlatformSupplierIdsByUmagIds,/)
-  ok('Case 7: loadData() calls fetchUmagSettlementsSupplierTotals() unconditionally (embedded or not) — debt source itself (fetchNativeSupplierDebts, unified with «К оплате») is unaffected by embedded/not')
+  assert.doesNotMatch(umagServiceSrc, /resolvePlatformSupplierIdsByUmagIds/)
+  ok('Case 7: the list reads getSuppliers()+fetchNativeSupplierDebts() unconditionally (embedded or not) — the old period-scoped RPC is gone entirely')
 
   assert.match(settlementsSrc, /import OperationDetailSheet from '\.\/OperationDetailSheet'/)
   // Case 6 (reconciliation flow wiring) and its Этап 2.1 sentinel are gone —
