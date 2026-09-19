@@ -140,12 +140,16 @@ function main() {
   assert.match(settlementsSrc, /if \(selected\) \{\s*\n\s*return \(\s*\n\s*<UmagSupplierDetail/)
   ok('supplier drill-down (UmagSupplierDetail) branch is untouched — not gated by embedded')
 
-  // --- Case 7: embedded settlements calls fetchUmagSettlementsBySupplier() the same way regardless of embedded ---
-  assert.match(settlementsSrc, /fetchUmagSettlementsBySupplier\(\{ dateFrom, dateTo, search \}\)/)
-  assert.doesNotMatch(settlementsSrc, /embedded[\s\S]{0,80}fetchUmagSettlementsBySupplier/)
+  // --- Case 7: embedded settlements calls fetchUmagSettlementsSupplierTotals() the same way regardless of embedded ---
+  // Renamed 2026-09-18 (Взаиморасчёты perf) — the list load is now a single
+  // SQL aggregate (fetchUmagSettlementsSupplierTotals), not the old
+  // fetchUmagSettlementsBySupplier() that fetched every raw document for
+  // every supplier just to render the list.
+  assert.match(settlementsSrc, /fetchUmagSettlementsSupplierTotals\(\{ dateFrom, dateTo, search \}\)/)
+  assert.doesNotMatch(settlementsSrc, /embedded[\s\S]{0,80}fetchUmagSettlementsSupplierTotals/)
   const umagServiceSrc = read('src/services/umagSettlementsService.js')
   assert.match(umagServiceSrc, /fetchNativeSupplierDebts,\s*\n\s*resolvePlatformSupplierIdsByUmagIds,/)
-  ok('Case 7: loadData() calls fetchUmagSettlementsBySupplier() unconditionally (embedded or not) — debt source itself (fetchNativeSupplierDebts, unified with «К оплате») is unaffected by embedded/not')
+  ok('Case 7: loadData() calls fetchUmagSettlementsSupplierTotals() unconditionally (embedded or not) — debt source itself (fetchNativeSupplierDebts, unified with «К оплате») is unaffected by embedded/not')
 
   assert.match(settlementsSrc, /import OperationDetailSheet from '\.\/OperationDetailSheet'/)
   // Case 6 (reconciliation flow wiring) and its Этап 2.1 sentinel are gone —

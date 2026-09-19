@@ -131,7 +131,7 @@ function stageCaller() {
 }
 
 function stageSettlementsQuery() {
-  console.log('Stage 5: fetchUmagSettlementsBySupplier — attributed native marks win, real UMAG history survives')
+  console.log('Stage 5: fetchUmagSupplierOperationHistory — attributed native marks win, real UMAG history survives')
   const service = read('src/services/umagSettlementsService.js')
 
   assert('imports buildNativeSettlementPaymentRows', service.includes('buildNativeSettlementPaymentRows'))
@@ -148,17 +148,23 @@ function stageSettlementsQuery() {
         service
       )
   )
+  // Rewritten 2026-09-18 (Взаиморасчёты perf): fetchUmagSupplierOperationHistory
+  // is scoped to ONE supplier, so it no longer needs the old bulk function's
+  // per-row ensureSettlementRow() accumulation (row.documentPaymentAmount/
+  // row.documentRefundAmount) — the same exclusion/inclusion guarantee is now
+  // a plain filter + array spread feeding straight into
+  // buildSupplierOperationHistory(), unchanged.
   assert(
     'a raw UMAG payment is skipped ONLY when non-refund AND its supply is in attributedSupplyIds — refunds and non-attributed supplies still count',
-    /if \(!isRefund\) \{\s*\n[\s\S]{0,200}attributedSupplyIds\.has\(linkedSupplyId\)\) continue/.test(service)
+    /if \(isUmagPaymentRefund\(payment\)\) return true/.test(service) &&
+      /return !\(linkedSupplyId != null && attributedSupplyIds\.has\(linkedSupplyId\)\)/.test(service)
   )
   assert(
-    'kept UMAG payments still accumulate into row.documentPaymentAmount/row.documentRefundAmount and row.payments',
-    /if \(isRefund\) row\.documentRefundAmount[\s\S]{0,100}else row\.documentPaymentAmount/.test(service)
-  )
-  assert(
-    'nativePaymentRows (attributed marks only) additionally feed row.documentPaymentAmount / row.payments',
-    /for \(const payment of nativePaymentRows\) \{[\s\S]{0,300}row\.documentPaymentAmount/.test(service)
+    'kept UMAG payments and native marks are combined into one array fed straight into buildSupplierOperationHistory — no separate per-row accumulation needed for a single supplier',
+    /const filteredPayments = payments\.filter/.test(service) &&
+      /buildSupplierOperationHistory\(\s*\n\s*supplies,\s*\n\s*returns,\s*\n\s*\[\.\.\.filteredPayments, \.\.\.nativePaymentRows\],/.test(
+        service
+      )
   )
   assert(
     'documentNumber never falls back to the internal payment.id (would leak "platform-paid:<uuid>") — null when there is no real umag_payment_id',

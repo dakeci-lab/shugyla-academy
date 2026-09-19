@@ -9,7 +9,8 @@ import {
 } from '../../../config/permissions'
 import {
   fetchLastUmagSyncRun,
-  fetchUmagSettlementsBySupplier,
+  fetchUmagSettlementsSupplierTotals,
+  fetchUmagSupplierOperationHistory,
   filterSupplierOperations,
   formatSignedUmagMoney,
   formatUmagDate,
@@ -260,13 +261,43 @@ function formatAccountNames(value) {
 
 function UmagSupplierDetail({
   supplier,
+  dateFrom,
+  dateTo,
   canManagePayments,
   onBack,
   onSyncComplete,
   showError,
   showSuccess,
 }) {
-  const operations = supplier.operations || []
+  // «Второй уровень» — the individual receiving/return/payment history is
+  // fetched only now, scoped to this one supplier, not eagerly for the
+  // whole list (see fetchUmagSupplierOperationHistory's own doc comment).
+  const [detail, setDetail] = useState(null)
+  const [detailLoading, setDetailLoading] = useState(true)
+  const [detailError, setDetailError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setDetailLoading(true)
+    setDetailError('')
+    void fetchUmagSupplierOperationHistory({
+      platformSupplierId: supplier.platformSupplierId,
+      umagSupplierId: supplier.umagSupplierId,
+      dateFrom,
+      dateTo,
+    }).then((result) => {
+      if (cancelled) return
+      if (result.error) setDetailError(result.error)
+      setDetail(result)
+      setDetailLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [supplier.platformSupplierId, supplier.umagSupplierId, dateFrom, dateTo])
+
+  const operations = detail?.operations || []
+  const openingBalance = detail?.openingBalance || 0
   const [opsFilter, setOpsFilter] = useState('all')
   const [selectedOperation, setSelectedOperation] = useState(null)
   const visibleOps = useMemo(
@@ -335,7 +366,13 @@ function UmagSupplierDetail({
           </div>
         </div>
 
-        {visibleOps.length === 0 ? (
+        {detailLoading ? (
+          <DelayedLoadingSkeleton variant="table" count={5} />
+        ) : detailError ? (
+          <div className="umag-settlements__error" role="alert">
+            {detailError}
+          </div>
+        ) : visibleOps.length === 0 ? (
           <div className="umag-settlements__empty">
             За выбранный период операций UMAG не найдено
           </div>
@@ -356,14 +393,14 @@ function UmagSupplierDetail({
                   </tr>
                 </thead>
                 <tbody>
-                  {Number(supplier.openingBalance) !== 0 && (
+                  {Number(openingBalance) !== 0 && (
                     <tr className="umag-settlements__ops-row umag-settlements__ops-row--opening">
                       <td colSpan={2}>Начальное сальдо</td>
                       <td>—</td>
                       <td className="umag-settlements__money-col">—</td>
                       <td className="umag-settlements__money-col">—</td>
                       <td className="umag-settlements__money-col">
-                        {formatUmagMoney(supplier.openingBalance)}
+                        {formatUmagMoney(openingBalance)}
                       </td>
                       <td>
                         <span className="umag-settlements__pay-status umag-settlements__pay-status--posted">
@@ -531,7 +568,7 @@ export default function UmagSettlementsPanel({
     setLoading(true)
     setLoadError('')
     const [settlements, run] = await Promise.all([
-      fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search }),
+      fetchUmagSettlementsSupplierTotals({ dateFrom, dateTo, search }),
       fetchLastUmagSyncRun(),
     ])
     setLastRun(run)
@@ -616,6 +653,8 @@ export default function UmagSettlementsPanel({
     return (
       <UmagSupplierDetail
         supplier={selected}
+        dateFrom={dateFrom}
+        dateTo={dateTo}
         canManagePayments={canManagePayments}
         onBack={() => setSelected(null)}
         onSyncComplete={() => {

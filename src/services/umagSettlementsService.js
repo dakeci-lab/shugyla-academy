@@ -399,7 +399,7 @@ function ensureSettlementRow(byKey, seed) {
  * lookup map (canonicalDebtByPlatformId — despite the name, now built by
  * fetchNativeSupplierDebts(), the same formula «К оплате» uses; "canonical"
  * here refers to resolving to one deduplicated supplier, not to the old
- * UMAG-current_debt formula) — split out from fetchUmagSettlementsBySupplier()
+ * UMAG-current_debt formula) — split out from fetchUmagSettlementsSupplierTotals()
  * so it's directly testable without a live Supabase connection.
  *
  * A row only known by umagSupplierId that never resolves to a canonical
@@ -576,256 +576,49 @@ export function filterSupplierOperations(operations, filter = 'all') {
 }
 
 /**
- * Load supplies + returns + payments for period and aggregate by canonical supplier.
+ * Fast list load — one SQL aggregate (umag_settlements_supplier_totals, added
+ * 2026-09-18) instead of fetching every raw supply/return/payment document
+ * for every supplier just to sum 5 numbers per row. Previously the list and
+ * the per-supplier drilldown shared one function that fetched everything
+ * upfront (~1500+ rows for ~190 suppliers, 5-8s) — the drilldown is now a
+ * separate, per-supplier, on-demand fetch (fetchUmagSupplierOperationHistory
+ * below), matching the owner's "list fast, detail on click" request.
  * @param {{ dateFrom: string, dateTo: string, search?: string }} params
  */
-export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search = '' }) {
+export async function fetchUmagSettlementsSupplierTotals({ dateFrom, dateTo, search = '' }) {
   if (!isSupabaseConfigured() || !supabase) {
     return { rows: [], totals: emptyTotals(), error: 'Supabase не настроен.' }
   }
 
-  const fromIso = `${dateFrom}T00:00:00+05:00`
-  const toIso = `${dateTo}T23:59:59.999+05:00`
-
-  const [suppliesRes, returnsRes, paymentsRes, openingRes, nativePaidRes] = await Promise.all([
-    fetchAllSupabaseRows(() =>
-      supabase
-        .from('umag_supplies')
-        .select(
-          'id, umag_supply_id, supplier_id, platform_supplier_id, umag_supplier_id, supplier_name, supplier_legal_name, doc_time, amount, payment_amount, payment_refund_amount, debt, account, comment, umag_user_name'
-        )
-        .eq('is_source_deleted', false)
-        .gte('doc_time', fromIso)
-        .lte('doc_time', toIso)
-        .order('doc_time', { ascending: false })
-    ),
-    fetchAllSupabaseRows(() =>
-      supabase
-        .from('umag_supply_returns')
-        .select(
-          'id, umag_return_id, platform_supplier_id, umag_supplier_id, supplier_name, user_name, amount, payed_amount, document_time, operation_time, note, is_provided, account_names, operation_type'
-        )
-        .eq('is_source_deleted', false)
-        .gte('document_time', fromIso)
-        .lte('document_time', toIso)
-        .order('document_time', { ascending: false })
-    ),
-    fetchAllSupabaseRows(() =>
-      supabase
-        .from('umag_document_payments')
-        .select(
-          'id, umag_payment_id, platform_supplier_id, umag_supplier_id, supplier_name, payment_time, amount, payment_type, class_name, linked_umag_supply_id, linked_umag_return_id, account_name, user_name, note'
-        )
-        .eq('is_source_deleted', false)
-        .gte('payment_time', fromIso)
-        .lte('payment_time', toIso)
-        .order('payment_time', { ascending: false })
-    ),
-    fetchAllSupabaseRows(() =>
-      supabase
-        .from('platform_supplier_ledger_events')
-        .select('platform_supplier_id, umag_supplier_id, balance_delta')
-        .lt('occurred_at', fromIso)
-        .order('occurred_at', { ascending: true })
-    ),
-    // Natively-marked payments ("Оплачено" in «К оплате») with a real
-    // employee attached — the trustworthy source once staff mark documents
-    // paid in UMAG immediately at receiving time (see
-    // buildNativeSettlementPaymentRows). platform_paid_by IS NULL means this
-    // obligation was closed by the one-time 2026-09-15 backfill migration
-    // (mass-marking pre-existing debt with no real payment moment recorded)
-    // — those fall back to their real historical UMAG document-payment
-    // record instead (see attributedSupplyIds below), never a fabricated one.
-    fetchAllSupabaseRows(() =>
-      supabase
-        .from('supplier_payment_obligations')
-        .select(
-          'id, platform_supplier_id, umag_supply_id, original_supply_amount, platform_paid_at, platform_paid_by, platform_payment_account_id, supplier:platform_suppliers!platform_supplier_id(name)'
-        )
-        .not('platform_paid_at', 'is', null)
-        .not('platform_paid_by', 'is', null)
-        .gte('platform_paid_at', fromIso)
-        .lte('platform_paid_at', toIso)
-    ),
-  ])
-
-  if (suppliesRes.error) {
+  const { data, error } = await supabase.rpc('umag_settlements_supplier_totals', {
+    p_date_from: dateFrom,
+    p_date_to: dateTo,
+  })
+  if (error) {
     return {
       rows: [],
       totals: emptyTotals(),
-      error: suppliesRes.error.message || 'Не удалось загрузить приёмки UMAG.',
+      error: error.message || 'Не удалось загрузить сводку по поставщикам.',
     }
   }
-  if (returnsRes.error) {
-    return {
-      rows: [],
-      totals: emptyTotals(),
-      error: returnsRes.error.message || 'Не удалось загрузить возвраты поставщикам UMAG.',
-    }
-  }
-  // Payments / opening ledger may be absent before migration — treat as empty.
-  const payments = paymentsRes.error ? [] : paymentsRes.data || []
-  const openingRows = openingRes.error ? [] : openingRes.data || []
-  const nativePaidObligations = nativePaidRes.error ? [] : nativePaidRes.data || []
 
-  const employeeIds = [
-    ...new Set(
-      nativePaidObligations
-        .map((row) => row.platform_paid_by)
-        .filter((id) => id != null)
-    ),
-  ]
-  const employeeNameById = new Map()
-  if (employeeIds.length > 0) {
-    const { data: employeeRows } = await supabase
-      .from('academy_users')
-      .select('id, full_name')
-      .in('id', employeeIds)
-    for (const row of employeeRows || []) {
-      employeeNameById.set(row.id, row.full_name || null)
-    }
-  }
-  // Supplies whose obligation has a real attributed native mark
-  // (platform_paid_by set) — their raw UMAG document-payment record (if any)
-  // is superseded by the native mark below and must not also be rendered as
-  // a second, duplicate payment line. Every other supply's real UMAG payment
-  // record (if any) still stands as-is — it predates the "mark paid in UMAG
-  // immediately at receiving" policy and is genuine history.
-  const linkedSupplyIdsInPayments = [
-    ...new Set(
-      payments
-        .filter((p) => !isUmagPaymentRefund(p) && p.linked_umag_supply_id != null)
-        .map((p) => Number(p.linked_umag_supply_id))
-    ),
-  ]
-  let attributedSupplyIds = new Set()
-  if (linkedSupplyIdsInPayments.length > 0) {
-    const { data: attributedRows } = await supabase
-      .from('supplier_payment_obligations')
-      .select('umag_supply_id')
-      .not('platform_paid_by', 'is', null)
-      .in('umag_supply_id', linkedSupplyIdsInPayments)
-    attributedSupplyIds = new Set((attributedRows || []).map((row) => Number(row.umag_supply_id)))
-  }
+  const rawRows = data || []
 
-  await ensurePaymentAccountsLoaded()
-  const accountNameById = {
-    get: (accountId) => (accountId ? getPaymentAccountName(accountId) : null),
-  }
-  const nativePaymentRows = buildNativeSettlementPaymentRows(
-    nativePaidObligations.map((row) => ({
-      id: row.id,
-      platformSupplierId: row.platform_supplier_id,
-      umagSupplyId: row.umag_supply_id,
-      originalSupplyAmount: row.original_supply_amount,
-      platformPaidAt: row.platform_paid_at,
-      platformPaidBy: row.platform_paid_by,
-      platformPaymentAccountId: row.platform_payment_account_id,
-      supplierName: (Array.isArray(row.supplier) ? row.supplier[0] : row.supplier)?.name || null,
-    })),
-    { accountNameById, employeeNameById }
-  )
-
-  const supplies = suppliesRes.data || []
-  const returns = returnsRes.data || []
-  const byKey = new Map()
-
-  const openingByKey = new Map()
-  for (const row of openingRows) {
-    const key = supplierSettlementKey({
-      platformSupplierId: row.platform_supplier_id,
-      umagSupplierId: row.umag_supplier_id,
-      name: null,
-    })
-    openingByKey.set(key, (openingByKey.get(key) || 0) + toNumber(row.balance_delta))
-  }
-
-  for (const supply of supplies) {
-    const row = ensureSettlementRow(byKey, {
-      platformSupplierId: supply.platform_supplier_id,
-      supplierId: supply.supplier_id,
-      umagSupplierId: supply.umag_supplier_id,
-      name: supply.supplier_name,
-      legalName: supply.supplier_legal_name,
-    })
-    row.supplyCount += 1
-    row.amount += toNumber(supply.amount)
-    row.paymentAmount += toNumber(supply.payment_amount)
-    row.paymentRefundAmount += toNumber(supply.payment_refund_amount)
-    row.supplies.push(supply)
-  }
-
-  for (const ret of returns) {
-    const row = ensureSettlementRow(byKey, {
-      platformSupplierId: ret.platform_supplier_id,
-      umagSupplierId: ret.umag_supplier_id,
-      name: ret.supplier_name,
-    })
-    row.returnCount += 1
-    row.returnAmount += Math.abs(toNumber(ret.amount))
-    row.returns.push(ret)
-  }
-
-  // Refunds always come from UMAG's own feed (unaffected by the receiving-
-  // time marking policy). Non-refund UMAG payments are skipped only when
-  // their linked supply now has a real attributed native mark — that mark
-  // is this supply's trustworthy payment record instead (see
-  // attributedSupplyIds above); every other UMAG payment is genuine history
-  // and still counts.
-  for (const payment of payments) {
-    const isRefund = isUmagPaymentRefund(payment)
-    if (!isRefund) {
-      const linkedSupplyId =
-        payment.linked_umag_supply_id != null ? Number(payment.linked_umag_supply_id) : null
-      if (linkedSupplyId != null && attributedSupplyIds.has(linkedSupplyId)) continue
-    }
-    const row = ensureSettlementRow(byKey, {
-      platformSupplierId: payment.platform_supplier_id,
-      umagSupplierId: payment.umag_supplier_id,
-      name: payment.supplier_name,
-    })
-    const abs = Math.abs(toNumber(payment.amount))
-    if (isRefund) row.documentRefundAmount = (row.documentRefundAmount || 0) + abs
-    else row.documentPaymentAmount = (row.documentPaymentAmount || 0) + abs
-    row.payments = row.payments || []
-    row.payments.push(payment)
-  }
-
-  for (const payment of nativePaymentRows) {
-    const row = ensureSettlementRow(byKey, {
-      platformSupplierId: payment.platform_supplier_id,
-      umagSupplierId: payment.umag_supplier_id,
-      name: payment.supplier_name,
-    })
-    row.documentPaymentAmount = (row.documentPaymentAmount || 0) + Math.abs(toNumber(payment.amount))
-    row.payments = row.payments || []
-    row.payments.push(payment)
-  }
-
-  // «Задолженность» = native current debt (same formula as «К оплате» —
-  // resolveOwedAmount/isActiveOpenObligation), never UMAG's own current_debt
-  // (Этап 2.1's canonical-debt formula — retired here so this number can
-  // never again disagree with «К оплате»'s Долг tile), never the ledger
-  // closing balance, never a SUM(umag_supplies.debt)-for-period fallback.
-  // Bulk, not per-row: one resolve query for rows only known by
-  // umagSupplierId, one debt query for every canonical supplier this
-  // period's rows touch.
-  const rowsList = [...byKey.values()]
   let resolvedPlatformIdByUmagId
   let canonicalDebtByPlatformId
   try {
     const umagIdsNeedingResolution = [
       ...new Set(
-        rowsList
-          .filter((row) => !row.platformSupplierId && row.umagSupplierId != null)
-          .map((row) => row.umagSupplierId)
+        rawRows
+          .filter((row) => !row.platform_supplier_id && row.umag_supplier_id != null)
+          .map((row) => row.umag_supplier_id)
       ),
     ]
     resolvedPlatformIdByUmagId = await resolvePlatformSupplierIdsByUmagIds(umagIdsNeedingResolution)
 
     const canonicalIds = [
       ...new Set([
-        ...rowsList.filter((row) => row.platformSupplierId).map((row) => row.platformSupplierId),
+        ...rawRows.filter((row) => row.platform_supplier_id).map((row) => row.platform_supplier_id),
         ...resolvedPlatformIdByUmagId.values(),
       ]),
     ]
@@ -838,26 +631,34 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
     }
   }
 
-  let rows = rowsList.map((row) => {
-    const openingBalance = openingByKey.get(row.key) || 0
-    const history = buildSupplierOperationHistory(
-      row.supplies,
-      row.returns,
-      row.payments || [],
-      openingBalance
-    )
-    const paidFromDocuments = toNumber(row.documentPaymentAmount)
-    const debt = resolveRowCanonicalDebt(row, resolvedPlatformIdByUmagId, canonicalDebtByPlatformId)
-
+  let rows = rawRows.map((row) => {
+    const documentPaymentAmount = toNumber(row.document_payment_amount) + toNumber(row.native_payment_amount)
+    const rowForDebt = {
+      platformSupplierId: row.platform_supplier_id || null,
+      umagSupplierId: row.umag_supplier_id ?? null,
+    }
     return {
-      ...row,
-      openingBalance,
-      // History/audit trail only — never read as product debt (Этап 2.5 item 11).
-      ledgerClosingBalance: history.closingBalance,
-      // Prefer real payment documents for "Оплачено" when available.
-      paymentAmount: paidFromDocuments > 0 ? paidFromDocuments : row.paymentAmount,
-      debt,
-      operations: history.operations,
+      key: row.key,
+      platformSupplierId: row.platform_supplier_id || null,
+      supplierId: row.platform_supplier_id || null,
+      umagSupplierUuid: null,
+      umagSupplierId: row.umag_supplier_id ?? null,
+      name: row.name || 'Без названия',
+      legalName: row.legal_name || null,
+      supplyCount: Number(row.supply_count) || 0,
+      amount: toNumber(row.amount),
+      paymentAmount: documentPaymentAmount > 0 ? documentPaymentAmount : toNumber(row.payment_amount_from_supplies),
+      paymentRefundAmount: toNumber(row.document_refund_amount),
+      returnCount: Number(row.return_count) || 0,
+      returnAmount: toNumber(row.return_amount),
+      documentPaymentAmount,
+      documentRefundAmount: toNumber(row.document_refund_amount),
+      debt: resolveRowCanonicalDebt(rowForDebt, resolvedPlatformIdByUmagId, canonicalDebtByPlatformId),
+      // Filled in lazily by fetchUmagSupplierOperationHistory() once this
+      // supplier's card is opened — never eagerly for the whole list.
+      openingBalance: null,
+      ledgerClosingBalance: null,
+      operations: null,
     }
   })
 
@@ -877,14 +678,183 @@ export async function fetchUmagSettlementsBySupplier({ dateFrom, dateTo, search 
 
   const totals = computeSettlementsListTotals(rows)
 
+  return { rows, totals, error: null }
+}
+
+/**
+ * Full operation history (individual receiving/return/payment lines) for ONE
+ * supplier — the «second level» detail, fetched only when that supplier's
+ * card is opened. Scoped queries only (platform_supplier_id or, failing
+ * that, umag_supplier_id), never "give me everything for the period".
+ * @param {{ platformSupplierId?: string|null, umagSupplierId?: number|null, dateFrom: string, dateTo: string }} params
+ */
+export async function fetchUmagSupplierOperationHistory({
+  platformSupplierId = null,
+  umagSupplierId = null,
+  dateFrom,
+  dateTo,
+}) {
+  const empty = { operations: [], openingBalance: 0, closingBalance: 0, error: null }
+  if (!isSupabaseConfigured() || !supabase) {
+    return { ...empty, error: 'Supabase не настроен.' }
+  }
+  if (!platformSupplierId && umagSupplierId == null) {
+    return empty
+  }
+
+  const fromIso = `${dateFrom}T00:00:00+05:00`
+  const toIso = `${dateTo}T23:59:59.999+05:00`
+
+  function scopeToSupplier(query) {
+    return platformSupplierId
+      ? query.eq('platform_supplier_id', platformSupplierId)
+      : query.eq('umag_supplier_id', umagSupplierId)
+  }
+
+  const [suppliesRes, returnsRes, paymentsRes, openingRes, nativePaidRes] = await Promise.all([
+    fetchAllSupabaseRows(() =>
+      scopeToSupplier(
+        supabase
+          .from('umag_supplies')
+          .select(
+            'id, umag_supply_id, supplier_id, platform_supplier_id, umag_supplier_id, supplier_name, supplier_legal_name, doc_time, amount, payment_amount, payment_refund_amount, debt, account, comment, umag_user_name'
+          )
+      )
+        .eq('is_source_deleted', false)
+        .gte('doc_time', fromIso)
+        .lte('doc_time', toIso)
+        .order('doc_time', { ascending: false })
+    ),
+    fetchAllSupabaseRows(() =>
+      scopeToSupplier(
+        supabase
+          .from('umag_supply_returns')
+          .select(
+            'id, umag_return_id, platform_supplier_id, umag_supplier_id, supplier_name, user_name, amount, payed_amount, document_time, operation_time, note, is_provided, account_names, operation_type'
+          )
+      )
+        .eq('is_source_deleted', false)
+        .gte('document_time', fromIso)
+        .lte('document_time', toIso)
+        .order('document_time', { ascending: false })
+    ),
+    fetchAllSupabaseRows(() =>
+      scopeToSupplier(
+        supabase
+          .from('umag_document_payments')
+          .select(
+            'id, umag_payment_id, platform_supplier_id, umag_supplier_id, supplier_name, payment_time, amount, payment_type, class_name, linked_umag_supply_id, linked_umag_return_id, account_name, user_name, note'
+          )
+      )
+        .eq('is_source_deleted', false)
+        .gte('payment_time', fromIso)
+        .lte('payment_time', toIso)
+        .order('payment_time', { ascending: false })
+    ),
+    fetchAllSupabaseRows(() =>
+      scopeToSupplier(
+        supabase.from('platform_supplier_ledger_events').select('platform_supplier_id, umag_supplier_id, balance_delta')
+      ).lt('occurred_at', fromIso)
+    ),
+    platformSupplierId
+      ? fetchAllSupabaseRows(() =>
+          supabase
+            .from('supplier_payment_obligations')
+            .select(
+              'id, platform_supplier_id, umag_supply_id, original_supply_amount, platform_paid_at, platform_paid_by, platform_payment_account_id, supplier:platform_suppliers!platform_supplier_id(name)'
+            )
+            .eq('platform_supplier_id', platformSupplierId)
+            .not('platform_paid_at', 'is', null)
+            .not('platform_paid_by', 'is', null)
+            .gte('platform_paid_at', fromIso)
+            .lte('platform_paid_at', toIso)
+        )
+      : Promise.resolve({ data: [], error: null }),
+  ])
+
+  if (suppliesRes.error) {
+    return { ...empty, error: suppliesRes.error.message || 'Не удалось загрузить приёмки UMAG.' }
+  }
+  if (returnsRes.error) {
+    return { ...empty, error: returnsRes.error.message || 'Не удалось загрузить возвраты поставщикам UMAG.' }
+  }
+
+  const payments = paymentsRes.error ? [] : paymentsRes.data || []
+  const openingRows = openingRes.error ? [] : openingRes.data || []
+  const nativePaidObligations = nativePaidRes.error ? [] : nativePaidRes.data || []
+
+  const employeeIds = [
+    ...new Set(nativePaidObligations.map((row) => row.platform_paid_by).filter((id) => id != null)),
+  ]
+  const employeeNameById = new Map()
+  if (employeeIds.length > 0) {
+    const { data: employeeRows } = await supabase
+      .from('academy_users')
+      .select('id, full_name')
+      .in('id', employeeIds)
+    for (const row of employeeRows || []) {
+      employeeNameById.set(row.id, row.full_name || null)
+    }
+  }
+
+  const linkedSupplyIdsInPayments = [
+    ...new Set(
+      payments
+        .filter((p) => !isUmagPaymentRefund(p) && p.linked_umag_supply_id != null)
+        .map((p) => Number(p.linked_umag_supply_id))
+    ),
+  ]
+  let attributedSupplyIds = new Set()
+  if (linkedSupplyIdsInPayments.length > 0) {
+    const { data: attributedRows } = await supabase
+      .from('supplier_payment_obligations')
+      .select('umag_supply_id')
+      .not('platform_paid_by', 'is', null)
+      .in('umag_supply_id', linkedSupplyIdsInPayments)
+    attributedSupplyIds = new Set((attributedRows || []).map((row) => Number(row.umag_supply_id)))
+  }
+
+  await ensurePaymentAccountsLoaded()
+  const accountNameById = { get: (accountId) => (accountId ? getPaymentAccountName(accountId) : null) }
+  const nativePaymentRows = buildNativeSettlementPaymentRows(
+    nativePaidObligations.map((row) => ({
+      id: row.id,
+      platformSupplierId: row.platform_supplier_id,
+      umagSupplyId: row.umag_supply_id,
+      originalSupplyAmount: row.original_supply_amount,
+      platformPaidAt: row.platform_paid_at,
+      platformPaidBy: row.platform_paid_by,
+      platformPaymentAccountId: row.platform_payment_account_id,
+      supplierName: (Array.isArray(row.supplier) ? row.supplier[0] : row.supplier)?.name || null,
+    })),
+    { accountNameById, employeeNameById }
+  )
+
+  const supplies = suppliesRes.data || []
+  const returns = returnsRes.data || []
+
+  let openingBalance = 0
+  for (const row of openingRows) openingBalance += toNumber(row.balance_delta)
+
+  const filteredPayments = payments.filter((payment) => {
+    if (isUmagPaymentRefund(payment)) return true
+    const linkedSupplyId =
+      payment.linked_umag_supply_id != null ? Number(payment.linked_umag_supply_id) : null
+    return !(linkedSupplyId != null && attributedSupplyIds.has(linkedSupplyId))
+  })
+
+  const history = buildSupplierOperationHistory(
+    supplies,
+    returns,
+    [...filteredPayments, ...nativePaymentRows],
+    openingBalance
+  )
+
   return {
-    rows,
-    totals,
+    operations: history.operations,
+    openingBalance,
+    closingBalance: history.closingBalance,
     error: null,
-    suppliesCount: supplies.length,
-    returnsCount: returns.length,
-    paymentsCount: payments.length,
-    paymentsLoadError: paymentsRes.error?.message || null,
   }
 }
 
