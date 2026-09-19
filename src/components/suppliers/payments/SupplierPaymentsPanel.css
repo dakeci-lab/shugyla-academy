@@ -436,6 +436,47 @@
   width: 100%;
 }
 
+.spo-panel__mark-paid-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.spo-panel__mark-paid-row .spo-panel__mark-paid-btn {
+  margin-top: 0;
+  flex: 1;
+}
+
+/* Reuses .pf-field__control/.pf-field__display/.pf-field__chevron/.pf-field__list/
+   .pf-field__item (the «Фильтр» popover's account/supplier fields) — same
+   border/height/font/chevron closed, and the SAME custom list open, instead
+   of a native <select> (whose open dropdown a browser never lets you
+   restyle — the "старый браузерский" look the owner flagged). MarkPaidAccountSelect
+   owns real DOM state (open/close, click-outside, Escape); this file only
+   adds the floating position + selected-row highlight the filter popover's
+   inline (non-floating) list didn't need. */
+.spo-panel__mark-paid-control {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.spo-panel__mark-paid-list {
+  /* top/left/width come from an inline style (getBoundingClientRect) —
+     portalled to document.body, escaping GroupDetail's own scrollable
+     sheet (overflow: auto) instead of being clipped by it. */
+  position: fixed;
+  z-index: 90;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.16);
+}
+
+.spo-panel__mark-paid-item[aria-selected='true'] {
+  background: #ecfdf3;
+  color: #047857;
+  font-weight: 700;
+}
+
 @media (min-width: 901px) {
   .spo-panel__sheet-backdrop {
     align-items: center;

@@ -42,6 +42,7 @@ import { getTableSettings, saveTableSettings } from '../../../services/tableSett
 import {
   ensurePaymentAccountsLoaded,
   getPaymentAccountName,
+  getPaymentAccountsCacheSync,
 } from '../../../services/paymentAccountsService'
 import {
   PAYMENTS_COLUMN_RESIZE_MIN_WIDTH,
@@ -748,6 +749,140 @@ function ObligationCard({ group, todayKey, canEditTerms, onOpen, onConfigure }) 
   )
 }
 
+/**
+ * Single-select account picker for the «Оплачено» row — a real dropdown
+ * (open state fully our own CSS), not a native <select>: the browser's own
+ * <select> popup can't be restyled at all once open, which is exactly the
+ * "old browser look" the owner flagged. Reuses the same pf-field__control/
+ * display/chevron/list/item classes as the «Фильтр» popover's fields, so
+ * closed AND open states both match.
+ *
+ * The list itself is portalled to document.body and positioned with
+ * getBoundingClientRect() — GroupDetail's own sheet scrolls
+ * (overflow: auto, see the comment above it), which would otherwise clip an
+ * absolutely-positioned dropdown the moment the row isn't near the top.
+ */
+function MarkPaidAccountSelect({ accounts, value, onChange, disabled }) {
+  const [open, setOpen] = useState(false)
+  const [menuRect, setMenuRect] = useState(null)
+  const rootRef = useRef(null)
+  const menuRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+    const rect = rootRef.current?.getBoundingClientRect()
+    if (rect) {
+      // Flip upward when the row sits near the bottom of the viewport (the
+      // sheet itself can be scrolled arbitrarily far) — a fixed max-height
+      // list opening downward there would render mostly off-screen.
+      const estimatedMenuHeight = 46 * (accounts.length + 1) + 8
+      const roomBelow = window.innerHeight - rect.bottom
+      const openUpward = roomBelow < estimatedMenuHeight && rect.top > roomBelow
+      setMenuRect({
+        left: rect.left,
+        width: rect.width,
+        ...(openUpward
+          ? { bottom: window.innerHeight - rect.top + 6 }
+          : { top: rect.bottom + 6 }),
+      })
+    }
+
+    function handlePointerDown(event) {
+      if (!(event.target instanceof Node)) return
+      // The list itself is portalled to document.body — a plain
+      // rootRef.contains() check misses it entirely, so a real mouse click
+      // (mousedown fires before click) closed the menu out from under
+      // itself before the option's own onClick ever ran. Both refs must
+      // count as "inside".
+      if (rootRef.current?.contains(event.target)) return
+      if (menuRef.current?.contains(event.target)) return
+      setOpen(false)
+    }
+    function handleEscape(event) {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    // The row can move (sheet scroll, window resize) while the list is
+    // open — closing on either is simpler and less error-prone than
+    // continuously re-tracking the trigger's position.
+    function handleClose() {
+      setOpen(false)
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+    window.addEventListener('resize', handleClose)
+    document.addEventListener('scroll', handleClose, true)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+      window.removeEventListener('resize', handleClose)
+      document.removeEventListener('scroll', handleClose, true)
+    }
+  }, [open])
+
+  const selected = accounts.find((account) => account.id === value)
+  const label = selected?.name || 'Без счёта'
+
+  function choose(nextValue) {
+    onChange(nextValue)
+    setOpen(false)
+  }
+
+  return (
+    <div className="pf-field__control spo-panel__mark-paid-control" ref={rootRef}>
+      <button
+        type="button"
+        className="pf-field__display"
+        disabled={disabled}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((isOpen) => !isOpen)}
+      >
+        {label}
+      </button>
+      <button
+        type="button"
+        className="pf-field__chevron"
+        aria-label="Открыть список счетов"
+        disabled={disabled}
+        onClick={() => setOpen((isOpen) => !isOpen)}
+      >
+        <ChevronDownIcon size={16} />
+      </button>
+      {open && menuRect
+        ? createPortal(
+            <div
+              ref={menuRef}
+              className="pf-field__list spo-panel__mark-paid-list"
+              role="listbox"
+              style={menuRect}
+            >
+              <div
+                className="pf-field__item spo-panel__mark-paid-item"
+                role="option"
+                aria-selected={value == null}
+                onClick={() => choose(null)}
+              >
+                Без счёта
+              </div>
+              {accounts.map((account) => (
+                <div
+                  key={account.id}
+                  className="pf-field__item spo-panel__mark-paid-item"
+                  role="option"
+                  aria-selected={value === account.id}
+                  onClick={() => choose(account.id)}
+                >
+                  {account.name}
+                </div>
+              ))}
+            </div>,
+            document.body
+          )
+        : null}
+    </div>
+  )
+}
+
 function GroupDetail({
   group,
   todayKey,
@@ -759,9 +894,22 @@ function GroupDetail({
   onMarkPaid,
   onUnmarkPaid,
 }) {
+  // Счёт, которым фактически оплачена ЭТА приёмка — независим от способа
+  // оплаты по умолчанию у поставщика (см. Case: поставщику иногда платят
+  // наличными, иногда переводом). Defaults to the supplier's usual account,
+  // overridable per obligation right before marking paid.
+  const [selectedAccountByObId, setSelectedAccountByObId] = useState(() => {
+    const initial = {}
+    for (const ob of group?.obligations || []) {
+      initial[ob.id] = ob.supplierPaymentAccountId ?? null
+    }
+    return initial
+  })
+
   if (!group) return null
   const isMissing = group.status === OBLIGATION_STATUS.TERMS_MISSING
   const mapped = Boolean(group.platformSupplierId)
+  const activeAccounts = getPaymentAccountsCacheSync().filter((account) => account.isActive)
 
   // Portalled to document.body: rendered inline, this "fixed" backdrop would
   // actually be contained by PullToRefresh's always-on `will-change:
@@ -841,14 +989,40 @@ function GroupDetail({
                   </strong>
                 </div>
                 {canManagePayments ? (
-                  <button
-                    type="button"
-                    className={`btn btn--sm spo-panel__mark-paid-btn${markedPaid ? ' btn--ghost' : ' btn--primary'}`}
-                    disabled={isMarking}
-                    onClick={() => (markedPaid ? onUnmarkPaid(ob) : onMarkPaid(ob))}
-                  >
-                    {isMarking ? 'Сохранение…' : markedPaid ? 'Отменить оплату' : 'Оплачено'}
-                  </button>
+                  markedPaid ? (
+                    <button
+                      type="button"
+                      className="btn btn--sm btn--ghost spo-panel__mark-paid-btn"
+                      disabled={isMarking}
+                      onClick={() => onUnmarkPaid(ob)}
+                    >
+                      {isMarking ? 'Сохранение…' : 'Отменить оплату'}
+                    </button>
+                  ) : (
+                    <div className="spo-panel__mark-paid-row">
+                      {activeAccounts.length > 0 ? (
+                        <MarkPaidAccountSelect
+                          accounts={activeAccounts}
+                          value={selectedAccountByObId[ob.id] ?? null}
+                          onChange={(nextId) =>
+                            setSelectedAccountByObId((prev) => ({
+                              ...prev,
+                              [ob.id]: nextId,
+                            }))
+                          }
+                          disabled={isMarking}
+                        />
+                      ) : null}
+                      <button
+                        type="button"
+                        className="btn btn--sm btn--primary spo-panel__mark-paid-btn"
+                        disabled={isMarking}
+                        onClick={() => onMarkPaid(ob, selectedAccountByObId[ob.id] ?? null)}
+                      >
+                        {isMarking ? 'Сохранение…' : 'Оплачено'}
+                      </button>
+                    </div>
+                  )
                 ) : null}
               </li>
             )
@@ -1333,19 +1507,20 @@ export default function SupplierPaymentsPanel({
     })
   }
 
-  async function handleMarkPaid(ob) {
+  async function handleMarkPaid(ob, chosenAccountId) {
     if (!canManagePayments || markingId) return
+    const accountId = chosenAccountId !== undefined ? chosenAccountId : ob.supplierPaymentAccountId ?? null
     setMarkingId(ob.id)
     try {
       await markObligationPaid(ob, {
         paidByEmployeeId: user?.id ?? null,
-        accountId: ob.supplierPaymentAccountId ?? null,
+        accountId,
         employeeName: user?.name ?? null,
-        accountName: getPaymentAccountName(ob.supplierPaymentAccountId ?? null),
+        accountName: getPaymentAccountName(accountId),
       })
       patchSelectedGroupObligation(ob.id, {
         platformPaidAt: new Date().toISOString(),
-        platformPaymentAccountId: ob.supplierPaymentAccountId ?? null,
+        platformPaymentAccountId: accountId,
       })
       toast.success?.('Отмечено оплаченным')
       void reloadAfterMutation()

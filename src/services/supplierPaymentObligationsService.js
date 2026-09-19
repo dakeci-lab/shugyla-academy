@@ -124,6 +124,35 @@ export async function listPaymentObligations({ includePaid = false } = {}) {
   return (data || []).map(normalizeObligation).filter(Boolean)
 }
 
+/**
+ * Total actually paid to suppliers per payment account (platform_payment_account_id
+ * — the account chosen at the moment «Оплачено» was clicked, independent of
+ * the supplier's default), across every natively-marked-paid obligation.
+ * Powers «Выплачено поставщикам» on Настройки → Счета оплаты (Уровень А of
+ * the ДДС discussion — a report, not a running balance: the platform has no
+ * inflow tracking, so this only ever shows money going out).
+ */
+export async function fetchPaymentAccountPaidTotals() {
+  assertCloudReady()
+
+  const { data, error } = await fetchAllSupabaseRows(() =>
+    supabase
+      .from('supplier_payment_obligations')
+      .select('id, platform_payment_account_id, original_supply_amount')
+      .not('platform_paid_at', 'is', null)
+      .order('id', { ascending: true })
+  )
+  if (error) throw new Error(error.message || 'Не удалось загрузить суммы по счетам оплаты')
+
+  const totals = new Map()
+  for (const row of data || []) {
+    const key = row.platform_payment_account_id || null
+    const amount = Math.abs(toNumber(row.original_supply_amount))
+    totals.set(key, (totals.get(key) || 0) + amount)
+  }
+  return totals
+}
+
 export async function listPaymentObligationsForSupplier(platformSupplierId) {
   assertCloudReady()
   if (!platformSupplierId) return []

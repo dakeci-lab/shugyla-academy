@@ -1,5 +1,6 @@
 import Can from '../../auth/Can'
 import { PERMISSION_CODES } from '../../../config/permissions'
+import { formatUmagMoney } from '../../../services/umagSettlementsService'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import { usePaymentAccountsData } from './usePaymentAccountsData'
 import { usePaymentAccountEditor } from './usePaymentAccountEditor'
@@ -8,7 +9,8 @@ import '../admin-shared.css'
 import './PaymentAccountsPanel.css'
 
 export default function PaymentAccountsPanel() {
-  const { accounts, loading, error, isMigrationError, reload } = usePaymentAccountsData()
+  const { accounts, loading, error, isMigrationError, reload, paidTotals, paidTotalsLoading } =
+    usePaymentAccountsData()
   const editor = usePaymentAccountEditor({ accounts, onSaved: reload })
 
   return (
@@ -52,6 +54,9 @@ export default function PaymentAccountsPanel() {
               <tr>
                 <th>Счёт</th>
                 <th>Статус</th>
+                <Can permission={PERMISSION_CODES.SUPPLIER_PAYMENTS_VIEW}>
+                  <th>Выплачено поставщикам</th>
+                </Can>
                 <th aria-label="Действия" />
               </tr>
             </thead>
@@ -71,6 +76,15 @@ export default function PaymentAccountsPanel() {
                       {account.isActive ? 'Активен' : 'Неактивен'}
                     </span>
                   </td>
+                  <Can permission={PERMISSION_CODES.SUPPLIER_PAYMENTS_VIEW}>
+                    <td>
+                      {paidTotalsLoading
+                        ? '…'
+                        : paidTotals
+                          ? formatUmagMoney(paidTotals.get(account.id) || 0)
+                          : '—'}
+                    </td>
+                  </Can>
                   <td>
                     <div className="roles-access__actions">
                       <Can permission={PERMISSION_CODES.PAYMENT_ACCOUNTS_MANAGE}>
