@@ -69,9 +69,14 @@ function main() {
   assert.match(panel, /const allSuppliers = suppliersReady \? getSuppliers\(\) : \[\]/)
   assert.match(
     panel,
-    /const filtered = useMemo\(\s*\n\s*\(\) => filterSuppliers\(allSuppliers, \{ search, showArchived: appliedShowArchived \}\)/
+    /const filteredUnsorted = useMemo\(\(\) => \{\s*\n\s*const base = filterSuppliers\(allSuppliers, \{ search: '', showArchived: appliedShowArchived \}\)/
   )
-  ok('the list is built from getSuppliers()+filterSuppliers() — the full directory, not a date-scoped aggregate')
+  assert.match(panel, /\(debtByPlatformId\.get\(b\.id\) \|\| 0\) - \(debtByPlatformId\.get\(a\.id\) \|\| 0\)/)
+  assert.match(panel, /<PgtFoot/)
+  assert.match(panel, /import \{ PgtFoot, PgtHead, PgtRow, PgtTable \} from '..\/..\/platform\/PlatformGridTable'/)
+  assert.match(panel, /import FilterComboField from '..\/..\/platform\/FilterComboField'/)
+  assert.doesNotMatch(panel, /PlatformSearchToolbar/)
+  ok('the search box is gone — supplier search lives inside the shared «Фильтр» popover (FilterComboField, same as «К оплате»); the list is built from getSuppliers()+filterSuppliers(), sorted by balance descending with a pinned total row — the full directory, not a date-scoped aggregate')
 
   assert.doesNotMatch(panel, /fetchUmagSettlementsSupplierTotals/)
   assert.doesNotMatch(service, /export async function fetchUmagSettlementsSupplierTotals/)
@@ -88,7 +93,7 @@ function main() {
   )
   ok('«Текущий долг» comes from fetchNativeSupplierDebts (same lifetime formula «К оплате» uses) — unaffected by the merge')
 
-  assert.match(panel, /<th>Поставщик<\/th>\s*\n\s*\{canViewFinance \? <th>Баланс<\/th> : null\}/)
+  assert.match(panel, /label: 'Поставщик'[\s\S]{0,400}canViewFinance[\s\S]{0,120}label: 'Баланс'/)
   ok('the list has exactly two possible columns — supplier name, and «Баланс» (renamed from «Текущий долг») gated by canViewFinance — no leftover period columns (Приёмок/Сумма/Возвраты/Оплачено)')
 
   // --- Each card owns its own period -----------------------------------------

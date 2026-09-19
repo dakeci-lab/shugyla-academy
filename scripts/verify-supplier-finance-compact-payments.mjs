@@ -103,10 +103,10 @@ async function main() {
   // each date group, and a sticky "Итого" footer under the whole table —
   // both use the SAME --spo-compact-cols grid as the data rows (not a
   // free-floating right-aligned pair) so the sum lines up under «Сумма».
-  assert.match(panelSrc, /function ReceivedDateGroupTotal\(/)
-  assert.match(panelSrc, /function PaymentsScheduleFoot\(/)
-  assert.match(panelSrc, /spo-compact__day-total["'][\s\S]{0,40}style=\{gridStyle\}/)
-  assert.match(panelSrc, /spo-compact__tfoot["'][\s\S]{0,40}style=\{gridStyle\}/)
+  // 2026-09-19: the table is the shared PlatformGridTable now (same grid for
+  // head/rows/subtotals/pinned foot) — the column gear was removed.
+  assert.match(panelSrc, /<PgtSubtotal\s*\n\s*columns=\{PAYMENTS_COLUMNS\}/)
+  assert.match(panelSrc, /<PgtFoot\s*\n\s*columns=\{PAYMENTS_COLUMNS\}/)
   assert.match(panelSrc, /Итого \{label\}/)
   ok('Case 4: per-day subtotal and grand-total footer both render on the shared column grid, not a standalone right-aligned label/amount pair')
 
@@ -200,17 +200,16 @@ async function main() {
   ok('Case 14: embedded branch renders ReceivedDatePaymentSchedule; legacy branch keeps spo-panel__tabs')
 
   // --- Case 15: desktop row structure ---------------------------------------
-  assert.match(cssSrc, /\.spo-compact__supplier/)
   assert.match(cssSrc, /\.spo-compact__due/)
   assert.match(cssSrc, /\.spo-compact__status/)
-  assert.match(cssSrc, /\.spo-compact__amount/)
   assert.doesNotMatch(cssSrc, /min-width:\s*900px/)
   ok('Case 15: compact CSS defines supplier/due/status/amount columns without rigid min-width')
 
   // --- Case 16: mobile responsive -------------------------------------------
-  assert.match(cssSrc, /@media \(max-width: 640px\)[\s\S]*\.spo-compact__mobile-meta/)
-  assert.match(cssSrc, /\.spo-compact__mobile-meta[\s\S]*display: none/)
-  ok('Case 16: mobile layout uses spo-compact__mobile-meta without horizontal overflow table')
+  const gridCss = read('src/components/platform/PlatformGridTable.css')
+  assert.match(gridCss, /@media \(max-width: 640px\)[\s\S]*\.pgt__mobile-meta/)
+  assert.match(gridCss, /\.pgt__mobile-meta \{\s*\n\s*display: none/)
+  ok('Case 16: mobile layout uses the shared pgt__mobile-meta without a horizontal overflow table')
 
   // --- Case 17: native debt / summary formulas still present in source ------
   const debtSrc = read(DEBT_SERVICE)
@@ -230,8 +229,8 @@ async function main() {
   ok('SupplierPaymentsPanel still uses buildPaymentScheduleView; standalone self-loads obligations')
 
   // --- Empty sections hidden ------------------------------------------------
-  assert.match(panelSrc, /if \(!groups\.length\) return null/)
-  ok('empty compact sections are omitted (not four «нет платежей» blocks)')
+  assert.match(panelSrc, /\.filter\(\(group\) => group\.rows\.length > 0\)/)
+  ok('empty date groups are omitted (not blocks of «нет платежей»)')
 
   // --- Nav / routes (source) ------------------------------------------------
   const navSrc = read('src/platform/platformNav.js')

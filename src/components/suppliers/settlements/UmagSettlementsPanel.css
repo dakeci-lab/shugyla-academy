@@ -9,14 +9,6 @@
   padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
 
-.umag-settlements__list-body {
-  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
-}
-
-.umag-settlements__search-toolbar {
-  width: 100%;
-}
-
 .umag-settlements__warning,
 .umag-settlements__error {
   padding: 10px 12px;
@@ -35,17 +27,6 @@
   background: #fef2f2;
   color: #991b1b;
   border: 1px solid #fecaca;
-}
-
-.umag-settlements__empty-cell {
-  text-align: center;
-  color: var(--color-text-secondary, #64748b);
-  padding: 28px 16px !important;
-  white-space: normal;
-}
-
-.umag-settlements__empty--mobile {
-  display: none;
 }
 
 .umag-settlements__empty {
@@ -92,22 +73,6 @@
   border-bottom: none;
 }
 
-.umag-settlements__link {
-  appearance: none;
-  border: none;
-  background: none;
-  padding: 0;
-  font: inherit;
-  font-weight: 600;
-  color: #047857;
-  cursor: pointer;
-  text-align: left;
-}
-
-.umag-settlements__link:hover {
-  text-decoration: underline;
-}
-
 .umag-settlements__debt {
   color: #b91c1c;
 }
@@ -129,10 +94,6 @@
   color: inherit;
 }
 
-.umag-settlements__card--static {
-  cursor: default;
-}
-
 .umag-settlements__card-title {
   display: flex;
   align-items: center;
@@ -141,24 +102,6 @@
   font-size: 15px;
   font-weight: 700;
   margin-bottom: 10px;
-}
-
-.umag-settlements__card-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 6px 12px;
-  font-size: 13px;
-}
-
-.umag-settlements__card-grid span {
-  color: var(--color-text-secondary, #64748b);
-}
-
-.umag-settlements__comment {
-  margin: 10px 0 0;
-  font-size: 13px;
-  color: var(--color-text-secondary, #64748b);
-  line-height: 1.4;
 }
 
 .umag-settlements__back {
@@ -179,14 +122,6 @@
   font-size: 20px;
   font-weight: 700;
   letter-spacing: -0.02em;
-}
-
-.umag-settlements__detail-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  align-items: flex-start;
-  justify-content: space-between;
 }
 
 .umag-settlements__identity {
@@ -239,14 +174,6 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text, #0f172a);
-}
-
-.umag-settlements__list-foot td {
-  padding: 10px 12px;
-  font-weight: 700;
-  font-size: 13px;
-  border-top: 1px solid var(--color-border, #e2e8f0);
-  background: #f8fafc;
 }
 
 .umag-settlements__section-title {
@@ -524,26 +451,11 @@
   color: #64748b;
 }
 
+
+
 @media (max-width: 900px) {
-  .umag-settlements__search-toolbar.platform-search-toolbar {
-    flex-wrap: wrap;
-  }
-
-  .umag-settlements__search-toolbar .platform-search-toolbar__search {
-    flex: 1 1 100%;
-  }
-
-  .umag-settlements__search-toolbar .platform-search-toolbar__actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
   .umag-settlements__table-wrap {
     display: none;
-  }
-
-  .umag-settlements__empty--mobile {
-    display: block;
   }
 
   .umag-settlements__cards {
@@ -553,8 +465,67 @@
     padding-bottom: 8px;
   }
 
-  .umag-settlements__list-body {
-    padding-bottom: calc(112px + env(safe-area-inset-bottom, 0px));
+}
+
+/* Edit-supplier modal footer — same layout/colors as the employee edit modal
+   (employees-modal-footer): danger action left, Отмена/Сохранить right. */
+.suppliers-modal-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+.suppliers-modal-footer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.suppliers-modal-footer__status-action {
+  min-height: 44px;
+}
+
+.suppliers-modal-footer__status-action--danger {
+  color: var(--color-danger, #b91c1c);
+  border-color: rgba(185, 28, 28, 0.35);
+}
+
+.suppliers-modal-footer__status-action--danger:hover:not(:disabled) {
+  background: rgba(185, 28, 28, 0.06);
+}
+
+@media (max-width: 480px) {
+  .suppliers-modal-footer {
+    flex-direction: column;
+    align-items: stretch;
   }
 
+  .suppliers-modal-footer__status-action {
+    width: 100%;
+  }
+
+  .suppliers-modal-footer__actions {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .suppliers-modal-footer__actions .btn {
+    flex: 1;
+    min-height: 44px;
+  }
+}
+
+.umag-settlements__topbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.umag-settlements__archived-toggle {
+  border-top: 1px solid var(--color-border, #e2e8f0);
 }

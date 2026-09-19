@@ -1,21 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
   SUPPLIER_STATUS,
   SUPPLIER_STATUS_LABELS,
-  formatDeferralDaysTerm,
   parseSupplierWeekdays,
   serializeSupplierWeekdays,
 } from '../../utils/supplierData'
-import {
-  getPaymentAccountName,
-  getPaymentAccountsForAssignment,
-} from '../../services/paymentAccountsService'
-import {
-  buildSupplierPaymentSummary,
-  formatUmagMoney,
-  listPaymentObligationsForSupplier,
-} from '../../services/supplierPaymentObligationsService'
+import { getPaymentAccountsForAssignment } from '../../services/paymentAccountsService'
 import SupplierWeekdaySelector from './SupplierWeekdaySelector'
 import '../../components/admin/admin-shared.css'
 import './SupplierForm.css'
@@ -33,53 +23,6 @@ export function validateSupplierDeferralDays(form) {
     return 'Срок оплаты должен быть целым числом от 0 до 365'
   }
   return null
-}
-
-function SupplierPaymentsSummary({ supplierId, form }) {
-  const [summary, setSummary] = useState(null)
-
-  useEffect(() => {
-    if (!supplierId) {
-      setSummary(null)
-      return
-    }
-    let cancelled = false
-    void listPaymentObligationsForSupplier(supplierId)
-      .then((rows) => {
-        if (!cancelled) setSummary(buildSupplierPaymentSummary(rows))
-      })
-      .catch(() => {
-        if (!cancelled) setSummary(null)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [supplierId])
-
-  if (!supplierId) return null
-
-  return (
-    <section className="supplier-form__payments" aria-label="Оплаты">
-      <h3 className="supplier-form__payments-title">Оплаты</h3>
-      <div className="supplier-form__payments-grid">
-        <span>Способ</span>
-        <strong>{getPaymentAccountName(form.paymentAccountId) || 'Не настроено'}</strong>
-        <span>Срок</span>
-        <strong>{formatDeferralDaysTerm(form.deferralDays)}</strong>
-        <span>Текущая задолженность</span>
-        <strong>{summary ? formatUmagMoney(summary.totalDebt) : '…'}</strong>
-        <span>Сегодня к оплате</span>
-        <strong>{summary ? formatUmagMoney(summary.dueToday) : '…'}</strong>
-        <span>Ближайшие 7 дней</span>
-        <strong>{summary ? formatUmagMoney(summary.next7Days) : '…'}</strong>
-        <span>Просрочено</span>
-        <strong>{summary ? formatUmagMoney(summary.overdue) : '…'}</strong>
-      </div>
-      <Link className="supplier-form__payments-link" to="/platform/supplier-finance?tab=payments">
-        Открыть календарь оплат
-      </Link>
-    </section>
-  )
 }
 
 export const EMPTY_SUPPLIER_FORM = {
@@ -355,10 +298,6 @@ export default function SupplierForm({
             />
           </label>
         </div>
-        <p className="admin-form__hint">
-          Способ и срок настраиваются независимо друг от друга. 0 — оплата сразу при поступлении
-          товара.
-        </p>
         <div className="admin-form__row">
           <label className="admin-form__label">
             Статус
@@ -376,8 +315,6 @@ export default function SupplierForm({
           </label>
         </div>
       </div>
-
-      <SupplierPaymentsSummary supplierId={supplierId} form={form} />
 
       {error && <p className="admin-form__error">{error}</p>}
     </div>

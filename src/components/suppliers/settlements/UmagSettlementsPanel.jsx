@@ -27,6 +27,7 @@ import { ensurePaymentAccountsLoaded, getPaymentAccountName } from '../../../ser
 import {
   filterSuppliers,
   formatDeferralDaysTerm,
+  matchesSupplierArchiveFilter as matchesArchive,
   isSupplierDeleted,
   SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED,
 } from '../../../utils/supplierData'
@@ -46,10 +47,8 @@ import {
 } from '../../../services/supplierPaymentObligationsService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformFilterTrigger from '../../platform/PlatformFilterTrigger'
-import PlatformSearchToolbar, {
-  PlatformFilterButton,
-  PlatformToolbarActionWrap,
-} from '../../platform/PlatformSearchToolbar'
+import FilterComboField from '../../platform/FilterComboField'
+import { PgtFoot, PgtHead, PgtRow, PgtTable } from '../../platform/PlatformGridTable'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import AdminModal from '../../admin/AdminModal'
@@ -62,7 +61,6 @@ import SettlementsFilterPopover, {
   getSettlementsPeriodDefaults,
   resolveSettlementsPeriodPreset,
 } from './SettlementsFilterPopover'
-import SupplierFilterPopover from '../SupplierFilterPopover'
 import SupplierForm, {
   EMPTY_SUPPLIER_FORM,
   formToSupplierUpdatePayload,
@@ -338,12 +336,11 @@ function UmagSupplierDetail({
   const filterTrigger = (
     <PlatformFilterTrigger
       ref={filterButtonRef}
-      label="Период"
       active={filterActive}
       open={filterOpen}
       onClick={openFilter}
-      aria-label={filterActive ? `Период, ${periodLabel}` : 'Период'}
-      title={filterActive ? `Период · ${periodLabel}` : 'Период'}
+      aria-label={filterActive ? `Фильтр, ${periodLabel}` : 'Фильтр периода'}
+      title={filterActive ? `Фильтр · ${periodLabel}` : 'Фильтр'}
     />
   )
   const filterPopover = (
@@ -564,6 +561,87 @@ function UmagSupplierDetail({
 }
 
 /**
+ * «Фильтр» popover for the supplier list — the same combobox design as
+ * «К оплате» (FilterComboField): a searchable supplier checkbox list. The
+ * old standalone search box lives here now. Also carries the archived toggle.
+ */
+function SuppliersFilterPopover({
+  open,
+  supplierOptions,
+  supplierDraft,
+  onToggleSupplier,
+  searchValue,
+  onSearchChange,
+  showArchivedDraft,
+  onShowArchivedChange,
+  onApply,
+  onReset,
+  onClose,
+  anchorRef,
+}) {
+  const popoverRef = useRef(null)
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    if (!open) return undefined
+    function handlePointerDown(event) {
+      if (popoverRef.current?.contains(event.target)) return
+      if (anchorRef.current?.contains(event.target)) return
+      onClose()
+    }
+    function handleEscape(event) {
+      if (event.key === 'Escape') onClose()
+    }
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [open, onClose, anchorRef])
+
+  useEffect(() => {
+    if (!open) setExpanded(false)
+  }, [open])
+
+  if (!open) return null
+
+  return (
+    <div ref={popoverRef} className="spo-filter-pop" role="dialog" aria-label="Фильтр">
+      <FilterComboField
+        label="Поставщик"
+        searchable
+        placeholder="Введите название"
+        searchValue={searchValue}
+        onSearchChange={onSearchChange}
+        options={supplierOptions}
+        draft={supplierDraft}
+        onToggle={onToggleSupplier}
+        expanded={expanded}
+        onToggleExpanded={() => setExpanded((value) => !value)}
+        emptyText="Поставщик не найден"
+      />
+      <label className="pf-field pf-field__item umag-settlements__archived-toggle">
+        <input
+          type="checkbox"
+          checked={showArchivedDraft}
+          onChange={(event) => onShowArchivedChange(event.target.checked)}
+        />
+        <span>Показать удалённых поставщиков</span>
+      </label>
+      <div className="spo-filter-pop__actions">
+        <button type="button" className="btn btn--ghost btn--sm" onClick={onReset}>
+          Сбросить
+        </button>
+        <button type="button" className="btn btn--primary btn--sm" onClick={onApply}>
+          Применить
+        </button>
+      </div>
+    </div>
+  )
+}
+
+/**
  * @param {{ embedded?: boolean, refreshToken?: unknown }} [props]
  *   embedded — hides the standalone shell's sync button and the last-run
  *     warning banner so this can render as pure content under
@@ -608,18 +686,22 @@ export default function UmagSettlementsPanel({
     void ensureModuleLoaded('suppliers')
   }, [canView])
 
-  const [search, setSearch] = useState('')
+  const [supplierFilter, setSupplierFilter] = useState(() => new Set())
+  const [supplierFilterDraft, setSupplierFilterDraft] = useState(() => new Set())
+  const [filterSearch, setFilterSearch] = useState('')
   const [appliedShowArchived, setAppliedShowArchived] = useState(SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED)
   const [draftShowArchived, setDraftShowArchived] = useState(SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED)
   const [filterOpen, setFilterOpen] = useState(false)
   const filterButtonRef = useRef(null)
-  const filtersActive = appliedShowArchived !== SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED
+  const filtersActive =
+    appliedShowArchived !== SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED || supplierFilter.size > 0
 
   const [lastRun, setLastRun] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [selectedId, setSelectedId] = useState(null)
   const [debtByPlatformId, setDebtByPlatformId] = useState(new Map())
   const [debtLoading, setDebtLoading] = useState(true)
+  const [debtsSettled, setDebtsSettled] = useState(false)
 
   const [showForm, setShowForm] = useState(false)
   const [editId, setEditId] = useState(null)
@@ -632,10 +714,21 @@ export default function UmagSettlementsPanel({
   const returnToRef = useRef(null)
 
   const allSuppliers = suppliersReady ? getSuppliers() : []
-  const filtered = useMemo(
-    () => filterSuppliers(allSuppliers, { search, showArchived: appliedShowArchived }),
+  const filteredUnsorted = useMemo(() => {
+    const base = filterSuppliers(allSuppliers, { search: '', showArchived: appliedShowArchived })
+    return supplierFilter.size > 0 ? base.filter((s) => supplierFilter.has(s.id)) : base
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allSuppliers, search, appliedShowArchived, version, dataVersion]
+  }, [allSuppliers, supplierFilter, appliedShowArchived, version, dataVersion])
+  // Biggest balance first so the largest debts stand out; name breaks ties
+  // (and orders the all-zero tail) so the list stays stable.
+  const filtered = useMemo(
+    () =>
+      [...filteredUnsorted].sort(
+        (a, b) =>
+          (debtByPlatformId.get(b.id) || 0) - (debtByPlatformId.get(a.id) || 0) ||
+          a.name.localeCompare(b.name, 'ru')
+      ),
+    [filteredUnsorted, debtByPlatformId]
   )
   const selected = selectedId ? allSuppliers.find((s) => s.id === selectedId) || null : null
   const totalDebt = useMemo(
@@ -644,19 +737,23 @@ export default function UmagSettlementsPanel({
   )
 
   const loadDebts = useCallback(() => {
-    if (!canViewFinance || !suppliersReady) {
+    if (!canViewFinance) {
       setDebtLoading(false)
+      setDebtsSettled(true)
       return
     }
+    if (!suppliersReady) return
     setDebtLoading(true)
     void fetchNativeSupplierDebts({ platformSupplierIds: allSuppliers.map((s) => s.id) })
       .then((map) => {
         setDebtByPlatformId(map)
         setDebtLoading(false)
+        setDebtsSettled(true)
       })
       .catch((err) => {
         showError(err.message || 'Не удалось рассчитать текущую задолженность поставщиков')
         setDebtLoading(false)
+        setDebtsSettled(true)
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [canViewFinance, suppliersReady, allSuppliers.length, version, dataVersion, refreshToken])
@@ -793,7 +890,7 @@ export default function UmagSettlementsPanel({
         {editId && canDelete && (
           <button
             type="button"
-            className="btn suppliers-modal-footer__delete"
+            className="btn suppliers-modal-footer__status-action suppliers-modal-footer__status-action--danger"
             disabled={saving || deleting}
             onClick={requestDelete}
           >
@@ -801,7 +898,7 @@ export default function UmagSettlementsPanel({
           </button>
         )}
         <div className="suppliers-modal-footer__actions">
-          <button type="button" className="btn btn--ghost" onClick={closeForm}>
+          <button type="button" className="btn btn--outline" onClick={closeForm}>
             Отмена
           </button>
           <button
@@ -824,17 +921,32 @@ export default function UmagSettlementsPanel({
       return
     }
     setDraftShowArchived(appliedShowArchived)
+    setSupplierFilterDraft(new Set(supplierFilter))
+    setFilterSearch('')
     setFilterOpen(true)
   }
 
-  function applyArchiveFilter() {
+  function toggleFilterSupplier(id) {
+    setSupplierFilterDraft((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function applyListFilter() {
     setAppliedShowArchived(draftShowArchived)
+    setSupplierFilter(new Set(supplierFilterDraft))
     setFilterOpen(false)
   }
 
-  function resetArchiveFilter() {
+  function resetListFilter() {
     setDraftShowArchived(SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED)
     setAppliedShowArchived(SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED)
+    setSupplierFilterDraft(new Set())
+    setSupplierFilter(new Set())
+    setFilterSearch('')
     setFilterOpen(false)
   }
 
@@ -842,13 +954,51 @@ export default function UmagSettlementsPanel({
     return <PlatformAccessDenied title="Нет доступа к поставщикам" />
   }
 
+  const listColumns = [
+    { key: 'name', label: 'Поставщик', width: 240, flex: true, mobile: 'title' },
+    ...(canViewFinance
+      ? [{ key: 'balance', label: 'Баланс', width: 160, align: 'end', mobile: 'end' }]
+      : []),
+    ...(canEdit ? [{ key: 'actions', label: '', width: 44, align: 'end', mobile: 'hide' }] : []),
+  ]
+
   const emptyMessage = (() => {
-    if (search.trim()) return 'По вашему запросу ничего не найдено.'
+    if (supplierFilter.size > 0) return 'По вашему запросу ничего не найдено.'
     if (appliedShowArchived) return 'Удалённых поставщиков нет.'
     return allSuppliers.length === 0
       ? 'Поставщики ещё не синхронизированы. Выполните синхронизацию с UMAG.'
       : 'По вашему запросу ничего не найдено.'
   })()
+
+  const listFilterTrigger = (
+    <PlatformFilterTrigger
+      ref={filterButtonRef}
+      active={filtersActive}
+      count={supplierFilter.size + (appliedShowArchived ? 1 : 0)}
+      open={filterOpen}
+      onClick={toggleFilter}
+      aria-label="Фильтр"
+      title="Фильтр"
+    />
+  )
+  const listFilterPopover = (
+    <SuppliersFilterPopover
+      open={filterOpen}
+      supplierOptions={allSuppliers
+        .filter((sup) => matchesArchive(sup, draftShowArchived))
+        .map((sup) => ({ id: sup.id, label: sup.name }))}
+      supplierDraft={supplierFilterDraft}
+      onToggleSupplier={toggleFilterSupplier}
+      searchValue={filterSearch}
+      onSearchChange={setFilterSearch}
+      showArchivedDraft={draftShowArchived}
+      onShowArchivedChange={setDraftShowArchived}
+      onApply={applyListFilter}
+      onReset={resetListFilter}
+      onClose={() => setFilterOpen(false)}
+      anchorRef={filterButtonRef}
+    />
+  )
 
   return (
     <>
@@ -868,52 +1018,58 @@ export default function UmagSettlementsPanel({
         />
       ) : (
         <div className="umag-settlements umag-settlements--list">
-          <PlatformSearchToolbar
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onClear={() => setSearch('')}
-            showClear
-            placeholder="Поиск по названию, менеджеру, телефону…"
-            ariaLabel="Поиск поставщиков"
-            flush
-            className="umag-settlements__search-toolbar"
-            actions={
-              <>
-                <PlatformToolbarActionWrap>
-                  <div className="pf-filter-anchor">
-                    <PlatformFilterButton
-                      buttonRef={filterButtonRef}
-                      active={filtersActive}
-                      onClick={toggleFilter}
-                      ariaExpanded={filterOpen}
-                      ariaLabel="Фильтр"
-                      title="Фильтр"
-                    />
-                    <SupplierFilterPopover
-                      open={filterOpen}
-                      draftShowArchived={draftShowArchived}
-                      onChange={setDraftShowArchived}
-                      onApply={applyArchiveFilter}
-                      onReset={resetArchiveFilter}
-                      onClose={() => setFilterOpen(false)}
-                      anchorRef={filterButtonRef}
-                    />
-                  </div>
-                </PlatformToolbarActionWrap>
-                {canSync && !embedded ? (
-                  <PlatformToolbarActionWrap>
-                    <PlatformSyncButton
-                      onClick={() => void handleSync()}
-                      syncing={syncing}
-                      disabled={!canSync}
-                      title="Синхронизация UMAG"
-                      aria-label="Синхронизация UMAG"
-                    />
-                  </PlatformToolbarActionWrap>
-                ) : null}
-              </>
-            }
-          />
+          {filterSlot
+            ? createPortal(
+                <div className="pf-filter-anchor">
+                  {listFilterTrigger}
+                  {listFilterPopover}
+                </div>,
+                filterSlot
+              )
+            : null}
+          {!filterSlot || (canSync && !embedded) ? (
+            <div className="umag-settlements__topbar">
+              {!filterSlot ? (
+                <div className="pf-filter-anchor">
+                  {listFilterTrigger}
+                  {listFilterPopover}
+                </div>
+              ) : null}
+              {canSync && !embedded ? (
+                <PlatformSyncButton
+                  onClick={() => void handleSync()}
+                  syncing={syncing}
+                  disabled={!canSync}
+                  title="Синхронизация UMAG"
+                  aria-label="Синхронизация UMAG"
+                />
+              ) : null}
+            </div>
+          ) : null}
+
+          {supplierFilter.size > 0 ? (
+            <div className="pf-filter-strip">
+              <span>Поставщики:</span>
+              {[...supplierFilter].map((id) => (
+                <span key={id} className="pf-filter-chip">
+                  {allSuppliers.find((sup) => sup.id === id)?.name || 'Поставщик'}
+                  <button
+                    type="button"
+                    aria-label="Убрать поставщика из фильтра"
+                    onClick={() =>
+                      setSupplierFilter((current) => {
+                        const next = new Set(current)
+                        next.delete(id)
+                        return next
+                      })
+                    }
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          ) : null}
 
           {!embedded && lastRun?.warning_message && (
             <div className="umag-settlements__warning" role="alert">
@@ -921,87 +1077,61 @@ export default function UmagSettlementsPanel({
             </div>
           )}
 
-          {!suppliersReady && filtered.length === 0 ? (
+          {(!suppliersReady && filtered.length === 0) || !debtsSettled ? (
             <DelayedLoadingSkeleton variant="table" count={5} />
           ) : filtered.length === 0 ? (
-            <div className="umag-settlements__empty">{emptyMessage}</div>
+            <div className="pgt__empty">{emptyMessage}</div>
           ) : (
-            <div className="umag-settlements__list-body">
-              <div className="umag-settlements__table-wrap">
-                <table className="umag-settlements__table">
-                  <thead>
-                    <tr>
-                      <th>Поставщик</th>
-                      {canViewFinance ? <th>Баланс</th> : null}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((s) => {
-                      const debt = debtByPlatformId.get(s.id) ?? null
-                      return (
-                        <tr key={s.id}>
-                          <td>
-                            <button
-                              type="button"
-                              className="umag-settlements__link"
-                              onClick={() => setSelectedId(s.id)}
-                            >
-                              {s.name}
-                            </button>
-                          </td>
-                          {canViewFinance ? (
-                            <td className={debt > 0 ? 'umag-settlements__debt' : undefined}>
-                              {debtLoading ? '…' : formatUmagMoney(debt ?? 0)}
-                            </td>
-                          ) : null}
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                  {canViewFinance ? (
-                    <tfoot className="umag-settlements__list-foot">
-                      <tr>
-                        <td>Итого</td>
-                        <td>{debtLoading ? '…' : formatUmagMoney(totalDebt)}</td>
-                      </tr>
-                    </tfoot>
-                  ) : null}
-                </table>
-              </div>
-
-              <div className="umag-settlements__cards" aria-label="Поставщики">
-                {filtered.map((s) => {
-                  const debt = debtByPlatformId.get(s.id) ?? null
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      className="umag-settlements__card"
-                      onClick={() => setSelectedId(s.id)}
-                    >
-                      <div className="umag-settlements__card-title">{s.name}</div>
-                      <div className="umag-settlements__card-grid">
-                        {canViewFinance ? (
-                          <>
-                            <span>Баланс</span>
-                            <strong className={debt > 0 ? 'umag-settlements__debt' : undefined}>
-                              {debtLoading ? '…' : formatUmagMoney(debt ?? 0)}
-                            </strong>
-                          </>
-                        ) : (
-                          <>
-                            <span>Менеджер</span>
-                            <strong>{s.managerName || '—'}</strong>
-                            <span>Телефон</span>
-                            <strong>{s.managerPhone || '—'}</strong>
-                          </>
-                        )}
-                      </div>
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
+            <PgtTable columns={listColumns}>
+              <PgtHead columns={listColumns} />
+              {filtered.map((s) => {
+                const debt = debtByPlatformId.get(s.id) ?? null
+                return (
+                  <PgtRow
+                    key={s.id}
+                    columns={listColumns}
+                    cells={{
+                      name: (
+                        <button
+                          type="button"
+                          className="pgt__link"
+                          onClick={() => setSelectedId(s.id)}
+                        >
+                          {s.name}
+                        </button>
+                      ),
+                      balance: (
+                        <span className={`pgt__money${debt > 0 ? ' pgt__money--debt' : ''}`}>
+                          {debtLoading ? '…' : formatUmagMoney(debt ?? 0)}
+                        </span>
+                      ),
+                      actions: (
+                        <IconActionButton
+                          label="Редактировать"
+                          variant="primary"
+                          onClick={() => openEdit(s)}
+                        >
+                          <PencilIcon />
+                        </IconActionButton>
+                      ),
+                    }}
+                  />
+                )
+              })}
+              {canViewFinance ? (
+                <PgtFoot
+                  columns={listColumns}
+                  cells={{
+                    name: <span>Итого</span>,
+                    balance: (
+                      <span className="pgt__money">
+                        {debtLoading ? '…' : formatUmagMoney(totalDebt)}
+                      </span>
+                    ),
+                  }}
+                />
+              ) : null}
+            </PgtTable>
           )}
         </div>
       )}

@@ -126,9 +126,11 @@ function main() {
 
   assert.doesNotMatch(
     settlementsSrc,
-    /embedded[\s\S]{0,40}<PlatformSearchToolbar|<PlatformSearchToolbar[\s\S]{0,10}\{!embedded/
+    /embedded[\s\S]{0,40}<SuppliersFilterPopover|<SuppliersFilterPopover[\s\S]{0,10}\{!embedded/
   )
-  assert.match(settlementsSrc, /<PlatformSearchToolbar\s*\n\s*value=\{search\}/)
+  // 2026-09-19: the search box moved into the «Фильтр» popover (same
+  // FilterComboField as «К оплате») — the filter trigger is what always renders.
+  assert.match(settlementsSrc, /<SuppliersFilterPopover/)
   ok('search + period filter (PlatformSearchToolbar, SettlementsFilterPopover) are NOT gated by embedded — always renders (item 8: period stays local content, not promoted to a future shared header yet)')
 
   assert.doesNotMatch(
@@ -174,7 +176,7 @@ function main() {
   // Case 5: panels edited in place — check committed source, not working-tree diff.
   assert.match(paymentsSrc, /export default function SupplierPaymentsPanel\(\{/)
   assert.match(paymentsSrc, /embedded = false,/)
-  assert.match(paymentsSrc, /function CompactPaymentSchedule\(/)
+  assert.match(paymentsSrc, /function ReceivedDatePaymentSchedule\(/)
   assert.match(settlementsSrc, /export default function UmagSettlementsPanel\(\{\s*\n\s*embedded = false,/)
   ok('Case 5: SupplierPaymentsPanel + UmagSettlementsPanel exist in source with embedded prop — no forked duplicate implementation')
 

@@ -103,9 +103,9 @@ async function main() {
   ok('Case 3/4/5: KpiTile component and the sfp-panel__kpis block are fully removed from the shell — no floating Долг/Просрочено/Сегодня cards')
 
   const paymentsPanelSrcForFoot = read(PAYMENTS_PANEL)
-  assert.match(paymentsPanelSrcForFoot, /function PaymentsScheduleFoot/)
-  assert.match(paymentsPanelSrcForFoot, /spo-compact__tfoot/)
-  ok('Case 3b: the removed Долг total now lives in PaymentsScheduleFoot — a sticky grand-total row under the «Сумма» column, mirroring UmagSettlementsPanel\'s own tfoot')
+  assert.match(paymentsPanelSrcForFoot, /<PgtFoot/)
+  assert.match(read('src/components/platform/PlatformGridTable.css'), /\.pgt__foot \{[\s\S]{0,120}position: sticky/)
+  ok('Case 3b: the removed Долг total now lives in the shared PgtFoot — a sticky grand-total row under the «Сумма» column, mirroring UmagSettlementsPanel\'s own tfoot')
 
   console.log('\n--- Real imports: pure logic exercised with fixture data ---\n')
   await runRealCases()

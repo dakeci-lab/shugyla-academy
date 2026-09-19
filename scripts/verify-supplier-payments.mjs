@@ -167,11 +167,11 @@ async function main() {
 
   const form = read('src/components/suppliers/SupplierForm.jsx')
   assert.match(form, /validateSupplierDeferralDays/)
-  assert.match(form, /SupplierPaymentsSummary/)
+  assert.doesNotMatch(form, /SupplierPaymentsSummary/)
   assert.match(form, /max=\"365\"/)
   assert.match(form, /supplier-payment-terms/)
   assert.match(form, /focusSection/)
-  ok('supplier form validates deferral days and shows payments summary')
+  ok('supplier form validates deferral days (the read-only «Оплаты» summary was removed 2026-09-19)')
 
   // 2026-09-19: the standalone «Поставщики» directory (SuppliersPage.jsx) was
   // merged into this file, which is now THE supplier list — payment-terms
@@ -185,7 +185,7 @@ async function main() {
   ok('merged «Поставщики» screen opens payment-terms focus and refreshes obligations')
 
   assert.doesNotMatch(settlements, /По данным UMAG/)
-  assert.match(settlements, /PlatformSearchToolbar/)
+  assert.match(settlements, /FilterComboField/)
   assert.match(settlements, /SettlementsFilterPopover/)
   assert.doesNotMatch(settlements, /umag-settlements__presets/)
   assert.doesNotMatch(settlements, /umag-settlements__meta/)
