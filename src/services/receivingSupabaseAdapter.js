@@ -230,6 +230,12 @@ async function fetchDocumentById(documentId, { attachPhotoUrls = true } = {}) {
   }
 }
 
+/**
+ * Light list load: document rows only, no line items. Loading every line of
+ * every document made the module (and the «Приёмка» page) slow; lines are
+ * fetched per document — for the selected day's cards via
+ * fetchReceivingItemsForDocuments(), or in full on the detail page.
+ */
 export async function fetchReceivingDataCloud() {
   ensureClient()
 
@@ -239,20 +245,39 @@ export async function fetchReceivingDataCloud() {
     .order('created_at', { ascending: false })
 
   const documents = await throwIfError(docsResult, 'Загрузка документов приёмки')
-  if (!documents?.length) {
-    return { documents: [] }
-  }
+  return { documents: (documents || []).map((row) => rowToDocument(row, [])) }
+}
 
-  const docIds = documents.map((row) => row.id)
-  const items = await fetchAllRowsByIdChunks({
-    ids: docIds,
+/** Documents expected within [dateFrom, dateTo] (YYYY-MM-DD), light rows, no lines. */
+export async function fetchReceivingDocumentsForPeriod({ dateFrom, dateTo }) {
+  ensureClient()
+  const result = await supabase
+    .from('receiving_documents')
+    .select('*')
+    .gte('expected_delivery_date', dateFrom)
+    .lte('expected_delivery_date', dateTo)
+    .order('expected_delivery_date', { ascending: true })
+    .order('supplier_name', { ascending: true })
+  const rows = await throwIfError(result, 'Загрузка документов приёмки')
+  return (rows || []).map((row) => rowToDocument(row, []))
+}
+
+/** Ordered lines (light columns) for a few documents at once → Map(docId → items). */
+export async function fetchReceivingItemsForDocuments(documentIds) {
+  ensureClient()
+  const ids = [...new Set((documentIds || []).filter(Boolean))]
+  const byDocument = new Map()
+  if (ids.length === 0) return byDocument
+
+  const rows = await fetchAllRowsByIdChunks({
+    ids,
     idChunkSize: DEFAULT_IN_FILTER_CHUNK_SIZE,
     pageSize: DEFAULT_POSTGREST_PAGE_SIZE,
     overflowMessage: 'Не удалось загрузить позиции приёмки.',
     fetchPage: ({ idChunk, from, to }) =>
       supabase
         .from('receiving_items')
-        .select('*')
+        .select('id, receiving_document_id, product_name, barcode, unit, ordered_qty, purchase_price, sort_order, created_at')
         .in('receiving_document_id', idChunk)
         .order('created_at', { ascending: true })
         .order('id', { ascending: true })
@@ -261,19 +286,11 @@ export async function fetchReceivingDataCloud() {
       throwIfError(result, 'Загрузка позиций приёмки', 'Не удалось загрузить позиции приёмки.'),
   })
 
-  const itemsByDoc = new Map()
-  for (const row of items) {
-    if (!itemsByDoc.has(row.receiving_document_id)) {
-      itemsByDoc.set(row.receiving_document_id, [])
-    }
-    itemsByDoc.get(row.receiving_document_id).push(row)
+  for (const row of rows) {
+    if (!byDocument.has(row.receiving_document_id)) byDocument.set(row.receiving_document_id, [])
+    byDocument.get(row.receiving_document_id).push(rowToItem(row))
   }
-
-  return {
-    documents: documents.map((row) =>
-      rowToDocument(row, itemsByDoc.get(row.id) || [])
-    ),
-  }
+  return byDocument
 }
 
 export async function transferFromPurchaseCloud(orderId, user) {

@@ -112,12 +112,12 @@ async function main() {
 
   // --- Case 12/14: VIEW PERIOD isolation ------------------------------------
   // Only the real import statements count — a code comment is allowed to
-  // *name* SettlementsFilterPopover while explaining that it is deliberately
+  // *name* PeriodFilterPopover while explaining that it is deliberately
   // not imported (see the "Item 23/24" comment above handleSync()).
   const panelImportBlock = panelSrc.slice(0, panelSrc.indexOf('const TABS ='))
-  assert.doesNotMatch(panelImportBlock, /SettlementsFilterPopover|getSettlementsPeriodDefaults/)
+  assert.doesNotMatch(panelImportBlock, /PeriodFilterPopover|getSettlementsPeriodDefaults/)
   assert.doesNotMatch(panelSrc, /useState\(currentMonth/)
-  ok('Case 12/24: the shell never imports SettlementsFilterPopover or holds any period/dateFrom/dateTo state — VIEW PERIOD stays inside UmagSettlementsPanel only')
+  ok('Case 12/24: the shell never imports PeriodFilterPopover or holds any period/dateFrom/dateTo state — VIEW PERIOD stays inside UmagSettlementsPanel only')
 
   assert.match(panelSrc, /const todayKey = summary\?\.todayKey \|\| toAqtobeDateKey\(\)/)
   assert.match(panelSrc, /const \{ dateFrom \} = getMonthRangeKeys\(year, month\)/)

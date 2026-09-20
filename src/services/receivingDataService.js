@@ -58,8 +58,32 @@ export function getReceivingDocumentByIdSync(id) {
 /** Загружает один документ независимо от состояния общего кэша модуля. */
 export async function loadReceivingDocumentById(id) {
   if (!id) return null
-  if (isCloudMode()) return cloud.fetchDocumentById(id)
+  // The page is view-only now: no need to sign discrepancy-photo URLs.
+  if (isCloudMode()) return cloud.fetchDocumentById(id, { attachPhotoUrls: false })
   return local.getLocalReceivingDocumentById(id)
+}
+
+/** Expected deliveries within [dateFrom, dateTo] — loaded per period, not the whole history. */
+export async function loadReceivingDocumentsForPeriod({ dateFrom, dateTo }) {
+  if (isCloudMode()) return cloud.fetchReceivingDocumentsForPeriod({ dateFrom, dateTo })
+  return local
+    .getLocalReceivingBundle()
+    .documents.filter((doc) => {
+      const key = String(doc.expectedDeliveryDate || '').slice(0, 10)
+      return key >= dateFrom && key <= dateTo
+    })
+}
+
+/** Ordered lines for several documents at once → Map(documentId → items). */
+export async function loadReceivingItemsForDocuments(ids) {
+  if (isCloudMode()) return cloud.fetchReceivingItemsForDocuments(ids)
+  const wanted = new Set(ids || [])
+  return new Map(
+    local
+      .getLocalReceivingBundle()
+      .documents.filter((doc) => wanted.has(doc.id))
+      .map((doc) => [doc.id, doc.items || []])
+  )
 }
 
 export async function loadReceivingDocuments() {

@@ -141,10 +141,10 @@ const MOBILE_LAYOUTS = [
   {
     id: 'receiving',
     file: 'src/components/receiving/UnifiedReceivingList.css',
-    what: 'the receiving list is card-based and reflows on a phone',
+    what: 'the receiving list is the shared grid table, which reflows on a phone',
     test: (css) =>
-      /\.unified-receiving-card\s*\{[\s\S]*?display:\s*grid/.test(css) &&
-      /@media \(max-width: 640px\)[\s\S]*?\.unified-receiving-card\s*\{/.test(css),
+      /unified-receiving__group-bar/.test(css) &&
+      /@media \(max-width: 640px\)/.test(fs.readFileSync(new URL('../src/components/platform/PlatformGridTable.css', import.meta.url), 'utf8')),
   },
   // 'suppliers' (SupplierTable.css) removed 2026-09-19: the standalone
   // directory was deleted along with its table, merged into the

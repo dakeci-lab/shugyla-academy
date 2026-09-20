@@ -1321,7 +1321,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         showSuccess(`Заказ для «${supplierLabel}» уже был создан.`, {
           duration: 6000,
           action: orderId
-            ? { label: 'Открыть заказ', to: `/platform/procurement/${orderId}` }
+            ? { label: 'Открыть заказ', to: `/platform/orders/${orderId}` }
             : null,
         })
       } else {
@@ -1330,7 +1330,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
           {
             duration: 6000,
             action: orderId
-              ? { label: 'Открыть заказ', to: `/platform/procurement/${orderId}` }
+              ? { label: 'Открыть заказ', to: `/platform/orders/${orderId}` }
               : null,
           }
         )
@@ -1492,7 +1492,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     const title = formatOrderHistoryTitle(history)
     return history.orderId ? (
       <Link
-        to={`/platform/procurement/${history.orderId}`}
+        to={`/platform/orders/${history.orderId}`}
         className="proc-planner__qty-history"
         title={title}
       >
@@ -2573,7 +2573,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         ) : null}
         {workflow.orderId ? (
           <Link
-            to={`/platform/procurement/${workflow.orderId}`}
+            to={`/platform/orders/${workflow.orderId}`}
             className="proc-planner__workflow-link"
           >
             Открыть заказ

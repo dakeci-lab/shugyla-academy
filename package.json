@@ -55,8 +55,6 @@
     "verify:platform-mobile-drawer": "node scripts/verify-platform-mobile-drawer.mjs",
     "verify:stale-shift-release": "node scripts/verify-stale-shift-release.mjs",
     "verify:receiving-row-display": "node scripts/verify-receiving-row-display.mjs",
-    "verify:unified-receiving-ui": "node scripts/verify-unified-receiving-ui.mjs",
-    "verify:receiving-umag-export": "node scripts/verify-receiving-umag-export.mjs",
     "verify:receiving-v1-foundation": "node scripts/verify-receiving-v1-foundation.mjs",
     "verify:mobile-page-header": "node scripts/verify-mobile-page-header.mjs",
     "verify:procurement-calendar-filter": "node scripts/verify-procurement-calendar-filter.mjs",

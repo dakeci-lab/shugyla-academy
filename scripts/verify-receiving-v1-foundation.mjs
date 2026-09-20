@@ -166,9 +166,8 @@ const signedOnlyCloudRow = cloudAdapter.itemToRow(
 )
 check('cloud row cannot persist a signed-only photo reference', signedOnlyCloudRow.photo_urls.length === 0)
 
-const detail = read('src/pages/platform/receiving/ReceivingDetailPage.jsx')
-check('detail uploads pending photos before save and complete', (detail.match(/await uploadPendingPhotos\(\)/g) || []).length === 2)
-check('detail sends document and export optimistic versions to history', /expectedVersion: document\.version/.test(detail) && /expectedExportVersion: document\.exportVersion/.test(detail))
-check('history is recorded before the prepared binary is downloaded', detail.indexOf('await recordReceivingUmagExport') < detail.indexOf('await downloadReceivingUmagXlsxBytes'))
+// 2026-09-20: «Приёмка» was merged into «Заказы»; the accept flow (photos, save/complete, UMAG
+// export) is gone from the UI, the DB/service layer above is kept as-is.
+check('the receiving pages are gone', !fs.existsSync(path.join(ROOT, 'src/pages/platform/receiving/ReceivingPage.jsx')))
 
 console.log(`\nOK: ${checks} checks passed.`)

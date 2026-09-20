@@ -31,22 +31,6 @@ function read(relPath) {
   return fs.readFileSync(path.join(ROOT, relPath), 'utf8')
 }
 
-function stageWeekGrid() {
-  console.log('Stage 1: Week day grid')
-
-  const css = read('src/components/procurement/SimpleDeliveryCard.css')
-  assert('seven equal grid columns', css.includes('grid-template-columns: repeat(7, minmax(0, 1fr))'))
-  assert('day cards min-width zero', css.includes('.simple-receiving-day-bar__day'))
-  assert('day card min-width zero', /simple-receiving-day-bar__day[\s\S]*min-width:\s*0/.test(css))
-  assert('week nav wrapper', read('src/components/procurement/WeekScheduleNav.jsx').includes('week-schedule-nav__days'))
-  assert('badge absolute positioning', css.includes('.simple-receiving-day-bar__count'))
-  assert('badge does not affect layout', /simple-receiving-day-bar__count[\s\S]*position:\s*absolute/.test(css))
-  assert('mobile grid tightening', css.includes('@media (max-width: 900px)'))
-  assert('narrow screen breakpoint', css.includes('@media (max-width: 360px)'))
-  assert('no scrollIntoView in week nav', !read('src/components/procurement/WeekScheduleNav.jsx').includes('scrollIntoView'))
-  assert('no scrollLeft in week nav', !read('src/components/procurement/WeekScheduleNav.jsx').includes('scrollLeft'))
-}
-
 function stageFilterModal() {
   console.log('Stage 2: Filter modal')
 
@@ -63,18 +47,11 @@ function stageFilterModal() {
 }
 
 function stageReceivingMonthCalendar() {
-  console.log('Stage 3: Compact receiving month calendar')
+  console.log('Stage 3: «Приёмка» merged into «Заказы» (2026-09-20)')
 
-  const list = read('src/components/receiving/UnifiedReceivingList.jsx')
-  const calendar = read('src/components/receiving/ReceivingMonthCalendar.jsx')
-  const css = read('src/components/receiving/UnifiedReceivingList.css')
-
-  assert('receiving no longer renders permanent week navigation', !list.includes('WeekScheduleNav'))
-  assert('receiving no longer renders supplier search', !list.includes('PlatformSearchToolbar'))
-  assert('receiving opens a dedicated month modal', list.includes('ReceivingMonthCalendar') && calendar.includes('AdminModal'))
-  assert('month grid has seven equal columns', /receiving-calendar__grid[\s\S]*grid-template-columns:\s*repeat\(7/.test(css))
-  assert('calendar counts are rendered per date', calendar.includes('countsByDate[dateKey]'))
-  assert('calendar focus returns to trigger', calendar.includes('returnFocusRef={returnFocusRef}'))
+  const orders = read('src/pages/platform/orders/OrdersPage.jsx')
+  assert('orders period comes from the shared period filter', orders.includes('PeriodFilterPopover') && !orders.includes('WeekScheduleNav'))
+  assert('the receiving pages and month calendar are gone', !fs.existsSync(path.join(ROOT, 'src/pages/platform/receiving/ReceivingPage.jsx')) && !fs.existsSync(path.join(ROOT, 'src/components/receiving')))
 }
 
 function stageBackdropAndToolbar() {
@@ -83,6 +60,7 @@ function stageBackdropAndToolbar() {
   const indexCss = read('src/index.css')
   const adminModalCss = read('src/components/admin/AdminModal.css')
   const page = read('src/pages/platform/procurement/ProcurementPage.jsx')
+  const ordersPage = read('src/pages/platform/orders/OrdersPage.jsx')
   const pageCss = read('src/pages/platform/procurement/ProcurementPage.css')
 
   assert('shared backdrop token', indexCss.includes('--platform-modal-backdrop'))
@@ -90,20 +68,17 @@ function stageBackdropAndToolbar() {
   assert('manual create button removed from orders', !page.includes('procurement-page__desktop-create'))
   assert('planning tab remains entry point', page.includes('ProcurementPlannerView'))
   assert('norms tab is available', page.includes('ProcurementNormsView'))
-  assert('orders use unified table', page.includes('<PurchaseTable'))
+  assert('orders use unified table', ordersPage.includes('<PurchaseTable'))
   assert(
     'Orders tab no plan visit list',
-    !page.includes('ProcurementPlanDayList') && !page.includes('Визиты поставщиков')
+    !ordersPage.includes('ProcurementPlanDayList') && !ordersPage.includes('Визиты поставщиков')
   )
   assert(
-    'order calendar counts only created orders',
-    page.includes('const counts = {}') && !page.includes('const expectedEntriesByDate')
-  )
-  assert(
-    'receiving calendar counts receiving documents only',
-    read('src/components/receiving/UnifiedReceivingList.jsx').includes(
-      'countReceivingDocumentsByDate(documents)'
-    )
+    'orders are filtered by delivery period from the shared «Фильтр», cancelled only via checkbox',
+    ordersPage.includes('PeriodFilterPopover') &&
+      ordersPage.includes('Показать отменённые заказы') &&
+      !ordersPage.includes('WeekScheduleNav') &&
+      !page.includes('const expectedEntriesByDate')
   )
   assert(
     'created order timestamp is displayed',
@@ -124,7 +99,6 @@ function stageScrollLock() {
 
 function main() {
   console.log('=== Procurement calendar & filter verification ===\n')
-  stageWeekGrid()
   stageFilterModal()
   stageReceivingMonthCalendar()
   stageBackdropAndToolbar()

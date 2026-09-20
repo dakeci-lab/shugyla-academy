@@ -65,6 +65,12 @@
   padding-bottom: 0.4rem;
 }
 
+.sfp-panel__strip-slot {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-bottom: 0.55rem;
+}
+
 .sfp-panel__filter-slot {
   display: flex;
   align-items: center;

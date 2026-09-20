@@ -4,7 +4,7 @@ import { useSession } from '../../../context/SessionContext'
 import { usePlatformPageTitle } from '../../../context/PlatformPageTitleContext'
 import { getPlatformSection } from '../../../platform/platformNav'
 import {
-  canViewPurchases,
+  canViewOrders,
   canEditPurchase,
   canTransferToReceiving,
 } from '../../../config/permissions'
@@ -54,7 +54,7 @@ import './PurchaseDetailPage.css'
 
 const EXPORT_MENU_ID = 'purchase-detail-export-menu'
 
-/** Детальная страница закупа — /platform/procurement/:id */
+/** Детальная страница заказа — /platform/orders/:id */
 export default function PurchaseDetailPage() {
   const { id } = useParams()
   const { pathname } = useLocation()
@@ -75,7 +75,7 @@ export default function PurchaseDetailPage() {
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exportMenuRef = useRef(null)
 
-  const canView = canViewPurchases(user)
+  const canView = canViewOrders(user)
   const canEdit = canEditPurchase(user)
   const canTransfer = canTransferToReceiving(user)
 
@@ -185,7 +185,7 @@ export default function PurchaseDetailPage() {
     showBack: true,
     backFallback: pathname.startsWith('/platform/procurement/analytics/')
       ? '/platform/procurement/analytics'
-      : '/platform/procurement',
+      : '/platform/orders',
   })
 
   if (!canView) {
@@ -200,7 +200,7 @@ export default function PurchaseDetailPage() {
     return (
       <div className="purchase-detail">
         <p className="purchase-detail__not-found">Закуп не найден.</p>
-        <Link to="/platform/procurement" className="btn btn--ghost">
+        <Link to="/platform/orders" className="btn btn--ghost">
           ← К списку закупов
         </Link>
       </div>
@@ -213,7 +213,7 @@ export default function PurchaseDetailPage() {
         <p className="purchase-detail__not-found">
           Это простая закупка. Редактирование доступно в списке закупов.
         </p>
-        <Link to="/platform/procurement" className="btn btn--ghost">
+        <Link to="/platform/orders" className="btn btn--ghost">
           ← К списку закупов
         </Link>
       </div>
@@ -388,8 +388,8 @@ export default function PurchaseDetailPage() {
   return (
     <div className="purchase-detail">
       <div className="purchase-detail__back">
-        <Link to="/platform/procurement" className="purchase-detail__back-link">
-          ← К закупу
+        <Link to="/platform/orders" className="purchase-detail__back-link">
+          ← К заказам
         </Link>
       </div>
 
@@ -506,16 +506,6 @@ export default function PurchaseDetailPage() {
           <dt>Ожидаемая доставка</dt>
           <dd>{formatPurchaseDate(order.expectedDeliveryDate)}</dd>
         </div>
-        {order.receivingDocumentId && (
-          <div>
-            <dt>Документ приёмки</dt>
-            <dd>
-              <Link to={`/platform/receiving/${order.receivingDocumentId}`}>
-                Открыть приёмку
-              </Link>
-            </dd>
-          </div>
-        )}
         <div className="purchase-detail__meta-wide">
           <dt>Комментарий</dt>
           <dd>{order.comment || '—'}</dd>

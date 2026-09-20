@@ -1,8 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import AdminModal from '../../admin/AdminModal'
-import useMediaQuery from '../../../hooks/useMediaQuery'
-import { ChevronLeftIcon, ChevronRightIcon } from '../../icons/PlatformIcons'
+import AdminModal from '../admin/AdminModal'
+import useMediaQuery from '../../hooks/useMediaQuery'
+import { ChevronLeftIcon, ChevronRightIcon } from '../icons/PlatformIcons'
 import {
   SETTLEMENTS_PERIOD_PRESET,
   SETTLEMENTS_PERIOD_PRESET_OPTIONS,
@@ -11,8 +11,8 @@ import {
   getSettlementsPeriodDefaults,
   resolveSettlementsPeriodPreset,
   shiftSettlementsPeriod,
-} from '../../../utils/settlementsPeriod'
-import './SettlementsFilterPopover.css'
+} from '../../utils/settlementsPeriod'
+import './PeriodFilterPopover.css'
 
 const MOBILE_QUERY = '(max-width: 900px)'
 const POPOVER_WIDTH = 360
@@ -26,7 +26,7 @@ export {
   getSettlementsPeriodDates,
 }
 
-function SettlementsFilterFields({ draft, onChange }) {
+function PeriodFilterFields({ draft, onChange }) {
   const navigatorLabel = formatSettlementsPeriodNavigatorLabel(
     draft.periodPreset,
     draft.dateFrom,
@@ -69,9 +69,9 @@ function SettlementsFilterFields({ draft, onChange }) {
   }
 
   return (
-    <div className="settlements-filter-popover__section">
-      <span className="settlements-filter-popover__label">Период</span>
-      <div className="settlements-filter-popover__presets" role="group" aria-label="Быстрый период">
+    <div className="period-filter-popover__section">
+      <span className="period-filter-popover__label">Период</span>
+      <div className="period-filter-popover__presets" role="group" aria-label="Быстрый период">
         {SETTLEMENTS_PERIOD_PRESET_OPTIONS.map((preset) => {
           const active = draft.periodPreset === preset.id
           return (
@@ -79,8 +79,8 @@ function SettlementsFilterFields({ draft, onChange }) {
               key={preset.id}
               type="button"
               aria-pressed={active}
-              className={`settlements-filter-popover__preset${
-                active ? ' settlements-filter-popover__preset--active' : ''
+              className={`period-filter-popover__preset${
+                active ? ' period-filter-popover__preset--active' : ''
               }`}
               onClick={() => selectPreset(preset.id)}
             >
@@ -90,21 +90,21 @@ function SettlementsFilterFields({ draft, onChange }) {
         })}
       </div>
 
-      <div className="settlements-filter-popover__navigator" aria-label="Навигация по периоду">
+      <div className="period-filter-popover__navigator" aria-label="Навигация по периоду">
         <button
           type="button"
-          className="settlements-filter-popover__nav-btn"
+          className="period-filter-popover__nav-btn"
           aria-label="Предыдущий период"
           onClick={() => shift(-1)}
         >
           <ChevronLeftIcon size={18} />
         </button>
-        <div className="settlements-filter-popover__nav-label" aria-live="polite">
+        <div className="period-filter-popover__nav-label" aria-live="polite">
           {navigatorLabel}
         </div>
         <button
           type="button"
-          className="settlements-filter-popover__nav-btn"
+          className="period-filter-popover__nav-btn"
           aria-label="Следующий период"
           onClick={() => shift(1)}
         >
@@ -112,25 +112,25 @@ function SettlementsFilterFields({ draft, onChange }) {
         </button>
       </div>
 
-      <span className="settlements-filter-popover__label">Произвольный период</span>
-      <div className="settlements-filter-popover__dates">
-        <label className="settlements-filter-popover__date-field">
+      <span className="period-filter-popover__label">Произвольный период</span>
+      <div className="period-filter-popover__dates">
+        <label className="period-filter-popover__date-field">
           <span>С</span>
-          <span className="settlements-filter-popover__date-wrap">
+          <span className="period-filter-popover__date-wrap">
             <input
               type="date"
-              className="settlements-filter-popover__date"
+              className="period-filter-popover__date"
               value={draft.dateFrom}
               onChange={(e) => updateDate('dateFrom', e.target.value)}
             />
           </span>
         </label>
-        <label className="settlements-filter-popover__date-field">
+        <label className="period-filter-popover__date-field">
           <span>По</span>
-          <span className="settlements-filter-popover__date-wrap">
+          <span className="period-filter-popover__date-wrap">
             <input
               type="date"
-              className="settlements-filter-popover__date"
+              className="period-filter-popover__date"
               value={draft.dateTo}
               onChange={(e) => updateDate('dateTo', e.target.value)}
             />
@@ -164,8 +164,13 @@ function computePopoverStyle(anchorEl, popoverEl) {
   return { top, left, width }
 }
 
-/** Period filter for Взаиморасчёты — desktop portal popover / mobile AdminModal. */
-export default function SettlementsFilterPopover({
+/**
+ * Shared period filter (presets, prev/next navigator, custom dates) — desktop
+ * portal popover / mobile AdminModal. Used by «Поставщики» cards and «Приёмка»;
+ * `getDefaults` says what «Сбросить» returns for the page (default: current month).
+ * `children` are extra page-specific options shown under the period (e.g. a checkbox).
+ */
+export default function PeriodFilterPopover({
   open,
   draft,
   onChange,
@@ -173,6 +178,8 @@ export default function SettlementsFilterPopover({
   onReset,
   onClose,
   anchorRef,
+  getDefaults = getSettlementsPeriodDefaults,
+  children = null,
 }) {
   const popoverRef = useRef(null)
   const isMobile = useMediaQuery(MOBILE_QUERY)
@@ -222,7 +229,7 @@ export default function SettlementsFilterPopover({
   if (!open) return null
 
   function handleReset() {
-    onChange?.(getSettlementsPeriodDefaults())
+    onChange?.(getDefaults())
     onReset?.()
   }
 
@@ -240,7 +247,8 @@ export default function SettlementsFilterPopover({
   if (isMobile) {
     return (
       <AdminModal title="Фильтр" onClose={onClose} returnFocusRef={anchorRef} footer={actions}>
-        <SettlementsFilterFields draft={draft} onChange={onChange} />
+        <PeriodFilterFields draft={draft} onChange={onChange} />
+        {children}
       </AdminModal>
     )
   }
@@ -248,10 +256,10 @@ export default function SettlementsFilterPopover({
   return createPortal(
     <div
       ref={popoverRef}
-      className="settlements-filter-popover"
+      className="period-filter-popover"
       role="dialog"
       aria-modal="false"
-      aria-labelledby="settlements-filter-popover-title"
+      aria-labelledby="period-filter-popover-title"
       style={
         style
           ? {
@@ -262,11 +270,12 @@ export default function SettlementsFilterPopover({
           : undefined
       }
     >
-      <h2 id="settlements-filter-popover-title" className="settlements-filter-popover__sr-title">
+      <h2 id="period-filter-popover-title" className="period-filter-popover__sr-title">
         Фильтр
       </h2>
-      <SettlementsFilterFields draft={draft} onChange={onChange} />
-      <div className="settlements-filter-popover__actions">{actions}</div>
+      <PeriodFilterFields draft={draft} onChange={onChange} />
+      {children}
+      <div className="period-filter-popover__actions">{actions}</div>
     </div>,
     document.body
   )

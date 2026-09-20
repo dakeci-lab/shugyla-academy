@@ -112,7 +112,7 @@ export function resetCloudBootstrapState() {
 /** Map pathname → modules needed before page can show real empty/error states. */
 export function getRouteCriticalModules(pathname = '') {
   const path = String(pathname || '')
-  if (path.includes('/platform/procurement') || path.includes('/platform/receiving')) {
+  if (path.includes('/platform/procurement') || path.includes('/platform/orders') || path.includes('/platform/receiving')) {
     return ['suppliers', 'procurement', 'receiving']
   }
   if (path.includes('/platform/suppliers')) {

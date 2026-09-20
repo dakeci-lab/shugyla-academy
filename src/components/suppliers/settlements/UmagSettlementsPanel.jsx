@@ -57,10 +57,10 @@ import IconActionButton from '../../admin/IconActionButton'
 import { PencilIcon } from '../../icons/PlatformIcons'
 import '../../admin/IconActionButton.css'
 import OperationDetailSheet from './OperationDetailSheet'
-import SettlementsFilterPopover, {
+import PeriodFilterPopover, {
   getSettlementsPeriodDefaults,
   resolveSettlementsPeriodPreset,
-} from './SettlementsFilterPopover'
+} from '../../platform/PeriodFilterPopover'
 import SupplierForm, {
   EMPTY_SUPPLIER_FORM,
   formToSupplierUpdatePayload,
@@ -344,7 +344,7 @@ function UmagSupplierDetail({
     />
   )
   const filterPopover = (
-    <SettlementsFilterPopover
+    <PeriodFilterPopover
       open={filterOpen}
       draft={draftFilter}
       onChange={setDraftFilter}

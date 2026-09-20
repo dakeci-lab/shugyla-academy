@@ -380,3 +380,9 @@
     display: block;
   }
 }
+
+.procurement-page__filter-strip {
+  flex: 1 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
+}

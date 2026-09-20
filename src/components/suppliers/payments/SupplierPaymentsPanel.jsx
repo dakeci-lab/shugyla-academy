@@ -759,7 +759,7 @@ function PaymentsFilterPopover({
 }
 
 /**
- * @param {{ embedded?: boolean, externalSummaryProvided?: boolean, summary?: object|null, summaryLoading?: boolean, obligations?: object[]|null, refreshToken?: unknown, filterSlot?: HTMLElement|null }} [props]
+ * @param {{ embedded?: boolean, externalSummaryProvided?: boolean, summary?: object|null, summaryLoading?: boolean, obligations?: object[]|null, refreshToken?: unknown, filterSlot?: HTMLElement|null, stripSlot?: HTMLElement|null }} [props]
  *   filterSlot — Этап 2.9: DOM node in the shared finance topbar (next to the
  *     ↻ button) where the supplier filter button + popover are portalled,
  *     replacing the old free-text search row.
@@ -784,6 +784,7 @@ export default function SupplierPaymentsPanel({
   obligations: obligationsProp = null,
   refreshToken = null,
   filterSlot = null,
+  stripSlot = null,
 } = {}) {
   const { user } = useSession()
   const toast = useToast()
@@ -812,6 +813,8 @@ export default function SupplierPaymentsPanel({
   const [accountFilterDraft, setAccountFilterDraft] = useState(() => new Set())
   const [filterOpen, setFilterOpen] = useState(false)
   const filterButtonRef = useRef(null)
+  // Filter-info strip sits next to the tabs (portal) so it never pushes the table down.
+  const wrapStrip = (node) => (stripSlot ? createPortal(node, stripSlot) : node)
   const [accountsCacheVersion, setAccountsCacheVersion] = useState(0)
 
   useEffect(() => {
@@ -1241,7 +1244,7 @@ export default function SupplierPaymentsPanel({
                   filterSlot
                 )
               : null}
-            {supplierFilter.size > 0 || accountFilter.size > 0 ? (
+            {(supplierFilter.size > 0 || accountFilter.size > 0) ? wrapStrip(
               <div className="pf-filter-strip">
                 {accountFilter.size > 0 ? (
                   <>

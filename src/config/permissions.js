@@ -32,6 +32,7 @@ export const ROUTE_KEYS = {
   PROCUREMENT_GROUP: 'procurement_group',
   PROCUREMENT: 'procurement',
   RECEIVING: 'receiving',
+  ORDERS: 'orders',
   SUPPLIERS: 'suppliers',
   SALES: 'sales',
   SUPPLIER_FINANCE: 'supplier_finance',
@@ -80,6 +81,9 @@ const ROUTE_ACCESS = {
     ROLE_IDS.BUYER,
     ROLE_IDS.RECEIVER,
   ],
+  // «Заказы» (merged with the former «Приёмка», 2026-09-20): visible to whoever
+  // could see either one; editing stays behind procurement.create.
+  [ROUTE_KEYS.ORDERS]: [ROLE_IDS.ADMIN, ROLE_IDS.BUYER, ROLE_IDS.RECEIVER],
   [ROUTE_KEYS.SUPPLIERS]: [ROLE_IDS.ADMIN, ROLE_IDS.BUYER],
   // Sales: permission-first (sales.view); role fallback admin-only, matching
   // the sales.* permission grants seeded by 20260829120000_sales_category_month_facts.sql.
@@ -223,6 +227,7 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.HR_CANDIDATES]: [P.RECRUITMENT_VIEW, P.RECRUITMENT_MANAGE_CANDIDATES],
     [ROUTE_KEYS.PROCUREMENT]: [P.PROCUREMENT_VIEW],
     [ROUTE_KEYS.RECEIVING]: [P.RECEIVING_VIEW],
+    [ROUTE_KEYS.ORDERS]: [P.PROCUREMENT_VIEW, P.RECEIVING_VIEW],
     [ROUTE_KEYS.SUPPLIERS]: [P.SUPPLIERS_VIEW],
     [ROUTE_KEYS.SALES]: [P.SALES_VIEW],
     // «Расчёты» — any of umag.settlements.view (Поставщики tab, merged with
@@ -352,6 +357,11 @@ export function canManageSupplierPayments(user) {
 
 export function canViewPurchases(user) {
   return canAccessRoute(user, ROUTE_KEYS.PROCUREMENT)
+}
+
+/** «Заказы»: список и карточка заказа (просмотр — procurement.view или receiving.view). */
+export function canViewOrders(user) {
+  return canAccessRoute(user, ROUTE_KEYS.ORDERS)
 }
 
 export function canCreatePurchase(user) {

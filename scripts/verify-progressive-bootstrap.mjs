@@ -43,7 +43,7 @@ function main() {
   const receivingSvc = read('src/services/receivingDataService.js')
   const session = read('src/context/SessionContext.jsx')
   const sessionGate = read('src/components/platform/PlatformSessionGate.jsx')
-  const procurementPage = read('src/pages/platform/procurement/ProcurementPage.jsx')
+  const procurementPage = read('src/pages/platform/orders/OrdersPage.jsx')
 
   console.log('Stage 1: Module load states')
   assert('cloudStore exports getModuleLoadState', cloudStore.includes('export function getModuleLoadState'))
@@ -89,8 +89,8 @@ function main() {
 
   console.log('Stage 5: Route-scoped realtime + bootstrap hygiene')
   assert(
-    'procurement realtime gated to procurement/receiving routes',
-    layout.includes('/platform/procurement') && layout.includes('/platform/receiving')
+    'procurement realtime gated to procurement/orders routes',
+    layout.includes('/platform/procurement') && layout.includes('/platform/orders')
   )
   assert('getEmployees does not call fetchAllData', !/export async function getEmployees\(\)[\s\S]*fetchAllData/.test(platformSvc))
   assert('getCourses API removed from platformDataService', !platformSvc.includes('export async function getCourses'))

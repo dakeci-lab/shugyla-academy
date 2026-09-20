@@ -38,7 +38,7 @@ function main() {
   const cloudStore = read('src/lib/cloudStore.js')
   const supabaseAdapter = read('src/services/supabaseDataAdapter.js')
   const platformService = read('src/services/platformDataService.js')
-  const page = read('src/pages/platform/procurement/ProcurementPage.jsx')
+  const page = read('src/pages/platform/orders/OrdersPage.jsx')
   const purchaseService = read('src/services/purchaseDataService.js')
   const optimistic = read('src/services/purchaseOptimisticService.js')
   const migration = read('supabase/migrations/20260717210000_secure_procurement_rls.sql')
@@ -73,7 +73,7 @@ function main() {
   console.log('Stage 4: Procurement page sync + error UX')
   assert('page reloads procurement on open', page.includes('reloadProcurement()'))
   assert('page shows toast on load error', page.includes('showError(message)'))
-  assert('empty state uses load error message', page.includes('if (procurementLoadError) return procurementLoadError'))
+  assert('empty state uses load error message', page.includes('procurementLoadError ||'))
   assert('does not treat load error as empty catalog only', page.includes('procurementLoadError'))
   assert('empty state waits for module loading', page.includes('isPurchasesDataLoading'))
   assert(
@@ -83,7 +83,7 @@ function main() {
   const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
   assert(
     'planning tab keeps an explicit UMAG sync control',
-    page.includes('<ProcurementPlannerView') && planner.includes('<PlatformSyncButton')
+    read('src/pages/platform/procurement/ProcurementPage.jsx').includes('<ProcurementPlannerView') && planner.includes('<PlatformSyncButton')
   )
 
   console.log('Stage 4b: Realtime without aggressive polling')

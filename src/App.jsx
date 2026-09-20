@@ -77,9 +77,9 @@ const AnalyticsProcurementPage = lazy(
 const PurchaseDetailPage = lazy(
   () => import('./pages/platform/procurement/PurchaseDetailPage')
 )
-const ReceivingPage = lazy(() => import('./pages/platform/receiving/ReceivingPage'))
-const ReceivingDetailPage = lazy(
-  () => import('./pages/platform/receiving/ReceivingDetailPage')
+const OrdersPage = lazy(() => import('./pages/platform/orders/OrdersPage'))
+const ReceivingDocumentRedirect = lazy(
+  () => import('./pages/platform/receiving/ReceivingDocumentRedirect')
 )
 /**
  * Маршрутизация Shugyla Platform
@@ -95,6 +95,12 @@ function PlatformSuspense({ children }) {
  * SupplierPaymentsPanel's "open payment terms" deep link
  * (openEditId/focusSection/returnTo) still opens the edit modal there.
  */
+/** Old /platform/procurement/:id order links → the «Заказы» section. */
+function ProcurementOrderRedirect() {
+  const { id } = useParams()
+  return <Navigate to={`/platform/orders/${id}`} replace />
+}
+
 function SupplierDirectoryRedirect() {
   const location = useLocation()
   const { id } = useParams()
@@ -314,28 +320,27 @@ export default function App() {
                 />
                 <Route
                   path="procurement/:id"
+                  element={<ProcurementOrderRedirect />}
+                />
+                <Route
+                  path="orders"
                   element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
+                    <PlatformRoute routeKey={ROUTE_KEYS.ORDERS}>
+                      <OrdersPage />
+                    </PlatformRoute>
+                  }
+                />
+                <Route
+                  path="orders/:id"
+                  element={
+                    <PlatformRoute routeKey={ROUTE_KEYS.ORDERS}>
                       <PurchaseDetailPage />
                     </PlatformRoute>
                   }
                 />
-                <Route
-                  path="receiving"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.RECEIVING}>
-                      <ReceivingPage />
-                    </PlatformRoute>
-                  }
-                />
-                <Route
-                  path="receiving/:id"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.RECEIVING}>
-                      <ReceivingDetailPage />
-                    </PlatformRoute>
-                  }
-                />
+                {/* «Приёмка» merged into «Заказы» (2026-09-20): old links keep working. */}
+                <Route path="receiving" element={<Navigate to="/platform/orders" replace />} />
+                <Route path="receiving/:id" element={<ReceivingDocumentRedirect />} />
                 {/* 2026-09-19: the standalone directory was merged into
                     supplier-finance's «Поставщики» tab (formerly
                     «Взаиморасчёты» — see UmagSettlementsPanel). These two

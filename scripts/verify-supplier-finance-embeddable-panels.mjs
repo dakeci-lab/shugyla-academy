@@ -131,7 +131,7 @@ function main() {
   // 2026-09-19: the search box moved into the «Фильтр» popover (same
   // FilterComboField as «К оплате») — the filter trigger is what always renders.
   assert.match(settlementsSrc, /<SuppliersFilterPopover/)
-  ok('search + period filter (PlatformSearchToolbar, SettlementsFilterPopover) are NOT gated by embedded — always renders (item 8: period stays local content, not promoted to a future shared header yet)')
+  ok('search + period filter (PlatformSearchToolbar, PeriodFilterPopover) are NOT gated by embedded — always renders (item 8: period stays local content, not promoted to a future shared header yet)')
 
   assert.doesNotMatch(
     settlementsSrc,

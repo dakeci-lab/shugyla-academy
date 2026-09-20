@@ -32,7 +32,16 @@ export default function PurchaseStatsCards({ orders }) {
   )
 }
 
+/**
+ * «Ожидает приёмки» — обычное состояние заказа: товары принимают в UMAG,
+ * а не на платформе, поэтому это не показываем. Значимы черновик, отмена и т.п.
+ */
+export function isPurchaseStatusShown(status) {
+  return status !== 'awaiting_receiving'
+}
+
 export function PurchaseStatusBadge({ status }) {
+  if (!isPurchaseStatusShown(status)) return null
   return (
     <StatusBadge
       label={PURCHASE_STATUS_LABELS[status] || status}

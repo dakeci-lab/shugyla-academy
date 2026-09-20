@@ -20,7 +20,7 @@ function assert(label, condition) {
 const pagination = read('src/components/procurement/TablePagination.jsx')
 const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
 const plannerCss = read('src/components/procurement/ProcurementPlannerView.css')
-const orders = read('src/pages/platform/procurement/ProcurementPage.jsx')
+const orders = read('src/pages/platform/orders/OrdersPage.jsx')
 const norms = read('src/components/procurement/ProcurementNormsView.jsx')
 
 assert('page sizes are 25/50/100/500', pagination.includes('[25, 50, 100, 500]'))
@@ -48,7 +48,7 @@ assert('planner CSS soft-fetch opacity', plannerCss.includes('proc-planner__tabl
 assert('planner CSS soft-fetch top bar', plannerCss.includes('proc-planner-fetch-bar'))
 
 assert('orders default to 25 rows', orders.includes('useState(25)'))
-assert('orders are sliced by page', orders.includes('dayOrders.slice(start, start + ordersPageSize)'))
+assert('orders are sliced by page', orders.includes('orders.slice(start, start + pageSize)'))
 assert('orders use shared pagination', orders.includes('<TablePagination'))
 assert('orders refresh/filter header removed', !orders.includes('procurement-page__header'))
 assert('orders filter popover removed', !orders.includes('PurchaseFilterPopover'))

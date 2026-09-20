@@ -24,7 +24,7 @@ export const PLATFORM_NAV = [
     label: 'Закупки',
     routeKey: ROUTE_KEYS.PROCUREMENT_GROUP,
     title: 'Закупки',
-    description: 'Закуп, приёмка, поставщики и расчёты.',
+    description: 'Закуп, заказы, поставщики и расчёты.',
     /**
      * Раздел целиком доступен с телефона. Ни один пункт не помечен webOnly:
      * у каждого есть своя мобильная раскладка (карточки вместо таблиц), и
@@ -40,12 +40,12 @@ export const PLATFORM_NAV = [
         description: 'Формирование заказов поставщикам на основе остатков и продаж.',
       },
       {
-        id: 'receiving',
-        path: '/platform/receiving',
-        label: 'Приёмка',
-        routeKey: ROUTE_KEYS.RECEIVING,
-        title: 'Приёмка',
-        description: 'Приёмка товара и сверка с накладными.',
+        id: 'orders',
+        path: '/platform/orders',
+        label: 'Заказы',
+        routeKey: ROUTE_KEYS.ORDERS,
+        title: 'Заказы',
+        description: 'Созданные заказы поставщикам и ожидаемые поставки.',
       },
       {
         id: 'supplier-finance',
@@ -274,8 +274,8 @@ function getDynamicPlatformSection(pathname, flat) {
     }
   }
 
-  if (/^\/platform\/receiving\/[^/]+/.test(pathname)) {
-    return flat.find((item) => item.id === 'receiving') || null
+  if (/^\/platform\/orders\/[^/]+/.test(pathname)) {
+    return flat.find((item) => item.id === 'orders') || null
   }
 
   if (/^\/platform\/procurement\/analytics\/[^/]+/.test(pathname)) {
@@ -286,7 +286,7 @@ function getDynamicPlatformSection(pathname, flat) {
   }
 
   if (/^\/platform\/procurement\/[^/]+/.test(pathname)) {
-    return flat.find((item) => item.id === 'procurement') || null
+    return flat.find((item) => item.id === 'orders') || null
   }
 
   return null

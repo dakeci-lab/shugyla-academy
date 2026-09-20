@@ -335,9 +335,9 @@ async function stagePeriodMath() {
     yday.dateFrom === '2026-08-09' && yday.dateTo === '2026-08-09'
   )
 
-  const popover = read('src/components/suppliers/settlements/SettlementsFilterPopover.jsx')
-  assert('popover uses settlementsPeriod util', popover.includes("from '../../../utils/settlementsPeriod'"))
-  assert('popover has navigator', popover.includes('settlements-filter-popover__navigator'))
+  const popover = read('src/components/platform/PeriodFilterPopover.jsx')
+  assert('popover uses settlementsPeriod util', popover.includes("from '../../utils/settlementsPeriod'"))
+  assert('popover has navigator', popover.includes('period-filter-popover__navigator'))
   assert('popover has yesterday tab', popover.includes('SETTLEMENTS_PERIOD_PRESET_OPTIONS'))
   assert('popover keeps periodPreset on shift', popover.includes('periodPreset: draft.periodPreset'))
   assert('popover uses role=group', popover.includes('role="group"'))

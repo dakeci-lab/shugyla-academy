@@ -82,9 +82,9 @@ export default function PlatformDashboard() {
     {
       icon: '↧',
       value: '—',
-      label: 'Ожидаемые приёмки',
-      hint: 'Откройте раздел приёмки',
-      to: '/platform/receiving',
+      label: 'Ожидаемые поставки',
+      hint: 'Откройте раздел заказов',
+      to: '/platform/orders',
       variant: 'warning',
     },
     {

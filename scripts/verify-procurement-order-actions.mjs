@@ -449,25 +449,17 @@ function stageListPage() {
   const src = read(LIST_PAGE)
 
   assert('list keeps a cancelled-orders collection', src.includes('cancelledOrders'))
-  assert('filter state exists', /const \[showCancelled, setShowCancelled\] = useState\(false\)/.test(src))
+  assert('cancelled filter state lives in the shared filter', /showCancelled: Boolean\(filterDraft\.showCancelled\)/.test(src))
   assert(
-    'day list switches source by the filter',
+    'list switches source by the filter',
     /const source = showCancelled \? cancelledOrders : activeOrders/.test(src)
   )
-  assert('filter control is labelled', src.includes('Отменённые'))
-  assert(
-    'filter buttons report their state to assistive tech',
-    /aria-pressed=\{!showCancelled\}/.test(src) && /aria-pressed=\{showCancelled\}/.test(src)
-  )
+  assert('filter checkbox is labelled «Показать отменённые заказы»', src.includes('Показать отменённые заказы'))
   assert(
     'switching the filter resets pagination',
-    /setOrdersPage\(1\)[\s\S]{0,120}\[selectedDateKey, ordersPageSize, showCancelled\]/.test(src)
+    /setOrdersPage\(1\)[\s\S]{0,120}\[periodFrom, periodTo, ordersPageSize, showCancelled\]/.test(src)
   )
-  assert(
-    'calendar counters still ignore cancelled orders',
-    /for \(const order of activeOrders\)/.test(src),
-    'cancelled orders must not inflate day counts'
-  )
+  assert('active list never includes cancelled orders', /const activeOrders[\s\S]{0,120}!== PURCHASE_STATUS\.CANCELLED/.test(src))
 
   console.log('')
 }

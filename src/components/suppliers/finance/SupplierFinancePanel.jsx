@@ -85,6 +85,7 @@ export default function SupplierFinancePanel() {
   const [syncing, setSyncing] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
   const [filterSlot, setFilterSlot] = useState(null)
+  const [stripSlot, setStripSlot] = useState(null)
 
   const loadSummary = useCallback(async () => {
     setSummaryLoading(true)
@@ -125,7 +126,7 @@ export default function SupplierFinancePanel() {
     setSyncing(true)
     try {
       // Item 23/24: a neutral current-month range, never the Settlements VIEW
-      // PERIOD (SettlementsFilterPopover's dateFrom/dateTo never reach here —
+      // PERIOD (PeriodFilterPopover's dateFrom/dateTo never reach here —
       // this component doesn't even import that period state). The Этап 2.2
       // backend independently widens this to the real effective sync scope.
       const todayKey = summary?.todayKey || toAqtobeDateKey()
@@ -186,6 +187,8 @@ export default function SupplierFinancePanel() {
           ))}
         </div>
 
+        <div className="sfp-panel__strip-slot" ref={setStripSlot} />
+
         <div className="sfp-panel__sync">
           <span
             className={`sfp-panel__sync-status sfp-panel__sync-status--${syncStatus.tone}`}
@@ -227,6 +230,7 @@ export default function SupplierFinancePanel() {
           obligations={obligations}
           refreshToken={refreshToken}
           filterSlot={filterSlot}
+          stripSlot={stripSlot}
         />
       ) : null}
 

@@ -37,7 +37,7 @@ function PlatformLayoutShell({ onLogout }) {
     if (!user) return false
     return (
       pathname.includes('/platform/procurement') ||
-      pathname.includes('/platform/receiving')
+      pathname.includes('/platform/orders')
     )
   }, [user, pathname])
   // Subscription/refresh side effects stay active; connection status no longer renders a banner.
