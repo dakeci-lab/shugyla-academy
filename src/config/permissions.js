@@ -385,10 +385,6 @@ export function canViewReceivingDocuments(user) {
   return canAccessRoute(user, ROUTE_KEYS.RECEIVING)
 }
 
-export function canReceiveGoods(user) {
-  return can(user, PERMISSION_CODES.RECEIVING_MANAGE)
-}
-
 export function isSimplePurchaseReceived(order) {
   return order?.status === 'received'
 }

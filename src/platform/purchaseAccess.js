@@ -8,5 +8,4 @@ export {
   canCreatePurchase,
   canTransferToReceiving,
   canViewReceivingDocuments,
-  canReceiveGoods,
 } from '../config/permissions'
