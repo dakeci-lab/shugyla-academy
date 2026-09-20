@@ -1,3 +1,4 @@
+import HrPageTabs from '../../components/hr/HrPageTabs'
 import VacanciesSection from '../../components/admin/sections/VacanciesSection'
 import '../../components/admin/admin-shared.css'
 
@@ -5,6 +6,7 @@ import '../../components/admin/admin-shared.css'
 export default function PlatformHrVacancies() {
   return (
     <div className="platform-hr-vacancies">
+      <HrPageTabs />
       <VacanciesSection />
     </div>
   )

@@ -270,7 +270,7 @@ export default function App() {
                   element={<Navigate to="/platform/hr/vacancies" replace />}
                 />
 
-                <Route path="hr" element={<Navigate to="/platform/hr/vacancies" replace />} />
+                <Route path="hr" element={<Navigate to="/platform/hr/candidates" replace />} />
                 <Route
                   path="hr/vacancies"
                   element={
@@ -417,6 +417,10 @@ export default function App() {
                 />
                 <Route
                   path="settings/payment-accounts"
+                  element={<Navigate to="/platform/finance/payment-accounts" replace />}
+                />
+                <Route
+                  path="finance/payment-accounts"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.SETTINGS_PAYMENT_ACCOUNTS}>
                       <PlatformSettingsPaymentAccounts />

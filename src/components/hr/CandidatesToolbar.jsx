@@ -6,7 +6,7 @@ import PlatformSearchToolbar, {
 import CandidateFiltersPopover from './CandidateFiltersPopover'
 import CandidateFiltersSheet from './CandidateFiltersSheet'
 import CandidateFilterChips from './CandidateFilterChips'
-import CandidateStatusSegmentedControl from './CandidateStatusSegmentedControl'
+import HrPageTabs from './HrPageTabs'
 import {
   AGE_SORT,
   countActiveCandidateFilters,
@@ -48,8 +48,6 @@ export default function CandidatesToolbar({
   vacancies,
   resultCount,
   draftResultCount,
-  statusValue,
-  onStatusChange,
 }) {
   const filterButtonRef = useRef(null)
   const [filterOpen, setFilterOpen] = useState(false)
@@ -89,7 +87,7 @@ export default function CandidatesToolbar({
 
   return (
     <div className="candidates-page">
-      <CandidateStatusSegmentedControl value={statusValue} onChange={onStatusChange} />
+      <HrPageTabs />
 
       <PlatformSearchToolbar
         value={searchInput}

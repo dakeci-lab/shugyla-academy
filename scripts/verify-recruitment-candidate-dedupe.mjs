@@ -454,25 +454,22 @@ function stageUi() {
   assert('CandidatesSection renders TablePagination (reused from procurement)', section.includes("import TablePagination from '../../procurement/TablePagination'") && section.includes('<TablePagination'))
   assert('pagination page/pageSize state exists', /const \[page, setPage\] = useState\(1\)/.test(section) && /const \[pageSize, setPageSize\] = useState\(/.test(section))
   assert('pagination resets to page 1 when filters/search/page size change', /setPage\(1\)[\s\S]{0,80}\[appliedFilters, debouncedSearch, pageSize\]/.test(section))
-  assert('status control is wired as an always-visible primary control, not a popover filter', section.includes('statusValue={appliedFilters.status}') && section.includes('onStatusChange='))
+  assert('status is a normal filter now (no separate status control props)', !section.includes('statusValue=') && !section.includes('onStatusChange='))
   assert('large candidate summary cards are removed', !section.includes('<StatCard') && !section.includes('Уникальных кандидатов') && !section.includes('Всего заявок'))
 
   const toolbar = read('src/components/hr/CandidatesToolbar.jsx')
-  assert('CandidatesToolbar renders the segmented status control', toolbar.includes('<CandidateStatusSegmentedControl'))
+  assert('CandidatesToolbar renders the single HR page tabs', toolbar.includes('<HrPageTabs'))
   assert('visible Найдено result row is removed', !toolbar.includes('Найдено:') && !toolbar.includes('candidates-toolbar__meta'))
 
-  const segmented = read('src/components/hr/CandidateStatusSegmentedControl.jsx')
-  assert('segmented control has no "all statuses" option', !segmented.includes('Все статусы') && !/value === ['"]all['"]/.test(segmented))
-  assert('segmented control maps exactly the 5 visible statuses', segmented.includes('CANDIDATE_STATUS_VISIBLE_ORDER.map'))
-  assert('status navigation uses tab semantics', segmented.includes('role="tablist"') && segmented.includes('role="tab"') && segmented.includes('aria-selected={active}'))
-  assert('status tabs render no numeric count badges', !segmented.includes('candidate-status-toggle__count') && !segmented.includes('counts?.[status]'))
+  const tabs = read('src/components/hr/HrPageTabs.jsx')
+  assert('HR page tab bar has «Кандидаты» and «Вакансии» tabs with tab semantics', tabs.includes('Кандидаты') && tabs.includes('Вакансии') && tabs.includes('role="tablist"') && tabs.includes('role="tab"') && !tabs.includes('CANDIDATE_STATUS_VISIBLE_ORDER'))
 
-  const segmentedCss = read('src/components/hr/CandidateStatusSegmentedControl.css')
-  assert('status navigation matches flat procurement tabs', segmentedCss.includes('border-bottom: 1px solid') && segmentedCss.includes('border-bottom: 2px solid transparent') && segmentedCss.includes('border-bottom-color: var(--color-primary'))
-  assert('status navigation has no pill styling', !segmentedCss.includes('border-radius: 999px') && !segmentedCss.includes('background: var(--color-primary'))
+  const tabsCss = read('src/components/hr/HrPageTabs.css')
+  assert('page tabs keep the flat procurement tab styling', tabsCss.includes('border-bottom: 1px solid') && tabsCss.includes('border-bottom: 2px solid transparent') && tabsCss.includes('border-bottom-color: var(--color-primary'))
+  assert('page tabs have no pill styling', !tabsCss.includes('border-radius: 999px') && !tabsCss.includes('background: var(--color-primary'))
 
   const filterFields = read('src/components/hr/CandidateFiltersFields.jsx')
-  assert('status select removed from the collapsible filter popover/sheet', !filterFields.includes('Статус') && !filterFields.includes('Все статусы'))
+  assert('status is a single-select inside the filter popover/sheet: the 5 visible statuses, default «Новый», no «all» option', filterFields.includes('Статус') && filterFields.includes('CANDIDATE_STATUS_VISIBLE_ORDER.map') && !filterFields.includes('Все статусы') && !filterFields.includes('type="checkbox"'))
 }
 
 async function main() {

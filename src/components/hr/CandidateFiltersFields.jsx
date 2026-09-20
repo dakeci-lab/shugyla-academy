@@ -1,4 +1,5 @@
 import { AGE_SORT } from '../../utils/candidateListUtils'
+import { CANDIDATE_STATUS_LABELS, CANDIDATE_STATUS_VISIBLE_ORDER } from '../../utils/recruitmentData'
 
 const AGE_SORT_OPTIONS = [
   { id: AGE_SORT.DEFAULT, label: 'По умолчанию' },
@@ -19,6 +20,22 @@ export default function CandidateFiltersFields({
 
   return (
     <div className="candidate-filters-fields">
+      {/* One status at a time (no «all», no checkboxes) — «Новый» by default. */}
+      <label className="admin-form__label">
+        Статус
+        <select
+          className="admin-form__select"
+          value={draft.status}
+          onChange={(e) => patch({ status: e.target.value })}
+        >
+          {CANDIDATE_STATUS_VISIBLE_ORDER.map((status) => (
+            <option key={status} value={status}>
+              {CANDIDATE_STATUS_LABELS[status]}
+            </option>
+          ))}
+        </select>
+      </label>
+
       <label className="admin-form__label">
         Вакансия
         <select

@@ -47,7 +47,7 @@ DELETE нет ни в RLS, ни в адаптерах — деактивация
 `rbacService.js`.
 
 **UI**: новая вкладка «Счета оплаты» в Настройках
-(`/platform/settings/payment-accounts`), список + модалка создания/
+(`/platform/finance/payment-accounts`), список + модалка создания/
 редактирования, по образцу `RolesListTab`/`useRoleEditor`, но без матрицы
 разрешений — только название, описание, статус.
 
@@ -88,7 +88,7 @@ npm run verify:payment-accounts-module
 ```
 
 Нужно подтвердить на реальной Supabase: применить миграцию, зайти под
-админом на `web.shugyla-market.kz/platform/settings/payment-accounts`,
+админом на `web.shugyla-market.kz/platform/finance/payment-accounts`,
 убедиться что сид (Наличные/Перевод) появился, попробовать создать/
 деактивировать счёт.
 

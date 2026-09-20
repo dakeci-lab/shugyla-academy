@@ -131,13 +131,13 @@ function stagePermissionsWiring() {
     permissions.includes('[ROUTE_KEYS.SETTINGS_PAYMENT_ACCOUNTS]: [P.PAYMENT_ACCOUNTS_VIEW, P.PAYMENT_ACCOUNTS_MANAGE]')
   )
 
-  assert('nav entry points at /platform/settings/payment-accounts', nav.includes("path: '/platform/settings/payment-accounts'"))
+  assert('nav entry (under «Финансы») points at /platform/finance/payment-accounts', nav.includes("path: '/platform/finance/payment-accounts'"))
   assert('nav entry uses the new route key', nav.includes('routeKey: ROUTE_KEYS.SETTINGS_PAYMENT_ACCOUNTS'))
 
   assert('App.jsx lazy-imports the settings page', app.includes("import('./pages/platform/PlatformSettingsPaymentAccounts')"))
   assert(
-    'App.jsx registers settings/payment-accounts route',
-    app.includes('path="settings/payment-accounts"') && app.includes('routeKey={ROUTE_KEYS.SETTINGS_PAYMENT_ACCOUNTS}')
+    'App.jsx registers finance/payment-accounts (old settings/ path redirects)',
+    app.includes('path="finance/payment-accounts"') && app.includes('routeKey={ROUTE_KEYS.SETTINGS_PAYMENT_ACCOUNTS}') && app.includes('<Navigate to="/platform/finance/payment-accounts" replace />')
   )
   console.log('')
 }

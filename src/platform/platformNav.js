@@ -12,64 +12,12 @@ export const PLATFORM_NAV = [
     description: 'Отметка прихода и ухода, статус сегодняшней смены.',
   },
   {
-    id: 'employees',
-    label: 'Сотрудники',
-    routeKey: ROUTE_KEYS.EMPLOYEES_GROUP,
-    title: 'Сотрудники',
-    description: 'Учётные записи, роли и статус сотрудников.',
-    children: [
-      {
-        id: 'employees-list',
-        path: '/platform/employees/list',
-        label: 'Список сотрудников',
-        routeKey: ROUTE_KEYS.EMPLOYEES_LIST,
-        title: 'Список сотрудников',
-        description: 'Добавление, редактирование, роли и увольнение сотрудников.',
-      },
-      {
-        id: 'employees-schedule',
-        path: '/platform/employees/schedule',
-        label: 'График работы',
-        routeKey: ROUTE_KEYS.EMPLOYEES_SCHEDULE,
-        title: 'График работы',
-        description: 'Настройки графика персонала магазина.',
-      },
-      {
-        id: 'employees-payroll',
-        path: '/platform/employees/payroll',
-        label: 'Подсчёт зарплаты',
-        routeKey: ROUTE_KEYS.EMPLOYEES_PAYROLL,
-        title: 'Подсчёт зарплаты',
-        description: 'Расчёт заработной платы сотрудников.',
-        webOnly: true,
-      },
-    ],
-  },
-  {
-    id: 'hr-group',
-    label: 'HR',
-    routeKey: ROUTE_KEYS.HR_GROUP,
-    title: 'HR',
-    description: 'Вакансии, кандидаты и процесс найма.',
-    pathPrefixes: ['/platform/hr'],
-    children: [
-      {
-        id: 'hr-vacancies',
-        path: '/platform/hr/vacancies',
-        label: 'Вакансии',
-        routeKey: ROUTE_KEYS.HR_VACANCIES,
-        title: 'Вакансии',
-        description: 'Управление вакансиями и ссылками для кандидатов.',
-      },
-      {
-        id: 'hr-candidates',
-        path: '/platform/hr/candidates',
-        label: 'Кандидаты',
-        routeKey: ROUTE_KEYS.HR_CANDIDATES,
-        title: 'Кандидаты',
-        description: 'Кандидаты, результаты анкетирования и статусы найма.',
-      },
-    ],
+    id: 'sales',
+    path: '/platform/sales',
+    label: 'Продажи',
+    routeKey: ROUTE_KEYS.SALES,
+    title: 'Продажи',
+    description: 'Выручка и маржа по категориям, аналитика и синхронизация с UMAG.',
   },
   {
     id: 'procurement-group',
@@ -111,12 +59,66 @@ export const PLATFORM_NAV = [
     ],
   },
   {
-    id: 'sales',
-    path: '/platform/sales',
-    label: 'Продажи',
-    routeKey: ROUTE_KEYS.SALES,
-    title: 'Продажи',
-    description: 'Выручка и маржа по категориям, аналитика и синхронизация с UMAG.',
+    id: 'employees',
+    label: 'Сотрудники',
+    routeKey: ROUTE_KEYS.EMPLOYEES_GROUP,
+    title: 'Сотрудники',
+    description: 'Учётные записи, роли и статус сотрудников.',
+    children: [
+      {
+        id: 'employees-list',
+        path: '/platform/employees/list',
+        label: 'Список сотрудников',
+        routeKey: ROUTE_KEYS.EMPLOYEES_LIST,
+        title: 'Список сотрудников',
+        description: 'Добавление, редактирование, роли и увольнение сотрудников.',
+      },
+      {
+        id: 'employees-schedule',
+        path: '/platform/employees/schedule',
+        label: 'График работы',
+        routeKey: ROUTE_KEYS.EMPLOYEES_SCHEDULE,
+        title: 'График работы',
+        description: 'Настройки графика персонала магазина.',
+      },
+      {
+        id: 'employees-payroll',
+        path: '/platform/employees/payroll',
+        label: 'Подсчёт зарплаты',
+        routeKey: ROUTE_KEYS.EMPLOYEES_PAYROLL,
+        title: 'Подсчёт зарплаты',
+        description: 'Расчёт заработной платы сотрудников.',
+        webOnly: true,
+      },
+      {
+        id: 'hr',
+        path: '/platform/hr/candidates',
+        pathPrefixes: ['/platform/hr'],
+        label: 'HR',
+        routeKey: ROUTE_KEYS.HR_GROUP,
+        title: 'HR',
+        description: 'Кандидаты, вакансии и процесс найма.',
+      },
+    ],
+  },
+  {
+    id: 'finance',
+    label: 'Финансы',
+    routeKey: ROUTE_KEYS.FINANCES_GROUP,
+    title: 'Финансы',
+    description: 'Финансы компании: счета оплаты и дальнейшие финансовые разделы.',
+    pathPrefixes: ['/platform/finance'],
+    children: [
+      {
+        id: 'finance-payment-accounts',
+        path: '/platform/finance/payment-accounts',
+        label: 'Счета оплаты',
+        end: true,
+        routeKey: ROUTE_KEYS.SETTINGS_PAYMENT_ACCOUNTS,
+        title: 'Счета оплаты',
+        description: 'Справочник способов оплаты поставщикам: наличные, переводы, счета.',
+      },
+    ],
   },
   {
     id: 'settings',
@@ -152,15 +154,6 @@ export const PLATFORM_NAV = [
         routeKey: ROUTE_KEYS.SETTINGS_NOTIFICATIONS,
         title: 'Настройки уведомлений',
         description: 'Автоматические уведомления тайм-трекера по графику смен.',
-      },
-      {
-        id: 'settings-payment-accounts',
-        path: '/platform/settings/payment-accounts',
-        label: 'Счета оплаты',
-        end: true,
-        routeKey: ROUTE_KEYS.SETTINGS_PAYMENT_ACCOUNTS,
-        title: 'Счета оплаты',
-        description: 'Справочник способов оплаты поставщикам: наличные, переводы, счета.',
       },
     ],
   },
@@ -203,6 +196,10 @@ export function isNavItemActive(pathname, item) {
     return pathname === item.path
   }
 
+  if (item.pathPrefixes?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))) {
+    return true
+  }
+
   return pathname === item.path || pathname.startsWith(`${item.path}/`)
 }
 
@@ -225,6 +222,11 @@ export function getPlatformSection(pathname) {
 
   const exact = flat.find((item) => item.path === pathname)
   if (exact) return exact
+
+  const byPrefix = flat.find((item) =>
+    item.pathPrefixes?.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+  )
+  if (byPrefix) return byPrefix
 
   const nested = flat
     .filter((item) => item.path !== '/platform')

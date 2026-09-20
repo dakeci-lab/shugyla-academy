@@ -105,9 +105,10 @@ export function cycleAgeSort(current) {
   return AGE_SORT.DEFAULT
 }
 
-/** Status is the always-visible primary control, not counted as a "secondary" filter. */
+/** Status counts as active only when it differs from the default («Новый»). */
 export function countActiveCandidateFilters(filters) {
   let count = 0
+  if (filters.status !== DEFAULT_CANDIDATE_FILTERS.status) count += 1
   if (filters.vacancyId !== 'all') count += 1
   if (filters.ageMin !== '' && filters.ageMin != null) count += 1
   if (filters.ageMax !== '' && filters.ageMax != null) count += 1

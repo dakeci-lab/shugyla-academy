@@ -200,8 +200,6 @@ export default function CandidatesSection() {
         vacancies={vacancies}
         resultCount={displayedRows.length}
         draftResultCount={draftResultCount}
-        statusValue={appliedFilters.status}
-        onStatusChange={(status) => setAppliedFilters((prev) => ({ ...prev, status }))}
       />
 
       {candidates.length === 0 ? (
