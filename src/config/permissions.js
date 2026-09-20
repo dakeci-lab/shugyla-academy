@@ -225,6 +225,23 @@ export function canAccessRoute(user, routeKey) {
     ],
     [ROUTE_KEYS.HR_VACANCIES]: [P.RECRUITMENT_VIEW, P.RECRUITMENT_MANAGE_VACANCIES],
     [ROUTE_KEYS.HR_CANDIDATES]: [P.RECRUITMENT_VIEW, P.RECRUITMENT_MANAGE_CANDIDATES],
+    // Menu groups: visible when any of their children is (kept in sync with PLATFORM_NAV).
+    [ROUTE_KEYS.EMPLOYEES_GROUP]: [
+      P.EMPLOYEES_VIEW,
+      P.SCHEDULE_VIEW_TEAM,
+      P.SCHEDULE_VIEW_OWN,
+      P.PAYROLL_VIEW,
+      P.RECRUITMENT_VIEW,
+      P.RECRUITMENT_MANAGE_VACANCIES,
+      P.RECRUITMENT_MANAGE_CANDIDATES,
+    ],
+    [ROUTE_KEYS.PROCUREMENT_GROUP]: [
+      P.PROCUREMENT_VIEW,
+      P.RECEIVING_VIEW,
+      P.UMAG_SETTLEMENTS_VIEW,
+      P.SUPPLIER_PAYMENTS_VIEW,
+      P.SUPPLIERS_VIEW,
+    ],
     [ROUTE_KEYS.PROCUREMENT]: [P.PROCUREMENT_VIEW],
     [ROUTE_KEYS.RECEIVING]: [P.RECEIVING_VIEW],
     [ROUTE_KEYS.ORDERS]: [P.PROCUREMENT_VIEW, P.RECEIVING_VIEW],
@@ -245,6 +262,12 @@ export function canAccessRoute(user, routeKey) {
 
   const permissions = routePermissionMap[routeKey]
   if (permissions?.some((perm) => can(user, perm))) return true
+
+  // Once the permissions are loaded from the database they are the only source
+  // of truth: unticking a permission in «Роли и доступы» must actually close the
+  // route. The role-name list below is only a safety net for the moments the
+  // permissions are not available (still loading / failed to load).
+  if (getRbacLoadState() === RBAC_LOAD_STATE.LOADED) return false
 
   if (!role) return false
 
