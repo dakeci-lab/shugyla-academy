@@ -185,3 +185,16 @@
   font-size: 0.875rem;
   cursor: pointer;
 }
+
+/* First option with no period above it (planner): no divider. */
+.period-filter-popover__option:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.period-filter-popover__option-count {
+  margin-left: auto;
+  color: var(--color-text-secondary, #64748b);
+  font-variant-numeric: tabular-nums;
+}

@@ -64,21 +64,21 @@ async function stageHeaderStrip() {
     'snapshot collapses to one line: date · SKU',
     ready.text === '13.08.2026, 11:04 · 9807 SKU'
   )
-  assert('negative stock stays a separate warn token', ready.warnText === '1479 отриц.')
+  assert('negative stock is no longer a separate red token in the header (removed 2026-09-21); it stays in the title', ready.warnText === undefined && ready.title.includes('1479'))
   assert(
     'the full wording survives in the title',
     ready.title.startsWith('Снимок UMAG · Обновлён 13.08.2026, 11:04 · 9807 SKU') &&
       ready.title.includes('с отрицательным остатком')
   )
   assert(
-    'a clean snapshot has no warn token',
-    ux.buildSnapshotHeadline({
+    'a clean snapshot title has no negative-stock note',
+    !ux.buildSnapshotHeadline({
       hasSnapshot: true,
       status: 'ready',
       syncedAtLabel: '13.08.2026, 11:04',
       itemCount: 10,
       negativeStockCount: 0,
-    }).warnText === null
+    }).title.includes('отрицательным')
   )
   assert(
     'syncing / failed / missing snapshots each get their own text',
@@ -525,15 +525,15 @@ function stageLayoutInvariants() {
   assert(
     'chips navigate to a filter instead of only reporting a number',
     planner.includes('function handleAlertChipClick(chip)') &&
-      planner.includes('unassignedOnly: true') &&
       planner.includes('platformSupplierId: supplierId')
   )
   assert(
-    'unassigned filter is reachable via alert chip (no advanced filter popover)',
+    'the unassigned filter is a checkbox in the toolbar «Фильтр», not an alert chip (2026-09-21)',
     !planner.includes('Только без поставщика') &&
       !planner.includes('proc-planner__filter-pop') &&
-      planner.includes("chip.id === 'unassigned'") &&
-      planner.includes('unassignedOnly: true')
+      planner.includes("chip.id !== 'unassigned'") &&
+      planner.includes('function applyQuickFilter()') &&
+      planner.includes('unassignedOnly,')
   )
 
   assert(

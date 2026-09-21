@@ -169,6 +169,7 @@ function computePopoverStyle(anchorEl, popoverEl) {
  * portal popover / mobile AdminModal. Used by «Поставщики» cards and «Приёмка»;
  * `getDefaults` says what «Сбросить» returns for the page (default: current month).
  * `children` are extra page-specific options shown under the period (e.g. a checkbox).
+ * `showPeriod={false}` turns it into a plain option popover (only `children`, e.g. the planner).
  */
 export default function PeriodFilterPopover({
   open,
@@ -179,6 +180,7 @@ export default function PeriodFilterPopover({
   onClose,
   anchorRef,
   getDefaults = getSettlementsPeriodDefaults,
+  showPeriod = true,
   children = null,
 }) {
   const popoverRef = useRef(null)
@@ -229,7 +231,7 @@ export default function PeriodFilterPopover({
   if (!open) return null
 
   function handleReset() {
-    onChange?.(getDefaults())
+    if (showPeriod) onChange?.(getDefaults())
     onReset?.()
   }
 
@@ -247,7 +249,7 @@ export default function PeriodFilterPopover({
   if (isMobile) {
     return (
       <AdminModal title="Фильтр" onClose={onClose} returnFocusRef={anchorRef} footer={actions}>
-        <PeriodFilterFields draft={draft} onChange={onChange} />
+        {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} /> : null}
         {children}
       </AdminModal>
     )
@@ -273,7 +275,7 @@ export default function PeriodFilterPopover({
       <h2 id="period-filter-popover-title" className="period-filter-popover__sr-title">
         Фильтр
       </h2>
-      <PeriodFilterFields draft={draft} onChange={onChange} />
+      {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} /> : null}
       {children}
       <div className="period-filter-popover__actions">{actions}</div>
     </div>,

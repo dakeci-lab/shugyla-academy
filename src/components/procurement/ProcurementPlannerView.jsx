@@ -1,5 +1,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import PlatformFilterTrigger from '../platform/PlatformFilterTrigger'
+import PeriodFilterPopover from '../platform/PeriodFilterPopover'
 import { Link } from 'react-router-dom'
 import { useSession } from '../../context/SessionContext'
 import { usePlatformData } from '../../context/PlatformDataContext'
@@ -78,6 +80,7 @@ import {
   getFirstEditableItemId,
   getItemOrderHistory,
   getNextEditableItemId,
+  buildStockHealthSummary,
   getPlannerAlertChips,
   getSupplierWorkflowStatus,
   getSyncDisabledReason,
@@ -167,23 +170,8 @@ function PlannerColumnSettingsIcon({ size = 18 }) {
   )
 }
 
-/** Hover help for ABC column header (replaces on-screen legend). */
-const ABC_COLUMN_HELP =
-  'A — до 80% накопленного вклада; B — от 80% до 95%; C — остальные с положительным вкладом; — нет данных. К — количество, В — выручка, П — прибыль.'
-
-function AbcColumnHelp() {
-  return (
-    <span
-      className="proc-planner__abc-help"
-      title={ABC_COLUMN_HELP}
-      aria-label={ABC_COLUMN_HELP}
-      role="img"
-    >
-      ?
-    </span>
-  )
-}
-
+/** Groups the stock-health widget leaves out of its 100% scale; picked in the toolbar «Фильтр». */
+const QUICK_RESERVE_EXTRAS = ['no_demand', 'negative_stock']
 
 /** Scope for hard-clear vs soft keep-previous (excludes page/pageSize). */
 function buildPlannerItemsScopeKey(snapshotId, debouncedSearch, filters, abcSort) {
@@ -326,6 +314,14 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     abcRevenue: [],
     abcProfit: [],
   })
+  // Toolbar «Фильтр»: the rarely used quick filters («Только к заказу», «Без поставщика»).
+  const [quickFilterOpen, setQuickFilterOpen] = useState(false)
+  const [quickFilterDraft, setQuickFilterDraft] = useState({
+    orderableOnly: false,
+    unassignedOnly: false,
+    reserveExtra: '',
+  })
+  const quickFilterButtonRef = useRef(null)
   const [abcSort, setAbcSort] = useState({ field: '', dir: 'asc' })
   const [filterOptions, setFilterOptions] = useState(EMPTY_FILTER_OPTIONS)
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(false)
@@ -1352,12 +1348,13 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     [dataVersion]
   )
 
+  // «Без поставщика» moved into the toolbar «Фильтр» (2026-09-21); only real alerts stay as chips.
   const alertChips = useMemo(
     () =>
       getPlannerAlertChips({
         unassignedOrderableCount: filterOptions.unassignedOrderableCount || 0,
         suppliers: filterOptions.suppliers || [],
-      }),
+      }).filter((chip) => chip.id !== 'unassigned'),
     [filterOptions.unassignedOrderableCount, filterOptions.suppliers]
   )
 
@@ -2210,20 +2207,23 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   /**
    * ProcurementStockHealthWidget bucket key <-> procurement_snapshot_items.reserve_status.
-   * Same four values as get_procurement_snapshot_stock_health() and the
-   * generated column (20260908140000_procurement_snapshot_items_reserve_status.sql).
+   * The four values of get_procurement_snapshot_stock_health() and the
+   * generated column (20260908140000_procurement_snapshot_items_reserve_status.sql),
+   * plus the widget-only negativeStock group (negative_stock = true).
    */
   const RESERVE_STATUS_BY_BUCKET = {
     onNorm: 'on_norm',
     overNorm: 'over_norm',
     underNorm: 'under_norm',
     noDemand: 'no_demand',
+    negativeStock: 'negative_stock',
   }
   const RESERVE_STATUS_LABELS = {
     on_norm: 'Точно',
     over_norm: 'Перезатарка',
     under_norm: 'Недостаток',
-    no_demand: 'Нет данных',
+    no_demand: 'Нет продаж 8 нед.',
+    negative_stock: 'Отрицательный остаток',
   }
   const activeReserveBucket =
     Object.entries(RESERVE_STATUS_BY_BUCKET).find(
@@ -2242,15 +2242,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   /** Chips navigate to the matching filter; they never just report a number. */
   function handleAlertChipClick(chip) {
-    if (chip.id === 'unassigned') {
-      setFilters((current) => ({
-        ...current,
-        platformSupplierId: '',
-        orderableOnly: true,
-        unassignedOnly: true,
-      }))
-      return
-    }
     if (chip.id === 'inconsistent') {
       const supplierId = chip.supplierIds?.[0]
       if (!supplierId) return
@@ -2262,6 +2253,57 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         unassignedOnly: false,
       }))
     }
+  }
+
+  // The two groups the stock-health widget leaves out of its 100% scale.
+  const reserveExtraFilter = QUICK_RESERVE_EXTRAS.includes(filters.reserveStatus) ? filters.reserveStatus : ''
+  const stockHealthExcluded = useMemo(
+    () => buildStockHealthSummary(stockHealth)?.excluded || null,
+    [stockHealth]
+  )
+  const quickFilterCount =
+    (filters.orderableOnly ? 1 : 0) + (filters.unassignedOnly ? 1 : 0) + (reserveExtraFilter ? 1 : 0)
+
+  function toggleQuickFilter() {
+    if (quickFilterOpen) {
+      setQuickFilterOpen(false)
+      return
+    }
+    setQuickFilterDraft({
+      orderableOnly: filters.orderableOnly,
+      unassignedOnly: filters.unassignedOnly,
+      reserveExtra: reserveExtraFilter,
+    })
+    setQuickFilterOpen(true)
+  }
+
+  function applyQuickFilter() {
+    const { orderableOnly, unassignedOnly, reserveExtra } = quickFilterDraft
+    setFilters((current) => ({
+      ...current,
+      orderableOnly,
+      unassignedOnly,
+      // A bucket picked on the widget stays; only these two extras are set/cleared here.
+      reserveStatus: reserveExtra
+        ? reserveExtra
+        : QUICK_RESERVE_EXTRAS.includes(current.reserveStatus)
+          ? ''
+          : current.reserveStatus,
+      // «Без поставщика» is about rows with no supplier, so a picked supplier would contradict it.
+      platformSupplierId: unassignedOnly ? '' : current.platformSupplierId,
+    }))
+    setQuickFilterOpen(false)
+  }
+
+  function resetQuickFilter() {
+    setQuickFilterDraft({ orderableOnly: false, unassignedOnly: false, reserveExtra: '' })
+    setFilters((current) => ({
+      ...current,
+      orderableOnly: false,
+      unassignedOnly: false,
+      reserveStatus: QUICK_RESERVE_EXTRAS.includes(current.reserveStatus) ? '' : current.reserveStatus,
+    }))
+    setQuickFilterOpen(false)
   }
 
   const snapshotHeadline = buildSnapshotHeadline({
@@ -2336,9 +2378,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       <span className="proc-planner__snapshot" title={snapshotHeadline.title}>
         <span className="proc-planner__snapshot-label">UMAG</span>
         <span className="proc-planner__snapshot-text">{snapshotHeadline.text}</span>
-        {snapshotHeadline.warnText ? (
-          <span className="proc-planner__snapshot-warn">{snapshotHeadline.warnText}</span>
-        ) : null}
       </span>
       {alertChips.length > 0 ? (
         <span className="proc-planner__chips">
@@ -2354,11 +2393,89 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                 <span className="proc-planner__chip-label">{chip.label}</span>
                 <span className="proc-planner__chip-count">{chip.count}</span>
               </button>
-              {chip.id === 'unassigned' ? <AbcColumnHelp /> : null}
             </Fragment>
           ))}
         </span>
       ) : null}
+      <div className="pf-filter-anchor">
+        <PlatformFilterTrigger
+          ref={quickFilterButtonRef}
+          active={quickFilterCount > 0}
+          count={quickFilterCount}
+          open={quickFilterOpen}
+          onClick={toggleQuickFilter}
+        />
+        <PeriodFilterPopover
+          open={quickFilterOpen}
+          showPeriod={false}
+          draft={quickFilterDraft}
+          onChange={setQuickFilterDraft}
+          onApply={applyQuickFilter}
+          onReset={resetQuickFilter}
+          onClose={() => setQuickFilterOpen(false)}
+          anchorRef={quickFilterButtonRef}
+        >
+          <label className="period-filter-popover__option">
+            <input
+              type="checkbox"
+              checked={quickFilterDraft.orderableOnly}
+              onChange={(event) =>
+                setQuickFilterDraft((current) => ({
+                  ...current,
+                  orderableOnly: event.target.checked,
+                  // «Без поставщика» only looks at rows to order, so it cannot outlive this one.
+                  unassignedOnly: event.target.checked ? current.unassignedOnly : false,
+                }))
+              }
+            />
+            Только к заказу
+            {orderableChipCount > 0 ? (
+              <span className="period-filter-popover__option-count">{orderableChipCount}</span>
+            ) : null}
+          </label>
+          <label className="period-filter-popover__option">
+            <input
+              type="checkbox"
+              checked={quickFilterDraft.unassignedOnly}
+              onChange={(event) =>
+                setQuickFilterDraft((current) => ({
+                  ...current,
+                  orderableOnly: event.target.checked ? true : current.orderableOnly,
+                  unassignedOnly: event.target.checked,
+                }))
+              }
+            />
+            Без поставщика
+            {(filterOptions.unassignedOrderableCount || 0) > 0 ? (
+              <span className="period-filter-popover__option-count">
+                {filterOptions.unassignedOrderableCount}
+              </span>
+            ) : null}
+          </label>
+          {[
+            { value: 'no_demand', label: 'Нет продаж 8 нед.', count: stockHealthExcluded?.noDemand.count },
+            { value: 'negative_stock', label: 'Отрицательный остаток', count: stockHealthExcluded?.negative.count },
+          ].map((option) => (
+            <label key={option.value} className="period-filter-popover__option">
+              <input
+                type="checkbox"
+                checked={quickFilterDraft.reserveExtra === option.value}
+                onChange={(event) =>
+                  // One group at a time: the table filters by a single reserve status.
+                  setQuickFilterDraft((current) => ({
+                    ...current,
+                    reserveExtra: event.target.checked ? option.value : '',
+                  }))
+                }
+              />
+              {option.label}
+              {option.count > 0 ? (
+                <span className="period-filter-popover__option-count">{option.count}</span>
+              ) : null}
+            </label>
+          ))}
+        </PeriodFilterPopover>
+      </div>
       <PlatformToolbarActionWrap>
         <span className="proc-planner__tip-wrap proc-planner__tip-wrap--topbar" data-tooltip={syncTooltip}>
           <PlatformSyncButton
@@ -2465,25 +2582,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
                 }
               />
             </div>
-            <button
-              type="button"
-              className={`proc-planner__orderable-toggle${filters.orderableOnly ? ' is-active' : ''}`}
-              aria-pressed={filters.orderableOnly}
-              title="Показать только позиции с количеством к заказу больше 0"
-              onClick={() =>
-                setFilters((current) => ({
-                  ...current,
-                  orderableOnly: !current.orderableOnly,
-                }))
-              }
-            >
-              <span className="proc-planner__orderable-toggle-label">Только к заказу</span>
-              {orderableChipCount > 0 ? (
-                <span className="proc-planner__orderable-toggle-count">
-                  {orderableChipCount}
-                </span>
-              ) : null}
-            </button>
             <PlatformToolbarActionWrap>
               <PlannerTooltipButton
                 className="proc-planner__create-btn"

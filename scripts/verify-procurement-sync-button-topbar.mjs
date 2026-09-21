@@ -60,8 +60,8 @@ function main() {
     !searchToolbarBlock.includes('<PlatformSyncButton'),
   )
   assert(
-    'orderable toggle still in search toolbar actions (untouched)',
-    searchToolbarBlock.includes('proc-planner__orderable-toggle'),
+    'the blue «Только к заказу» button is gone from the search toolbar (moved into the «Фильтр», 2026-09-21)',
+    !searchToolbarBlock.includes('proc-planner__orderable-toggle'),
   )
   assert(
     'create button still in search toolbar actions (untouched)',

@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
- * Verification for the planner's stock-health KPI widget (retail 80/10/10
- * standard, ties into buyer KPI/bonus).
+ * Verification for the planner's stock-health widget: the current share of
+ * «Точно / Перезатарка / Недостаток» on a 100% scale (2026-09-21: no fixed
+ * 80/10/10 standard shown; no-sales and negative-stock SKUs sit outside the
+ * calculation).
  *
  * Usage:
  *   npm run verify:procurement-stock-health-widget
@@ -38,36 +40,46 @@ const plannerCss = read('src/components/procurement/ProcurementPlannerView.css')
 const migrationSrc = read('supabase/migrations/20260824090000_procurement_snapshot_stock_health.sql')
 
 // ---------------------------------------------------------------------------
-// Pure math — buildStockHealthSummary / STOCK_HEALTH_TARGET
+// Pure math — buildStockHealthSummary
 // ---------------------------------------------------------------------------
 
-assert('STOCK_HEALTH_TARGET is 80/10/10', ux.STOCK_HEALTH_TARGET.onNorm === 80 && ux.STOCK_HEALTH_TARGET.overNorm === 10 && ux.STOCK_HEALTH_TARGET.underNorm === 10)
+const bucketOf = (summary, key) => summary.buckets.find((b) => b.key === key)
+const sumPct = (summary) => Math.round(summary.buckets.reduce((acc, b) => acc + b.pct, 0) * 10) / 10
 
 assert('null stockHealth -> null summary', ux.buildStockHealthSummary(null) === null)
 assert('zero total -> null summary (nothing to show)', ux.buildStockHealthSummary({ total: 0, noDemand: 0, underNorm: 0, onNorm: 0, overNorm: 0 }) === null)
+assert('no fixed 80/10/10 standard is exported any more', ux.STOCK_HEALTH_TARGET === undefined)
 
 {
-  // 100 total, 20 no-demand -> rated = 80. 64 on, 8 over, 8 under -> 80%/10%/10% exactly on target.
-  const summary = ux.buildStockHealthSummary({ total: 100, noDemand: 20, onNorm: 64, overNorm: 8, underNorm: 8 })
-  assert('rated denominator excludes noDemand', summary.rated === 80)
-  const onNorm = summary.buckets.find((b) => b.key === 'onNorm')
-  const overNorm = summary.buckets.find((b) => b.key === 'overNorm')
-  const underNorm = summary.buckets.find((b) => b.key === 'underNorm')
-  assert('onNorm at exactly 80% is on target', onNorm.pct === 80 && onNorm.isOffTarget === false)
-  assert('overNorm at exactly 10% is on target', overNorm.pct === 10 && overNorm.isOffTarget === false)
-  assert('underNorm at exactly 10% is on target', underNorm.pct === 10 && underNorm.isOffTarget === false)
-  assert('noDemand percentage is of the full total, not rated', summary.noDemand.pct === 20)
+  // Last production snapshot (2026-09-21): 8209 SKU, 1011 no sales, 616 on / 3155 over / 3427 under.
+  const summary = ux.buildStockHealthSummary({ total: 8209, noDemand: 1011, onNorm: 616, overNorm: 3155, underNorm: 3427 })
+  assert('rated = everything except the no-sales group', summary.rated === 7198)
+  assert('the three shares add up to exactly 100%', sumPct(summary) === 100)
+  assert('shares are of the rated SKUs (8,6 / 43,8 / 47,6)', bucketOf(summary, 'onNorm').pct === 8.6 && bucketOf(summary, 'overNorm').pct === 43.8 && bucketOf(summary, 'underNorm').pct === 47.6)
+  assert('no-sales group is reported as a count, not a percentage', summary.excluded.noDemand.count === 1011 && summary.excluded.noDemand.pct === undefined)
 }
 
 {
-  // Owner's own example: overstock worse than standard, understock fine.
-  const summary = ux.buildStockHealthSummary({ total: 100, noDemand: 5, onNorm: 74, overNorm: 12, underNorm: 9 })
-  const overNorm = summary.buckets.find((b) => b.key === 'overNorm')
-  const underNorm = summary.buckets.find((b) => b.key === 'underNorm')
-  const onNorm = summary.buckets.find((b) => b.key === 'onNorm')
-  assert('overstock above 10% is flagged off-target', overNorm.isOffTarget === true && overNorm.deviation > 0)
-  assert('understock at/under 10% is not flagged', underNorm.isOffTarget === false)
-  assert('onNorm below 80% (a minimum) is flagged off-target', onNorm.isOffTarget === true && onNorm.deviation < 0)
+  // Negative stock is an accounting error: out of the three shares, shown on its own.
+  const summary = ux.buildStockHealthSummary({
+    total: 100,
+    noDemand: 10,
+    onNorm: 20,
+    overNorm: 30,
+    underNorm: 40,
+    negative: { noDemand: 1, underNorm: 10, onNorm: 0, overNorm: 0 },
+  })
+  assert('negative-stock rows leave the under-norm bucket', bucketOf(summary, 'underNorm').count === 30)
+  assert('negative-stock rows leave the no-sales group too', summary.excluded.noDemand.count === 9)
+  assert('negative-stock group counts all of them once', summary.excluded.negative.count === 11)
+  assert('rated is what is left after both exclusions', summary.rated === 80)
+  assert('shares still add up to 100% (25 / 37,5 / 37,5)', sumPct(summary) === 100 && bucketOf(summary, 'onNorm').pct === 25 && bucketOf(summary, 'overNorm').pct === 37.5)
+}
+
+{
+  // Largest remainder: three equal thirds must still add to 100,0, not 99,9.
+  const summary = ux.buildStockHealthSummary({ total: 3, noDemand: 0, onNorm: 1, overNorm: 1, underNorm: 1 })
+  assert('thirds add up to 100% (no 99,9)', sumPct(summary) === 100)
 }
 
 assert(
@@ -88,6 +100,17 @@ assert(
     serviceSrc.includes("supabase.rpc('get_procurement_snapshot_stock_health'")
 )
 assert(
+  'negative-stock rows are counted per server bucket and passed to the summary',
+  ['no_demand', 'under_norm', 'on_norm', 'over_norm'].every((status) => serviceSrc.includes(`negativeCount('${status}')`)) &&
+    serviceSrc.includes('negative: { noDemand: negNoDemand')
+)
+assert(
+  'the table filter keeps negative-stock rows out of the four buckets and has its own group',
+  serviceSrc.includes("export const NEGATIVE_STOCK_FILTER = 'negative_stock'") &&
+    serviceSrc.includes(".eq('reserve_status', reserveStatus).eq('negative_stock', false)") &&
+    serviceSrc.includes("query = query.eq('negative_stock', true)")
+)
+assert(
   'service short-circuits without a snapshot id (no wasted RPC call)',
   /fetchProcurementSnapshotStockHealth\(snapshotId\) \{\s*\n\s*ensureClient\(\)\s*\n\s*if \(!snapshotId\) return null/.test(
     serviceSrc
@@ -103,8 +126,10 @@ assert(
   widgetSrc.includes('if (!summary) return loading ? <StockHealthSkeleton /> : null')
 )
 assert('widget uses buildStockHealthSummary from the shared ux module', widgetSrc.includes('buildStockHealthSummary'))
-assert('widget shows all three buckets plus the no-demand bucket', ['onNorm', 'overNorm', 'underNorm', 'no-demand'].every((key) => widgetSrc.includes(key)))
-assert('off-target values get a distinct class for styling', widgetSrc.includes('is-off-target'))
+assert('widget shows the three rated buckets only, each card under its own bar segment', ['onNorm', 'overNorm', 'underNorm'].every((key) => widgetSrc.includes(key)) && widgetSrc.includes("'--legend-cols'") && !widgetSrc.includes('noDemand'))
+assert('no-sales and negative-stock groups are picked in the planner toolbar «Фильтр»', plannerSrc.includes('Нет продаж 8 нед.') && plannerSrc.includes('Отрицательный остаток') && plannerSrc.includes('stockHealthExcluded'))
+assert('widget shows no standard / deviation labels', !widgetSrc.includes('стандарт') && !widgetSrc.includes('is-off-target'))
+assert('the group without sales is not called «Нет данных» anywhere', !widgetSrc.includes('Нет данных') && !plannerSrc.includes("'Нет данных'") && plannerSrc.includes('Нет продаж 8 нед.'))
 assert('bar has an accessible text alternative (role=img + aria-label)', widgetSrc.includes('role="img"') && widgetSrc.includes('aria-label='))
 
 // ---------------------------------------------------------------------------

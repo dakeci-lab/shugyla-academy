@@ -121,7 +121,7 @@ assert(
   planner.includes('weekColumns.labels[') &&
     layoutSrc.includes('proc-planner__sticky-order') &&
     layoutSrc.includes('proc-planner__col-order--accent') &&
-    planner.includes('proc-planner__orderable-toggle') &&
+    planner.includes('<PlatformFilterTrigger') &&
     planner.includes('proc-planner__snapshot')
 )
 assert(

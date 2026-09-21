@@ -83,7 +83,7 @@ function stageService() {
   assert('applySnapshotItemsPageQuery accepts reserveStatus', /applySnapshotItemsPageQuery\(query, \{[\s\S]{0,400}reserveStatus = ''/.test(src))
   assert(
     'applySnapshotItemsPageQuery filters by reserve_status only against the whitelist',
-    /if \(reserveStatus && RESERVE_STATUS_VALUES\.includes\(reserveStatus\)\) \{\s*\n\s*query = query\.eq\('reserve_status', reserveStatus\)/.test(src)
+    /\} else if \(reserveStatus && RESERVE_STATUS_VALUES\.includes\(reserveStatus\)\) \{[\s\S]{0,200}query = query\.eq\('reserve_status', reserveStatus\)\.eq\('negative_stock', false\)/.test(src)
   )
 
   console.log('')
@@ -118,7 +118,9 @@ function stageWidget() {
   assert('widget accepts activeBucket and onBucketClick props', widget.includes('activeBucket = null') && widget.includes('onBucketClick = null'))
   assert('bar segments are <button> elements, not decorative spans', /<button[\s\S]{0,200}proc-stock-health__bar-seg/.test(widget))
   assert('legend cards are <button> elements', /<button[\s\S]{0,200}proc-stock-health__legend-item/.test(widget))
-  assert('the no-demand bucket is clickable too (key "noDemand")', widget.includes("handleClick('noDemand')"))
+  assert('the widget only shows the three rated buckets; no-sales / negative-stock moved to the toolbar «Фильтр» (2026-09-21)', !widget.includes("key: 'noDemand'") && !widget.includes("key: 'negativeStock'") && !widget.includes('proc-stock-health__excluded'))
+  const plannerSrc = read('src/components/procurement/ProcurementPlannerView.jsx')
+  assert('the toolbar «Фильтр» offers «Нет продаж 8 нед.» and «Отрицательный остаток» as reserve-status filters', plannerSrc.includes("value: 'no_demand'") && plannerSrc.includes("value: 'negative_stock'") && plannerSrc.includes('QUICK_RESERVE_EXTRAS'))
   assert('active bucket gets an is-active class', widget.includes("' is-active'"))
   assert('non-active buckets get dimmed while one is selected', widget.includes("' is-dimmed'"))
   assert('buttons are disabled (not just inert) when no onBucketClick handler is given', widget.includes('disabled={!clickable}'))

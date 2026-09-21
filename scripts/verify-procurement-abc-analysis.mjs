@@ -689,13 +689,7 @@ assert(
   )
   assert('sort buttons have aria-label and pressed state', planner.includes('abcSortAriaLabel') && planner.includes('aria-pressed={active}'))
   assert('changing filters/sort resets page', planner.includes('[debouncedSearch, filters, abcSort, snapshot?.id]'))
-  assert('legend moved to ABC column help tooltip', planner.includes('AbcColumnHelp') && planner.includes('ABC_COLUMN_HELP') && !planner.includes('proc-planner__abc-legend'))
-  assert(
-    'ABC help covers class thresholds and axes',
-    planner.includes('до 80%') &&
-      planner.includes('К — количество') &&
-      planner.includes('proc-planner__abc-help')
-  )
+  assert('no on-screen ABC legend and no «?» help icon in the toolbar (removed 2026-09-21)', !planner.includes('proc-planner__abc-legend') && !planner.includes('AbcColumnHelp') && !planner.includes('proc-planner__abc-help'))
   assert(
     'snapshot ABC unavailable notice uses exact copy',
     planner.includes('{ABC_UNAVAILABLE_NOTICE}') &&

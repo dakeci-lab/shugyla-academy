@@ -1078,7 +1078,7 @@ export function getNextEditableItemId(items, fromId, isEditable) {
  * One-line UMAG snapshot summary for the header strip.
  * Pure: the caller formats `syncedAtLabel` (timezone-aware) and passes it in.
  *
- * @returns {{ text: string, warnText: string|null, title: string }}
+ * @returns {{ text: string, title: string }}
  */
 export function buildSnapshotHeadline({
   hasSnapshot = false,
@@ -1090,21 +1090,18 @@ export function buildSnapshotHeadline({
   if (!hasSnapshot) {
     return {
       text: 'Нет снимка',
-      warnText: null,
       title: 'Снимок UMAG ещё не создан — запустите синхронизацию',
     }
   }
   if (status === 'syncing') {
     return {
       text: 'Синхронизация…',
-      warnText: null,
       title: 'Снимок UMAG: синхронизация выполняется',
     }
   }
   if (status === 'failed') {
     return {
       text: 'Ошибка синхронизации',
-      warnText: null,
       title: 'Снимок UMAG: последняя синхронизация не удалась',
     }
   }
@@ -1118,53 +1115,75 @@ export function buildSnapshotHeadline({
 
   return {
     text: `${syncedAtLabel} · ${items} SKU`,
-    warnText: negative > 0 ? `${negative} отриц.` : null,
     title: `Снимок UMAG · Обновлён ${syncedAtLabel} · ${items} SKU${negativeTitle}`,
   }
 }
 
-/** Retail standard for the stock-health widget: 80% of rated SKUs on norm,
- * up to 10% overstock, up to 10% understock. Ties into buyer KPI/bonus. */
-export const STOCK_HEALTH_TARGET = Object.freeze({
-  onNorm: 80,
-  overNorm: 10,
-  underNorm: 10,
-})
+/**
+ * Splits `total` (in tenths of a percent, 1000 = 100,0%) between the given
+ * counts by the largest-remainder method, so the shares always add up to
+ * exactly 100,0% — plain rounding drifts to 99,9% / 100,1%.
+ */
+function sharesSummingTo100(counts) {
+  const sum = counts.reduce((acc, n) => acc + n, 0)
+  if (sum <= 0) return counts.map(() => 0)
+  const exact = counts.map((n) => (n / sum) * 1000)
+  const tenths = exact.map(Math.floor)
+  let left = 1000 - tenths.reduce((acc, n) => acc + n, 0)
+  const order = exact
+    .map((value, index) => ({ index, rest: value - Math.floor(value) }))
+    .sort((a, b) => b.rest - a.rest || a.index - b.index)
+  for (let i = 0; left > 0 && i < order.length; i += 1, left -= 1) tenths[order[i].index] += 1
+  return tenths.map((n) => n / 10)
+}
 
 /**
  * Shapes raw bucket counts from get_procurement_snapshot_stock_health into
- * display-ready percentages against STOCK_HEALTH_TARGET.
+ * display-ready shares for the widget.
  *
- * The 80/10/10 denominator is "rated" SKUs (total minus noDemand) — items
- * with no demand signal (avg_daily <= 0, shown as "—" in the table) have
- * nothing to compare their stock against and are reported separately.
+ * «Точно / Перезатарка / Недостаток» are shares of the RATED SKUs only and
+ * always add up to 100%. Two groups are left out of the calculation and
+ * reported separately (they have nothing honest to be compared with):
+ *  - «Нет продаж 8 нед.» — no net sales in the 56-day window (avg_daily <= 0);
+ *  - «Отрицательный остаток» — an accounting error, not a real shortage
+ *    (owner decision 2026-09-21).
  *
- * @param {{ total: number, noDemand: number, underNorm: number, onNorm: number, overNorm: number }|null} stockHealth
+ * `stockHealth.negative` holds how many of each server bucket have a negative
+ * stock, so they can be taken out of the server counts.
+ *
+ * @param {{ total: number, noDemand: number, underNorm: number, onNorm: number, overNorm: number,
+ *           negative?: { noDemand?: number, underNorm?: number, onNorm?: number, overNorm?: number } }|null} stockHealth
  */
 export function buildStockHealthSummary(stockHealth) {
   if (!stockHealth || !(stockHealth.total > 0)) return null
 
-  const { total, noDemand, underNorm, onNorm, overNorm } = stockHealth
-  const rated = Math.max(0, total - noDemand)
-  const pctOfRated = (count) => (rated > 0 ? Math.round((count / rated) * 100) : 0)
+  const negative = stockHealth.negative || {}
+  const negNoDemand = Number(negative.noDemand) || 0
+  const negUnder = Number(negative.underNorm) || 0
+  const negOn = Number(negative.onNorm) || 0
+  const negOver = Number(negative.overNorm) || 0
+  const negativeTotal = negNoDemand + negUnder + negOn + negOver
 
-  function bucket(key, label, count, target, badWhen) {
-    const pct = pctOfRated(count)
-    const deviation = pct - target
-    const isOffTarget = badWhen === 'above' ? deviation > 0 : deviation < 0
-    return { key, label, count, pct, target, deviation, isOffTarget }
-  }
+  const onNorm = Math.max(0, stockHealth.onNorm - negOn)
+  const overNorm = Math.max(0, stockHealth.overNorm - negOver)
+  const underNorm = Math.max(0, stockHealth.underNorm - negUnder)
+  const noDemand = Math.max(0, stockHealth.noDemand - negNoDemand)
+  const rated = onNorm + overNorm + underNorm
+
+  const counts = [onNorm, overNorm, underNorm]
+  const pcts = sharesSummingTo100(counts)
+  const meta = [
+    ['onNorm', 'Точно'],
+    ['overNorm', 'Перезатарка'],
+    ['underNorm', 'Недостаток'],
+  ]
 
   return {
     rated,
-    buckets: [
-      bucket('onNorm', 'Точно', onNorm, STOCK_HEALTH_TARGET.onNorm, 'below'),
-      bucket('overNorm', 'Перезатарка', overNorm, STOCK_HEALTH_TARGET.overNorm, 'above'),
-      bucket('underNorm', 'Недостаток', underNorm, STOCK_HEALTH_TARGET.underNorm, 'above'),
-    ],
-    noDemand: {
-      count: noDemand,
-      pct: total > 0 ? Math.round((noDemand / total) * 100) : 0,
+    buckets: meta.map(([key, label], index) => ({ key, label, count: counts[index], pct: pcts[index] })),
+    excluded: {
+      noDemand: { count: noDemand },
+      negative: { count: negativeTotal },
     },
   }
 }

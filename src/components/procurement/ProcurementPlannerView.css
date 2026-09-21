@@ -98,57 +98,6 @@
 }
 
 
-.proc-planner__orderable-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  min-height: 34px;
-  padding: 0 0.65rem;
-  border: 1px solid var(--border, #d1d5db);
-  border-radius: 8px;
-  background: var(--surface, #fff);
-  color: var(--text, #111827);
-  font: inherit;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.proc-planner__orderable-toggle:hover {
-  border-color: #93c5fd;
-  background: #f8fbff;
-}
-
-.proc-planner__orderable-toggle.is-active {
-  border-color: #2563eb;
-  background: #eff6ff;
-  color: #1d4ed8;
-}
-
-.proc-planner__orderable-toggle:focus-visible {
-  outline: 2px solid #2563eb;
-  outline-offset: 2px;
-}
-
-.proc-planner__orderable-toggle-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 1.25rem;
-  padding: 0.1rem 0.3rem;
-  border-radius: 999px;
-  background: #dbeafe;
-  color: #1d4ed8;
-  font-size: 0.75rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.proc-planner__orderable-toggle.is-active .proc-planner__orderable-toggle-count {
-  background: #bfdbfe;
-}
-
 
 .proc-planner__snapshot-label {
   flex: none;
@@ -166,13 +115,6 @@
   white-space: nowrap;
   color: var(--text, #111827);
   font-variant-numeric: tabular-nums;
-}
-
-.proc-planner__snapshot-warn {
-  flex: none;
-  color: #b42318;
-  font-weight: 600;
-  white-space: nowrap;
 }
 
 .proc-planner__chips {
@@ -578,29 +520,6 @@
   height: 1.1rem;
   padding: 0 0.12rem;
   font-size: 0.625rem;
-}
-
-.proc-planner__abc-help {
-  /* Sits next to the «Без поставщика» chip in the toolbar, not inside the
-     ABC column headers — a small circled «?», not an icon. */
-  display: inline-flex;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  width: 1.1rem;
-  height: 1.1rem;
-  border: 1px solid #9ca3af;
-  border-radius: 50%;
-  color: #6b7280;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  line-height: 1;
-  cursor: help;
-}
-
-.proc-planner__abc-help:hover {
-  color: #2563eb;
-  border-color: #2563eb;
 }
 
 .proc-planner__card-order {
@@ -1467,7 +1386,6 @@ a.proc-planner__qty-history:hover {
   font-size: 0.75rem;
   font-weight: 400;
   color: var(--text-secondary, #9ca3af);
-  cursor: help;
 }
 
 .proc-stock-health__asof {
@@ -1486,7 +1404,7 @@ a.proc-planner__qty-history:hover {
 
 /* Bucket colors: exact codes from the "К оплате" KPI tiles
    (SupplierFinancePanel.css: --debt/--overdue/--today), owner-approved —
-   Недостаток=green, Перезатарка=red, Точно=amber, Нет данных=grey.
+   Недостаток=green, Перезатарка=red, Точно=amber.
    Bar segments use each color softened ~20% toward white (a flat solid
    fill read as too high-contrast across a wide strip); dots/legend use
    the colors at full strength. */
@@ -1531,13 +1449,9 @@ a.proc-planner__qty-history:hover {
   background: #56cb80;
 }
 
-.proc-stock-health__bar-seg.is-no-demand {
-  background: #8390a2;
-}
-
 .proc-stock-health__legend {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: var(--legend-cols, repeat(3, minmax(0, 1fr)));
   gap: 0.5rem 1rem;
 }
 
@@ -1598,19 +1512,11 @@ a.proc-planner__qty-history:hover {
   background: #2cbe60;
 }
 
-.proc-stock-health__dot.is-no-demand {
-  background: #64748b;
-}
-
 .proc-stock-health__legend-value {
   font-size: 1.25rem;
   font-weight: 600;
   color: var(--text, #111827);
   line-height: 1.2;
-}
-
-.proc-stock-health__legend-value.is-off-target {
-  color: #912018;
 }
 
 .proc-stock-health__legend-meta {
@@ -1619,17 +1525,9 @@ a.proc-planner__qty-history:hover {
   color: var(--text-secondary, #9ca3af);
 }
 
-.proc-stock-health__legend-meta.is-off-target {
-  color: #912018;
-}
-
-.proc-stock-health__legend-item.is-muted .proc-stock-health__legend-value {
-  color: var(--text-secondary, #9ca3af);
-}
-
 @media (max-width: 700px) {
   .proc-stock-health__legend {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
 

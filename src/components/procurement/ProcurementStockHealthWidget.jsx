@@ -1,17 +1,7 @@
-import { buildStockHealthSummary, STOCK_HEALTH_TARGET } from '../../utils/procurementPlannerUx'
+import { buildStockHealthSummary } from '../../utils/procurementPlannerUx'
 
-const STANDARD_TITLE =
-  'Стандарт ритейла: 80% позиций — точно по норме, до 10% — перезатарка, до 10% — недостаток. Не входит в 80/10/10: позиции без данных о спросе.'
-
-function DeviationLabel({ bucket }) {
-  if (!bucket.isOffTarget) return <span>в пределах стандарта</span>
-  const sign = bucket.deviation > 0 ? '+' : ''
-  return (
-    <span className="proc-stock-health__legend-meta is-off-target">
-      {sign}
-      {bucket.deviation}% от стандарта
-    </span>
-  )
+function formatPct(value) {
+  return `${Number(value).toLocaleString('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}%`
 }
 
 /**
@@ -31,7 +21,7 @@ function StockHealthSkeleton() {
       <div className="proc-stock-health__bar" />
 
       <div className="proc-stock-health__legend">
-        {[0, 1, 2, 3].map((key) => (
+        {[0, 1, 2].map((key) => (
           <div key={key} className="proc-stock-health__legend-item">
             <div className="proc-stock-health__legend-label">
               <span className="proc-stock-health__skeleton-block" style={{ width: '70%' }} />
@@ -53,15 +43,18 @@ function StockHealthSkeleton() {
 }
 
 /**
- * Retail 80/10/10 stock-health KPI widget for the planner header.
+ * Stock-health widget for the planner header: what share of the rated SKUs is
+ * «Точно / Перезатарка / Недостаток» right now. The three shares always add up
+ * to 100%. SKUs with no sales in 8 weeks and SKUs with a negative stock stay
+ * outside the calculation; they are reachable through the planner toolbar «Фильтр».
  * While `stockHealth` is still loading, renders a same-sized skeleton
  * instead of nothing, so the toolbar/table below don't jump once the data
  * (and the widget's real content) lands.
  *
- * Every bucket (bar segment + legend card, including «Нет данных») is
- * clickable — `onBucketClick(key)` where key is 'onNorm' | 'overNorm' |
- * 'underNorm' | 'noDemand'. `activeBucket` highlights the currently
- * filtered-to bucket and dims the rest of the bar.
+ * Every group (bar segment + legend card) is clickable —
+ * `onBucketClick(key)` where key is 'onNorm' | 'overNorm' | 'underNorm'.
+ * `activeBucket` highlights the currently
+ * filtered-to group and dims the rest of the bar.
  */
 export default function ProcurementStockHealthWidget({
   stockHealth,
@@ -79,14 +72,15 @@ export default function ProcurementStockHealthWidget({
     if (clickable) onBucketClick(key)
   }
 
+  const [onNorm, overNorm, underNorm] = summary.buckets
+
   return (
     <div className="proc-stock-health">
       <div className="proc-stock-health__head">
         <span className="proc-stock-health__title">
           Соответствие норме запаса
-          <span className="proc-stock-health__standard" title={STANDARD_TITLE}>
-            стандарт {STOCK_HEALTH_TARGET.onNorm} / {STOCK_HEALTH_TARGET.overNorm} /{' '}
-            {STOCK_HEALTH_TARGET.underNorm}
+          <span className="proc-stock-health__standard">
+            от {summary.rated.toLocaleString('ru-RU')} SKU с продажами
           </span>
         </span>
         {asOfLabel ? (
@@ -94,7 +88,11 @@ export default function ProcurementStockHealthWidget({
         ) : null}
       </div>
 
-      <div className="proc-stock-health__bar" role="img" aria-label={`Точно ${summary.buckets[0].pct}%, перезатарка ${summary.buckets[1].pct}%, недостаток ${summary.buckets[2].pct}%, нет данных ${summary.noDemand.pct}%`}>
+      <div
+        className="proc-stock-health__bar"
+        role="img"
+        aria-label={`Точно ${formatPct(onNorm.pct)}, перезатарка ${formatPct(overNorm.pct)}, недостаток ${formatPct(underNorm.pct)}`}
+      >
         {summary.buckets.map((bucket) => (
           <button
             key={bucket.key}
@@ -109,20 +107,17 @@ export default function ProcurementStockHealthWidget({
             onClick={() => handleClick(bucket.key)}
           />
         ))}
-        <button
-          type="button"
-          className={`proc-stock-health__bar-seg is-no-demand${
-            activeBucket === 'noDemand' ? ' is-active' : ''
-          }${activeBucket && activeBucket !== 'noDemand' ? ' is-dimmed' : ''}`}
-          style={{ width: `${summary.noDemand.pct}%` }}
-          disabled={!clickable}
-          aria-pressed={activeBucket === 'noDemand'}
-          title="Нет данных — нажмите, чтобы показать эти позиции в таблице"
-          onClick={() => handleClick('noDemand')}
-        />
       </div>
 
-      <div className="proc-stock-health__legend">
+      {/* Each card sits under its own bar segment: same proportions as the bar. */}
+      <div
+        className="proc-stock-health__legend"
+        style={{
+          '--legend-cols': summary.buckets
+            .map((bucket) => `minmax(6.5rem, ${Math.max(bucket.pct, 0.1)}fr)`)
+            .join(' '),
+        }}
+      >
         {summary.buckets.map((bucket) => (
           <button
             key={bucket.key}
@@ -138,36 +133,13 @@ export default function ProcurementStockHealthWidget({
               <span className={`proc-stock-health__dot is-${bucket.key}`} aria-hidden="true" />
               {bucket.label}
             </div>
-            <div
-              className={`proc-stock-health__legend-value${bucket.isOffTarget ? ' is-off-target' : ''}`}
-            >
-              {bucket.pct}%
-            </div>
+            <div className="proc-stock-health__legend-value">{formatPct(bucket.pct)}</div>
             <div className="proc-stock-health__legend-meta">
               {bucket.count.toLocaleString('ru-RU')} SKU
             </div>
-            <DeviationLabel bucket={bucket} />
           </button>
         ))}
-        <button
-          type="button"
-          className={`proc-stock-health__legend-item is-muted${
-            activeBucket === 'noDemand' ? ' is-active' : ''
-          }`}
-          disabled={!clickable}
-          aria-pressed={activeBucket === 'noDemand'}
-          onClick={() => handleClick('noDemand')}
-        >
-          <div className="proc-stock-health__legend-label">
-            <span className="proc-stock-health__dot is-no-demand" aria-hidden="true" />
-            Нет данных
-          </div>
-          <div className="proc-stock-health__legend-value">{summary.noDemand.pct}%</div>
-          <div className="proc-stock-health__legend-meta">
-            {summary.noDemand.count.toLocaleString('ru-RU')} SKU
-          </div>
-          <span className="proc-stock-health__legend-meta">не входит в 80/10/10</span>
-        </button>
+
       </div>
     </div>
   )

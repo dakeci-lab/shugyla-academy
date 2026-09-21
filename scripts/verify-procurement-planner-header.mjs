@@ -34,10 +34,12 @@ assert('sense-line removed from UI', !planner.includes('proc-planner__sense'))
 assert('sense helper removed from ux', !uxSrc.includes('buildPlannerSenseLine'))
 assert('UMAG snapshot strip kept', planner.includes('proc-planner__snapshot') && planner.includes('buildSnapshotHeadline'))
 assert(
-  'toolbar orderable toggle kept',
-  planner.includes('proc-planner__orderable-toggle') &&
+  '«Только к заказу» and «Без поставщика» live in the toolbar «Фильтр» next to the sync button, not as toolbar buttons',
+  !planner.includes('proc-planner__orderable-toggle') &&
+    planner.includes('<PlatformFilterTrigger') &&
+    planner.includes('showPeriod={false}') &&
     planner.includes('Только к заказу') &&
-    /orderableOnly:\s*!current\.orderableOnly/.test(planner)
+    planner.includes('Без поставщика')
 )
 assert(
   'orderable chip count uses getOrderableChipCount',
@@ -60,16 +62,12 @@ assert(
     plannerCss.includes('.proc-planner__abc-arrow.is-on')
 )
 assert(
-  'ABC column help icon lives next to the «Без поставщика» toolbar chip, not the column header',
-  planner.includes('AbcColumnHelp') &&
-    planner.includes('ABC_COLUMN_HELP') &&
-    planner.includes('proc-planner__abc-help') &&
-    /chip\.id === 'unassigned' \? <AbcColumnHelp \/> : null/.test(planner) &&
+  'the «?» ABC help icon is gone from the toolbar (removed 2026-09-21)',
+  !planner.includes('AbcColumnHelp') &&
+    !planner.includes('ABC_COLUMN_HELP') &&
+    !planner.includes('proc-planner__abc-help') &&
+    !plannerCss.includes('.proc-planner__abc-help') &&
     !planner.includes('firstVisibleAbcColumnName')
-)
-assert(
-  'ABC help CSS present',
-  plannerCss.includes('.proc-planner__abc-help')
 )
 assert(
   'desktop ABC cells via renderPlannerSkuCell + AbcBadge',

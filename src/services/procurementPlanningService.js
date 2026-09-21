@@ -584,12 +584,33 @@ export async function fetchProcurementSnapshotStockHealth(snapshotId) {
   const row = Array.isArray(data) ? data[0] : data
   if (!row) return null
 
+  // Negative stock is an accounting error, not a real bucket member: count how many
+  // rows of each server bucket have it so the widget can leave them out of the
+  // 100% scale (see buildStockHealthSummary).
+  const negativeCount = async (reserveStatus) => {
+    const { count, error: countError } = await supabase
+      .from('procurement_snapshot_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('snapshot_id', snapshotId)
+      .eq('negative_stock', true)
+      .eq('reserve_status', reserveStatus)
+    if (countError) throw new Error(countError.message || 'Не удалось загрузить сводку по остаткам')
+    return count || 0
+  }
+  const [negNoDemand, negUnder, negOn, negOver] = await Promise.all([
+    negativeCount('no_demand'),
+    negativeCount('under_norm'),
+    negativeCount('on_norm'),
+    negativeCount('over_norm'),
+  ])
+
   return {
     total: Number(row.total_count) || 0,
     noDemand: Number(row.no_demand_count) || 0,
     underNorm: Number(row.under_norm_count) || 0,
     onNorm: Number(row.on_norm_count) || 0,
     overNorm: Number(row.over_norm_count) || 0,
+    negative: { noDemand: negNoDemand, underNorm: negUnder, onNorm: negOn, overNorm: negOver },
   }
 }
 
@@ -599,6 +620,9 @@ export async function fetchProcurementSnapshotStockHealth(snapshotId) {
  */
 /** Whitelisted values for reserve_status — a generated column, always exactly one of these. */
 export const RESERVE_STATUS_VALUES = ['no_demand', 'under_norm', 'on_norm', 'over_norm']
+
+/** Widget-only filter value: every row with a negative stock, whatever its reserve_status. */
+export const NEGATIVE_STOCK_FILTER = 'negative_stock'
 
 export async function fetchSnapshotItemsPage({
   snapshotId,
@@ -695,8 +719,11 @@ export function applySnapshotItemsPageQuery(query, {
   if (unassignedOnly) query = query.is('platform_supplier_id', null)
   if (warningsOnly) query = query.eq('negative_stock', true)
   if (orderableOnly) query = query.gt('final_order_qty', 0)
-  if (reserveStatus && RESERVE_STATUS_VALUES.includes(reserveStatus)) {
-    query = query.eq('reserve_status', reserveStatus)
+  if (reserveStatus === NEGATIVE_STOCK_FILTER) {
+    query = query.eq('negative_stock', true)
+  } else if (reserveStatus && RESERVE_STATUS_VALUES.includes(reserveStatus)) {
+    // Rows with a negative stock have their own group and stay out of the four buckets.
+    query = query.eq('reserve_status', reserveStatus).eq('negative_stock', false)
   }
 
   const abcQuery = describeSnapshotItemsAbcQuery({
