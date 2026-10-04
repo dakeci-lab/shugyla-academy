@@ -1,0 +1,1 @@
+import{j as c}from"./index-D3y4FdY7.js";function e({label:t,onClick:o,variant:n="neutral",children:a,disabled:i=!1}){const r=n==="danger"?"icon-action-btn--danger":n==="primary"?"icon-action-btn--primary":"";return c.jsx("button",{type:"button",className:`icon-action-btn ${r}`,onClick:o,"aria-label":t,title:t,"data-tooltip":t,disabled:i,children:a})}export{e as I};
