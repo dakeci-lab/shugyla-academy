@@ -51,6 +51,7 @@
     "supabase:local:verify-employee-schedule-write": "node scripts/verify-employee-schedule-write.mjs",
     "supabase:local:verify-team-workforce-admin-access": "node scripts/verify-team-workforce-admin-access.mjs",
     "verify:time-tracker-attendance-routing": "node scripts/verify-time-tracker-attendance-routing.mjs",
+    "verify:time-tracker-dispatch-query-budget": "deno run -A --no-check scripts/verify-time-tracker-dispatch-query-budget.ts",
     "verify:time-tracker-checkout-ui": "node scripts/verify-time-tracker-checkout-ui.mjs",
     "verify:platform-mobile-drawer": "node scripts/verify-platform-mobile-drawer.mjs",
     "verify:stale-shift-release": "node scripts/verify-stale-shift-release.mjs",
