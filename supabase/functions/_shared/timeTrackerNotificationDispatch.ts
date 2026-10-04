@@ -376,27 +376,59 @@ async function loadShifts(
   })
 }
 
-async function loadExistingAttempts(
+// Every deduplication key a (shift, rule) pair can ever produce: the bare key
+// and, for repeating events, one key per allowed attempt.
+function candidateDeduplicationKeys(shift: ShiftRow, rule: TimeTrackerRule): string[] {
+  const base = buildDeduplicationKey(rule.event_code, shift.employee_id, shift.id)
+  if (!REPEAT_EVENT_CODES.has(rule.event_code)) return [base]
+
+  const keys = [base]
+  for (let attempt = 1; attempt <= (rule.max_attempts ?? 1); attempt += 1) {
+    keys.push(buildDeduplicationKey(rule.event_code, shift.employee_id, shift.id, attempt))
+  }
+  return keys
+}
+
+const NOTIFICATION_KEY_CHUNK_SIZE = 40
+
+// One batched lookup per run instead of per-shift/per-rule queries:
+// this scheduler fires every minute, so per-row queries dominated API traffic.
+async function loadExistingNotificationKeys(
   serviceClient: SupabaseClient,
-  employeeId: number,
-  shiftId: string,
-  eventCode: string
-): Promise<ExistingAttempt[]> {
-  const prefix = `time_tracker:${eventCode}:${employeeId}:${shiftId}`
-  const { data, error } = await serviceClient
-    .from('notifications')
-    .select('deduplication_key, created_at')
-    .eq('employee_id', employeeId)
-    .like('deduplication_key', `${prefix}%`)
+  keys: string[]
+): Promise<Map<string, Date>> {
+  const existing = new Map<string, Date>()
+  const unique = [...new Set(keys)]
 
-  if (error) throw new Error('attempt_load_error')
+  for (let i = 0; i < unique.length; i += NOTIFICATION_KEY_CHUNK_SIZE) {
+    const chunk = unique.slice(i, i + NOTIFICATION_KEY_CHUNK_SIZE)
+    const { data, error } = await serviceClient
+      .from('notifications')
+      .select('deduplication_key, created_at')
+      .in('deduplication_key', chunk)
 
-  return (data ?? [])
-    .map((row) => ({
-      attempt: parseAttemptFromDedupeKey(row.deduplication_key, eventCode),
-      createdAt: new Date(row.created_at),
-    }))
-    .sort((a, b) => a.attempt - b.attempt)
+    if (error) throw new Error('attempt_load_error')
+
+    for (const row of data ?? []) {
+      existing.set(row.deduplication_key, new Date(row.created_at))
+    }
+  }
+
+  return existing
+}
+
+function attemptsFromExistingKeys(
+  keys: string[],
+  eventCode: string,
+  existing: Map<string, Date>
+): ExistingAttempt[] {
+  const attempts: ExistingAttempt[] = []
+  for (const key of keys) {
+    const createdAt = existing.get(key)
+    if (!createdAt) continue
+    attempts.push({ attempt: parseAttemptFromDedupeKey(key, eventCode), createdAt })
+  }
+  return attempts.sort((a, b) => a.attempt - b.attempt)
 }
 
 export async function dispatchTimeTrackerNotifications(params: {
@@ -421,7 +453,11 @@ export async function dispatchTimeTrackerNotifications(params: {
     noActiveSubscriptions: 0,
   }
 
-  const templates = await loadTemplates(params.serviceClient, params.rules)
+  let templatesPromise: Promise<Map<string, NotificationTemplate>> | null = null
+  const getTemplates = () => {
+    templatesPromise ??= loadTemplates(params.serviceClient, params.rules)
+    return templatesPromise
+  }
   let shifts = await loadShifts(params.serviceClient, params.runAt)
   if (params.shiftIds?.length) {
     const allowed = new Set(params.shiftIds)
@@ -434,181 +470,143 @@ export async function dispatchTimeTrackerNotifications(params: {
 
   result.scannedShifts = shifts.length
 
+  // Pass 1 (no I/O): keep only (shift, rule) pairs that can match at all.
+  // Evaluating with no prior attempts is a safe filter: existing attempts can
+  // only suppress a match, never create one.
+  const candidates: Array<{
+    shift: ShiftWithEmployee
+    window: PlannedShiftWindow
+    rule: TimeTrackerRule
+    keys: string[]
+  }> = []
+
   for (const shift of shifts) {
     const window = buildPlannedShiftWindow(shift)
     if (!window) continue
 
     for (const rule of params.rules) {
-      const existingAttempts = REPEAT_EVENT_CODES.has(rule.event_code)
-        ? await loadExistingAttempts(params.serviceClient, shift.employee_id, shift.id, rule.event_code)
-        : []
-
-      const match = evaluateTimeTrackerRule({
+      const possible = evaluateTimeTrackerRule({
         shift,
         rule,
         window,
         runAt: params.runAt,
-        existingAttempts,
+        existingAttempts: [],
       })
+      if (!possible) continue
 
-      if (!match) continue
-      result.matchedEvents += 1
+      candidates.push({ shift, window, rule, keys: candidateDeduplicationKeys(shift, rule) })
+    }
+  }
 
-      if (dryRun) continue
+  // Idle runs (nothing due) stop here without touching `notifications`.
+  if (!candidates.length) return result
 
-      const { data: existingNotification } = await params.serviceClient
-        .from('notifications')
-        .select('id')
-        .eq('deduplication_key', match.deduplicationKey)
-        .maybeSingle()
+  const existingKeys = await loadExistingNotificationKeys(
+    params.serviceClient,
+    candidates.flatMap((candidate) => candidate.keys)
+  )
 
-      if (existingNotification?.id) {
+  for (const { shift, window, rule, keys } of candidates) {
+    const existingAttempts = REPEAT_EVENT_CODES.has(rule.event_code)
+      ? attemptsFromExistingKeys(keys, rule.event_code, existingKeys)
+      : []
+
+    const match = evaluateTimeTrackerRule({
+      shift,
+      rule,
+      window,
+      runAt: params.runAt,
+      existingAttempts,
+    })
+
+    if (!match) continue
+    result.matchedEvents += 1
+
+    if (dryRun) continue
+
+    if (existingKeys.has(match.deduplicationKey)) {
+      result.skippedDuplicates += 1
+      continue
+    }
+
+    const template = (await getTemplates()).get(match.templateId)
+    if (!template) continue
+
+    const title = renderTemplate(template.title_template, { minutes: match.minutesUntilStart })
+    const body = renderTemplate(template.body_template, { minutes: match.minutesUntilStart })
+
+    const { data: notification, error: insertError } = await params.serviceClient
+      .from('notifications')
+      .insert({
+        employee_id: shift.employee_id,
+        auth_user_id: shift.auth_user_id ?? null,
+        template_id: match.templateId,
+        rule_id: rule.id,
+        module_code: rule.module_code,
+        event_code: match.eventCode,
+        title,
+        body,
+        action_url: template.default_action_url,
+        priority: rule.priority ?? template.default_priority,
+        status: 'processing',
+        deduplication_key: match.deduplicationKey,
+        metadata: {
+          source: 'time_tracker_dispatcher',
+          shift_id: shift.id,
+          rule_code: match.ruleCode,
+          attempt: match.attempt,
+          scheduled_for: match.scheduledFor.toISOString(),
+          ...(params.controlledRunId
+            ? { controlled_run_id: params.controlledRunId }
+            : {}),
+        },
+      })
+      .select('id, title, body, action_url')
+      .single()
+
+    if (insertError) {
+      if (isDuplicateKeyError(insertError)) {
         result.skippedDuplicates += 1
         continue
       }
+      throw new Error('notification_create_error')
+    }
 
-      const template = templates.get(match.templateId)
-      if (!template) continue
+    if (!notification?.id) continue
+    result.createdNotifications += 1
 
-      const title = renderTemplate(template.title_template, { minutes: match.minutesUntilStart })
-      const body = renderTemplate(template.body_template, { minutes: match.minutesUntilStart })
+    const { data: subscriptions, error: subscriptionError } = await params.serviceClient
+      .from('notification_push_subscriptions')
+      .select('id, endpoint, p256dh_key, auth_key, failure_count, vapid_key_fingerprint')
+      .eq('employee_id', shift.employee_id)
+      .eq('is_active', true)
+      .eq('permission_status', 'granted')
 
-      const { data: notification, error: insertError } = await params.serviceClient
-        .from('notifications')
-        .insert({
-          employee_id: shift.employee_id,
-          auth_user_id: shift.auth_user_id ?? null,
-          template_id: match.templateId,
-          rule_id: rule.id,
-          module_code: rule.module_code,
-          event_code: match.eventCode,
-          title,
-          body,
-          action_url: template.default_action_url,
-          priority: rule.priority ?? template.default_priority,
-          status: 'processing',
-          deduplication_key: match.deduplicationKey,
-          metadata: {
-            source: 'time_tracker_dispatcher',
-            shift_id: shift.id,
-            rule_code: match.ruleCode,
-            attempt: match.attempt,
-            scheduled_for: match.scheduledFor.toISOString(),
-            ...(params.controlledRunId
-              ? { controlled_run_id: params.controlledRunId }
-              : {}),
-          },
-        })
-        .select('id, title, body, action_url')
-        .single()
+    if (subscriptionError) throw new Error('subscription_load_error')
 
-      if (insertError) {
-        if (isDuplicateKeyError(insertError)) {
-          result.skippedDuplicates += 1
-          continue
-        }
-        throw new Error('notification_create_error')
-      }
+    const currentVapidFingerprint = await getCurrentServerVapidFingerprint()
+    const deliverableSubscriptions = (subscriptions ?? []).filter(
+      (subscription) =>
+        currentVapidFingerprint &&
+        subscription.vapid_key_fingerprint === currentVapidFingerprint
+    )
+    const outdatedCount = (subscriptions ?? []).length - deliverableSubscriptions.length
 
-      if (!notification?.id) continue
-      result.createdNotifications += 1
-
-      const { data: subscriptions, error: subscriptionError } = await params.serviceClient
-        .from('notification_push_subscriptions')
-        .select('id, endpoint, p256dh_key, auth_key, failure_count, vapid_key_fingerprint')
-        .eq('employee_id', shift.employee_id)
-        .eq('is_active', true)
-        .eq('permission_status', 'granted')
-
-      if (subscriptionError) throw new Error('subscription_load_error')
-
-      const currentVapidFingerprint = await getCurrentServerVapidFingerprint()
-      const deliverableSubscriptions = (subscriptions ?? []).filter(
-        (subscription) =>
-          currentVapidFingerprint &&
-          subscription.vapid_key_fingerprint === currentVapidFingerprint
-      )
-      const outdatedCount = (subscriptions ?? []).length - deliverableSubscriptions.length
-
-      if (!deliverableSubscriptions.length) {
-        result.noActiveSubscriptions += 1
-        await params.serviceClient
-          .from('notifications')
-          .update({
-            status: 'dispatched',
-            metadata: {
-              source: 'time_tracker_dispatcher',
-              shift_id: shift.id,
-              rule_code: match.ruleCode,
-              attempt: match.attempt,
-              scheduled_for: match.scheduledFor.toISOString(),
-              web_push_outcome: 'no_current_subscription',
-              web_push_accepted_count: 0,
-              web_push_failed_count: 0,
-              web_push_outdated_skipped: outdatedCount,
-              ...(params.controlledRunId
-                ? { controlled_run_id: params.controlledRunId }
-                : {}),
-            },
-          })
-          .eq('id', notification.id)
-        continue
-      }
-
-      const requestId = crypto.randomUUID()
-      let acceptedCount = 0
-      let failedCount = 0
-
-      for (const subscription of deliverableSubscriptions) {
-        const delivery = await deliverNotificationToSubscription({
-          serviceClient: params.serviceClient,
-          notification,
-          subscription,
-          requestId,
-          attemptNumber: match.attempt,
-          sender,
-          buildPayload: (notificationId, reqId) =>
-            buildTimeTrackerPushPayload(notificationId, reqId, notification),
-          updateNotificationStatus: false,
-        })
-
-        if (delivery.status === 'accepted') {
-          acceptedCount += 1
-        } else {
-          failedCount += 1
-        }
-      }
-
-      result.pushAccepted += acceptedCount
-      result.pushFailed += failedCount
-
-      const webPushOutcome =
-        acceptedCount > 0 && failedCount > 0
-          ? 'partial'
-          : acceptedCount > 0
-            ? 'accepted'
-            : 'failed'
-
-      // notifications.status remains broader than Web Push:
-      // delivered truth for push is notification_deliveries + metadata.web_push_outcome.
-      const finalStatus =
-        failedCount > 0 && acceptedCount === 0
-          ? 'failed'
-          : 'dispatched'
-
+    if (!deliverableSubscriptions.length) {
+      result.noActiveSubscriptions += 1
       await params.serviceClient
         .from('notifications')
         .update({
-          status: finalStatus,
+          status: 'dispatched',
           metadata: {
             source: 'time_tracker_dispatcher',
             shift_id: shift.id,
             rule_code: match.ruleCode,
             attempt: match.attempt,
             scheduled_for: match.scheduledFor.toISOString(),
-            web_push_outcome: webPushOutcome,
-            web_push_accepted_count: acceptedCount,
-            web_push_failed_count: failedCount,
+            web_push_outcome: 'no_current_subscription',
+            web_push_accepted_count: 0,
+            web_push_failed_count: 0,
             web_push_outdated_skipped: outdatedCount,
             ...(params.controlledRunId
               ? { controlled_run_id: params.controlledRunId }
@@ -616,7 +614,70 @@ export async function dispatchTimeTrackerNotifications(params: {
           },
         })
         .eq('id', notification.id)
+      continue
     }
+
+    const requestId = crypto.randomUUID()
+    let acceptedCount = 0
+    let failedCount = 0
+
+    for (const subscription of deliverableSubscriptions) {
+      const delivery = await deliverNotificationToSubscription({
+        serviceClient: params.serviceClient,
+        notification,
+        subscription,
+        requestId,
+        attemptNumber: match.attempt,
+        sender,
+        buildPayload: (notificationId, reqId) =>
+          buildTimeTrackerPushPayload(notificationId, reqId, notification),
+        updateNotificationStatus: false,
+      })
+
+      if (delivery.status === 'accepted') {
+        acceptedCount += 1
+      } else {
+        failedCount += 1
+      }
+    }
+
+    result.pushAccepted += acceptedCount
+    result.pushFailed += failedCount
+
+    const webPushOutcome =
+      acceptedCount > 0 && failedCount > 0
+        ? 'partial'
+        : acceptedCount > 0
+          ? 'accepted'
+          : 'failed'
+
+    // notifications.status remains broader than Web Push:
+    // delivered truth for push is notification_deliveries + metadata.web_push_outcome.
+    const finalStatus =
+      failedCount > 0 && acceptedCount === 0
+        ? 'failed'
+        : 'dispatched'
+
+    await params.serviceClient
+      .from('notifications')
+      .update({
+        status: finalStatus,
+        metadata: {
+          source: 'time_tracker_dispatcher',
+          shift_id: shift.id,
+          rule_code: match.ruleCode,
+          attempt: match.attempt,
+          scheduled_for: match.scheduledFor.toISOString(),
+          web_push_outcome: webPushOutcome,
+          web_push_accepted_count: acceptedCount,
+          web_push_failed_count: failedCount,
+          web_push_outdated_skipped: outdatedCount,
+          ...(params.controlledRunId
+            ? { controlled_run_id: params.controlledRunId }
+            : {}),
+        },
+      })
+      .eq('id', notification.id)
   }
 
   return result
