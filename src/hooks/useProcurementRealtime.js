@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { subscribeProcurementRealtime } from '../services/procurementRealtimeService'
 import { usePlatformData } from '../context/PlatformDataContext'
 import { isCloudMode } from '../lib/dataMode'
+import { PROCUREMENT_FRESH_MS } from '../lib/procurementFreshness'
 
 /**
  * Event-driven sync for Закуп / Приёмка via Supabase Realtime.
@@ -20,8 +21,14 @@ export function useProcurementRealtime(enabled = true) {
     }
 
     return subscribeProcurementRealtime(
-      async () => {
-        await reloadRef.current()
+      async ({ source } = {}) => {
+        // Passive triggers (focus / visibility / re-subscribe) only top up data that
+        // went stale; change events and reconnects always fetch.
+        const passive =
+          source === 'focus' ||
+          source === 'visibility' ||
+          source === 'realtime:subscribed'
+        await reloadRef.current(passive ? { maxAgeMs: PROCUREMENT_FRESH_MS } : undefined)
       },
       {
         onStatus: (status) => setConnectionStatus(status),

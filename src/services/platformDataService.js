@@ -11,6 +11,7 @@ import {
   markModuleReady,
   markModuleError,
   resetModuleLoadStates,
+  isModuleFresh,
   MODULE_STATUS,
 } from '../lib/cloudStore'
 import { normalizeEmployee } from '../utils/employeeData'
@@ -351,10 +352,10 @@ function applyFullFetchResult(data) {
   else markModuleReady('receiving')
 }
 
-/** Обновить только закуп и приёмку (Realtime / foreground refresh) */
-export async function refreshProcurementData() {
-  if (!isCloudMode()) return null
+let procurementRefreshInFlight = null
+let procurementRefreshQueued = null
 
+async function runProcurementRefresh() {
   markModuleLoading('procurement')
   markModuleLoading('receiving')
   notifyModulesChanged()
@@ -393,6 +394,58 @@ export async function refreshProcurementData() {
     purchases: purchasesResult.value.purchases,
     receivingDocuments: receivingResult.value.receivingDocuments,
   }
+}
+
+function cachedProcurementResult() {
+  return {
+    purchases: getCloudStore().purchases,
+    receivingDocuments: getCloudStore().receivingDocuments,
+  }
+}
+
+/**
+ * Обновить только закуп и приёмку (Realtime / foreground refresh / после мутаций).
+ *
+ * - `maxAgeMs > 0`: если закуп И приёмка уже загружены не позже `maxAgeMs` назад —
+ *   сеть не трогаем. Для монтирования страницы, focus/visibility и т.п.
+ * - без `maxAgeMs` (по умолчанию): принудительная загрузка — для мутаций и
+ *   realtime-событий, которым нужны актуальные данные.
+ * - Одновременные вызовы не плодят запросы: мягкий вызов делит текущий запрос,
+ *   принудительный ждёт его и запускает один повторный (данные могли устареть
+ *   в момент старта текущего запроса); несколько принудительных делят этот повтор.
+ */
+export async function refreshProcurementData({ maxAgeMs = 0 } = {}) {
+  if (!isCloudMode()) return null
+
+  const soft = maxAgeMs > 0
+  if (soft && isModuleFresh('procurement', maxAgeMs) && isModuleFresh('receiving', maxAgeMs)) {
+    return cachedProcurementResult()
+  }
+
+  if (procurementRefreshQueued) return procurementRefreshQueued
+
+  if (procurementRefreshInFlight) {
+    if (soft) return procurementRefreshInFlight
+    if (!procurementRefreshQueued) {
+      procurementRefreshQueued = procurementRefreshInFlight
+        .catch(() => {})
+        .then(() => {
+          procurementRefreshQueued = null
+          return startProcurementRefresh()
+        })
+    }
+    return procurementRefreshQueued
+  }
+
+  return startProcurementRefresh()
+}
+
+function startProcurementRefresh() {
+  const run = runProcurementRefresh().finally(() => {
+    if (procurementRefreshInFlight === run) procurementRefreshInFlight = null
+  })
+  procurementRefreshInFlight = run
+  return run
 }
 
 export async function refreshData() {

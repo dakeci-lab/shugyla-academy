@@ -154,6 +154,7 @@
     "verify:web-push-background-delivery": "node scripts/verify-web-push-background-delivery.mjs",
     "verify:web-push-vapid-consistency": "node scripts/verify-web-push-vapid-consistency.mjs",
     "verify:procurement-cross-device-sync": "node scripts/verify-procurement-cross-device-sync.mjs",
+    "verify:procurement-refetch-throttle": "node scripts/verify-procurement-refetch-throttle.mjs",
     "verify:procurement-sync-button-topbar": "node scripts/verify-procurement-sync-button-topbar.mjs",
     "verify:procurement-daily-auto-sync": "node scripts/verify-procurement-daily-auto-sync.mjs",
     "verify:employee-self-edit": "node scripts/verify-employee-self-edit.mjs",

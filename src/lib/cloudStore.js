@@ -41,6 +41,9 @@ function createUnreachedModuleFlags() {
   return Object.fromEntries(CLOUD_MODULES.map((name) => [name, false]))
 }
 let moduleEverReady = createUnreachedModuleFlags()
+/** Epoch ms of the last successful load per module. Lets callers skip a refetch
+ *  of data that was loaded moments ago (focus/mount/realtime-subscribe storms). */
+let moduleLoadedAt = {}
 
 function assertModuleName(moduleName) {
   if (!CLOUD_MODULES.includes(moduleName)) {
@@ -95,8 +98,23 @@ export function markModuleReady(moduleName) {
   assertModuleName(moduleName)
   moduleStates = { ...moduleStates, [moduleName]: MODULE_STATUS.READY }
   moduleEverReady = { ...moduleEverReady, [moduleName]: true }
+  moduleLoadedAt = { ...moduleLoadedAt, [moduleName]: Date.now() }
   delete moduleErrors[moduleName]
   ensureCloudStoreReady()
+}
+
+/** Epoch ms of the last successful load of a module, or 0 if never loaded. */
+export function getModuleLoadedAt(moduleName) {
+  assertModuleName(moduleName)
+  return moduleLoadedAt[moduleName] || 0
+}
+
+/** True when the module is ready and was loaded less than maxAgeMs ago. */
+export function isModuleFresh(moduleName, maxAgeMs) {
+  if (!(maxAgeMs > 0)) return false
+  if (!isModuleReady(moduleName)) return false
+  const loadedAt = getModuleLoadedAt(moduleName)
+  return loadedAt > 0 && Date.now() - loadedAt < maxAgeMs
 }
 
 export function markModuleError(moduleName, error) {
@@ -151,6 +169,7 @@ export function clearCloudStore() {
   store = { ...emptyStore }
   resetModuleLoadStates()
   moduleEverReady = createUnreachedModuleFlags()
+  moduleLoadedAt = {}
 }
 
 function readWhenReady(moduleName, value) {
