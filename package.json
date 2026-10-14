@@ -60,6 +60,7 @@
     "verify:mobile-page-header": "node scripts/verify-mobile-page-header.mjs",
     "verify:procurement-calendar-filter": "node scripts/verify-procurement-calendar-filter.mjs",
     "verify:procurement-planning-v1": "node scripts/verify-procurement-planning-v1.mjs",
+    "verify:parallel-id-chunk-fetch": "node scripts/verify-parallel-id-chunk-fetch.mjs",
     "verify:procurement-order-actions": "node scripts/verify-procurement-order-actions.mjs",
     "verify:rbac-database-source": "node scripts/verify-rbac-database-source.mjs",
     "verify:roles-and-desktop-visibility": "node scripts/verify-roles-and-desktop-visibility.mjs",
