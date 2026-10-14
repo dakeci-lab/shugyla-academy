@@ -888,19 +888,43 @@ export function getSupplierById(id) {
   return getSupplierByIdSync(id)
 }
 
+/**
+ * Single-supplier writes patch the in-memory cache instead of calling
+ * refreshData(): a full reload re-fetched every module (employees, candidates,
+ * all purchase order items…) and made one field edit take ~15 s.
+ * Falls back to the full reload only when the cache cannot be patched.
+ */
+function replaceCachedSupplier(supplier) {
+  const store = getCloudStore()
+  if (!store.loaded || !supplier?.id) return false
+  const current = store.suppliers || []
+  if (!current.some((s) => s.id === supplier.id)) return false
+  patchCloudStore({ suppliers: current.map((s) => (s.id === supplier.id ? supplier : s)) })
+  notifyModulesChanged()
+  return true
+}
+
+function removeCachedSupplier(supplierId) {
+  const store = getCloudStore()
+  if (!store.loaded) return false
+  patchCloudStore({ suppliers: (store.suppliers || []).filter((s) => s.id !== supplierId) })
+  notifyModulesChanged()
+  return true
+}
+
 export async function updateSupplier(supplierId, updates) {
-  await getSuppliersAdapter().updateSupplier(supplierId, updates)
-  if (isCloudMode()) await refreshData()
+  const saved = await getSuppliersAdapter().updateSupplier(supplierId, updates)
+  if (isCloudMode() && !replaceCachedSupplier(saved)) await refreshData()
 }
 
 export async function deleteSupplier(supplierId) {
   await getSuppliersAdapter().deleteSupplier(supplierId)
-  if (isCloudMode()) await refreshData()
+  if (isCloudMode() && !removeCachedSupplier(supplierId)) await refreshData()
 }
 
 export async function archiveSupplier(supplierId) {
-  await getSuppliersAdapter().archiveSupplier(supplierId)
-  if (isCloudMode()) await refreshData()
+  const saved = await getSuppliersAdapter().archiveSupplier(supplierId)
+  if (isCloudMode() && !replaceCachedSupplier(saved)) await refreshData()
 }
 
 // --- Employee shifts / schedule ---

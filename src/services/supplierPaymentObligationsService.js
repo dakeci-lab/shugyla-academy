@@ -213,7 +213,11 @@ export async function refreshObligationTermsForSupplier(platformSupplierId, supp
   if (error) throw new Error(error.message || 'Не удалось обновить сроки оплаты')
 
   const now = new Date().toISOString()
-  let updated = 0
+
+  // Rows that need the same patch (typically same document date → same due
+  // date) are written in one UPDATE ... WHERE id IN (...), and the groups run
+  // in parallel — instead of one sequential round trip per row.
+  const groups = new Map()
   for (const row of rows || []) {
     const docDate =
       row.supply_document_date ||
@@ -230,14 +234,32 @@ export async function refreshObligationTermsForSupplier(platformSupplierId, supp
     )
     if (!patch) continue
 
-    const { error: updError } = await supabase
-      .from('supplier_payment_obligations')
-      .update({ ...patch, terms_snapshot_created_at: now })
-      .eq('id', row.id)
-    if (updError) throw new Error(updError.message || 'Не удалось сохранить срок оплаты')
-    updated += 1
+    const key = JSON.stringify(patch)
+    const group = groups.get(key) || { patch, ids: [] }
+    group.ids.push(row.id)
+    groups.set(key, group)
   }
-  return { updated }
+
+  const CHUNK = 100
+  const writes = []
+  for (const { patch, ids } of groups.values()) {
+    for (let i = 0; i < ids.length; i += CHUNK) {
+      const chunk = ids.slice(i, i + CHUNK)
+      writes.push(
+        supabase
+          .from('supplier_payment_obligations')
+          .update({ ...patch, terms_snapshot_created_at: now })
+          .in('id', chunk)
+          .then(({ error: updError }) => {
+            if (updError) throw new Error(updError.message || 'Не удалось сохранить срок оплаты')
+            return chunk.length
+          })
+      )
+    }
+  }
+
+  const counts = await Promise.all(writes)
+  return { updated: counts.reduce((sum, n) => sum + n, 0) }
 }
 
 export async function syncUmagForPayments({ dateFrom, dateTo }) {

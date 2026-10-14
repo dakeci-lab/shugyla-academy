@@ -123,10 +123,13 @@ export async function updateSupplier(supplierId, updates) {
   // Linked suppliers: never let the client overwrite UMAG-owned identity fields.
   const patch = current.linkedToUmag ? supplierToOperationalRow(merged) : supplierToRow(merged)
 
-  await throwIfError(
-    await supabase.from('platform_suppliers').update(patch).eq('id', supplierId),
+  // Return the saved row so callers can patch the in-memory cache instead of
+  // reloading every module of the platform.
+  const row = await throwIfError(
+    await supabase.from('platform_suppliers').update(patch).eq('id', supplierId).select('*').maybeSingle(),
     'Обновление поставщика'
   )
+  return row ? rowToSupplier(row) : null
 }
 
 export async function deleteSupplier(supplierId) {
@@ -137,5 +140,5 @@ export async function deleteSupplier(supplierId) {
 }
 
 export async function archiveSupplier(supplierId) {
-  await updateSupplier(supplierId, { status: SUPPLIER_STATUS.ARCHIVED })
+  return updateSupplier(supplierId, { status: SUPPLIER_STATUS.ARCHIVED })
 }
