@@ -1,8 +1,14 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
+import {
+  PROCUREMENT_FRESH_MS,
+  PROCUREMENT_REALTIME_DEBOUNCE_MS,
+  PROCUREMENT_REALTIME_MAX_WAIT_MS,
+} from '../lib/procurementFreshness'
 
-const DEBOUNCE_MS = 400
-const STALE_MS = 12_000
+const DEBOUNCE_MS = PROCUREMENT_REALTIME_DEBOUNCE_MS
+const MAX_WAIT_MS = PROCUREMENT_REALTIME_MAX_WAIT_MS
+const STALE_MS = PROCUREMENT_FRESH_MS
 const RECONNECT_BASE_MS = 1_500
 const RECONNECT_MAX_MS = 30_000
 const CHANNEL_NAME = 'procurement-sync'
@@ -35,6 +41,7 @@ export function subscribeProcurementRealtime(onSync, options = {}) {
   const { onStatus } = options
   let disposed = false
   let debounceTimer = null
+  let burstStartedAt = 0
   let reconnectTimer = null
   let reconnectAttempt = 0
   let inFlight = null
@@ -86,12 +93,19 @@ export function subscribeProcurementRealtime(onSync, options = {}) {
     await inFlight
   }
 
+  // Coalesce a burst of change events (e.g. saving an order with N items fires
+  // N events) into one reload; a continuous stream still reloads every MAX_WAIT_MS.
   function scheduleSync(source) {
     if (disposed) return
+    const now = Date.now()
+    if (!burstStartedAt) burstStartedAt = now
+    const waited = now - burstStartedAt
+    const delay = Math.max(0, Math.min(DEBOUNCE_MS, MAX_WAIT_MS - waited))
     clearTimeout(debounceTimer)
     debounceTimer = window.setTimeout(() => {
+      burstStartedAt = 0
       void runSync(source)
-    }, DEBOUNCE_MS)
+    }, delay)
   }
 
   function scheduleSyncImmediateIfStale(source) {

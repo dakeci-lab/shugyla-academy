@@ -99,13 +99,18 @@ export function PlatformDataProvider({ children }) {
     bumpVersion()
   }, [cloudMode, pathname, user?.id, bumpVersion])
 
-  const reloadProcurement = useCallback(async () => {
-    if (cloudMode) {
-      await refreshProcurementData()
-      setLoadError(null)
-    }
-    bumpVersion()
-  }, [cloudMode, bumpVersion])
+  // `options.maxAgeMs` makes the reload a no-op when procurement was loaded that
+  // recently (mount / focus); mutations and realtime events call it without it.
+  const reloadProcurement = useCallback(
+    async (options) => {
+      if (cloudMode) {
+        await refreshProcurementData(options)
+        setLoadError(null)
+      }
+      bumpVersion()
+    },
+    [cloudMode, bumpVersion]
+  )
 
   const ensureModules = useCallback(
     async (moduleNames = []) => {

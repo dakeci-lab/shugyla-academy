@@ -14,6 +14,7 @@ import {
 import { isCloudMode } from '../../../lib/dataMode'
 import { toUserErrorMessage } from '../../../utils/userErrorMessage'
 import { PURCHASE_STATUS } from '../../../utils/purchaseData'
+import { PROCUREMENT_FRESH_MS } from '../../../lib/procurementFreshness'
 import {
   describeSettlementsPeriod,
   getSettlementsPeriodDates,
@@ -76,7 +77,8 @@ export default function OrdersPage() {
     void (async () => {
       setRefreshing(true)
       try {
-        await reloadProcurement()
+        // Skip the network when the module was loaded moments ago (e.g. bootstrap).
+        await reloadProcurement({ maxAgeMs: PROCUREMENT_FRESH_MS })
         if (!cancelled) setProcurementLoadError(null)
       } catch (error) {
         const message = toUserErrorMessage(error, 'Не удалось загрузить заказы с сервера.')

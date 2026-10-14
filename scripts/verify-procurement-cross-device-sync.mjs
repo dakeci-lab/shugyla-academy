@@ -71,7 +71,7 @@ function main() {
   assert('refreshProcurement marks module error', platformService.includes("markModuleError('procurement'"))
 
   console.log('Stage 4: Procurement page sync + error UX')
-  assert('page reloads procurement on open', page.includes('reloadProcurement()'))
+  assert('page reloads procurement on open', page.includes('reloadProcurement('))
   assert('page shows toast on load error', page.includes('showError(message)'))
   assert('empty state uses load error message', page.includes('procurementLoadError ||'))
   assert('does not treat load error as empty catalog only', page.includes('procurementLoadError'))
