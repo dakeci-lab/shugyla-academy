@@ -88,7 +88,7 @@ let backgroundPrefetchScheduled = false
 let onModulesChanged = null
 
 /** Prefetched after shell; procurement/receiving stay route-triggered. */
-const BACKGROUND_MODULES = ['recruitment', 'suppliers']
+const BACKGROUND_MODULES = ['suppliers']
 
 function notifyModulesChanged() {
   if (typeof onModulesChanged === 'function') {
@@ -119,15 +119,9 @@ export function getRouteCriticalModules(pathname = '') {
   if (path.includes('/platform/suppliers')) {
     return ['suppliers']
   }
-  // Internal HR only — never match public /vacancies or /apply.
-  if (path.includes('/platform/hr') || path.includes('/platform/recruitment')) {
-    return ['recruitment']
-  }
-  if (path === '/platform' || path === '/platform/') {
-    // Home: employees are operational; suppliers stay in background prefetch.
-    return ['employees']
-  }
-  if (path.includes('/platform/employees') || path.includes('/platform/dashboard')) {
+  // «Пользователи» (Настройки) — единственный экран, которому нужен список сотрудников.
+  // Рекрутинг, график и тайм-трекер скрыты (stage 12), /platform только перенаправляет.
+  if (path.includes('/platform/settings/users')) {
     return ['employees']
   }
   return []

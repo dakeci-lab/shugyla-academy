@@ -10,9 +10,7 @@ import { validateContactEmail } from '../utils/profileValidation'
 import { LOGIN_PATH } from '../router/authRoutes'
 import ProfileAvatarEditor from '../components/ProfileAvatarEditor'
 import ProfilePasswordModal from '../components/profile/ProfilePasswordModal'
-import PushNotificationSettings from '../components/platform/notifications/PushNotificationSettings'
 import { ChevronRightIcon } from '../components/icons/PlatformIcons'
-import { getEmployeeDocumentsPath } from '../utils/employeeDocuments'
 import './Profile.css'
 
 function getInitialForm(user, employee) {
@@ -151,18 +149,7 @@ export default function Profile() {
         </button>
       </form>
 
-      <PushNotificationSettings />
-
       <div className="profile-page__actions">
-        <button
-          type="button"
-          className="profile-page__action-row"
-          onClick={() => navigate(getEmployeeDocumentsPath(user.id))}
-        >
-          <span>Документы</span>
-          <ChevronRightIcon size={18} />
-        </button>
-
         <button
           ref={passwordTriggerRef}
           type="button"

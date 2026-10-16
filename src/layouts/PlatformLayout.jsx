@@ -3,7 +3,6 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import PlatformHeaderActions from '../components/platform/PlatformHeaderActions'
 import PlatformMobileHeader from '../components/platform/PlatformMobileHeader'
 import AppInstallBanner from '../components/platform/AppInstallBanner'
-import DeviceSetupOnboarding from '../components/platform/DeviceSetupOnboarding'
 import PlatformDesktopNav, {
   PlatformDesktopLogo,
 } from '../components/platform/PlatformDesktopNav'
@@ -11,7 +10,6 @@ import PlatformSidebar from '../components/platform/PlatformSidebar'
 import PullToRefresh from '../components/platform/PullToRefresh'
 import PlatformErrorBoundary from '../components/platform/PlatformErrorBoundary'
 import PlatformSessionGate from '../components/platform/PlatformSessionGate'
-import { DevicePermissionsProvider } from '../context/DevicePermissionsContext'
 import { PullToRefreshProvider } from '../context/PullToRefreshContext'
 import { PlatformPageTitleProvider, usePlatformPageTitleContext } from '../context/PlatformPageTitleContext'
 import { usePlatformData } from '../context/PlatformDataContext'
@@ -171,39 +169,36 @@ function PlatformLayoutShell({ onLogout }) {
         />
       )}
 
-      <DevicePermissionsProvider enabled={Boolean(user)}>
-        <PullToRefreshProvider onGlobalRefresh={reload}>
-          <div className="platform-layout__main">
-            <AppInstallBanner />
+      <PullToRefreshProvider onGlobalRefresh={reload}>
+        <div className="platform-layout__main">
+          <AppInstallBanner />
 
-            {/* Header stays outside PullToRefresh so it never translates/unmounts. */}
-            <PlatformMobileHeader
-              title={pageTitle}
-              onMenuOpen={() => setDrawerOpen(true)}
-              showBack={showMobileBack}
-              onBack={handleMobileBack}
-              actions={titleContext?.override?.actions ?? null}
-            />
+          {/* Header stays outside PullToRefresh so it never translates/unmounts. */}
+          <PlatformMobileHeader
+            title={pageTitle}
+            onMenuOpen={() => setDrawerOpen(true)}
+            showBack={showMobileBack}
+            onBack={handleMobileBack}
+            actions={titleContext?.override?.actions ?? null}
+          />
 
-            {!isMobile && (
-              <header className="platform-layout__topbar">
-                <PlatformDesktopLogo />
-                <PlatformDesktopNav />
-                <PlatformHeaderActions user={user} onLogout={onLogout} bellVariant="desktop" />
-              </header>
-            )}
+          {!isMobile && (
+            <header className="platform-layout__topbar">
+              <PlatformDesktopLogo />
+              <PlatformDesktopNav />
+              <PlatformHeaderActions user={user} onLogout={onLogout} />
+            </header>
+          )}
 
-            <PullToRefresh disabled={drawerOpen || drawerDragging} className="platform-layout__refresh">
-              <div className="platform-layout__content">
-                <PlatformErrorBoundary onLogout={onLogout}>
-                  <Outlet />
-                </PlatformErrorBoundary>
-              </div>
-            </PullToRefresh>
-          </div>
-        </PullToRefreshProvider>
-        <DeviceSetupOnboarding />
-      </DevicePermissionsProvider>
+          <PullToRefresh disabled={drawerOpen || drawerDragging} className="platform-layout__refresh">
+            <div className="platform-layout__content">
+              <PlatformErrorBoundary onLogout={onLogout}>
+                <Outlet />
+              </PlatformErrorBoundary>
+            </div>
+          </PullToRefresh>
+        </div>
+      </PullToRefreshProvider>
     </div>
   )
 }

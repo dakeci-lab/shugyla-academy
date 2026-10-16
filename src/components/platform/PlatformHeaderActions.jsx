@@ -1,17 +1,14 @@
 import PlatformUserMenu from './PlatformUserMenu'
-import NotificationBell from './notifications/NotificationBell'
 
-/** Действия шапки платформы: колокольчик + меню пользователя */
+/** Действия шапки платформы: меню пользователя (колокольчик убран: уведомления были только у тайм-трекера) */
 export default function PlatformHeaderActions({
   user,
   onLogout,
   compact = false,
-  bellVariant = 'desktop',
   showUserMenu = true,
 }) {
   return (
     <div className={`platform-header-actions${compact ? ' platform-header-actions--compact' : ''}`}>
-      <NotificationBell variant={bellVariant} />
       {showUserMenu && (
         <PlatformUserMenu user={user} onLogout={onLogout} compact={compact} />
       )}

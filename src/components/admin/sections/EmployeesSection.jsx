@@ -351,7 +351,7 @@ export default function EmployeesSection() {
 
   function clearCandidateQuery() {
     if (searchParams.get('createFromCandidate')) {
-      navigate('/platform/employees/list', { replace: true })
+      navigate('/platform/settings/users', { replace: true })
     }
   }
 
@@ -635,11 +635,7 @@ export default function EmployeesSection() {
           getRoleLabelForEmployee={getRoleLabelForEmployee}
           canEdit={canEdit}
           onEdit={canEdit ? openEdit : null}
-          onOpen={
-            canViewList
-              ? (employee) => navigate(`/platform/employees/${employee.id}`)
-              : null
-          }
+          onOpen={null}
           emptyCopy={getEmptyCopy()}
           onClearSearch={() => setSearchInput('')}
           loading={Boolean(cloudMode && listLoading)}

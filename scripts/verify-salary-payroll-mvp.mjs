@@ -65,8 +65,8 @@ function main() {
   assert('recalculate persist', service.includes('recalculateAndPersistTotals') || service.includes('total_payable'))
 
   console.log('\nStage 3: UI / routes')
-  assert('list page wired', app.includes('PlatformPayroll') && app.includes('employees/payroll'))
-  assert('detail route', app.includes('employees/payroll/records/:recordId'))
+  // Stage 12: payroll is hidden — all /platform/employees/* routes redirect to the entry page.
+  assert('payroll routes redirect (stage 12)', app.includes('path="employees/*"') && !app.includes('PlatformPayroll'))
   assert('no green month bar', !list.includes('PlatformPeriodHeader'))
   assert('filter popover', list.includes('PayrollFilterPopover'))
   assert(
@@ -178,10 +178,8 @@ function main() {
   const nav = read('src/platform/platformNav.js')
   const webOnly = read('src/platform/webOnlyNav.js')
   assert(
-    'payroll hidden on mobile nav',
-    nav.includes('employees-payroll') &&
-      nav.includes('webOnly: true') &&
-      webOnly.includes('employees-payroll'),
+    'payroll removed from navigation (stage 12)',
+    !nav.includes('employees-payroll'),
   )
 }
 

@@ -49,11 +49,11 @@ assert(
 assert(
   'Internal providers wrap /platform route',
   app.includes('path="/platform"') &&
-    app.indexOf('InternalPlatformProviders') < app.indexOf('path="hr/vacancies"')
+    app.indexOf('InternalPlatformProviders') < app.indexOf('path="procurement"')
 )
 assert(
   '/apply registered as public element',
-  app.includes('path="/apply"') && app.includes('<ApplyHubPage')
+  app.includes('path="/apply"') && app.includes('<CareersRetiredRedirect')
 )
 assert(
   'ApplyHub uses public list service',
@@ -109,7 +109,7 @@ assert(
 )
 assert(
   'getRouteCriticalModules does not match public /vacancies',
-  platformDataSvc.includes("path.includes('/platform/hr')") &&
+  platformDataSvc.includes("path.includes('/platform/settings/users')") &&
     !platformDataSvc.match(/path\.includes\('\/vacancies'\)/)
 )
 assert(
@@ -134,8 +134,8 @@ assert(
   app.includes("lazy(() => import('./layouts/PlatformLayout'))")
 )
 assert(
-  'App eager-loads ApplyHub (public)',
-  app.includes("import ApplyHubPage from './pages/ApplyHub'")
+  'App no longer loads ApplyHub at all (careers retired, stage 12)',
+  !app.includes("pages/ApplyHub")
 )
 
 const failed = checks.filter((c) => !c.ok)

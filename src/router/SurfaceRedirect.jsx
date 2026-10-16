@@ -2,10 +2,14 @@ import { useEffect } from 'react'
 import { Navigate, useLocation, useParams } from 'react-router-dom'
 import { useLanguage } from '../context/LanguageContext'
 import {
+  CORPORATE_ORIGIN,
+  HOST_SURFACE,
   getCareersHomePath,
   getCareersUrl,
+  getHostSurface,
   getPlatformUrl,
 } from './hostSurface'
+import { LOGIN_PATH } from './authRoutes'
 
 function ExternalRedirect({ target }) {
   const { t } = useLanguage()
@@ -54,4 +58,15 @@ export function CareersHomeRedirect() {
       replace
     />
   )
+}
+
+/**
+ * Сайт вакансий закрыт (stage 12): вакансии/заявки больше не используются.
+ * На боевых доменах — на корпоративный сайт, локально — на вход в платформу.
+ */
+export function CareersRetiredRedirect() {
+  if (getHostSurface() === HOST_SURFACE.COMBINED) {
+    return <Navigate to={LOGIN_PATH} replace />
+  }
+  return <ExternalRedirect target={CORPORATE_ORIGIN} />
 }
