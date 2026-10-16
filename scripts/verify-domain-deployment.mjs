@@ -95,10 +95,11 @@ assert(
   hostSurface.includes("'localhost'") && hostSurface.includes("'dakeci-lab.github.io'")
 )
 assert('root corporate placeholder is routed', app.includes('<CorporateHome />'))
-assert('corporate placeholder links to careers', corporateHome.includes('getCareersUrl'))
+// Stage 12: careers site retired — corporate page no longer links to it.
+assert('corporate placeholder does not link to careers (stage 12)', !corporateHome.includes('getCareersUrl'))
 assert(
-  'web and root careers routes use external redirect',
-  app.includes('CareersExternalRedirect')
+  'careers routes redirect to the corporate site (stage 12)',
+  app.includes('CareersRetiredRedirect')
 )
 assert(
   'jobs blocks internal routes',

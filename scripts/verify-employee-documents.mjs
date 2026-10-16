@@ -82,18 +82,19 @@ function main() {
 
   console.log('\nStage 2: App wiring')
   assert('extensible document types', catalog.includes('identity_card') && catalog.includes('EMPLOYEE_DOCUMENT_TYPES'))
-  assert('documents route', app.includes('employees/:employeeId/documents'))
+  // Stage 12: employee documents hidden — old employee routes redirect to the entry page.
+  assert('documents route redirects (stage 12)', app.includes('path="employees/*"') && !app.includes('employees/:employeeId/documents'))
   assert('documents page', page.includes('PlatformEmployeeDocuments') || page.includes('Документы'))
   assert('no duplicate page intro', !page.includes('employee-docs__header') && !page.includes('Загрузите документы'))
   assert('upload via storage', service.includes('EMPLOYEE_DOCUMENT_BUCKET') && service.includes('.upload('))
   assert('signed url view', service.includes('createSignedUrl'))
   assert('header documents button', header.includes('Документы') && header.includes('showDocuments'))
-  assert('profile documents row', profile.includes('Документы') && !profile.includes('ProfileNotificationsModal'))
+  assert('profile has no documents row (stage 12)', !profile.includes('getEmployeeDocumentsPath') && !profile.includes('ProfileNotificationsModal'))
 
   console.log('\nStage 3: Notifications UX')
   assert('inbox has push toggle', inbox.includes('PushNotificationToggle'))
   assert('panel has push toggle', panel.includes('PushNotificationToggle'))
-  assert('notifications nested under home', sidebar.includes('nestMobileNotificationsUnderHome'))
+  assert('no notifications entry in the mobile menu (stage 12)', !sidebar.includes('nestMobileNotificationsUnderHome') && !sidebar.includes('MOBILE_NOTIFICATIONS_ITEM'))
   assert('no separate notifications group insert', !sidebar.includes('insertMobileNotificationsItem'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)

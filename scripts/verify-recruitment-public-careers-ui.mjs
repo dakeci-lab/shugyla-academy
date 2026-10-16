@@ -31,8 +31,8 @@ const stagingWorkflow = read('.github/workflows/e2e-recruitment-staging.yml')
 const platformHeader = read('src/components/Header.jsx')
 
 assert('CareersPublicLayout exists', layout.includes('CareersHeader') && layout.includes('Outlet'))
-assert('App wraps careers routes in CareersPublicLayout', app.includes('CareersPublicLayout'))
-assert('public routes nested under careers layout', app.includes('<Route element={<CareersPublicLayout />}>'))
+// Stage 12: careers site retired — every careers route redirects to the corporate site.
+assert('careers routes are retired (stage 12)', app.includes('CareersRetiredRedirect') && !app.includes('<CareersPublicLayout'))
 assert('CareersHeader brands Shugyla Market', header.includes('Shugyla Market'))
 assert('CareersHeader has no logout', !header.includes('Выйти') && !header.includes('logout'))
 assert('CareersHeader has no useSession', !header.includes('useSession'))

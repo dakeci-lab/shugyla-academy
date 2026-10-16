@@ -3,20 +3,11 @@ import { ROUTE_KEYS } from '../config/permissions'
 /** Разделы Shugyla Platform — иерархическая навигация */
 export const PLATFORM_NAV = [
   {
-    id: 'home',
-    path: '/platform',
-    label: 'Главная',
-    end: true,
-    routeKey: ROUTE_KEYS.HOME,
-    title: 'Главная',
-    description: 'Отметка прихода и ухода, статус сегодняшней смены.',
-  },
-  {
     id: 'sales',
     path: '/platform/sales',
-    label: 'Продажи',
+    label: 'Главная',
     routeKey: ROUTE_KEYS.SALES,
-    title: 'Продажи',
+    title: 'Главная',
     description: 'Выручка и маржа по категориям, аналитика и синхронизация с UMAG.',
   },
   {
@@ -59,49 +50,6 @@ export const PLATFORM_NAV = [
     ],
   },
   {
-    id: 'employees',
-    label: 'Сотрудники',
-    routeKey: ROUTE_KEYS.EMPLOYEES_GROUP,
-    title: 'Сотрудники',
-    description: 'Учётные записи, роли и статус сотрудников.',
-    children: [
-      {
-        id: 'employees-list',
-        path: '/platform/employees/list',
-        label: 'Список сотрудников',
-        routeKey: ROUTE_KEYS.EMPLOYEES_LIST,
-        title: 'Список сотрудников',
-        description: 'Добавление, редактирование, роли и увольнение сотрудников.',
-      },
-      {
-        id: 'employees-schedule',
-        path: '/platform/employees/schedule',
-        label: 'График работы',
-        routeKey: ROUTE_KEYS.EMPLOYEES_SCHEDULE,
-        title: 'График работы',
-        description: 'Настройки графика персонала магазина.',
-      },
-      {
-        id: 'employees-payroll',
-        path: '/platform/employees/payroll',
-        label: 'Подсчёт зарплаты',
-        routeKey: ROUTE_KEYS.EMPLOYEES_PAYROLL,
-        title: 'Подсчёт зарплаты',
-        description: 'Расчёт заработной платы сотрудников.',
-        webOnly: true,
-      },
-      {
-        id: 'hr',
-        path: '/platform/hr/candidates',
-        pathPrefixes: ['/platform/hr'],
-        label: 'HR',
-        routeKey: ROUTE_KEYS.HR_GROUP,
-        title: 'HR',
-        description: 'Кандидаты, вакансии и процесс найма.',
-      },
-    ],
-  },
-  {
     id: 'finance',
     label: 'Финансы',
     routeKey: ROUTE_KEYS.FINANCES_GROUP,
@@ -125,17 +73,17 @@ export const PLATFORM_NAV = [
     label: 'Настройки',
     routeKey: ROUTE_KEYS.SETTINGS,
     title: 'Настройки',
-    description: 'Тайм-трекер, роли доступа и уведомления.',
+    description: 'Пользователи платформы и роли доступа.',
     pathPrefixes: ['/platform/settings'],
     children: [
       {
-        id: 'settings-general',
-        path: '/platform/settings/general',
-        label: 'Управление тайм-трекером',
+        id: 'settings-users',
+        path: '/platform/settings/users',
+        label: 'Пользователи',
         end: true,
-        routeKey: ROUTE_KEYS.SETTINGS_GENERAL,
-        title: 'Управление тайм-трекером',
-        description: 'Рабочая территория и штрафные баллы тайм-трекера.',
+        routeKey: ROUTE_KEYS.EMPLOYEES_LIST,
+        title: 'Пользователи',
+        description: 'Учётные записи платформы: создание, роль, отключение.',
       },
       {
         id: 'settings-roles',
@@ -144,16 +92,7 @@ export const PLATFORM_NAV = [
         end: true,
         routeKey: ROUTE_KEYS.SETTINGS_ROLES,
         title: 'Роли и доступы',
-        description: 'Роли сотрудников и матрица разрешений.',
-      },
-      {
-        id: 'settings-notifications',
-        path: '/platform/settings/notifications',
-        label: 'Настройки уведомлений',
-        end: true,
-        routeKey: ROUTE_KEYS.SETTINGS_NOTIFICATIONS,
-        title: 'Настройки уведомлений',
-        description: 'Автоматические уведомления тайм-трекера по графику смен.',
+        description: 'Роли пользователей и матрица разрешений.',
       },
     ],
   },
@@ -162,11 +101,6 @@ export const PLATFORM_NAV = [
 export const PROFILE_SECTION = {
   title: 'Профиль',
   description: 'Личные данные пользователя',
-}
-
-export const NOTIFICATIONS_SECTION = {
-  title: 'Уведомления',
-  description: 'Лента уведомлений платформы.',
 }
 
 function flattenNav(nav = PLATFORM_NAV) {
@@ -210,10 +144,6 @@ export function getAutoExpandedGroupIds(pathname, navItems = PLATFORM_NAV) {
 }
 
 export function getPlatformSection(pathname) {
-  if (pathname === '/platform/notifications' || pathname.startsWith('/platform/notifications/')) {
-    return NOTIFICATIONS_SECTION
-  }
-
   if (pathname === '/platform/profile' || pathname.startsWith('/platform/profile/')) {
     return PROFILE_SECTION
   }

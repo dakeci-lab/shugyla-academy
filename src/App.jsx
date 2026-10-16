@@ -8,26 +8,16 @@ import ProtectedRoute from './components/ProtectedRoute'
 import InternalPlatformProviders from './components/platform/InternalPlatformProviders'
 import PlatformRoute from './components/platform/PlatformRoute'
 import PlatformNotFound from './components/platform/PlatformNotFound'
-import HrPlatformRoute from './components/platform/HrPlatformRoute'
 import { LOGIN_PATH } from './router/authRoutes'
 import { ROUTE_KEYS } from './config/permissions'
 import Login from './pages/Login'
 import ForgotPassword from './pages/ForgotPassword'
 import ResetPassword from './pages/ResetPassword'
-import VacanciesPage from './pages/VacanciesPage'
-import VacancyDetailPage from './pages/VacancyDetailPage'
-import ApplyPage from './pages/Apply'
-import ApplyHubPage from './pages/ApplyHub'
 import CorporateHome from './pages/CorporateHome'
-import CareersPublicLayout from './layouts/CareersPublicLayout'
 import AuthLoadingScreen from './components/AuthLoadingScreen'
 import AppLaunchGate from './components/AppLaunchGate'
 import { getHostSurface, HOST_SURFACE } from './router/hostSurface'
-import {
-  CareersExternalRedirect,
-  CareersHomeRedirect,
-  PlatformExternalRedirect,
-} from './router/SurfaceRedirect'
+import { CareersRetiredRedirect, PlatformExternalRedirect } from './router/SurfaceRedirect'
 
 /**
  * Internal platform pages — lazy so public /apply does not download HR UI.
@@ -36,36 +26,11 @@ const PlatformLayout = lazy(() => import('./layouts/PlatformLayout'))
 const Profile = lazy(() => import('./pages/Profile'))
 const PlatformIndex = lazy(() => import('./pages/platform/PlatformIndex'))
 const PlatformSettings = lazy(() => import('./pages/platform/PlatformSettings'))
-const PlatformSettingsGeneral = lazy(() => import('./pages/platform/PlatformSettingsGeneral'))
 const PlatformSettingsRoles = lazy(() => import('./pages/platform/PlatformSettingsRoles'))
-const PlatformSettingsNotifications = lazy(
-  () => import('./pages/platform/PlatformSettingsNotifications')
-)
 const PlatformSettingsPaymentAccounts = lazy(
   () => import('./pages/platform/PlatformSettingsPaymentAccounts')
 )
-const PlatformNotificationsInbox = lazy(
-  () => import('./pages/platform/PlatformNotificationsInbox')
-)
-const PlatformEmployeeDocuments = lazy(
-  () => import('./pages/platform/PlatformEmployeeDocuments')
-)
 const PlatformEmployees = lazy(() => import('./pages/platform/PlatformEmployees'))
-const PlatformEmployeesRedirect = lazy(
-  () => import('./pages/platform/PlatformEmployeesRedirect')
-)
-const PlatformWorkSchedule = lazy(() => import('./pages/platform/PlatformWorkSchedule'))
-const PlatformEmployeeSchedule = lazy(
-  () => import('./pages/platform/PlatformEmployeeSchedule')
-)
-const PlatformEmployeeProfile = lazy(
-  () => import('./pages/platform/PlatformEmployeeProfile')
-)
-const PlatformPayroll = lazy(() => import('./pages/platform/PlatformPayroll'))
-const PlatformPayrollRecord = lazy(() => import('./pages/platform/PlatformPayrollRecord'))
-const PlatformTimeTracker = lazy(() => import('./pages/platform/PlatformTimeTracker'))
-const PlatformHrVacancies = lazy(() => import('./pages/platform/PlatformHrVacancies'))
-const PlatformHrCandidates = lazy(() => import('./pages/platform/PlatformHrCandidates'))
 const SupplierFinancePage = lazy(
   () => import('./pages/platform/supplier-finance/SupplierFinancePage')
 )
@@ -110,15 +75,13 @@ function SupplierDirectoryRedirect() {
 
 export default function App() {
   const surface = getHostSurface()
-  const careersEnabled =
-    surface === HOST_SURFACE.CAREERS || surface === HOST_SURFACE.COMBINED
   const internalEnabled =
     surface === HOST_SURFACE.PLATFORM || surface === HOST_SURFACE.COMBINED
 
   function internalElement(element) {
     if (internalEnabled) return element
     if (surface === HOST_SURFACE.CAREERS) {
-      return <CareersHomeRedirect />
+      return <CareersRetiredRedirect />
     }
     return <PlatformExternalRedirect />
   }
@@ -135,9 +98,7 @@ export default function App() {
                 path="/"
                 element={
                   surface === HOST_SURFACE.CAREERS ? (
-                    <CareersPublicLayout>
-                      <ApplyHubPage />
-                    </CareersPublicLayout>
+                    <CareersRetiredRedirect />
                   ) : surface === HOST_SURFACE.CORPORATE ? (
                     <CorporateHome />
                   ) : (
@@ -145,50 +106,11 @@ export default function App() {
                   )
                 }
               />
-              <Route element={<CareersPublicLayout />}>
-                <Route
-                  path="/vacancies"
-                  element={
-                    careersEnabled ? (
-                      <VacanciesPage />
-                    ) : (
-                      <CareersExternalRedirect />
-                    )
-                  }
-                />
-                <Route
-                  path="/vacancies/:slug"
-                  element={
-                    careersEnabled ? (
-                      <VacancyDetailPage />
-                    ) : (
-                      <CareersExternalRedirect route="vacancy" />
-                    )
-                  }
-                />
-                <Route
-                  path="/apply"
-                  element={
-                    surface === HOST_SURFACE.COMBINED ? (
-                      <ApplyHubPage />
-                    ) : surface === HOST_SURFACE.CAREERS ? (
-                      <CareersHomeRedirect />
-                    ) : (
-                      <CareersExternalRedirect />
-                    )
-                  }
-                />
-                <Route
-                  path="/apply/:slug"
-                  element={
-                    careersEnabled ? (
-                      <ApplyPage />
-                    ) : (
-                      <CareersExternalRedirect route="apply" />
-                    )
-                  }
-                />
-              </Route>
+              {/* Сайт вакансий закрыт (stage 12): всё ведёт на корпоративный сайт. */}
+              <Route path="/vacancies" element={<CareersRetiredRedirect />} />
+              <Route path="/vacancies/:slug" element={<CareersRetiredRedirect />} />
+              <Route path="/apply" element={<CareersRetiredRedirect />} />
+              <Route path="/apply/:slug" element={<CareersRetiredRedirect />} />
               <Route path="/login" element={internalElement(<Login />)} />
               <Route path="/forgot-password" element={internalElement(<ForgotPassword />)} />
               <Route path="/reset-password" element={internalElement(<ResetPassword />)} />
@@ -215,84 +137,20 @@ export default function App() {
                   }
                 />
 
-                <Route path="notifications" element={<PlatformNotificationsInbox />} />
-
-                <Route path="employees" element={<PlatformEmployeesRedirect />} />
+                {/*
+                  Personnel modules are hidden (stage 12, docs/platform/stage-12-hide-personnel-modules.md):
+                  time tracker, schedule, payroll, HR/recruiting, employee profiles and the
+                  notification inbox. Old links land on the entry page. Code and data are kept.
+                */}
+                <Route path="notifications" element={<Navigate to="/platform" replace />} />
+                <Route path="time-tracker" element={<Navigate to="/platform" replace />} />
+                <Route path="employees" element={<Navigate to="/platform/settings/users" replace />} />
                 <Route
                   path="employees/list"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_LIST}>
-                      <PlatformEmployees />
-                    </PlatformRoute>
-                  }
+                  element={<Navigate to="/platform/settings/users" replace />}
                 />
-                <Route
-                  path="employees/schedule"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_SCHEDULE}>
-                      <PlatformWorkSchedule />
-                    </PlatformRoute>
-                  }
-                />
-                <Route
-                  path="time-tracker"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.HOME}>
-                      <PlatformTimeTracker />
-                    </PlatformRoute>
-                  }
-                />
-                <Route
-                  path="employees/payroll"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_PAYROLL}>
-                      <PlatformPayroll />
-                    </PlatformRoute>
-                  }
-                />
-                <Route
-                  path="employees/payroll/records/:recordId"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_PAYROLL}>
-                      <PlatformPayrollRecord />
-                    </PlatformRoute>
-                  }
-                />
-                <Route
-                  path="employees/:employeeId/schedule"
-                  element={<PlatformEmployeeSchedule />}
-                />
-                <Route
-                  path="employees/:employeeId/documents"
-                  element={<PlatformEmployeeDocuments />}
-                />
-                <Route path="employees/:employeeId" element={<PlatformEmployeeProfile />} />
-                <Route
-                  path="employees/hiring"
-                  element={<Navigate to="/platform/hr/vacancies" replace />}
-                />
-                <Route
-                  path="employees/recruitment"
-                  element={<Navigate to="/platform/hr/vacancies" replace />}
-                />
-
-                <Route path="hr" element={<Navigate to="/platform/hr/candidates" replace />} />
-                <Route
-                  path="hr/vacancies"
-                  element={
-                    <HrPlatformRoute routeKey={ROUTE_KEYS.HR_VACANCIES}>
-                      <PlatformHrVacancies />
-                    </HrPlatformRoute>
-                  }
-                />
-                <Route
-                  path="hr/candidates"
-                  element={
-                    <HrPlatformRoute routeKey={ROUTE_KEYS.HR_CANDIDATES}>
-                      <PlatformHrCandidates />
-                    </HrPlatformRoute>
-                  }
-                />
+                <Route path="employees/*" element={<Navigate to="/platform" replace />} />
+                <Route path="hr/*" element={<Navigate to="/platform" replace />} />
 
                 <Route
                   path="procurement"
@@ -397,13 +255,14 @@ export default function App() {
 
                 <Route path="settings" element={<PlatformSettings />} />
                 <Route
-                  path="settings/general"
+                  path="settings/users"
                   element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.SETTINGS_GENERAL}>
-                      <PlatformSettingsGeneral />
+                    <PlatformRoute routeKey={ROUTE_KEYS.EMPLOYEES_LIST}>
+                      <PlatformEmployees />
                     </PlatformRoute>
                   }
                 />
+                <Route path="settings/general" element={<Navigate to="/platform" replace />} />
                 <Route
                   path="settings/roles"
                   element={
@@ -412,14 +271,7 @@ export default function App() {
                     </PlatformRoute>
                   }
                 />
-                <Route
-                  path="settings/notifications"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.SETTINGS_NOTIFICATIONS}>
-                      <PlatformSettingsNotifications />
-                    </PlatformRoute>
-                  }
-                />
+                <Route path="settings/notifications" element={<Navigate to="/platform" replace />} />
                 <Route
                   path="settings/payment-accounts"
                   element={<Navigate to="/platform/finance/payment-accounts" replace />}
@@ -478,7 +330,7 @@ export default function App() {
                 path="*"
                 element={
                   surface === HOST_SURFACE.CAREERS ? (
-                    <CareersHomeRedirect />
+                    <CareersRetiredRedirect />
                   ) : surface === HOST_SURFACE.CORPORATE ? (
                     <CorporateHome />
                   ) : (

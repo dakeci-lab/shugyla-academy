@@ -133,13 +133,12 @@ export async function fetchReceivingModuleData() {
 export async function fetchAllData() {
   const { employees } = await fetchCoreEmployeeData()
 
-  const [
-    recruitmentResult,
-    suppliersResult,
-    purchasesResult,
-    receivingResult,
-  ] = await Promise.allSettled([
-    fetchRecruitmentModuleData(),
+  // Recruitment is hidden (stage 12): not fetched on a full reload.
+  const recruitmentResult = {
+    status: 'fulfilled',
+    value: { vacancies: [], candidateQuestions: [], candidates: [] },
+  }
+  const [suppliersResult, purchasesResult, receivingResult] = await Promise.allSettled([
     fetchSuppliersModuleData(),
     fetchPurchasesModuleData(),
     fetchReceivingModuleData(),

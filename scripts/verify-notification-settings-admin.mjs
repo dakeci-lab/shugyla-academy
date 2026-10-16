@@ -51,8 +51,8 @@ function main() {
 
   console.log('Stage 1: Navigation and RBAC')
 
-  assert('settings nav item', nav.includes('Настройки уведомлений'))
-  assert('settings route path', nav.includes('/platform/settings/notifications'))
+  // Stage 12: time-tracker notification settings hidden from navigation.
+  assert('settings nav item hidden (stage 12)', !nav.includes('Настройки уведомлений') && !nav.includes('/platform/settings/notifications'))
   assert('route key defined', permissions.includes('SETTINGS_NOTIFICATIONS'))
   assert('notifications.manage permission', catalog.includes('notifications.manage'))
   assert('route guarded by notifications.manage', permissions.includes('[P.NOTIFICATIONS_MANAGE]'))

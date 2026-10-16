@@ -15,15 +15,6 @@ import './PlatformSidebar.css'
 const MOBILE_QUERY = '(max-width: 900px)'
 const HOVER_COLLAPSE_DELAY_MS = 220
 
-const MOBILE_NOTIFICATIONS_ITEM = {
-  id: 'notifications-inbox',
-  path: '/platform/notifications',
-  label: 'Уведомления',
-  end: true,
-  title: 'Уведомления',
-  description: 'Лента уведомлений платформы.',
-}
-
 function useMediaQuery(query) {
   const [matches, setMatches] = useState(
     () => typeof window !== 'undefined' && window.matchMedia(query).matches
@@ -38,53 +29,6 @@ function useMediaQuery(query) {
   }, [query])
 
   return matches
-}
-
-/** Mobile: Уведомления — подпункт группы «Главная», не отдельная группа */
-function nestMobileNotificationsUnderHome(navItems) {
-  let nested = false
-  const items = navItems.map((item) => {
-    if (item.id !== 'home' || item.children?.length) return item
-    nested = true
-    return {
-      id: 'home-group',
-      label: 'Главная',
-      children: [
-        {
-          id: 'home-index',
-          path: item.path || '/platform',
-          label: item.label || 'Главная',
-          end: item.end !== false,
-          routeKey: item.routeKey,
-          title: item.title || 'Главная',
-          description: item.description || '',
-        },
-        MOBILE_NOTIFICATIONS_ITEM,
-      ],
-    }
-  })
-
-  if (!nested) {
-    return [
-      {
-        id: 'home-group',
-        label: 'Главная',
-        children: [
-          {
-            id: 'home-index',
-            path: '/platform',
-            label: 'Главная',
-            end: true,
-            title: 'Главная',
-          },
-          MOBILE_NOTIFICATIONS_ITEM,
-        ],
-      },
-      ...items,
-    ]
-  }
-
-  return items
 }
 
 /**
@@ -102,7 +46,7 @@ export default function PlatformSidebar({ isOpen = false, onNavigate, panelRef =
   )
   const navItems = useMemo(() => {
     if (!isMobile) return filteredNav
-    return nestMobileNotificationsUnderHome(excludeWebOnlyNavItems(filteredNav))
+    return excludeWebOnlyNavItems(filteredNav)
   }, [filteredNav, isMobile])
 
   const pinnedGroupIds = useMemo(

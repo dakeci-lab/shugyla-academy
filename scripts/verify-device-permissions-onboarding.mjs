@@ -247,7 +247,8 @@ function stageStatic() {
     return !body.includes('queryGeolocationPermission(')
   })())
 
-  assert('layout mounts onboarding modal', layout.includes('DeviceSetupOnboarding'))
+  // Stage 12: device onboarding served the time tracker, which is hidden — layout no longer mounts it.
+  assert('layout does not mount onboarding modal (stage 12)', !layout.includes('DeviceSetupOnboarding'))
   assert('layout does not mount setup banner', !layout.includes('DeviceSetupBanner'))
   assert('hook does not expose showBanner', !hook.includes('showBanner'))
   assert(
