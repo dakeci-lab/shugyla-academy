@@ -222,12 +222,6 @@ function main() {
   assert('section flattens for render', section.includes('flattenEmployeeOrganization'))
   assert('section uses EmployeeListTable', section.includes('<EmployeeListTable'))
   assert('OrganizationList not primary path', !section.includes('<EmployeeOrganizationList'))
-  const scheduleSection = read('src/components/admin/sections/WorkScheduleSection.jsx')
-  assert(
-    'schedule reuses organisation helpers (Stage 5B)',
-    scheduleSection.includes('groupEmployeesByPositionStructure') &&
-      scheduleSection.includes('flattenEmployeeOrganization')
-  )
   assert(
     'OrganizationList.jsx removed (Wave 1)',
     !fs.existsSync(path.join(ROOT, 'src/components/admin/employees/EmployeeOrganizationList.jsx')),

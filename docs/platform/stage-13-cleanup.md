@@ -6,7 +6,7 @@ is not needed and is deleted **without archiving**. Each sub-stage is its own PR
 | Sub-stage | What | Status |
 |---|---|---|
 | 13a | Close the public careers intake in the DB | done |
-| 13b | Delete frontend code of hidden screens | pending |
+| 13b | Delete frontend code of hidden screens | done |
 | 13c | Delete the 8 personnel Edge Functions (the 5 account functions stay) | pending |
 | 13d | Drop personnel tables / buckets (irreversible, applied only on explicit go) | pending |
 
@@ -31,3 +31,35 @@ file keeps its own timestamp, as with several earlier migrations).
 **Rollback:** the `grant execute … to anon` statements at the top of the migration file.
 
 **Verification:** `npm run verify:careers-intake-closed` (9 checks).
+
+## 13b — frontend code of hidden screens deleted
+
+**What:** everything under `src/` that is no longer reachable from `src/main.jsx` and belongs
+to personnel / HR / careers / notifications / the old admin shell: 201 files, **−31 491 lines**
+(admin sections and modals, HR, careers, apply, payroll, schedule, time tracker, notification
+UI and services, device permissions, public-apply services, the old `Admin`/`Apply`/`Vacancies`
+pages, old `Header`/`Sidebar`/`Hero`, related utils and CSS).
+
+**Method:** import graph from `src/main.jsx` (static, dynamic imports, CSS `@import`) →
+unreachable files → filtered to the personnel scope → deleted in passes until stable (second pass
+found nothing). Procurement, suppliers, sales, receiving files that were already dead before this
+work (`components/procurement/Simple*`, `purchaseOptimisticService`, `purchaseAccess`,
+`supplierAccess`, `purchaseFilter*`, `receivingList`, `simpleMarkdown`, `useBodyScrollLock`) were
+**not touched** — separate cleanup.
+
+**Tests / CI:** the careers e2e suite (`tests/e2e`, both `e2e-recruitment-*` workflows and the
+three `test:e2e:recruitment*` npm scripts) was removed — it tested the retired site.
+`@playwright/test` stays in `devDependencies` (dependency changes are a separate decision).
+
+**Verify scripts:** 39 `verify:*` scripts whose only subject was a removed feature were deleted
+(careers restyle, recruitment, schedule, notifications/web push, payroll, home/workforce,
+documents, device onboarding, public-route isolation, roles-and-desktop-visibility,
+page-refresh-experience, price-checker-and-standards-removal, request-deduplication, workforce
+edge perf). Scripts on kept features that read a removed file were patched to drop only those
+assertions (`buyer-role-compatibility`, `domain-deployment`, `employee-organization-structure`,
+`employees-list`, `platform-data-rename`, `secure-platform-suppliers-rls`, `sunmark-icons-s2/s3`).
+
+**Result:** build ok; `verify:*` — **no new failures** versus the stage-12 baseline (the same 42
+already-stale scripts fail as before).
+
+**Rollback:** `git revert` of the merge commit restores all files.

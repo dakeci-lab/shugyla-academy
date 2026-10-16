@@ -33,7 +33,6 @@ const main = read('src/main.jsx')
 const app = read('src/App.jsx')
 const corporateHome = read('src/pages/CorporateHome.jsx')
 const recruitmentData = read('src/utils/recruitmentData.js')
-const qrModal = read('src/components/admin/ApplyHubQrModal.jsx')
 const stagingWorkflow = read('.github/workflows/e2e-recruitment-staging.yml')
 const { isProductionAppUrl } = await import('../tests/e2e/helpers/env.mjs')
 
@@ -106,10 +105,6 @@ assert(
   app.includes('surface === HOST_SURFACE.CAREERS') && app.includes('internalElement')
 )
 assert('apply URL helpers use canonical careers utility', recruitmentData.includes('getCareersUrl'))
-assert(
-  'QR keeps store source on canonical hub',
-  qrModal.includes("getApplyHubUrl('?source=store_qr')")
-)
 assert('legacy GitHub Pages workflow stays removed', !fs.existsSync(legacyPagesWorkflow))
 assert('PS.kz build targets domain root', psWorkflow.includes('APP_BASE_PATH: /'))
 assert(

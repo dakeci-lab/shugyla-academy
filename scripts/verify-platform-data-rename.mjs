@@ -114,10 +114,6 @@ function main() {
 
   console.log('\nWorking consumers use usePlatformData')
   assert(
-    'PlatformDashboard uses usePlatformData',
-    read('src/pages/platform/PlatformDashboard.jsx').includes('usePlatformData'),
-  )
-  assert(
     'ProcurementPage uses usePlatformData',
     read('src/pages/platform/procurement/ProcurementPage.jsx').includes('usePlatformData'),
   )

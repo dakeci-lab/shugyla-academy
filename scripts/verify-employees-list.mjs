@@ -40,7 +40,6 @@ function main() {
   const filter = read('src/components/admin/employees/EmployeeFilterPopover.jsx')
   const table = read('src/components/admin/employees/EmployeeListTable.jsx')
   const tableCss = read('src/components/admin/employees/EmployeeListTable.css')
-  const header = read('src/components/admin/employees/EmployeeProfileHeader.jsx')
   const employeeData = read('src/utils/employeeData.js')
 
   console.log('Stage 1: Toolbar')
@@ -142,8 +141,6 @@ function main() {
   assert('status labels working/fired', employeeData.includes("active: 'Работает'") && employeeData.includes("terminated: 'Уволен'"))
   assert('no deactivated UI label', !employeeData.includes('Деактивирован'))
   assert('hire date helpers', employeeData.includes('formatEmployeeDateRu') && employeeData.includes('todayEmployeeDateKey'))
-  assert('hire date in profile', header.includes('Принят на работу') && header.includes('formatEmployeeDateRu'))
-  assert('termination date only when fired', header.includes('isTerminatedEmployeeStatus'))
   assert('editable hire date in form', editModal.includes('Дата приёма на работу') && editModal.includes('type="date"'))
   assert('loading uses list skeleton', table.includes('employee-list__skeleton') || section.includes('loading={Boolean(cloudMode && listLoading)}'))
   assert('inline AdminModal form removed from list', !section.includes('<AdminModal'))
@@ -165,8 +162,6 @@ function main() {
 
   console.log('Stage 7: Status badge next to name, no status column in list')
 
-  assert('name and status badge share one row', header.includes('employee-profile-header__name-row'))
-  assert('no standalone status block in header', !header.includes('employee-profile-header__status'))
   assert('no status column header in table', !table.includes('<th scope="col">Статус</th>'))
   assert('no status column width rule', !tableCss.includes('employee-list-table__col-status'))
   assert('no StatusBadge import left in table', !table.includes("from '../StatusBadge'"))
