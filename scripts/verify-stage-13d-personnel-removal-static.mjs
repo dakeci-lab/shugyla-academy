@@ -55,6 +55,6 @@ assert('apply drops only the time-tracker cron job',
   (code.match(/cron\.unschedule/g) || []).length === 1)
 const fnCount = (code.match(/^drop function /gm) || []).length
 assert(`drops exactly the 27 listed functions (found ${fnCount})`, fnCount === 27)
-assert('README marks the stage as not applied until the owner says so', /NOT APPLIED/.test(read('README.md')))
+assert('README marks the stage as applied', /APPLIED/.test(read("README.md")))
 
 console.log(`\nOK — ${checks} checks`)

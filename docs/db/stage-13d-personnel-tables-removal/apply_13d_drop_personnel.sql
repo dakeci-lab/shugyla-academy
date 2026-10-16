@@ -11,6 +11,11 @@ select pg_advisory_xact_lock(202610170001);
 -- 1. the disabled per-minute time-tracker cron job
 select cron.unschedule(jobid) from cron.job where jobname = 'time-tracker-notification-scheduler-every-minute';
 
+-- 2a. functions whose signature uses a dropped table's row type must go BEFORE the tables
+--     (found on the first apply attempt, which rolled back atomically: no CASCADE)
+drop function public.attendance_check_in(bigint, numeric, numeric, numeric);
+drop function public.attendance_check_out(bigint, numeric, numeric, numeric);
+
 -- 2. tables (one statement, so mutual foreign keys inside the set are fine)
 drop table
   public.salary_allowances,
@@ -34,7 +39,7 @@ drop table
   public.academy_vacancies,
   public.academy_people;
 
--- 3. functions that only served the dropped tables (also no CASCADE)
+-- 3. remaining functions that only served the dropped tables (also no CASCADE)
 drop function public.academy_candidates_maintain_current();
 drop function public.academy_vacancies_seed_form_on_insert();
 drop function public.academy_vacancies_sync_position_snapshot();
@@ -43,8 +48,6 @@ drop function public.notification_deliveries_require_push_subscription();
 drop function public.application_form_limits();
 drop function public.application_form_normalize_options(jsonb);
 drop function public.application_form_question_used(uuid, uuid);
-drop function public.attendance_check_in(bigint, numeric, numeric, numeric);
-drop function public.attendance_check_out(bigint, numeric, numeric, numeric);
 drop function public.cancel_candidate_photo_upload_session(uuid);
 drop function public.candidate_status_progress_rank(text);
 drop function public.consume_notification_test_send_permit(uuid, bigint, uuid, uuid, uuid);

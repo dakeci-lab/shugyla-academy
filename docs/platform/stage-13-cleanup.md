@@ -8,7 +8,7 @@ is not needed and is deleted **without archiving**. Each sub-stage is its own PR
 | 13a | Close the public careers intake in the DB | done |
 | 13b | Delete frontend code of hidden screens | done |
 | 13c | Delete the 8 personnel Edge Functions (the 5 account functions stay) | code done; deployed copies to be deleted by hand |
-| 13d | Drop personnel tables / buckets (irreversible, applied only on explicit go) | prepared, **not applied** — see `docs/db/stage-13d-personnel-tables-removal/` |
+| 13d | Drop personnel tables / buckets (irreversible, applied only on explicit go) | tables/functions **applied on prod 2026-10-16** — see `docs/db/stage-13d-personnel-tables-removal/`; buckets still manual |
 
 ## 13a — public careers intake closed
 
