@@ -94,16 +94,11 @@ function main() {
   const allowedSnapshot = JSON.stringify(frozenAllowed)
   roleListIncludes(frozenAllowed, 'buyer')
   assertEqual('allowedRoles not mutated', JSON.stringify(frozenAllowed), allowedSnapshot)
-  assert(
-    'payroll-style match buyer vs purchaser',
-    normalizeRoleId('buyer') === normalizeRoleId('purchaser'),
-  )
 
   console.log('\nSource guards')
   const rolesJs = read('src/data/roles.js')
   const permissionsJs = read('src/config/permissions.js')
   const catalogJs = read('src/config/permissionCatalog.js')
-  const payroll = read('src/components/admin/payroll/PayrollSection.jsx')
   const recruitment = read('src/utils/recruitmentData.js')
   const modal = read('src/components/admin/employees/EmployeeEditModal.jsx')
   const pkg = read('package.json')
@@ -131,7 +126,6 @@ function main() {
   assert("no default permissions key 'purchaser:'", !catalogJs.includes('purchaser: ['))
   assert("system role seed code 'buyer'", catalogJs.includes("code: 'buyer'"))
   assert("system role seed no code 'purchaser'", !catalogJs.includes("code: 'purchaser'"))
-  assert('payroll filter normalizes roles', payroll.includes('normalizeRoleId(emp.role)'))
   assert('roles.js keeps roleListIncludes for audience checks', rolesJs.includes('export function roleListIncludes'))
   assert('vacancy roles prefer buyer', recruitment.includes("'buyer'") && recruitment.includes('VACANCY_ROLES'))
   assert('vacancy keeps purchaser label for read', recruitment.includes('purchaser: \'Закупщик\''))

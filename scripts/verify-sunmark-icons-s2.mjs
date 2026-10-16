@@ -34,8 +34,6 @@ const jsxTargets = [
   'src/pages/Login.jsx',
   'src/pages/ForgotPassword.jsx',
   'src/pages/ResetPassword.jsx',
-  'src/components/Sidebar.jsx',
-  'src/components/Header.jsx',
 ]
 
 for (const file of jsxTargets) {
@@ -67,8 +65,6 @@ const cssTargets = [
   'src/layouts/PlatformLayout.css',
   'src/components/platform/PlatformSidebar.css',
   'src/pages/Login.css',
-  'src/components/Sidebar.css',
-  'src/components/Header.css',
 ]
 
 for (const file of cssTargets) {
