@@ -24,40 +24,20 @@ import * as recruitmentLocalAdapter from './recruitmentLocalAdapter'
 import * as recruitmentSupabaseAdapter from './recruitmentSupabaseAdapter'
 import * as suppliersLocalAdapter from './suppliersLocalAdapter'
 import * as suppliersSupabaseAdapter from './suppliersSupabaseAdapter'
-import * as shiftLocalAdapter from './shiftLocalAdapter'
-import * as shiftSupabaseAdapter from './shiftSupabaseAdapter'
 import * as attendanceLocalAdapter from './attendanceLocalAdapter'
 import * as attendanceSupabaseAdapter from './attendanceSupabaseAdapter'
 import {
-  getAllVacanciesSync,
-  getPublishedVacanciesSync,
   getVacancyByIdSync,
-  getVacancyBySlugSync,
-  getPublishedVacancyBySlugSync,
-  getCandidateQuestionsSync,
-  getAllCandidateQuestionsSync,
-  getAllCandidatesSync,
-  getCandidatesByVacancySync,
   getCandidateByIdSync,
-  generateUniqueVacancySlug,
-  CANDIDATE_STATUS,
-  getVacancyEmployeeRole,
 } from '../utils/recruitmentData'
 import {
-  EMPLOYMENT_STATUS,
   getEmployeeById,
   todayEmployeeDateKey,
 } from '../utils/employeeData'
-import { prepareCandidatePhotoForSubmit } from './candidatePhotoService'
 import {
   getAllSuppliersSync,
   getSupplierByIdSync,
 } from '../utils/supplierData'
-import {
-  parseYearMonthFromDateKey,
-  notifyAttendanceUpdated,
-  getCurrentMonthState,
-} from '../utils/attendanceData'
 
 function getAdapter() {
   return isCloudMode() ? supabaseAdapter : localAdapter
@@ -69,10 +49,6 @@ function getRecruitmentAdapter() {
 
 function getSuppliersAdapter() {
   return isCloudMode() ? suppliersSupabaseAdapter : suppliersLocalAdapter
-}
-
-function getShiftAdapter() {
-  return isCloudMode() ? shiftSupabaseAdapter : shiftLocalAdapter
 }
 
 function getAttendanceAdapter() {
@@ -537,7 +513,6 @@ export async function updateEmployee(id, updates) {
     return
   }
   await getAdapter().updateEmployee(id, updates)
-  await maybeClearLocalShiftsAfterTermination(id, updates)
 }
 
 export async function deactivateEmployee(id) {
@@ -550,7 +525,6 @@ export async function deactivateEmployee(id) {
     return
   }
   await getAdapter().deactivateEmployee(id)
-  await shiftLocalAdapter.clearEmployeeShiftsAfterTermination(Number(id), terminatedAt)
 }
 
 export async function restoreEmployee(id) {
@@ -562,18 +536,6 @@ export async function restoreEmployee(id) {
     return
   }
   await getAdapter().restoreEmployee(id)
-}
-
-async function maybeClearLocalShiftsAfterTermination(id, updates) {
-  const status = updates?.employmentStatus ?? updates?.status
-  const isTerm =
-    status === 'terminated' || status === 'inactive' || status === 'deactivated'
-  if (!isTerm) return
-  const terminatedAt =
-    updates?.terminatedAt != null && String(updates.terminatedAt).trim() !== ''
-      ? String(updates.terminatedAt).trim().slice(0, 10)
-      : todayEmployeeDateKey()
-  await shiftLocalAdapter.clearEmployeeShiftsAfterTermination(Number(id), terminatedAt)
 }
 
 export async function permanentlyDeleteEmployee(id) {
@@ -662,40 +624,8 @@ export async function migrateLocalDataToCloud() {
 
 // --- Recruitment (sync reads) ---
 
-export function getVacancies() {
-  return getAllVacanciesSync()
-}
-
-export function getPublishedVacancies() {
-  return getPublishedVacanciesSync()
-}
-
 export function getVacancyById(vacancyId) {
   return getVacancyByIdSync(vacancyId)
-}
-
-export function getVacancyBySlug(slug) {
-  return getVacancyBySlugSync(slug)
-}
-
-export function getPublishedVacancyBySlug(slug) {
-  return getPublishedVacancyBySlugSync(slug)
-}
-
-export function getCandidateQuestions(vacancyId) {
-  return getCandidateQuestionsSync(vacancyId)
-}
-
-export function getAllCandidateQuestions() {
-  return getAllCandidateQuestionsSync()
-}
-
-export function getCandidates() {
-  return getAllCandidatesSync()
-}
-
-export function getCandidatesByVacancy(vacancyId) {
-  return getCandidatesByVacancySync(vacancyId)
 }
 
 export function getCandidateById(candidateId) {
@@ -704,159 +634,6 @@ export function getCandidateById(candidateId) {
 
 // --- Recruitment (async mutations) ---
 
-export async function createVacancy(vacancyData) {
-  if (!vacancyData.title?.trim()) throw new Error('Укажите название вакансии')
-  if (!vacancyData.positionId) throw new Error('Выберите должность')
-  const vacancies = getAllVacanciesSync()
-  const slug = vacancyData.slug || generateUniqueVacancySlug(vacancyData.title, vacancies)
-  const id = await getRecruitmentAdapter().createVacancy({ ...vacancyData, slug })
-  if (isCloudMode()) await refreshData()
-  return id
-}
-
-export async function updateVacancy(vacancyId, updates) {
-  if (updates.title != null && !updates.title.trim()) {
-    throw new Error('Укажите название вакансии')
-  }
-  if (Object.prototype.hasOwnProperty.call(updates, 'positionId') && !updates.positionId) {
-    throw new Error('Выберите должность')
-  }
-  await getRecruitmentAdapter().updateVacancy(vacancyId, updates)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function publishVacancy(vacancyId) {
-  await getRecruitmentAdapter().publishVacancy(vacancyId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function unpublishVacancy(vacancyId) {
-  await getRecruitmentAdapter().unpublishVacancy(vacancyId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function archiveVacancy(vacancyId) {
-  await getRecruitmentAdapter().archiveVacancy(vacancyId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function deleteVacancy(vacancyId) {
-  await getRecruitmentAdapter().deleteVacancy(vacancyId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function duplicateVacancy(vacancyId) {
-  const id = await getRecruitmentAdapter().duplicateVacancy(vacancyId)
-  if (isCloudMode()) await refreshData()
-  return id
-}
-
-export async function saveVacancyApplicationForm(vacancyId, payload) {
-  const adapter = getRecruitmentAdapter()
-  if (typeof adapter.saveVacancyApplicationForm !== 'function') {
-    throw new Error('Сохранение анкеты недоступно в этом режиме')
-  }
-  const result = await adapter.saveVacancyApplicationForm(vacancyId, payload)
-  if (isCloudMode()) await refreshData()
-  return result
-}
-
-export async function createCandidateQuestion(vacancyId, questionData) {
-  const id = await getRecruitmentAdapter().createCandidateQuestion(vacancyId, questionData)
-  if (isCloudMode()) await refreshData()
-  return id
-}
-
-export async function updateCandidateQuestion(questionId, updates) {
-  await getRecruitmentAdapter().updateCandidateQuestion(questionId, updates)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function deleteCandidateQuestion(questionId) {
-  await getRecruitmentAdapter().deleteCandidateQuestion(questionId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function reorderCandidateQuestions(vacancyId, orderedQuestionIds) {
-  await getRecruitmentAdapter().reorderCandidateQuestions(vacancyId, orderedQuestionIds)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function submitCandidateApplication(applicationData) {
-  if (!applicationData.vacancyId) throw new Error('Вакансия не указана')
-  if (applicationData.formVersion == null) throw new Error('Анкета устарела. Обновите страницу.')
-
-  let photoPayload = {
-    photoUrl: null,
-    photoPath: null,
-    photoUploadId: applicationData.photoUploadId || null,
-  }
-
-  // Prefer pre-uploaded session from the form (avoids double upload).
-  if (applicationData.photoFile && !applicationData.photoUploadId) {
-    try {
-      photoPayload = await prepareCandidatePhotoForSubmit(applicationData.photoFile, {
-        vacancyId: applicationData.vacancyId,
-        formVersion: applicationData.formVersion,
-      })
-    } catch (err) {
-      throw new Error(err.message || 'Не удалось загрузить фото')
-    }
-  }
-
-  const { photoFile, vacancySlug, ...rest } = applicationData
-
-  // Prefer publicApplySubmitService for /apply — this path must not refresh PlatformData.
-  const result = await getRecruitmentAdapter().submitCandidateApplication({
-    ...rest,
-    photoUrl: photoPayload.photoUrl,
-    photoPath: photoPayload.photoPath,
-    photoUploadId: photoPayload.photoUploadId,
-  })
-
-  return {
-    ...result,
-    localPhotoWarning: photoPayload.isLocalFallback
-      ? 'В локальном режиме фото сохраняется только для демо-превью.'
-      : null,
-  }
-}
-
-export async function updateCandidateStatus(candidateId, status) {
-  await getRecruitmentAdapter().updateCandidateStatus(candidateId, status)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function updateCandidateNotes(candidateId, notes) {
-  await getRecruitmentAdapter().updateCandidateNotes(candidateId, notes)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function rejectCandidate(candidateId) {
-  await getRecruitmentAdapter().rejectCandidate(candidateId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function restoreCandidateToNew(candidateId) {
-  await getRecruitmentAdapter().restoreCandidateToNew(candidateId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function inviteCandidate(candidateId) {
-  await getRecruitmentAdapter().inviteCandidate(candidateId)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function saveCandidateInterviewInvitation(candidateId, invitation) {
-  await getRecruitmentAdapter().saveCandidateInterviewInvitation(candidateId, invitation)
-  if (isCloudMode()) await refreshData()
-}
-
-export async function convertCandidateToTrainee(candidateId) {
-  await getRecruitmentAdapter().convertCandidateToTrainee(candidateId)
-  if (isCloudMode()) await refreshData()
-}
-
 export async function linkCandidateToEmployee(candidateId, userId) {
   const candidate = getCandidateByIdSync(candidateId)
   if (!candidate) throw new Error('Кандидат не найден')
@@ -864,52 +641,6 @@ export async function linkCandidateToEmployee(candidateId, userId) {
 
   await getRecruitmentAdapter().linkCandidateToEmployee(candidateId, userId)
   if (isCloudMode()) await refreshData()
-}
-
-export async function hireCandidateAsUser(candidateId, userData, options = {}) {
-  const candidate = getCandidateByIdSync(candidateId)
-  if (!candidate) throw new Error('Кандидат не найден')
-
-  const vacancy = candidate.vacancyId ? getVacancyByIdSync(candidate.vacancyId) : null
-  const role = userData.role || getVacancyEmployeeRole(vacancy) || 'cashier'
-  const positionId = userData.positionId || userData.position_id || null
-  if (!positionId) {
-    throw new Error('Укажите должность сотрудника')
-  }
-
-  const employeePayload = {
-    firstName: userData.firstName || candidate.firstName,
-    lastName: userData.lastName || candidate.lastName,
-    positionId,
-    role,
-    roleId: userData.roleId || null,
-    login: userData.login,
-    password: userData.password,
-    employmentStatus: userData.employmentStatus || EMPLOYMENT_STATUS.ACTIVE,
-    // Prefer explicit employee avatar; candidate photos are private and transferred below.
-    avatarUrl: userData.avatarUrl || null,
-  }
-
-  const newUserId = await createEmployee(employeePayload)
-
-  await getRecruitmentAdapter().markCandidateHired(
-    candidateId,
-    newUserId,
-    CANDIDATE_STATUS.HIRED
-  )
-
-  if (isCloudMode() && !employeePayload.avatarUrl) {
-    try {
-      const { transferCandidatePhotoToEmployee } = await import('./candidatePhotoService')
-      const avatarUrl = await transferCandidatePhotoToEmployee(candidate, newUserId)
-      if (avatarUrl) await updateEmployee(newUserId, { avatarUrl })
-    } catch {
-      /* hire succeeds even if photo copy fails */
-    }
-  }
-
-  if (isCloudMode()) await refreshData()
-  return newUserId
 }
 
 export {
@@ -976,97 +707,7 @@ export async function archiveSupplier(supplierId) {
 
 // --- Employee shifts / schedule ---
 
-export async function getEmployeeShiftsForMonth(employeeId, year, month) {
-  return getShiftAdapter().getShiftsForEmployeeMonth(Number(employeeId), year, month)
-}
-
-export async function getEmployeeShiftsForDateRange(employeeId, dateFrom, dateTo) {
-  return getShiftAdapter().getShiftsForEmployeeDateRange(
-    Number(employeeId),
-    dateFrom,
-    dateTo
-  )
-}
-
-export async function getTeamShiftsForMonth(year, month, employeeIds = null) {
-  return getShiftAdapter().getShiftsForMonth(year, month, employeeIds)
-}
-
-export async function saveEmployeeShift(employeeId, payload, createdBy = null) {
-  const saved = await getShiftAdapter().upsertEmployeeShift(Number(employeeId), payload, createdBy)
-  const { year, month } = parseYearMonthFromDateKey(saved.shiftDate)
-  notifyAttendanceUpdated(year, month)
-  return saved
-}
-
-export async function applyBulkEmployeeShifts(employeeId, entries, options = {}) {
-  const count = await getShiftAdapter().bulkApplyEmployeeShifts(Number(employeeId), entries, options)
-  if (count > 0 && entries.length > 0) {
-    const months = new Set(
-      entries.map((entry) => {
-        const { year, month } = parseYearMonthFromDateKey(entry.shiftDate)
-        return `${year}-${month}`
-      })
-    )
-    for (const key of months) {
-      const [year, month] = key.split('-').map(Number)
-      notifyAttendanceUpdated(year, month)
-    }
-  }
-  return count
-}
-
-export async function deleteEmployeeShiftDay(employeeId, shiftDate) {
-  const result = await getShiftAdapter().deleteEmployeeShift(Number(employeeId), shiftDate)
-  const { year, month } = parseYearMonthFromDateKey(shiftDate)
-  notifyAttendanceUpdated(year, month)
-  return result
-}
-
-export async function clearEmployeeShiftsFromDate(employeeId, fromDate) {
-  const result = await getShiftAdapter().clearEmployeeShiftsFromDate(
-    Number(employeeId),
-    fromDate
-  )
-  const { year, month } = parseYearMonthFromDateKey(fromDate)
-  notifyAttendanceUpdated(year, month)
-  return result
-}
-
 export async function getWorkLocations() {
   return getAttendanceAdapter().getWorkLocations()
 }
 
-export async function saveWorkLocation(location) {
-  return getAttendanceAdapter().saveWorkLocation(location)
-}
-
-export async function getAttendanceSettings() {
-  return getAttendanceAdapter().getAttendanceSettings()
-}
-
-export async function saveAttendanceSettings(settings, updatedBy = null) {
-  const saved = await getAttendanceAdapter().saveAttendanceSettings(settings, updatedBy)
-  const { year, month } = getCurrentMonthState()
-  notifyAttendanceUpdated(year, month)
-  return saved
-}
-
-
-export async function checkInEmployee(employeeId, coords) {
-  const saved = await getAttendanceAdapter().checkInEmployee(Number(employeeId), coords)
-  const { year, month } = parseYearMonthFromDateKey(saved.shiftDate)
-  notifyAttendanceUpdated(year, month)
-  return saved
-}
-
-export async function checkOutEmployee(employeeId, coords) {
-  const saved = await getAttendanceAdapter().checkOutEmployee(Number(employeeId), coords)
-  const { year, month } = parseYearMonthFromDateKey(saved.shiftDate)
-  notifyAttendanceUpdated(year, month)
-  return saved
-}
-
-export async function getTodayShiftForEmployee(employeeId) {
-  return getAttendanceAdapter().getTodayShiftForEmployee(Number(employeeId))
-}

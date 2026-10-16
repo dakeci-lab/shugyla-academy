@@ -100,3 +100,27 @@ supabase functions delete admin-manage-employee-schedule admin-team-workforce-da
 are still bundled (reachable through `platformDataService`) but have no UI callers.
 
 **Rollback:** `git revert` the merge commit, then redeploy the functions.
+
+## 13b2 — push/attendance remnants (after the DB drop, 2026-10-16)
+
+**Trigger:** right after 13d, prod logs showed `404` on `GET /rest/v1/notification_push_subscriptions`
+(the table no longer exists). Source: `SessionContext` (after login and on logout) and
+`registerServiceWorker` (after registration / `controllerchange`) still loaded
+`webPushSubscriptionService`, which queried the dropped table. Errors were swallowed, but each was a
+wasted request.
+
+**Change:**
+- `SessionContext`: no push sync after login, no push cleanup on logout.
+- `registerServiceWorker`: no push resync.
+- `platformDataService`: 42 exported functions with no caller (vacancies, candidates, shifts,
+  work-location/attendance settings, check-in/out …) removed, plus their now-unused imports and the
+  hollow `maybeClearLocalShiftsAfterTermination`.
+- Orphaned files deleted: `webPushSubscriptionService` (~1 700 lines), `shiftLocalAdapter`,
+  `shiftSupabaseAdapter`, 2 utils. `verify:production-vapid-rotation` retired.
+- Checked with an ESLint `no-undef` pass over `src/` (0 findings; the config was sanity-tested).
+
+**Still there (deliberately):** the «Пользователи» form keeps the legacy «create from candidate»
+flow (`createFromCandidate`, `linkCandidateToEmployee`, candidate photo transfer) — it is
+unreachable now (no candidates, no links), but untangling it from the user form is a separate,
+riskier change. `getWorkLocations` keeps `attendance*Adapter` alive for the user form.
+Old browser tabs running a pre-13b bundle may still log a few 404s until reloaded.
