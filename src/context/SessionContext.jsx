@@ -275,22 +275,8 @@ export function SessionProvider({ children }) {
     return next
   }, [sessionType])
 
-  useEffect(() => {
-    if (!isCloudMode() || !supabaseAuthenticated) return
-
-    import('../services/webPushSubscriptionService')
-      .then(({ ensurePushNotificationsReady }) => ensurePushNotificationsReady())
-      .catch(() => {})
-  }, [supabaseAuthenticated, user?.id])
-
   const logout = useCallback(async () => {
     if (isCloudMode() && usesSupabaseAuth()) {
-      try {
-        const { removePushSubscriptionForLogout } = await import('../services/webPushSubscriptionService')
-        await removePushSubscriptionForLogout()
-      } catch (err) {
-        console.warn('Push subscription cleanup failed during logout')
-      }
       try {
         await signOut()
       } catch (err) {
