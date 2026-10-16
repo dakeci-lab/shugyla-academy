@@ -124,3 +124,25 @@ flow (`createFromCandidate`, `linkCandidateToEmployee`, candidate photo transfer
 unreachable now (no candidates, no links), but untangling it from the user form is a separate,
 riskier change. `getWorkLocations` keeps `attendance*Adapter` alive for the user form.
 Old browser tabs running a pre-13b bundle may still log a few 404s until reloaded.
+
+## 13e — storage, functions and RBAC catalog (2026-10-16)
+
+Done directly on prod with the logged-in Supabase CLI (`npx supabase`) after the owner's instruction:
+
+- **8 personnel Edge Functions deleted** from the project (`supabase functions delete`). Remaining
+  (11): 5 account functions, `umag-sync`, `umag-operation-details`, `umag-procurement`,
+  `umag-sales-sync`, `procurement-archive`, and `umag-probe-payments` (not in the repo — left as is).
+- **Buckets deleted with their files:** `candidate-photos` (43 files) and `employee-documents`
+  (6 files). Remaining buckets: `employee-avatars` (public), `procurement-snapshot-archives`,
+  `receiving-discrepancy-photos`, `supplier-reconciliation-docs`.
+- **Storage policies** (migration `close_avatars_anon_write_drop_orphan_storage_policies`, prod
+  2026-10-16): the 3 anonymous write policies on `employee-avatars` were replaced by
+  `authenticated` insert/update/delete (public read stays); the 6 orphaned policies of the deleted
+  buckets were dropped (including the anonymous upload policy of `candidate-photos`).
+  Rollback: recreate the `Anon … employee avatars` policies (`for … to public`, `bucket_id = 'employee-avatars'`).
+- **RBAC catalog:** the 16 permissions of removed modules (`schedule.*`, `attendance.*`,
+  `recruitment.*`, `payroll.*`, `notifications.manage`) are removed from `PERMISSION_CATALOG`, the
+  default role grants, the legacy aliases and the module labels (the roles UI is built from the
+  catalog, so they disappear from «Роли и доступы»). The `PERMISSION_CODES` constants stay because
+  `config/permissions.js` still maps hidden route keys to them. DB rows are deleted after this
+  frontend is deployed (see below).
