@@ -7,7 +7,7 @@ is not needed and is deleted **without archiving**. Each sub-stage is its own PR
 |---|---|---|
 | 13a | Close the public careers intake in the DB | done |
 | 13b | Delete frontend code of hidden screens | done |
-| 13c | Delete the 8 personnel Edge Functions (the 5 account functions stay) | pending |
+| 13c | Delete the 8 personnel Edge Functions (the 5 account functions stay) | code done; deployed copies to be deleted by hand |
 | 13d | Drop personnel tables / buckets (irreversible, applied only on explicit go) | pending |
 
 ## 13a — public careers intake closed
@@ -63,3 +63,40 @@ assertions (`buyer-role-compatibility`, `domain-deployment`, `employee-organizat
 already-stale scripts fail as before).
 
 **Rollback:** `git revert` of the merge commit restores all files.
+
+## 13c — personnel Edge Functions removed from the repo
+
+**Removed (8):** `admin-manage-employee-schedule`, `admin-team-workforce-data`,
+`admin-notification-settings`, `employee-time-tracker-action`,
+`dispatch-time-tracker-notifications`, `run-time-tracker-notification-scheduler`,
+`manage-push-subscription`, `send-test-web-push` — source dirs and their `config.toml` sections.
+
+**Kept (5 account functions, used by «Пользователи»):** `admin-check-employee-login`,
+`admin-create-employee`, `admin-list-employees`, `admin-update-employee`,
+`admin-reset-employee-password`. Kept UMAG/procurement functions: `umag-sync`, `umag-procurement`,
+`umag-operation-details`, `umag-sales-sync`, `procurement-archive`.
+
+**Shared code:** 16 `_shared/*.ts` files (web push, notification delivery, time-tracker dispatch /
+scheduler, subscription readiness, test broadcast/permits, `shiftWorkWindow`, `workforceFields`, …)
+were reachable only from the removed functions (import graph from the 10 kept entry points) and
+were deleted. No unresolved relative imports remain in the kept functions.
+
+**Verify scripts:** `scheduler-controlled-run`, `time-tracker-dispatch-query-budget`,
+`rating-and-escalations-removal` retired; `position-structure-data-layer` patched.
+
+**Not done here — deployed copies on Supabase.** The functions are still deployed on the prod
+project; deleting a deployed function is a dashboard/CLI action. Nothing calls them any more
+(cron job 2 is disabled, the UI is hidden). Delete from the dashboard (Edge Functions →
+function → Delete) or with the CLI:
+
+```bash
+supabase functions delete admin-manage-employee-schedule admin-team-workforce-data admin-notification-settings \
+  employee-time-tracker-action dispatch-time-tracker-notifications run-time-tracker-notification-scheduler \
+  manage-push-subscription send-test-web-push --project-ref cxadzerxndlscwvdaymk
+```
+
+**Left for 13b2 (frontend):** `attendanceSupabaseAdapter`, `shiftSupabaseAdapter`,
+`webPushSubscriptionService` and the schedule/attendance/payroll APIs in `platformDataService`
+are still bundled (reachable through `platformDataService`) but have no UI callers.
+
+**Rollback:** `git revert` the merge commit, then redeploy the functions.
