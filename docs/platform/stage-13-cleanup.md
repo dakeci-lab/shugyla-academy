@@ -1,0 +1,33 @@
+# Stage 13 — cleanup after hiding personnel modules
+
+Follows `stage-12-hide-personnel-modules.md`. Owner decision (2026-10-16): the personnel data
+is not needed and is deleted **without archiving**. Each sub-stage is its own PR.
+
+| Sub-stage | What | Status |
+|---|---|---|
+| 13a | Close the public careers intake in the DB | done |
+| 13b | Delete frontend code of hidden screens | pending |
+| 13c | Delete the 8 personnel Edge Functions (the 5 account functions stay) | pending |
+| 13d | Drop personnel tables / buckets (irreversible, applied only on explicit go) | pending |
+
+## 13a — public careers intake closed
+
+**Why:** the careers site is retired (stage 12) but the functions behind the public flow were
+still executable by `anon` — an open write path with no legitimate caller.
+
+**Change:** `supabase/migrations/20261016200000_revoke_anon_careers_intake.sql` revokes
+`EXECUTE` from `anon` on `submit_candidate_application` (2 overloads),
+`create_candidate_photo_upload_session`, `cancel_candidate_photo_upload_session`,
+`get_public_vacancy_application_form`, `list_published_vacancies_for_apply`.
+`authenticated` and `service_role` keep access. Tables were already closed by RLS; the
+`candidate-photos` bucket is private.
+
+**Applied on prod:** 2026-10-16 (via MCP, recorded by Supabase as `20261016181610`; the repo
+file keeps its own timestamp, as with several earlier migrations).
+
+**Postcheck (prod):** all 6 functions → `anon_exec = false`, `authenticated_exec = true`,
+`service_exec = true`.
+
+**Rollback:** the `grant execute … to anon` statements at the top of the migration file.
+
+**Verification:** `npm run verify:careers-intake-closed` (9 checks).
