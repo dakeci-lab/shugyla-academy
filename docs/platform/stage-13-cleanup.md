@@ -145,4 +145,9 @@ Done directly on prod with the logged-in Supabase CLI (`npx supabase`) after the
   default role grants, the legacy aliases and the module labels (the roles UI is built from the
   catalog, so they disappear from «Роли и доступы»). The `PERMISSION_CODES` constants stay because
   `config/permissions.js` still maps hidden route keys to them. DB rows are deleted after this
-  frontend is deployed (see below).
+  frontend is deployed.
+
+**DB rows deleted (prod, 2026-10-16, after the catalog deploy `097e817`):** 16 `permissions` rows and
+their 46 `role_permissions` rows (migration `remove_personnel_permissions`, file
+`supabase/migrations/20261017120000_remove_personnel_permissions.sql`). Before applying: no RLS policy
+or function referenced these codes; the only FK into `permissions` is `role_permissions`.
