@@ -1,6 +1,7 @@
 # Stage 13d — drop personnel / HR / careers / notification tables
 
-**Status: PREPARED, NOT APPLIED.** Apply only on the owner's explicit "применяй".
+**Status: APPLIED on prod `cxadzerxndlscwvdaymk` 2026-10-16 on the owner's explicit "применяй"** (see `APPLY-REPORT.md`).
+Do not re-apply.
 Follows `docs/platform/stage-13-cleanup.md` and the stage process in
 `docs/db/stage-7a-academy-learning-removal/`.
 
