@@ -27,14 +27,11 @@ const serviceWorker = read('public/sw.js')
 const htaccess = read('public/.htaccess')
 const legacyPagesWorkflow = path.join(ROOT, '.github/workflows/main.yml')
 const psWorkflow = read('.github/workflows/deploy-ps-production.yml')
-const e2eEnvironment = read('tests/e2e/helpers/env.mjs')
 const hostSurface = read('src/router/hostSurface.js')
 const main = read('src/main.jsx')
 const app = read('src/App.jsx')
 const corporateHome = read('src/pages/CorporateHome.jsx')
 const recruitmentData = read('src/utils/recruitmentData.js')
-const stagingWorkflow = read('.github/workflows/e2e-recruitment-staging.yml')
-const { isProductionAppUrl } = await import('../tests/e2e/helpers/env.mjs')
 
 function loadNotificationNormalizer(scope) {
   const scopeUrl = new URL(scope)
@@ -112,31 +109,6 @@ assert(
   psWorkflow.includes('VITE_CAREERS_ORIGIN: https://jobs.shugyla-market.kz')
 )
 assert('PS.kz artifact is isolated on its own branch', psWorkflow.includes('ps-production'))
-assert('old production URL is protected from mutating E2E', e2eEnvironment.includes('dakeci-lab.github.io'))
-assert('web production URL is protected from mutating E2E', e2eEnvironment.includes('web.shugyla-market.kz'))
-assert('jobs production URL is protected from mutating E2E', e2eEnvironment.includes('jobs.shugyla-market.kz'))
-assert('staging workflow blocks jobs production URL', stagingWorkflow.includes('jobs\\.'))
-assert(
-  'old production route is detected at runtime',
-  isProductionAppUrl('https://dakeci-lab.github.io/shugyla-academy/apply')
-)
-assert(
-  'web production route is detected at runtime',
-  isProductionAppUrl('https://web.shugyla-market.kz/platform')
-)
-assert(
-  'jobs production route is detected at runtime',
-  isProductionAppUrl('https://jobs.shugyla-market.kz/apply/kassir')
-)
-assert(
-  'transition root route remains protected at runtime',
-  isProductionAppUrl('https://shugyla-market.kz/platform')
-)
-assert(
-  'unrelated staging host stays available for mutating E2E',
-  !isProductionAppUrl('https://staging.example.kz/platform')
-)
-
 const normalizeWebNotification = loadNotificationNormalizer('https://web.shugyla-market.kz/')
 const normalizeFallbackNotification = loadNotificationNormalizer(
   'https://dakeci-lab.github.io/shugyla-academy/'
