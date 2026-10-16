@@ -77,14 +77,6 @@ export const PERMISSION_KEYS = PERMISSION_CODES
 /** Алиасы legacy-кодов v1 → v2 */
 export const LEGACY_PERMISSION_ALIASES = {
   'platform.home': PERMISSION_CODES.DASHBOARD_VIEW,
-  'employees.schedule.view_team': PERMISSION_CODES.SCHEDULE_VIEW_TEAM,
-  'employees.schedule.view_own': PERMISSION_CODES.SCHEDULE_VIEW_OWN,
-  'employees.schedule.edit': PERMISSION_CODES.SCHEDULE_EDIT,
-  'employees.payroll.view': PERMISSION_CODES.PAYROLL_VIEW,
-  'hr.vacancies.view': PERMISSION_CODES.RECRUITMENT_VIEW,
-  'hr.vacancies.edit': PERMISSION_CODES.RECRUITMENT_MANAGE_VACANCIES,
-  'hr.candidates.view': PERMISSION_CODES.RECRUITMENT_VIEW,
-  'hr.candidates.edit': PERMISSION_CODES.RECRUITMENT_MANAGE_CANDIDATES,
   'suppliers.archive': PERMISSION_CODES.SUPPLIERS_EDIT,
   'roles.manage': PERMISSION_CODES.ROLES_ASSIGN_PERMISSIONS,
   'users.manage': PERMISSION_CODES.EMPLOYEES_MANAGE_ROLES,
@@ -94,9 +86,6 @@ export const PERMISSION_MODULES = {
   dashboard: 'Главная',
   employees: 'Сотрудники',
   roles: 'Роли и доступы',
-  schedule: 'График работы',
-  attendance: 'Тайм-трекер',
-  recruitment: 'HR',
   procurement: 'Закупки',
   receiving: 'Заказы',
   suppliers: 'Поставщики',
@@ -176,18 +165,6 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.ROLES_EDIT, name: 'Редактирование ролей', module: 'roles', sortOrder: 32 },
   { code: PERMISSION_CODES.ROLES_DELETE, name: 'Удаление ролей', module: 'roles', sortOrder: 33 },
   { code: PERMISSION_CODES.ROLES_ASSIGN_PERMISSIONS, name: 'Назначение разрешений', module: 'roles', sortOrder: 34 },
-  { code: PERMISSION_CODES.SCHEDULE_VIEW_TEAM, name: 'График команды', module: 'schedule', sortOrder: 40 },
-  { code: PERMISSION_CODES.SCHEDULE_VIEW_OWN, name: 'Свой график', module: 'schedule', sortOrder: 41 },
-  { code: PERMISSION_CODES.SCHEDULE_EDIT, name: 'Редактирование графика', module: 'schedule', sortOrder: 42 },
-  { code: PERMISSION_CODES.SCHEDULE_BULK_EDIT, name: 'Массовое редактирование', module: 'schedule', sortOrder: 43 },
-  { code: PERMISSION_CODES.ATTENDANCE_VIEW, name: 'Просмотр посещаемости', module: 'attendance', sortOrder: 50 },
-  { code: PERMISSION_CODES.ATTENDANCE_CHECK_IN, name: 'Отметка прихода', module: 'attendance', sortOrder: 51 },
-  { code: PERMISSION_CODES.ATTENDANCE_CHECK_OUT, name: 'Отметка ухода', module: 'attendance', sortOrder: 52 },
-  { code: PERMISSION_CODES.RECRUITMENT_VIEW, name: 'Раздел HR', module: 'recruitment', sortOrder: 70 },
-  { code: PERMISSION_CODES.RECRUITMENT_MANAGE_VACANCIES, name: 'Управление вакансиями', module: 'recruitment', sortOrder: 71 },
-  { code: PERMISSION_CODES.RECRUITMENT_MANAGE_CANDIDATES, name: 'Управление кандидатами', module: 'recruitment', sortOrder: 72 },
-  { code: PERMISSION_CODES.RECRUITMENT_INVITE_CANDIDATE, name: 'Приглашение кандидата', module: 'recruitment', sortOrder: 73 },
-  { code: PERMISSION_CODES.RECRUITMENT_HIRE_CANDIDATE, name: 'Приём кандидата', module: 'recruitment', sortOrder: 74 },
   { code: PERMISSION_CODES.PROCUREMENT_VIEW, name: 'Просмотр закупок', module: 'procurement', sortOrder: 100 },
   { code: PERMISSION_CODES.PROCUREMENT_CREATE, name: 'Создание закупки', module: 'procurement', sortOrder: 101 },
   { code: PERMISSION_CODES.PROCUREMENT_EDIT, name: 'Редактирование закупки', module: 'procurement', sortOrder: 102 },
@@ -204,9 +181,6 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.UMAG_SETTLEMENTS_SYNC, name: 'Синхронизация UMAG', module: 'umag', sortOrder: 171 },
   { code: PERMISSION_CODES.SUPPLIER_PAYMENTS_VIEW, name: 'Просмотр оплат поставщикам', module: 'supplier_payments', sortOrder: 190 },
   { code: PERMISSION_CODES.SUPPLIER_PAYMENTS_MANAGE, name: 'Управление календарём оплат поставщикам', module: 'supplier_payments', sortOrder: 191 },
-  { code: PERMISSION_CODES.PAYROLL_VIEW, name: 'Просмотр зарплат', module: 'payroll', sortOrder: 140 },
-  { code: PERMISSION_CODES.PAYROLL_CALCULATE, name: 'Расчёт зарплаты', module: 'payroll', sortOrder: 141 },
-  { code: PERMISSION_CODES.PAYROLL_MANAGE_SETTINGS, name: 'Настройки зарплаты', module: 'payroll', sortOrder: 142 },
   {
     code: PERMISSION_CODES.POSITIONS_VIEW,
     name: 'Просмотр организационной структуры',
@@ -223,7 +197,6 @@ export const PERMISSION_CATALOG = [
   },
   { code: PERMISSION_CODES.SETTINGS_VIEW, name: 'Просмотр настроек', module: 'settings', sortOrder: 160 },
   { code: PERMISSION_CODES.SETTINGS_MANAGE, name: 'Управление настройками', module: 'settings', sortOrder: 161 },
-  { code: PERMISSION_CODES.NOTIFICATIONS_MANAGE, name: 'Управление уведомлениями', module: 'settings', sortOrder: 162 },
   { code: PERMISSION_CODES.PAYMENT_ACCOUNTS_VIEW, name: 'Просмотр счетов оплаты', module: 'payment_accounts', sortOrder: 163 },
   {
     code: PERMISSION_CODES.PAYMENT_ACCOUNTS_MANAGE,
@@ -248,9 +221,9 @@ export const RBAC_SYSTEM_ROLES = [
   { code: 'admin', name: 'Администратор', description: 'Полный доступ ко всем разделам платформы.', isSystem: true },
   { code: 'buyer', name: 'Закупщик', description: 'Закуп, заказы и поставщики.', isSystem: true },
   { code: 'receiver', name: 'Приёмщик', description: 'Просмотр ожидаемых поставок (заказов).', isSystem: true },
-  { code: 'floor_admin', name: 'Администратор торгового зала', description: 'График работы.', isSystem: true },
-  { code: 'cashier', name: 'Кассир', description: 'Личный график.', isSystem: true },
-  { code: 'seller', name: 'Продавец', description: 'Личный график.', isSystem: true },
+  { code: 'floor_admin', name: 'Администратор торгового зала', description: 'Нет разделов платформы (учёт времени ведётся в Прополисе).', isSystem: true },
+  { code: 'cashier', name: 'Кассир', description: 'Нет разделов платформы (учёт времени ведётся в Прополисе).', isSystem: true },
+  { code: 'seller', name: 'Продавец', description: 'Нет разделов платформы (учёт времени ведётся в Прополисе).', isSystem: true },
 ]
 
 const P = PERMISSION_CODES
@@ -258,28 +231,23 @@ const P = PERMISSION_CODES
 export const RBAC_DEFAULT_ROLE_PERMISSIONS = {
   admin: ALL_PERMISSION_CODES,
   buyer: [
-    P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN,
+    P.DASHBOARD_VIEW,
     P.PROCUREMENT_VIEW, P.PROCUREMENT_CREATE, P.PROCUREMENT_EDIT, P.PROCUREMENT_DELETE, P.PROCUREMENT_TRANSFER,
     P.RECEIVING_VIEW,
     P.SUPPLIERS_VIEW, P.SUPPLIERS_CREATE, P.SUPPLIERS_EDIT, P.SUPPLIERS_DELETE,
   ],
   receiver: [
-    P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN,
+    P.DASHBOARD_VIEW,
     P.RECEIVING_VIEW,
   ],
   floor_admin: [
-    P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN, P.SCHEDULE_VIEW_TEAM, P.SCHEDULE_EDIT,
+    P.DASHBOARD_VIEW,
   ],
   cashier: [
-    P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN,
+    P.DASHBOARD_VIEW,
   ],
   seller: [
-    P.DASHBOARD_VIEW, P.ATTENDANCE_VIEW, P.ATTENDANCE_CHECK_IN, P.ATTENDANCE_CHECK_OUT,
-    P.SCHEDULE_VIEW_OWN,
+    P.DASHBOARD_VIEW,
   ],
 }
 

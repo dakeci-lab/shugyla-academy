@@ -68,7 +68,8 @@ assert('the buyer still sees orders through receiving.view', canViewOrders(buyer
 console.log('Menu groups follow their children')
 const cashierRole = cache.roles.find((role) => role.code === 'cashier')
 const cashier = { role: 'cashier', roleId: cashierRole.id }
-assert('cashier (own schedule only) still sees the «Сотрудники» group', canAccessRoute(cashier, ROUTE_KEYS.EMPLOYEES_GROUP))
+// Stage 13: schedule/attendance permissions were removed, so a cashier has no platform sections.
+assert('cashier no longer sees the «Сотрудники» group (stage 13)', !canAccessRoute(cashier, ROUTE_KEYS.EMPLOYEES_GROUP))
 assert('cashier does not see the «Закупки» group', !canAccessRoute(cashier, ROUTE_KEYS.PROCUREMENT_GROUP))
 assert('cashier does not see orders', !canViewOrders(cashier))
 
