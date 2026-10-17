@@ -1,16 +1,20 @@
 # CLAUDE.md — контекст проекта Shugyla
 
 > Опись проекта для AI-агентов. Обновлять при смене архитектуры, домена или этапа работ.
-> Дата составления: 2026-08-12. Ветка на момент описи: `agent/careers-production`.
+> Дата составления: 2026-10-17. Основная ветка: `main`.
 
 ## 1. Что это
 
-Внутренняя платформа управления продуктовым супермаркетом **Shugyla Market** (Актобе, KZ).
-Исторически начиналась как обучающая платформа («Shugyla Academy» — отсюда имя репозитория),
-сейчас academy-часть удалена/редиректится, а продукт = ERP-подобная платформа для персонала и закупа.
+Внутренняя платформа **Shugyla Market** (Актобе, KZ) для **закупа и взаиморасчётов с поставщиками**.
+Историческое имя репозитория (`shugyla-academy`) осталось от обучающей платформы; academy давно удалена.
 
-Источник учётных данных — **UMAG** (`api.umag.kz`), система автоматизации магазина. Данные тянутся
-через Supabase Edge Functions и складываются в собственные таблицы Postgres.
+С октября 2026 платформа сведена **только к закупу и взаиморасчётам** (решение владельца):
+тайм-трекер, график, зарплата, HR/рекрутинг, сайт вакансий и уведомления **удалены** (этапы 12–14,
+см. `docs/platform/stage-12-*.md`, `stage-13-cleanup.md`, `stage-14-polish.md`). Учёт рабочего времени
+владелец ведёт во внешней системе **Прополис**. Не возвращать удалённое без явного решения владельца.
+
+Источник данных — **UMAG** (`api.umag.kz`), система автоматизации магазина. Данные тянутся через Supabase
+Edge Functions и складываются в собственные таблицы Postgres.
 
 ## 2. Стек
 
@@ -19,175 +23,135 @@
 | Frontend | React 19 + Vite 6 + React Router 7, чистый CSS (без UI-библиотек) |
 | Backend | Supabase (Postgres + Auth + RLS + Edge Functions на Deno/TypeScript) |
 | Прод-хостинг | PS.kz / Plesk — деплой артефактом в ветку `ps-production` через GitHub Actions |
-| CI | GitHub Actions: `deploy-ps-production.yml`, `main.yml`, e2e recruitment (staging/prod) |
-| Тесты | Playwright (`tests/`) + ~140 самописных `verify:*` node-скриптов в `scripts/` |
-| Прочее | PWA (sw.js, manifest), Web Push (VAPID), xlsx, pdfmake, qrcode |
+| CI | GitHub Actions: `deploy-ps-production.yml` (сборка + `verify:domain-deployment` + публикация артефакта) |
+| Тесты | ~100 самописных `verify:*` node-скриптов в `scripts/` (часть устарела, см. §8) |
+| Прочее | PWA (sw.js, manifest), xlsx, pdfmake, qrcode |
 
-Зависимости намеренно минимальны — нет TypeScript на фронте, нет state-библиотек,
-нет Tailwind. Не вводить новые зависимости без обсуждения.
+Зависимости намеренно минимальны — нет TypeScript на фронте, нет state-библиотек, нет Tailwind.
+Не вводить новые зависимости без обсуждения.
 
-## 3. Домены (три поверхности из одного билда)
+## 3. Домены
 
 `src/router/hostSurface.js` определяет поверхность по hostname:
 
 | Домен | Поверхность | Содержимое |
 |-------|-------------|-----------|
-| `shugyla-market.kz` | CORPORATE | корпоративный сайт (`CorporateHome`) |
 | `web.shugyla-market.kz` | PLATFORM | внутренняя платформа `/platform/*` |
-| `jobs.shugyla-market.kz` | CAREERS | вакансии + публичные заявки (`/vacancies`, `/apply`) |
-| `localhost`, `dakeci-lab.github.io` | COMBINED | всё вместе (dev + легаси GitHub Pages) |
+| `shugyla-market.kz` | CORPORATE | корпоративная заглушка (`CorporateHome`) |
+| `jobs.shugyla-market.kz` | CAREERS (закрыт) | всё редиректит на корпоративный сайт |
+| `localhost`, `dakeci-lab.github.io` | COMBINED | dev + легаси |
 
-Легаси-прод `dakeci-lab.github.io/shugyla-academy/` ещё упоминается в perf-документах.
+## 4. Разделы платформы (`/platform/*`)
 
-## 4. Модули платформы (`/platform/*`)
+Меню (`src/platform/platformNav.js`):
 
-- **Персонал**: список, профиль, документы, аватары, график работы, рейтинг, тайм-трекер (check-in/out, ночные смены), расчёт зарплаты
-- **HR / рекрутинг**: вакансии, кандидаты, публичная форма заявки, приглашения на интервью, hiring flow
-- **Закуп (procurement)**: планирование по нормам, генерация заказов по поставщикам, аналитика, экспорт
-- **Приёмка (receiving)**: приход товара, сверка
-- **Поставщики**: справочник (сеян из UMAG), взаиморасчёты (settlements), платёжные обязательства
-- **Товары**: ценники (price-tags)
-- **Уведомления**: in-app inbox + Web Push, диспетчер тайм-трекера, эскалации админам
-- **Настройки**: общие, роли (RBAC), уведомления
+- **Главная** (`/platform/sales`, бывшие «Продажи»; право `sales.view`, по умолчанию администратор) — выручка и маржа, синк продаж UMAG
+- **Закупки**: Закуп (`/procurement`, планирование по нормам), Заказы (`/orders`, заказы поставщикам + приёмка), Расчёты (`/supplier-finance`: вкладки «К оплате» и «Поставщики»/взаиморасчёты)
+- **Финансы**: Счета оплаты (`/finance/payment-accounts`)
+- **Настройки**: Пользователи (`/settings/users`), Роли и доступы (`/settings/roles`)
+- Профиль (`/profile`)
+
+`/platform` сам по себе не имеет страницы: `PlatformIndex` отправляет роль в первый доступный раздел
+(админ → Главная, закупщик → Закуп, приёмщик → Заказы). Роли без разделов (кассир, продавец,
+администратор зала) видят `PlatformNoAccess`.
+
+Отметка оплаты поставщику — **только в платформе** (`platform_paid_at` в `supplier_payment_obligations`);
+`current_debt` из UMAG по политике владельца всегда ~0 и не используется как признак оплаты.
 
 ## 5. Архитектура данных
 
-**Adapter pattern.** Каждый домен имеет пару адаптеров: `*LocalAdapter.js` (localStorage,
-демо/офлайн-режим) и `*SupabaseAdapter.js` (прод). Выбор через `src/lib/dataMode.js`
-(`isCloudMode`). Оркестратор — `src/services/platformDataService.js`.
+**Adapter pattern.** Домены закупа/поставщиков/приёмки имеют `*LocalAdapter.js` (localStorage,
+демо/офлайн) и `*SupabaseAdapter.js` (прод). Выбор через `src/lib/dataMode.js` (`isCloudMode`).
+Оркестратор — `src/services/platformDataService.js`. Точечные записи (например поставщик) патчат
+кэш, а не вызывают полный `refreshData()`.
 
-**Кэш в памяти** — `src/lib/cloudStore.js`: модульные состояния загрузки
-(`markModuleLoading/Ready/Error`, `ensureModuleLoaded`). После Stage 1 оболочка приложения
-рендерится сразу после Auth+RBAC, модули догружаются лениво по маршруту.
+**Кэш в памяти** — `src/lib/cloudStore.js`: модули `employees`, `suppliers`, `procurement`, `receiving`
+(`markModuleLoading/Ready/Error`, `ensureModuleLoaded`). Оболочка рендерится после Auth+RBAC, модули
+догружаются лениво по маршруту (`getRouteCriticalModules`); `employees` нужен только экрану «Пользователи».
+Длинные списки грузятся пачками с ограниченным параллелизмом (`fetchAllRowsByIdChunks`).
 
-**React-контексты** (`src/context/`): Session, PlatformData, Permission (RBAC), Language,
-NotificationInbox, DevicePermissions, PullToRefresh, Toast, PlatformPageTitle.
+**React-контексты** (`src/context/`): Session, PlatformData, Permission (RBAC), Language, PullToRefresh,
+Toast, PlatformPageTitle.
 
-**RBAC** — гибкий, в БД (`add_rbac_flexible_v2.sql`), проверки прав и на фронте
-(`PermissionContext`), и в Edge Functions (`_shared/employeeAuthorization.ts`),
-и в RLS-политиках. Права строкой вида `umag.settlements.sync`.
+**RBAC** — гибкий, в БД (`roles`, `permissions`, `role_permissions`); UI «Роли и доступы» строится из
+`PERMISSION_CATALOG` (`src/config/permissionCatalog.js`). Проверки прав — на фронте (`PermissionContext`),
+в Edge Functions (`_shared/employeeAuthorization.ts`) и в RLS. Права строкой вида `umag.settlements.sync`.
+`academy_users` — учётные записи (логин, роль, «кто отметил оплату»); таблица остаётся основой авторизации.
 
-## 6. Edge Functions (`supabase/functions/`)
+## 6. Edge Functions (`supabase/functions/`, всего 10)
 
-UMAG-интеграция (креды UMAG **никогда** не уходят на клиент — `_shared/umagAuth.ts`):
+UMAG / закуп (креды UMAG **никогда** не уходят на клиент — `_shared/umagAuth.ts`, секреты
+`UMAG_LOGIN`/`UMAG_PASSWORD`/`UMAG_STORE_ID` в Supabase → Edge Functions → Secrets):
+`umag-sync` (поставщики, поставки, возвраты, платежи, обязательства), `umag-procurement`,
+`umag-operation-details`, `umag-sales-sync`, `procurement-archive`.
 
-- `umag-sync` — поставщики, поставки, возвраты, платежи по документам
-- `umag-procurement` — планирование закупа
-- `umag-operation-details`, `umag-probe-payments` (*незакоммичена*)
+Аккаунты (для «Пользователи»): `admin-create-employee`, `admin-update-employee`, `admin-list-employees`,
+`admin-reset-employee-password`, `admin-check-employee-login`.
 
-Админ/персонал: `admin-create-employee`, `admin-list-employees`, `admin-update-employee`,
-`admin-manage-employee-schedule`, `admin-team-workforce-data`, `admin-notification-settings`,
-`employee-time-tracker-action`.
-Пуши: `manage-push-subscription`, `dispatch-time-tracker-notifications`,
-`run-time-tracker-notification-scheduler`, `send-test-web-push`.
+Задачи по расписанию (`pg_cron`): `procurement-sync-scheduler-daily-0700-aqtobe`,
+`procurement-archive-scheduler-daily-0730-aqtobe`. Деплой функции: `npx supabase functions deploy <name>
+--project-ref cxadzerxndlscwvdaymk --use-api` (CLI через `npx`, авторизован у владельца; Docker не нужен).
 
 ## 7. База данных
 
-`supabase/migrations/` — 82 файла, смешанные соглашения об именах: часть с таймстампом
-(`20260809072915_procurement_planning_v1.sql`), часть просто описательные
-(`add_rbac_system.sql`). Актуальный слепок — `supabase/schema.sql`.
+Проект Supabase prod: `cxadzerxndlscwvdaymk` (staging `iutrhweudmythmwbtzid` — на паузе).
+`supabase/migrations/` — файлы с таймстампом или описательными именами (имя в репозитории может
+отличаться от версии, записанной Supabase при применении через MCP). Миграции **не** применяются
+GitHub Actions — только вручную/через MCP.
 
-Крупные операции с БД оформляются как «этапы» с preflight / apply / postcheck / rollback —
-см. `docs/db/stage-7a-academy-learning-removal/` как эталон процесса.
+Крупные операции с БД — «этапы» с preflight / apply / postcheck / report: эталоны
+`docs/db/stage-7a-academy-learning-removal/` и `docs/db/stage-13d-personnel-tables-removal/`.
+**Урок stage 13d:** preflight должен проверять не только таблицы, представления, политики и триггеры,
+но и **код Edge Functions и фронтенда** (`grep` по `.from('<таблица>')`/`rpc('<функция>')`) — после
+удаления таблицы смен «Отключить сотрудника» сломалось, пока не убрали очистку графика из
+`admin-update-employee`. Удаления делать без `CASCADE` и без `IF EXISTS`, одной транзакцией.
 
-## 8. Где остановились (по состоянию на 2026-08-12)
+## 8. Состояние и что осталось
 
-### 8.0 Живой баг — приоритет владельца
+Сделано (октябрь 2026): гигиена загрузки (прогрессивный bootstrap, параллельные пачки позиций закупа,
+точечные записи вместо полной перезагрузки, throttle повторных загрузок закупа), отключён лишний
+планировщик, удалены персонал/HR/рекрутинг/вакансии/уведомления (код, функции, таблицы, бакеты, права),
+закрыт анонимный приём заявок и анонимная запись в аватары.
 
-`permission denied for table procurement_snapshots` при изменении количества в планировании закупа.
+Остаётся (`docs/platform/stage-14-polish.md`):
+- **~28 устаревших `verify:*`** падают с давних пор (закуп, расчёты, PWA — ожидания разошлись с UI).
+  Новые проверки писать через `scripts/lib/extensionlessResolver.mjs` (реальные модули, не регулярки).
+- По желанию владельца: упростить форму «Пользователи» и убрать колонки `academy_users`, нужные только
+  удалённым модулям (`work_mode`, `salary_calculation_type`, `payroll_participation`, `work_location_id`),
+  и таблицу `platform_work_locations`.
+- Дедуп поставщиков «Данон» (две записи).
 
-**Причина найдена и подтверждена по коду.** Триггер
-`public.procurement_snapshot_items_guard_update()`
-(`supabase/migrations/20260809072915_procurement_planning_v1.sql:126`, переопределён в
-`20260810160315_procurement_partial_supplier_generation.sql:114`) объявлен как
-`language plpgsql set search_path = ''` — **без `security definer`**, то есть выполняется
-с правами вызывающего. Внутри он делает
-`select s.status from public.procurement_snapshots where s.id = new.snapshot_id for share`
-(строка 166). В PostgreSQL блокирующая клауза `FOR SHARE` требует привилегии `UPDATE`
-на таблицу, а роли `authenticated` выдан только `grant select on procurement_snapshots`
-(строка 642). Отсюда отказ.
-
-Остальные функции в тех же миграциях `security definer` (строки 225, 603, 637) —
-то есть это упущение, а не замысел.
-
-**Правильное исправление:** добавить `security definer` этому триггеру (сохранив
-`set search_path = ''`, владелец `postgres`). Права пользователя расширять **нельзя** —
-`grant update` на `procurement_snapshots` для `authenticated` открыл бы запись в снимки.
-
-**Оба PR написаны Claude, лежат незакоммиченными в рабочем дереве:**
-
-- `docs/procurement/fix-snapshot-guard-permission.md` — PR 1, только БД, одна функция.
-  Миграция `20260812032500_fix_procurement_snapshot_guard_security_definer.sql`,
-  `verify:procurement-snapshot-guard-static` зелёный, DB-часть верификации требует Docker.
-- `docs/procurement/order-actions-ux.md` — PR 2, только фронтенд, миграций нет.
-  `verify:procurement-order-actions` — 45 проверок зелёные.
-
-Не сделано: прогон с локальной Supabase, клик руками в `npm run dev`, применение миграции на прод.
-
-Побочно появился `scripts/lib/extensionlessResolver.mjs` — loader-хук, который позволяет
-verify-скриптам импортировать реальные модули приложения (Vite-импорты без расширений,
-JSON, `import.meta.env`). Использовать в новых verify-скриптах вместо проверок регулярками.
-
-Решения по UX кнопок заказа (приняты владельцем 2026-08-12): возврат в черновик разрешён,
-пока склад не начал приёмку; отменённые заказы — через фильтр «Отменённые»; экспорт остаётся
-двумя иконками (объединение в одну кнопку отклонено); удаление черновика мягкое.
-Отложено отдельным PR: генерация заказа в `draft` + явная кнопка «Отправить поставщику».
-
-Попутно найденный дефект (входит в PR 2): отмена заказа не отменяет связанный документ
-приёмки — склад продолжает ждать поставку по отменённому заказу
-(`purchaseSupabaseAdapter.js:530`).
-
-### 8.1 Трек производительности загрузки Документация: `docs/performance/`.
-
-- Stage 1 — прогрессивный bootstrap + изоляция сбоев модулей: **сделано** (`d4307b0`)
-- Stage 2 — замер production-baseline с авторизацией: **сделано** (доки, без изменений кода)
-- **Stage 3 — Variant A: гигиена дублей и waterfall — следующий шаг, не начат**
-
-Подтверждённый P1 из Stage 2 (`S2-F03`): штормы дублирующих запросов —
-`admin-team-workforce-data` ×2 на Home, `admin-list-employees` ×7 и RBAC-каталог ×7–8
-на Employees. Один вызов workforce сам по себе ~3–7 с → Home готов за ~6–10 с.
-
-Задачи Stage 3: coalescing in-flight запросов, устранение remount/effect-штормов,
-один вызов workforce на cold load. Отложено сознательно: Variant E (сужение Edge-контракта
-workforce), Variant F (`React.lazy`, бандл 1.35 МБ), индексы, RLS-хелперы, обрезка `select('*')`.
-Полный реестр находок — `docs/performance/findings-backlog.md` (F-01…F-15, S2-F01…S2-F04).
-
-**Параллельный трек** — corporate + careers поверхности запущены и **уже в проде**.
-Ветка `agent/careers-production` полностью влита в `origin/main` (уникальных коммитов 0) —
-её можно удалять. Прод (`web.shugyla-market.kz/version.json`) отдаёт `c6fc3e6` = голова
-`origin/main`, деплой-пайплайн работает. Локальный `main` отставал на 4 коммита — нужен `git pull`.
-
-**Масштаб использования:** ~13–15 сотрудников работают в платформе ежедневно.
-Значит: 6–10 с загрузки Home — это реальная ежедневная боль, но и рефакторинг
-требует аккуратности (нельзя ломать рабочий инструмент живой смены).
-
-**Незакоммичено в рабочем дереве:** правки perf-доков, `docs/performance/stage-2-production-baseline.md`,
-`scripts/audit-stage2-manual-checklist.md`, `supabase/functions/umag-probe-payments/`, `tmp/`.
+**Масштаб использования:** платформой пользуются несколько человек (владелец, закупщик, приёмщик,
+бухгалтер). Любой рефакторинг — аккуратно: это рабочий инструмент.
 
 ## 9. Процесс работы
 
-Роли: пользователь (Данияр, владелец бизнеса) ставит цель → **Claude = бригадир**
-(проектирование, ТЗ и промпты для исполнителя, ревью результата) → **Cursor = исполнитель**
-(пишет код, гоняет миграции). Ранее бригадиром был ChatGPT Codex — отсюда ветки `codex/*`.
-Ветки: `main`, `agent/*`, `codex/*`, `cursor/*`, артефакт-ветка `ps-production` (не трогать вручную).
+Роли: пользователь (Данияр, владелец бизнеса) ставит цель → **Claude** проектирует, пишет код, гоняет
+проверки, открывает PR → владелец проверяет в браузере. Ранее исполнителем был Cursor, бригадиром —
+ChatGPT Codex (отсюда ветки `codex/*`, `cursor/*`).
+Ветки: `main`, `agent/*`; артефакт-ветка `ps-production` (не трогать вручную).
 
 Правила, выведенные из истории проекта:
 
 1. **Один PR = одно направление.** Не смешивать frontend-фикс + контракт Edge + RLS.
-2. **Сначала замер, потом оптимизация.** Каждый этап начинается с baseline-документа.
-3. **Каждая фича получает `verify:*` скрипт** в `scripts/` и запись в `package.json`.
-4. **Каждый этап получает документ** в `docs/<область>/` с preflight и критериями проверки.
-5. Секреты — только в `.env.local` / `.local-secrets` / GitHub Secrets. Никогда в код.
+2. **Сначала замер, потом оптимизация** (логи Supabase `edge_logs`, baseline-документ).
+3. **Каждая фича получает `verify:*` скрипт** и запись в `package.json`.
+4. **Каждый этап получает документ** в `docs/<область>/` с критериями проверки и откатом.
+5. Секреты — только в `.env.local` / `.local-secrets` / GitHub Secrets / Supabase Secrets. Никогда в код.
+6. **Деплой фронта = слияние в `main`.** Между двумя слияниями дожидаться завершения деплоя
+   (`gh run list --workflow deploy-ps-production.yml`): два быстрых слияния подряд могут затереть
+   сборку (случилось 2026-10-14). После деплоя сверять `https://web.shugyla-market.kz/version.json`.
+7. Перед слиянием прогонять полный набор `verify:*` и сравнивать с базой «уже падали».
 
 ## 10. Команды
 
 ```bash
 npm run dev                      # http://localhost:5173
 npm run build                    # прод-билд (APP_BASE_PATH управляет base)
-npm run supabase:local:bootstrap # локальная Supabase
-npm run verify:<фича>            # ~140 проверочных скриптов, см. package.json
-npx playwright test              # e2e
+npm run verify:<фича>            # проверочные скрипты, см. package.json
+npm run supabase:local:bootstrap # локальная Supabase (песочница, полностью не пересобирается)
 ```
 
-Переменные окружения: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`,
-`VITE_WEB_PUSH_VAPID_PUBLIC_KEY`, `VITE_CAREERS_ORIGIN`, `APP_BASE_PATH`.
+Переменные окружения: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_CAREERS_ORIGIN`, `APP_BASE_PATH`.
+
+Документация: `docs/<область>/`; устаревшее по удалённым модулям — `docs/archive/`.
