@@ -97,6 +97,8 @@ assert('full reload does not fetch recruitment',
 console.log('\nusers screen keeps working without the removed profile page')
 const employees = read('src/components/admin/sections/EmployeesSection.jsx')
 assert('users list does not link to the hidden employee profile', !employees.includes('/platform/employees/${employee.id}'))
-assert('users list stays on settings/users', employees.includes("navigate('/platform/settings/users'"))
+assert('users list has no «create from candidate» flow (stage 14)',
+  !/createFromCandidate|sourceCandidateId|candidatePhone/.test(employees) &&
+  !/sourceCandidateId|candidatePhone/.test(read('src/components/admin/employees/EmployeeEditModal.jsx')))
 
 console.log(`\nOK — ${checks} checks`)

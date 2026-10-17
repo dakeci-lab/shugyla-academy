@@ -20,16 +20,10 @@ import { updateEmployeeAsAdmin } from './employeeAdminService'
 import * as supabaseAdapter from './supabaseDataAdapter'
 import * as localAdapter from './localDataAdapter'
 import { markDevPerf, logDevPerf } from '../utils/devPerf'
-import * as recruitmentLocalAdapter from './recruitmentLocalAdapter'
-import * as recruitmentSupabaseAdapter from './recruitmentSupabaseAdapter'
 import * as suppliersLocalAdapter from './suppliersLocalAdapter'
 import * as suppliersSupabaseAdapter from './suppliersSupabaseAdapter'
 import * as attendanceLocalAdapter from './attendanceLocalAdapter'
 import * as attendanceSupabaseAdapter from './attendanceSupabaseAdapter'
-import {
-  getVacancyByIdSync,
-  getCandidateByIdSync,
-} from '../utils/recruitmentData'
 import {
   getEmployeeById,
   todayEmployeeDateKey,
@@ -41,10 +35,6 @@ import {
 
 function getAdapter() {
   return isCloudMode() ? supabaseAdapter : localAdapter
-}
-
-function getRecruitmentAdapter() {
-  return isCloudMode() ? recruitmentSupabaseAdapter : recruitmentLocalAdapter
 }
 
 function getSuppliersAdapter() {
@@ -147,12 +137,6 @@ async function loadModule(moduleName) {
   switch (moduleName) {
     case 'employees': {
       await ensureEmployeesCore()
-      return
-    }
-    case 'recruitment': {
-      const data = await supabaseAdapter.fetchRecruitmentModuleData()
-      patchCloudStore(data)
-      markModuleReady('recruitment')
       return
     }
     case 'suppliers': {
@@ -309,9 +293,6 @@ function applyFullFetchResult(data) {
 
   markModuleReady('employees')
 
-  if (failures.recruitment) markModuleError('recruitment', failures.recruitment)
-  else markModuleReady('recruitment')
-
   if (failures.suppliers) markModuleError('suppliers', failures.suppliers)
   else markModuleReady('suppliers')
 
@@ -466,7 +447,6 @@ export async function createEmployee(data) {
       // Legacy text only as last-resort fallback for old callers; new UI sends positionId.
       position: data.positionId ? undefined : data.position,
       avatarUrl: data.avatarUrl,
-      sourceCandidateId: data.sourceCandidateId,
     })
 
     const store = getCloudStore()
@@ -620,27 +600,6 @@ export async function migrateLocalDataToCloud() {
   await supabaseAdapter.upsertMigrationBatch(snapshot)
   await refreshData()
   return snapshot.counts
-}
-
-// --- Recruitment (sync reads) ---
-
-export function getVacancyById(vacancyId) {
-  return getVacancyByIdSync(vacancyId)
-}
-
-export function getCandidateById(candidateId) {
-  return getCandidateByIdSync(candidateId)
-}
-
-// --- Recruitment (async mutations) ---
-
-export async function linkCandidateToEmployee(candidateId, userId) {
-  const candidate = getCandidateByIdSync(candidateId)
-  if (!candidate) throw new Error('Кандидат не найден')
-  if (candidate.createdUserId) throw new Error('Сотрудник уже создан для этого кандидата')
-
-  await getRecruitmentAdapter().linkCandidateToEmployee(candidateId, userId)
-  if (isCloudMode()) await refreshData()
 }
 
 export {

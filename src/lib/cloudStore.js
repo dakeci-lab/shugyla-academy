@@ -10,7 +10,6 @@ export const MODULE_STATUS = {
 /** Logical cloud data modules (bootstrap / route readiness). */
 export const CLOUD_MODULES = [
   'employees',
-  'recruitment',
   'suppliers',
   'procurement',
   'receiving',
@@ -19,9 +18,6 @@ export const CLOUD_MODULES = [
 const emptyStore = {
   loaded: false,
   employees: [],
-  vacancies: [],
-  candidateQuestions: [],
-  candidates: [],
   suppliers: [],
   purchases: [],
   receivingDocuments: [],
@@ -136,11 +132,6 @@ export function patchCloudStore(patch) {
     ensureCloudStoreReady()
   }
   if (patch.employees !== undefined) store.employees = patch.employees
-  if (patch.vacancies !== undefined) store.vacancies = patch.vacancies
-  if (patch.candidateQuestions !== undefined) {
-    store.candidateQuestions = patch.candidateQuestions
-  }
-  if (patch.candidates !== undefined) store.candidates = patch.candidates
   if (patch.suppliers !== undefined) store.suppliers = patch.suppliers
   if (patch.purchases !== undefined) store.purchases = patch.purchases
   if (patch.receivingDocuments !== undefined) {
@@ -152,9 +143,6 @@ export function setCloudStore(data) {
   store = {
     loaded: true,
     employees: data.employees || [],
-    vacancies: data.vacancies || [],
-    candidateQuestions: data.candidateQuestions || [],
-    candidates: data.candidates || [],
     suppliers: data.suppliers || [],
     purchases: data.purchases || [],
     receivingDocuments: data.receivingDocuments || [],
@@ -183,18 +171,6 @@ function readWhenReady(moduleName, value) {
 
 export function getCloudEmployees() {
   return readWhenReady('employees', store.employees)
-}
-
-export function getCloudVacancies() {
-  return readWhenReady('recruitment', store.vacancies)
-}
-
-export function getCloudCandidateQuestions() {
-  return readWhenReady('recruitment', store.candidateQuestions)
-}
-
-export function getCloudCandidates() {
-  return readWhenReady('recruitment', store.candidates)
 }
 
 export function getCloudSuppliers() {
