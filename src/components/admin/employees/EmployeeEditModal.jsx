@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
   EMPTY_EMPLOYEE_FORM,
   employeeToForm,
@@ -18,13 +17,6 @@ import {
 import { resetEmployeePasswordAsAdmin } from '../../../services/employeeAdminService'
 import { getRoleLabel } from '../../../data/roles'
 import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
-import {
-  buildPositionSelectGroups,
-  ensurePositionCatalogLoaded,
-  getPositionById,
-  isPositionAssignable,
-  reloadPositionCatalog,
-} from '../../../services/positionCatalogService'
 import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
 import { isCloudMode } from '../../../lib/dataMode'
 import {
@@ -41,12 +33,9 @@ import ProfileAvatarEditor from '../../ProfileAvatarEditor'
 import '../RecruitmentSection.css'
 import './EmployeeEditModal.css'
 
-const POSITION_INACTIVE_RE =
-  /должность недоступна|position_inactive|position_group_inactive|position_not_found|invalid_position/i
-
 /**
  * Shared create/edit employee modal used by the list and employee profile.
- * Position (job title) and system role (access) are independent fields.
+ * The system role is the only job/access attribute (positions were removed in stage 17).
  */
 export default function EmployeeEditModal({
   employee = null,
@@ -70,9 +59,6 @@ export default function EmployeeEditModal({
   const [submitting, setSubmitting] = useState(false)
   const [assignableRoles, setAssignableRoles] = useState([])
   const [avatarRevision, setAvatarRevision] = useState(0)
-  const [positionGroups, setPositionGroups] = useState([])
-  const [catalogLoading, setCatalogLoading] = useState(Boolean(cloudMode))
-  const [catalogError, setCatalogError] = useState('')
   const [roleConfirmOpen, setRoleConfirmOpen] = useState(false)
   const [pendingSaveEvent, setPendingSaveEvent] = useState(null)
   const [passwordResetConfirmOpen, setPasswordResetConfirmOpen] = useState(false)
@@ -164,22 +150,12 @@ export default function EmployeeEditModal({
     [editId, sessionUser?.id]
   )
 
-  const canEditPosition =
-    !editingSelf &&
-    (editId
-      ? can(sessionUser, PERMISSION_CODES.EMPLOYEES_EDIT)
-      : can(sessionUser, PERMISSION_CODES.EMPLOYEES_CREATE) ||
-        can(sessionUser, PERMISSION_CODES.EMPLOYEES_EDIT))
-
   const canEditRole =
     !editingSelf &&
     (editId
       ? can(sessionUser, PERMISSION_CODES.EMPLOYEES_MANAGE_ROLES)
       : can(sessionUser, PERMISSION_CODES.EMPLOYEES_CREATE) ||
         can(sessionUser, PERMISSION_CODES.EMPLOYEES_MANAGE_ROLES))
-
-  const canViewPositions = can(sessionUser, PERMISSION_CODES.POSITIONS_VIEW)
-  const canManagePositions = can(sessionUser, PERMISSION_CODES.POSITIONS_MANAGE)
 
   const canResetPassword = Boolean(
     cloudMode &&
@@ -189,48 +165,6 @@ export default function EmployeeEditModal({
       isActiveStaffEmployee(employee) &&
       employee.authLinked === true &&
       can(sessionUser, PERMISSION_CODES.EMPLOYEES_MANAGE_ROLES)
-  )
-
-  const loadCatalog = async ({ force = false } = {}) => {
-    if (!cloudMode) {
-      setCatalogLoading(false)
-      setCatalogError('')
-      setPositionGroups([])
-      return
-    }
-    setCatalogLoading(true)
-    setCatalogError('')
-    try {
-      if (force) await reloadPositionCatalog()
-      else await ensurePositionCatalogLoaded()
-      const currentId = form.positionId || employee?.positionId || null
-      setPositionGroups(
-        buildPositionSelectGroups({
-          currentPositionId: currentId,
-          includeArchivedCurrent: Boolean(editId),
-        })
-      )
-    } catch (err) {
-      setCatalogError(err?.message || 'Не удалось загрузить справочник должностей')
-    } finally {
-      setCatalogLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    loadCatalog()
-    // Re-group when current position changes so archived current stays visible.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional catalog refresh on open/position
-  }, [cloudMode, editId, form.positionId, employee?.positionId])
-
-  const selectedPosition = useMemo(() => {
-    if (!form.positionId) return null
-    return getPositionById(form.positionId)
-  }, [form.positionId, positionGroups])
-
-  const selectedPositionArchived = Boolean(
-    selectedPosition &&
-      (selectedPosition.isActive === false || selectedPosition.groupIsActive === false)
   )
 
   const showDeactivateAction =
@@ -278,8 +212,7 @@ export default function EmployeeEditModal({
       }
     }
 
-    const requirePositionId = cloudMode && (canEditPosition || !editId)
-    const error = validateEmployeeForm(form, editId, { requirePositionId })
+    const error = validateEmployeeForm(form, editId)
     if (error) {
       setFormError(error)
       return
@@ -293,21 +226,6 @@ export default function EmployeeEditModal({
       return
     }
 
-    if (cloudMode && canEditPosition && form.positionId) {
-      if (!editId || String(form.positionId) !== String(employee?.positionId || '')) {
-        if (!isPositionAssignable(form.positionId)) {
-          setFormError('Выбранная должность недоступна. Выберите активную должность.')
-          return
-        }
-      }
-    }
-
-    if (catalogError && canEditPosition && form.positionId &&
-      String(form.positionId) !== String(employee?.positionId || '')) {
-      setFormError('Справочник должностей недоступен. Повторите загрузку перед сменой должности.')
-      return
-    }
-
     setSubmitting(true)
     setFormError('')
     try {
@@ -318,7 +236,6 @@ export default function EmployeeEditModal({
             editingSelf,
           })
           if (!canEditRole && changes.roleId) delete changes.roleId
-          if (!canEditPosition && changes.positionId) delete changes.positionId
           if (Object.keys(changes).length === 0) {
             showSuccess('Изменений нет')
             onClose?.()
@@ -335,9 +252,6 @@ export default function EmployeeEditModal({
                   roleId: selectedRole?.id || form.roleId || null,
                 }
               : {}),
-            ...(canEditPosition && form.positionId
-              ? { positionId: form.positionId }
-              : {}),
             login: form.login.trim(),
             employmentStatus: form.employmentStatus,
             ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
@@ -353,7 +267,6 @@ export default function EmployeeEditModal({
           lastName: form.lastName.trim(),
           role: roleCode,
           roleId: selectedRole?.id || form.roleId || null,
-          positionId: form.positionId || null,
           login: form.login.trim(),
           employmentStatus: form.employmentStatus,
           ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
@@ -368,9 +281,6 @@ export default function EmployeeEditModal({
       const message = err.message || 'Не удалось сохранить сотрудника'
       setFormError(message)
       showError(message)
-      if (POSITION_INACTIVE_RE.test(message) || POSITION_INACTIVE_RE.test(String(err?.code || ''))) {
-        await loadCatalog({ force: true })
-      }
     } finally {
       setSubmitting(false)
       setRoleConfirmOpen(false)
@@ -441,12 +351,6 @@ export default function EmployeeEditModal({
   const nextRoleLabel = nextRole
     ? formatRoleDisplayLabel(nextRole, assignableRoles)
     : getRoleLabel(form.role)
-
-  const legacyUnlinked =
-    editId && !form.positionId && Boolean(employee?.position)
-
-  const positionSelectDisabled =
-    submitting || !canEditPosition || catalogLoading || Boolean(catalogError && !form.positionId)
 
   return (
     <>
@@ -545,89 +449,7 @@ export default function EmployeeEditModal({
           </div>
 
           <fieldset className="employee-form-section" disabled={submitting}>
-            <legend className="employee-form-section__legend">Работа и доступ</legend>
-            <p className="employee-form-section__note" id="employee-position-role-note">
-              Должность определяет работу сотрудника, а роль — его доступы в платформе.
-            </p>
-
-            <label className="admin-form__label" htmlFor="employee-position-select">
-              Должность {!editId ? '*' : ''}
-              {catalogLoading ? (
-                <span className="admin-form__hint" role="status">
-                  Загрузка справочника должностей…
-                </span>
-              ) : null}
-              {catalogError ? (
-                <div className="employee-form-catalog-error" role="alert">
-                  <p className="admin-form__error">{catalogError}</p>
-                  <button
-                    type="button"
-                    className="btn btn--outline btn--sm"
-                    onClick={() => loadCatalog({ force: true })}
-                  >
-                    Повторить
-                  </button>
-                </div>
-              ) : null}
-              <select
-                id="employee-position-select"
-                className="admin-form__select"
-                value={form.positionId || ''}
-                disabled={positionSelectDisabled}
-                aria-describedby="employee-position-role-note employee-position-hint"
-                onChange={(e) => patchForm({ positionId: e.target.value })}
-              >
-                <option value="">
-                  {legacyUnlinked ? 'Выберите должность из справочника' : 'Выберите должность'}
-                </option>
-                {positionGroups.map((group) => (
-                  <optgroup
-                    key={group.groupId || group.groupName}
-                    label={
-                      group.groupIsActive === false
-                        ? `${group.groupName} (архивная группа)`
-                        : group.groupName
-                    }
-                  >
-                    {group.positions.map((position) => {
-                      const archived =
-                        position.isActive === false ||
-                        position.groupIsActive === false ||
-                        position.__isCurrentArchived
-                      return (
-                        <option key={position.id} value={position.id}>
-                          {position.name}
-                          {archived ? ' (архивная)' : ''}
-                        </option>
-                      )
-                    })}
-                  </optgroup>
-                ))}
-              </select>
-              <span className="admin-form__hint" id="employee-position-hint">
-                {editingSelf
-                  ? 'Собственную должность нельзя изменить.'
-                  : !canEditPosition
-                    ? 'Недостаточно прав для изменения должности.'
-                    : selectedPosition
-                      ? `Группа: ${selectedPosition.groupName || '—'}${
-                          selectedPositionArchived ? ' · Архивная структура' : ''
-                        }`
-                      : legacyUnlinked
-                        ? `Должность не привязана к справочнику · ${employee.position}`
-                        : 'Выберите должность из справочника организационной структуры.'}
-              </span>
-              {canViewPositions && (
-                <span className="admin-form__hint employee-form-position-link">
-                  <Link to="/platform/settings/roles?tab=positions">
-                    {canManagePositions
-                      ? 'Создать должность в настройках'
-                      : 'Управление должностями'}
-                  </Link>
-                </span>
-              )}
-            </label>
-
+            <legend className="employee-form-section__legend">Доступ</legend>
             <label className="admin-form__label" htmlFor="employee-role-select">
               Роль в системе *
               <select

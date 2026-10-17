@@ -11,16 +11,8 @@ import {
 } from '../utils/employeeData'
 import { normalizeRoleId } from '../data/roles'
 import { resolveRoleIdByCode } from './rbacService'
-import {
-  buildPositionFieldsFromCatalog,
-  ensurePositionCatalogLoaded,
-} from './positionCatalogService'
 
 function mapAcademyUserRow(row) {
-  const positionFields = buildPositionFieldsFromCatalog(
-    row.position_id,
-    row.position || '',
-  )
   return normalizeEmployee({
     id: row.id,
     firstName: row.first_name,
@@ -29,7 +21,6 @@ function mapAcademyUserRow(row) {
     login: row.login,
     role: row.role,
     roleId: row.role_id,
-    ...positionFields,
     employmentStatus: row.status,
     hiredAt: row.hired_at,
     terminatedAt: row.terminated_at,
@@ -88,9 +79,6 @@ export async function fetchCoreEmployeeData() {
       .select(ACADEMY_AUTH_PROFILE_FIELDS)
       .order('id')
   }
-
-  // Batch catalog load (not per employee). Failures leave legacy position text intact.
-  await ensurePositionCatalogLoaded().catch(() => null)
 
   const users = settleTableResult(usersRes, 'Загрузка сотрудников', [])
   const employees = users.map((row) => mapAcademyUserRow(row))
@@ -175,8 +163,6 @@ async function createUser(data) {
     password: employee.password || '',
     role: employee.role,
     role_id: employee.roleId || null,
-    position_id: employee.positionId || null,
-    position: employee.position || '',
     status: employee.employmentStatus,
     hired_at: employee.hiredAt || null,
     terminated_at: employee.terminatedAt || null,
@@ -224,11 +210,6 @@ async function updateUser(id, updates) {
     patch.role_id = await resolveRoleIdForSlug(updates.role)
   }
   if (updates.roleId != null) patch.role_id = updates.roleId
-  if (updates.positionId != null) {
-    patch.position_id = updates.positionId
-    if (updates.position != null) patch.position = updates.position
-  }
-  // Legacy position text without positionId is not applied (cloud Edge path is canonical).
   if (updates.employmentStatus != null) patch.status = updates.employmentStatus
   if (updates.status != null) patch.status = updates.status
   if (updates.hiredAt !== undefined) patch.hired_at = updates.hiredAt
@@ -329,7 +310,6 @@ export async function authenticateUser(loginValue, password) {
     return { ok: false, reason: 'deactivated' }
   }
 
-  await ensurePositionCatalogLoaded().catch(() => null)
   return {
     ok: true,
     user: mapAcademyUserRow(row),

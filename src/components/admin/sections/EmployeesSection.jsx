@@ -8,10 +8,6 @@ import {
   isActiveStaffEmployee,
 } from '../../../utils/employeeData'
 import {
-  flattenEmployeeOrganization,
-  groupEmployeesByPositionStructure,
-} from '../../../utils/employeeOrganizationStructure'
-import {
   deactivateEmployee,
   restoreEmployee,
 } from '../../../services/platformDataService'
@@ -22,8 +18,6 @@ import {
   ADMIN_LIST_DEFAULT_PAGE_SIZE,
 } from '../../../services/employeeAdminService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
-import {
-} from '../../../services/positionCatalogService'
 import { getRoleLabel } from '../../../data/roles'
 import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
 import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
@@ -250,11 +244,7 @@ export default function EmployeesSection() {
     })
   }, [cloudMode, cloudEmployees, debouncedSearch, appliedStatus, appliedRoleId, version])
 
-  const orderedEmployees = useMemo(
-    () =>
-      flattenEmployeeOrganization(groupEmployeesByPositionStructure(filteredEmployees)),
-    [filteredEmployees]
-  )
+  const orderedEmployees = filteredEmployees
 
   const filterPreviewCount = useMemo(() => {
     if (cloudMode) return filterPreviewTotal

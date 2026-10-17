@@ -13,29 +13,6 @@ function displayValue(value) {
   return value
 }
 
-/** Группа должностей для колонки списка (не название должности). */
-function resolvePositionGroupCell(employee) {
-  const groupName = String(employee?.positionGroupName || '').trim()
-  const archived = employee?.positionGroupIsActive === false
-  const positionHint = String(employee?.positionName || employee?.position || '').trim()
-
-  if (groupName) {
-    return {
-      label: groupName,
-      archived,
-      missing: false,
-      title: positionHint ? `${groupName} · ${positionHint}` : groupName,
-    }
-  }
-
-  return {
-    label: 'Не назначена',
-    archived: false,
-    missing: true,
-    title: positionHint ? `Не назначена · ${positionHint}` : 'Не назначена',
-  }
-}
-
 function handleCardKeyDown(event, onOpen, employee) {
   if (event.key === 'Enter' || event.key === ' ') {
     event.preventDefault()
@@ -111,7 +88,6 @@ export default function EmployeeListTable({
               <col className="employee-list-table__col-num" />
               <col className="employee-list-table__col-name" />
               <col className="employee-list-table__col-login" />
-              <col className="employee-list-table__col-group" />
               <col className="employee-list-table__col-role" />
               <col className="employee-list-table__col-actions" />
             </colgroup>
@@ -120,7 +96,6 @@ export default function EmployeeListTable({
                 <th scope="col">№</th>
                 <th scope="col">Сотрудник</th>
                 <th scope="col">Логин</th>
-                <th scope="col">Группа должностей</th>
                 <th scope="col">Роль</th>
                 <th scope="col" className="employee-list-table__actions-head">
                   <span className="visually-hidden">Действия</span>
@@ -129,7 +104,6 @@ export default function EmployeeListTable({
             </thead>
             <tbody>
               {employees.map((employee, index) => {
-                const group = resolvePositionGroupCell(employee)
                 const roleLabel = displayValue(getRoleLabelForEmployee(employee))
                 return (
                   <tr
@@ -176,19 +150,6 @@ export default function EmployeeListTable({
                       </code>
                     </td>
                     <td>
-                      <span
-                        className={`employee-list-table__clamp${
-                          group.missing ? ' employee-list-table__clamp--muted' : ''
-                        }`}
-                        title={group.title}
-                      >
-                        {group.label}
-                      </span>
-                      {group.archived ? (
-                        <span className="employee-list-table__archive-badge">Архивная</span>
-                      ) : null}
-                    </td>
-                    <td>
                       <span className="employee-list-table__clamp" title={roleLabel}>
                         {roleLabel}
                       </span>
@@ -220,7 +181,6 @@ export default function EmployeeListTable({
       <ul className="employee-cards">
         {employees.map((employee, index) => {
           const isInteractive = Boolean(onOpen)
-          const group = resolvePositionGroupCell(employee)
           const roleLabel = displayValue(getRoleLabelForEmployee(employee))
 
           return (
@@ -263,13 +223,6 @@ export default function EmployeeListTable({
               </div>
 
               <div className="employee-card-item__meta">
-                <p className="employee-card-item__meta-line">
-                  <span className="employee-card-item__meta-label">Группа должностей:</span>{' '}
-                  <span className="employee-card-item__meta-value">
-                    {group.label}
-                    {group.archived ? ' · Архивная' : ''}
-                  </span>
-                </p>
                 <p className="employee-card-item__meta-line">
                   <span className="employee-card-item__meta-label">Роль:</span>{' '}
                   <span className="employee-card-item__meta-value">{roleLabel}</span>
