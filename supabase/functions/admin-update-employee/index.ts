@@ -120,7 +120,7 @@ Deno.serve(async (req) => {
   const { data: target, error: targetError } = await serviceClient
     .from('academy_users')
     .select(
-      'id, status, role, role_id, auth_user_id, login, password, first_name, last_name',
+      'id, status, role, role_id, auth_user_id, login, first_name, last_name',
     )
     .eq('id', employeeId)
     .maybeSingle()

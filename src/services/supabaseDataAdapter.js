@@ -5,7 +5,6 @@ import {
 } from './authService'
 import {
   normalizeEmployee,
-  canEmployeeLogin,
   todayEmployeeDateKey,
   migrateEmployeeLocalSchema,
 } from '../utils/employeeData'
@@ -156,7 +155,6 @@ async function createUser(data) {
     last_name: employee.lastName,
     full_name: employee.name,
     login: employee.login,
-    password: employee.password || '',
     role: employee.role,
     role_id: employee.roleId || null,
     status: employee.employmentStatus,
@@ -196,7 +194,6 @@ async function updateUser(id, updates) {
   }
   if (updates.name != null) patch.full_name = updates.name
   if (updates.login != null) patch.login = updates.login
-  if (updates.password != null && updates.password !== '') patch.password = updates.password
   if (updates.role != null) {
     patch.role = updates.role
     patch.role_id = await resolveRoleIdForSlug(updates.role)
@@ -273,31 +270,6 @@ export async function updateProfile(userId, { firstName, lastName, contactEmail 
       .eq('id', userId),
     'Обновление профиля'
   )
-}
-
-/** @deprecated Pre-Auth password compare — not used in Auth-first cloud login. */
-export async function authenticateUser(loginValue, password) {
-  if (!loginValue?.trim()) return { ok: false, reason: 'invalid' }
-
-  const result = await supabase
-    .from('academy_users')
-    .select('*')
-    .eq('login', loginValue.trim())
-    .maybeSingle()
-
-  const row = await throwIfError(result, 'Аутентификация')
-  if (!row || row.password !== password) {
-    return { ok: false, reason: 'invalid' }
-  }
-
-  if (!canEmployeeLogin(row.status)) {
-    return { ok: false, reason: 'deactivated' }
-  }
-
-  return {
-    ok: true,
-    user: mapAcademyUserRow(row),
-  }
 }
 
 /** Users-only migration upsert (learning tables removed from this adapter). */

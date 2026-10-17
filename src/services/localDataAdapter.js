@@ -19,7 +19,6 @@ export function collectLocalSnapshot() {
     last_name: emp.lastName,
     full_name: emp.name,
     login: emp.login,
-    password: emp.password || '',
     role: emp.role,
     status: emp.employmentStatus || 'active',
   }))
