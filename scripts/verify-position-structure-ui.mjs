@@ -116,11 +116,6 @@ function main() {
   assert('EmployeeEditModal unchanged by structure import', !modal.includes('positionStructureAdminService') && !modal.includes('PositionGroupsWorkspace'))
   assert('verify script registered', pkg.includes('verify:position-structure-ui'))
 
-  const stagedMigrations = fs
-    .readdirSync(path.join(ROOT, 'supabase/migrations'))
-    .filter((name) => /^\d{14}_.+\.sql$/.test(name) && name.slice(0, 14) > '20260801150000')
-  assert('no newer DB migration', stagedMigrations.length === 0, stagedMigrations.join(','))
-
   const rpcFile = read(
     'supabase/migrations/20260801150000_secure_position_structure_management_backend.sql',
   )

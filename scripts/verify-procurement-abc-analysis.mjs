@@ -674,8 +674,10 @@ assert(
       planner.includes("case 'abcProfit':") &&
       planner.includes('<AbcBadge')
   )
-  assert('badge shows the letter, not color alone', planner.includes('{letter}') && planner.includes('aria-label={title}') && planner.includes('title={title}') && /role="img"/.test(planner))
-  assert('NULL renders an accessible dash', planner.includes("formatAbcClass") && planner.includes('is-empty'))
+  // The badge component lives in AbcBadges.jsx now (shared by the planner table and the cards).
+  const abcBadges = read('src/components/procurement/AbcBadges.jsx')
+  assert('badge shows the letter, not color alone', abcBadges.includes('{letter}') && abcBadges.includes('aria-label={title}') && abcBadges.includes('title={title}') && /role="img"/.test(abcBadges))
+  assert('NULL renders an accessible dash', abcBadges.includes("formatAbcClass") && abcBadges.includes('is-empty'))
   assert('mobile cards show ABC badges', /proc-planner__card[\s\S]*<AbcBadges item=\{item\} \/>/.test(planner) || planner.includes('<AbcBadges item={item} />'))
   assert('three filter groups with A/B/C checkboxes', !planner.includes('proc-planner__abc-filter'))
   assert(
@@ -774,10 +776,10 @@ const SERVICE_UI_ONLY = process.argv.includes('--service-ui-only')
 const SERVICE_ONLY = process.argv.includes('--service-only')
 
 const EXPECTED_CHECKS = {
-  full: 120,
+  full: 119,
   backend: 65,
   service: 33,
-  serviceUi: 56,
+  serviceUi: 54,
 }
 
 async function main() {

@@ -34,7 +34,7 @@ register(pathToFileURL(path.join(__dirname, 'lib/extensionlessResolver.mjs')))
 
 const OBLIGATIONS_UTILS = 'src/utils/supplierPaymentObligations.js'
 const SERVICE = 'src/services/supplierPaymentObligationsService.js'
-const SUPPLIERS_PAGE = 'src/pages/platform/suppliers/SuppliersPage.jsx'
+const SUPPLIERS_PAGE = 'src/components/suppliers/settlements/UmagSettlementsPanel.jsx'
 
 let checks = 0
 function ok(name) {
@@ -54,55 +54,70 @@ async function main() {
     pathToFileURL(path.join(ROOT, OBLIGATIONS_UTILS)).href
   )
 
+  // Payment terms are now two independent axes: the payment account (способ оплаты) and the
+  // deferral days (срок). due_date depends only on the days; the account snapshot follows the supplier.
+  const ACCOUNT = '1fcc6c24-0387-4e69-ba4c-b26d70343849'
+
   // --- Case 1: 0 days -> 14 days recomputes an already-snapshotted row -----
   {
     const oldSnapshot = {
-      paymentTermsTypeSnapshot: 'cash',
+      paymentAccountIdSnapshot: ACCOUNT,
       defermentDaysSnapshot: 0,
       dueDate: '2026-08-26',
     }
-    const newTerms = resolveSupplierPaymentTerms({ paymentType: 'deferral', deferralDays: 14 })
+    const newTerms = resolveSupplierPaymentTerms({ paymentAccountId: ACCOUNT, deferralDays: 14 })
     const patch = resolveObligationTermsPatch(oldSnapshot, newTerms, '2026-08-26')
     assert.ok(patch, 'expected a patch — the exact bug report scenario')
-    assert.equal(patch.payment_terms_type_snapshot, 'deferral')
+    assert.equal(patch.payment_account_id_snapshot, ACCOUNT)
     assert.equal(patch.deferment_days_snapshot, 14)
     assert.equal(patch.due_date, '2026-09-09')
   }
-  ok('Case 1: cash/0 (26.08) -> deferral/14 recomputes due_date to 09.09 — the exact «Тассай» scenario')
+  ok('Case 1: days 0 (26.08) -> 14 recomputes due_date to 09.09 — the exact «Тассай» scenario')
 
   // --- Case 2: already matching current terms -> no patch (idempotent) -----
   {
     const snapshot = {
-      paymentTermsTypeSnapshot: 'deferral',
+      paymentAccountIdSnapshot: ACCOUNT,
       defermentDaysSnapshot: 14,
       dueDate: '2026-09-09',
     }
-    const terms = resolveSupplierPaymentTerms({ paymentType: 'deferral', deferralDays: 14 })
+    const terms = resolveSupplierPaymentTerms({ paymentAccountId: ACCOUNT, deferralDays: 14 })
     const patch = resolveObligationTermsPatch(snapshot, terms, '2026-08-26')
     assert.equal(patch, null)
   }
   ok('Case 2: snapshot already matches current terms -> no patch (no pointless write / timestamp bump on unrelated saves)')
 
-  // --- Case 3: clearing the supplier's terms resets open obligations too ---
-  // (symmetric with Case 1 per the owner's explicit confirmation.)
+  // --- Case 2b: changing only the payment account keeps the due date ------
+  {
+    const snapshot = { paymentAccountIdSnapshot: ACCOUNT, defermentDaysSnapshot: 14, dueDate: '2026-09-09' }
+    const terms = resolveSupplierPaymentTerms({ paymentAccountId: 'other-account', deferralDays: 14 })
+    const patch = resolveObligationTermsPatch(snapshot, terms, '2026-08-26')
+    assert.ok(patch)
+    assert.equal(patch.payment_account_id_snapshot, 'other-account')
+    assert.equal(patch.due_date, '2026-09-09')
+  }
+  ok('Case 2b: changing only the payment account updates the account snapshot and leaves due_date untouched')
+
+  // --- Case 3: clearing the supplier's days resets open obligations too ----
+  // (symmetric with Case 1 per the owner's explicit confirmation; the account is an independent axis.)
   {
     const configuredSnapshot = {
-      paymentTermsTypeSnapshot: 'deferral',
+      paymentAccountIdSnapshot: ACCOUNT,
       defermentDaysSnapshot: 14,
       dueDate: '2026-09-09',
     }
-    const unconfiguredTerms = resolveSupplierPaymentTerms({ paymentType: 'deferral', deferralDays: null })
+    const unconfiguredTerms = resolveSupplierPaymentTerms({ paymentAccountId: ACCOUNT, deferralDays: null })
     const patch = resolveObligationTermsPatch(configuredSnapshot, unconfiguredTerms, '2026-08-26')
-    assert.ok(patch, 'clearing terms should produce a patch that resets the obligation')
-    assert.equal(patch.payment_terms_type_snapshot, null)
+    assert.ok(patch, 'clearing days should produce a patch that resets the obligation')
+    assert.equal(patch.payment_account_id_snapshot, ACCOUNT)
     assert.equal(patch.deferment_days_snapshot, null)
     assert.equal(patch.due_date, null)
   }
-  ok('Case 3: clearing supplier terms to "не настроено" resets already-configured open obligations back to null (symmetric, per owner confirmation)')
+  ok('Case 3: clearing supplier days resets already-configured open obligations to null due_date (account snapshot stays)')
 
   // --- Case 4: never invents a due date without a document date -----------
   {
-    const terms = resolveSupplierPaymentTerms({ paymentType: 'cash' })
+    const terms = resolveSupplierPaymentTerms({ paymentAccountId: ACCOUNT, deferralDays: 0 })
     const patch = resolveObligationTermsPatch(null, terms, null)
     assert.ok(patch)
     assert.equal(patch.due_date, null)
@@ -117,10 +132,12 @@ async function main() {
     serviceSrc.indexOf('\n}', serviceSrc.indexOf('export async function refreshObligationTermsForSupplier')) + 2
   )
   assert.match(fnBody, /\.eq\('is_source_deleted', false\)/)
-  assert.match(fnBody, /\.gt\('current_debt', 0\)/)
+  // Open = not natively marked paid (UMAG current_debt is not authoritative since 2026-09-15).
+  assert.match(fnBody, /\.is\('platform_paid_at', null\)/)
+  assert.doesNotMatch(fnBody, /\.gt\('current_debt', 0\)/)
   assert.doesNotMatch(fnBody, /\.is\('due_date', null\)/)
   assert.match(fnBody, /resolveObligationTermsPatch\(/)
-  ok('Case 5: refreshObligationTermsForSupplier scopes to open obligations (is_source_deleted=false, current_debt>0) with no due_date-IS-NULL gate left over')
+  ok('Case 5: refreshObligationTermsForSupplier scopes to open obligations (is_source_deleted=false, platform_paid_at IS NULL) with no due_date-IS-NULL gate left over')
 
   assert.doesNotMatch(serviceSrc, /applyMissingObligationSnapshotsForSupplier/)
   ok('Case 5b: old write-once-only function name is gone, not left as dead code alongside the new one')
@@ -129,7 +146,7 @@ async function main() {
   const pageSrc = read(SUPPLIERS_PAGE)
   assert.match(pageSrc, /refreshObligationTermsForSupplier/)
   assert.doesNotMatch(pageSrc, /applyMissingObligationSnapshotsForSupplier/)
-  ok('Case 6: SuppliersPage.jsx calls the renamed function after saving a supplier')
+  ok('Case 6: the suppliers panel calls the function after saving a supplier')
 
   console.log(`\n${checks} checks passed`)
 }

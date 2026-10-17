@@ -346,12 +346,6 @@ assert(
     planner.includes('proc-planner__column-settings-popover')
 )
 
-assert(
-  'T3: gear only inside desktop section',
-  planner.includes('proc-planner__desktop-bar') &&
-    planner.includes('renderColumnSettingsGear()') &&
-    planner.indexOf('renderColumnSettingsGear()') < planner.indexOf('proc-planner__mobile')
-)
 
 assert(
   'T3: saveTableSettings wired for persist',

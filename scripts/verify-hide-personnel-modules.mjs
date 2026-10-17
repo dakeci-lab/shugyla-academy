@@ -54,6 +54,14 @@ assert('«Главная» is the first menu item', PLATFORM_NAV[0].id === 'sale
 assert('no menu path points at hidden modules',
   !flatPaths(PLATFORM_NAV).some((p) => /\/platform\/(hr|time-tracker|notifications)|employees\/(schedule|payroll)/.test(p)))
 
+console.log('\nmobile access: the whole procurement group works on a phone')
+const { isWebOnlyNavEntry } = await load('src/platform/webOnlyNav.js')
+const procurementGroup = PLATFORM_NAV.find((i) => i.id === 'procurement-group')
+assert('«Закупки» group exists with Закуп, Заказы, Расчёты',
+  ['procurement', 'orders', 'supplier-finance'].every((id) => procurementGroup.children.some((c) => c.id === id)))
+assert('no item of the procurement group is web-only (it has narrow-screen layouts)',
+  !isWebOnlyNavEntry(procurementGroup) && procurementGroup.children.every((c) => !isWebOnlyNavEntry(c)))
+
 console.log('\nlanding: each role opens its first allowed section')
 const land = (role) => getFirstAllowedPlatformPath({ role })
 assert('admin lands on «Главная» (sales)', land('admin') === '/platform/sales')

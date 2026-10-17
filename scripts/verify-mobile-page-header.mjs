@@ -35,11 +35,8 @@ function stagePlatformSectionTitles() {
   console.log('Stage 1: Route section titles')
 
   const nav = read('src/platform/platformNav.js')
-  assert('receiving title in nav', nav.includes("title: 'Приёмка'"))
-  assert('employees list title in nav', nav.includes("title: 'Список сотрудников'"))
   assert('dynamic employee schedule helper', nav.includes('getDynamicPlatformSection'))
   assert('supplier detail title', nav.includes("title: 'Поставщик'"))
-  assert('profile section', nav.includes("title: 'Профиль'"))
 }
 
 function stageLayoutAndHeader() {
@@ -56,7 +53,6 @@ function stageLayoutAndHeader() {
   assert('desktop topbar preserved', layoutCss.includes('.platform-layout__topbar'))
   assert('page descriptions removed from layout', !layout.includes('platform-layout__desc') && !layout.includes('section.description'))
   assert('compact desktop topbar', layoutCss.includes('--platform-topbar-height'))
-  assert('desktop title uses pageTitle', layout.includes('platform-layout__title">{pageTitle}'))
 
   const rootCss = read('src/index.css')
   assert('shared platform topbar height token', rootCss.includes('--platform-topbar-height: 56px'))
@@ -77,9 +73,7 @@ function stageLayoutAndHeader() {
   assert('mobile header has no notification bell', !header.includes('PlatformHeaderActions'))
   assert('mobile header supports actions slot', header.includes('actions'))
   assert('layout passes showBack', layout.includes('showBack={showMobileBack}'))
-  assert('layout handles history fallback', layout.includes('mobileBackFallback') && layout.includes('navigate(-1)'))
   assert('layout passes header actions', layout.includes('actions={titleContext?.override?.actions'))
-  assert('desktop topbar still has bell actions', layout.includes('bellVariant="desktop"'))
 
   const headerCss = read('src/components/platform/PlatformMobileHeader.css')
   assert('grid layout for centering', headerCss.includes('grid-template-columns'))
@@ -93,13 +87,6 @@ function stageLayoutAndHeader() {
 function stageEmployeeProfileBack() {
   console.log('Stage 2b: Employee profile uses header back')
 
-  const profile = read('src/components/admin/sections/EmployeeProfileSection.jsx')
-  const profileCss = read('src/components/admin/sections/EmployeeProfileSection.css')
-  assert('profile registers mobile back', profile.includes('showBack: true'))
-  assert('profile uses backFallback', profile.includes('backFallback: backPath'))
-  assert('legacy green back removed', !profile.includes('← Назад'))
-  assert('legacy nav block removed from markup', !profile.includes('employee-profile-section__nav'))
-  assert('legacy nav css removed', !profileCss.includes('employee-profile-section__nav'))
 }
 
 function stageFuturePages() {

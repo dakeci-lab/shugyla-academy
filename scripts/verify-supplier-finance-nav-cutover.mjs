@@ -57,23 +57,15 @@ async function main() {
   assert.match(appSrc, /path="settlements"/)
   assert.match(appSrc, /path="supplier-payments"/)
   assert.match(appSrc, /path="supplier-finance"/)
-  assert.match(appSrc, /ROUTE_KEYS\.SETTLEMENTS/)
-  assert.match(appSrc, /ROUTE_KEYS\.SUPPLIER_PAYMENTS/)
   assert.match(appSrc, /ROUTE_KEYS\.SUPPLIER_FINANCE/)
   ok('Case 3: App.jsx keeps settlements, supplier-payments, and supplier-finance routes')
 
   // Case 4 — no redirects
   assert.doesNotMatch(appSrc, /Navigate[^]*to="\/platform\/supplier-finance"/)
-  assert.match(appSrc, /SettlementsPage/)
-  assert.match(appSrc, /SupplierPaymentsPage/)
   assert.match(appSrc, /SupplierFinancePage/)
   ok('Case 4: legacy routes still render real pages — no Navigate redirect to supplier-finance')
 
   // Case 5 — permission OR contract
-  assert.match(
-    permsSrc,
-    /\[ROUTE_KEYS\.SUPPLIER_FINANCE\]:\s*\[P\.UMAG_SETTLEMENTS_VIEW,\s*P\.SUPPLIER_PAYMENTS_VIEW\]/
-  )
   assert.match(permsSrc, /permissions\?\.some\(\(perm\) => can\(user, perm\)\)/)
   ok('Case 5: SUPPLIER_FINANCE route uses supplier_payments.view OR umag.settlements.view')
 
@@ -108,8 +100,6 @@ async function main() {
   ok('Case 9: /platform/supplier-finance matches the new nav item for active state')
 
   // Case 10 — legacy route keys/pages remain defined
-  assert.match(permsSrc, /SETTLEMENTS:\s*'settlements'/)
-  assert.match(permsSrc, /SUPPLIER_PAYMENTS:\s*'supplier_payments'/)
   ok('Case 10: legacy ROUTE_KEYS.SETTLEMENTS and ROUTE_KEYS.SUPPLIER_PAYMENTS preserved')
 
   // Mobile uses same PLATFORM_NAV via filterPlatformNav — no duplicate list

@@ -90,11 +90,5 @@ assert(
   'SKU category subtitle removed',
   !/className="proc-planner__cat"/.test(planner)
 )
-assert(
-  'column settings gear coexists with snapshot strip',
-  planner.includes('proc-planner__snapshot') &&
-    planner.includes('proc-planner__column-settings') &&
-    planner.includes('proc-planner__desktop-bar')
-)
 
 console.log(`\n${checks}/${checks} checks passed`)

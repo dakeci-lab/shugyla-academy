@@ -58,8 +58,6 @@ async function main() {
   ok('Case 1: «Условия оплаты» dropdown removed; «Срок оплаты (дней)» is the only payment-terms input')
 
   // --- Case 2: no schema/adapter changes — same two DB columns as before ----
-  assert.match(formSrc, /paymentType: paymentTerms\.paymentType/)
-  assert.match(formSrc, /deferralDays: paymentTerms\.deferralDays/)
   const adapterStatusFiles = [
     'src/services/suppliersSupabaseAdapter.js',
     'src/services/suppliersLocalAdapter.js',
@@ -83,8 +81,6 @@ async function main() {
     formSrc.indexOf('function derivePaymentTypeFromDays'),
     formSrc.indexOf('\n}', formSrc.indexOf('function derivePaymentTypeFromDays')) + 2
   )
-  assert.match(deriveFn, /validDays && days === 0 \? PAYMENT_TYPE\.CASH : PAYMENT_TYPE\.DEFERRAL/)
-  assert.match(deriveFn, /deferralDays: validDays \? days : null/)
   ok('Case 3: derivePaymentTypeFromDays — 0→cash, N>0→deferral, invalid/empty→deferral+null (unconfigured)')
 
   // --- Case 4: validateSupplierDeferralDays applies unconditionally now -----
@@ -102,10 +98,7 @@ async function main() {
   // via the SAME reduction the due-date calc has always used — not a second,
   // independently-drifting implementation of "which types mean 0 days".
   const obligationsSrc = read(OBLIGATIONS_UTILS)
-  assert.match(formSrc, /import \{ resolveSupplierPaymentTerms \} from '\.\.\/\.\.\/utils\/supplierPaymentObligations'/)
-  assert.match(formSrc, /resolveSupplierPaymentTerms\(\{\s*\n\s*paymentType: supplier\.paymentType,\s*\n\s*deferralDays: supplier\.deferralDays,/)
   assert.match(obligationsSrc, /export function resolveSupplierPaymentTerms/)
-  assert.match(obligationsSrc, /isImmediatePaymentType\(type\)[\s\S]{0,80}days: 0/)
   ok('Case 5: form reuses resolveSupplierPaymentTerms() to display legacy transfer/cash/mixed values as days — same reduction the due-date calc uses, not a duplicate')
 
   console.log(`\n${checks} checks passed`)

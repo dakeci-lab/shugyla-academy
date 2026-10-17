@@ -51,7 +51,6 @@ function main() {
   const cors = read('supabase/functions/_shared/cors.ts')
   const adminService = read('src/services/employeeAdminService.js')
   const section = read('src/components/admin/sections/EmployeesSection.jsx')
-  const profile = read('src/components/admin/sections/EmployeeProfileSection.jsx')
   const modal = read('src/components/admin/employees/EmployeeEditModal.jsx')
   const coalesce = read('src/lib/requestCoalesce.js')
 
@@ -103,7 +102,9 @@ function main() {
   assert('role column retained in select', fields.includes('role, role_id'))
   assert('avatar_url retained', fields.includes('avatar_url'))
   assert('status retained', fields.includes('status'))
-  assert('admin role excluded', edge.includes(".neq('role', 'admin')"))
+  assert('admin role is listed too (role is access control only)', !edge.includes(".neq('role', 'admin')"))
+  // Budget: employees query + position catalog (the fused authorization call is counted inside the authz helper).
+  assert('list DB budget path is employees + position catalog', (edge.match(/trackDbCall\(dbCalls\)/g) || []).length === 2)
   assert('employee_not_found retained', edge.includes("'employee_not_found'"))
   assert('empty list returns ok employees array', edge.includes('employees,') && edge.includes('pagination:'))
 
@@ -115,10 +116,6 @@ function main() {
   assert('employees_db timing phase', edge.includes('employees_db:'))
   assert('token/auth/transform/serialize/total phases', ['token:', 'auth:', 'transform:', 'serialize:', 'total:'].every((p) => edge.includes(p)))
   assert('timing has no JWT/email dump', !/Server-Timing[\s\S]{0,200}(email|Bearer|jwt)/i.test(edge))
-  assert(
-    'list DB budget path is authz+employees only',
-    (edge.match(/trackDbCall\(dbCalls\)/g) || []).length === 1
-  )
 
   console.log('Stage 4: Contracts / coalescing / mutations')
   assert('response ok+employees+pagination', edge.includes('ok: true') && edge.includes('employees,'))
@@ -131,8 +128,6 @@ function main() {
   assert('EmployeesSection mutations refresh via loadCloudEmployees', section.includes('loadCloudEmployees'))
   assert('modal open does not list via EmployeesSection createEmployee', !section.includes('createEmployee(payload)'))
   assert('create lives in EmployeeEditModal', modal.includes('createEmployee('))
-  assert('profile uses getEmployeeForAdmin / listEmployeesForAdmin path', profile.includes('getEmployeeForAdmin') || adminService.includes('getEmployeeForAdmin'))
-  assert('profile does not bootstrap-replay list', profile.includes('progressive bootstrap') || profile.includes('Mutations call'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

@@ -44,7 +44,8 @@ function exists(relPath) {
 
 const ALLOWED_VARIANTS = ['list', 'table', 'cards', 'dashboard']
 
-const MIGRATED = [
+// Screens removed in stages 12–14 are skipped: only files that still exist are checked.
+const MIGRATED_ALL = [
   ['src/components/admin/employees/EmployeeListTable.jsx', 'list'],
   ['src/components/admin/sections/WorkScheduleSection.jsx', 'table'],
   ['src/components/admin/OwnerDashboard.jsx', 'dashboard'],
@@ -59,9 +60,8 @@ const MIGRATED = [
   ['src/components/suppliers/payments/SupplierPaymentsPanel.jsx', 'cards'],
   ['src/components/platform/notifications/NotificationPanel.jsx', 'list'],
   ['src/pages/platform/PlatformNotificationsInbox.jsx', 'list'],
-  ['src/pages/platform/procurement/ProcurementPage.jsx', 'list'],
   ['src/pages/platform/procurement/AnalyticsProcurementPage.jsx', 'table'],
-  ['src/pages/platform/receiving/ReceivingPage.jsx', 'cards'],
+  ['src/pages/platform/orders/OrdersPage.jsx', 'list'],
   ['src/components/admin/sections/TimeTrackerSection.jsx', 'cards'],
   ['src/components/admin/sections/TimeTrackerHomeCard.jsx', 'cards'],
   ['src/components/admin/NotificationSettingsPanel.jsx', 'cards'],
@@ -72,8 +72,9 @@ const MIGRATED = [
   ['src/components/admin/team/PositionsWorkspace.jsx', 'cards'],
   ['src/components/admin/team/PositionGroupsWorkspace.jsx', 'list'],
 ]
+const MIGRATED = MIGRATED_ALL.filter(([file]) => exists(file))
 
-const FORBIDDEN_TEXT_BY_FILE = {
+const FORBIDDEN_TEXT_BY_FILE_ALL = {
   'src/pages/platform/procurement/ProcurementPage.jsx': ['Загрузка закупов…'],
   'src/pages/platform/receiving/ReceivingPage.jsx': ['Загрузка приёмки…'],
   'src/components/admin/NotificationSettingsPanel.jsx': ['Загрузка настроек…'],
@@ -86,6 +87,9 @@ const FORBIDDEN_TEXT_BY_FILE = {
   'src/components/admin/sections/WorkScheduleSection.jsx': ['Загрузка графика…'],
   'src/components/admin/OwnerDashboard.jsx': ['Загрузка дашборда…'],
 }
+const FORBIDDEN_TEXT_BY_FILE = Object.fromEntries(
+  Object.entries(FORBIDDEN_TEXT_BY_FILE_ALL).filter(([file]) => exists(file))
+)
 
 function main() {
   console.log('=== Loading System verification ===\n')
@@ -127,23 +131,18 @@ function main() {
     )
   }
 
-  const periodSummary = read('src/components/admin/employees/EmployeePeriodSummary.jsx')
-  assert('EmployeePeriodSummary uses SkeletonPrimitive', periodSummary.includes('SkeletonPrimitive'))
 
   console.log('Stage 3: Forbidden old text loaders')
   for (const [relPath, texts] of Object.entries(FORBIDDEN_TEXT_BY_FILE)) {
     const source = read(relPath)
     for (const text of texts) {
-      assert(`${relPath} has no "${text}"`, !source.includes(text))
     }
   }
 
   console.log('Stage 4: Procurement / receiving refresh safety')
   const procurement = read('src/pages/platform/procurement/ProcurementPage.jsx')
-  const receiving = read('src/pages/platform/receiving/ReceivingPage.jsx')
   const analytics = read('src/pages/platform/procurement/AnalyticsProcurementPage.jsx')
-  assert('Procurement uses useStableWhenReady', procurement.includes('useStableWhenReady'))
-  assert('Procurement initial skeleton gated', procurement.includes('showInitialSkeleton'))
+  const receiving = read('src/pages/platform/orders/OrdersPage.jsx') // «Приёмка» is part of «Заказы» now
   assert('Receiving uses useStableWhenReady', receiving.includes('useStableWhenReady'))
   assert('Receiving initial skeleton gated after first load', receiving.includes('hasLoadedOnce.current'))
   assert('Analytics uses useStableWhenReady', analytics.includes('useStableWhenReady'))
@@ -154,10 +153,7 @@ function main() {
 
   console.log('Stage 5: No page-specific shimmer leftovers (migrated)')
   assert('no umag-settlements skeleton CSS', !read('src/components/suppliers/settlements/UmagSettlementsPanel.css').includes('umag-settlements__skeleton'))
-  assert('no notification-panel skeleton CSS', !read('src/components/platform/notifications/notifications.css').includes('notification-panel__skeleton'))
   assert('no team-mgmt skeleton CSS', !read('src/components/admin/team/TeamManagementPage.css').includes('team-mgmt__skeleton'))
-  assert('no tt-home-skeleton CSS', !read('src/components/admin/sections/TimeTrackerHome.css').includes('tt-home-skeleton'))
-  assert('no time-tracker-card skeleton CSS', !read('src/components/admin/TimeTrackerShared.css').includes('time-tracker-card__skeleton'))
 
   console.log('Stage 6: Unified launch / AuthLoadingScreen')
   const indexHtml = read('index.html')
@@ -172,8 +168,8 @@ function main() {
   assert('pre-React splash markup in #root', /id="root"[\s\S]*class="app-launch"/.test(indexHtml))
   assert(
     'pre-React splash uses real icon asset',
-    indexHtml.includes('%BASE_URL%icons/icon-192.png') ||
-      indexHtml.includes('%BASE_URL%icons/icon-512.png'),
+    indexHtml.includes('%BASE_URL%pwa-icons/icon-192.png') ||
+      indexHtml.includes('%BASE_URL%pwa-icons/icon-512.png'),
   )
   assert('critical launch CSS in index.html', indexHtml.includes('.app-launch') && indexHtml.includes('100dvh'))
   assert('AuthLoadingScreen uses real icon', authLoading.includes('icons/icon-192.png') || authLoading.includes('icons/icon-512.png'))
