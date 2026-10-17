@@ -73,3 +73,23 @@ referenced them, and exactly the 3 expected accounts remain). Their avatar was r
 
 **State now:** 3 accounts (2 administrators, 1 buyer). Roles `buhgalter` and `receiver` exist but have no users;
 they were kept on purpose so a new receiver / accountant can be created later.
+
+## 15f — frontend load: vendor chunk split (2026-10-17)
+
+**Correction of an earlier remark:** Excel (`xlsx`) and PDF (`pdfmake` + fonts) were already `await import()`-ed only
+when exporting, and `index.html` never preloaded them; nothing to fix there.
+
+What the main bundle really was: ≈ 700 KB raw / 169 KB brotli, of which almost everything is third-party
+(react-dom, `@supabase/*`, react-router); platform code is a small part. Assets are served with a 10-year cache
+(`.htaccess`) and brotli, so repeat visits are free — except that every release changed the single big file.
+
+**Change:** `vite.config.js` `build.rollupOptions.output.manualChunks` splits the libraries into
+`vendor-react`, `vendor-router`, `vendor-supabase` (modulepreloaded from `index.html`); Excel/PDF stay dynamic.
+
+| Chunk | Raw | Brotli | Changes per release |
+|---|---|---|---|
+| `index` (platform code) | 246 KB | 43 KB | yes |
+| `vendor-react` / `vendor-router` / `vendor-supabase` | 189 / 38 / 209 KB | 51 / 12 / 46 KB | no (cached) |
+
+First visit: same total download. After each release a browser re-downloads ~43 KB instead of ~169 KB.
+No code changes; build ok; `verify:*` 99/100 (the one left needs a local Supabase).

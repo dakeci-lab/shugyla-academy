@@ -21,6 +21,22 @@ export default defineConfig(({ command }) => {
 
   return {
     base,
+    build: {
+      rollupOptions: {
+        output: {
+          // Third-party libraries change rarely, platform code on every release. Separate files let a
+          // browser keep the cached vendor chunks (assets are served with a 10-year cache) and re-download
+          // only the changed app chunk. Excel/PDF libraries stay dynamic-import only.
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+            if (/node_modules\/(react|react-dom|scheduler)\//.test(id)) return 'vendor-react'
+            if (/node_modules\/react-router/.test(id)) return 'vendor-router'
+            if (/node_modules\/(@supabase|iceberg-js|tslib)\//.test(id)) return 'vendor-supabase'
+            return undefined
+          },
+        },
+      },
+    },
     plugins: [
       react(),
       {
