@@ -10,7 +10,7 @@ Follows `stage-13-cleanup.md`. Owner asked to plan and execute the leftovers the
 | 4 | Cut the dead «create from candidate» flow and the recruitment code behind it | done |
 | 5 | Repair the stale verify scripts of kept features | done |
 | 6 | Update `CLAUDE.md`, archive docs of removed modules | done |
-| 7 | (owner decision) simplify the «Пользователи» form and `academy_users` columns | pending |
+| 7 | (owner decision) simplify the «Пользователи» form and `academy_users` columns | form done; DB columns pending (irreversible, separate go) |
 
 ## 2 — dead code
 
@@ -109,3 +109,20 @@ need a local Supabase (Docker); it cannot pass in this environment.
 Not a problem: the second record (`b82c9c87…`) is already merged into the first (`is_merged = true`,
 `merged_into_supplier_id` set, `archived`, no obligations/supplies/orders); the platform's merge mechanism handled it
 and the list hides merged suppliers.
+
+## 7 — «Пользователи» form simplified
+
+Owner confirmed (2026-10-17): drop what only the removed modules used.
+
+- `EmployeeEditModal`: removed the fields «Дата приёма на работу», «Режим работы», «Тип расчёта зарплаты»,
+  «Участие в ведомости», «Рабочая точка» and their keys from the create / update payloads. The create Edge
+  Function already sets server-side defaults (`work_mode = offline`, `salary_calculation_type = shift_based`,
+  `payroll_participation = active`, `hired_at = today`), and the update function only writes keys it receives,
+  so nothing else changes.
+- `getWorkLocations` and the now-unreachable attendance adapters/utils (`attendanceSupabaseAdapter`,
+  `attendanceLocalAdapter`, `attendanceActionErrors`, `attendanceData`, `shiftMidnightEnd`) deleted.
+- `verify:employees-list` updated; `verify:hide-personnel-modules` guards the form (50 checks).
+
+**Not done (needs a separate explicit go, irreversible):** drop the `academy_users` columns `work_mode`,
+`salary_calculation_type`, `payroll_participation`, `work_location_id` (and `hired_at`/`terminated_at` if
+desired) and the table `platform_work_locations`. Preflight must include `grep` of Edge Functions and src.

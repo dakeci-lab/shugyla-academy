@@ -6,9 +6,6 @@ import {
   validateEmployeeForm,
   buildEmployeeCloudUpdateChanges,
   EMPLOYEE_STATUS_OPTIONS,
-  WORK_MODE_OPTIONS,
-  SALARY_CALCULATION_TYPE_OPTIONS,
-  PAYROLL_PARTICIPATION_OPTIONS,
   getStaffEmployees,
   isActiveStaffEmployee,
   isDeactivatedStaffEmployee,
@@ -16,7 +13,6 @@ import {
 import {
   createEmployee,
   updateEmployee,
-  getWorkLocations,
   checkEmployeeLoginAvailability,
 } from '../../../services/platformDataService'
 import { resetEmployeePasswordAsAdmin } from '../../../services/employeeAdminService'
@@ -72,7 +68,6 @@ export default function EmployeeEditModal({
   )
   const [formError, setFormError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [workLocations, setWorkLocations] = useState([])
   const [assignableRoles, setAssignableRoles] = useState([])
   const [avatarRevision, setAvatarRevision] = useState(0)
   const [positionGroups, setPositionGroups] = useState([])
@@ -116,12 +111,6 @@ export default function EmployeeEditModal({
       })
       .catch(() => setAssignableRoles([]))
   }, [form.role, form.roleId])
-
-  useEffect(() => {
-    getWorkLocations()
-      .then(setWorkLocations)
-      .catch(() => setWorkLocations([]))
-  }, [])
 
   // Live login-availability check on the create form only. Advisory: the actual
   // create call still enforces the conflict server-side (see admin-create-employee).
@@ -351,11 +340,6 @@ export default function EmployeeEditModal({
               : {}),
             login: form.login.trim(),
             employmentStatus: form.employmentStatus,
-            hiredAt: form.hiredAt,
-            workMode: form.workMode,
-            salaryCalculationType: form.salaryCalculationType,
-            payrollParticipation: form.payrollParticipation,
-            workLocationId: form.workLocationId || null,
             ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
             ...(form.password?.trim() ? { password: form.password } : {}),
           })
@@ -372,10 +356,6 @@ export default function EmployeeEditModal({
           positionId: form.positionId || null,
           login: form.login.trim(),
           employmentStatus: form.employmentStatus,
-          workMode: form.workMode,
-          salaryCalculationType: form.salaryCalculationType,
-          payrollParticipation: form.payrollParticipation,
-          workLocationId: form.workLocationId || null,
           ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
           ...(form.password?.trim() ? { password: form.password } : {}),
         }
@@ -736,98 +716,7 @@ export default function EmployeeEditModal({
                 </span>
               )}
             </label>
-
-            {editId && (
-              <label className="admin-form__label">
-                Дата приёма на работу
-                <input
-                  className="admin-form__input"
-                  type="date"
-                  value={form.hiredAt || ''}
-                  onChange={(e) => patchForm({ hiredAt: e.target.value })}
-                  disabled={submitting}
-                  required
-                />
-                <span className="admin-form__hint">
-                  Можно изменить при переносе сотрудников, уже работавших до создания аккаунта.
-                </span>
-              </label>
-            )}
-
-            <div className="admin-form__row">
-              <label className="admin-form__label">
-                Режим работы
-                <select
-                  className="admin-form__select"
-                  value={form.workMode}
-                  onChange={(e) => patchForm({ workMode: e.target.value })}
-                  disabled={submitting}
-                >
-                  {WORK_MODE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="admin-form__label">
-                Тип расчёта зарплаты
-                <select
-                  className="admin-form__select"
-                  value={form.salaryCalculationType}
-                  onChange={(e) => patchForm({ salaryCalculationType: e.target.value })}
-                  disabled={submitting}
-                >
-                  {SALARY_CALCULATION_TYPE_OPTIONS.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-
-            <label className="admin-form__label">
-              Участие в ведомости
-              <select
-                className="admin-form__select"
-                value={form.payrollParticipation}
-                onChange={(e) => patchForm({ payrollParticipation: e.target.value })}
-                disabled={submitting}
-              >
-                {PAYROLL_PARTICIPATION_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              <span className="admin-form__hint">
-                Исключённые сотрудники не участвуют в зарплатной ведомости. Карточка и доступ к
-                платформе не меняются.
-              </span>
-            </label>
           </fieldset>
-
-          {!cloudMode && workLocations.length > 0 && (
-            <label className="admin-form__label">
-              Рабочая точка
-              <select
-                className="admin-form__select"
-                value={form.workLocationId || ''}
-                onChange={(e) => patchForm({ workLocationId: e.target.value })}
-                disabled={submitting}
-              >
-                <option value="">По умолчанию (активная точка)</option>
-                {workLocations
-                  .filter((loc) => loc.isActive)
-                  .map((loc) => (
-                    <option key={loc.id} value={loc.id}>
-                      {loc.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          )}
 
           <div className="admin-form__row">
             <label className="admin-form__label">

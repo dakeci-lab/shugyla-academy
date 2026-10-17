@@ -141,7 +141,8 @@ function main() {
   assert('status labels working/fired', employeeData.includes("active: 'Работает'") && employeeData.includes("terminated: 'Уволен'"))
   assert('no deactivated UI label', !employeeData.includes('Деактивирован'))
   assert('hire date helpers', employeeData.includes('formatEmployeeDateRu') && employeeData.includes('todayEmployeeDateKey'))
-  assert('editable hire date in form', editModal.includes('Дата приёма на работу') && editModal.includes('type="date"'))
+  // Stage 14: payroll-related fields (hire date, work mode, salary type, payroll participation, work point) left the form.
+  assert('payroll-only fields are not in the form (stage 14)', !editModal.includes('Дата приёма на работу') && !editModal.includes('Режим работы') && !editModal.includes('Участие в ведомости') && !editModal.includes('Тип расчёта зарплаты'))
   assert('loading uses list skeleton', table.includes('employee-list__skeleton') || section.includes('loading={Boolean(cloudMode && listLoading)}'))
   assert('inline AdminModal form removed from list', !section.includes('<AdminModal'))
   assert(

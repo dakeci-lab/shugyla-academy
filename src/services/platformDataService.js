@@ -22,8 +22,6 @@ import * as localAdapter from './localDataAdapter'
 import { markDevPerf, logDevPerf } from '../utils/devPerf'
 import * as suppliersLocalAdapter from './suppliersLocalAdapter'
 import * as suppliersSupabaseAdapter from './suppliersSupabaseAdapter'
-import * as attendanceLocalAdapter from './attendanceLocalAdapter'
-import * as attendanceSupabaseAdapter from './attendanceSupabaseAdapter'
 import {
   getEmployeeById,
   todayEmployeeDateKey,
@@ -39,10 +37,6 @@ function getAdapter() {
 
 function getSuppliersAdapter() {
   return isCloudMode() ? suppliersSupabaseAdapter : suppliersLocalAdapter
-}
-
-function getAttendanceAdapter() {
-  return isCloudMode() ? attendanceSupabaseAdapter : attendanceLocalAdapter
 }
 
 export { isCloudMode, getDataModeLabel, getDataModeVariant }
@@ -665,8 +659,4 @@ export async function archiveSupplier(supplierId) {
 }
 
 // --- Employee shifts / schedule ---
-
-export async function getWorkLocations() {
-  return getAttendanceAdapter().getWorkLocations()
-}
 

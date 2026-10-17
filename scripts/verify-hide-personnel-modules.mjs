@@ -109,4 +109,10 @@ assert('users list has no «create from candidate» flow (stage 14)',
   !/createFromCandidate|sourceCandidateId|candidatePhone/.test(employees) &&
   !/sourceCandidateId|candidatePhone/.test(read('src/components/admin/employees/EmployeeEditModal.jsx')))
 
+console.log('\nusers form: no fields of removed modules')
+const modal = read('src/components/admin/employees/EmployeeEditModal.jsx')
+for (const key of ['workMode', 'salaryCalculationType', 'payrollParticipation', 'workLocationId', 'hiredAt']) {
+  assert(`the user form does not send or edit ${key}`, !modal.includes(key))
+}
+
 console.log(`\nOK — ${checks} checks`)
