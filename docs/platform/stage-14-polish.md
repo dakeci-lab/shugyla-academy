@@ -103,3 +103,9 @@ web-only — moved into `verify-hide-personnel-modules`).
 
 **Still failing (1):** `auth-first-frontend-production-readiness` runs `supabase:local:verify-*` scripts that
 need a local Supabase (Docker); it cannot pass in this environment.
+
+## Checked: duplicate supplier «Данон»
+
+Not a problem: the second record (`b82c9c87…`) is already merged into the first (`is_merged = true`,
+`merged_into_supplier_id` set, `archived`, no obligations/supplies/orders); the platform's merge mechanism handled it
+and the list hides merged suppliers.
