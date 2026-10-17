@@ -8,7 +8,7 @@ Follows `stage-13-cleanup.md`. Owner asked to plan and execute the leftovers the
 | 2 | Delete remaining dead code: 22 files, −3 130 lines (old procurement `Simple*` / filter components, `purchaseOptimisticService`, `purchaseAccess`, `supplierAccess`, `purchaseFilter*`, `receivingList`, `simpleMarkdown`, `useBodyScrollLock`) | done |
 | 3 | Retire verify scripts and local tooling of removed modules | done |
 | 4 | Cut the dead «create from candidate» flow and the recruitment code behind it | done |
-| 5 | Repair the stale verify scripts of kept features | pending |
+| 5 | Repair the stale verify scripts of kept features | done |
 | 6 | Update `CLAUDE.md`, archive docs of removed modules | done |
 | 7 | (owner decision) simplify the «Пользователи» form and `academy_users` columns | pending |
 
@@ -77,3 +77,29 @@ Edge Function code; add `grep` of `supabase/functions` to the preflight template
   clearing, auth team-workforce, workforce/scheduler performance stages, 4 platform docs); an
   `archive/README.md` explains them. `docs/hr/login-collision-incident.md` stays (referenced by
   `admin-create-employee`). No scripts or sources referenced the moved paths.
+
+## 5 — stale verify scripts of kept features repaired
+
+From 28 failing `verify:*` scripts down to 1 (100 scripts in total). Method: for each script find the
+failing assertion, decide whether the code or the expectation moved, and update the script (never the
+other way round); scripts whose whole subject no longer exists were retired.
+
+**Updated to the current behavior** (examples): `umag-sync-lock` (the sales sync is a second writer with its
+own entity `sales_facts`, asserted), `supplier-retroactive-payment-terms` (terms are now payment account +
+days; open = not natively marked paid), `supplier-finance-summary` (owed amount = invoice until marked paid),
+`procurement-order-actions` (cancelled filter lives in `OrdersPage`), `procurement-abc-analysis` (badge moved to
+`AbcBadges.jsx`; expected check counts), `procurement-planning-v1` (tabs Planning → Norms; orders are separate),
+`employee-admin-edge-performance` (admins are listed; DB budget = employees + position catalog),
+`mobile-shell` / `mobile-profile` / `mobile-page-header` (no bell, user menu, documents row),
+`loading-system`, `pwa-zoom-guard` (cache v7), `position-structure-ui`, `supplier-finance-*`.
+
+**Retired (subject gone):** `supplier-finance-terms-missing-banner` (replaced by the unified status list),
+`umag-open-obligations-sync` (the `sync_open_obligations` action no longer exists), `umag-first-suppliers`
+(directory page merged), `procurement-mobile-access` (its main guarantee — nothing in the procurement group is
+web-only — moved into `verify-hide-personnel-modules`).
+
+**Code touched:** a comment in `procurementPlanningService.js` that tripped the «no service_role in src» scan;
+`SupplierPaymentsPanel.css` lost a `scrollbar-width: thin` that broke the hidden-scrollbars policy.
+
+**Still failing (1):** `auth-first-frontend-production-readiness` runs `supabase:local:verify-*` scripts that
+need a local Supabase (Docker); it cannot pass in this environment.

@@ -902,7 +902,7 @@ export async function resetItemToRecommendation(item) {
 }
 
 /**
- * Persist norm via Edge action set_norm → service_role RPC.
+ * Persist norm via Edge action set_norm → privileged RPC (never called with a client key).
  * Preserves final_order_qty when manual_override=true.
  */
 export async function persistNormDaysForScope({

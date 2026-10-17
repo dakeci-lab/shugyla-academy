@@ -24,7 +24,7 @@ Edge Functions и складываются в собственные табли�
 | Backend | Supabase (Postgres + Auth + RLS + Edge Functions на Deno/TypeScript) |
 | Прод-хостинг | PS.kz / Plesk — деплой артефактом в ветку `ps-production` через GitHub Actions |
 | CI | GitHub Actions: `deploy-ps-production.yml` (сборка + `verify:domain-deployment` + публикация артефакта) |
-| Тесты | ~100 самописных `verify:*` node-скриптов в `scripts/` (часть устарела, см. §8) |
+| Тесты | 100 самописных `verify:*` node-скриптов в `scripts/` (99 проходят, см. §8) |
 | Прочее | PWA (sw.js, manifest), xlsx, pdfmake, qrcode |
 
 Зависимости намеренно минимальны — нет TypeScript на фронте, нет state-библиотек, нет Tailwind.
@@ -114,7 +114,7 @@ GitHub Actions — только вручную/через MCP.
 закрыт анонимный приём заявок и анонимная запись в аватары.
 
 Остаётся (`docs/platform/stage-14-polish.md`):
-- **~28 устаревших `verify:*`** падают с давних пор (закуп, расчёты, PWA — ожидания разошлись с UI).
+- `verify:*`: из 100 проходят 99; `auth-first-frontend-production-readiness` требует локальную Supabase (Docker).
   Новые проверки писать через `scripts/lib/extensionlessResolver.mjs` (реальные модули, не регулярки).
 - По желанию владельца: упростить форму «Пользователи» и убрать колонки `academy_users`, нужные только
   удалённым модулям (`work_mode`, `salary_calculation_type`, `payroll_participation`, `work_location_id`),

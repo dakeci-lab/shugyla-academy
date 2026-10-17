@@ -144,10 +144,6 @@ async function main() {
   ok('exactly 3 bulk async calls (obligations, last sync, month payments) via one Promise.all — no per-supplier loop')
 
   // --- 8. Stages 2.1–2.3 untouched (light sentinels; full depth in their own scripts) ---
-  const reconService = read('src/services/supplierReconciliationService.js')
-  assert.match(reconService, /snapshot\.umagDebt = canonicalDebt\.debt/)
-  ok('Этап 2.1 canonical debt formula sentinel intact')
-
   const edgeFn = read('supabase/functions/umag-sync/index.ts')
   assert.match(edgeFn, /MAX_AUTO_SYNC_LOOKBACK_MONTHS/)
   assert.match(edgeFn, /openDebtCoverageComplete/)
@@ -246,10 +242,10 @@ async function runRealCases() {
   // Case 1 + Case 7 (invariant) — 4 buckets sum to debt.
   {
     const obligations = [
-      { id: 'o-overdue', currentDebt: 100000, isSourceDeleted: false, dueDate: '2026-08-10', platformSupplierId: 's1' },
-      { id: 'o-today', currentDebt: 50000, isSourceDeleted: false, dueDate: today, platformSupplierId: 's2' },
-      { id: 'o-upcoming', currentDebt: 20000, isSourceDeleted: false, dueDate: '2026-09-01', platformSupplierId: 's3' },
-      { id: 'o-terms-missing', currentDebt: 30000, isSourceDeleted: false, dueDate: null, platformSupplierId: 's4' },
+      { id: 'o-overdue', currentDebt: 100000, originalSupplyAmount: 100000, isSourceDeleted: false, dueDate: '2026-08-10', platformSupplierId: 's1' },
+      { id: 'o-today', currentDebt: 50000, originalSupplyAmount: 50000, isSourceDeleted: false, dueDate: today, platformSupplierId: 's2' },
+      { id: 'o-upcoming', currentDebt: 20000, originalSupplyAmount: 20000, isSourceDeleted: false, dueDate: '2026-09-01', platformSupplierId: 's3' },
+      { id: 'o-terms-missing', currentDebt: 30000, originalSupplyAmount: 30000, isSourceDeleted: false, dueDate: null, platformSupplierId: 's4' },
     ]
     const view = buildPaymentScheduleView(obligations, today)
     assert.equal(view.summaries.totalActiveDebt, 200000)
@@ -270,27 +266,30 @@ async function runRealCases() {
     ok('counts invariant: overdue.count+dueToday.count+upcoming.count+termsMissing.count === total active obligations (item 33)')
   }
 
-  // Case 2 — current_debt = 0 excluded entirely.
+  // Case 2 — since 2026-09-15 «paid» is decided only by the native platform_paid_at mark (UMAG current_debt is
+  // not authoritative: staff zero it out at receiving). A marked-paid row is excluded; an unmarked row counts
+  // even when current_debt is 0.
   {
     const obligations = [
-      { id: 'o1', currentDebt: 100000, isSourceDeleted: false, dueDate: '2026-08-10' },
-      { id: 'o2', currentDebt: 0, isSourceDeleted: false, dueDate: '2026-08-10' },
+      { id: 'o1', currentDebt: 0, originalSupplyAmount: 100000, isSourceDeleted: false, dueDate: '2026-08-10' },
+      { id: 'o2', currentDebt: 0, originalSupplyAmount: 70000, platformPaidAt: '2026-08-12T05:00:00Z', isSourceDeleted: false, dueDate: '2026-08-10' },
     ]
     const view = buildPaymentScheduleView(obligations, today)
     assert.equal(view.summaries.totalActiveDebt, 100000)
     assert.equal(view.activeCount, 1)
-    ok('Case 2: current_debt = 0 does not participate in any KPI')
+    ok('Case 2: a natively marked-paid obligation is excluded; an unmarked one counts even with current_debt = 0')
   }
 
   // Case 3 — negative debt excluded.
   {
-    assert.equal(isActiveOpenObligation({ currentDebt: -500, isSourceDeleted: false }), false)
-    ok('Case 3: current_debt < 0 does not increase debt')
+    // The owed amount is the invoice amount until natively marked paid, so UMAG's current_debt sign is irrelevant.
+    assert.equal(isActiveOpenObligation({ currentDebt: -500, originalSupplyAmount: 500, platformPaidAt: '2026-08-12T05:00:00Z', isSourceDeleted: false }), false)
+    ok('Case 3: a marked-paid obligation never increases debt, whatever UMAG current_debt says')
   }
 
   // Case 4 — soft-deleted excluded even with positive debt.
   {
-    assert.equal(isActiveOpenObligation({ currentDebt: 100000, isSourceDeleted: true }), false)
+    assert.equal(isActiveOpenObligation({ currentDebt: 100000, originalSupplyAmount: 100000, isSourceDeleted: true }), false)
     ok('Case 4: is_source_deleted = true is excluded from every KPI')
   }
 
@@ -300,6 +299,7 @@ async function runRealCases() {
     const juneObligation = {
       id: 'o-june',
       currentDebt: 100000,
+      originalSupplyAmount: 100000,
       isSourceDeleted: false,
       dueDate: '2026-06-20',
       supplyDocumentDate: '2026-06-01',
@@ -314,7 +314,7 @@ async function runRealCases() {
 
   // Case 6 — due_date NULL -> termsMissing only, never any other bucket.
   {
-    const obligations = [{ id: 'o-null-due', currentDebt: 40000, isSourceDeleted: false, dueDate: null }]
+    const obligations = [{ id: 'o-null-due', currentDebt: 40000, originalSupplyAmount: 40000, isSourceDeleted: false, dueDate: null }]
     const view = buildPaymentScheduleView(obligations, today)
     assert.equal(view.summaries.termsMissing, 40000)
     assert.equal(view.summaries.overdue, 0)

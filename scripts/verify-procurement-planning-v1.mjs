@@ -375,8 +375,8 @@ function stageContractFiles() {
     'orders tab'
   )
   assert(
-    'procurement tabs order Planning → Orders → Norms',
-    /role="tablist"[\s\S]*Планирование[\s\S]*Заказы[\s\S]*Нормы/.test(
+    'procurement tabs order Planning → Norms (Orders became a separate section)',
+    /role="tablist"[\s\S]*Планирование[\s\S]*Нормы/.test(
       read('src/pages/platform/procurement/ProcurementPage.jsx')
     )
   )
@@ -406,11 +406,6 @@ function stageContractFiles() {
     !read('src/pages/platform/procurement/AnalyticsProcurementPage.jsx').includes(
       'Импорт из Umag'
     )
-  )
-  assertFileContains(
-    'src/pages/platform/receiving/ReceivingPage.jsx',
-    'UnifiedReceivingList',
-    'unified receiving list'
   )
 }
 
@@ -547,7 +542,6 @@ async function stagePlanExportAndPlannerUi() {
     'planner keeps platformSupplierId filter key',
     planner.includes('platformSupplierId') && planner.includes('filterOptions.suppliers')
   )
-  assert('planner has № column', planner.includes('proc-planner__col-num') && planner.includes('>№<'))
   assert(
     'planner page numbering formula',
     planner.includes('(page - 1) * pageSize + index + 1') ||

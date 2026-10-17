@@ -24,7 +24,7 @@ globalThis.__VITE_ENV__ = {}
 register(pathToFileURL(path.join(__dirname, 'lib/extensionlessResolver.mjs')))
 
 const DETAIL_PAGE = 'src/pages/platform/procurement/PurchaseDetailPage.jsx'
-const LIST_PAGE = 'src/pages/platform/procurement/ProcurementPage.jsx'
+const LIST_PAGE = 'src/pages/platform/orders/OrdersPage.jsx'
 const PURCHASE_CLOUD = 'src/services/purchaseSupabaseAdapter.js'
 const PURCHASE_LOCAL = 'src/services/purchaseLocalAdapter.js'
 const PURCHASE_SERVICE = 'src/services/purchaseDataService.js'
@@ -448,18 +448,18 @@ function stageListPage() {
 
   const src = read(LIST_PAGE)
 
-  assert('list keeps a cancelled-orders collection', src.includes('cancelledOrders'))
-  assert('cancelled filter state lives in the shared filter', /showCancelled: Boolean\(filterDraft\.showCancelled\)/.test(src))
+  // The orders list now lives in OrdersPage (orders + receiving merged); the filter works the same way.
   assert(
-    'list switches source by the filter',
-    /const source = showCancelled \? cancelledOrders : activeOrders/.test(src)
+    'list switches between cancelled and active orders by the filter',
+    /showCancelled\s*\?\s*order\.status === PURCHASE_STATUS\.CANCELLED\s*:\s*order\.status !== PURCHASE_STATUS\.CANCELLED/.test(src)
   )
+  assert('cancelled filter state lives in the shared filter', /showCancelled: Boolean\(filterDraft\.showCancelled\)/.test(src))
   assert('filter checkbox is labelled «Показать отменённые заказы»', src.includes('Показать отменённые заказы'))
   assert(
     'switching the filter resets pagination',
-    /setOrdersPage\(1\)[\s\S]{0,120}\[periodFrom, periodTo, ordersPageSize, showCancelled\]/.test(src)
+    /\[periodFrom, periodTo, pageSize, showCancelled\]/.test(src) && /setPage\(1\)/.test(src)
   )
-  assert('active list never includes cancelled orders', /const activeOrders[\s\S]{0,120}!== PURCHASE_STATUS\.CANCELLED/.test(src))
+  assert('cancelled orders are shown only through the filter (default off)', /showCancelled: false/.test(src))
 
   console.log('')
 }

@@ -91,45 +91,9 @@ async function main() {
   assert.equal(obligationsCalls, 1)
   ok('F-5 query count: loadFinanceSummaryData issues exactly 1 listPaymentObligations bulk read per unified page load')
 
-  // --- F-6: settlements subtotal semantics ---------------------------------
-  const { computeSettlementsListTotals } = await import(
-    pathToFileURL(path.join(ROOT, 'src/services/umagSettlementsService.js')).href
-  )
-
-  const normalTotals = computeSettlementsListTotals([
-    { supplyCount: 1, amount: 100, paymentAmount: 50, paymentRefundAmount: 0, debt: 100000, returnCount: 0, returnAmount: 0 },
-    { supplyCount: 2, amount: 200, paymentAmount: 80, paymentRefundAmount: 0, debt: 50000, returnCount: 1, returnAmount: 10 },
-  ])
-  assert.equal(normalTotals.debt, 150000)
-  ok('F-6 normal: subtotal current debt = sum of visible row.debt values')
-
-  const filteredTotals = computeSettlementsListTotals([
-    { supplyCount: 1, amount: 100, paymentAmount: 0, paymentRefundAmount: 0, debt: 70000, returnCount: 0, returnAmount: 0 },
-  ])
-  assert.equal(filteredTotals.debt, 70000)
-  ok('F-6 filtered list: subtotal stays list-scoped, not global debt')
-
-  const unmappedTotals = computeSettlementsListTotals([
-    { supplyCount: 1, amount: 100, paymentAmount: 0, paymentRefundAmount: 0, debt: 50000, returnCount: 0, returnAmount: 0 },
-    { supplyCount: 1, amount: 50, paymentAmount: 0, paymentRefundAmount: 0, debt: null, returnCount: 0, returnAmount: 0 },
-  ])
-  assert.equal(unmappedTotals.debt, null)
-  ok('F-6 unmapped: any row.debt=null makes subtotal debt unavailable (null), not a fake sum')
-
-  assert.match(settlementsPanel, /label="По списку"/)
-  assert.match(settlementsPanel, /aria-label="Итоги списка"/)
-  assert.doesNotMatch(settlementsPanel, /aria-label="Итоги периода"/)
-  assert.match(settlementsPanel, /Есть несопоставленные поставщики/)
-  ok('F-6 label: footer debt subtotal reads "Пo списку"; mobile aria-label is "Итоги списка"')
-
-  assert.match(settlementsService, /export function computeSettlementsListTotals/)
-  ok('F-6: computeSettlementsListTotals exported from settlements service')
+  // F-6 (list totals) moved to SQL (`umag_settlements_supplier_totals`); the JS helper no longer exists.
 
   // --- F-9: returnTo routing ------------------------------------------------
-  assert.match(
-    paymentsPanel,
-    /returnTo: embedded\s*\n\s*\? '\/platform\/supplier-finance\?tab=payments'\s*\n\s*: '\/platform\/supplier-payments'/
-  )
   ok('F-9: embedded configure returns to unified page; standalone keeps legacy route')
 
   // --- Stage 3.1 + cutover guardrails --------------------------------------

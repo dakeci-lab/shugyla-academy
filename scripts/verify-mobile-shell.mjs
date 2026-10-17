@@ -44,12 +44,12 @@ function main() {
 
   console.log('Stage 1: Mobile header')
 
-  assert('mobile header hides user menu', mobileHeader.includes('showUserMenu={false}'))
-  assert('mobile header keeps notification bell', mobileHeader.includes('PlatformHeaderActions'))
+  // Stage 12/13: the mobile header has no user menu and no bell (notifications were removed).
+  assert('mobile header has no user menu or bell', !mobileHeader.includes('PlatformHeaderActions') && !mobileHeader.includes('NotificationBell'))
   assert('mobile header no user prop', !mobileHeader.includes('user={user}'))
   assert('mobile header no compact avatar mode', !mobileHeader.includes('compact'))
   assert('header actions support showUserMenu flag', headerActions.includes('showUserMenu'))
-  assert('header actions render bell', headerActions.includes('NotificationBell'))
+  assert('header actions have no bell (stage 13)', !headerActions.includes('NotificationBell'))
   assert('user menu gated by showUserMenu', headerActions.includes('showUserMenu &&'))
 
   console.log('Stage 2: Desktop header preserved')

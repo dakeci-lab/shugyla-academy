@@ -56,10 +56,16 @@ function main() {
   ).trim()
   assert.equal(
     writers,
-    'src/services/umagSettlementsService.js\nsupabase/functions/umag-sync/index.ts',
+    'src/services/salesDataService.js\nsrc/services/umagSettlementsService.js\nsupabase/functions/umag-sales-sync/index.ts\nsupabase/functions/umag-sync/index.ts',
     'a new writer of umag_sync_runs appeared — re-check the lock key against it'
   )
-  ok('umag_sync_runs is written only by umag-sync/index.ts (service_role) — frontend only SELECTs; no independent workflow to protect from the lock')
+  ok('umag_sync_runs writers: umag-sync (entity all) and umag-sales-sync (entity sales_facts) in the edge; frontend only SELECTs')
+
+  // The sales pipeline is an independent entity: the lock is keyed on entity, so it never blocks umag-sync.
+  const salesEdge = read('supabase/functions/umag-sales-sync/index.ts')
+  const salesEntities = [...salesEdge.matchAll(/entity:\s*'([^']+)'|\.eq\('entity',\s*'([^']+)'\)/g)].map((m) => m[1] || m[2])
+  assert.deepEqual([...new Set(salesEntities)], ['sales_facts'], "umag-sales-sync must use its own entity 'sales_facts', distinct from 'all'")
+  ok("umag-sales-sync uses only entity 'sales_facts' — independent of the 'all' financial pipeline, so the per-entity lock cannot block it")
 
   const edge = read(EDGE_FN)
   const entityLiterals = [...edge.matchAll(/entity:\s*'([^']+)'/g)].map((m) => m[1])
