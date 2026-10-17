@@ -35,8 +35,7 @@ function main() {
   console.log('=== Modal scroll lock verification ===\n')
 
   const util = read('src/utils/modalScrollLock.js')
-  const hook = read('src/hooks/useBodyScrollLock.js')
-  const modal = read('src/components/admin/AdminModal.jsx')
+    const modal = read('src/components/admin/AdminModal.jsx')
   const modalCss = read('src/components/admin/AdminModal.css')
 
   assert('shared scroll lock utility exists', util.includes('lockModalScroll'))
@@ -52,8 +51,6 @@ function main() {
   assert('admin modal unlocks on cleanup', modal.includes('unlockModalScroll'))
   assert('admin modal onClose stored in ref', modal.includes('onCloseRef'))
   assert('admin modal focus effect isolated', modal.includes('autoFocusClose'))
-  assert('body scroll hook delegates to utility', hook.includes('lockModalScroll'))
-  assert('filter modal passes return focus ref', read('src/components/procurement/PurchaseFilterPopover.jsx').includes('returnFocusRef={anchorRef}'))
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

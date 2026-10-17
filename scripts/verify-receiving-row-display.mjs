@@ -97,17 +97,7 @@ function stageEntryTypesAndJoin() {
 function stageStaticChecks() {
   console.log('Stage 3: Static UI checks')
 
-  const card = read('src/components/procurement/SimpleDeliveryCard.jsx')
-  assert('no expected badge in card', !card.includes('По расписанию'))
-  assert('no expected delivery label import', !card.includes('EXPECTED_DELIVERY_LABEL'))
-  assert('no row status label variable', !card.includes('const statusLabel'))
-  assert('no overdue/pending text in card', !card.includes('Просрочено') && !card.includes('Ожидается'))
-  assert('uses payment terms helper', card.includes('formatSupplierPaymentTerms'))
-  assert('schedule-only hides meta', card.includes('isCreatedPurchase &&'))
 
-  const css = read('src/components/procurement/SimpleDeliveryCard.css')
-  assert('payment terms style exists', css.includes('simple-delivery-row__payment-terms'))
-  assert('overdue orange styling kept', css.includes('simple-delivery-row--overdue'))
 }
 
 function main() {

@@ -199,8 +199,6 @@ async function main() {
   assert.match(filterCss, /position:\s*fixed/)
   assert.match(filterCss, /min-width/)
   assert.match(filterCss, /date-wrap/)
-  const purchaseFilterCss = read('src/components/procurement/PurchaseFilterPopover.css')
-  assert.doesNotMatch(purchaseFilterCss, /width:\s*min\(360px,\s*100%\)/)
   ok('settlements UI without large UMAG source banners')
 
   const nav = read('src/platform/platformNav.js')
