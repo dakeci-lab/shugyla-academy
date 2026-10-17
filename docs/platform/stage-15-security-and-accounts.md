@@ -63,5 +63,13 @@ request seen from the browser is network + PostgREST/RLS overhead, so don't expe
 
 - 6 RLS policies that re-evaluate `auth.uid()` per row (`user_table_settings`, `academy_users`), 20 unused indexes.
 - Dashboard: enable «Leaked password protection».
-- Two accounts (receiver, accountant) were switched to «terminated» on 2026-10-17; they were not deleted pending
-  the owner's confirmation (they are the only holders of those roles).
+
+
+## 15e — last two terminated accounts deleted (2026-10-17)
+
+The receiver and the accountant accounts, switched to «terminated» by the owner on 2026-10-17, were deleted after the
+owner's explicit confirmation (same transaction pattern: asserted no payment marks / orders / receiving documents
+referenced them, and exactly the 3 expected accounts remain). Their avatar was removed too.
+
+**State now:** 3 accounts (2 administrators, 1 buyer). Roles `buhgalter` and `receiver` exist but have no users;
+they were kept on purpose so a new receiver / accountant can be created later.
