@@ -1,11 +1,5 @@
 import { formatRoleDisplayLabel } from '../../../utils/roleDisplay'
 
-export const TEAM_TABS = [
-  { id: 'roles', label: 'Роли и доступы' },
-  { id: 'groups', label: 'Группы должностей' },
-  { id: 'positions', label: 'Должности' },
-]
-
 export function idsEqual(a = [], b = []) {
   if (a.length !== b.length) return false
   const setB = new Set(b)

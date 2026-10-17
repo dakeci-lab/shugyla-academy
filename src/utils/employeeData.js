@@ -326,9 +326,6 @@ export function filterEmployees(
       employee.lastName,
       employee.fullName,
       employee.login,
-      employee.position,
-      employee.positionName,
-      employee.positionGroupName,
       employee.role,
       employee.roleName,
       employee.roleLabel,
@@ -360,15 +357,6 @@ function splitName(fullName) {
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') }
 }
 
-/** Resolve HR position text only — never from access role labels. */
-function resolvePositionDisplay(raw) {
-  const positionName = raw?.positionName ?? raw?.position_name ?? null
-  const structured = typeof positionName === 'string' ? positionName.trim() : ''
-  if (structured) return structured
-  const legacy = typeof raw?.position === 'string' ? raw.position.trim() : ''
-  return legacy
-}
-
 /** Нормализация записи сотрудника */
 export function normalizeEmployee(raw) {
   const roleId = normalizeRoleId(raw.role) || raw.role
@@ -376,9 +364,6 @@ export function normalizeEmployee(raw) {
   const firstName = raw.firstName ?? fromName.firstName
   const lastName = raw.lastName ?? fromName.lastName
   const name = `${firstName} ${lastName}`.trim() || raw.name || ''
-  const positionId = raw.positionId ?? raw.position_id ?? null
-  const positionName = raw.positionName ?? raw.position_name ?? null
-  const position = resolvePositionDisplay(raw)
 
   return {
     ...raw,
@@ -386,17 +371,6 @@ export function normalizeEmployee(raw) {
     firstName,
     lastName,
     name,
-    position,
-    positionId,
-    positionName: positionName || position || null,
-    positionGroupId: raw.positionGroupId ?? raw.position_group_id ?? null,
-    positionGroupName: raw.positionGroupName ?? raw.position_group_name ?? null,
-    positionSortOrder: raw.positionSortOrder ?? raw.position_sort_order ?? null,
-    positionGroupSortOrder:
-      raw.positionGroupSortOrder ?? raw.position_group_sort_order ?? null,
-    positionIsActive: raw.positionIsActive ?? raw.position_is_active ?? null,
-    positionGroupIsActive:
-      raw.positionGroupIsActive ?? raw.position_group_is_active ?? null,
     roleId: raw.roleId ?? raw.role_id ?? null,
     employmentStatus: normalizeEmploymentStatus(
       raw.employmentStatus || raw.status
@@ -416,34 +390,11 @@ export function normalizeEmployee(raw) {
   }
 }
 
-/**
- * Merge cloud employee with optional local edit overlay.
- * Cloud positionId always wins over local legacy position text.
- */
+/** Merge cloud employee with optional local edit overlay. */
 export function mergeEmployeeWithLocalEdit(cloudEmployee, localEdit) {
   if (!cloudEmployee) return null
   if (!localEdit || typeof localEdit !== 'object') return normalizeEmployee(cloudEmployee)
-
-  const merged = {
-    ...cloudEmployee,
-    ...localEdit,
-  }
-
-  if (cloudEmployee.positionId) {
-    merged.positionId = cloudEmployee.positionId
-    merged.positionName = cloudEmployee.positionName ?? cloudEmployee.position
-    merged.position = cloudEmployee.positionName || cloudEmployee.position
-    merged.positionGroupId = cloudEmployee.positionGroupId ?? null
-    merged.positionGroupName = cloudEmployee.positionGroupName ?? null
-    merged.positionSortOrder = cloudEmployee.positionSortOrder ?? null
-    merged.positionGroupSortOrder = cloudEmployee.positionGroupSortOrder ?? null
-    merged.positionIsActive = cloudEmployee.positionIsActive ?? null
-    merged.positionGroupIsActive = cloudEmployee.positionGroupIsActive ?? null
-  } else if (localEdit.positionId) {
-    merged.positionId = localEdit.positionId
-  }
-
-  return normalizeEmployee(merged)
+  return normalizeEmployee({ ...cloudEmployee, ...localEdit })
 }
 
 /** Idempotent selective migration of local employee cache keys. */
@@ -668,7 +619,6 @@ export const EMPTY_EMPLOYEE_FORM = {
   lastName: '',
   role: ROLE_IDS.CASHIER,
   roleId: '',
-  positionId: '',
   login: '',
   password: '',
   avatarUrl: '',
@@ -686,7 +636,6 @@ export function employeeToForm(employee) {
     lastName: employee.lastName || '',
     role: employee.role || ROLE_IDS.CASHIER,
     roleId: employee.roleId || '',
-    positionId: employee.positionId || '',
     login: employee.login || '',
     password: '',
     avatarUrl: employee.avatarUrl || '',
@@ -699,7 +648,7 @@ export function employeeToForm(employee) {
   }
 }
 
-export function validateEmployeeForm(form, editId = null, { requirePositionId = false } = {}) {
+export function validateEmployeeForm(form, editId = null) {
   if (!form.firstName?.trim()) {
     return 'Укажите имя сотрудника'
   }
@@ -712,9 +661,6 @@ export function validateEmployeeForm(form, editId = null, { requirePositionId = 
   if (!editId && !form.roleId) {
     return 'Укажите роль в системе'
   }
-  if ((requirePositionId || !editId) && !form.positionId) {
-    return 'Укажите должность'
-  }
   if (editId && !toEmployeeDateKey(form.hiredAt)) {
     return 'Укажите дату приёма на работу'
   }
@@ -722,35 +668,6 @@ export function validateEmployeeForm(form, editId = null, { requirePositionId = 
     return 'Сотрудник с таким логином уже существует'
   }
   return null
-}
-
-/** Display helpers for employee position / role separation in UI. */
-export function getEmployeePositionLabel(employee) {
-  if (!employee) return ''
-  if (employee.positionId && employee.positionName) return employee.positionName
-  if (employee.positionName) return employee.positionName
-  if (employee.positionId && employee.position) return employee.position
-  if (employee.positionId) return ''
-  return employee.position || ''
-}
-
-/**
- * UI label for HR position. Never uses access role / getRoleLabel.
- * Priority: positionName → legacy position text → «Должность не назначена».
- */
-export function getEmployeePositionDisplay(employee) {
-  const label = String(getEmployeePositionLabel(employee) || '').trim()
-  return label || 'Должность не назначена'
-}
-
-export function getEmployeePositionGroupLabel(employee) {
-  if (!employee) return ''
-  return employee.positionGroupName || ''
-}
-
-export function isEmployeePositionUnlinked(employee) {
-  if (!employee) return false
-  return !employee.positionId && Boolean(employee.position)
 }
 
 function normEmployeeText(value) {
@@ -761,8 +678,6 @@ function normEmployeeText(value) {
 /**
  * Diff-only cloud update payload for employee edit.
  * Omits unchanged fields. For self-edit never includes roleId / employmentStatus.
- * Role changes never include position / positionId — position is independent.
- * Position changes only when form.positionId is explicitly provided and differs.
  */
 export function buildEmployeeCloudUpdateChanges(
   employee,
@@ -775,7 +690,6 @@ export function buildEmployeeCloudUpdateChanges(
     firstName: String(form.firstName || '').trim(),
     lastName: String(form.lastName || '').trim(),
     roleId: selectedRole?.id || form.roleId || null,
-    positionId: form.positionId ?? form.position_id ?? null,
     employmentStatus: normalizeEmploymentStatus(
       form.employmentStatus || employee.employmentStatus,
     ),
@@ -817,14 +731,6 @@ export function buildEmployeeCloudUpdateChanges(
   }
 
   if (!editingSelf) {
-    // Explicit positionId only — never derive from selectedRole.name.
-    if (
-      next.positionId != null &&
-      next.positionId !== '' &&
-      normEmployeeText(next.positionId) !== normEmployeeText(employee.positionId)
-    ) {
-      changes.positionId = next.positionId
-    }
     if (normEmployeeText(next.roleId) !== normEmployeeText(employee.roleId)) {
       changes.roleId = next.roleId
     }

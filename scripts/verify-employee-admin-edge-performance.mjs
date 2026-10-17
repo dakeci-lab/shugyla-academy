@@ -103,8 +103,8 @@ function main() {
   assert('avatar_url retained', fields.includes('avatar_url'))
   assert('status retained', fields.includes('status'))
   assert('admin role is listed too (role is access control only)', !edge.includes(".neq('role', 'admin')"))
-  // Budget: employees query + position catalog (the fused authorization call is counted inside the authz helper).
-  assert('list DB budget path is employees + position catalog', (edge.match(/trackDbCall\(dbCalls\)/g) || []).length === 2)
+  // Budget: employees query (positions were removed in stage 17) (the fused authorization call is counted inside the authz helper).
+  assert('list DB budget path is a single employees query', (edge.match(/trackDbCall\(dbCalls\)/g) || []).length === 1)
   assert('employee_not_found retained', edge.includes("'employee_not_found'"))
   assert('empty list returns ok employees array', edge.includes('employees,') && edge.includes('pagination:'))
 

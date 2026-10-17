@@ -21,7 +21,6 @@ export function collectLocalSnapshot() {
     login: emp.login,
     password: emp.password || '',
     role: emp.role,
-    position: emp.position || '',
     status: emp.employmentStatus || 'active',
   }))
 

@@ -66,9 +66,6 @@ export const PERMISSION_CODES = {
   SETTINGS_MANAGE: 'settings.manage',
   NOTIFICATIONS_MANAGE: 'notifications.manage',
 
-  POSITIONS_VIEW: 'positions.view',
-  POSITIONS_MANAGE: 'positions.manage',
-
   PAYMENT_ACCOUNTS_VIEW: 'payment_accounts.view',
   PAYMENT_ACCOUNTS_MANAGE: 'payment_accounts.manage',
 }
@@ -95,7 +92,6 @@ export const PERMISSION_MODULES = {
   supplier_payments: 'Оплаты поставщикам',
   sales: 'Продажи',
   payroll: 'Зарплата',
-  positions: 'Организационная структура',
   settings: 'Настройки',
   payment_accounts: 'Счета оплаты',
 }
@@ -114,7 +110,6 @@ export const RBAC_MATRIX_MODULES = [
   'umag',
   'supplier_payments',
   'sales',
-  'positions',
   'settings',
   'roles',
   'payment_accounts',
@@ -184,20 +179,6 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.UMAG_SETTLEMENTS_SYNC, name: 'Синхронизация UMAG', module: 'umag', sortOrder: 171 },
   { code: PERMISSION_CODES.SUPPLIER_PAYMENTS_VIEW, name: 'Просмотр оплат поставщикам', module: 'supplier_payments', sortOrder: 190 },
   { code: PERMISSION_CODES.SUPPLIER_PAYMENTS_MANAGE, name: 'Управление календарём оплат поставщикам', module: 'supplier_payments', sortOrder: 191 },
-  {
-    code: PERMISSION_CODES.POSITIONS_VIEW,
-    name: 'Просмотр организационной структуры',
-    description: 'Просмотр групп должностей, должностей и их порядка',
-    module: 'positions',
-    sortOrder: 155,
-  },
-  {
-    code: PERMISSION_CODES.POSITIONS_MANAGE,
-    name: 'Управление организационной структурой',
-    description: 'Создание, редактирование, перемещение, архивирование и изменение порядка групп должностей и должностей',
-    module: 'positions',
-    sortOrder: 156,
-  },
   { code: PERMISSION_CODES.SETTINGS_VIEW, name: 'Просмотр настроек', module: 'settings', sortOrder: 160 },
   { code: PERMISSION_CODES.SETTINGS_MANAGE, name: 'Управление настройками', module: 'settings', sortOrder: 161 },
   { code: PERMISSION_CODES.PAYMENT_ACCOUNTS_VIEW, name: 'Просмотр счетов оплаты', module: 'payment_accounts', sortOrder: 163 },

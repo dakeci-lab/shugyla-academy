@@ -23,7 +23,6 @@ import {
 } from '../utils/phoneUtils'
 
 import { getAppUrl } from '../router/basename'
-import { resolveSessionPosition } from '../utils/sessionPosition'
 
 /**
  * Minimal profile columns for Auth login/session restore.
@@ -31,11 +30,7 @@ import { resolveSessionPosition } from '../utils/sessionPosition'
  * after migrations cannot break sign-in.
  */
 export const ACADEMY_AUTH_PROFILE_FIELDS =
-  'id, first_name, last_name, full_name, login, role, role_id, status, position, position_id, avatar_url, auth_user_id, contact_email, created_at'
-
-/** Fallback without position_id when column grants lag behind schema (hotfix 2.1). */
-export const ACADEMY_AUTH_PROFILE_FIELDS_WITHOUT_POSITION_ID =
-  'id, first_name, last_name, full_name, login, role, role_id, status, position, avatar_url, auth_user_id, contact_email, created_at'
+  'id, first_name, last_name, full_name, login, role, role_id, status, avatar_url, auth_user_id, contact_email, created_at'
 
 /** Safe academy_users columns for Auth-first cloud queries (never includes password). */
 export const ACADEMY_PROFILE_SAFE_FIELDS =
@@ -80,7 +75,6 @@ export function getPasswordResetRedirectUrl() {
 function buildSessionUser(employee, phone = null) {
   const role = getRole(employee.role)
   const loginPhone = phone || technicalEmailToPhone(employee.login) || employee.login
-  const sessionPosition = resolveSessionPosition(employee)
   return {
     id: employee.id,
     login: employee.login,
@@ -90,7 +84,6 @@ function buildSessionUser(employee, phone = null) {
     role: employee.role,
     roleId: employee.roleId ?? employee.role_id ?? null,
     roleName: role?.label || employee.role,
-    ...sessionPosition,
     avatarUrl: employee.avatarUrl || null,
     workMode: employee.workMode || employee.work_mode || 'offline',
     permissions: role?.permissions || [],
@@ -106,8 +99,6 @@ function profileRowToEmployee(row) {
     login: row.login,
     role: row.role,
     roleId: row.role_id,
-    position: row.position,
-    positionId: row.position_id ?? null,
     employmentStatus: row.status,
     hiredAt: row.hired_at,
     terminatedAt: row.terminated_at,
@@ -129,18 +120,7 @@ function profileRowToEmployee(row) {
  * Employment dates are attached when the extended select succeeds.
  */
 async function loadAcademyUserRow(match) {
-  let authResult = await match(ACADEMY_AUTH_PROFILE_FIELDS)
-
-  // Hotfix 2.1: column-level GRANT may lag after ADD COLUMN position_id.
-  // Retry without position_id so Auth session can still become a platform profile.
-  if (authResult.error && isProfilePermissionDeniedError(authResult.error)) {
-    if (import.meta.env.DEV) {
-      console.warn('[auth] profile select forbidden; retrying without position_id', {
-        code: PROFILE_LOAD_ERROR.FORBIDDEN,
-      })
-    }
-    authResult = await match(ACADEMY_AUTH_PROFILE_FIELDS_WITHOUT_POSITION_ID)
-  }
+  const authResult = await match(ACADEMY_AUTH_PROFILE_FIELDS)
 
   if (authResult.error || !authResult.data) return authResult
 
@@ -515,7 +495,6 @@ async function restoreLegacyPlatformSession(storedSnapshot) {
     roleId: rbacRole.id,
   })
 
-  const sessionPosition = resolveSessionPosition(profile)
 
   return {
     user: {
@@ -525,8 +504,7 @@ async function restoreLegacyPlatformSession(storedSnapshot) {
       role: rbacRole.code,
       roleId: rbacRole.id,
       roleName: rbacRole.name,
-      ...sessionPosition,
-      permissions: [],
+        permissions: [],
       permissionCodes,
       permissionSlugs: permissionCodes,
       sessionType: SESSION_TYPE.LEGACY,
@@ -836,7 +814,6 @@ export async function signInWithEmail(email, password) {
   }
 
   const role = getRole(legacy.user.role)
-  const sessionPosition = resolveSessionPosition(legacy.user)
   return {
     ok: true,
     user: {
@@ -846,8 +823,7 @@ export async function signInWithEmail(email, password) {
       name: legacy.user.name,
       role: legacy.user.role,
       roleName: role?.label || legacy.user.role,
-      ...sessionPosition,
-      avatarUrl: legacy.user.avatarUrl || null,
+        avatarUrl: legacy.user.avatarUrl || null,
       permissions: role?.permissions || [],
     },
     session: null,

@@ -437,9 +437,6 @@ export async function createEmployee(data) {
       lastName: data.lastName,
       fullName,
       roleId: data.roleId,
-      positionId: data.positionId || data.position_id || undefined,
-      // Legacy text only as last-resort fallback for old callers; new UI sends positionId.
-      position: data.positionId ? undefined : data.position,
       avatarUrl: data.avatarUrl,
     })
 
@@ -453,15 +450,6 @@ export async function createEmployee(data) {
         login: row.login,
         role: row.role,
         roleId: row.role_id,
-        position: row.position,
-        positionId: row.position_id ?? null,
-        positionName: row.position_name ?? null,
-        positionGroupId: row.position_group_id ?? null,
-        positionGroupName: row.position_group_name ?? null,
-        positionSortOrder: row.position_sort_order ?? null,
-        positionGroupSortOrder: row.position_group_sort_order ?? null,
-        positionIsActive: row.position_is_active ?? null,
-        positionGroupIsActive: row.position_group_is_active ?? null,
         employmentStatus: row.status,
         avatarUrl: row.avatar_url,
         hiredAt: row.hired_at,
