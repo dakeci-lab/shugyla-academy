@@ -129,7 +129,7 @@ function NormInput({ value, disabled, label, inherited = false, onSave }) {
 }
 
 function readonlyMessage(snapshot, canEdit) {
-  if (!canEdit) return 'Нет прав на изменение норм'
+  if (!canEdit) return 'Нормы может менять только директор'
   if (snapshot?.status === 'generated' || snapshot?.status === 'closed') {
     return 'Снимок зафиксирован. Нормы можно изменить в новом рабочем снимке'
   }
@@ -156,7 +156,8 @@ export default function ProcurementNormsView({ snapshot: suppliedSnapshot = null
   const [expanded, setExpanded] = useState(() => new Set())
   const [loading, setLoading] = useState(!initialModel)
 
-  const canEditNorms = can(user, PERMISSION_CODES.PROCUREMENT_EDIT)
+  // Norms drive the stock-health KPI, so only the director (procurement.norms.manage) may change them.
+  const canEditNorms = can(user, PERMISSION_CODES.PROCUREMENT_NORMS_MANAGE)
   const editable =
     canEditNorms &&
     (snapshot?.status === 'ready' || snapshot?.status === 'partially_generated')

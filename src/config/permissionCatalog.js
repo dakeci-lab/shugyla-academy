@@ -39,6 +39,8 @@ export const PERMISSION_CODES = {
   PROCUREMENT_EDIT: 'procurement.edit',
   PROCUREMENT_DELETE: 'procurement.delete',
   PROCUREMENT_TRANSFER: 'procurement.transfer',
+  /** Only the director: the stock-norm KPI is computed from these norms. */
+  PROCUREMENT_NORMS_MANAGE: 'procurement.norms.manage',
 
   RECEIVING_VIEW: 'receiving.view',
 
@@ -170,6 +172,7 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.PROCUREMENT_EDIT, name: 'Редактирование закупки', module: 'procurement', sortOrder: 102 },
   { code: PERMISSION_CODES.PROCUREMENT_DELETE, name: 'Удаление закупки', module: 'procurement', sortOrder: 103 },
   { code: PERMISSION_CODES.PROCUREMENT_TRANSFER, name: 'Формирование заказов из планирования', module: 'procurement', sortOrder: 104 },
+  { code: PERMISSION_CODES.PROCUREMENT_NORMS_MANAGE, name: 'Управление нормами запаса', description: 'Изменение норм запаса по категориям и подкатегориям. По нормам считается шкала соответствия запаса, поэтому право у директора.', module: 'procurement', sortOrder: 105 },
   { code: PERMISSION_CODES.RECEIVING_VIEW, name: 'Просмотр заказов', module: 'receiving', sortOrder: 110 },
   { code: PERMISSION_CODES.SUPPLIERS_VIEW, name: 'Просмотр поставщиков', module: 'suppliers', sortOrder: 120 },
   { code: PERMISSION_CODES.SUPPLIERS_CREATE, name: 'Создание поставщиков', module: 'suppliers', sortOrder: 121 },

@@ -38,6 +38,8 @@ import {
 const PERMISSION_EDIT = 'procurement.edit'
 const PERMISSION_CREATE = 'procurement.create'
 const PERMISSION_TRANSFER = 'procurement.transfer'
+/** Norms feed the buyer stock-health KPI: director only (see docs/procurement/norms-director-only.md). */
+const PERMISSION_NORMS_MANAGE = 'procurement.norms.manage'
 
 /**
  * Sentinel caller.id for the daily 07:00 (Aqtobe) cron sync — no real employee
@@ -849,7 +851,7 @@ async function handleSetNorm(
   authz: Exclude<Awaited<ReturnType<typeof authorizeWorkforceRequest>>, Response>,
   body: Record<string, unknown>
 ): Promise<Response> {
-  if (authz.permissions[PERMISSION_EDIT] !== true) {
+  if (authz.permissions[PERMISSION_NORMS_MANAGE] !== true) {
     return adminErrorResponse('forbidden', 403)
   }
 
@@ -986,7 +988,9 @@ Deno.serve(async (req) => {
   const needed =
     action === 'generate'
       ? [PERMISSION_CREATE, PERMISSION_TRANSFER]
-      : [PERMISSION_EDIT]
+      : action === 'set_norm'
+        ? [PERMISSION_NORMS_MANAGE]
+        : [PERMISSION_EDIT]
 
   const authz = await authorizeWorkforceRequest(req, needed)
   if (authz instanceof Response) return authz
