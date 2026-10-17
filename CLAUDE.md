@@ -116,9 +116,9 @@ GitHub Actions — только вручную/через MCP.
 Остаётся (`docs/platform/stage-14-polish.md`):
 - `verify:*`: из 100 проходят 99; `auth-first-frontend-production-readiness` требует локальную Supabase (Docker).
   Новые проверки писать через `scripts/lib/extensionlessResolver.mjs` (реальные модули, не регулярки).
-- По желанию владельца: упростить форму «Пользователи» и убрать колонки `academy_users`, нужные только
-  удалённым модулям (`work_mode`, `salary_calculation_type`, `payroll_participation`, `work_location_id`),
-  и таблицу `platform_work_locations`.
+- По желанию владельца: убрать колонки `academy_users`, нужные только удалённым модулям (`work_mode`,
+  `salary_calculation_type`, `payroll_participation`, `work_location_id`), и таблицу `platform_work_locations`.
+- Должности и группы должностей удалены (этап 17, `docs/platform/stage-17-remove-positions.md`): остаётся только роль.
 
 **Масштаб использования:** платформой пользуются несколько человек (владелец, закупщик, приёмщик,
 бухгалтер). Любой рефакторинг — аккуратно: это рабочий инструмент.
