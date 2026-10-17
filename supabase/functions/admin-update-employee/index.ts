@@ -29,11 +29,6 @@ import {
   resolveActivePositionForAssignment,
 } from '../_shared/employeePositions.ts'
 import { corsPreflightResponse, jsonResponse } from '../_shared/cors.ts'
-import {
-  clearPlanShiftsAfterTerminationDate,
-  isTerminatedEmploymentStatus,
-  toScheduleDateKey,
-} from '../_shared/employeeScheduleWrite.ts'
 
 const PERMISSION_EDIT = 'employees.edit'
 
@@ -417,30 +412,8 @@ Deno.serve(async (req) => {
   }
 
   const updatedRow = updated as DbEmployeeRow
-  let scheduleClear: { deleted: number; retained_with_attendance: number } | null = null
-  const effectiveTerminatedAt = toScheduleDateKey(updatedRow.terminated_at)
-  if (
-    effectiveTerminatedAt &&
-    isTerminatedEmploymentStatus(updatedRow.status)
-  ) {
-    try {
-      const clearResult = await clearPlanShiftsAfterTerminationDate(
-        serviceClient,
-        employeeId,
-        effectiveTerminatedAt
-      )
-      scheduleClear = {
-        deleted: clearResult.deleted,
-        retained_with_attendance: clearResult.retainedWithAttendance,
-      }
-    } catch (clearErr) {
-      console.error('admin_update_employee_schedule_clear_failed', {
-        category: clearErr instanceof Error ? clearErr.message : 'unknown',
-        employeeId,
-      })
-      return adminErrorResponse('schedule_clear_failed', 500)
-    }
-  }
+  // Schedule clearing on termination was removed with the schedule module (stage 13d dropped
+  // academy_employee_shifts); querying it would fail every update of a terminated employee.
 
   const catalog = await loadPositionCatalogByIds(serviceClient, [
     updatedRow.position_id,
@@ -449,6 +422,5 @@ Deno.serve(async (req) => {
   return jsonResponse({
     ok: true,
     employee: mapSafeEmployee(updatedRow, catalog),
-    ...(scheduleClear ? { schedule_clear: scheduleClear } : {}),
   })
 })

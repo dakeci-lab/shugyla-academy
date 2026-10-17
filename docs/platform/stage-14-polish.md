@@ -32,3 +32,22 @@ failures (41 stale ones fail as before — tasks 3 and 5).
   `cleanup-recruitment-upload-sessions`; their `package.json` entries removed. No dangling
   `npm run` references and no missing script files remain.
 - Result: 28 stale `verify:*` scripts left (was 41), no new failures; they are the subject of task 5.
+
+## Hotfix — terminating an employee broke after the DB drop (2026-10-17)
+
+**Found while planning task 4:** `admin-update-employee` cleared the employee's future shifts after
+any update of a terminated employee (`clearPlanShiftsAfterTerminationDate` → `academy_employee_shifts`).
+Stage 13d dropped that table, so «Отключить» in «Пользователи» (and any later edit of a terminated
+user) returned `schedule_clear_failed` (500) — the status change itself was saved, but the UI showed
+an error.
+
+**Fix (deployed to prod 2026-10-17 with `supabase functions deploy --use-api`):**
+- `admin-update-employee`: the schedule-clearing block and its `schedule_clear` response field removed.
+- `admin-create-employee`: the dead `source_candidate_id` shortcut (queried `academy_candidates`) removed.
+- `_shared/employeeScheduleWrite.ts` deleted (no callers left).
+- Audit of every `.from('<dropped table>')` / `rpc('<dropped function>')` in `supabase/functions` and
+  `src`: the remaining hits are only in unreachable-by-UI frontend code (`recruitmentSupabaseAdapter`,
+  `candidatePhotoService`, `attendanceSupabaseAdapter`) — removed in tasks 4 and 7.
+
+**Lesson recorded for DB drops:** the preflight checked tables, views, policies and triggers but not
+Edge Function code; add `grep` of `supabase/functions` to the preflight template of the next drop.
