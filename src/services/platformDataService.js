@@ -561,12 +561,6 @@ export async function removeEmployeeAvatar(userId) {
   await updateEmployee(userId, { avatarUrl: null })
 }
 
-// --- Auth ---
-
-export async function authenticateUser(loginValue, password) {
-  return getAdapter().authenticateUser(loginValue, password)
-}
-
 // --- Migration (employees only) ---
 
 export async function migrateLocalDataToCloud() {

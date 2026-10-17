@@ -108,7 +108,7 @@ function stageLegacyLoginAbsent() {
   assert('signInSupabaseAuthAfterAcademyLogin not called from src', !legacyCalls, legacyCalls || undefined)
 
   const adapterAuth = read('src/services/supabaseDataAdapter.js')
-  assert('supabase authenticateUser marked deprecated', adapterAuth.includes('@deprecated Pre-Auth password compare'))
+  assert('supabase adapter has no pre-Auth password compare (academy_users.password dropped)', !adapterAuth.includes('authenticateUser') && !adapterAuth.includes('row.password'))
   console.log('')
 }
 
