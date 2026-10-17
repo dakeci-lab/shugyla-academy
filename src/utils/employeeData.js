@@ -74,133 +74,6 @@ export const EMPLOYEE_STATUS_OPTIONS = [
   { value: EMPLOYMENT_STATUS.TERMINATED, label: 'Уволен' },
 ]
 
-/** Режим работы сотрудника (offline — магазин / online — удалённо) */
-export const WORK_MODE = {
-  OFFLINE: 'offline',
-  ONLINE: 'online',
-}
-
-export const WORK_MODE_LABELS = {
-  offline: 'Офлайн',
-  online: 'Онлайн',
-}
-
-export const WORK_MODE_OPTIONS = [
-  { value: WORK_MODE.OFFLINE, label: WORK_MODE_LABELS.offline },
-  { value: WORK_MODE.ONLINE, label: WORK_MODE_LABELS.online },
-]
-
-/**
- * Тип расчёта зарплаты.
- * В ведомости колонка «Ставка»:
- * fixed_salary → месячный оклад (base_salary); фонд и к выдаче = полный оклад (временно);
- * shift_based → стоимость смены (shift_rate); фонд = rate×назначенные, к выдаче = rate×подтверждённые.
- */
-export const SALARY_CALCULATION_TYPE = {
-  SHIFT_BASED: 'shift_based',
-  FIXED_SALARY: 'fixed_salary',
-}
-
-/** Участие в зарплатной ведомости (независимо от статуса сотрудника) */
-export const PAYROLL_PARTICIPATION = {
-  ACTIVE: 'active',
-  EXCLUDED: 'excluded',
-}
-
-export const PAYROLL_PARTICIPATION_LABELS = {
-  active: 'Активный',
-  excluded: 'Исключён',
-}
-
-export const PAYROLL_PARTICIPATION_OPTIONS = [
-  { value: PAYROLL_PARTICIPATION.ACTIVE, label: PAYROLL_PARTICIPATION_LABELS.active },
-  { value: PAYROLL_PARTICIPATION.EXCLUDED, label: PAYROLL_PARTICIPATION_LABELS.excluded },
-]
-
-/** Список ведомости по умолчанию показывает участвующих сотрудников */
-export const PAYROLL_LIST_DEFAULT_SHOW_EXCLUDED = false
-
-export const SALARY_CALCULATION_TYPE_LABELS = {
-  shift_based: 'По сменам',
-  fixed_salary: 'Фиксированный оклад',
-}
-
-export const SALARY_CALCULATION_TYPE_OPTIONS = [
-  {
-    value: SALARY_CALCULATION_TYPE.SHIFT_BASED,
-    label: SALARY_CALCULATION_TYPE_LABELS.shift_based,
-  },
-  {
-    value: SALARY_CALCULATION_TYPE.FIXED_SALARY,
-    label: SALARY_CALCULATION_TYPE_LABELS.fixed_salary,
-  },
-]
-
-export function normalizeWorkMode(value) {
-  return value === WORK_MODE.ONLINE ? WORK_MODE.ONLINE : WORK_MODE.OFFLINE
-}
-
-export function normalizeSalaryCalculationType(value) {
-  return value === SALARY_CALCULATION_TYPE.FIXED_SALARY
-    ? SALARY_CALCULATION_TYPE.FIXED_SALARY
-    : SALARY_CALCULATION_TYPE.SHIFT_BASED
-}
-
-export function normalizePayrollParticipation(value) {
-  return value === PAYROLL_PARTICIPATION.EXCLUDED
-    ? PAYROLL_PARTICIPATION.EXCLUDED
-    : PAYROLL_PARTICIPATION.ACTIVE
-}
-
-export function getPayrollParticipationLabel(value) {
-  return (
-    PAYROLL_PARTICIPATION_LABELS[normalizePayrollParticipation(value)] ||
-    PAYROLL_PARTICIPATION_LABELS.active
-  )
-}
-
-export function isPayrollExcluded(employeeOrValue) {
-  const value =
-    employeeOrValue && typeof employeeOrValue === 'object'
-      ? employeeOrValue.payrollParticipation ?? employeeOrValue.payroll_participation
-      : employeeOrValue
-  return normalizePayrollParticipation(value) === PAYROLL_PARTICIPATION.EXCLUDED
-}
-
-export function getWorkModeLabel(value) {
-  return WORK_MODE_LABELS[normalizeWorkMode(value)] || WORK_MODE_LABELS.offline
-}
-
-export function getSalaryCalculationTypeLabel(value) {
-  return (
-    SALARY_CALCULATION_TYPE_LABELS[normalizeSalaryCalculationType(value)] ||
-    SALARY_CALCULATION_TYPE_LABELS.shift_based
-  )
-}
-
-function resolveWorkModeValue(employeeOrMode) {
-  if (employeeOrMode == null) return WORK_MODE.OFFLINE
-  if (typeof employeeOrMode === 'string') return employeeOrMode
-  return employeeOrMode.workMode ?? employeeOrMode.work_mode
-}
-
-/** Удалённый режим — без графика, смен и присутствия в магазине */
-export function isOnlineWorkMode(employeeOrMode) {
-  return normalizeWorkMode(resolveWorkModeValue(employeeOrMode)) === WORK_MODE.ONLINE
-}
-
-export function isOfflineWorkMode(employeeOrMode) {
-  return !isOnlineWorkMode(employeeOrMode)
-}
-
-/**
- * Участвует в графике / сменах / модулях физического присутствия.
- * Не смешивать с типом расчёта зарплаты.
- */
-export function participatesInStoreSchedule(employee) {
-  return isOfflineWorkMode(employee)
-}
-
 /** Нормализация статуса из базы / legacy-значений → Работает | Уволен */
 export function normalizeEmploymentStatus(status) {
   if (!status) return EMPLOYMENT_STATUS.ACTIVE
@@ -274,11 +147,6 @@ export function getStaffEmployees(filter = 'active') {
   }
 
   return staff
-}
-
-/** Активные сотрудники, доступные для графика и назначения смен */
-export function getScheduleEligibleEmployees(filter = 'active') {
-  return getStaffEmployees(filter).filter(participatesInStoreSchedule)
 }
 
 /** Значение фильтра списка сотрудников по умолчанию */
@@ -377,16 +245,8 @@ export function normalizeEmployee(raw) {
     ),
     terminatedAt: toEmployeeDateKey(raw.terminatedAt ?? raw.terminated_at),
     hiredAt: toEmployeeDateKey(raw.hiredAt ?? raw.hired_at),
-    workMode: normalizeWorkMode(raw.workMode ?? raw.work_mode),
-    salaryCalculationType: normalizeSalaryCalculationType(
-      raw.salaryCalculationType ?? raw.salary_calculation_type
-    ),
-    payrollParticipation: normalizePayrollParticipation(
-      raw.payrollParticipation ?? raw.payroll_participation
-    ),
     avatarUrl: raw.avatarUrl ?? raw.avatar_url ?? null,
     contactEmail: raw.contactEmail ?? raw.contact_email ?? '',
-    workLocationId: raw.workLocationId ?? raw.work_location_id ?? null,
   }
 }
 
@@ -504,11 +364,6 @@ export function addEmployee(data) {
     employmentStatus: data.employmentStatus || EMPLOYMENT_STATUS.ACTIVE,
     hiredAt: data.hiredAt || todayEmployeeDateKey(),
     terminatedAt: data.terminatedAt ?? null,
-    workMode: data.workMode || WORK_MODE.OFFLINE,
-    salaryCalculationType:
-      data.salaryCalculationType || SALARY_CALCULATION_TYPE.SHIFT_BASED,
-    payrollParticipation:
-      data.payrollParticipation || PAYROLL_PARTICIPATION.ACTIVE,
   })
 
   extra.push(employee)
@@ -624,10 +479,6 @@ export const EMPTY_EMPLOYEE_FORM = {
   avatarUrl: '',
   employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
   hiredAt: '',
-  workMode: WORK_MODE.OFFLINE,
-  salaryCalculationType: SALARY_CALCULATION_TYPE.SHIFT_BASED,
-  payrollParticipation: PAYROLL_PARTICIPATION.ACTIVE,
-  workLocationId: '',
 }
 
 export function employeeToForm(employee) {
@@ -641,10 +492,6 @@ export function employeeToForm(employee) {
     avatarUrl: employee.avatarUrl || '',
     employmentStatus: employmentStatusForForm(employee.employmentStatus),
     hiredAt: toEmployeeDateKey(employee.hiredAt) || '',
-    workMode: normalizeWorkMode(employee.workMode),
-    salaryCalculationType: normalizeSalaryCalculationType(employee.salaryCalculationType),
-    payrollParticipation: normalizePayrollParticipation(employee.payrollParticipation),
-    workLocationId: employee.workLocationId || '',
   }
 }
 
@@ -694,9 +541,6 @@ export function buildEmployeeCloudUpdateChanges(
       form.employmentStatus || employee.employmentStatus,
     ),
     hiredAt: toEmployeeDateKey(form.hiredAt),
-    workMode: normalizeWorkMode(form.workMode),
-    salaryCalculationType: normalizeSalaryCalculationType(form.salaryCalculationType),
-    payrollParticipation: normalizePayrollParticipation(form.payrollParticipation),
     avatarUrl: form.avatarUrl || null,
   }
 
@@ -714,22 +558,6 @@ export function buildEmployeeCloudUpdateChanges(
   if (toEmployeeDateKey(next.hiredAt) !== toEmployeeDateKey(employee.hiredAt)) {
     changes.hiredAt = next.hiredAt
   }
-  if (normalizeWorkMode(next.workMode) !== normalizeWorkMode(employee.workMode)) {
-    changes.workMode = next.workMode
-  }
-  if (
-    normalizeSalaryCalculationType(next.salaryCalculationType) !==
-    normalizeSalaryCalculationType(employee.salaryCalculationType)
-  ) {
-    changes.salaryCalculationType = next.salaryCalculationType
-  }
-  if (
-    normalizePayrollParticipation(next.payrollParticipation) !==
-    normalizePayrollParticipation(employee.payrollParticipation)
-  ) {
-    changes.payrollParticipation = next.payrollParticipation
-  }
-
   if (!editingSelf) {
     if (normEmployeeText(next.roleId) !== normEmployeeText(employee.roleId)) {
       changes.roleId = next.roleId

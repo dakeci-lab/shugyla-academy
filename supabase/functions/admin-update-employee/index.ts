@@ -7,19 +7,13 @@ import {
   roleHasPermissionCode,
 } from '../_shared/employeeAuthorization.ts'
 import {
-  ALLOWED_PAYROLL_PARTICIPATIONS,
-  ALLOWED_SALARY_CALCULATION_TYPES,
   ALLOWED_STATUSES,
-  ALLOWED_WORK_MODES,
   MAX_AVATAR_URL_LENGTH,
   MAX_NAME_LENGTH,
   SAFE_EMPLOYEE_SELECT,
   buildFullName,
   mapSafeEmployee,
   normalizeDateKey,
-  normalizePayrollParticipation,
-  normalizeSalaryCalculationType,
-  normalizeWorkMode,
   todayDateKeyAlmaty,
   type DbEmployeeRow,
 } from '../_shared/employeeFields.ts'
@@ -35,9 +29,6 @@ const ALLOWED_CHANGE_KEYS = new Set([
   'status',
   'hired_at',
   'terminated_at',
-  'work_mode',
-  'salary_calculation_type',
-  'payroll_participation',
 ])
 
 const FORBIDDEN_CHANGE_KEYS = new Set([
@@ -95,8 +86,17 @@ Deno.serve(async (req) => {
 
   const changes = { ...(changesRaw as Record<string, unknown>) }
 
-  // Stale clients (pre-stage 17) may still send position fields; positions no longer exist.
-  for (const legacyKey of ['position', 'position_id', 'positionId']) delete changes[legacyKey]
+  // Stale clients may still send removed fields (positions: stage 17; work mode / payroll: stage 18); ignore them.
+  for (const legacyKey of [
+    'position',
+    'position_id',
+    'positionId',
+    'work_mode',
+    'salary_calculation_type',
+    'payroll_participation',
+  ]) {
+    delete changes[legacyKey]
+  }
 
   const changeKeys = Object.keys(changes)
   if (changeKeys.length === 0) {
@@ -263,37 +263,6 @@ Deno.serve(async (req) => {
       }
       patch.terminated_at = terminatedAt
     }
-  }
-
-  if ('work_mode' in changes) {
-    if (typeof changes.work_mode !== 'string' || !ALLOWED_WORK_MODES.has(changes.work_mode.trim())) {
-      return adminErrorResponse('invalid_work_mode', 422)
-    }
-    patch.work_mode = normalizeWorkMode(changes.work_mode.trim())
-  }
-
-  if ('salary_calculation_type' in changes) {
-    if (
-      typeof changes.salary_calculation_type !== 'string' ||
-      !ALLOWED_SALARY_CALCULATION_TYPES.has(changes.salary_calculation_type.trim())
-    ) {
-      return adminErrorResponse('invalid_salary_calculation_type', 422)
-    }
-    patch.salary_calculation_type = normalizeSalaryCalculationType(
-      changes.salary_calculation_type.trim()
-    )
-  }
-
-  if ('payroll_participation' in changes) {
-    if (
-      typeof changes.payroll_participation !== 'string' ||
-      !ALLOWED_PAYROLL_PARTICIPATIONS.has(changes.payroll_participation.trim())
-    ) {
-      return adminErrorResponse('invalid_payroll_participation', 422)
-    }
-    patch.payroll_participation = normalizePayrollParticipation(
-      changes.payroll_participation.trim()
-    )
   }
 
   // Status transitions drive termination date when client did not send it explicitly

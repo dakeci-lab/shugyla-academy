@@ -24,13 +24,9 @@ function mapAcademyUserRow(row) {
     employmentStatus: row.status,
     hiredAt: row.hired_at,
     terminatedAt: row.terminated_at,
-    workMode: row.work_mode,
-    salaryCalculationType: row.salary_calculation_type,
-    payrollParticipation: row.payroll_participation,
     createdAt: row.created_at,
     avatarUrl: row.avatar_url,
     contactEmail: row.contact_email || '',
-    workLocationId: row.work_location_id,
   })
 }
 
@@ -166,11 +162,7 @@ async function createUser(data) {
     status: employee.employmentStatus,
     hired_at: employee.hiredAt || null,
     terminated_at: employee.terminatedAt || null,
-    work_mode: employee.workMode || 'offline',
-    salary_calculation_type: employee.salaryCalculationType || 'shift_based',
-    payroll_participation: employee.payrollParticipation || 'active',
     avatar_url: employee.avatarUrl || null,
-    work_location_id: employee.workLocationId || null,
   }
 
   if (!row.role_id && employee.role) {
@@ -214,15 +206,7 @@ async function updateUser(id, updates) {
   if (updates.status != null) patch.status = updates.status
   if (updates.hiredAt !== undefined) patch.hired_at = updates.hiredAt
   if (updates.terminatedAt !== undefined) patch.terminated_at = updates.terminatedAt
-  if (updates.workMode !== undefined) patch.work_mode = updates.workMode
-  if (updates.salaryCalculationType !== undefined) {
-    patch.salary_calculation_type = updates.salaryCalculationType
-  }
-  if (updates.payrollParticipation !== undefined) {
-    patch.payroll_participation = updates.payrollParticipation
-  }
   if (updates.avatarUrl != null) patch.avatar_url = updates.avatarUrl
-  if (updates.workLocationId != null) patch.work_location_id = updates.workLocationId
 
   if (Object.keys(patch).length > 0) {
     await throwIfError(

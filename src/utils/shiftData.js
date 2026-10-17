@@ -113,7 +113,6 @@ function normalizeShiftFacts(raw) {
     checkOutLatitude: raw.checkOutLatitude ?? raw.check_out_latitude ?? null,
     checkOutLongitude: raw.checkOutLongitude ?? raw.check_out_longitude ?? null,
     checkOutAccuracy: raw.checkOutAccuracy ?? raw.check_out_accuracy ?? null,
-    workLocationId: raw.workLocationId ?? raw.work_location_id ?? null,
   }
 }
 
