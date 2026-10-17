@@ -86,15 +86,10 @@ export async function authenticateUser(loginValue, password) {
 }
 
 export async function initializeLocal() {
-  const { getLocalRecruitmentBundle } = await import('./recruitmentLocalAdapter')
-  const recruitmentBundle = getLocalRecruitmentBundle()
   const { getLocalSuppliersBundle } = await import('./suppliersLocalAdapter')
   const suppliersBundle = getLocalSuppliersBundle()
   return {
     employees: getAllEmployeesLocal(),
-    vacancies: recruitmentBundle.vacancies,
-    candidateQuestions: recruitmentBundle.questions,
-    candidates: recruitmentBundle.candidates,
     suppliers: suppliersBundle.suppliers,
   }
 }

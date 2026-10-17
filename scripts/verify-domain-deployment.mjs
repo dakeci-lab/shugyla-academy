@@ -31,7 +31,6 @@ const hostSurface = read('src/router/hostSurface.js')
 const main = read('src/main.jsx')
 const app = read('src/App.jsx')
 const corporateHome = read('src/pages/CorporateHome.jsx')
-const recruitmentData = read('src/utils/recruitmentData.js')
 
 function loadNotificationNormalizer(scope) {
   const scopeUrl = new URL(scope)
@@ -101,7 +100,6 @@ assert(
   'jobs blocks internal routes',
   app.includes('surface === HOST_SURFACE.CAREERS') && app.includes('internalElement')
 )
-assert('apply URL helpers use canonical careers utility', recruitmentData.includes('getCareersUrl'))
 assert('legacy GitHub Pages workflow stays removed', !fs.existsSync(legacyPagesWorkflow))
 assert('PS.kz build targets domain root', psWorkflow.includes('APP_BASE_PATH: /'))
 assert(

@@ -7,7 +7,7 @@ Follows `stage-13-cleanup.md`. Owner asked to plan and execute the leftovers the
 | 1 | Delete the orphan prod Edge Function `umag-probe-payments` (one-off UMAG payments probe, not in the repo, no callers) | done (`supabase functions delete`, 2026-10-17) |
 | 2 | Delete remaining dead code: 22 files, −3 130 lines (old procurement `Simple*` / filter components, `purchaseOptimisticService`, `purchaseAccess`, `supplierAccess`, `purchaseFilter*`, `receivingList`, `simpleMarkdown`, `useBodyScrollLock`) | done |
 | 3 | Retire verify scripts and local tooling of removed modules | done |
-| 4 | Cut the dead «create from candidate» flow and the recruitment code behind it | pending |
+| 4 | Cut the dead «create from candidate» flow and the recruitment code behind it | done |
 | 5 | Repair the stale verify scripts of kept features | pending |
 | 6 | Update `CLAUDE.md`, archive docs of removed modules | pending |
 | 7 | (owner decision) simplify the «Пользователи» form and `academy_users` columns | pending |
@@ -51,3 +51,18 @@ an error.
 
 **Lesson recorded for DB drops:** the preflight checked tables, views, policies and triggers but not
 Edge Function code; add `grep` of `supabase/functions` to the preflight template of the next drop.
+
+## 4 — «create from candidate» flow and recruitment code removed
+
+- `EmployeesSection` / `EmployeeEditModal`: no `createFromCandidate` query handling, candidate prefill,
+  link-to-candidate, candidate photo transfer, candidate meta block; `sourceCandidateId` no longer sent
+  to `createEmployeeWithAuth` / `admin-create-employee`.
+- `platformDataService`: `getVacancyById`, `getCandidateById`, `linkCandidateToEmployee` and all
+  recruitment adapter wiring removed; `supabaseDataAdapter.fetchRecruitmentModuleData` and the
+  recruitment part of `fetchAllData` removed; `cloudStore`: `recruitment` module and its store fields /
+  getters removed; `localDataAdapter` no longer builds a recruitment bundle.
+- Files deleted (unreachable after that): `recruitmentSupabaseAdapter`, `recruitmentLocalAdapter`,
+  `candidatePhotoService` (`readPhotoAsDataUrl` inlined into `employeeAvatarService`), `utils/recruitmentData`,
+  `applicationForm`, `kzPhone`, `slugify` — −2 800 lines.
+- Build ok; ESLint `no-undef` 0 and no unused imports in the touched files; full `verify:*`: no new
+  failures after patching `buyer-role-compatibility`, `domain-deployment` and `hide-personnel-modules`.

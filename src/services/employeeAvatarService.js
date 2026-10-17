@@ -1,11 +1,20 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { isCloudMode } from '../lib/dataMode'
-import { readPhotoAsDataUrl } from './candidatePhotoService'
 import {
   normalizeAvatarImage,
   isAllowedAvatarInputFile,
   AVATAR_OUTPUT_MIME,
 } from '../utils/normalizeAvatarImage'
+
+/** Local fallback: keep the avatar as a data URL for the preview */
+function readPhotoAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(new Error('Не удалось прочитать файл'))
+    reader.readAsDataURL(file)
+  })
+}
 
 export const EMPLOYEE_AVATAR_BUCKET = 'employee-avatars'
 export const MAX_EMPLOYEE_AVATAR_BYTES = 5 * 1024 * 1024

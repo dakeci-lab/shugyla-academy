@@ -99,7 +99,6 @@ function main() {
   const rolesJs = read('src/data/roles.js')
   const permissionsJs = read('src/config/permissions.js')
   const catalogJs = read('src/config/permissionCatalog.js')
-  const recruitment = read('src/utils/recruitmentData.js')
   const modal = read('src/components/admin/employees/EmployeeEditModal.jsx')
   const pkg = read('package.json')
 
@@ -127,8 +126,6 @@ function main() {
   assert("system role seed code 'buyer'", catalogJs.includes("code: 'buyer'"))
   assert("system role seed no code 'purchaser'", !catalogJs.includes("code: 'purchaser'"))
   assert('roles.js keeps roleListIncludes for audience checks', rolesJs.includes('export function roleListIncludes'))
-  assert('vacancy roles prefer buyer', recruitment.includes("'buyer'") && recruitment.includes('VACANCY_ROLES'))
-  assert('vacancy keeps purchaser label for read', recruitment.includes('purchaser: \'Закупщик\''))
   assert('EmployeeEditModal still uses DB rbacService', modal.includes('getRolesForEmployeeForm'))
   assert('PWA schema version not bumped in employeeData', !read('src/utils/employeeData.js').includes('EMPLOYEE_LOCAL_SCHEMA_VERSION = 3'))
   assert('script registered', pkg.includes('verify:buyer-role-compatibility'))

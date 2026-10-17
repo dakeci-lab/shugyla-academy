@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
 import {
   getStaffEmployees,
   EMPTY_EMPLOYEE_FORM,
-  EMPLOYMENT_STATUS,
   EMPLOYEE_LIST_DEFAULT_STATUS,
   filterEmployees,
   isDeactivatedStaffEmployee,
@@ -16,8 +14,6 @@ import {
 import {
   deactivateEmployee,
   restoreEmployee,
-  getCandidateById,
-  getVacancyById,
 } from '../../../services/platformDataService'
 import {
   listEmployeesForAdmin,
@@ -27,17 +23,6 @@ import {
 } from '../../../services/employeeAdminService'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import {
-  getVacancyEmployeeRole,
-  canCreateEmployeeForCandidate,
-  isCandidateEmployeeCreated,
-} from '../../../utils/recruitmentData'
-import {
-  createCandidatePhotoSignedUrl,
-  resolveCandidatePhotoStoragePath,
-} from '../../../services/candidatePhotoService'
-import {
-  ensurePositionCatalogLoaded,
-  isPositionAssignable,
 } from '../../../services/positionCatalogService'
 import { getRoleLabel } from '../../../data/roles'
 import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
@@ -52,7 +37,6 @@ import Can from '../../auth/Can'
 import {
   PERMISSION_CODES,
   canEditEmployees,
-  canManageEmployees,
 } from '../../../config/permissions'
 import ConfirmDialog from '../ConfirmDialog'
 import EmployeeFilterPopover from '../employees/EmployeeFilterPopover'
@@ -91,10 +75,7 @@ export default function EmployeesSection() {
   const { user: sessionUser } = useSession()
   const { success: showSuccess, error: showError } = useToast()
   const { version, refresh } = useAdminRefresh()
-  const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const filterButtonRef = useRef(null)
-  const activeCandidateIdRef = useRef(null)
   const formTouchedRef = useRef(false)
   const loadSeqRef = useRef(0)
   const mountedRef = useRef(true)
@@ -126,8 +107,6 @@ export default function EmployeesSection() {
   const [editingEmployee, setEditingEmployee] = useState(null)
   const [createInitialForm, setCreateInitialForm] = useState(null)
   const [actionError, setActionError] = useState('')
-  const [sourceCandidateId, setSourceCandidateId] = useState(null)
-  const [candidatePhone, setCandidatePhone] = useState('')
   const [deactivateTarget, setDeactivateTarget] = useState(null)
   const [activateTarget, setActivateTarget] = useState(null)
   const [deactivating, setDeactivating] = useState(false)
@@ -136,7 +115,6 @@ export default function EmployeesSection() {
 
   void version
 
-  const canViewList = canManageEmployees(sessionUser)
   const canEdit = canEditEmployees(sessionUser)
 
   const filtersActive =
@@ -349,146 +327,28 @@ export default function EmployeesSection() {
     }
   }
 
-  function clearCandidateQuery() {
-    if (searchParams.get('createFromCandidate')) {
-      navigate('/platform/settings/users', { replace: true })
-    }
-  }
-
   function closeForm() {
     setShowForm(false)
     setEditingEmployee(null)
     setCreateInitialForm(null)
-    setSourceCandidateId(null)
-    setCandidatePhone('')
-    activeCandidateIdRef.current = null
     formTouchedRef.current = false
-    clearCandidateQuery()
   }
 
   function openAdd() {
     setActionError('')
-    setSourceCandidateId(null)
-    setCandidatePhone('')
-    activeCandidateIdRef.current = null
     formTouchedRef.current = false
     setEditingEmployee(null)
     setCreateInitialForm({ ...EMPTY_EMPLOYEE_FORM })
-    clearCandidateQuery()
     setShowForm(true)
   }
 
   function openEdit(emp) {
     setActionError('')
-    setSourceCandidateId(null)
-    setCandidatePhone('')
-    activeCandidateIdRef.current = null
     formTouchedRef.current = false
     setCreateInitialForm(null)
     setEditingEmployee(emp)
-    clearCandidateQuery()
     setShowForm(true)
   }
-
-  useEffect(() => {
-    const candidateId = searchParams.get('createFromCandidate')
-    if (!candidateId) {
-      activeCandidateIdRef.current = null
-      return
-    }
-
-    const candidate = getCandidateById(candidateId)
-    if (!candidate) {
-      if (activeCandidateIdRef.current !== candidateId) {
-        setActionError('Кандидат не найден')
-      }
-      return
-    }
-
-    if (isCandidateEmployeeCreated(candidate)) {
-      setActionError('Сотрудник уже создан для этого кандидата')
-      return
-    }
-
-    if (!canCreateEmployeeForCandidate(candidate)) {
-      setActionError('Создание сотрудника доступно после собеседования или для стажёра')
-      return
-    }
-
-    const candidateChanged = activeCandidateIdRef.current !== candidateId
-    if (!candidateChanged && formTouchedRef.current) {
-      if (!showForm) setShowForm(true)
-      return
-    }
-
-    const vacancy = candidate.vacancyId ? getVacancyById(candidate.vacancyId) : null
-    // Prefill RBAC role from vacancy.employeeRole only when explicitly set.
-    // Prefill position from vacancy.position_id when assignable; never invent from title/role.
-    const role = getVacancyEmployeeRole(vacancy) || EMPTY_EMPLOYEE_FORM.role
-
-    if (candidateChanged) {
-      activeCandidateIdRef.current = candidateId
-      formTouchedRef.current = false
-
-      const applyPrefill = (positionId = '') => {
-        setCreateInitialForm({
-          ...EMPTY_EMPLOYEE_FORM,
-          firstName: candidate.firstName || '',
-          lastName: candidate.lastName || '',
-          role,
-          roleId: '',
-          positionId,
-          avatarUrl: candidate.photoUrl || '',
-          employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
-        })
-      }
-
-      applyPrefill('')
-
-      if (isCloudMode() && vacancy?.positionId) {
-        ensurePositionCatalogLoaded()
-          .then(() => {
-            if (activeCandidateIdRef.current !== candidateId) return
-            if (isPositionAssignable(vacancy.positionId)) {
-              applyPrefill(vacancy.positionId)
-            } else {
-              setActionError(
-                'Должность вакансии архивна или недоступна. Выберите действующую должность перед созданием сотрудника.'
-              )
-              applyPrefill('')
-            }
-          })
-          .catch(() => {
-            /* catalog failure: leave position empty for manual select */
-          })
-      }
-
-      // Refresh short-lived signed URL for preview (not persisted on create).
-      const photoPath = resolveCandidatePhotoStoragePath(candidate)
-      if (photoPath && isCloudMode()) {
-        createCandidatePhotoSignedUrl(photoPath)
-          .then((signedUrl) => {
-            if (activeCandidateIdRef.current !== candidateId) return
-            setCreateInitialForm((prev) =>
-              prev
-                ? {
-                    ...prev,
-                    avatarUrl: signedUrl,
-                  }
-                : prev
-            )
-          })
-          .catch(() => {
-            /* preview without photo is acceptable */
-          })
-      }
-    }
-
-    setSourceCandidateId(candidateId)
-    setCandidatePhone(candidate.phone || '')
-    setEditingEmployee(null)
-    setShowForm(true)
-  }, [searchParams, version, showForm])
 
   function toggleFilter() {
     if (filterOpen) {
@@ -701,8 +561,6 @@ export default function EmployeesSection() {
           <EmployeeEditModal
             employee={editingEmployee}
             initialForm={editingEmployee ? null : createInitialForm}
-            sourceCandidateId={sourceCandidateId}
-            candidatePhone={candidatePhone}
             onClose={closeForm}
             onSaved={handleEmployeeSaved}
             onFormDirty={() => {

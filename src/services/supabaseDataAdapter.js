@@ -98,16 +98,6 @@ export async function fetchCoreEmployeeData() {
   return { employees }
 }
 
-export async function fetchRecruitmentModuleData() {
-  const { fetchRecruitmentData } = await import('./recruitmentSupabaseAdapter')
-  const data = await fetchRecruitmentData()
-  return {
-    vacancies: data.vacancies,
-    candidateQuestions: data.questions,
-    candidates: data.candidates,
-  }
-}
-
 export async function fetchSuppliersModuleData() {
   const { fetchSuppliersData } = await import('./suppliersSupabaseAdapter')
   const data = await fetchSuppliersData()
@@ -133,21 +123,12 @@ export async function fetchReceivingModuleData() {
 export async function fetchAllData() {
   const { employees } = await fetchCoreEmployeeData()
 
-  // Recruitment is hidden (stage 12): not fetched on a full reload.
-  const recruitmentResult = {
-    status: 'fulfilled',
-    value: { vacancies: [], candidateQuestions: [], candidates: [] },
-  }
   const [suppliersResult, purchasesResult, receivingResult] = await Promise.allSettled([
     fetchSuppliersModuleData(),
     fetchPurchasesModuleData(),
     fetchReceivingModuleData(),
   ])
 
-  const recruitment =
-    recruitmentResult.status === 'fulfilled'
-      ? recruitmentResult.value
-      : { vacancies: [], candidateQuestions: [], candidates: [] }
   const suppliers =
     suppliersResult.status === 'fulfilled' ? suppliersResult.value : { suppliers: [] }
 
@@ -167,12 +148,10 @@ export async function fetchAllData() {
 
   return {
     employees,
-    ...recruitment,
     ...suppliers,
     ...purchases,
     ...receiving,
     _moduleFailures: {
-      recruitment: recruitmentResult.status === 'rejected' ? recruitmentResult.reason : null,
       suppliers: suppliersResult.status === 'rejected' ? suppliersResult.reason : null,
       procurement: purchasesResult.status === 'rejected' ? purchasesResult.reason : null,
       receiving: receivingResult.status === 'rejected' ? receivingResult.reason : null,

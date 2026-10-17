@@ -79,7 +79,6 @@ export async function createEmployeeWithAuth(payload) {
     position_id: payload.positionId || undefined,
     position: payload.position?.trim() || undefined,
     avatar_url: payload.avatarUrl || undefined,
-    source_candidate_id: payload.sourceCandidateId || undefined,
   }
 
   const { data, error } = await supabase.functions.invoke('admin-create-employee', { body })

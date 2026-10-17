@@ -16,12 +16,9 @@ import {
 import {
   createEmployee,
   updateEmployee,
-  linkCandidateToEmployee,
   getWorkLocations,
-  getCandidateById,
   checkEmployeeLoginAvailability,
 } from '../../../services/platformDataService'
-import { transferCandidatePhotoToEmployee } from '../../../services/candidatePhotoService'
 import { resetEmployeePasswordAsAdmin } from '../../../services/employeeAdminService'
 import { getRoleLabel } from '../../../data/roles'
 import { getRoleByCode, getRolesForEmployeeForm } from '../../../services/rbacService'
@@ -44,7 +41,6 @@ import Can from '../../auth/Can'
 import { can, PERMISSION_CODES } from '../../../config/permissions'
 import AdminModal from '../AdminModal'
 import ConfirmDialog from '../ConfirmDialog'
-import EmployeeAvatar from '../../EmployeeAvatar'
 import ProfileAvatarEditor from '../../ProfileAvatarEditor'
 import '../RecruitmentSection.css'
 import './EmployeeEditModal.css'
@@ -59,8 +55,6 @@ const POSITION_INACTIVE_RE =
 export default function EmployeeEditModal({
   employee = null,
   initialForm = null,
-  sourceCandidateId = null,
-  candidatePhone = '',
   onClose,
   onSaved,
   onFormDirty,
@@ -104,7 +98,7 @@ export default function EmployeeEditModal({
     setPasswordResetConfirmOpen(false)
     setPasswordResetting(false)
     setTemporaryPassword('')
-  }, [employee, initialForm, sourceCandidateId])
+  }, [employee, initialForm])
 
   useEffect(() => {
     getRolesForEmployeeForm(form.role, form.roleId)
@@ -382,35 +376,10 @@ export default function EmployeeEditModal({
           salaryCalculationType: form.salaryCalculationType,
           payrollParticipation: form.payrollParticipation,
           workLocationId: form.workLocationId || null,
-          sourceCandidateId: sourceCandidateId || undefined,
-          // Never persist short-lived candidate-photo signed URLs as employee avatar.
-          ...(!sourceCandidateId && form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
+          ...(form.avatarUrl ? { avatarUrl: form.avatarUrl } : {}),
           ...(form.password?.trim() ? { password: form.password } : {}),
         }
         const newUserId = await createEmployee(payload)
-        if (sourceCandidateId) {
-          try {
-            await linkCandidateToEmployee(sourceCandidateId, newUserId)
-          } catch (linkError) {
-            // Employee already created — retry link once without creating a second account.
-            try {
-              await linkCandidateToEmployee(sourceCandidateId, newUserId)
-            } catch (retryError) {
-              throw new Error(
-                `Сотрудник создан, но связь с кандидатом не сохранилась. Откройте кандидата и повторите оформление. ${retryError.message || linkError.message || ''}`
-              )
-            }
-          }
-          try {
-            const candidate = getCandidateById(sourceCandidateId)
-            const avatarUrl = await transferCandidatePhotoToEmployee(candidate, newUserId)
-            if (avatarUrl) {
-              await updateEmployee(newUserId, { avatarUrl })
-            }
-          } catch (photoError) {
-            console.warn('Не удалось перенести фото кандидата:', photoError?.message)
-          }
-        }
         await onSaved?.({ id: newUserId, mode: 'create' })
         showSuccess('Сотрудник успешно создан')
         onClose?.()
@@ -478,11 +447,7 @@ export default function EmployeeEditModal({
     }
   }
 
-  const saveLabel = submitting
-    ? 'Сохранение…'
-    : sourceCandidateId
-      ? 'Создать сотрудника'
-      : 'Сохранить'
+  const saveLabel = submitting ? 'Сохранение…' : 'Сохранить'
 
   const currentRoleLabel = formatRoleDisplayLabel(
     getRoleByCode(employee?.role) || {
@@ -558,28 +523,6 @@ export default function EmployeeEditModal({
         }
       >
         <form id="employee-form" className="admin-form" onSubmit={handleSave}>
-          {sourceCandidateId && (
-            <div className="employee-form-candidate-meta">
-              {form.avatarUrl && (
-                <EmployeeAvatar
-                  name={`${form.firstName} ${form.lastName}`.trim()}
-                  avatarUrl={form.avatarUrl}
-                  size="lg"
-                />
-              )}
-              <div className="employee-form-candidate-meta__info">
-                <p className="admin-form__hint">
-                  Данные заполнены из карточки кандидата. Логин, пароль, должность и роль укажите
-                  вручную.
-                </p>
-                {candidatePhone && (
-                  <p>
-                    <strong>Телефон:</strong> {candidatePhone}
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
 
           {editId && !cloudMode && (
             <ProfileAvatarEditor
