@@ -103,26 +103,6 @@ async function findEmployeeByLogin(serviceClient: SupabaseClient, login: string)
   return data
 }
 
-async function findEmployeeByCandidateId(serviceClient: SupabaseClient, candidateId: string) {
-  const { data, error } = await serviceClient
-    .from('academy_candidates')
-    .select('created_user_id')
-    .eq('id', candidateId)
-    .maybeSingle()
-
-  if (error) throw error
-  if (!data?.created_user_id) return null
-
-  const { data: employee, error: employeeError } = await serviceClient
-    .from('academy_users')
-    .select(EMPLOYEE_RETURN_SELECT)
-    .eq('id', data.created_user_id)
-    .maybeSingle()
-
-  if (employeeError) throw employeeError
-  return employee
-}
-
 Deno.serve(async (req) => {
   const requestId = crypto.randomUUID()
 
@@ -164,8 +144,6 @@ Deno.serve(async (req) => {
   const temporaryPassword =
     typeof payload.temporary_password === 'string' ? payload.temporary_password : ''
   const roleId = typeof payload.role_id === 'string' ? payload.role_id.trim() : ''
-  const sourceCandidateId =
-    typeof payload.source_candidate_id === 'string' ? payload.source_candidate_id.trim() : ''
 
   const canonical = canonicalLogin(loginRaw)
   if (!canonical || canonical.length > MAX_LOGIN_LENGTH) {
@@ -229,13 +207,6 @@ Deno.serve(async (req) => {
   const { serviceClient } = authResult
 
   try {
-    if (sourceCandidateId) {
-      const candidateEmployee = await findEmployeeByCandidateId(serviceClient, sourceCandidateId)
-      if (candidateEmployee?.auth_user_id) {
-        return jsonResponse({ ok: true, employee: candidateEmployee, idempotent: true }, 200)
-      }
-    }
-
     const { data: targetRole, error: roleError } = await serviceClient
       .from('roles')
       .select('id, code, name, is_active')
@@ -275,10 +246,8 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Login collisions are always a hard conflict here. The only safe idempotent
-    // shortcut is the source_candidate_id check above (same candidate, same request).
-    // A login match against a DIFFERENT candidate/request must never be treated as
-    // "already done" — that used to silently attach the new hire to someone else's
+    // Login collisions are always a hard conflict: a match must never be treated as
+    // "already done" — that used to silently attach a new hire to someone else's
     // existing account instead of erroring. See docs/hr/login-collision-incident.md.
     const existingEmployee = await findEmployeeByLogin(serviceClient, canonical)
     if (existingEmployee) {
