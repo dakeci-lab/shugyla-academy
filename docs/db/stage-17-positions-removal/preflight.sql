@@ -6,3 +6,4 @@ select 'functions_using_positions (expect 8 position_structure_* only)', count(*
  where n.nspname='public' and (p.proname like 'position_structure%' or p.prosrc ilike '%positions%' or p.prosrc ilike '%position_groups%');
 select 'other_fks_to_positions (expect 1: academy_users.position_id)', count(*)
   from pg_constraint where contype='f' and confrelid in ('public.positions'::regclass,'public.position_groups'::regclass) and conrelid <> 'public.positions'::regclass;
+select 'private_schema_objects (expect 9 functions, used only by position_structure_*)', count(*) from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='position_structure_private';
