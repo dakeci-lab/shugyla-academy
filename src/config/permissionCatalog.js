@@ -221,9 +221,6 @@ export const RBAC_SYSTEM_ROLES = [
   { code: 'admin', name: 'Администратор', description: 'Полный доступ ко всем разделам платформы.', isSystem: true },
   { code: 'buyer', name: 'Закупщик', description: 'Закуп, заказы и поставщики.', isSystem: true },
   { code: 'receiver', name: 'Приёмщик', description: 'Просмотр ожидаемых поставок (заказов).', isSystem: true },
-  { code: 'floor_admin', name: 'Администратор торгового зала', description: 'Нет разделов платформы (учёт времени ведётся в Прополисе).', isSystem: true },
-  { code: 'cashier', name: 'Кассир', description: 'Нет разделов платформы (учёт времени ведётся в Прополисе).', isSystem: true },
-  { code: 'seller', name: 'Продавец', description: 'Нет разделов платформы (учёт времени ведётся в Прополисе).', isSystem: true },
 ]
 
 const P = PERMISSION_CODES
@@ -239,15 +236,6 @@ export const RBAC_DEFAULT_ROLE_PERMISSIONS = {
   receiver: [
     P.DASHBOARD_VIEW,
     P.RECEIVING_VIEW,
-  ],
-  floor_admin: [
-    P.DASHBOARD_VIEW,
-  ],
-  cashier: [
-    P.DASHBOARD_VIEW,
-  ],
-  seller: [
-    P.DASHBOARD_VIEW,
   ],
 }
 

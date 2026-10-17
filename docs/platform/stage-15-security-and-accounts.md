@@ -40,7 +40,28 @@ No names, logins or ids are recorded here (the repository is public).
 them (and `finansist_2`, also empty) would also need the built-in system-role list in `permissionCatalog.js`
 updated.
 
-## Next from the advisor list (not done)
+## 15c — empty roles deleted (applied on prod, 2026-10-17)
 
-Indexes for 17 unindexed foreign keys (notably `purchase_order_items.purchase_order_id`), 6 RLS policies that
-re-evaluate `auth.uid()` per row, 20 unused indexes.
+Roles with no users and no platform sections: `cashier`, `seller`, `floor_admin`, `tehnichka`, `finansist_2`
+(5 rows in `roles`; `role_permissions` cascade). The transaction asserted that none had users and that exactly 5
+rows matched. Roles left: `admin`, `buyer`, `receiver`, `buhgalter`. The frontend catalog lost the three built-in
+system roles `cashier` / `seller` / `floor_admin` and their default grants (`RBAC_SYSTEM_ROLES`,
+`RBAC_DEFAULT_ROLE_PERMISSIONS`); the legacy role-code constants stay so old links/sessions still resolve to
+«no sections».
+
+## 15d — foreign-key indexes (applied on prod, 2026-10-17)
+
+`supabase/migrations/20261017160000_index_foreign_keys_procurement_receiving.sql`: 16 indexes on foreign keys from
+the performance advisor (purchase order items / orders, receiving items / documents / versions / exports, payment
+obligations, supply items, match candidates).
+
+**Measured honestly:** the database side of loading order items was never the main cost. Before: seq scan, 20 ms
+for the 100 newest orders (8.8 k rows); after: index scan, 10 ms, and it no longer grows with the table. The ~0.8 s per
+request seen from the browser is network + PostgREST/RLS overhead, so don't expect a large load-time change from this.
+
+## Still open
+
+- 6 RLS policies that re-evaluate `auth.uid()` per row (`user_table_settings`, `academy_users`), 20 unused indexes.
+- Dashboard: enable «Leaked password protection».
+- Two accounts (receiver, accountant) were switched to «terminated» on 2026-10-17; they were not deleted pending
+  the owner's confirmation (they are the only holders of those roles).
