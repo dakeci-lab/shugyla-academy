@@ -43,9 +43,8 @@ function main() {
   assert('edge value-based self role check', edge.includes('requestedRoleId') && edge.includes('self_role_change_forbidden'))
   assert('edge value-based self status check', edge.includes('requestedStatus') && edge.includes('self_status_change_forbidden'))
   assert('edge strips unchanged protected keys', edge.includes('delete changes.role_id') && edge.includes('delete changes.status'))
-  assert('payroll_participation is allowed change key', edge.includes("'payroll_participation'"))
-  assert('salary_calculation_type is allowed change key', edge.includes("'salary_calculation_type'"))
-  assert('work_mode is allowed change key', edge.includes("'work_mode'"))
+  // Stage 18: work mode / salary type / payroll participation were removed; stale clients' values are ignored.
+  assert('removed payroll fields are ignored, not allowed', !edge.includes("ALLOWED_PAYROLL_PARTICIPATIONS") && edge.includes("'payroll_participation',\n  ]) {"))
   assert('hired_at is allowed change key', edge.includes("'hired_at'"))
   assert('diff helper exists', data.includes('buildEmployeeCloudUpdateChanges'))
   assert('diff omits self role/status', data.includes('if (!editingSelf)') && data.includes('changes.roleId') && data.includes('changes.employmentStatus'))
@@ -57,7 +56,7 @@ function main() {
   assert('status hint for self', modal.includes('Собственный статус сотрудника нельзя изменить'))
   assert('verify script registered', pkg.includes('verify:employee-self-edit'))
   assert('diff has no position fields (stage 17)', data.includes('if (!editingSelf)') && !data.includes('changes.positionId'))
-  assert('edge ignores stale position fields', edge.includes("'position_id', 'positionId'"))
+  assert('edge ignores stale position fields', edge.includes("'position_id',") && edge.includes("'positionId',"))
 
   // Lightweight behavioral mirror of the diff helper contract
   assert(

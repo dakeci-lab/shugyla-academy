@@ -34,7 +34,7 @@ export const ACADEMY_AUTH_PROFILE_FIELDS =
 
 /** Safe academy_users columns for Auth-first cloud queries (never includes password). */
 export const ACADEMY_PROFILE_SAFE_FIELDS =
-  `${ACADEMY_AUTH_PROFILE_FIELDS}, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation`
+  `${ACADEMY_AUTH_PROFILE_FIELDS}, hired_at, terminated_at`
 
 export const PROFILE_LOAD_ERROR = {
   FORBIDDEN: 'profile_forbidden',
@@ -85,7 +85,6 @@ function buildSessionUser(employee, phone = null) {
     roleId: employee.roleId ?? employee.role_id ?? null,
     roleName: role?.label || employee.role,
     avatarUrl: employee.avatarUrl || null,
-    workMode: employee.workMode || employee.work_mode || 'offline',
     permissions: role?.permissions || [],
   }
 }
@@ -102,9 +101,6 @@ function profileRowToEmployee(row) {
     employmentStatus: row.status,
     hiredAt: row.hired_at,
     terminatedAt: row.terminated_at,
-    workMode: row.work_mode,
-    salaryCalculationType: row.salary_calculation_type,
-    payrollParticipation: row.payroll_participation,
     createdAt: row.created_at,
     avatarUrl: row.avatar_url,
   })
@@ -124,24 +120,6 @@ async function loadAcademyUserRow(match) {
 
   if (authResult.error || !authResult.data) return authResult
 
-  const extendedResult = await match(
-    'id, hired_at, terminated_at, work_mode, salary_calculation_type, payroll_participation'
-  )
-  if (!extendedResult.error && extendedResult.data) {
-    return {
-      ...authResult,
-      data: {
-        ...authResult.data,
-        hired_at: extendedResult.data.hired_at ?? null,
-        terminated_at: extendedResult.data.terminated_at ?? null,
-        work_mode: extendedResult.data.work_mode ?? null,
-        salary_calculation_type: extendedResult.data.salary_calculation_type ?? null,
-        payroll_participation: extendedResult.data.payroll_participation ?? null,
-      },
-    }
-  }
-
-  // Fallback if PostgREST cache still lacks the newest columns
   const datesResult = await match('id, hired_at, terminated_at')
   if (!datesResult.error && datesResult.data) {
     return {

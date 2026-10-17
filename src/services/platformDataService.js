@@ -454,11 +454,7 @@ export async function createEmployee(data) {
         avatarUrl: row.avatar_url,
         hiredAt: row.hired_at,
         terminatedAt: row.terminated_at,
-        workMode: row.work_mode,
-        salaryCalculationType: row.salary_calculation_type,
-        payrollParticipation: row.payroll_participation,
         createdAt: row.created_at,
-        workLocationId: data.workLocationId || null,
       })
       store.employees = [...store.employees, employee]
     }
