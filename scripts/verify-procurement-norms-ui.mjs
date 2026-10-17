@@ -65,7 +65,7 @@ assert('page loading spinner removed', !component.includes('className="proc-norm
 assert('generated snapshot is read-only', component.includes("snapshot?.status === 'generated'") && component.includes("snapshot?.status === 'ready'"))
 assert('partially generated snapshot stays editable', component.includes("snapshot?.status === 'partially_generated'"))
 assert('norm writes use existing set_norm service path', service.includes('persistNormDaysForScope'))
-assert('category save reapplies subcategory overrides', service.includes('overridesApplied') && service.includes('for (const override of overrides)'))
+assert('category save is one request; the server keeps subcategory overrides', !service.includes('for (const override of overrides)') && service.includes('subcategoryName: \'\''))
 assert('taxonomy uses one compact RPC', service.includes("rpc('get_procurement_norm_taxonomy'") && service.includes('p_snapshot_id'))
 assert('taxonomy no longer pages through every SKU', !service.includes('.range(') && !service.includes('100_000'))
 assert('component renders cached model before network refresh', component.includes('getLatestCachedProcurementNormsModel') && component.includes('onCached: applyModel'))

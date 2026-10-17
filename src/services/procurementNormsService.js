@@ -115,27 +115,14 @@ export async function saveProcurementSubcategoryNorm({
 }
 
 /**
- * The current category RPC updates every item in the category. Reapply stored
- * subcategory overrides immediately so the hierarchy remains effective in the draft.
+ * The server applies the category norm only to items whose subcategory has no explicit norm,
+ * in a single transaction, so subcategory overrides are never touched.
  */
 export async function saveProcurementCategoryNorm({ snapshotId, categoryName, normDays }) {
-  const categoryResult = await persistNormDaysForScope({
+  return persistNormDaysForScope({
     snapshotId,
     categoryName,
     subcategoryName: '',
     normDays,
   })
-
-  const rules = await fetchProcurementNormRules({ categoryName })
-  const overrides = rules.filter((rule) => Boolean(rule.subcategoryName))
-  for (const override of overrides) {
-    await persistNormDaysForScope({
-      snapshotId,
-      categoryName,
-      subcategoryName: override.subcategoryName,
-      normDays: override.normDays,
-    })
-  }
-
-  return { ...categoryResult, overridesApplied: overrides.length }
 }
