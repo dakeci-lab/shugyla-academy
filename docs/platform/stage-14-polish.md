@@ -9,7 +9,7 @@ Follows `stage-13-cleanup.md`. Owner asked to plan and execute the leftovers the
 | 3 | Retire verify scripts and local tooling of removed modules | done |
 | 4 | Cut the dead «create from candidate» flow and the recruitment code behind it | done |
 | 5 | Repair the stale verify scripts of kept features | pending |
-| 6 | Update `CLAUDE.md`, archive docs of removed modules | pending |
+| 6 | Update `CLAUDE.md`, archive docs of removed modules | done |
 | 7 | (owner decision) simplify the «Пользователи» form and `academy_users` columns | pending |
 
 ## 2 — dead code
@@ -66,3 +66,14 @@ Edge Function code; add `grep` of `supabase/functions` to the preflight template
   `applicationForm`, `kzPhone`, `slugify` — −2 800 lines.
 - Build ok; ESLint `no-undef` 0 and no unused imports in the touched files; full `verify:*`: no new
   failures after patching `buyer-role-compatibility`, `domain-deployment` and `hide-personnel-modules`.
+
+## 6 — CLAUDE.md and docs
+
+- `CLAUDE.md` rewritten for the current scope (procurement + settlements only): domains, menu, data
+  architecture without the removed modules, the 10 remaining Edge Functions and cron jobs, DB process with
+  the stage-13d lesson (grep Edge Functions and frontend in every drop preflight), deploy-race rule,
+  what is left.
+- 19 docs of removed modules moved with `git mv` to `docs/archive/` (careers, notifications, hr shift
+  clearing, auth team-workforce, workforce/scheduler performance stages, 4 platform docs); an
+  `archive/README.md` explains them. `docs/hr/login-collision-incident.md` stays (referenced by
+  `admin-create-employee`). No scripts or sources referenced the moved paths.
