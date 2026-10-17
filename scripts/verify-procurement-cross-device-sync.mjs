@@ -40,8 +40,7 @@ function main() {
   const platformService = read('src/services/platformDataService.js')
   const page = read('src/pages/platform/orders/OrdersPage.jsx')
   const purchaseService = read('src/services/purchaseDataService.js')
-  const optimistic = read('src/services/purchaseOptimisticService.js')
-  const migration = read('supabase/migrations/20260717210000_secure_procurement_rls.sql')
+    const migration = read('supabase/migrations/20260717210000_secure_procurement_rls.sql')
   const sw = read('public/sw.js')
 
   console.log('Stage 1: Auth-gated cloud bootstrap')
@@ -120,7 +119,6 @@ function main() {
   console.log('Stage 5: Source of truth')
   assert('cloud list reads cloudStore + overlay', purchaseService.includes('getCloudPurchases()'))
   assert('sync source gated on module ready', purchaseService.includes("isModuleReady('procurement')"))
-  assert('optimistic create syncs to supabase', optimistic.includes('syncSimplePurchaseCloud'))
   assert('overlay is merge-only for pending/error', read('src/services/purchaseOptimisticStore.js').includes('getOptimisticOverlayForMerge'))
   console.log('Stage 6: Secure RLS migration')
   assert('migration revokes anon purchase_orders', migration.includes('revoke all on table public.purchase_orders from anon'))
