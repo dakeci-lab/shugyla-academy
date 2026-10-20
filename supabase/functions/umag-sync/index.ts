@@ -26,6 +26,7 @@ import {
   MAX_AUTO_SYNC_LOOKBACK_MONTHS,
   nearlyEqual,
   parseUmagEditTime,
+  SYNC_WINDOW_DAYS,
   STALE_SYNC_THRESHOLD_MINUTES,
   sumNumbers,
   UMAG_PAGE_SIZE,
@@ -1884,11 +1885,10 @@ async function fetchOpenObligationDatePoints(
  * matter how old the underlying приёмка is — Этап 2.2.
  *
  *   automaticOpenDebtFrom = max(oldestOpenDebtDate, autoFloor)   — capped widening
- *   effectiveFrom = min(recentStart, automaticOpenDebtFrom, requestedFrom)
+ *   effectiveFrom = max(min(recentStart, automaticOpenDebtFrom, requestedFrom), today − SYNC_WINDOW_DAYS)
  *   effectiveTo   = today (Aqtobe)                                — always refresh "now"
  *
- * requestedFrom itself is never capped by MAX_AUTO_SYNC_LOOKBACK_MONTHS — an
- * explicit historical VIEW-period request (backfill) stays honored even past it.
+ * SYNC_WINDOW_DAYS (60) is a hard ceiling over all of the above, including explicit historical requests.
  * "Uncovered" folds in both cap-truncated old debt AND debt whose date could
  * not be resolved at all — neither can be called guaranteed-fresh.
  */
@@ -1937,9 +1937,12 @@ async function computeEffectiveSyncScope(
         ? autoFloor
         : oldestOpenDebtDate
 
-  const effectiveFrom = [recentStart, automaticOpenDebtFrom, requestedFrom].reduce((min, key) =>
+  // Never reach further back than SYNC_WINDOW_DAYS (owner decision 2026-10-20).
+  const windowStart = addCalendarDays(todayKey, -SYNC_WINDOW_DAYS)
+  const widenedFrom = [recentStart, automaticOpenDebtFrom, requestedFrom].reduce((min, key) =>
     key < min ? key : min
   )
+  const effectiveFrom = widenedFrom < windowStart ? windowStart : widenedFrom
   const effectiveTo = todayKey
 
   let uncoveredOpenObligationsCount = 0

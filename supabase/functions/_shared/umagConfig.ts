@@ -18,6 +18,14 @@ export const UMAG_TIMEZONE_OFFSET_MS = 5 * 60 * 60 * 1000 // Asia/Aqtobe (+05), 
 export const MAX_AUTO_SYNC_LOOKBACK_MONTHS = 24
 
 /**
+ * Hard ceiling for every sync (owner decision 2026-10-20): the UMAG fetch never reaches further back than this many
+ * days from today, whatever the open debt or the requested period. The period used to start at the oldest open
+ * obligation (02.09) and grew daily, which made syncs slower and eventually broke them (see
+ * docs/incidents/2026-10-20-umag-sync-url-limit.md). Older open obligations are no longer refreshed from UMAG.
+ */
+export const SYNC_WINDOW_DAYS = 60
+
+/**
  * Этап 2.3 — how long a `running` umag_sync_runs row is trusted before the
  * next sync attempt treats it as crashed/abandoned and closes it as stale.
  *
