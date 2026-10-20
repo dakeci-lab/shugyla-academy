@@ -21,6 +21,7 @@
     "verify:procurement-calendar-filter": "node scripts/verify-procurement-calendar-filter.mjs",
     "verify:procurement-planning-v1": "node scripts/verify-procurement-planning-v1.mjs",
     "verify:stage-13d-personnel-removal-static": "node scripts/verify-stage-13d-personnel-removal-static.mjs",
+    "verify:umag-sync-window": "node scripts/verify-umag-sync-window.mjs",
     "verify:procurement-norm-journal": "node scripts/verify-procurement-norm-journal.mjs",
     "verify:procurement-norms-director-only": "node scripts/verify-procurement-norms-director-only.mjs",
     "verify:careers-intake-closed": "node scripts/verify-careers-intake-closed.mjs",
