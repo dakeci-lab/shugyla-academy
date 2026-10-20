@@ -603,10 +603,14 @@ async function upsertSuppliers(
     .map((a) => asBigIntId(a.id))
     .filter((id): id is number => id != null)
 
-  const { data: existingRows, error: existingError } = await serviceClient
-    .from('umag_suppliers')
-    .select('id, umag_supplier_id')
-    .in('umag_supplier_id', umagIds)
+  // Chunked: a single .in() with every id overflows the PostgREST URL limit once the list grows.
+  const { rows: existingRows, error: existingError } = await fetchRowsByIdsInChunks(
+    serviceClient,
+    'umag_suppliers',
+    'id, umag_supplier_id',
+    'umag_supplier_id',
+    umagIds
+  )
 
   if (existingError) {
     console.error('umag_suppliers_select_failed', { message: existingError.message })
@@ -1077,10 +1081,14 @@ async function upsertSupplies(
     .map((s) => asBigIntId(s.id))
     .filter((id): id is number => id != null)
 
-  const { data: existingRows, error: existingError } = await serviceClient
-    .from('umag_supplies')
-    .select('id, umag_supply_id, is_source_deleted')
-    .in('umag_supply_id', umagIds)
+  // Chunked: a single .in() with every id (1200+ documents) overflows the PostgREST URL limit.
+  const { rows: existingRows, error: existingError } = await fetchRowsByIdsInChunks(
+    serviceClient,
+    'umag_supplies',
+    'id, umag_supply_id, is_source_deleted',
+    'umag_supply_id',
+    umagIds
+  )
 
   if (existingError) {
     console.error('umag_supplies_select_failed', { message: existingError.message })
@@ -1146,10 +1154,28 @@ async function upsertSupplies(
       .from('umag_supplies')
       .upsert(chunk, { onConflict: 'umag_supply_id' })
     if (error) {
-      console.error('umag_supplies_upsert_failed', { message: error.message, offset: i })
+      console.error('umag_supplies_upsert_failed', {
+        message: error.message,
+        code: error.code,
+        offset: i,
+      })
+      // Isolate the offending document(s): retry the chunk row by row so the good rows are
+      // saved and the failure names the exact UMAG supply id and the database reason.
+      const failures: string[] = []
+      for (const row of chunk) {
+        const { error: rowError } = await serviceClient
+          .from('umag_supplies')
+          .upsert([row], { onConflict: 'umag_supply_id' })
+        if (rowError) {
+          failures.push(`№${row.umag_supply_id}: ${rowError.message}`)
+        }
+      }
+      const detail = failures.length
+        ? failures.slice(0, 3).join('; ')
+        : error.message
       return umagErrorResponse(
         'SUPABASE_UPSERT_FAILED',
-        'Не удалось сохранить приёмки UMAG.',
+        `Не удалось сохранить приёмки UMAG (${failures.length || 'пачка'}): ${detail}`.slice(0, 500),
         500
       )
     }
@@ -1415,10 +1441,13 @@ async function upsertSupplyReturns(
     if (id != null) umagIds.push(id)
   }
 
-  const { data: existingRows, error: existingError } = await serviceClient
-    .from('umag_supply_returns')
-    .select('id, umag_return_id, is_source_deleted')
-    .in('umag_return_id', umagIds)
+  const { rows: existingRows, error: existingError } = await fetchRowsByIdsInChunks(
+    serviceClient,
+    'umag_supply_returns',
+    'id, umag_return_id, is_source_deleted',
+    'umag_return_id',
+    umagIds
+  )
 
   if (existingError) {
     console.error('umag_supply_returns_select_failed', { message: existingError.message })
@@ -2465,9 +2494,17 @@ Deno.serve(async (req) => {
       platformMap
     )
     if (suppliesUpsert instanceof Response) {
+      let upsertDetail = ''
+      try {
+        upsertDetail = String((await suppliesUpsert.clone().json())?.message ?? '')
+      } catch {
+        // keep the generic text
+      }
       await finishSyncRun(authz.serviceClient, runId, {
         status: 'failed',
-        error_message: 'Ошибка сохранения приёмок',
+        error_message: upsertDetail
+          ? `Ошибка сохранения приёмок. ${upsertDetail}`.slice(0, 600)
+          : 'Ошибка сохранения приёмок',
         records_received: suppliesResult.supplies.length,
         source_total_count: source.totalCount,
         source_amount: source.amount,
