@@ -1,4 +1,4 @@
--- Stage 18 preflight (read-only). Expect: director_exists=1, accounts_table=1,
+-- Stage 20 preflight (read-only). Expect: director_exists=1, accounts_table=1,
 -- columns_already=0, active_returns ≈ 209, and policy/grant checks informational.
 select
   (select count(*) from public.academy_users where id = 1 and login = 'admin') as director_exists,
