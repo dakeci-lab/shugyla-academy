@@ -115,7 +115,7 @@ function main() {
 
   assert.match(
     detailFn,
-    /fetchUmagSupplierOperationHistory\(\{\s*\n\s*platformSupplierId: supplier\.id,\s*\n\s*umagSupplierId: supplier\.umagSupplierId,\s*\n\s*dateFrom,\s*\n\s*dateTo,/
+    /fetchUmagSupplierOperationHistory\(\{\s*\n\s*platformSupplierId: (?:supplier\.isVirtual \? null : )?supplier\.id,\s*\n\s*umagSupplierId: supplier\.umagSupplierId,[\s\S]{0,80}dateFrom,\s*\n\s*dateTo,/
   )
   ok('the card fetches its own scoped history for its own period — never the list-wide dateFrom/dateTo')
 
