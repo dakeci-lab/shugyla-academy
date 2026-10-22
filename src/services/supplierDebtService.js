@@ -11,6 +11,15 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { fetchAllSupabaseRows } from '../utils/supabasePagination'
 
+/**
+ * Pseudo supplier id for open obligations whose UMAG document has no supplier
+ * selected (platform_supplier_id IS NULL) — e.g. a receiving the receiver has
+ * not finished filling in yet. Shown as «Поставщик не выбран» so the
+ * «Поставщики» total always equals «К оплате».
+ */
+export const UNASSIGNED_SUPPLIER_ID = '__unassigned__'
+export const UNASSIGNED_SUPPLIER_NAME = 'Поставщик не выбран'
+
 function toNumber(value) {
   const n = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(n) ? n : 0
@@ -31,6 +40,23 @@ function assertSupabaseReady() {
  * "still owed" at all, so it must never feed a debt total shown next to
  * «К оплате» anywhere in the app.
  */
+async function fetchOpenUnassignedObligationRows() {
+  assertSupabaseReady()
+  const { data, error } = await fetchAllSupabaseRows(() =>
+    supabase
+      .from('supplier_payment_obligations')
+      .select('id, original_supply_amount')
+      .eq('is_source_deleted', false)
+      .is('platform_paid_at', null)
+      .is('platform_supplier_id', null)
+      .order('id', { ascending: true })
+  )
+  if (error) {
+    throw new Error(error.message || 'Не удалось рассчитать задолженность без поставщика')
+  }
+  return data || []
+}
+
 async function fetchOpenNativeObligationRows(platformSupplierIds) {
   assertSupabaseReady()
 
@@ -70,12 +96,23 @@ async function fetchOpenNativeObligationRows(platformSupplierIds) {
  * @param {{ platformSupplierIds?: string[] }} [params]
  * @returns {Promise<Map<string, number>>} platformSupplierId -> debt
  */
-export async function fetchNativeSupplierDebts({ platformSupplierIds } = {}) {
-  const rows = await fetchOpenNativeObligationRows(
-    Array.isArray(platformSupplierIds) ? platformSupplierIds.filter(Boolean) : undefined
-  )
+export async function fetchNativeSupplierDebts({ platformSupplierIds, includeUnassigned = false } = {}) {
+  const [rows, unassignedRows] = await Promise.all([
+    fetchOpenNativeObligationRows(
+      Array.isArray(platformSupplierIds) ? platformSupplierIds.filter(Boolean) : undefined
+    ),
+    includeUnassigned ? fetchOpenUnassignedObligationRows() : Promise.resolve([]),
+  ])
 
   const map = new Map()
+  if (includeUnassigned) {
+    // Always present (0 when nothing is unassigned) so callers can tell
+    // "loaded, nothing there" from "not requested".
+    map.set(
+      UNASSIGNED_SUPPLIER_ID,
+      unassignedRows.reduce((sum, row) => sum + toNumber(row.original_supply_amount), 0)
+    )
+  }
   for (const row of rows) {
     if (!row.platform_supplier_id) continue
     const id = row.platform_supplier_id

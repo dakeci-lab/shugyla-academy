@@ -577,6 +577,7 @@ async function attachSupplyObligations(supplies) {
 export async function fetchUmagSupplierOperationHistory({
   platformSupplierId = null,
   umagSupplierId = null,
+  unassigned = false,
   dateFrom,
   dateTo,
 }) {
@@ -589,14 +590,17 @@ export async function fetchUmagSupplierOperationHistory({
   if (!isSupabaseConfigured() || !supabase) {
     return { ...empty, error: 'Supabase не настроен.' }
   }
-  if (!platformSupplierId && umagSupplierId == null) {
+  if (!unassigned && !platformSupplierId && umagSupplierId == null) {
     return empty
   }
 
   const fromIso = `${dateFrom}T00:00:00+05:00`
   const toIso = `${dateTo}T23:59:59.999+05:00`
 
+  // «Поставщик не выбран»: documents with no platform supplier at all —
+  // the same set supplierDebtService counts under UNASSIGNED_SUPPLIER_ID.
   function scopeToSupplier(query) {
+    if (unassigned) return query.is('platform_supplier_id', null)
     return platformSupplierId
       ? query.eq('platform_supplier_id', platformSupplierId)
       : query.eq('umag_supplier_id', umagSupplierId)
@@ -647,14 +651,21 @@ export async function fetchUmagSupplierOperationHistory({
         supabase.from('platform_supplier_ledger_events').select('platform_supplier_id, umag_supplier_id, balance_delta')
       ).lt('occurred_at', fromIso)
     ),
-    platformSupplierId
+    platformSupplierId || unassigned
       ? fetchAllSupabaseRows(() =>
-          supabase
-            .from('supplier_payment_obligations')
-            .select(
-              'id, platform_supplier_id, umag_supply_id, original_supply_amount, platform_paid_at, platform_paid_by, platform_payment_account_id, supplier:platform_suppliers!platform_supplier_id(name)'
-            )
-            .eq('platform_supplier_id', platformSupplierId)
+          (unassigned
+            ? supabase
+                .from('supplier_payment_obligations')
+                .select(
+                  'id, platform_supplier_id, umag_supply_id, original_supply_amount, platform_paid_at, platform_paid_by, platform_payment_account_id, supplier:platform_suppliers!platform_supplier_id(name)'
+                )
+                .is('platform_supplier_id', null)
+            : supabase
+                .from('supplier_payment_obligations')
+                .select(
+                  'id, platform_supplier_id, umag_supply_id, original_supply_amount, platform_paid_at, platform_paid_by, platform_payment_account_id, supplier:platform_suppliers!platform_supplier_id(name)'
+                )
+                .eq('platform_supplier_id', platformSupplierId))
             .not('platform_paid_at', 'is', null)
             .not('platform_paid_by', 'is', null)
             .gte('platform_paid_at', fromIso)

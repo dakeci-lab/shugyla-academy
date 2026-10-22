@@ -22,7 +22,11 @@ import {
   deleteSupplier,
   ensureModuleLoaded,
 } from '../../../services/platformDataService'
-import { fetchNativeSupplierDebts } from '../../../services/supplierDebtService'
+import {
+  fetchNativeSupplierDebts,
+  UNASSIGNED_SUPPLIER_ID,
+  UNASSIGNED_SUPPLIER_NAME,
+} from '../../../services/supplierDebtService'
 import {
   ensurePaymentAccountsLoaded,
   getPaymentAccountName,
@@ -177,6 +181,30 @@ function formatAccountNames(value) {
  * and asked for one denser identity card instead.
  */
 function SupplierIdentityCard({ supplier, canEdit, canViewFinance, debtLoading, onEdit }) {
+  if (supplier.isVirtual) {
+    return (
+      <div className="umag-settlements__identity">
+        <div className="umag-settlements__identity-main">
+          <h2 className="umag-settlements__detail-title">{supplier.name}</h2>
+        </div>
+        <p className="umag-settlements__identity-note">
+          Документы UMAG, у которых не выбран поставщик (например, приёмка ещё не оформлена
+          полностью). Выберите поставщика в UMAG — после синхронизации документ перейдёт к нему.
+          Оплатить такой документ можно и здесь.
+        </p>
+        {canViewFinance ? (
+          <dl className="umag-settlements__identity-grid">
+            <div>
+              <dt>Баланс</dt>
+              <dd className={supplier.debt > 0 ? 'umag-settlements__debt' : undefined}>
+                {debtLoading ? '…' : formatUmagMoney(supplier.debt ?? 0)}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
+      </div>
+    )
+  }
   const archived = isSupplierDeleted(supplier)
   const paymentMethodLabel = getPaymentAccountName(supplier.paymentAccountId) || 'Не настроено'
   const paymentTermLabel = formatDeferralDaysTerm(supplier.deferralDays)
@@ -305,8 +333,9 @@ function UmagSupplierDetail({
     setDetailLoading(true)
     setDetailError('')
     void fetchUmagSupplierOperationHistory({
-      platformSupplierId: supplier.id,
+      platformSupplierId: supplier.isVirtual ? null : supplier.id,
       umagSupplierId: supplier.umagSupplierId,
+      unassigned: Boolean(supplier.isVirtual),
       dateFrom,
       dateTo,
     }).then((result) => {
@@ -318,7 +347,7 @@ function UmagSupplierDetail({
     return () => {
       cancelled = true
     }
-  }, [canViewFinance, supplier.id, supplier.umagSupplierId, dateFrom, dateTo, reloadToken])
+  }, [canViewFinance, supplier.id, supplier.umagSupplierId, supplier.isVirtual, dateFrom, dateTo, reloadToken])
 
   const operations = detail?.operations || []
   const openingBalance = detail?.openingBalance || 0
@@ -349,8 +378,8 @@ function UmagSupplierDetail({
           {
             id: op.settlement.obligationId,
             originalSupplyAmount: obligation?.original_supply_amount,
-            platformSupplierId: supplier.id,
-            supplierName: supplier.name,
+            platformSupplierId: supplier.isVirtual ? null : supplier.id,
+            supplierName: supplier.isVirtual ? null : supplier.name,
             umagSupplyId: op.source?.umag_supply_id,
           },
           {
@@ -811,11 +840,25 @@ export default function UmagSettlementsPanel({
   const returnToRef = useRef(null)
 
   const allSuppliers = suppliersReady ? getSuppliers() : []
+  const unassignedDebt = debtByPlatformId.get(UNASSIGNED_SUPPLIER_ID) ?? 0
+  const unassignedSupplier = useMemo(
+    () => ({
+      id: UNASSIGNED_SUPPLIER_ID,
+      name: UNASSIGNED_SUPPLIER_NAME,
+      isVirtual: true,
+    }),
+    []
+  )
   const filteredUnsorted = useMemo(() => {
     const base = filterSuppliers(allSuppliers, { search: '', showArchived: appliedShowArchived })
-    return supplierFilter.size > 0 ? base.filter((s) => supplierFilter.has(s.id)) : base
+    const list = supplierFilter.size > 0 ? base.filter((s) => supplierFilter.has(s.id)) : base
+    // Shown only while there is something unassigned, and only in the default
+    // (non-archive, unfiltered) view, so it never sits in an empty list.
+    return unassignedDebt !== 0 && supplierFilter.size === 0 && !appliedShowArchived
+      ? [...list, unassignedSupplier]
+      : list
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allSuppliers, supplierFilter, appliedShowArchived, version, dataVersion])
+  }, [allSuppliers, supplierFilter, appliedShowArchived, unassignedDebt, unassignedSupplier, version, dataVersion])
   // Biggest balance first so the largest debts stand out; name breaks ties
   // (and orders the all-zero tail) so the list stays stable.
   const filtered = useMemo(
@@ -827,7 +870,12 @@ export default function UmagSettlementsPanel({
       ),
     [filteredUnsorted, debtByPlatformId]
   )
-  const selected = selectedId ? allSuppliers.find((s) => s.id === selectedId) || null : null
+  const selected =
+    selectedId === UNASSIGNED_SUPPLIER_ID
+      ? unassignedSupplier
+      : selectedId
+        ? allSuppliers.find((s) => s.id === selectedId) || null
+        : null
   const totalDebt = useMemo(
     () => filtered.reduce((sum, s) => sum + (debtByPlatformId.get(s.id) || 0), 0),
     [filtered, debtByPlatformId]
@@ -841,7 +889,10 @@ export default function UmagSettlementsPanel({
     }
     if (!suppliersReady) return
     setDebtLoading(true)
-    void fetchNativeSupplierDebts({ platformSupplierIds: allSuppliers.map((s) => s.id) })
+    void fetchNativeSupplierDebts({
+      platformSupplierIds: allSuppliers.map((s) => s.id),
+      includeUnassigned: true,
+    })
       .then((map) => {
         setDebtByPlatformId(map)
         setDebtLoading(false)
@@ -1202,7 +1253,7 @@ export default function UmagSettlementsPanel({
                           {debtLoading ? '…' : formatUmagMoney(debt ?? 0)}
                         </span>
                       ),
-                      actions: (
+                      actions: s.isVirtual ? null : (
                         <IconActionButton
                           label="Редактировать"
                           variant="primary"
