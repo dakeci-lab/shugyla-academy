@@ -37,6 +37,7 @@ import {
   type UmagSession,
 } from '../_shared/umagAuth.ts'
 import { rebuildLedgerEventsForPeriod } from '../_shared/umagDocumentPayments.ts'
+import { mapConcurrent } from '../_shared/concurrency.ts'
 
 const PERMISSION_SYNC = 'umag.settlements.sync'
 const ALLOWED_BODY_KEYS = new Set(['action', 'dateFrom', 'dateTo', 'syncSuppliers'])
@@ -1069,6 +1070,38 @@ async function loadPlatformSupplierMap(
   return map
 }
 
+/**
+ * True when an incoming supply differs from what is already stored (or is new / was soft-deleted).
+ * Compares the business columns plus UMAG's editTime, which UMAG bumps on any document change.
+ */
+function supplyRowChanged(
+  row: Record<string, unknown>,
+  stored: Record<string, unknown> | undefined
+): boolean {
+  if (!stored || stored.is_source_deleted === true) return true
+  const sameNumber = (a: unknown, b: unknown) => {
+    if (a == null || b == null) return a == null && b == null
+    return Math.abs(Number(a) - Number(b)) < 1e-6
+  }
+  const sameText = (a: unknown, b: unknown) => (a ?? null) === (b ?? null)
+  const sameTime = (a: unknown, b: unknown) => {
+    if (a == null || b == null) return a == null && b == null
+    return new Date(String(a)).getTime() === new Date(String(b)).getTime()
+  }
+  return !(
+    sameTime(row.umag_edit_time, stored.umag_edit_time) &&
+    sameNumber(row.amount, stored.amount) &&
+    sameNumber(row.payment_amount, stored.payment_amount) &&
+    sameNumber(row.payment_refund_amount, stored.payment_refund_amount) &&
+    sameNumber(row.debt, stored.debt) &&
+    sameNumber(row.umag_supplier_id, stored.umag_supplier_id) &&
+    sameText(row.platform_supplier_id, stored.platform_supplier_id) &&
+    sameText(row.supplier_id, stored.supplier_id) &&
+    sameText(row.comment, stored.comment) &&
+    sameText(row.account, stored.account)
+  )
+}
+
 async function upsertSupplies(
   // deno-lint-ignore no-explicit-any
   serviceClient: any,
@@ -1086,7 +1119,7 @@ async function upsertSupplies(
   const { rows: existingRows, error: existingError } = await fetchRowsByIdsInChunks(
     serviceClient,
     'umag_supplies',
-    'id, umag_supply_id, is_source_deleted',
+    'id, umag_supply_id, is_source_deleted, umag_edit_time, amount, payment_amount, payment_refund_amount, debt, umag_supplier_id, platform_supplier_id, supplier_id, comment, account',
     'umag_supply_id',
     umagIds
   )
@@ -1101,8 +1134,10 @@ async function upsertSupplies(
   }
 
   const existing = new Map<number, boolean>()
+  const existingRowById = new Map<number, Record<string, unknown>>()
   for (const row of existingRows || []) {
     existing.set(Number(row.umag_supply_id), Boolean(row.is_source_deleted))
+    existingRowById.set(Number(row.umag_supply_id), row)
   }
   const now = new Date().toISOString()
   const rows = []
@@ -1144,52 +1179,60 @@ async function upsertSupplies(
     })
   }
 
-  // Upsert in chunks to avoid payload limits
-  const chunkSize = 200
+  // Counters describe the whole received snapshot, whether or not a row needed writing.
   let created = 0
   let updated = 0
   let reactivated = 0
-  for (let i = 0; i < rows.length; i += chunkSize) {
-    const chunk = rows.slice(i, i + chunkSize)
+  for (const row of rows) {
+    const umagId = Number(row.umag_supply_id)
+    if (existing.has(umagId)) {
+      updated += 1
+      if (existing.get(umagId) === true) reactivated += 1
+    } else {
+      created += 1
+    }
+  }
+
+  // Only write documents that are new, were soft-deleted, or whose business fields changed:
+  // a typical sync re-receives ~1300 documents of which a handful actually differ, and each
+  // upsert chunk carries the full raw_payload (~1 s per round trip).
+  const rowsToWrite = rows.filter((row) => supplyRowChanged(row, existingRowById.get(Number(row.umag_supply_id))))
+
+  // Upsert in chunks to avoid payload limits; chunks are independent, so they run in parallel.
+  const chunkSize = 200
+  const chunks: Array<typeof rows> = []
+  for (let i = 0; i < rowsToWrite.length; i += chunkSize) chunks.push(rowsToWrite.slice(i, i + chunkSize))
+
+  const failureResponses = await mapConcurrent(chunks, DB_CONCURRENCY, async (chunk, chunkIndex) => {
     const { error } = await serviceClient
       .from('umag_supplies')
       .upsert(chunk, { onConflict: 'umag_supply_id' })
-    if (error) {
-      console.error('umag_supplies_upsert_failed', {
-        message: error.message,
-        code: error.code,
-        offset: i,
-      })
-      // Isolate the offending document(s): retry the chunk row by row so the good rows are
-      // saved and the failure names the exact UMAG supply id and the database reason.
-      const failures: string[] = []
-      for (const row of chunk) {
-        const { error: rowError } = await serviceClient
-          .from('umag_supplies')
-          .upsert([row], { onConflict: 'umag_supply_id' })
-        if (rowError) {
-          failures.push(`№${row.umag_supply_id}: ${rowError.message}`)
-        }
-      }
-      const detail = failures.length
-        ? failures.slice(0, 3).join('; ')
-        : error.message
-      return umagErrorResponse(
-        'SUPABASE_UPSERT_FAILED',
-        `Не удалось сохранить приёмки UMAG (${failures.length || 'пачка'}): ${detail}`.slice(0, 500),
-        500
-      )
-    }
+    if (!error) return null
+    console.error('umag_supplies_upsert_failed', {
+      message: error.message,
+      code: error.code,
+      offset: chunkIndex * chunkSize,
+    })
+    // Isolate the offending document(s): retry the chunk row by row so the good rows are
+    // saved and the failure names the exact UMAG supply id and the database reason.
+    const failures: string[] = []
     for (const row of chunk) {
-      const umagId = Number(row.umag_supply_id)
-      if (existing.has(umagId)) {
-        updated += 1
-        if (existing.get(umagId) === true) reactivated += 1
-      } else {
-        created += 1
+      const { error: rowError } = await serviceClient
+        .from('umag_supplies')
+        .upsert([row], { onConflict: 'umag_supply_id' })
+      if (rowError) {
+        failures.push(`№${row.umag_supply_id}: ${rowError.message}`)
       }
     }
-  }
+    const detail = failures.length ? failures.slice(0, 3).join('; ') : error.message
+    return umagErrorResponse(
+      'SUPABASE_UPSERT_FAILED',
+      `Не удалось сохранить приёмки UMAG (${failures.length || 'пачка'}): ${detail}`.slice(0, 500),
+      500
+    )
+  })
+  const failureResponse = failureResponses.find((response) => response != null)
+  if (failureResponse) return failureResponse
 
   return { created, updated, reactivated }
 }
@@ -1747,6 +1790,8 @@ function resolveCanonicalSupplierId(
   return null
 }
 
+const DB_CONCURRENCY = 5
+
 async function fetchRowsByIdsInChunks(
   // deno-lint-ignore no-explicit-any
   serviceClient: any,
@@ -1757,10 +1802,15 @@ async function fetchRowsByIdsInChunks(
   chunkSize = 100
   // deno-lint-ignore no-explicit-any
 ): Promise<{ rows: any[]; error: { message: string; code?: string } | null }> {
+  const chunks: Array<Array<string | number>> = []
+  for (let i = 0; i < ids.length; i += chunkSize) chunks.push(ids.slice(i, i + chunkSize))
+  // Chunks are independent reads — run them in parallel (each is a ~0.5 s round trip).
+  const results = await mapConcurrent<
+    Array<string | number>,
+    { data: unknown[] | null; error: { message: string; code?: string } | null }
+  >(chunks, DB_CONCURRENCY, (chunk) => serviceClient.from(table).select(select).in(idColumn, chunk))
   const rows: unknown[] = []
-  for (let i = 0; i < ids.length; i += chunkSize) {
-    const chunk = ids.slice(i, i + chunkSize)
-    const { data, error } = await serviceClient.from(table).select(select).in(idColumn, chunk)
+  for (const { data, error } of results) {
     if (error) return { rows: [], error }
     for (const row of data || []) rows.push(row)
   }
@@ -2207,19 +2257,24 @@ async function refreshPaymentObligations(
   }
 
   const chunkSize = 100
+  const obligationChunks: Array<typeof upsertRows> = []
   for (let i = 0; i < upsertRows.length; i += chunkSize) {
-    const chunk = upsertRows.slice(i, i + chunkSize)
+    obligationChunks.push(upsertRows.slice(i, i + chunkSize))
+  }
+  // Independent chunks — written in parallel; failedSupplyIds/failedDetails are only touched
+  // between awaits, so the shared arrays stay consistent.
+  await mapConcurrent(obligationChunks, DB_CONCURRENCY, async (chunk, chunkIndex) => {
     const { error } = await serviceClient
       .from('supplier_payment_obligations')
       .upsert(chunk, { onConflict: 'umag_supply_id' })
-    if (!error) continue
+    if (!error) return
 
     console.error('spo_upsert_chunk_failed', {
       message: error.message,
       code: error.code,
       details: error.details,
       hint: error.hint,
-      offset: i,
+      offset: chunkIndex * chunkSize,
       chunkSize: chunk.length,
     })
 
@@ -2244,7 +2299,7 @@ async function refreshPaymentObligations(
         hint: rowError.hint,
       })
     }
-  }
+  })
 
   const failed = failedSupplyIds.length
   const status: ObligationsRefreshResult['status'] =
