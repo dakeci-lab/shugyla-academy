@@ -136,17 +136,13 @@ function stageSettlementsQuery() {
 
   assert('imports buildNativeSettlementPaymentRows', service.includes('buildNativeSettlementPaymentRows'))
   assert(
-    'native-marks query requires BOTH platform_paid_at and platform_paid_by — the 2026-09-15 backfill batch (no employee) is excluded',
-    /from\('supplier_payment_obligations'\)[\s\S]{0,400}not\('platform_paid_at', 'is', null\)[\s\S]{0,100}not\('platform_paid_by', 'is', null\)/.test(
-      service
-    )
+    'native-marks rows require BOTH platform_paid_at and platform_paid_by — the 2026-09-15 backfill batch (no employee) is excluded',
+    /from\('supplier_payment_obligations'\)/.test(service) &&
+      /row\.platform_paid_at == null \|\| row\.platform_paid_by == null\) return false/.test(service)
   )
   assert(
-    'computes attributedSupplyIds (supplies whose obligation has platform_paid_by set) from the linked supplies actually present in this period\'s payments',
-    service.includes('let attributedSupplyIds = new Set()') &&
-      /not\('platform_paid_by', 'is', null\)[\s\S]{0,200}\.in\('umag_supply_id', linkedSupplyIdsInPayments\)/.test(
-        service
-      )
+    'computes attributedSupplyIds (supplies whose obligation has platform_paid_by set) from the supplier\'s already-loaded obligations',
+    /const attributedSupplyIds = new Set\(\s*\n\s*\(obligations \|\| \[\]\)\s*\n\s*\.filter\(\(row\) => row\.platform_paid_by != null\)/.test(service)
   )
   // Rewritten 2026-09-18 (Взаиморасчёты perf): fetchUmagSupplierOperationHistory
   // is scoped to ONE supplier, so it no longer needs the old bulk function's

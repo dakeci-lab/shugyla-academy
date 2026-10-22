@@ -97,12 +97,13 @@ async function fetchOpenNativeObligationRows(platformSupplierIds) {
  * @returns {Promise<Map<string, number>>} platformSupplierId -> debt
  */
 export async function fetchNativeSupplierDebts({ platformSupplierIds, includeUnassigned = false } = {}) {
-  const [rows, unassignedRows] = await Promise.all([
-    fetchOpenNativeObligationRows(
-      Array.isArray(platformSupplierIds) ? platformSupplierIds.filter(Boolean) : undefined
-    ),
-    includeUnassigned ? fetchOpenUnassignedObligationRows() : Promise.resolve([]),
+  const idsGiven = Array.isArray(platformSupplierIds)
+  const [rows, separateUnassignedRows] = await Promise.all([
+    fetchOpenNativeObligationRows(idsGiven ? platformSupplierIds.filter(Boolean) : undefined),
+    // Without an id filter the single query below already returns the unassigned rows too.
+    includeUnassigned && idsGiven ? fetchOpenUnassignedObligationRows() : Promise.resolve([]),
   ])
+  const unassignedRows = idsGiven ? separateUnassignedRows : rows.filter((row) => !row.platform_supplier_id)
 
   const map = new Map()
   if (includeUnassigned) {
