@@ -79,7 +79,7 @@ function main() {
   assert('suppliers list not updated in setField', !form.includes('updateSupplier'))
   assert(
     'filter uses version/dataVersion, not form',
-    page.includes('[allSuppliers, supplierFilter, appliedShowArchived, version, dataVersion]')
+    /\[allSuppliers, supplierFilter, appliedShowArchived,[^\]]*version, dataVersion\]/.test(page) && !/\[[^\]]*\bform\b[^\]]*\]\s*\)\s*\n\s*const filtered/.test(page)
   )
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)

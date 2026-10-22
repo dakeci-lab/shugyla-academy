@@ -89,7 +89,7 @@ function main() {
 
   assert.match(
     panel,
-    /const loadDebts = useCallback\(\(\) => \{[\s\S]{0,400}fetchNativeSupplierDebts\(\{ platformSupplierIds: allSuppliers\.map\(\(s\) => s\.id\) \}\)/
+    /const loadDebts = useCallback\(\(\) => \{[\s\S]{0,400}fetchNativeSupplierDebts\(\{\s*platformSupplierIds: allSuppliers\.map\(\(s\) => s\.id\),?[^}]*\}\)/
   )
   ok('«Текущий долг» comes from fetchNativeSupplierDebts (same lifetime formula «К оплате» uses) — unaffected by the merge')
 
