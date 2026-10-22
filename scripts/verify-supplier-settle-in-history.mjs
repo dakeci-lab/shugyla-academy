@@ -98,4 +98,15 @@ const mig = read('supabase/migrations/20261022120000_supply_returns_native_refun
 assert.match(mig, /supplier_payments\.manage/)
 ok('DB update policy requires supplier_payments.manage')
 
+// Speed: the card's history is ONE parallel stage (no chained follow-up queries).
+const histSrc = svc.slice(svc.indexOf('export async function fetchUmagSupplierOperationHistory'))
+assert.match(histSrc, /const \[suppliesRes, returnsRes, paymentsRes, openingRes, obligationsRes, employeesRes\] = await Promise\.all\(\[/)
+assert.doesNotMatch(histSrc, /await supabase\s*\n\s*\.from\('academy_users'\)/)
+assert.doesNotMatch(histSrc, /await supabase\s*\n\s*\.from\('supplier_payment_obligations'\)/)
+ok('supplier history loads supplies/returns/payments/opening/obligations/users in one parallel stage')
+const debtSrc = read('src/services/supplierDebtService.js')
+assert.match(debtSrc, /rows\.filter\(\(row\) => !row\.platform_supplier_id\)/)
+assert.doesNotMatch(panel, /if \(!suppliersReady\) return\s*\n\s*setDebtLoading\(true\)/)
+ok('list debts need no supplier ids: one obligations query, started together with the suppliers load')
+
 console.log(`\nverify:supplier-settle-in-history — ${checks} checks passed`)

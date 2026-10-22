@@ -886,12 +886,10 @@ export default function UmagSettlementsPanel({
       setDebtsSettled(true)
       return
     }
-    if (!suppliersReady) return
     setDebtLoading(true)
-    void fetchNativeSupplierDebts({
-      platformSupplierIds: allSuppliers.map((s) => s.id),
-      includeUnassigned: true,
-    })
+    // Needs no supplier ids: every open obligation with a supplier plus the unassigned bucket, so the
+    // query starts together with the suppliers load instead of waiting for it.
+    void fetchNativeSupplierDebts({ includeUnassigned: true })
       .then((map) => {
         setDebtByPlatformId(map)
         setDebtLoading(false)
@@ -903,7 +901,7 @@ export default function UmagSettlementsPanel({
         setDebtsSettled(true)
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [canViewFinance, suppliersReady, allSuppliers.length, version, dataVersion, refreshToken])
+  }, [canViewFinance, version, dataVersion, refreshToken])
 
   useEffect(() => {
     loadDebts()

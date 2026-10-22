@@ -485,6 +485,15 @@ export function filterSupplierOperations(operations, filter = 'all') {
   return operations
 }
 
+/** Decorate supplies with the already-loaded obligation row of the same UMAG supply (`obligation`). */
+function attachObligationsFromList(supplies, obligations) {
+  const byUmagSupplyId = new Map(obligations.map((row) => [Number(row.umag_supply_id), row]))
+  return supplies.map((supply) => ({
+    ...supply,
+    obligation: byUmagSupplyId.get(Number(supply.umag_supply_id)) || null,
+  }))
+}
+
 const OBLIGATION_ID_CHUNK = 200
 
 /**
@@ -563,7 +572,7 @@ export async function fetchUmagSupplierOperationHistory({
       : query.eq('umag_supplier_id', umagSupplierId)
   }
 
-  const [suppliesRes, returnsRes, paymentsRes, openingRes, nativePaidRes] = await Promise.all([
+  const [suppliesRes, returnsRes, paymentsRes, openingRes, obligationsRes, employeesRes] = await Promise.all([
     fetchAllSupabaseRows(() =>
       scopeToSupplier(
         supabase
@@ -608,27 +617,24 @@ export async function fetchUmagSupplierOperationHistory({
         supabase.from('platform_supplier_ledger_events').select('platform_supplier_id, umag_supplier_id, balance_delta')
       ).lt('occurred_at', fromIso)
     ),
+    // ONE read of every obligation of this supplier (a 60-day sync window keeps it small): it feeds
+    // the native paid rows, each supply's settlement state and the "attributed" check — three
+    // things that used to be separate queries chained one after another.
     platformSupplierId || unassigned
-      ? fetchAllSupabaseRows(() =>
-          (unassigned
-            ? supabase
-                .from('supplier_payment_obligations')
-                .select(
-                  'id, platform_supplier_id, umag_supply_id, original_supply_amount, platform_paid_at, platform_paid_by, platform_payment_account_id, supplier:platform_suppliers!platform_supplier_id(name)'
-                )
-                .is('platform_supplier_id', null)
-            : supabase
-                .from('supplier_payment_obligations')
-                .select(
-                  'id, platform_supplier_id, umag_supply_id, original_supply_amount, platform_paid_at, platform_paid_by, platform_payment_account_id, supplier:platform_suppliers!platform_supplier_id(name)'
-                )
-                .eq('platform_supplier_id', platformSupplierId))
-            .not('platform_paid_at', 'is', null)
-            .not('platform_paid_by', 'is', null)
-            .gte('platform_paid_at', fromIso)
-            .lte('platform_paid_at', toIso)
-        )
-      : Promise.resolve({ data: [], error: null }),
+      ? fetchAllSupabaseRows(() => {
+          const query = supabase
+            .from('supplier_payment_obligations')
+            .select(
+              'id, platform_supplier_id, umag_supply_id, original_supply_amount, is_source_deleted, platform_paid_at, platform_paid_by, platform_payment_account_id, supplier:platform_suppliers!platform_supplier_id(name)'
+            )
+          return unassigned
+            ? query.is('platform_supplier_id', null)
+            : query.eq('platform_supplier_id', platformSupplierId)
+        })
+      : Promise.resolve({ data: null, error: null }),
+    // Tiny table (one row per platform user) — fetched in parallel instead of after the obligations.
+    supabase.from('academy_users').select('id, full_name'),
+    ensurePaymentAccountsLoaded(),
   ])
 
   if (suppliesRes.error) {
@@ -640,40 +646,30 @@ export async function fetchUmagSupplierOperationHistory({
 
   const payments = paymentsRes.error ? [] : paymentsRes.data || []
   const openingRows = openingRes.error ? [] : openingRes.data || []
-  const nativePaidObligations = nativePaidRes.error ? [] : nativePaidRes.data || []
+  // null = obligations were not loaded for this scope (or the read failed): no native rows, no settlement buttons.
+  const obligations = obligationsRes.error ? null : obligationsRes.data
 
-  const employeeIds = [
-    ...new Set(nativePaidObligations.map((row) => row.platform_paid_by).filter((id) => id != null)),
-  ]
+  const paidFromTime = new Date(fromIso).getTime()
+  const paidToTime = new Date(toIso).getTime()
+  const nativePaidObligations = (obligations || []).filter((row) => {
+    if (row.platform_paid_at == null || row.platform_paid_by == null) return false
+    const paidTime = new Date(row.platform_paid_at).getTime()
+    return paidTime >= paidFromTime && paidTime <= paidToTime
+  })
+
   const employeeNameById = new Map()
-  if (employeeIds.length > 0) {
-    const { data: employeeRows } = await supabase
-      .from('academy_users')
-      .select('id, full_name')
-      .in('id', employeeIds)
-    for (const row of employeeRows || []) {
-      employeeNameById.set(row.id, row.full_name || null)
-    }
+  for (const row of employeesRes.error ? [] : employeesRes.data || []) {
+    employeeNameById.set(row.id, row.full_name || null)
   }
 
-  const linkedSupplyIdsInPayments = [
-    ...new Set(
-      payments
-        .filter((p) => !isUmagPaymentRefund(p) && p.linked_umag_supply_id != null)
-        .map((p) => Number(p.linked_umag_supply_id))
-    ),
-  ]
-  let attributedSupplyIds = new Set()
-  if (linkedSupplyIdsInPayments.length > 0) {
-    const { data: attributedRows } = await supabase
-      .from('supplier_payment_obligations')
-      .select('umag_supply_id')
-      .not('platform_paid_by', 'is', null)
-      .in('umag_supply_id', linkedSupplyIdsInPayments)
-    attributedSupplyIds = new Set((attributedRows || []).map((row) => Number(row.umag_supply_id)))
-  }
+  // Supplies whose obligation was marked paid by a named user: their raw UMAG payment is hidden in
+  // favour of the native «Оплата поставщику» row (see filteredPayments below).
+  const attributedSupplyIds = new Set(
+    (obligations || [])
+      .filter((row) => row.platform_paid_by != null)
+      .map((row) => Number(row.umag_supply_id))
+  )
 
-  await ensurePaymentAccountsLoaded()
   const accountNameById = { get: (accountId) => (accountId ? getPaymentAccountName(accountId) : null) }
   const nativePaymentRows = buildNativeSettlementPaymentRows(
     nativePaidObligations.map((row) => ({
@@ -690,7 +686,9 @@ export async function fetchUmagSupplierOperationHistory({
   )
 
   const returns = returnsRes.data || []
-  const supplies = await attachSupplyObligations(suppliesRes.data || [])
+  const supplies = obligations
+    ? attachObligationsFromList(suppliesRes.data || [], obligations)
+    : await attachSupplyObligations(suppliesRes.data || [])
 
   let openingBalance = 0
   for (const row of openingRows) openingBalance += toNumber(row.balance_delta)
