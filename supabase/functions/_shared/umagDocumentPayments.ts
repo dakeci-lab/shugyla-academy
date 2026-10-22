@@ -4,6 +4,7 @@
  */
 import { umagFetchAuthed, type UmagSession } from './umagAuth.ts'
 import { parseUmagEditTime, UMAG_PAGE_SIZE } from './umagConfig.ts'
+import { mapConcurrent } from './concurrency.ts'
 
 export type UmagDocumentPayment = {
   id?: number | string
@@ -623,18 +624,24 @@ export async function rebuildLedgerEventsForPeriod(
     }
   }
 
-  for (let i = 0; i < events.length; i += 200) {
-    const chunk = events.slice(i, i + 200)
+  const eventChunks: Array<typeof events> = []
+  for (let i = 0; i < events.length; i += 200) eventChunks.push(events.slice(i, i + 200))
+  const eventFailures = await mapConcurrent(eventChunks, 5, async (chunk, chunkIndex) => {
     const { error } = await serviceClient.from('platform_supplier_ledger_events').upsert(chunk, {
       onConflict: 'external_source,event_type,external_id',
     })
     if (error) {
-      console.error('ledger_events_upsert_failed', { message: error.message, offset: i })
-      return Response.json(
-        { success: false, code: 'SUPABASE_UPSERT_FAILED', message: error.message },
-        { status: 500 }
-      )
+      console.error('ledger_events_upsert_failed', { message: error.message, offset: chunkIndex * 200 })
+      return error.message as string
     }
+    return null
+  })
+  const eventFailure = eventFailures.find((message) => message != null)
+  if (eventFailure) {
+    return Response.json(
+      { success: false, code: 'SUPABASE_UPSERT_FAILED', message: eventFailure },
+      { status: 500 }
+    )
   }
 
   return { upserted: events.length }
