@@ -1,4 +1,4 @@
--- Stage 18 postcheck. Expect: unmarked=0, marked = all_returns, by_director = marked,
+-- Stage 20 postcheck. Expect: unmarked=0, marked = all_returns, by_director = marked,
 -- update_grant_columns = 3, update_policy = 1.
 select
   (select count(*) from public.umag_supply_returns where platform_refunded_at is null) as unmarked,

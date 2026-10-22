@@ -1,4 +1,4 @@
--- Stage 18 rollback (run in one transaction). Safe: no frontend uses the columns until PR 2.
+-- Stage 20 rollback (run in one transaction). Safe: no frontend uses the columns until PR 2.
 begin;
 drop policy if exists umag_supply_returns_update_refund_mark on public.umag_supply_returns;
 revoke update (platform_refunded_at, platform_refunded_by, platform_refund_account_id)
