@@ -12,7 +12,7 @@
 --
 -- Backfill: every return that exists now is old and already settled — marked
 -- received by the director (academy_users id 1) at the return's own date.
--- Docs: docs/db/stage-18-returns-refund-marking/
+-- Docs: docs/db/stage-20-returns-refund-marking/
 
 select pg_advisory_xact_lock(202610221200);
 

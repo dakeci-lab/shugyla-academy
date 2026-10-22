@@ -185,9 +185,11 @@ function main() {
   assert.match(edge, /openDebtCoverageComplete/)
   assert.match(
     edge,
-    /const effectiveFrom = \[recentStart, automaticOpenDebtFrom, requestedFrom\]\.reduce\(\(min, key\) =>\s*\n\s*key < min \? key : min\s*\n\s*\)/
+    /const widenedFrom = \[recentStart, automaticOpenDebtFrom, requestedFrom\]\.reduce\(\(min, key\) =>\s*\n\s*key < min \? key : min\s*\n\s*\)/
   )
-  ok('Этап 2.2 sync-scope algorithm (computeEffectiveSyncScope, effectiveFrom formula, openDebtCoverageComplete) is textually unchanged')
+  assert.match(edge, /const effectiveFrom = widenedFrom < windowStart \? windowStart : widenedFrom/)
+  assert.match(edge, /const windowStart = addCalendarDays\(todayKey, -SYNC_WINDOW_DAYS\)/)
+  ok('Этап 2.2 sync-scope algorithm (computeEffectiveSyncScope, widened range clamped to SYNC_WINDOW_DAYS, openDebtCoverageComplete)')
 
   // --- 7. Debt formula untouched -------------------------------------------
   assert.match(edge, /const debt = asNumber\(supply\.debt\)/)
