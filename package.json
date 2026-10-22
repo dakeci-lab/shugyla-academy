@@ -67,6 +67,7 @@
     "verify:umag-sync-canonical-batch": "node scripts/verify-umag-sync-canonical-batch.mjs",
     "verify:umag-sync-lock": "node scripts/verify-umag-sync-lock.mjs",
     "verify:supplier-finance-summary": "node scripts/verify-supplier-finance-summary.mjs",
+    "verify:supplier-settle-in-history": "node scripts/verify-supplier-settle-in-history.mjs",
     "verify:supplier-finance-embeddable-panels": "node scripts/verify-supplier-finance-embeddable-panels.mjs",
     "verify:supplier-finance-page": "node scripts/verify-supplier-finance-page.mjs",
     "verify:supplier-finance-compact-payments": "node scripts/verify-supplier-finance-compact-payments.mjs",

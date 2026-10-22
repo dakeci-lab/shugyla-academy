@@ -347,6 +347,40 @@ export async function unmarkObligationPaid(obligationId) {
   }
 }
 
+/**
+ * Mark a supplier return «Возврат получен» natively — the supplier's money for
+ * it arrived. Independent of UMAG's payed_amount (closed in UMAG at entry by
+ * policy) and of supply payments: returns are money IN, supplies money OUT,
+ * never netted. Needs supplier_payments.manage (column-level grant + RLS).
+ */
+export async function markReturnRefunded(returnId, { refundedByEmployeeId, accountId } = {}) {
+  assertCloudReady()
+  if (!returnId) throw new Error('Возврат не указан')
+  const { error } = await supabase
+    .from('umag_supply_returns')
+    .update({
+      platform_refunded_at: new Date().toISOString(),
+      platform_refunded_by: refundedByEmployeeId ?? null,
+      platform_refund_account_id: accountId ?? null,
+    })
+    .eq('id', returnId)
+  if (error) throw new Error(error.message || 'Не удалось отметить получение возврата')
+}
+
+export async function unmarkReturnRefunded(returnId) {
+  assertCloudReady()
+  if (!returnId) throw new Error('Возврат не указан')
+  const { error } = await supabase
+    .from('umag_supply_returns')
+    .update({
+      platform_refunded_at: null,
+      platform_refunded_by: null,
+      platform_refund_account_id: null,
+    })
+    .eq('id', returnId)
+  if (error) throw new Error(error.message || 'Не удалось отменить отметку возврата')
+}
+
 export {
   buildPaymentScheduleView,
   buildSupplierPaymentSummary,

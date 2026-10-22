@@ -384,6 +384,22 @@ export function supplyPaymentStatusLabel(status) {
 }
 
 /**
+ * Native settlement state of a supply (money OUT): derived from its
+ * supplier_payment_obligations row, never from UMAG's payment_amount/debt
+ * (closed in UMAG at receiving time by policy). null when the supply has no
+ * obligation row or its source was deleted — nothing to pay then.
+ */
+function buildSupplySettlement(obligation) {
+  if (!obligation || obligation.is_source_deleted) return null
+  return {
+    type: 'payable',
+    settled: obligation.platform_paid_at != null,
+    settledAt: obligation.platform_paid_at ?? null,
+    obligationId: obligation.id,
+  }
+}
+
+/**
  * Build unified chronological operations for one supplier (newest first).
  * Includes supplies, returns, and UMAG document-payments with running balance.
  */
@@ -414,6 +430,7 @@ export function buildSupplierOperationHistory(
       documentNumber: String(supply.umag_supply_id || supply.id || ''),
       statusLabel: ledgerEventStatusLabel(LEDGER_EVENT_TYPES.RECEIVING, 'posted'),
       signedAmount: amount,
+      settlement: buildSupplySettlement(supply.obligation),
       source: supply,
     })
   }
@@ -435,6 +452,11 @@ export function buildSupplierOperationHistory(
       documentNumber: String(ret.umag_return_id || ret.id || ''),
       statusLabel: ledgerEventStatusLabel(LEDGER_EVENT_TYPES.SUPPLIER_RETURN, 'posted'),
       signedAmount: -abs,
+      settlement: {
+        type: 'receivable',
+        settled: ret.platform_refunded_at != null,
+        settledAt: ret.platform_refunded_at ?? null,
+      },
       source: ret,
     })
   }
@@ -477,6 +499,9 @@ export function buildSupplierOperationHistory(
 }
 
 export function filterSupplierOperations(operations, filter = 'all') {
+  if (filter === 'open') {
+    return operations.filter((op) => op.settlement && !op.settlement.settled)
+  }
   if (filter === 'supplies') {
     return operations.filter(
       (op) => op.kind === 'supply' || op.eventType === LEDGER_EVENT_TYPES.RECEIVING
@@ -501,6 +526,41 @@ export function filterSupplierOperations(operations, filter = 'all') {
     )
   }
   return operations
+}
+
+const OBLIGATION_ID_CHUNK = 200
+
+/**
+ * Decorate supplies with their supplier_payment_obligations row (`obligation`),
+ * the source of the native «Оплачено» state. A failed read leaves supplies
+ * undecorated (no settlement buttons) rather than failing the whole history.
+ */
+async function attachSupplyObligations(supplies) {
+  const ids = [...new Set(supplies.map((s) => s.umag_supply_id).filter((id) => id != null))]
+  if (ids.length === 0) return supplies
+  const chunks = []
+  for (let i = 0; i < ids.length; i += OBLIGATION_ID_CHUNK) {
+    chunks.push(ids.slice(i, i + OBLIGATION_ID_CHUNK))
+  }
+  const results = await Promise.all(
+    chunks.map((chunk) =>
+      supabase
+        .from('supplier_payment_obligations')
+        .select(
+          'id, umag_supply_id, platform_supplier_id, original_supply_amount, is_source_deleted, platform_paid_at'
+        )
+        .in('umag_supply_id', chunk)
+    )
+  )
+  const byUmagSupplyId = new Map()
+  for (const res of results) {
+    if (res.error) return supplies
+    for (const row of res.data || []) byUmagSupplyId.set(Number(row.umag_supply_id), row)
+  }
+  return supplies.map((supply) => ({
+    ...supply,
+    obligation: byUmagSupplyId.get(Number(supply.umag_supply_id)) || null,
+  }))
 }
 
 /**
@@ -561,7 +621,7 @@ export async function fetchUmagSupplierOperationHistory({
         supabase
           .from('umag_supply_returns')
           .select(
-            'id, umag_return_id, platform_supplier_id, umag_supplier_id, supplier_name, user_name, amount, payed_amount, document_time, operation_time, note, is_provided, account_names, operation_type'
+            'id, umag_return_id, platform_supplier_id, umag_supplier_id, supplier_name, user_name, amount, payed_amount, document_time, operation_time, note, is_provided, account_names, operation_type, platform_refunded_at, platform_refunded_by, platform_refund_account_id'
           )
       )
         .eq('is_source_deleted', false)
@@ -661,8 +721,8 @@ export async function fetchUmagSupplierOperationHistory({
     { accountNameById, employeeNameById }
   )
 
-  const supplies = suppliesRes.data || []
   const returns = returnsRes.data || []
+  const supplies = await attachSupplyObligations(suppliesRes.data || [])
 
   let openingBalance = 0
   for (const row of openingRows) openingBalance += toNumber(row.balance_delta)

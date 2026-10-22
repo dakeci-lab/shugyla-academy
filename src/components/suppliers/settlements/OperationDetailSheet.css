@@ -293,3 +293,30 @@
     max-height: min(88vh, 860px);
   }
 }
+
+.umag-op-detail__settle {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.umag-op-detail__settle-state {
+  flex: 1 1 auto;
+  font-weight: 600;
+  color: #047857;
+}
+
+.umag-op-detail__settle-account {
+  flex: 1 1 180px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #fff;
+}
