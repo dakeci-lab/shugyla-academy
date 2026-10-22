@@ -64,7 +64,7 @@ function SupplierDirectoryRedirect() {
   const location = useLocation()
   const { id } = useParams()
   const state = id ? { ...(location.state || {}), openEditId: id } : location.state
-  return <Navigate to="/platform/supplier-finance?tab=settlements" replace state={state} />
+  return <Navigate to="/platform/supplier-finance" replace state={state} />
 }
 
 export default function App() {

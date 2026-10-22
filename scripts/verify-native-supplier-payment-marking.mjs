@@ -39,9 +39,6 @@ async function stagePureLogic() {
   const {
     isPlatformMarkedPaid,
     isActiveOpenObligation,
-    deriveObligationStatus,
-    OBLIGATION_STATUS,
-    formatPlatformPaymentMark,
     resolveOwedAmount,
   } = await import(pathToFileURL(path.join(ROOT, 'src/utils/supplierPaymentObligations.js')).href)
 
@@ -55,18 +52,6 @@ async function stagePureLogic() {
     isPlatformMarkedPaid({ platform_paid_at: '2026-09-15T00:00:00Z' }) === true
   )
 
-  assert(
-    'a platform-marked-paid obligation is PAID even with open UMAG debt + overdue date',
-    deriveObligationStatus(
-      { platformPaidAt: '2026-09-15T00:00:00Z', currentDebt: 50000, dueDate: '2026-01-01' },
-      '2026-09-15'
-    ) === OBLIGATION_STATUS.PAID
-  )
-  assert(
-    'an un-marked obligation with open debt is NOT paid',
-    deriveObligationStatus({ currentDebt: 50000, dueDate: '2026-09-01' }, '2026-09-15') !==
-      OBLIGATION_STATUS.PAID
-  )
 
   assert(
     'platform-marked-paid obligation is excluded from active/open list even with debt > 0',
@@ -81,11 +66,6 @@ async function stagePureLogic() {
     'CRITICAL: un-marked obligation with debt = 0 is STILL active/open — UMAG debt is fully untrusted',
     isActiveOpenObligation({ currentDebt: 0, originalSupplyAmount: 30000 }) === true
   )
-  assert(
-    'CRITICAL: un-marked obligation with debt = 0 does NOT derive as PAID',
-    deriveObligationStatus({ currentDebt: 0, dueDate: '2026-01-01' }, '2026-09-15') !==
-      OBLIGATION_STATUS.PAID
-  )
 
   assert(
     'resolveOwedAmount ignores current_debt entirely, uses original_supply_amount',
@@ -96,15 +76,6 @@ async function stagePureLogic() {
     resolveOwedAmount({ platformPaidAt: '2026-09-15T00:00:00Z', originalSupplyAmount: 42000 }) === 0
   )
 
-  assert('formatPlatformPaymentMark returns null when not marked', formatPlatformPaymentMark({}) === null)
-  const marked = formatPlatformPaymentMark({
-    platformPaidAt: '2026-09-15T10:00:00Z',
-    platformPaymentAccountId: null,
-  })
-  assert(
-    'formatPlatformPaymentMark returns a non-empty label when marked',
-    typeof marked === 'string' && marked.length > 0 && marked.includes('Оплачено вручную')
-  )
   console.log('')
 }
 
@@ -187,84 +158,19 @@ function stageService() {
       service.slice(service.indexOf('export async function markObligationPaid'))
     )
   )
-  assert(
-    'listPaymentObligations excludes platform-paid rows at the SQL level, NOT by current_debt',
-    service.includes("query.is('platform_paid_at', null)") &&
-      !service.includes(".gt('current_debt', 0).is('platform_paid_at', null)")
-  )
-  assert('OBLIGATION_SELECT reads the 3 new columns', service.includes('platform_paid_at,') && service.includes('platform_paid_by,') && service.includes('platform_payment_account_id,'))
-  assert('normalizeObligation maps all 3 new columns', service.includes('platformPaidAt: row.platform_paid_at') && service.includes('platformPaidBy: row.platform_paid_by') && service.includes('platformPaymentAccountId: row.platform_payment_account_id'))
   console.log('')
 }
 
 function stageUi() {
-  console.log('Stage 4: UI — instant button, gated by supplier_payments.manage')
-  const panel = read('src/components/suppliers/payments/SupplierPaymentsPanel.jsx')
+  console.log('Stage 4: UI — pay from the supplier card history, gated by supplier_payments.manage')
+  const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
+  const sheet = read('src/components/suppliers/settlements/OperationDetailSheet.jsx')
 
   assert('imports canManageSupplierPayments', panel.includes('canManageSupplierPayments'))
   assert('imports markObligationPaid/unmarkObligationPaid', panel.includes('markObligationPaid') && panel.includes('unmarkObligationPaid'))
-  assert('renders Оплачено button gated by canManagePayments', panel.includes('canManagePayments ?') && panel.includes("'Оплачено'"))
-  assert('renders Отменить оплату for already-marked rows', panel.includes('Отменить оплату'))
-  // Owner request (2026-09-18): a supplier is sometimes paid cash, sometimes
-  // by transfer — the account can no longer be silently forced to the
-  // supplier's configured default. handleMarkPaid still falls back to it
-  // when no explicit choice is passed (chosenAccountId === undefined,
-  // e.g. any other future caller), but GroupDetail now offers a per-row
-  // <select> (defaulting to the same account) that overrides it before
-  // the click reaches handleMarkPaid.
-  assert(
-    "falls back to the supplier's configured account only when no explicit account was chosen",
-    /handleMarkPaid\(ob, chosenAccountId\)[\s\S]{0,400}chosenAccountId !== undefined \? chosenAccountId : ob\.supplierPaymentAccountId/.test(
-      panel
-    )
-  )
-  assert(
-    "GroupDetail renders a per-obligation account picker, defaulting to the supplier's account",
-    panel.includes('<MarkPaidAccountSelect') &&
-      /initial\[ob\.id\] = ob\.supplierPaymentAccountId/.test(panel)
-  )
-  // Owner request (2026-09-18): the account picker must look AND behave like
-  // the «Фильтр» popover's Счёт оплаты/Поставщик fields ("same handwriting")
-  // in both the closed and OPEN state — a native <select> was tried first,
-  // but its open dropdown is unstylable OS chrome no CSS can touch.
-  // MarkPaidAccountSelect is a from-scratch single-select combobox reusing
-  // the exact same pf-field__control/display/chevron/list/item classes.
-  assert(
-    'MarkPaidAccountSelect reuses the shared pf-field control/display/chevron/list/item classes',
-    panel.includes('pf-field__control spo-panel__mark-paid-control') &&
-      panel.includes('className="pf-field__display"') &&
-      panel.includes('className="pf-field__chevron"') &&
-      panel.includes('pf-field__list spo-panel__mark-paid-list') &&
-      panel.includes('pf-field__item spo-panel__mark-paid-item')
-  )
-  assert(
-    "MarkPaidAccountSelect's own list is a real (non-native) dropdown, portalled to escape GroupDetail's scrollable sheet",
-    /function MarkPaidAccountSelect[\s\S]{0,4000}createPortal\(/.test(panel) &&
-      !/function MarkPaidAccountSelect[\s\S]{0,4000}<select/.test(panel)
-  )
-  // Regression: the portalled list lives outside rootRef's DOM subtree, so
-  // the outside-click handler must also treat menuRef as "inside" — a
-  // rootRef-only check closes (unmounts) the list on the option's own
-  // mousedown, before its click ever fires. A real mouse click showed this;
-  // a JS-synthesized .click() (single event, no separate mousedown) did not.
-  assert(
-    "the outside-click handler treats both rootRef AND the portalled menuRef as \"inside\" (a real click, not .click(), exposed this)",
-    /function MarkPaidAccountSelect[\s\S]{0,4000}const menuRef = useRef\(null\)/.test(panel) &&
-      /rootRef\.current\?\.contains\(event\.target\)\) return\s*\n\s*if \(menuRef\.current\?\.contains\(event\.target\)\) return/.test(
-        panel
-      ) &&
-      /ref=\{menuRef\}\s*\n\s*className="pf-field__list spo-panel__mark-paid-list"/.test(panel)
-  )
-  assert(
-    'the button click passes the currently selected account, not always the supplier default',
-    /onClick=\{\(\) => onMarkPaid\(ob, selectedAccountByObId\[ob\.id\] \?\? null\)\}/.test(panel)
-  )
-  assert('passes the current employee id as paidByEmployeeId', /paidByEmployeeId: user\?\.id/.test(panel))
-  assert('optimistically patches the open sheet without waiting for reload', panel.includes('patchSelectedGroupObligation'))
-  assert(
-    'per-document amount owed comes from resolveOwedAmount, not raw UMAG debt',
-    panel.includes('resolveOwedAmount(ob)') && !panel.includes('formatUmagMoney(ob.currentDebt)')
-  )
+  assert('the settle block renders only when canManage is set', /canManage && operation\?\.settlement && onSettle/.test(sheet))
+  assert('offers Оплатить and Отменить оплату', sheet.includes("'Оплатить'") && sheet.includes('Отменить оплату'))
+  assert('lets the payer choose the payment account (Без счёта by default)', sheet.includes('Без счёта') && sheet.includes('paymentAccounts'))
   console.log('')
 }
 

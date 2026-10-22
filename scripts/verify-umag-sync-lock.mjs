@@ -231,12 +231,9 @@ function main() {
   ok('src/utils/edgeFunctionErrors.js already prefers a Cyrillic body.message over any generic/English fallback — confirmed by reading the existing (unmodified) utility')
 
   // --- 10. Delegation: both sync buttons hit the same pipeline (Case 10) ---
-  const paymentsService = read('src/services/supplierPaymentObligationsService.js')
-  assert.match(
-    paymentsService,
-    /export async function syncUmagForPayments\(\{ dateFrom, dateTo \}\) \{\s*\n\s*return syncUmagSettlements\(\{ dateFrom, dateTo, syncSuppliers: true \}\)\s*\n\}/
-  )
-  ok('Case 10: syncUmagForPayments (Оплаты) still delegates verbatim to syncUmagSettlements (Взаиморасчёты) — both tabs\' ↻ hit the exact same Edge Function call, hence the same DB lock')
+  const financeShell = read('src/components/suppliers/finance/SupplierFinancePanel.jsx')
+  assert.match(financeShell, /syncUmagSettlements\(\{ dateFrom, dateTo: todayKey, syncSuppliers: true \}\)/)
+  ok("Case 10: the «Расчёты» ↻ calls syncUmagSettlements directly — the only sync path left, hence the same DB lock")
 
   console.log('\n--- Mirrored pure-logic tests ---\n')
   runMirrorCases(migration)

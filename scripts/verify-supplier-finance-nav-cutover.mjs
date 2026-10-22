@@ -60,10 +60,11 @@ async function main() {
   assert.match(appSrc, /ROUTE_KEYS\.SUPPLIER_FINANCE/)
   ok('Case 3: App.jsx keeps settlements, supplier-payments, and supplier-finance routes')
 
-  // Case 4 — no redirects
-  assert.doesNotMatch(appSrc, /Navigate[^]*to="\/platform\/supplier-finance"/)
+  // Case 4 — legacy routes redirect to the single «Расчёты» page
+  assert.match(appSrc, /path="settlements"\s*\n\s*element=\{<Navigate to="\/platform\/supplier-finance" replace \/>\}/)
+  assert.match(appSrc, /path="supplier-payments"\s*\n\s*element=\{<Navigate to="\/platform\/supplier-finance" replace \/>\}/)
   assert.match(appSrc, /SupplierFinancePage/)
-  ok('Case 4: legacy routes still render real pages — no Navigate redirect to supplier-finance')
+  ok('Case 4: legacy routes redirect to supplier-finance, which renders the real page')
 
   // Case 5 — permission OR contract
   assert.match(permsSrc, /permissions\?\.some\(\(perm\) => can\(user, perm\)\)/)
@@ -83,9 +84,9 @@ async function main() {
 
   // Case 8 — unified UX panels untouched (zero-diff preference)
   const financePanel = read('src/components/suppliers/finance/SupplierFinancePanel.jsx')
-  assert.match(financePanel, /fetchSupplierFinancePageData/)
+  assert.match(financePanel, /<UmagSettlementsPanel embedded/)
   assert.doesNotMatch(financePanel, /Navigate/)
-  ok('Case 8: SupplierFinancePanel unchanged apart from pre-existing unified shell')
+  ok('Case 8: SupplierFinancePanel is the sync bar around the supplier list, with no redirects')
 
   // Case 9 — active route mapping
   const { isNavItemActive } = await import(

@@ -367,7 +367,6 @@ function stageSyncButton() {
   const sites = [
     'src/components/procurement/ProcurementPlannerView.jsx',
     'src/components/suppliers/settlements/UmagSettlementsPanel.jsx',
-    'src/components/suppliers/payments/SupplierPaymentsPanel.jsx',
   ]
   for (const rel of sites) {
     const src = read(rel)
