@@ -61,12 +61,83 @@ function PaymentStatusBadge({ status }) {
   )
 }
 
+/**
+ * Close-the-operation block: pay an open supply (money out) or mark an open
+ * return received (money in). The two streams are never netted.
+ */
+function SettleBlock({ settlement, accounts, onSettle, onUnsettle }) {
+  const [accountId, setAccountId] = useState('')
+  const [busy, setBusy] = useState(false)
+  const isPayable = settlement.type === 'payable'
+
+  async function run(action) {
+    if (busy) return
+    setBusy(true)
+    try {
+      await action()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (settlement.settled) {
+    return (
+      <div className="umag-op-detail__settle">
+        <span className="umag-op-detail__settle-state">
+          {isPayable ? 'Оплачено' : 'Возврат получен'}
+          {settlement.settledAt ? ` · ${formatUmagDateTime(settlement.settledAt)}` : ''}
+        </span>
+        {onUnsettle ? (
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={busy}
+            onClick={() => void run(onUnsettle)}
+          >
+            {isPayable ? 'Отменить оплату' : 'Отменить получение'}
+          </button>
+        ) : null}
+      </div>
+    )
+  }
+
+  return (
+    <div className="umag-op-detail__settle">
+      <select
+        className="umag-op-detail__settle-account"
+        value={accountId}
+        onChange={(e) => setAccountId(e.target.value)}
+        disabled={busy}
+        aria-label={isPayable ? 'Счёт оплаты' : 'Счёт, на который пришёл возврат'}
+      >
+        <option value="">Без счёта</option>
+        {accounts.map((account) => (
+          <option key={account.id} value={account.id}>
+            {account.name}
+          </option>
+        ))}
+      </select>
+      <button
+        type="button"
+        className="btn btn-primary"
+        disabled={busy}
+        onClick={() => void run(() => onSettle(accountId || null))}
+      >
+        {busy ? 'Сохранение…' : isPayable ? 'Оплатить' : 'Получили возврат'}
+      </button>
+    </div>
+  )
+}
+
 export default function OperationDetailSheet({
   operation,
   supplierName,
   onClose,
   canManage = false,
   onUnmark,
+  paymentAccounts = [],
+  onSettle,
+  onUnsettle,
 }) {
   const kind = operation?.kind
   const isPaymentDoc = kind === 'payment' || kind === 'refund'
@@ -359,6 +430,15 @@ export default function OperationDetailSheet({
           </>
         ) : (
           <>
+        {canManage && operation?.settlement && onSettle ? (
+          <SettleBlock
+            settlement={operation.settlement}
+            accounts={paymentAccounts}
+            onSettle={onSettle}
+            onUnsettle={onUnsettle}
+          />
+        ) : null}
+
         {(headerFromHistory.comment || headerFromHistory.note || document?.comment || document?.note) ? (
           <p className="umag-op-detail__comment">
             {headerFromHistory.comment ||

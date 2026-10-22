@@ -23,7 +23,11 @@ import {
   ensureModuleLoaded,
 } from '../../../services/platformDataService'
 import { fetchNativeSupplierDebts } from '../../../services/supplierDebtService'
-import { ensurePaymentAccountsLoaded, getPaymentAccountName } from '../../../services/paymentAccountsService'
+import {
+  ensurePaymentAccountsLoaded,
+  getPaymentAccountName,
+  getPaymentAccountsForAssignment,
+} from '../../../services/paymentAccountsService'
 import {
   filterSuppliers,
   formatDeferralDaysTerm,
@@ -42,8 +46,11 @@ import {
   syncUmagSettlements,
 } from '../../../services/umagSettlementsService'
 import {
+  markObligationPaid,
+  markReturnRefunded,
   refreshObligationTermsForSupplier,
   unmarkObligationPaid,
+  unmarkReturnRefunded,
 } from '../../../services/supplierPaymentObligationsService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformFilterTrigger from '../../platform/PlatformFilterTrigger'
@@ -111,6 +118,26 @@ function operationDetailsLabel(op) {
 }
 
 function operationStatusNode(op) {
+  const settlement = op.settlement
+  if (settlement) {
+    const isPayable = settlement.type === 'payable'
+    const label = isPayable
+      ? settlement.settled
+        ? 'Оплачено'
+        : 'Не оплачено'
+      : settlement.settled
+        ? 'Возврат получен'
+        : 'Ждём возврат'
+    return (
+      <span
+        className={`umag-settlements__pay-status umag-settlements__pay-status--${
+          settlement.settled ? 'paid' : 'unpaid'
+        }`}
+      >
+        {label}
+      </span>
+    )
+  }
   if (op.kind === 'supply' && op.paymentStatus) {
     return <PaymentStatusBadge status={op.paymentStatus} />
   }
@@ -254,6 +281,20 @@ function UmagSupplierDetail({
     }
   }, [])
 
+  const { user } = useSession()
+  const [reloadToken, setReloadToken] = useState(0)
+  const [paymentAccounts, setPaymentAccounts] = useState([])
+  useEffect(() => {
+    if (!canManagePayments) return undefined
+    let cancelled = false
+    void getPaymentAccountsForAssignment().then((list) => {
+      if (!cancelled) setPaymentAccounts(list || [])
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [canManagePayments])
+
   const [detail, setDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(canViewFinance)
   const [detailError, setDetailError] = useState('')
@@ -277,7 +318,7 @@ function UmagSupplierDetail({
     return () => {
       cancelled = true
     }
-  }, [canViewFinance, supplier.id, supplier.umagSupplierId, dateFrom, dateTo])
+  }, [canViewFinance, supplier.id, supplier.umagSupplierId, dateFrom, dateTo, reloadToken])
 
   const operations = detail?.operations || []
   const openingBalance = detail?.openingBalance || 0
@@ -297,6 +338,58 @@ function UmagSupplierDetail({
       onSyncComplete?.()
     } catch (err) {
       showError?.(err.message || 'Не удалось отменить отметку оплаты')
+    }
+  }
+
+  async function handleSettle(op, accountId) {
+    try {
+      if (op.settlement?.type === 'payable') {
+        const obligation = op.source?.obligation
+        await markObligationPaid(
+          {
+            id: op.settlement.obligationId,
+            originalSupplyAmount: obligation?.original_supply_amount,
+            platformSupplierId: supplier.id,
+            supplierName: supplier.name,
+            umagSupplyId: op.source?.umag_supply_id,
+          },
+          {
+            paidByEmployeeId: user?.id ?? null,
+            accountId,
+            employeeName: user?.name ?? null,
+            accountName: getPaymentAccountName(accountId),
+          }
+        )
+        showSuccess?.('Отмечено оплаченным')
+      } else {
+        await markReturnRefunded(op.source?.id, {
+          refundedByEmployeeId: user?.id ?? null,
+          accountId,
+        })
+        showSuccess?.('Возврат отмечен полученным')
+      }
+      setSelectedOperation(null)
+      setReloadToken((token) => token + 1)
+      onSyncComplete?.()
+    } catch (err) {
+      showError?.(err.message || 'Не удалось сохранить отметку')
+    }
+  }
+
+  async function handleUnsettle(op) {
+    try {
+      if (op.settlement?.type === 'payable') {
+        await unmarkObligationPaid(op.settlement.obligationId)
+        showSuccess?.('Отметка оплаты снята')
+      } else {
+        await unmarkReturnRefunded(op.source?.id)
+        showSuccess?.('Отметка получения возврата снята')
+      }
+      setSelectedOperation(null)
+      setReloadToken((token) => token + 1)
+      onSyncComplete?.()
+    } catch (err) {
+      showError?.(err.message || 'Не удалось снять отметку')
     }
   }
 
@@ -387,6 +480,7 @@ function UmagSupplierDetail({
               <div className="umag-settlements__ops-filters" role="tablist" aria-label="Фильтр операций">
                 {[
                   { id: 'all', label: 'Все' },
+                  { id: 'open', label: 'Не закрытые' },
                   { id: 'supplies', label: 'Приёмки' },
                   { id: 'payments', label: 'Оплаты' },
                   { id: 'returns', label: 'Возвраты' },
@@ -554,6 +648,9 @@ function UmagSupplierDetail({
           onClose={() => setSelectedOperation(null)}
           canManage={canManagePayments}
           onUnmark={handleUnmarkPayment}
+          paymentAccounts={paymentAccounts}
+          onSettle={(accountId) => handleSettle(selectedOperation, accountId)}
+          onUnsettle={() => handleUnsettle(selectedOperation)}
         />
       ) : null}
     </div>

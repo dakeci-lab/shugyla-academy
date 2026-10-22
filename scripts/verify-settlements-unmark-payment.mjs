@@ -84,7 +84,7 @@ function stagePanelWiring() {
 
   assert(
     'imports unmarkObligationPaid from the obligations service (not a reinvented mutation)',
-    /import \{\s*\n\s*refreshObligationTermsForSupplier,\s*\n\s*unmarkObligationPaid,\s*\n\} from '\.\.\/\.\.\/\.\.\/services\/supplierPaymentObligationsService'/.test(
+    /import \{[^}]*\bunmarkObligationPaid\b[^}]*\} from '\.\.\/\.\.\/\.\.\/services\/supplierPaymentObligationsService'/.test(
       panel
     )
   )
