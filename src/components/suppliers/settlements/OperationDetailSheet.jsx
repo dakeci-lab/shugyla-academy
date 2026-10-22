@@ -275,7 +275,7 @@ export default function OperationDetailSheet({
   }
 
   // Portalled to document.body — see the same note in
-  // SupplierPaymentsPanel.jsx's GroupDetail: rendered inline, this "fixed"
+  // the other platform sheets: rendered inline, this "fixed"
   // backdrop would be contained by PullToRefresh's always-on
   // will-change:transform wrapper and center in the middle of the whole
   // page instead of the viewport.

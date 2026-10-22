@@ -1,42 +1,27 @@
 /**
- * Расчёты — Этап 2.7: unified shell over the existing embedded panels.
+ * Расчёты — оболочка вокруг списка поставщиков (UmagSettlementsPanel).
  *
- * Owns exactly what the page needs to own once: the 4 KPIs + lastSync
- * (fetchSupplierFinanceSummary(), Этап 2.4 — not reinvented), the tab/URL
- * state, and the single ↻ action (existing syncUmagSettlements() pipeline).
- * Everything else is delegated to the already-embeddable panels (Этап 2.6).
+ * Вкладки «К оплате» / «Поставщики» объединены: оплата накладных и получение
+ * возвратов делаются прямо в истории операций карточки поставщика, поэтому
+ * отдельный список обязательств не нужен. Оболочка владеет только строкой
+ * статуса синка UMAG и единственной кнопкой ↻ (пайплайн syncUmagSettlements()).
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
-import {
-  canSyncUmagSettlements,
-  canViewSupplierPayments,
-  canViewUmagSettlements,
-} from '../../../config/permissions'
+import { canSyncUmagSettlements, canViewUmagSettlements } from '../../../config/permissions'
 import {
   UMAG_SETTLEMENTS_ERROR_CODES,
   fetchLastUmagSyncRun,
   syncUmagSettlements,
 } from '../../../services/umagSettlementsService'
-import { fetchSupplierFinancePageData } from '../../../services/supplierFinanceSummaryService'
 import { toAqtobeDateKey } from '../../../utils/supplierPaymentObligations'
 import { getMonthRangeKeys } from '../../../utils/settlementsPeriod'
-import {
-  describeSyncStatus,
-  resolveActiveTab,
-} from '../../../utils/supplierFinancePagePresentation'
+import { describeSyncStatus } from '../../../utils/supplierFinancePagePresentation'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
-import SupplierPaymentsPanel from '../payments/SupplierPaymentsPanel'
 import UmagSettlementsPanel from '../settlements/UmagSettlementsPanel'
 import './SupplierFinancePanel.css'
-
-const TABS = [
-  { id: 'payments', label: 'К оплате' },
-  { id: 'settlements', label: 'Поставщики' },
-]
 
 export default function SupplierFinancePanel() {
   const { user } = useSession()
@@ -45,91 +30,30 @@ export default function SupplierFinancePanel() {
   const showError = toast.error
   const showWarning = typeof toast.warning === 'function' ? toast.warning : showError
 
-  const canViewPayments = canViewSupplierPayments(user)
-  const canViewSettlements = canViewUmagSettlements(user)
+  const canView = canViewUmagSettlements(user)
   const canSync = canSyncUmagSettlements(user)
 
-  const allowedTabs = useMemo(() => {
-    const list = []
-    if (canViewPayments) list.push('payments')
-    if (canViewSettlements) list.push('settlements')
-    return list
-  }, [canViewPayments, canViewSettlements])
-
-  const [searchParams, setSearchParams] = useSearchParams()
-  const rawTab = searchParams.get('tab')
-  const activeTab = resolveActiveTab(rawTab, allowedTabs)
-
-  // Item 14/9 (Case 9): normalize/replace an invalid or forbidden ?tab= to
-  // the first allowed tab, without adding a history entry.
-  useEffect(() => {
-    if (!activeTab) return
-    if (rawTab === activeTab) return
-    const params = new URLSearchParams(searchParams)
-    params.set('tab', activeTab)
-    setSearchParams(params, { replace: true })
-  }, [activeTab, rawTab, searchParams, setSearchParams])
-
-  function handleTabChange(tabId) {
-    if (tabId === activeTab || !allowedTabs.includes(tabId)) return
-    const params = new URLSearchParams(searchParams)
-    params.set('tab', tabId)
-    setSearchParams(params, { replace: false })
-  }
-
-  const [summary, setSummary] = useState(null)
-  const [obligations, setObligations] = useState(null)
   const [lastSync, setLastSync] = useState(null)
-  const [summaryLoading, setSummaryLoading] = useState(true)
-  const [summaryError, setSummaryError] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
   const [filterSlot, setFilterSlot] = useState(null)
-  const [stripSlot, setStripSlot] = useState(null)
 
-  const loadSummary = useCallback(async () => {
-    setSummaryLoading(true)
-    setSummaryError('')
-    try {
-      // Item 16: fetchSupplierFinanceSummary() reads supplier_payment_obligations,
-      // gated by supplier_payments.view/suppliers.view RLS — a settlements-only
-      // user would silently get 0 rows there (RLS filters, it doesn't error),
-      // which would show as a fabricated "Долг = 0". Only call it when the
-      // user actually has the permission that makes it safe to trust.
-      if (canViewPayments) {
-        const pageData = await fetchSupplierFinancePageData()
-        setSummary(pageData.summary)
-        setObligations(pageData.obligations)
-        setLastSync(pageData.summary.lastSync)
-      } else {
-        setSummary(null)
-        setObligations(null)
-        if (canViewSettlements) {
-          setLastSync(await fetchLastUmagSyncRun())
-        }
-      }
-    } catch (err) {
-      setSummaryError(err.message || 'Не удалось загрузить сводку')
-      setSummary(null)
-      setObligations(null)
-    } finally {
-      setSummaryLoading(false)
-    }
-  }, [canViewPayments, canViewSettlements])
+  const loadLastSync = useCallback(async () => {
+    setLastSync(await fetchLastUmagSyncRun())
+  }, [])
 
   useEffect(() => {
-    void loadSummary()
-  }, [loadSummary])
+    if (!canView) return
+    void loadLastSync()
+  }, [canView, loadLastSync])
 
   async function handleSync() {
     if (!canSync || syncing) return
     setSyncing(true)
     try {
-      // Item 23/24: a neutral current-month range, never the Settlements VIEW
-      // PERIOD (PeriodFilterPopover's dateFrom/dateTo never reach here —
-      // this component doesn't even import that period state). The Этап 2.2
-      // backend independently widens this to the real effective sync scope.
-      const todayKey = summary?.todayKey || toAqtobeDateKey()
+      // A neutral current-month range, never a supplier-card view period.
+      // The backend independently widens this to the real effective sync scope.
+      const todayKey = toAqtobeDateKey()
       const [year, month] = todayKey.split('-').map(Number)
       const { dateFrom } = getMonthRangeKeys(year, month)
 
@@ -138,7 +62,7 @@ export default function SupplierFinancePanel() {
       if (!result.success) {
         if (result.code === UMAG_SETTLEMENTS_ERROR_CODES.SYNC_ALREADY_RUNNING) {
           showWarning(result.message)
-          await loadSummary()
+          await loadLastSync()
         } else {
           showError(result.message)
         }
@@ -151,7 +75,7 @@ export default function SupplierFinancePanel() {
         showSuccess(result.message)
       }
 
-      await loadSummary()
+      await loadLastSync()
       setRefreshToken((token) => token + 1)
     } catch (err) {
       showError(err?.message || 'Не удалось синхронизировать')
@@ -160,35 +84,15 @@ export default function SupplierFinancePanel() {
     }
   }
 
-  if (!canViewPayments && !canViewSettlements) {
+  if (!canView) {
     return null
   }
 
   const syncStatus = describeSyncStatus(lastSync)
-  const activeTabMeta = TABS.find((tab) => tab.id === activeTab)
-
-  const isPaymentsTab = canViewPayments && activeTabMeta?.id === 'payments'
 
   return (
     <div className="sfp-panel">
       <div className="sfp-panel__bar">
-        <div className="sfp-panel__tabs" role="tablist" aria-label="Раздел">
-          {TABS.filter((tab) => allowedTabs.includes(tab.id)).map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              role="tab"
-              aria-selected={activeTab === tab.id}
-              className={`sfp-panel__tab${activeTab === tab.id ? ' sfp-panel__tab--active' : ''}`}
-              onClick={() => handleTabChange(tab.id)}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="sfp-panel__strip-slot" ref={setStripSlot} />
-
         <div className="sfp-panel__sync">
           <span
             className={`sfp-panel__sync-status sfp-panel__sync-status--${syncStatus.tone}`}
@@ -209,34 +113,7 @@ export default function SupplierFinancePanel() {
         </div>
       </div>
 
-      {/* Item: эта ошибка загрузки относится к сводке «К оплате»
-          (fetchSupplierFinancePageData) — «Взаиморасчёты» её не использует
-          и самостоятельно тянет свои итоги, поэтому привязана к активной
-          вкладке, а не показывается на обеих постоянно. Долг/Просрочено/
-          Сегодня как KPI-плитки убраны — итог теперь виден в подвале
-          таблицы «К оплате» (SupplierPaymentsPanel). */}
-      {isPaymentsTab && summaryError && !summary ? (
-        <div className="sfp-panel__error" role="alert">
-          {summaryError}
-        </div>
-      ) : null}
-
-      {activeTabMeta?.id === 'payments' ? (
-        <SupplierPaymentsPanel
-          embedded
-          externalSummaryProvided
-          summary={summary}
-          summaryLoading={summaryLoading}
-          obligations={obligations}
-          refreshToken={refreshToken}
-          filterSlot={filterSlot}
-          stripSlot={stripSlot}
-        />
-      ) : null}
-
-      {activeTabMeta?.id === 'settlements' ? (
-        <UmagSettlementsPanel embedded refreshToken={refreshToken} filterSlot={filterSlot} />
-      ) : null}
+      <UmagSettlementsPanel embedded refreshToken={refreshToken} filterSlot={filterSlot} />
     </div>
   )
 }

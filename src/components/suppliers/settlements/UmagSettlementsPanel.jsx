@@ -296,8 +296,7 @@ function UmagSupplierDetail({
 
   // Warms the payment-accounts cache so SupplierIdentityCard's «Способ
   // оплаты» resolves even when nothing else on the page has loaded it yet;
-  // the setState-on-resolve forces the one re-render needed to show it
-  // (same pattern as SupplierPaymentsPanel's accountsCacheVersion).
+  // the setState-on-resolve forces the one re-render needed to show it.
   const [, setAccountsCacheVersion] = useState(0)
   useEffect(() => {
     let cancelled = false

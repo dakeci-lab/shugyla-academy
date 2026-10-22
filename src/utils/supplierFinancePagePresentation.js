@@ -1,46 +1,10 @@
 /**
- * Pure presentation logic for the Этап 2.7 unified «Расчёты» shell —
- * split out from SupplierFinancePanel.jsx (which has JSX and can't be
- * imported by a plain Node verify script) so tab resolution and sync-status
- * derivation are directly, really testable.
+ * Pure presentation logic for the «Расчёты» shell — split out from
+ * SupplierFinancePanel.jsx (which has JSX and can't be imported by a plain
+ * Node verify script) so sync-status derivation is directly testable.
  */
 
 import { formatUmagDateTime } from '../services/umagSettlementsService'
-
-const MONTH_NAMES_RU = [
-  'январь',
-  'февраль',
-  'март',
-  'апрель',
-  'май',
-  'июнь',
-  'июль',
-  'август',
-  'сентябрь',
-  'октябрь',
-  'ноябрь',
-  'декабрь',
-]
-
-/**
- * Presentation only — the business date itself always comes from the
- * caller's summary.todayKey (Asia/Aqtobe), never a fresh `new Date()`.
- */
-export function monthLabelFromDateKey(dateKey) {
-  const month = Number(String(dateKey || '').slice(5, 7))
-  return MONTH_NAMES_RU[month - 1] || ''
-}
-
-/**
- * Permission-aware default/fallback tab (item 14): the requested ?tab= wins
- * only if it's in the allowed list; otherwise the first allowed tab —
- * 'payments' before 'settlements' when both are allowed, since callers push
- * 'payments' first when canViewPayments is true.
- */
-export function resolveActiveTab(rawTab, allowedTabs) {
-  if (rawTab && allowedTabs.includes(rawTab)) return rawTab
-  return allowedTabs[0] || null
-}
 
 /** Compact sync-status presentation — success/partial/running/failed never conflated. */
 export function describeSyncStatus(lastSync) {
