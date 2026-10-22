@@ -98,6 +98,9 @@ UMAG / закуп (креды UMAG **никогда** не уходят на к�
 Задачи по расписанию (`pg_cron`): `procurement-sync-scheduler-daily-0700-aqtobe`,
 `procurement-archive-scheduler-daily-0730-aqtobe`. Деплой функции: `npx supabase functions deploy <name>
 --project-ref cxadzerxndlscwvdaymk --use-api` (CLI через `npx`, авторизован у владельца; Docker не нужен).
+Без локальной машины: GitHub Actions → «Deploy Supabase Edge Functions» (ручной запуск, параметр `functions`:
+имена через пробел или `all`); нужен секрет репозитория `SUPABASE_ACCESS_TOKEN` (личный токен Supabase).
+Функции **не** деплоятся слиянием в `main` — после слияния правки в `supabase/functions/` запустить этот workflow.
 
 ## 7. База данных
 
