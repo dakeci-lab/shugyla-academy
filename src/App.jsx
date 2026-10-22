@@ -54,12 +54,6 @@ function PlatformSuspense({ children }) {
   return <Suspense fallback={<AuthLoadingScreen />}>{children}</Suspense>
 }
 
-/**
- * /platform/suppliers and /platform/suppliers/:id → supplier-finance's
- * «Поставщики» tab (2026-09-19 merge). Preserves location.state so
- * SupplierPaymentsPanel's "open payment terms" deep link
- * (openEditId/focusSection/returnTo) still opens the edit modal there.
- */
 /** Old /platform/procurement/:id order links → the «Заказы» section. */
 function ProcurementOrderRedirect() {
   const { id } = useParams()
@@ -70,7 +64,7 @@ function SupplierDirectoryRedirect() {
   const location = useLocation()
   const { id } = useParams()
   const state = id ? { ...(location.state || {}), openEditId: id } : location.state
-  return <Navigate to="/platform/supplier-finance?tab=settlements" replace state={state} />
+  return <Navigate to="/platform/supplier-finance" replace state={state} />
 }
 
 export default function App() {
@@ -199,13 +193,10 @@ export default function App() {
                 {/* «Приёмка» merged into «Заказы» (2026-09-20): old links keep working. */}
                 <Route path="receiving" element={<Navigate to="/platform/orders" replace />} />
                 <Route path="receiving/:id" element={<ReceivingDocumentRedirect />} />
-                {/* 2026-09-19: the standalone directory was merged into
-                    supplier-finance's «Поставщики» tab (formerly
-                    «Взаиморасчёты» — see UmagSettlementsPanel). These two
-                    routes are kept only as redirects for old links/bookmarks
-                    and for SupplierPaymentsPanel's "open payment terms"
-                    deep link, which relies on location.state surviving the
-                    hop (openEditId/focusSection/returnTo). */}
+                {/* The standalone supplier directory was merged into supplier-finance
+                    (see UmagSettlementsPanel). These two routes are kept only as
+                    redirects for old links/bookmarks; location.state (openEditId/
+                    focusSection/returnTo) survives the hop. */}
                 <Route
                   path="suppliers"
                   element={
@@ -230,17 +221,15 @@ export default function App() {
                     </PlatformRoute>
                   }
                 />
-                {/* Both old standalone pages are replaced by supplier-finance's tabs (same
-                    UmagSettlementsPanel/SupplierPaymentsPanel, now tabbed together). Neither
-                    was in platformNav.js or linked from anywhere in the app — kept as
-                    redirects only so a stale bookmark/tab still lands somewhere. */}
+                {/* Old standalone pages, replaced by supplier-finance. Not in platformNav.js
+                    or linked anywhere — kept as redirects only so a stale bookmark still lands. */}
                 <Route
                   path="settlements"
-                  element={<Navigate to="/platform/supplier-finance?tab=settlements" replace />}
+                  element={<Navigate to="/platform/supplier-finance" replace />}
                 />
                 <Route
                   path="supplier-payments"
-                  element={<Navigate to="/platform/supplier-finance?tab=payments" replace />}
+                  element={<Navigate to="/platform/supplier-finance" replace />}
                 />
                 <Route
                   path="supplier-finance"

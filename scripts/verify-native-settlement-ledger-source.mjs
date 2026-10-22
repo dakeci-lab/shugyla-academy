@@ -121,10 +121,10 @@ function stageService() {
 }
 
 function stageCaller() {
-  console.log('Stage 4: SupplierPaymentsPanel passes the obligation + names through')
-  const panel = read('src/components/suppliers/payments/SupplierPaymentsPanel.jsx')
+  console.log('Stage 4: the supplier card (UmagSettlementsPanel) passes the obligation + names through')
+  const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
 
-  assert('handleMarkPaid passes the full obligation, not just its id', /markObligationPaid\(ob, \{/.test(panel))
+  assert('handleSettle passes the full obligation, not just its id', /markObligationPaid\(\s*\{\s*\n\s*id: op\.settlement\.obligationId,/.test(panel))
   assert('passes employeeName from the session user', /employeeName: user\?\.name/.test(panel))
   assert('passes accountName resolved via getPaymentAccountName', /accountName: getPaymentAccountName\(/.test(panel))
   console.log('')

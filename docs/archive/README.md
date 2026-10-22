@@ -17,3 +17,8 @@ on the corresponding paths for the implementation.
 | `platform/` | employee documents, payroll filters, notification chip, schedule toggle |
 
 `docs/hr/login-collision-incident.md` stays in place: `admin-create-employee` still references it.
+
+## suppliers-payments-tab/ (2026-10-22)
+
+Docs of the «К оплате» tab, removed on 2026-10-22: payment is now done in the supplier card's
+operation history («Расчёты» → «Поставщики»). Kept for history only.

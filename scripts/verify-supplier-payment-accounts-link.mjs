@@ -149,10 +149,7 @@ async function stageFormatting() {
   const { formatDeferralDaysTerm, formatSupplierPaymentTerms } = await import(
     pathToFileURL(path.join(ROOT, 'src/utils/supplierData.js')).href
   )
-  const { formatPaymentAccountSnapshot, formatPaymentTermsDaysSnapshot } = await import(
-    pathToFileURL(path.join(ROOT, 'src/utils/supplierPaymentObligations.js')).href
-  )
-  const { createPaymentAccount, ensurePaymentAccountsLoaded } = await import(
+  const { ensurePaymentAccountsLoaded } = await import(
     pathToFileURL(path.join(ROOT, 'src/services/paymentAccountsService.js')).href
   )
 
@@ -175,36 +172,6 @@ async function stageFormatting() {
     'unknown/unset account -> Не настроено, term still shown',
     formatSupplierPaymentTerms({ paymentAccountId: null, deferralDays: 0 }) ===
       'Не настроено — сразу'
-  )
-
-  assert(
-    'formatPaymentAccountSnapshot resolves by id',
-    formatPaymentAccountSnapshot({ paymentAccountIdSnapshot: cash.id }) === 'Наличные'
-  )
-  assert(
-    'formatPaymentAccountSnapshot: no snapshot -> Не настроено',
-    formatPaymentAccountSnapshot({ paymentAccountIdSnapshot: null }) === 'Не настроено'
-  )
-  assert(
-    'formatPaymentTermsDaysSnapshot: 0 -> Сразу',
-    formatPaymentTermsDaysSnapshot({ defermentDaysSnapshot: 0 }) === 'Сразу'
-  )
-  assert(
-    'formatPaymentTermsDaysSnapshot: 14 -> 14 дн.',
-    formatPaymentTermsDaysSnapshot({ defermentDaysSnapshot: 14 }) === '14 дн.'
-  )
-  assert(
-    'formatPaymentTermsDaysSnapshot: null -> Не настроено',
-    formatPaymentTermsDaysSnapshot({ defermentDaysSnapshot: null }) === 'Не настроено'
-  )
-
-  // Renaming an account retroactively changes what old snapshots display —
-  // that's the whole point of snapshotting an id, not a copied label.
-  const renamed = await createPaymentAccount({ name: 'Kaspi Gold (verify)' })
-  await ensurePaymentAccountsLoaded(true)
-  assert(
-    'a freshly created account resolves by id immediately after cache warm',
-    formatPaymentAccountSnapshot({ paymentAccountIdSnapshot: renamed.id }) === 'Kaspi Gold (verify)'
   )
   console.log('')
 }
@@ -261,12 +228,11 @@ function stageServerWiring() {
 }
 
 function stageAdaptersAndForm() {
-  console.log('Stage 5: adapters, SupplierForm, SupplierPaymentsPanel')
+  console.log('Stage 5: adapters, SupplierForm')
   const localAdapter = read('src/services/suppliersLocalAdapter.js')
   const cloudAdapter = read('src/services/suppliersSupabaseAdapter.js')
   const supplierData = read('src/utils/supplierData.js')
   const form = read('src/components/suppliers/SupplierForm.jsx')
-  const panel = read('src/components/suppliers/payments/SupplierPaymentsPanel.jsx')
 
   assert('local adapter reads/writes payment_account_id', localAdapter.includes('payment_account_id: row.payment_account_id') && localAdapter.includes('payment_account_id: supplier.paymentAccountId || DEFAULT_CASH_ACCOUNT_ID'))
   assert('cloud adapter writes payment_account_id (no fabricated cash fallback)', cloudAdapter.includes('payment_account_id: data.paymentAccountId ?? null') && !cloudAdapter.includes('PAYMENT_TYPE'))
@@ -278,7 +244,6 @@ function stageAdaptersAndForm() {
   assert('срок оплаты field is independent — no derivePaymentTypeFromDays left', !form.includes('derivePaymentTypeFromDays'))
   assert('payload sends paymentAccountId and deferralDays independently', form.includes('paymentAccountId: form.paymentAccountId || null') && form.includes('deferralDays: validDays ? days : null'))
 
-  assert('payments panel splits Способ + Срок (not a single combined Условия line)', panel.includes('formatPaymentAccountSnapshot(ob)') && panel.includes('formatPaymentTermsDaysSnapshot(ob)'))
   console.log('')
 }
 

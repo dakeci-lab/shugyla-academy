@@ -173,14 +173,11 @@ function main() {
   assert.match(nav, /id: 'supplier-finance',\s*\n\s*path: '\/platform\/supplier-finance',\s*\n\s*label: 'Расчёты',/)
   ok('platformNav.js no longer has a separate «Поставщики» nav item — «Расчёты» is the one destination')
 
-  assert.match(shell, /\{ id: 'settlements', label: 'Поставщики' \}/)
-  ok('the settlements tab inside «Расчёты» is relabeled «Поставщики»')
-
   // --- Old directory routes redirect, preserving state for the payment-terms deep link ---
   assert.match(app, /function SupplierDirectoryRedirect\(\)/)
   assert.match(
     app,
-    /return <Navigate to="\/platform\/supplier-finance\?tab=settlements" replace state=\{state\} \/>/
+    /return <Navigate to="\/platform\/supplier-finance" replace state=\{state\} \/>/
   )
   assert.doesNotMatch(app, /<SuppliersPage \/>/)
   assert.doesNotMatch(app, /<SupplierDetailPage \/>/)

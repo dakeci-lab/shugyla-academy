@@ -5,56 +5,13 @@
   min-width: 0;
 }
 
-.sfp-panel__error {
-  padding: 10px 12px;
-  border-radius: 10px;
-  font-size: 13px;
-  line-height: 1.4;
-  background: #fef2f2;
-  color: #991b1b;
-  border: 1px solid #fecaca;
-}
-
-/* Underline tabs — same pattern as .procurement-page__tabs-row, so «Расчёты»
-   reads as the same platform as «Планирование/Заказы/Нормы» instead of a
-   separate, pill-button-styled page. */
 .sfp-panel__bar {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 0.25rem 1rem;
   border-bottom: 1px solid var(--color-border, #e5e7eb);
-}
-
-.sfp-panel__tabs {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.sfp-panel__tab {
-  appearance: none;
-  border: none;
-  background: transparent;
-  padding: 0.55rem 0.9rem;
-  font: inherit;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--color-text-secondary, #6b7280);
-  cursor: pointer;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  white-space: nowrap;
-}
-
-.sfp-panel__tab--active {
-  color: var(--color-text, #111827);
-  border-bottom-color: var(--color-primary, #059669);
-}
-
-.sfp-panel__tab:focus-visible {
-  outline: 2px solid var(--color-primary, #059669);
-  outline-offset: 2px;
 }
 
 .sfp-panel__sync {
@@ -63,12 +20,6 @@
   gap: 8px;
   min-width: 0;
   padding-bottom: 0.4rem;
-}
-
-.sfp-panel__strip-slot {
-  flex: 1 1 0;
-  min-width: 0;
-  padding-bottom: 0.55rem;
 }
 
 .sfp-panel__filter-slot {

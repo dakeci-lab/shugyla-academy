@@ -26,7 +26,6 @@ import assert from 'node:assert/strict'
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
 
-const PAYMENTS_PANEL = 'src/components/suppliers/payments/SupplierPaymentsPanel.jsx'
 const OPERATION_SHEET = 'src/components/suppliers/settlements/OperationDetailSheet.jsx'
 const PULL_TO_REFRESH_CSS = 'src/components/platform/PullToRefresh.css'
 const ADMIN_MODAL = 'src/components/admin/AdminModal.jsx'
@@ -57,23 +56,6 @@ function main() {
   assert.match(adminModalSrc, /document\.body\s*\)\s*\n\}/)
   ok('Case 2: AdminModal.jsx already portals to document.body — the pattern this fix follows, not a new one')
 
-  // --- Case 3: GroupDetail (К оплате) portals to document.body --------------
-  const paymentsSrc = read(PAYMENTS_PANEL)
-  assert.match(paymentsSrc, /import \{ createPortal \} from 'react-dom'/)
-  // Bounded by the next top-level function declaration, not the first bare
-  // "\n}" — GroupDetail's destructured param list can itself span multiple
-  // lines and close with "\n})", which a naive "\n}" search matches too early.
-  const groupDetailStart = paymentsSrc.indexOf('function GroupDetail')
-  const groupDetailNextFn = paymentsSrc.indexOf('\nfunction ', groupDetailStart + 1)
-  const groupDetailFn = paymentsSrc.slice(
-    groupDetailStart,
-    groupDetailNextFn > -1 ? groupDetailNextFn : undefined
-  )
-  assert.match(groupDetailFn, /return createPortal\(/)
-  assert.match(groupDetailFn, /spo-panel__sheet-backdrop/)
-  assert.match(groupDetailFn, /,\s*\n\s*document\.body\s*\n\s*\)/)
-  ok('Case 3: GroupDetail (row detail sheet in «К оплате») returns createPortal(..., document.body)')
-
   // --- Case 4: OperationDetailSheet (Взаиморасчёты) portals too --------------
   const opSheetSrc = read(OPERATION_SHEET)
   assert.match(opSheetSrc, /import \{ createPortal \} from 'react-dom'/)
@@ -95,9 +77,8 @@ function main() {
   ok('Case 4b: local `document` state (shadowing) confirmed present — portal target correctly qualifies window.document.body, not bare document.body')
 
   // --- Case 5: no behavior/content change, only the render target -----------
-  assert.match(paymentsSrc, /role="dialog"[\s\S]{0,40}aria-modal="true"[\s\S]{0,40}aria-label=\{group\.name\}/)
   assert.match(opSheetSrc, /role="dialog"[\s\S]{0,40}aria-modal="true"[\s\S]{0,40}aria-label=\{headerFromHistory\.title\}/)
-  ok('Case 5: dialog role/aria-modal/aria-label markup unchanged — only the portal target moved')
+  ok('Case 5: dialog markup of the operation sheet unchanged — only the portal target moved')
 
   console.log(`\n${checks} checks passed`)
 }

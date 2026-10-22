@@ -118,16 +118,6 @@ export function getMonthPeriodKeys(reference = new Date()) {
   return { dateFrom, dateTo }
 }
 
-export function getPreviousMonthPeriodKeys(reference = new Date()) {
-  const key = toAqtobeDateKey(reference)
-  const [y, m] = key.split('-').map(Number)
-  const prev = m === 1 ? { y: y - 1, m: 12 } : { y, m: m - 1 }
-  const dateFrom = `${prev.y}-${String(prev.m).padStart(2, '0')}-01`
-  const lastDay = new Date(Date.UTC(prev.y, prev.m, 0)).getUTCDate()
-  const dateTo = `${prev.y}-${String(prev.m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-  return { dateFrom, dateTo }
-}
-
 function mapErrorCode(code) {
   const normalized = String(code || '').toUpperCase()
   if (normalized === 'UMAG_NOT_CONFIGURED') return UMAG_SETTLEMENTS_ERROR_CODES.UMAG_NOT_CONFIGURED
@@ -289,39 +279,6 @@ export async function syncUmagSettlements({ dateFrom, dateTo, syncSuppliers = tr
     aggregates: data.aggregates,
     syncRunId: data.syncRunId,
     message,
-  }
-}
-
-/**
- * Sync every month that still holds open debt.
- *
- * No dates are sent: the Edge Function derives the months from open
- * obligations, because a receipt paid in a later month can only be corrected by
- * re-reading its own document month from UMAG.
- */
-export async function syncUmagOpenObligations() {
-  if (!isSupabaseConfigured() || !supabase) {
-    return fail(UMAG_SETTLEMENTS_ERROR_CODES.UNKNOWN, 'Supabase не настроен.')
-  }
-
-  const { data, failure } = await invokeUmagSync({ action: 'sync_open_obligations' })
-  if (failure) return failure
-
-  const months = data.months || {}
-  return {
-    success: true,
-    status: data.status || 'success',
-    warning: data.warning || null,
-    period: data.period || null,
-    months: {
-      planned: months.planned || [],
-      processed: months.processed || [],
-      remaining: months.remaining || [],
-      skippedOlder: months.skippedOlder || [],
-    },
-    supplies: data.supplies || null,
-    paymentObligations: data.paymentObligations || null,
-    syncRunId: data.syncRunId || null,
   }
 }
 
