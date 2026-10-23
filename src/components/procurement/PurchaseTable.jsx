@@ -24,14 +24,15 @@ export default function PurchaseTable({
   const canCancel = (order) => canEdit && order.status !== 'cancelled' && order.status !== 'received'
   const showActions = canEdit && orders.some(canCancel)
 
+  // Приёмщику важны «когда привезут» и «от кого»: доставка и поставщик — слева, служебное (кто и когда создал) — справа.
   const columns = [
-    { key: 'created', label: 'Создан', width: 150, mobile: 'hide' },
+    { key: 'delivery', label: 'Доставка', width: 110, mobile: 'hide' },
     { key: 'supplier', label: 'Поставщик', width: 200, flex: true, mobile: 'title' },
     { key: 'items', label: 'Товаров', width: 80, align: 'end', mobile: 'hide' },
     { key: 'amount', label: 'Сумма', width: 130, align: 'end', mobile: 'end' },
     ...(showStatus ? [{ key: 'status', label: 'Статус', width: 130, mobile: 'hide' }] : []),
+    { key: 'created', label: 'Создан', width: 150, mobile: 'hide' },
     { key: 'creator', label: 'Создал', width: 170, mobile: 'hide' },
-    { key: 'delivery', label: 'Доставка', width: 110, mobile: 'hide' },
     ...(showActions ? [{ key: 'actions', label: '', width: 44, align: 'end', mobile: 'hide' }] : []),
   ]
 
