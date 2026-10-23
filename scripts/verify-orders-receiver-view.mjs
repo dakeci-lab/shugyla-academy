@@ -55,4 +55,9 @@ assert.match(page, /\{order\.comment \? \(\s*\n\s*<div className="purchase-detai
 assert.doesNotMatch(page, /order\.comment \|\| '—'/)
 ok('the order card shows the comment row only when there is a comment')
 
+const list = read('src/components/procurement/PurchaseTable.jsx')
+const keys = [...list.slice(list.indexOf('const columns = ['), list.indexOf(']\n\n  return (')).matchAll(/key: '(\w+)'/g)].map((m) => m[1])
+assert.deepEqual(keys.filter((key) => key !== 'actions'), ['delivery', 'supplier', 'items', 'amount', 'status', 'created', 'creator'])
+ok('orders list: delivery and supplier first, created / creator last')
+
 console.log(`\nverify:orders-receiver-view — ${checks} checks passed`)
