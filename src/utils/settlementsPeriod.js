@@ -170,10 +170,15 @@ export function getSettlementsPeriodDates(presetId, reference = new Date()) {
   return getMonthPeriodKeys(reference)
 }
 
+/**
+ * Default period of the supplier card's history: the last three calendar months. UMAG data older than the
+ * sync window (60 days) is no longer refreshed, but paid documents from the previous month must still be
+ * findable without touching the filter.
+ */
 export function getSettlementsPeriodDefaults(reference = new Date()) {
-  const dates = getMonthPeriodKeys(reference)
+  const dates = getThreeMonthsPeriodKeys(reference)
   return {
-    periodPreset: SETTLEMENTS_PERIOD_PRESET.MONTH,
+    periodPreset: SETTLEMENTS_PERIOD_PRESET.THREE_MONTHS,
     dateFrom: dates.dateFrom,
     dateTo: dates.dateTo,
   }
@@ -214,7 +219,7 @@ export function resolveSettlementsPeriodPreset(dateFrom, dateTo, reference = new
 }
 
 export function isSettlementsFilterActive(dateFrom, dateTo, reference = new Date()) {
-  const current = getMonthPeriodKeys(reference)
+  const current = getSettlementsPeriodDefaults(reference)
   return dateFrom !== current.dateFrom || dateTo !== current.dateTo
 }
 

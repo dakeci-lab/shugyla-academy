@@ -69,7 +69,7 @@ function main() {
   assert.match(panel, /const allSuppliers = suppliersReady \? getSuppliers\(\) : \[\]/)
   assert.match(
     panel,
-    /const filteredUnsorted = useMemo\(\(\) => \{\s*\n\s*const base = filterSuppliers\(allSuppliers, \{ search: '', showArchived: appliedShowArchived \}\)/
+    /const baseList = useMemo\(\(\) => \{\s*\n\s*const base = filterSuppliers\(allSuppliers, \{ search: '', showArchived: appliedShowArchived \}\)/
   )
   assert.match(panel, /\(debtByPlatformId\.get\(b\.id\) \|\| 0\) - \(debtByPlatformId\.get\(a\.id\) \|\| 0\)/)
   assert.match(panel, /<PgtFoot/)
@@ -89,12 +89,12 @@ function main() {
 
   assert.match(
     panel,
-    /const loadDebts = useCallback\(\(\) => \{[\s\S]{0,700}fetchNativeSupplierDebts\(\{ includeUnassigned: true \}\)/
+    /const loadDebts = useCallback\(\(\) => \{[\s\S]{0,700}fetchNativeSupplierDebtSummary\(\{ includeUnassigned: true \}\)/
   )
   ok('«Текущий долг» comes from fetchNativeSupplierDebts (same lifetime formula «К оплате» uses) — unaffected by the merge')
 
-  assert.match(panel, /label: 'Поставщик'[\s\S]{0,400}canViewFinance[\s\S]{0,120}label: 'Баланс'/)
-  ok('the list has exactly two possible columns — supplier name, and «Баланс» (renamed from «Текущий долг») gated by canViewFinance — no leftover period columns (Приёмок/Сумма/Возвраты/Оплачено)')
+  assert.match(panel, /label: 'Поставщик'[\s\S]{0,400}canViewFinance[\s\S]{0,120}label: 'К оплате'/)
+  ok('the list has exactly two possible columns — supplier name, and «К оплате» (2026-10-23: renamed from «Баланс») gated by canViewFinance — no leftover period columns and no edit-pencil column')
 
   // --- Each card owns its own period -----------------------------------------
   const detailFn = panel.slice(
@@ -135,23 +135,20 @@ function main() {
   assert.doesNotMatch(panel, /umag-settlements__totals/)
   ok('the SummaryCard component and its wrapping grid are gone, not left as dead code')
 
-  // --- Identity card: directory fields + «Баланс» (ex-«Текущий долг») -------
+  // --- Identity card: quiet details + «К оплате» (2026-10-23 redesign) ----------
   assert.match(
     panel,
     /function SupplierIdentityCard\(\{ supplier, canEdit, canViewFinance, debtLoading, onEdit \}\)/
   )
-  assert.match(panel, /<dt>Юр\. название<\/dt>/)
-  assert.match(panel, /<dt>БИН<\/dt>/)
-  assert.match(panel, /<dt>Менеджер<\/dt>/)
-  assert.match(panel, /<dt>Дни заказа<\/dt>/)
-  assert.match(panel, /<dt>Дни доставки<\/dt>/)
-  assert.match(panel, /<dt>Способ оплаты<\/dt>/)
-  assert.match(panel, /<dt>Срок оплаты<\/dt>/)
+  for (const field of ['supplier.legalName', 'supplier.bin', 'supplier.managerName', 'supplier.managerPhone', 'supplier.orderDays', 'supplier.deliveryDays']) {
+    assert.ok(panel.includes(`filled(${field})`), field)
+  }
+  assert.match(panel, /`Оплата: \$\{payment\.join\(' · '\)\}`/)
   assert.match(
     panel,
-    /\{canEdit \? \(\s*\n\s*<IconActionButton label="Редактировать" variant="primary" onClick=\{onEdit\}>/
+    /\{canEdit \? \(\s*\n\s*<IconActionButton label="Редактировать поставщика" variant="primary" onClick=\{onEdit\}>/
   )
-  ok('SupplierIdentityCard now also shows legal name/BIN/payment method/payment term alongside manager/phone/order+delivery days and the edit action — one denser card, no address field (owner: «адреса нам не нужна»)')
+  ok('SupplierIdentityCard shows only the details that are filled in (as quiet text), the payment method/term line and the edit action — no rows of «—»')
   assert.doesNotMatch(panel, /<dt>.*[Аа]дрес.*<\/dt>/)
   ok('no address field was added to the identity card, per the owner\'s explicit exclusion')
 
@@ -159,14 +156,13 @@ function main() {
     panel,
     /<SupplierIdentityCard\s*\n\s*supplier=\{supplier\}\s*\n\s*canEdit=\{canEditSupplier\}\s*\n\s*canViewFinance=\{canViewFinance\}\s*\n\s*debtLoading=\{debtLoading\}\s*\n\s*onEdit=\{onEdit\}\s*\n\s*\/>/
   )
-  ok('the identity card is always rendered (independent of canViewFinance) but is itself given canViewFinance so only its own «Баланс» line is gated')
+  ok('the identity card is always rendered (independent of canViewFinance) but is itself given canViewFinance so only its own «К оплате» number is gated')
 
-  // --- «Баланс» (ex-«Текущий долг») lives inside the identity card, gated ---
   assert.match(
     panel,
-    /\{canViewFinance \? \(\s*\n\s*<div>\s*\n\s*<dt>Баланс<\/dt>\s*\n\s*<dd className=\{supplier\.debt > 0 \? 'umag-settlements__debt' : undefined\}>/
+    /canViewFinance \? \(\s*\n\s*<div className="umag-settlements__id-balance">\s*\n\s*<span className="umag-settlements__id-balance-label">К оплате<\/span>/
   )
-  ok('«Текущий долг» was renamed to «Баланс» everywhere (list header, mobile card, identity card) and stays gated by canViewFinance inside the identity card')
+  ok('the supplier debt is shown as «К оплате» in the card header and stays gated by canViewFinance')
 
   // --- Nav: one destination, not two ------------------------------------------
   assert.doesNotMatch(nav, /id: 'suppliers',\s*\n\s*path: '\/platform\/suppliers',/)

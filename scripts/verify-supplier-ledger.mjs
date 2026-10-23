@@ -114,8 +114,9 @@ function main() {
   assert('service builds with payments', service.includes('buildSupplierOperationHistory('))
 
   const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
-  assert('UI has increase/decrease columns', panel.includes('Увеличение') && panel.includes('Уменьшение'))
-  assert('UI has saldо column', panel.includes('Сальдо'))
+  // 2026-10-23 redesign: one signed «Сумма» column + status/action instead of increase / decrease / running balance
+  // (the running balance contradicted the card's native «К оплате»).
+  assert('UI has amount and status columns', panel.includes("label: 'Сумма'") && panel.includes("label: 'Статус'"))
   assert('UI payments filter', panel.includes("{ id: 'payments'"))
 
   console.log(`\nSupplier ledger verification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)

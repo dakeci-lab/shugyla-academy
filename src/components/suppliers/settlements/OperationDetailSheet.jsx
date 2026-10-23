@@ -90,7 +90,7 @@ function SettleBlock({ settlement, accounts, onSettle, onUnsettle }) {
         {onUnsettle ? (
           <button
             type="button"
-            className="btn btn-secondary"
+            className="btn btn--outline"
             disabled={busy}
             onClick={() => void run(onUnsettle)}
           >
@@ -119,7 +119,7 @@ function SettleBlock({ settlement, accounts, onSettle, onUnsettle }) {
       </select>
       <button
         type="button"
-        className="btn btn-primary"
+        className="btn btn--primary"
         disabled={busy}
         onClick={() => void run(() => onSettle(accountId || null))}
       >
@@ -305,6 +305,16 @@ export default function OperationDetailSheet({
           </button>
         </div>
 
+        {/* The action comes first: «Оплатить» / «Получили возврат» is what this window is opened for. */}
+        {!isPaymentDoc && canManage && operation?.settlement && onSettle ? (
+          <SettleBlock
+            settlement={operation.settlement}
+            accounts={paymentAccounts}
+            onSettle={onSettle}
+            onUnsettle={onUnsettle}
+          />
+        ) : null}
+
         <div className="umag-op-detail__summary">
           <div>
             <span>Сумма</span>
@@ -354,7 +364,7 @@ export default function OperationDetailSheet({
               ) : null}
             </>
           ) : null}
-          {kind === 'supply' ? (
+          {kind === 'supply' && !operation?.settlement ? (
             <>
               <div>
                 <span>Оплачено</span>
@@ -414,7 +424,7 @@ export default function OperationDetailSheet({
           <>
             <div className="umag-op-detail__empty">
               {headerFromHistory.externalSource === 'platform'
-                ? 'Отмечено оплаченным вручную на платформе, в разделе «К оплате». Состав товарных позиций для этого типа записи не отслеживается.'
+                ? 'Отмечено оплаченным на платформе, в карточке поставщика. Состав товарных позиций для этого типа записи не отслеживается.'
                 : 'Платёжный документ UMAG. Состав товарных позиций для этого типа операции не загружается.'}
             </div>
             {canUnmark ? (
@@ -430,15 +440,6 @@ export default function OperationDetailSheet({
           </>
         ) : (
           <>
-        {canManage && operation?.settlement && onSettle ? (
-          <SettleBlock
-            settlement={operation.settlement}
-            accounts={paymentAccounts}
-            onSettle={onSettle}
-            onUnsettle={onUnsettle}
-          />
-        ) : null}
-
         {(headerFromHistory.comment || headerFromHistory.note || document?.comment || document?.note) ? (
           <p className="umag-op-detail__comment">
             {headerFromHistory.comment ||

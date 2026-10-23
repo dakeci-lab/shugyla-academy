@@ -45,7 +45,7 @@ async function fetchOpenUnassignedObligationRows() {
   const { data, error } = await fetchAllSupabaseRows(() =>
     supabase
       .from('supplier_payment_obligations')
-      .select('id, original_supply_amount')
+      .select('id, original_supply_amount, supply_document_date')
       .eq('is_source_deleted', false)
       .is('platform_paid_at', null)
       .is('platform_supplier_id', null)
@@ -67,7 +67,9 @@ async function fetchOpenNativeObligationRows(platformSupplierIds) {
   const { data, error } = await fetchAllSupabaseRows(() => {
     let query = supabase
       .from('supplier_payment_obligations')
-      .select('id, platform_supplier_id, original_supply_amount, is_source_deleted, platform_paid_at')
+      .select(
+        'id, platform_supplier_id, original_supply_amount, supply_document_date, is_source_deleted, platform_paid_at'
+      )
       .eq('is_source_deleted', false)
       .is('platform_paid_at', null)
       .order('id', { ascending: true })
@@ -86,17 +88,16 @@ async function fetchOpenNativeObligationRows(platformSupplierIds) {
 }
 
 /**
- * Native current open debt for MANY suppliers in ONE bulk query — powers the
- * «Взаиморасчёты» list's debt column, agreeing with «К оплате». Rows with
- * platform_supplier_id = NULL (no canonical link at all) are excluded from
- * the map rather than lumped under one key — conflating unrelated unmapped
- * suppliers' debt under a single bucket would misattribute money to
- * whichever row happens to look it up.
+ * Native open debt per supplier in ONE bulk query: amount, number of unpaid documents and the date of
+ * the oldest one — the supplier list shows «3 неоплаченных · с 15.10» under the name. Agrees with
+ * «К оплате»'s old predicate (is_source_deleted = false AND platform_paid_at IS NULL, never UMAG's
+ * current_debt). Rows with platform_supplier_id = NULL are not lumped under any real supplier; with
+ * includeUnassigned they get their own UNASSIGNED_SUPPLIER_ID entry (always present, 0 when empty).
  *
- * @param {{ platformSupplierIds?: string[] }} [params]
- * @returns {Promise<Map<string, number>>} platformSupplierId -> debt
+ * @param {{ platformSupplierIds?: string[], includeUnassigned?: boolean }} [params]
+ * @returns {Promise<Map<string, { amount: number, count: number, oldestDate: string|null }>>}
  */
-export async function fetchNativeSupplierDebts({ platformSupplierIds, includeUnassigned = false } = {}) {
+export async function fetchNativeSupplierDebtSummary({ platformSupplierIds, includeUnassigned = false } = {}) {
   const idsGiven = Array.isArray(platformSupplierIds)
   const [rows, separateUnassignedRows] = await Promise.all([
     fetchOpenNativeObligationRows(idsGiven ? platformSupplierIds.filter(Boolean) : undefined),
@@ -106,18 +107,27 @@ export async function fetchNativeSupplierDebts({ platformSupplierIds, includeUna
   const unassignedRows = idsGiven ? separateUnassignedRows : rows.filter((row) => !row.platform_supplier_id)
 
   const map = new Map()
+  const add = (id, row) => {
+    const entry = map.get(id) || { amount: 0, count: 0, oldestDate: null }
+    entry.amount += toNumber(row.original_supply_amount)
+    entry.count += 1
+    const date = row.supply_document_date || null
+    if (date && (!entry.oldestDate || date < entry.oldestDate)) entry.oldestDate = date
+    map.set(id, entry)
+  }
   if (includeUnassigned) {
-    // Always present (0 when nothing is unassigned) so callers can tell
-    // "loaded, nothing there" from "not requested".
-    map.set(
-      UNASSIGNED_SUPPLIER_ID,
-      unassignedRows.reduce((sum, row) => sum + toNumber(row.original_supply_amount), 0)
-    )
+    map.set(UNASSIGNED_SUPPLIER_ID, { amount: 0, count: 0, oldestDate: null })
+    for (const row of unassignedRows) add(UNASSIGNED_SUPPLIER_ID, row)
   }
   for (const row of rows) {
     if (!row.platform_supplier_id) continue
-    const id = row.platform_supplier_id
-    map.set(id, (map.get(id) || 0) + toNumber(row.original_supply_amount))
+    add(row.platform_supplier_id, row)
   }
   return map
+}
+
+/** Same query, amounts only: platformSupplierId -> debt. */
+export async function fetchNativeSupplierDebts(params = {}) {
+  const summary = await fetchNativeSupplierDebtSummary(params)
+  return new Map([...summary].map(([id, entry]) => [id, entry.amount]))
 }
