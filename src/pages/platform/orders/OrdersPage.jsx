@@ -20,6 +20,7 @@ import {
   getSettlementsPeriodDates,
   SETTLEMENTS_PERIOD_PRESET,
 } from '../../../utils/settlementsPeriod'
+import { describeOrdersSummary, summarizeOrders } from '../../../utils/ordersSummary'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
 import PlatformFilterTrigger from '../../../components/platform/PlatformFilterTrigger'
 import PeriodFilterPopover from '../../../components/platform/PeriodFilterPopover'
@@ -149,6 +150,11 @@ export default function OrdersPage() {
   const filterActive = periodChanged || showCancelled
   const filterCount = (periodChanged ? 1 : 0) + (showCancelled ? 1 : 0)
   const periodLabel = describeSettlementsPeriod(periodFrom, periodTo)
+  const summaryText = describeOrdersSummary(summarizeOrders(orders), {
+    periodLabel,
+    isToday: !periodChanged,
+    cancelled: showCancelled,
+  })
 
   function toggleFilter() {
     if (filterOpen) {
@@ -272,6 +278,7 @@ export default function OrdersPage() {
         <DelayedLoadingSkeleton variant="list" count={5} />
       ) : (
         <div className="procurement-list-panel">
+          {summaryText ? <p className="orders-page__summary">{summaryText}</p> : null}
           <PurchaseTable orders={visibleOrders} canEdit={false} />
           <TablePagination
             page={page}

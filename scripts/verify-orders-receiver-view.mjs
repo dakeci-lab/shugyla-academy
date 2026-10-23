@@ -102,4 +102,23 @@ assert.match(table, /loadOrderChecklist\(checklistKey\)/)
 assert.match(read('src/pages/platform/procurement/PurchaseDetailPage.jsx'), /checklistKey=\{order\.id\}/)
 ok('the order card passes its id, so every order keeps its own ticks')
 
+// --- Summary above the orders list --------------------------------------------------------------
+const { summarizeOrders, describeOrdersSummary } = await import(
+  pathToFileURL(path.join(ROOT, 'src/utils/ordersSummary.js')).href
+)
+const sample = [{ itemsCount: 10 }, { itemsCount: 28 }, { items: [1, 2, 3] }, {}]
+assert.deepEqual(summarizeOrders(sample), { deliveries: 4, items: 41 })
+assert.deepEqual(summarizeOrders([]), { deliveries: 0, items: 0 })
+ok('summary counts deliveries and items (itemsCount, or the items array, or zero)')
+const label = { periodLabel: 'Неделя', isToday: true }
+assert.equal(describeOrdersSummary({ deliveries: 5, items: 38 }, label), 'Сегодня ждём 5 поставок, 38 товаров')
+assert.equal(describeOrdersSummary({ deliveries: 1, items: 1 }, label), 'Сегодня ждём 1 поставка, 1 товар')
+assert.equal(describeOrdersSummary({ deliveries: 2, items: 22 }, label), 'Сегодня ждём 2 поставки, 22 товара')
+assert.equal(describeOrdersSummary({ deliveries: 12, items: 120 }, { periodLabel: 'Неделя', isToday: false }), 'Неделя: 12 поставок, 120 товаров')
+assert.equal(describeOrdersSummary({ deliveries: 3, items: 9 }, { ...label, cancelled: true }), 'Отменено: 3 поставки, 9 товаров')
+assert.equal(describeOrdersSummary({ deliveries: 0, items: 0 }, label), null)
+ok('summary text: «Сегодня ждём N поставок, M товаров» with correct Russian plurals; other period and cancelled wording; nothing when empty')
+assert.match(read('src/pages/platform/orders/OrdersPage.jsx'), /summarizeOrders\(orders\)/)
+ok('the orders list shows the summary of exactly the orders on screen (after period / cancelled filters)')
+
 console.log(`\nverify:orders-receiver-view — ${checks} checks passed`)
