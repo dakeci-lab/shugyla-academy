@@ -494,3 +494,101 @@
     font-size: 12px;
   }
 }
+
+/* ---- Bulk payment: tick unpaid supplies, pay them in one go ---- */
+.umag-settlements__check {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #047857;
+}
+
+.umag-settlements__op-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* The tick lives in its own column on desktop; on phones the column is hidden and the tick sits before the name. */
+.umag-settlements__op-select {
+  display: none;
+  padding-top: 2px;
+}
+
+.umag-settlements__row--selected {
+  background: #f0fdf4;
+}
+
+.umag-settlements__bulk {
+  position: sticky;
+  bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  padding: 12px 14px;
+  border: 1px solid #a7f3d0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+}
+
+.umag-settlements__bulk-sum {
+  display: flex;
+  flex-direction: column;
+  margin-right: auto;
+  line-height: 1.2;
+}
+
+.umag-settlements__bulk-sum strong {
+  font-size: 13px;
+  color: var(--color-text-secondary, #64748b);
+  font-weight: 600;
+}
+
+.umag-settlements__bulk-sum span {
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.umag-settlements__bulk-account {
+  min-width: 160px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 14px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 10px;
+  background: #fff;
+}
+
+@media (max-width: 640px) {
+  .umag-settlements__op-select {
+    display: block;
+  }
+
+  .umag-settlements__bulk {
+    display: grid;
+    grid-template-columns: 1fr 1.7fr;
+    gap: 8px;
+  }
+
+  .umag-settlements__bulk-sum,
+  .umag-settlements__bulk-account {
+    grid-column: 1 / -1;
+  }
+
+  .umag-settlements__bulk-sum {
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-right: 0;
+  }
+
+  .umag-settlements__bulk .btn {
+    min-height: 44px;
+  }
+}

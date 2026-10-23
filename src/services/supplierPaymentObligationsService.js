@@ -189,6 +189,36 @@ export async function markObligationPaid(obligation, { paidByEmployeeId, account
   }
 }
 
+/**
+ * Mark several obligations paid with the same account — the «Оплатить выбранные» button of the supplier card.
+ * Each document goes through markObligationPaid (native mark + ledger event), a few at a time; one failure
+ * does not stop the others, the result says exactly which went through.
+ *
+ * @returns {Promise<{ paid: string[], failed: Array<{ id: string, message: string }> }>}
+ */
+export async function markObligationsPaid(obligations, options = {}, { onProgress, concurrency = 4 } = {}) {
+  const queue = [...obligations]
+  const paid = []
+  const failed = []
+  let done = 0
+  async function worker() {
+    for (;;) {
+      const obligation = queue.shift()
+      if (!obligation) return
+      try {
+        await markObligationPaid(obligation, options)
+        paid.push(obligation.id)
+      } catch (err) {
+        failed.push({ id: obligation.id, message: err?.message || 'Не удалось отметить оплату' })
+      }
+      done += 1
+      onProgress?.(done, obligations.length)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, obligations.length) }, worker))
+  return { paid, failed }
+}
+
 export async function unmarkObligationPaid(obligationId) {
   assertCloudReady()
   if (!obligationId) throw new Error('Обязательство не указано')
