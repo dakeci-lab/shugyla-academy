@@ -95,7 +95,7 @@ function stagePanelWiring() {
   )
   assert(
     'canManagePayments is threaded into UmagSupplierDetail',
-    /<UmagSupplierDetail[\s\S]{0,300}canManagePayments=\{canManagePayments\}/.test(panel)
+    /<UmagSupplierDetail[\s\S]{0,700}canManagePayments=\{canManagePayments\}/.test(panel)
   )
   assert(
     'handleUnmarkPayment calls the real unmarkObligationPaid(obligationId)',

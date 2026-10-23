@@ -592,3 +592,30 @@
     min-height: 44px;
   }
 }
+
+/* ---- Payment deadlines ---- */
+.umag-settlements__due--overdue {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.umag-settlements__due--today {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.umag-settlements__ops-filter-count--danger {
+  background: #b91c1c;
+}
+
+.umag-settlements__id-balance-overdue {
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #b91c1c;
+}
+
+.umag-settlements__due--overdue,
+.umag-settlements__due--today {
+  white-space: nowrap;
+}

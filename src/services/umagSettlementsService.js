@@ -353,6 +353,7 @@ function buildSupplySettlement(obligation) {
     settled: obligation.platform_paid_at != null,
     settledAt: obligation.platform_paid_at ?? null,
     obligationId: obligation.id,
+    dueDate: obligation.due_date ?? null,
   }
 }
 
@@ -513,7 +514,7 @@ async function attachSupplyObligations(supplies) {
       supabase
         .from('supplier_payment_obligations')
         .select(
-          'id, umag_supply_id, platform_supplier_id, original_supply_amount, is_source_deleted, platform_paid_at'
+          'id, umag_supply_id, platform_supplier_id, original_supply_amount, due_date, is_source_deleted, platform_paid_at'
         )
         .in('umag_supply_id', chunk)
     )
@@ -625,7 +626,7 @@ export async function fetchUmagSupplierOperationHistory({
           const query = supabase
             .from('supplier_payment_obligations')
             .select(
-              'id, platform_supplier_id, umag_supply_id, original_supply_amount, is_source_deleted, platform_paid_at, platform_paid_by, platform_payment_account_id, supplier:platform_suppliers!platform_supplier_id(name)'
+              'id, platform_supplier_id, umag_supply_id, original_supply_amount, due_date, is_source_deleted, platform_paid_at, platform_paid_by, platform_payment_account_id, supplier:platform_suppliers!platform_supplier_id(name)'
             )
           return unassigned
             ? query.is('platform_supplier_id', null)
