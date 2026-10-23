@@ -533,6 +533,7 @@ export default function PurchaseDetailPage() {
           onEdit={openEditItemModal}
           onDelete={handleDeleteItem}
           onAdd={openAddItemModal}
+          checklistKey={order.id}
         />
       </section>
 
