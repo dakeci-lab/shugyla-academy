@@ -626,6 +626,7 @@ function UmagSupplierDetail({
           canManage={canManagePayments}
           onUnmark={handleUnmarkPayment}
           paymentAccounts={paymentAccounts}
+          defaultAccountId={supplier.isVirtual ? null : supplier.paymentAccountId ?? null}
           onSettle={(accountId) => handleSettle(selectedOperation, accountId)}
           onUnsettle={() => handleUnsettle(selectedOperation)}
         />

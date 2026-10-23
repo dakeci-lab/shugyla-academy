@@ -65,9 +65,18 @@ function PaymentStatusBadge({ status }) {
  * Close-the-operation block: pay an open supply (money out) or mark an open
  * return received (money in). The two streams are never netted.
  */
-function SettleBlock({ settlement, accounts, onSettle, onUnsettle }) {
+function SettleBlock({ settlement, accounts, defaultAccountId = null, onSettle, onUnsettle }) {
   const [accountId, setAccountId] = useState('')
+  const [accountTouched, setAccountTouched] = useState(false)
   const [busy, setBusy] = useState(false)
+
+  // The supplier's own payment method is preselected, so the account is not forgotten (the list of accounts may
+  // arrive a moment after the window opens — hence the effect). A choice made by hand is never overwritten.
+  useEffect(() => {
+    if (accountTouched) return
+    const known = defaultAccountId && accounts.some((account) => account.id === defaultAccountId)
+    setAccountId(known ? defaultAccountId : '')
+  }, [accounts, defaultAccountId, accountTouched])
   const isPayable = settlement.type === 'payable'
 
   async function run(action) {
@@ -106,7 +115,10 @@ function SettleBlock({ settlement, accounts, onSettle, onUnsettle }) {
       <select
         className="umag-op-detail__settle-account"
         value={accountId}
-        onChange={(e) => setAccountId(e.target.value)}
+        onChange={(e) => {
+          setAccountTouched(true)
+          setAccountId(e.target.value)
+        }}
         disabled={busy}
         aria-label={isPayable ? 'Счёт оплаты' : 'Счёт, на который пришёл возврат'}
       >
@@ -136,6 +148,7 @@ export default function OperationDetailSheet({
   canManage = false,
   onUnmark,
   paymentAccounts = [],
+  defaultAccountId = null,
   onSettle,
   onUnsettle,
 }) {
@@ -310,6 +323,7 @@ export default function OperationDetailSheet({
           <SettleBlock
             settlement={operation.settlement}
             accounts={paymentAccounts}
+            defaultAccountId={defaultAccountId}
             onSettle={onSettle}
             onUnsettle={onUnsettle}
           />

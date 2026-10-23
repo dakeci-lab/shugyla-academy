@@ -98,4 +98,11 @@ assert.ok(sheet.indexOf('<SettleBlock') < sheet.indexOf('umag-op-detail__summary
 assert.match(sheet, /btn btn--primary/)
 ok('operation window: native pay block first, no contradicting UMAG «Оплачено / Осталось» fields')
 
+// Default pay account: the supplier's own payment method is preselected, a manual choice is never overwritten.
+assert.match(sheet, /function SettleBlock\(\{ settlement, accounts, defaultAccountId = null, onSettle, onUnsettle \}\)/)
+assert.match(sheet, /accounts\.some\(\(account\) => account\.id === defaultAccountId\)/)
+assert.match(sheet, /if \(accountTouched\) return/)
+assert.match(panel, /defaultAccountId=\{supplier\.isVirtual \? null : supplier\.paymentAccountId \?\? null\}/)
+ok("pay window preselects the supplier's own account (none for «Поставщик не выбран»); a hand-picked account is kept")
+
 console.log(`\nverify:supplier-card-ux — ${checks} checks passed`)
