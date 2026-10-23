@@ -57,3 +57,36 @@ export function matchesOperationQuery(op, query) {
   }
   return false
 }
+
+/** Whole days from fromKey to toKey (both 'YYYY-MM-DD'); positive when toKey is later. */
+function daysBetween(fromKey, toKey) {
+  const parse = (key) => {
+    const [y, m, d] = String(key).split('-').map(Number)
+    return Date.UTC(y, m - 1, d)
+  }
+  return Math.round((parse(toKey) - parse(fromKey)) / 86_400_000)
+}
+
+/**
+ * Payment deadline of an open document, for the history row: «просрочено на 3 дн.» (tone 'overdue'),
+ * «срок сегодня» ('today'), «срок до 25.10» ('upcoming'); nothing when the supplier has no payment term
+ * (due date unknown) or the document is already closed.
+ */
+export function describeDue(dueDate, todayKey) {
+  if (!dueDate || !todayKey) return null
+  const late = daysBetween(dueDate, todayKey)
+  if (late > 0) return { tone: 'overdue', text: `просрочено на ${late} дн.` }
+  if (late === 0) return { tone: 'today', text: 'срок сегодня' }
+  return { tone: 'upcoming', text: `срок до ${formatShortDate(dueDate)}` }
+}
+
+/** An open supply whose due date is before today. */
+export function isOverdueOperation(op, todayKey) {
+  const settlement = op?.settlement
+  if (!settlement || settlement.settled || settlement.type !== 'payable') return false
+  return Boolean(settlement.dueDate && todayKey && settlement.dueDate < todayKey)
+}
+
+export function countOverdueOperations(operations, todayKey) {
+  return (operations || []).filter((op) => isOverdueOperation(op, todayKey)).length
+}

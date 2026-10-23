@@ -10,6 +10,7 @@
 
 import { supabase, isSupabaseConfigured } from '../lib/supabaseClient'
 import { fetchAllSupabaseRows } from '../utils/supabasePagination'
+import { toAqtobeDateKey } from '../utils/supplierPaymentObligations'
 
 /**
  * Pseudo supplier id for open obligations whose UMAG document has no supplier
@@ -45,7 +46,7 @@ async function fetchOpenUnassignedObligationRows() {
   const { data, error } = await fetchAllSupabaseRows(() =>
     supabase
       .from('supplier_payment_obligations')
-      .select('id, original_supply_amount, supply_document_date')
+      .select('id, original_supply_amount, supply_document_date, due_date')
       .eq('is_source_deleted', false)
       .is('platform_paid_at', null)
       .is('platform_supplier_id', null)
@@ -68,7 +69,7 @@ async function fetchOpenNativeObligationRows(platformSupplierIds) {
     let query = supabase
       .from('supplier_payment_obligations')
       .select(
-        'id, platform_supplier_id, original_supply_amount, supply_document_date, is_source_deleted, platform_paid_at'
+        'id, platform_supplier_id, original_supply_amount, supply_document_date, due_date, is_source_deleted, platform_paid_at'
       )
       .eq('is_source_deleted', false)
       .is('platform_paid_at', null)
@@ -95,7 +96,9 @@ async function fetchOpenNativeObligationRows(platformSupplierIds) {
  * includeUnassigned they get their own UNASSIGNED_SUPPLIER_ID entry (always present, 0 when empty).
  *
  * @param {{ platformSupplierIds?: string[], includeUnassigned?: boolean }} [params]
- * @returns {Promise<Map<string, { amount: number, count: number, oldestDate: string|null }>>}
+ * Also counts what is overdue (due_date before today, Asia/Aqtobe): overdueCount / overdueAmount.
+ *
+ * @returns {Promise<Map<string, { amount: number, count: number, oldestDate: string|null, overdueCount: number, overdueAmount: number }>>}
  */
 export async function fetchNativeSupplierDebtSummary({ platformSupplierIds, includeUnassigned = false } = {}) {
   const idsGiven = Array.isArray(platformSupplierIds)
@@ -107,16 +110,21 @@ export async function fetchNativeSupplierDebtSummary({ platformSupplierIds, incl
   const unassignedRows = idsGiven ? separateUnassignedRows : rows.filter((row) => !row.platform_supplier_id)
 
   const map = new Map()
+  const todayKey = toAqtobeDateKey()
   const add = (id, row) => {
-    const entry = map.get(id) || { amount: 0, count: 0, oldestDate: null }
+    const entry = map.get(id) || { amount: 0, count: 0, oldestDate: null, overdueCount: 0, overdueAmount: 0 }
     entry.amount += toNumber(row.original_supply_amount)
     entry.count += 1
+    if (row.due_date && row.due_date < todayKey) {
+      entry.overdueCount += 1
+      entry.overdueAmount += toNumber(row.original_supply_amount)
+    }
     const date = row.supply_document_date || null
     if (date && (!entry.oldestDate || date < entry.oldestDate)) entry.oldestDate = date
     map.set(id, entry)
   }
   if (includeUnassigned) {
-    map.set(UNASSIGNED_SUPPLIER_ID, { amount: 0, count: 0, oldestDate: null })
+    map.set(UNASSIGNED_SUPPLIER_ID, { amount: 0, count: 0, oldestDate: null, overdueCount: 0, overdueAmount: 0 })
     for (const row of unassignedRows) add(UNASSIGNED_SUPPLIER_ID, row)
   }
   for (const row of rows) {

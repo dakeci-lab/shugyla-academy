@@ -29,11 +29,14 @@ import {
 } from '../../../services/supplierDebtService'
 import {
   countOpenOperations,
+  countOverdueOperations,
+  describeDue,
   describeOpenDocuments,
-  isOpenOperation,
+  isOverdueOperation,
   matchesOperationQuery,
   operationAmountSign,
 } from '../../../utils/supplierHistoryView'
+import { toAqtobeDateKey } from '../../../utils/supplierPaymentObligations'
 import {
   ensurePaymentAccountsLoaded,
   getPaymentAccountName,
@@ -151,6 +154,24 @@ function SelectAllCheckbox({ total, selected, onToggle }) {
   )
 }
 
+/** Under the operation name: the document number (or who paid) and, for an open supply, its payment deadline. */
+function OperationSubline({ op, todayKey }) {
+  const base = operationSubline(op)
+  const settlement = op.settlement
+  const due =
+    settlement && !settlement.settled && settlement.type === 'payable'
+      ? describeDue(settlement.dueDate, todayKey)
+      : null
+  if (!base && !due) return null
+  return (
+    <span className="umag-settlements__op-sub">
+      {base}
+      {base && due ? ' · ' : ''}
+      {due ? <span className={`umag-settlements__due umag-settlements__due--${due.tone}`}>{due.text}</span> : null}
+    </span>
+  )
+}
+
 const HISTORY_COLUMNS = [
   { key: 'date', label: 'Дата', width: 110, mobile: 'hide' },
   { key: 'op', label: 'Операция', width: 260, flex: true, mobile: 'title' },
@@ -223,6 +244,11 @@ function SupplierIdentityCard({ supplier, canEdit, canViewFinance, debtLoading, 
         >
           {debtLoading ? '…' : formatUmagMoney(supplier.debt ?? 0)}
         </span>
+        {!debtLoading && supplier.overdueAmount > 0 ? (
+          <span className="umag-settlements__id-balance-overdue">
+            из них просрочено {formatUmagMoney(supplier.overdueAmount)}
+          </span>
+        ) : null}
       </div>
     ) : null
   )
@@ -376,6 +402,8 @@ function UmagSupplierDetail({
   const [opsQuery, setOpsQuery] = useState('')
   const [selectedOperation, setSelectedOperation] = useState(null)
   const openCount = useMemo(() => countOpenOperations(operations), [operations])
+  const todayKey = useMemo(() => toAqtobeDateKey(), [])
+  const overdueCount = useMemo(() => countOverdueOperations(operations, todayKey), [operations, todayKey])
 
   // The card opens on what needs a click («Не закрытые»); with nothing open it opens on everything, and
   // right after the last document is paid it switches to the full list so the result is visible.
@@ -392,9 +420,13 @@ function UmagSupplierDetail({
   // A search looks through every operation of the period, whatever chip is active.
   const searching = opsQuery.trim() !== ''
   const visibleOps = useMemo(() => {
-    const base = searching ? operations : filterSupplierOperations(operations, opsFilter)
+    const base = searching
+      ? operations
+      : opsFilter === 'overdue'
+        ? operations.filter((op) => isOverdueOperation(op, todayKey))
+        : filterSupplierOperations(operations, opsFilter)
     return base.filter((op) => matchesOperationQuery(op, opsQuery))
-  }, [operations, opsFilter, opsQuery, searching])
+  }, [operations, opsFilter, opsQuery, searching, todayKey])
 
   // ---- «Оплатить выбранные»: tick unpaid supplies, pay them with one account in one go ----
   const [selectedIds, setSelectedIds] = useState(() => new Set())
@@ -644,6 +676,7 @@ function UmagSupplierDetail({
               <div className="umag-settlements__ops-filters" role="tablist" aria-label="Фильтр операций">
                 {[
                   { id: 'open', label: 'Не закрытые', count: openCount },
+                  ...(overdueCount > 0 ? [{ id: 'overdue', label: 'Просрочено', count: overdueCount, tone: 'danger' }] : []),
                   { id: 'all', label: 'Все' },
                   { id: 'supplies', label: 'Приёмки' },
                   { id: 'payments', label: 'Оплаты' },
@@ -663,7 +696,15 @@ function UmagSupplierDetail({
                     }}
                   >
                     {opt.label}
-                    {opt.count ? <span className="umag-settlements__ops-filter-count">{opt.count}</span> : null}
+                    {opt.count ? (
+                      <span
+                        className={`umag-settlements__ops-filter-count${
+                          opt.tone === 'danger' ? ' umag-settlements__ops-filter-count--danger' : ''
+                        }`}
+                      >
+                        {opt.count}
+                      </span>
+                    ) : null}
                   </button>
                 ))}
               </div>
@@ -689,8 +730,10 @@ function UmagSupplierDetail({
                   ? 'Ничего не найдено за выбранный период'
                   : opsFilter === 'open'
                     ? 'Неоплаченных документов нет'
-                    : 'За выбранный период операций UMAG не найдено'}
-                {!searching && opsFilter === 'open' ? (
+                    : opsFilter === 'overdue'
+                      ? 'Просроченных документов нет'
+                      : 'За выбранный период операций UMAG не найдено'}
+                {!searching && (opsFilter === 'open' || opsFilter === 'overdue') ? (
                   <button type="button" className="umag-settlements__empty-action" onClick={() => chooseOpsFilter('all')}>
                     Показать все
                   </button>
@@ -734,7 +777,7 @@ function UmagSupplierDetail({
                               >
                                 {op.label}
                               </button>
-                              {sub ? <span className="umag-settlements__op-sub">{sub}</span> : null}
+                              <OperationSubline op={op} todayKey={todayKey} />
                             </span>
                           </span>
                         ),
@@ -986,7 +1029,7 @@ export default function UmagSettlementsPanel({
     [debtSummary]
   )
   const [listQuery, setListQuery] = useState('')
-  const [debtOnly, setDebtOnly] = useState(true)
+  const [listView, setListView] = useState('debt')
   const [debtLoading, setDebtLoading] = useState(true)
   const [debtsSettled, setDebtsSettled] = useState(false)
 
@@ -1025,6 +1068,10 @@ export default function UmagSettlementsPanel({
     () => baseList.filter((s) => (debtByPlatformId.get(s.id) || 0) !== 0).length,
     [baseList, debtByPlatformId]
   )
+  const overdueSuppliersCount = useMemo(
+    () => baseList.filter((s) => (debtSummary.get(s.id)?.overdueCount || 0) > 0).length,
+    [baseList, debtSummary]
+  )
   // A search looks at every supplier, with or without debt; otherwise «С долгом» hides the zero-balance tail.
   const filteredUnsorted = useMemo(() => {
     const q = listQuery.trim().toLowerCase()
@@ -1032,9 +1079,10 @@ export default function UmagSettlementsPanel({
       if (q) {
         return `${s.name || ''} ${s.legalName || ''}`.toLowerCase().includes(q)
       }
-      return !debtOnly || (debtByPlatformId.get(s.id) || 0) !== 0
+      if (listView === 'overdue') return (debtSummary.get(s.id)?.overdueCount || 0) > 0
+      return listView === 'all' || (debtByPlatformId.get(s.id) || 0) !== 0
     })
-  }, [baseList, listQuery, debtOnly, debtByPlatformId])
+  }, [baseList, listQuery, listView, debtByPlatformId, debtSummary])
   // Biggest balance first so the largest debts stand out; name breaks ties
   // (and orders the all-zero tail) so the list stays stable.
   const filtered = useMemo(
@@ -1287,7 +1335,8 @@ export default function UmagSettlementsPanel({
     if (supplierFilter.size > 0) return 'По вашему запросу ничего не найдено.'
     if (appliedShowArchived) return 'Удалённых поставщиков нет.'
     if (searchingList) return 'Поставщик не найден.'
-    if (debtOnly && allSuppliers.length > 0) return 'Долгов нет — всё оплачено.'
+    if (listView === 'overdue') return 'Просроченных оплат нет.'
+    if (listView === 'debt' && allSuppliers.length > 0) return 'Долгов нет — всё оплачено.'
     return allSuppliers.length === 0
       ? 'Поставщики ещё не синхронизированы. Выполните синхронизацию с UMAG.'
       : 'По вашему запросу ничего не найдено.'
@@ -1327,7 +1376,11 @@ export default function UmagSettlementsPanel({
     <>
       {selected ? (
         <UmagSupplierDetail
-          supplier={{ ...selected, debt: debtByPlatformId.get(selected.id) ?? null }}
+          supplier={{
+            ...selected,
+            debt: debtByPlatformId.get(selected.id) ?? null,
+            overdueAmount: debtSummary.get(selected.id)?.overdueAmount ?? 0,
+          }}
           filterSlot={filterSlot}
           canViewFinance={canViewFinance}
           canEditSupplier={canEdit}
@@ -1405,9 +1458,12 @@ export default function UmagSettlementsPanel({
               <div className="umag-settlements__ops-filters" role="tablist" aria-label="Какие поставщики показывать">
                 {[
                   { id: 'debt', label: 'С долгом', count: withDebtCount },
+                  ...(overdueSuppliersCount > 0
+                    ? [{ id: 'overdue', label: 'Просрочено', count: overdueSuppliersCount, tone: 'danger' }]
+                    : []),
                   { id: 'all', label: 'Все', count: 0 },
                 ].map((opt) => {
-                  const active = !searchingList && (opt.id === 'debt') === debtOnly
+                  const active = !searchingList && opt.id === listView
                   return (
                     <button
                       key={opt.id}
@@ -1417,11 +1473,19 @@ export default function UmagSettlementsPanel({
                       className={`umag-settlements__ops-filter${active ? ' umag-settlements__ops-filter--active' : ''}`}
                       onClick={() => {
                         setListQuery('')
-                        setDebtOnly(opt.id === 'debt')
+                        setListView(opt.id)
                       }}
                     >
                       {opt.label}
-                      {opt.count ? <span className="umag-settlements__ops-filter-count">{opt.count}</span> : null}
+                      {opt.count ? (
+                        <span
+                          className={`umag-settlements__ops-filter-count${
+                            opt.tone === 'danger' ? ' umag-settlements__ops-filter-count--danger' : ''
+                          }`}
+                        >
+                          {opt.count}
+                        </span>
+                      ) : null}
                     </button>
                   )
                 })}
@@ -1446,7 +1510,8 @@ export default function UmagSettlementsPanel({
               <PgtHead columns={listColumns} />
               {filtered.map((s) => {
                 const debt = debtByPlatformId.get(s.id) ?? null
-                const meta = describeOpenDocuments(debtSummary.get(s.id))
+                const entry = debtSummary.get(s.id)
+                const meta = describeOpenDocuments(entry)
                 return (
                   <PgtRow
                     key={s.id}
@@ -1461,7 +1526,19 @@ export default function UmagSettlementsPanel({
                           >
                             {s.name}
                           </button>
-                          {meta ? <span className="umag-settlements__supplier-meta">{meta}</span> : null}
+                          {meta ? (
+                            <span className="umag-settlements__supplier-meta">
+                              {meta}
+                              {entry?.overdueCount ? (
+                                <>
+                                  {' · '}
+                                  <span className="umag-settlements__due umag-settlements__due--overdue">
+                                    просрочено {entry.overdueCount}
+                                  </span>
+                                </>
+                              ) : null}
+                            </span>
+                          ) : null}
                         </span>
                       ),
                       balance: (
