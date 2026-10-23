@@ -105,4 +105,29 @@ assert.match(sheet, /if \(accountTouched\) return/)
 assert.match(panel, /defaultAccountId=\{supplier\.isVirtual \? null : supplier\.paymentAccountId \?\? null\}/)
 ok("pay window preselects the supplier's own account (none for «Поставщик не выбран»); a hand-picked account is kept")
 
+// --- Bulk payment ------------------------------------------------------------------------------
+const { markObligationsPaid } = await load('src/services/supplierPaymentObligationsService.js')
+const progress = []
+const outcome = await markObligationsPaid(
+  [{ id: 'o1' }, { id: 'o2' }, { id: 'o3' }],
+  {},
+  { onProgress: (done, total) => progress.push([done, total]) }
+)
+// No Supabase in this environment, so every single mark fails — the point is that failures are collected per
+// document, nothing throws, and progress is reported for each one.
+assert.deepEqual(outcome.paid, [])
+assert.deepEqual(outcome.failed.map((f) => f.id).sort(), ['o1', 'o2', 'o3'])
+assert.ok(outcome.failed.every((f) => f.message))
+assert.deepEqual(progress.map(([done]) => done), [1, 2, 3])
+assert.ok(progress.every(([, total]) => total === 3))
+ok('bulk pay: one failure never stops the rest; every document is reported (paid / failed) and progress is emitted')
+assert.deepEqual(await markObligationsPaid([], {}), { paid: [], failed: [] })
+ok('bulk pay: an empty selection is a no-op')
+assert.match(panel, /function isBulkPayable\(op, canManage\)/)
+assert.match(panel, /Only what is on screen counts/)
+assert.match(panel, /<ConfirmDialog\s*\n\s*title="Оплатить выбранные накладные\?"/)
+assert.match(panel, /confirmVariant="primary"/)
+assert.match(panel, /Оплатить выбранные/)
+ok('unpaid supplies are tickable (not returns), the bar totals only what is on screen, and paying asks for confirmation first')
+
 console.log(`\nverify:supplier-card-ux — ${checks} checks passed`)

@@ -57,6 +57,7 @@ import {
 } from '../../../services/umagSettlementsService'
 import {
   markObligationPaid,
+  markObligationsPaid,
   markReturnRefunded,
   refreshObligationTermsForSupplier,
   unmarkObligationPaid,
@@ -113,6 +114,40 @@ function operationDetailsLabel(op) {
   }
   return (
     [op.source?.umag_user_name, op.source?.account].filter(Boolean).join(' · ') || 'UMAG'
+  )
+}
+
+/** Obligation payload for markObligationPaid, built from a history row. */
+function obligationFromOp(op, supplier) {
+  return {
+    id: op.settlement.obligationId,
+    originalSupplyAmount: op.source?.obligation?.original_supply_amount,
+    platformSupplierId: supplier.isVirtual ? null : supplier.id,
+    supplierName: supplier.isVirtual ? null : supplier.name,
+    umagSupplyId: op.source?.umag_supply_id,
+  }
+}
+
+/** An unpaid supply can be ticked for «Оплатить выбранные» (returns are marked one by one). */
+function isBulkPayable(op, canManage) {
+  return Boolean(canManage && op.settlement?.type === 'payable' && !op.settlement.settled)
+}
+
+/** Header checkbox of the selection column: checked / indeterminate / empty. */
+function SelectAllCheckbox({ total, selected, onToggle }) {
+  const ref = useRef(null)
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = selected > 0 && selected < total
+  }, [selected, total])
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      className="umag-settlements__check"
+      checked={total > 0 && selected === total}
+      onChange={onToggle}
+      aria-label="Выбрать все неоплаченные накладные"
+    />
   )
 }
 
@@ -361,6 +396,107 @@ function UmagSupplierDetail({
     return base.filter((op) => matchesOperationQuery(op, opsQuery))
   }, [operations, opsFilter, opsQuery, searching])
 
+  // ---- «Оплатить выбранные»: tick unpaid supplies, pay them with one account in one go ----
+  const [selectedIds, setSelectedIds] = useState(() => new Set())
+  const [bulkAccountId, setBulkAccountId] = useState('')
+  const [bulkAccountTouched, setBulkAccountTouched] = useState(false)
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false)
+  const [bulkProgress, setBulkProgress] = useState(null)
+  const selectableOps = useMemo(
+    () => visibleOps.filter((op) => isBulkPayable(op, canManagePayments)),
+    [visibleOps, canManagePayments]
+  )
+  // Only what is on screen counts: a ticked document hidden by another filter is neither shown in the total nor paid.
+  const selectedOps = useMemo(
+    () => selectableOps.filter((op) => selectedIds.has(op.id)),
+    [selectableOps, selectedIds]
+  )
+  const selectedTotal = selectedOps.reduce((sum, op) => sum + (Number(op.amount) || 0), 0)
+
+  useEffect(() => {
+    if (bulkAccountTouched) return
+    const preferred = supplier.isVirtual ? null : supplier.paymentAccountId
+    setBulkAccountId(preferred && paymentAccounts.some((account) => account.id === preferred) ? preferred : '')
+  }, [paymentAccounts, supplier.isVirtual, supplier.paymentAccountId, bulkAccountTouched])
+
+  function toggleSelected(id) {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((current) => {
+      const next = new Set(current)
+      const allOn = selectableOps.length > 0 && selectableOps.every((op) => next.has(op.id))
+      for (const op of selectableOps) {
+        if (allOn) next.delete(op.id)
+        else next.add(op.id)
+      }
+      return next
+    })
+  }
+
+  const historyColumns = useMemo(
+    () =>
+      selectableOps.length > 0
+        ? [
+            {
+              key: 'select',
+              label: (
+                <SelectAllCheckbox
+                  total={selectableOps.length}
+                  selected={selectedOps.length}
+                  onToggle={toggleSelectAll}
+                />
+              ),
+              width: 40,
+              mobile: 'hide',
+            },
+            ...HISTORY_COLUMNS,
+          ]
+        : HISTORY_COLUMNS,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectableOps, selectedOps.length]
+  )
+
+  async function handleBulkPay() {
+    const accountId = bulkAccountId || null
+    const ops = selectedOps
+    setBulkProgress({ done: 0, total: ops.length })
+    try {
+      const { paid, failed } = await markObligationsPaid(
+        ops.map((op) => obligationFromOp(op, supplier)),
+        {
+          paidByEmployeeId: user?.id ?? null,
+          accountId,
+          employeeName: user?.name ?? null,
+          accountName: getPaymentAccountName(accountId),
+        },
+        { onProgress: (done, total) => setBulkProgress({ done, total }) }
+      )
+      const paidOpIds = new Set(
+        ops.filter((op) => paid.includes(op.settlement.obligationId)).map((op) => op.id)
+      )
+      setSelectedIds((current) => new Set([...current].filter((id) => !paidOpIds.has(id))))
+      if (failed.length === 0) {
+        showSuccess?.(`Оплачено: ${paid.length} ${paid.length === 1 ? 'накладная' : 'накладных'}`)
+      } else {
+        showError?.(
+          `Оплачено ${paid.length} из ${ops.length}. Не удалось отметить ${failed.length}: ${failed[0].message}. Они остались выбранными.`
+        )
+      }
+      setReloadToken((token) => token + 1)
+      onSyncComplete?.()
+    } finally {
+      setBulkProgress(null)
+      setBulkConfirmOpen(false)
+    }
+  }
+
   async function handleUnmarkPayment(obligationId) {
     try {
       await unmarkObligationPaid(obligationId)
@@ -376,15 +512,8 @@ function UmagSupplierDetail({
   async function handleSettle(op, accountId) {
     try {
       if (op.settlement?.type === 'payable') {
-        const obligation = op.source?.obligation
         await markObligationPaid(
-          {
-            id: op.settlement.obligationId,
-            originalSupplyAmount: obligation?.original_supply_amount,
-            platformSupplierId: supplier.isVirtual ? null : supplier.id,
-            supplierName: supplier.isVirtual ? null : supplier.name,
-            umagSupplyId: op.source?.umag_supply_id,
-          },
+          obligationFromOp(op, supplier),
           {
             paidByEmployeeId: user?.id ?? null,
             accountId,
@@ -568,30 +697,45 @@ function UmagSupplierDetail({
                 ) : null}
               </div>
             ) : (
-              <PgtTable columns={HISTORY_COLUMNS}>
-                <PgtHead columns={HISTORY_COLUMNS} />
+              <PgtTable columns={historyColumns}>
+                <PgtHead columns={historyColumns} />
                 {visibleOps.map((op) => {
                   const sign = operationAmountSign(op)
                   const sub = operationSubline(op)
                   const statusNode = (
                     <OperationStatusCell op={op} canManage={canManagePayments} onOpen={setSelectedOperation} />
                   )
+                  const selectable = isBulkPayable(op, canManagePayments)
+                  const tick = selectable ? (
+                    <input
+                      type="checkbox"
+                      className="umag-settlements__check"
+                      checked={selectedIds.has(op.id)}
+                      onChange={() => toggleSelected(op.id)}
+                      aria-label={`Выбрать накладную № ${op.documentNumber}`}
+                    />
+                  ) : null
                   return (
                     <PgtRow
                       key={op.id}
-                      columns={HISTORY_COLUMNS}
+                      columns={historyColumns}
+                      className={selectable && selectedIds.has(op.id) ? 'umag-settlements__row--selected' : ''}
                       cells={{
+                        select: tick,
                         date: <span className="umag-settlements__date">{formatUmagDate(op.sortAt)}</span>,
                         op: (
-                          <span className="umag-settlements__op">
-                            <button
-                              type="button"
-                              className="umag-settlements__op-link"
-                              onClick={() => setSelectedOperation(op)}
-                            >
-                              {op.label}
-                            </button>
-                            {sub ? <span className="umag-settlements__op-sub">{sub}</span> : null}
+                          <span className="umag-settlements__op-wrap">
+                            {tick ? <span className="umag-settlements__op-select">{tick}</span> : null}
+                            <span className="umag-settlements__op">
+                              <button
+                                type="button"
+                                className="umag-settlements__op-link"
+                                onClick={() => setSelectedOperation(op)}
+                              >
+                                {op.label}
+                              </button>
+                              {sub ? <span className="umag-settlements__op-sub">{sub}</span> : null}
+                            </span>
                           </span>
                         ),
                         amount: (
@@ -614,6 +758,68 @@ function UmagSupplierDetail({
                 })}
               </PgtTable>
             )}
+
+            {selectedOps.length > 0 ? (
+              <div className="umag-settlements__bulk" role="region" aria-label="Оплата выбранных накладных">
+                <div className="umag-settlements__bulk-sum">
+                  <strong>
+                    Выбрано {selectedOps.length}
+                  </strong>
+                  <span>{formatUmagMoney(selectedTotal)}</span>
+                </div>
+                <select
+                  className="umag-settlements__bulk-account"
+                  value={bulkAccountId}
+                  onChange={(event) => {
+                    setBulkAccountTouched(true)
+                    setBulkAccountId(event.target.value)
+                  }}
+                  aria-label="Счёт оплаты"
+                  disabled={bulkProgress != null}
+                >
+                  <option value="">Без счёта</option>
+                  {paymentAccounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  className="btn btn--outline"
+                  onClick={() => setSelectedIds(new Set())}
+                  disabled={bulkProgress != null}
+                >
+                  Сбросить
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => setBulkConfirmOpen(true)}
+                  disabled={bulkProgress != null}
+                >
+                  Оплатить выбранные
+                </button>
+              </div>
+            ) : null}
+
+            {bulkConfirmOpen ? (
+              <ConfirmDialog
+                title="Оплатить выбранные накладные?"
+                message={`Будет отмечено оплаченными: ${selectedOps.length} ${
+                  selectedOps.length === 1 ? 'накладная' : 'накладных'
+                } на сумму ${formatUmagMoney(selectedTotal)}. Счёт: ${
+                  bulkAccountId ? getPaymentAccountName(bulkAccountId) || 'выбранный' : 'без счёта'
+                }. Каждую оплату можно отменить в окне документа.${
+                  bulkProgress ? ` Оплачено ${bulkProgress.done} из ${bulkProgress.total}…` : ''
+                }`}
+                confirmLabel="Оплатить"
+                confirmVariant="primary"
+                onCancel={() => (bulkProgress ? null : setBulkConfirmOpen(false))}
+                onConfirm={handleBulkPay}
+                loading={bulkProgress != null}
+              />
+            ) : null}
           </section>
         </>
       ) : null}
