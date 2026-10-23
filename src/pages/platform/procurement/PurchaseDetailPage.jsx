@@ -506,10 +506,12 @@ export default function PurchaseDetailPage() {
           <dt>Ожидаемая доставка</dt>
           <dd>{formatPurchaseDate(order.expectedDeliveryDate)}</dd>
         </div>
-        <div className="purchase-detail__meta-wide">
-          <dt>Комментарий</dt>
-          <dd>{order.comment || '—'}</dd>
-        </div>
+        {order.comment ? (
+          <div className="purchase-detail__meta-wide">
+            <dt>Комментарий</dt>
+            <dd>{order.comment}</dd>
+          </div>
+        ) : null}
         <div>
           <dt>Сумма заказа</dt>
           <dd className="purchase-detail__total">{formatPurchaseAmount(totalAmount)}</dd>

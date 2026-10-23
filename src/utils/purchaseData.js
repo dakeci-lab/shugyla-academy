@@ -106,6 +106,17 @@ export function calcOrderTotal(items) {
   return items.reduce((sum, item) => sum + calcLineTotal(item.orderQty, item.purchasePrice), 0)
 }
 
+/**
+ * Раньше формирование заказа из планирования само писало в комментарий эту фразу (миграция этапа 21
+ * убрала запись); приёмщику она ничего не говорит, поэтому служебный текст считается пустым комментарием.
+ */
+const AUTO_ORDER_COMMENT = 'Сформировано из планирования закупок'
+
+export function orderCommentForDisplay(comment) {
+  const text = String(comment ?? '').trim()
+  return text === AUTO_ORDER_COMMENT ? '' : text
+}
+
 export function normalizePurchaseOrder(raw) {
   if (!raw) return null
   const items = (raw.items || []).map(normalizePurchaseItem)
@@ -121,7 +132,7 @@ export function normalizePurchaseOrder(raw) {
     createdBy: raw.createdBy ?? raw.created_by ?? '',
     createdByName: raw.createdByName ?? raw.created_by_name ?? '',
     expectedDeliveryDate: raw.expectedDeliveryDate ?? raw.expected_delivery_date ?? '',
-    comment: raw.comment ?? '',
+    comment: orderCommentForDisplay(raw.comment),
     transferredToReceiving: raw.transferredToReceiving ?? raw.transferred_to_receiving ?? false,
     receivingDocumentId: raw.receivingDocumentId ?? raw.receiving_document_id ?? null,
     workflowMode: getWorkflowMode(raw),

@@ -4,7 +4,12 @@ import {
 } from '../../utils/purchaseData'
 import './PurchaseItemsTable.css'
 
-/** Таблица позиций закупа */
+/**
+ * Таблица позиций заказа. Для приёмщика — только то, что нужно при приёмке: товар, штрихкод,
+ * сколько заказано, цена, сумма. Остаток / продажи в день / рекомендация — аналитика закупщика,
+ * показывается лишь при редактировании черновика. Пустое значение — пустая ячейка, без «—»;
+ * колонка «Комментарий» есть, только если хоть у одной позиции он заполнен.
+ */
 export default function PurchaseItemsTable({
   items,
   canEditItems = false,
@@ -27,20 +32,23 @@ export default function PurchaseItemsTable({
     )
   }
 
+  const showAnalytics = canEditItems
+  const showComment = items.some((item) => String(item.comment ?? '').trim() !== '')
+
   return (
     <div className="purchase-items-wrap">
-      <table className="purchase-items admin-table">
+      <table className={`purchase-items admin-table${showAnalytics ? '' : ' purchase-items--receiver'}`}>
         <thead>
           <tr>
             <th>Наименование товара</th>
             <th>Штрихкод</th>
-            <th>Остаток</th>
-            <th>Продажи/день</th>
-            <th>Рекомендация</th>
+            {showAnalytics && <th>Остаток</th>}
+            {showAnalytics && <th>Продажи/день</th>}
+            {showAnalytics && <th>Рекомендация</th>}
             <th>Заказать</th>
             <th>Закупочная цена</th>
             <th>Сумма</th>
-            <th>Комментарий</th>
+            {showComment && <th>Комментарий</th>}
             {canEditItems && <th>Действия</th>}
           </tr>
         </thead>
@@ -48,14 +56,14 @@ export default function PurchaseItemsTable({
           {items.map((item) => (
             <tr key={item.id}>
               <td>{item.productName}</td>
-              <td className="purchase-items__barcode">{item.barcode || '—'}</td>
-              <td>{item.stock}</td>
-              <td>{item.salesPerDay}</td>
-              <td className="purchase-items__rec">{item.recommendation}</td>
+              <td className="purchase-items__barcode">{item.barcode}</td>
+              {showAnalytics && <td>{item.stock}</td>}
+              {showAnalytics && <td>{item.salesPerDay}</td>}
+              {showAnalytics && <td className="purchase-items__rec">{item.recommendation}</td>}
               <td>{item.orderQty}</td>
               <td>{formatPurchaseAmount(item.purchasePrice)}</td>
               <td>{formatPurchaseAmount(calcLineTotal(item.orderQty, item.purchasePrice))}</td>
-              <td>{item.comment || '—'}</td>
+              {showComment && <td>{item.comment}</td>}
               {canEditItems && (
                 <td className="purchase-items__actions">
                   <button

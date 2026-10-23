@@ -35,6 +35,10 @@
   border-bottom: none;
 }
 
+.purchase-items--receiver {
+  min-width: 640px;
+}
+
 .purchase-items__barcode {
   font-family: ui-monospace, monospace;
   font-size: 13px;
