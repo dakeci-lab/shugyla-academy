@@ -1,0 +1,1 @@
+import{aq as l}from"./index-Xrd3Suun.js";function h({permission:s,anyOf:e,allOf:t,fallback:i=null,children:o}){const{can:r,canAny:c,canAll:u}=l();let n=!1;return s?n=r(s):e!=null&&e.length?n=c(e):t!=null&&t.length&&(n=u(t)),n?o:i}export{h as C};

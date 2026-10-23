@@ -1,0 +1,1 @@
+import{r as s}from"./vendor-react-3fhDY5EL.js";import{t as u}from"./index-Xrd3Suun.js";function l(){const{version:r,reload:t,notifyChange:a}=u(),[n,o]=s.useState(0),i=s.useCallback(async()=>{await t(),o(e=>e+1)},[t]),c=s.useCallback(()=>{a(),o(e=>e+1)},[a]);return{version:n+r,refresh:i,notifyChange:c}}export{l as u};
