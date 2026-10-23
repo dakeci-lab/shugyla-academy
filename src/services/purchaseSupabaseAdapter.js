@@ -41,6 +41,8 @@ function rowToOrder(row, items = []) {
     comment: row.comment,
     transferred_to_receiving: row.transferred_to_receiving,
     receiving_document_id: row.receiving_document_id,
+    checked_at: row.checked_at,
+    checked_by_name: row.checked_by_name,
     workflow_mode: row.workflow_mode,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -103,6 +105,8 @@ function orderPatchToRow(patch) {
   if (patch.receivingDocumentId !== undefined) {
     row.receiving_document_id = patch.receivingDocumentId || null
   }
+  if (patch.checkedAt !== undefined) row.checked_at = patch.checkedAt || null
+  if (patch.checkedByName !== undefined) row.checked_by_name = patch.checkedByName || null
   if (patch.workflowMode !== undefined) {
     row.workflow_mode = patch.workflowMode
   }

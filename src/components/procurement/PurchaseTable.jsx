@@ -21,6 +21,7 @@ export default function PurchaseTable({
 }) {
   const navigate = useNavigate()
   const showStatus = orders.some((order) => isPurchaseStatusShown(order.status))
+  const showChecked = orders.some((order) => order.checkedAt)
   const canCancel = (order) => canEdit && order.status !== 'cancelled' && order.status !== 'received'
   const showActions = canEdit && orders.some(canCancel)
 
@@ -31,6 +32,7 @@ export default function PurchaseTable({
     { key: 'items', label: 'Товаров', width: 80, align: 'end', mobile: 'hide' },
     { key: 'amount', label: 'Сумма', width: 130, align: 'end', mobile: 'end' },
     ...(showStatus ? [{ key: 'status', label: 'Статус', width: 130, mobile: 'hide' }] : []),
+    ...(showChecked ? [{ key: 'checked', label: 'Сверено', width: 150, mobile: 'hide' }] : []),
     { key: 'created', label: 'Создан', width: 150, mobile: 'hide' },
     { key: 'creator', label: 'Создал', width: 170, mobile: 'hide' },
     ...(showActions ? [{ key: 'actions', label: '', width: 44, align: 'end', mobile: 'hide' }] : []),
@@ -61,6 +63,11 @@ export default function PurchaseTable({
               items: <span>{order.itemsCount ?? order.items?.length ?? 0}</span>,
               amount: <span className="pgt__money">{formatPurchaseAmount(order.totalAmount)}</span>,
               status: <PurchaseStatusBadge status={order.status} />,
+              checked: order.checkedAt ? (
+                <span className="pgt__checked" title={order.checkedByName || undefined}>
+                  ✓ {formatPurchaseDateTime(order.checkedAt)}
+                </span>
+              ) : null,
               creator: <span>{order.createdByName || '—'}</span>,
               delivery: <span>{formatPurchaseDate(order.expectedDeliveryDate)}</span>,
               actions: cancellable ? (
@@ -78,6 +85,7 @@ export default function PurchaseTable({
             mobileMeta={[
               `${order.itemsCount ?? order.items?.length ?? 0} тов.`,
               formatPurchaseDate(order.expectedDeliveryDate),
+              order.checkedAt ? '✓ сверено' : '',
               order.createdByName,
             ]
               .filter(Boolean)

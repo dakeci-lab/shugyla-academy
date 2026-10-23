@@ -135,6 +135,8 @@ export function normalizePurchaseOrder(raw) {
     comment: orderCommentForDisplay(raw.comment),
     transferredToReceiving: raw.transferredToReceiving ?? raw.transferred_to_receiving ?? false,
     receivingDocumentId: raw.receivingDocumentId ?? raw.receiving_document_id ?? null,
+    checkedAt: raw.checkedAt ?? raw.checked_at ?? null,
+    checkedByName: raw.checkedByName ?? raw.checked_by_name ?? '',
     workflowMode: getWorkflowMode(raw),
     syncStatus: raw.syncStatus ?? raw.sync_status ?? null,
     syncError: raw.syncError ?? raw.sync_error ?? null,

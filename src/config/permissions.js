@@ -408,6 +408,11 @@ export function canViewReceivingDocuments(user) {
   return canAccessRoute(user, ROUTE_KEYS.RECEIVING)
 }
 
+/** «Сверено» на заказе ставит приёмщик (право на приёмку), а не закупщик. */
+export function canMarkOrderChecked(user) {
+  return canViewReceivingDocuments(user)
+}
+
 export function isSimplePurchaseReceived(order) {
   return order?.status === 'received'
 }

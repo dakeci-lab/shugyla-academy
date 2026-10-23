@@ -224,3 +224,9 @@
     display: block;
   }
 }
+
+.pgt__checked {
+  color: #047857;
+  font-weight: 600;
+  white-space: nowrap;
+}

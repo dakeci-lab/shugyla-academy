@@ -85,6 +85,19 @@ export async function updatePurchaseOrder(orderId, updates) {
   return result
 }
 
+/**
+ * Приёмщик отметил заказ «Сверено» (всё сошлось с накладной). Отметка общая — её видят в списке заказов.
+ * `checked = false` снимает отметку.
+ */
+export async function setPurchaseOrderChecked(orderId, checked, user) {
+  return updatePurchaseOrder(
+    orderId,
+    checked
+      ? { checkedAt: new Date().toISOString(), checkedByName: user?.name || user?.login || '' }
+      : { checkedAt: null, checkedByName: null }
+  )
+}
+
 export async function cancelPurchaseOrder(orderId) {
   if (isCloudMode()) {
     await cloud.cancelPurchaseOrderCloud(orderId)
@@ -103,6 +116,8 @@ export async function returnPurchaseOrderToDraft(orderId) {
   const result = isCloudMode()
     ? await cloud.returnPurchaseOrderToDraftCloud(orderId)
     : await local.returnPurchaseOrderToDraft(orderId)
+  // A draft is changed and sent again — the old «сверено» no longer describes it.
+  await updatePurchaseOrder(orderId, { checkedAt: null, checkedByName: null }).catch(() => {})
   await afterPurchaseMutation()
   return result
 }
