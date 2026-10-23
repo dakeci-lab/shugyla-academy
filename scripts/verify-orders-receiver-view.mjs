@@ -67,10 +67,39 @@ assert.ok(head.indexOf('purchase-items__check-col') < head.indexOf('purchase-ite
 assert.ok(head.indexOf('purchase-items__num-col') < head.indexOf('Наименование товара'))
 ok('items table: checkbox column first, «№» second, then the product')
 assert.match(table, /\{index \+ 1\}/)
-assert.match(table, /const \[checkedIds, setCheckedIds\] = useState\(\(\) => new Set\(\)\)/)
-assert.doesNotMatch(table, /localStorage|sessionStorage|supabase|fetch\(|indexedDB/)
-ok('row numbers are 1-based; «сверено» marks are plain component state — never saved anywhere')
+assert.match(table, /const \[checkedIds, setCheckedIds\] = useState\(/)
+assert.doesNotMatch(table, /supabase|fetch\(|indexedDB/)
+ok('row numbers are 1-based; «сверено» marks never touch the database')
 assert.match(table, /Сверено: \{checkedCount\} из \{items\.length\}/)
 ok('a «Сверено: N из M» counter is shown above the table')
+
+// --- Ticks remembered in the receiver's browser -------------------------------------------------
+const { loadOrderChecklist, saveOrderChecklist, CHECKLIST_TTL_MS } = await import(
+  pathToFileURL(path.join(ROOT, 'src/utils/orderChecklistStorage.js')).href
+)
+const makeStorage = () => {
+  const m = new Map()
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, v) }
+}
+const st = makeStorage()
+saveOrderChecklist('o1', new Set(['a', 'b']), { storage: st, now: 1000 })
+saveOrderChecklist('o2', new Set(['x']), { storage: st, now: 1000 })
+assert.deepEqual([...loadOrderChecklist('o1', { storage: st, now: 2000 })].sort(), ['a', 'b'])
+assert.deepEqual([...loadOrderChecklist('o2', { storage: st, now: 2000 })], ['x'])
+assert.equal(loadOrderChecklist('o3', { storage: st, now: 2000 }).size, 0)
+ok('ticks are stored per order and read back')
+saveOrderChecklist('o1', new Set(), { storage: st, now: 3000 })
+assert.equal(loadOrderChecklist('o1', { storage: st, now: 3000 }).size, 0)
+ok('unticking everything removes the order entry')
+assert.equal(loadOrderChecklist('o2', { storage: st, now: 1000 + CHECKLIST_TTL_MS + 1 }).size, 0)
+ok('entries older than 30 days are dropped')
+const broken = { getItem: () => '{not json', setItem: () => { throw new Error('quota') } }
+assert.equal(loadOrderChecklist('o1', { storage: broken }).size, 0)
+saveOrderChecklist('o1', new Set(['a']), { storage: broken })
+assert.equal(loadOrderChecklist('o1', { storage: null }).size, 0)
+ok('broken / blocked / missing storage never throws — ticks just are not remembered')
+assert.match(table, /loadOrderChecklist\(checklistKey\)/)
+assert.match(read('src/pages/platform/procurement/PurchaseDetailPage.jsx'), /checklistKey=\{order\.id\}/)
+ok('the order card passes its id, so every order keeps its own ticks')
 
 console.log(`\nverify:orders-receiver-view — ${checks} checks passed`)

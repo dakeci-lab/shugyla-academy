@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   formatPurchaseAmount,
   calcLineTotal,
 } from '../../utils/purchaseData'
+import { loadOrderChecklist, saveOrderChecklist } from '../../utils/orderChecklistStorage'
 import './PurchaseItemsTable.css'
 
 /**
@@ -11,7 +12,7 @@ import './PurchaseItemsTable.css'
  * показывается лишь при редактировании черновика. Пустое значение — пустая ячейка, без «—»;
  * колонка «Комментарий» есть, только если хоть у одной позиции он заполнен.
  * Слева — галочка «сверено» и порядковый номер строки: отметки живут только в этом окне браузера
- * (никуда не сохраняются), нужны приёмщику, чтобы сверять товар по накладной штучно.
+ * (в базу не пишутся, помнятся в браузере приёмщика), нужны приёмщику, чтобы сверять товар по накладной штучно.
  */
 export default function PurchaseItemsTable({
   items,
@@ -19,8 +20,20 @@ export default function PurchaseItemsTable({
   onEdit,
   onDelete,
   onAdd,
+  checklistKey = null,
 }) {
-  const [checkedIds, setCheckedIds] = useState(() => new Set())
+  // Ticks are remembered in this browser per order (see orderChecklistStorage), never in the database.
+  const [checkedIds, setCheckedIds] = useState(() => loadOrderChecklist(checklistKey))
+  const loadedKey = useRef(checklistKey)
+
+  useEffect(() => {
+    if (loadedKey.current !== checklistKey) {
+      loadedKey.current = checklistKey
+      setCheckedIds(loadOrderChecklist(checklistKey))
+      return
+    }
+    saveOrderChecklist(checklistKey, checkedIds)
+  }, [checklistKey, checkedIds])
 
   function toggleChecked(id) {
     setCheckedIds((current) => {
