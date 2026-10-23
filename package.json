@@ -69,6 +69,7 @@
     "verify:supplier-settle-in-history": "node scripts/verify-supplier-settle-in-history.mjs",
     "verify:supplier-unassigned-row": "node scripts/verify-supplier-unassigned-row.mjs",
     "verify:umag-sync-speed": "node scripts/verify-umag-sync-speed.mjs",
+    "verify:orders-receiver-view": "node scripts/verify-orders-receiver-view.mjs",
     "verify:supplier-finance-detail-sheets-portal": "node scripts/verify-supplier-finance-detail-sheets-portal.mjs",
     "verify:supplier-finance-nav-cutover": "node scripts/verify-supplier-finance-nav-cutover.mjs",
     "verify:supplier-ledger": "node scripts/verify-supplier-ledger.mjs",
