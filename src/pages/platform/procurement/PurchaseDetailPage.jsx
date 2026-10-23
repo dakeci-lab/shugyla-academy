@@ -7,12 +7,14 @@ import {
   canViewOrders,
   canEditPurchase,
   canTransferToReceiving,
+  canMarkOrderChecked,
 } from '../../../config/permissions'
 import {
   getPurchaseOrderByIdSync,
   getPurchaseOrderById,
   cancelPurchaseOrder,
   returnPurchaseOrderToDraft,
+  setPurchaseOrderChecked,
   transferPurchaseToReceiving,
   addPurchaseOrderItem,
   updatePurchaseOrderItem,
@@ -25,6 +27,7 @@ import {
 import { isSimpleWorkflow } from '../../../utils/procurementWorkflow'
 import {
   formatPurchaseDate,
+  formatPurchaseDateTime,
   formatPurchaseAmount,
   calcLineTotal,
   canReturnPurchaseToDraft,
@@ -72,12 +75,14 @@ export default function PurchaseDetailPage() {
   const [loadingOrder, setLoadingOrder] = useState(true)
   const [loadedReceiving, setLoadedReceiving] = useState(null)
   const [returningToDraft, setReturningToDraft] = useState(false)
+  const [markingChecked, setMarkingChecked] = useState(false)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exportMenuRef = useRef(null)
 
   const canView = canViewOrders(user)
   const canEdit = canEditPurchase(user)
   const canTransfer = canTransferToReceiving(user)
+  const canMarkChecked = canMarkOrderChecked(user)
 
   void version
 
@@ -86,6 +91,9 @@ export default function PurchaseDetailPage() {
   const displayItems = order?.items ?? []
   const alreadyTransferred = Boolean(order?.transferredToReceiving || order?.receivingDocumentId)
   const canEditItems = canEdit && order?.status === PURCHASE_STATUS.DRAFT
+  // «Сверено» only makes sense for an order that is on its way to / at the warehouse.
+  const canShowCheckedMark =
+    order?.status !== PURCHASE_STATUS.DRAFT && order?.status !== PURCHASE_STATUS.CANCELLED
 
   const receivingDocId = order?.receivingDocumentId || null
   const cachedReceiving = useMemo(
@@ -340,6 +348,21 @@ export default function PurchaseDetailPage() {
     }
   }
 
+  async function handleToggleChecked(checked) {
+    if (markingChecked) return
+    setError('')
+    setMessage('')
+    setMarkingChecked(true)
+    try {
+      await setPurchaseOrderChecked(order.id, checked, user)
+      await refresh()
+    } catch (err) {
+      setError(toProcurementUserMessage(err, 'Не удалось сохранить отметку.'))
+    } finally {
+      setMarkingChecked(false)
+    }
+  }
+
   async function handleReturnToDraft() {
     if (!canReturnToDraft || returningToDraft) return
     if (
@@ -526,7 +549,34 @@ export default function PurchaseDetailPage() {
               + Добавить товар
             </button>
           )}
+          {canShowCheckedMark && !order.checkedAt && canMarkChecked && (
+            <button
+              type="button"
+              className="btn btn--primary btn--sm"
+              onClick={() => void handleToggleChecked(true)}
+              disabled={markingChecked}
+            >
+              Всё сверено
+            </button>
+          )}
         </div>
+        {canShowCheckedMark && order.checkedAt && (
+          <p className="purchase-detail__checked">
+            <span>
+              ✓ Сверено{order.checkedByName ? `: ${order.checkedByName}` : ''}, {formatPurchaseDateTime(order.checkedAt)}
+            </span>
+            {canMarkChecked && (
+              <button
+                type="button"
+                className="btn btn--ghost btn--sm"
+                onClick={() => void handleToggleChecked(false)}
+                disabled={markingChecked}
+              >
+                Снять отметку
+              </button>
+            )}
+          </p>
+        )}
         <PurchaseItemsTable
           items={displayItems}
           canEditItems={canEditItems}
