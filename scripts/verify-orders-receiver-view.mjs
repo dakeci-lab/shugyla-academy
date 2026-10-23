@@ -60,4 +60,17 @@ const keys = [...list.slice(list.indexOf('const columns = ['), list.indexOf(']\n
 assert.deepEqual(keys.filter((key) => key !== 'actions'), ['delivery', 'supplier', 'items', 'amount', 'status', 'created', 'creator'])
 ok('orders list: delivery and supplier first, created / creator last')
 
+// Checklist: checkbox first, row number second, nothing persisted.
+const headStart = table.indexOf('<thead>')
+const head = table.slice(headStart, table.indexOf('</thead>'))
+assert.ok(head.indexOf('purchase-items__check-col') < head.indexOf('purchase-items__num-col'))
+assert.ok(head.indexOf('purchase-items__num-col') < head.indexOf('Наименование товара'))
+ok('items table: checkbox column first, «№» second, then the product')
+assert.match(table, /\{index \+ 1\}/)
+assert.match(table, /const \[checkedIds, setCheckedIds\] = useState\(\(\) => new Set\(\)\)/)
+assert.doesNotMatch(table, /localStorage|sessionStorage|supabase|fetch\(|indexedDB/)
+ok('row numbers are 1-based; «сверено» marks are plain component state — never saved anywhere')
+assert.match(table, /Сверено: \{checkedCount\} из \{items\.length\}/)
+ok('a «Сверено: N из M» counter is shown above the table')
+
 console.log(`\nverify:orders-receiver-view — ${checks} checks passed`)

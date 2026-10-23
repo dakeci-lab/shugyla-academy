@@ -36,7 +36,39 @@
 }
 
 .purchase-items--receiver {
-  min-width: 640px;
+  min-width: 720px;
+}
+
+.purchase-items__progress {
+  margin: 0;
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.purchase-items__check-col {
+  width: 44px;
+  padding-right: 0;
+  text-align: center;
+}
+
+.purchase-items__num-col {
+  width: 48px;
+  color: var(--color-text-secondary);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.purchase-items__check {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: var(--color-primary, #059669);
+}
+
+.purchase-items__row--checked td {
+  background: var(--color-primary-light, #ecfdf5);
 }
 
 .purchase-items__barcode {
