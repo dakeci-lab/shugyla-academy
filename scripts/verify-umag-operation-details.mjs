@@ -61,7 +61,7 @@ function main() {
   const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
   assert.match(panel, /OperationDetailSheet/)
   assert.match(panel, /setSelectedOperation/)
-  assert.match(panel, /umag-settlements__op-badge--button/)
+  assert.match(panel, /umag-settlements__op-link/)
   assert.doesNotMatch(panel, /ReturnDetailModal/)
   ok('settlements history opens shared detail sheet')
 

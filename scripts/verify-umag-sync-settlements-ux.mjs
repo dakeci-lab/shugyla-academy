@@ -286,13 +286,13 @@ async function stagePeriodMath() {
 
   const defaults = period.getSettlementsPeriodDefaults(ref)
   assert(
-    'default = current month',
-    defaults.periodPreset === period.SETTLEMENTS_PERIOD_PRESET.MONTH &&
-      defaults.dateFrom === '2026-08-01'
+    'default = last three months (supplier card history, 2026-10-23)',
+    defaults.periodPreset === period.SETTLEMENTS_PERIOD_PRESET.THREE_MONTHS &&
+      defaults.dateFrom === '2026-06-01'
   )
   assert(
-    'filter inactive on current month',
-    period.isSettlementsFilterActive('2026-08-01', '2026-08-31', ref) === false
+    'filter inactive on the default (three months)',
+    period.isSettlementsFilterActive('2026-06-01', '2026-08-31', ref) === false
   )
   assert(
     'filter active on week',

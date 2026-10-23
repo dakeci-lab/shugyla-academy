@@ -177,8 +177,8 @@ function stageUi() {
   assert('hides the UMAG-only "Документ UMAG" field for platform-sourced entries', /externalSource === 'platform' \? null : \(\s*\n\s*<div>\s*\n\s*<span>Документ UMAG<\/span>/.test(sheet))
   assert(
     'shows a distinct empty-state note for platform-sourced entries instead of the UMAG one',
-    sheet.includes("Отмечено оплаченным вручную на платформе") &&
-      /externalSource === 'platform'\s*\n\s*\? 'Отмечено оплаченным вручную/.test(sheet)
+    sheet.includes("Отмечено оплаченным на платформе") &&
+      /externalSource === 'platform'\s*\n\s*\? 'Отмечено оплаченным на платформе/.test(sheet)
   )
 
   const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')

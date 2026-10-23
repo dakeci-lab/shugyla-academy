@@ -23,10 +23,17 @@ import {
   ensureModuleLoaded,
 } from '../../../services/platformDataService'
 import {
-  fetchNativeSupplierDebts,
+  fetchNativeSupplierDebtSummary,
   UNASSIGNED_SUPPLIER_ID,
   UNASSIGNED_SUPPLIER_NAME,
 } from '../../../services/supplierDebtService'
+import {
+  countOpenOperations,
+  describeOpenDocuments,
+  isOpenOperation,
+  matchesOperationQuery,
+  operationAmountSign,
+} from '../../../utils/supplierHistoryView'
 import {
   ensurePaymentAccountsLoaded,
   getPaymentAccountName,
@@ -46,7 +53,6 @@ import {
   formatUmagDate,
   formatUmagMoney,
   getMonthPeriodKeys,
-  supplyPaymentStatusLabel,
   syncUmagSettlements,
 } from '../../../services/umagSettlementsService'
 import {
@@ -84,17 +90,6 @@ import {
 } from '../../../utils/settlementsPeriod'
 import './UmagSettlementsPanel.css'
 
-function PaymentStatusBadge({ status }) {
-  if (!status) {
-    return <span className="umag-settlements__pay-status umag-settlements__pay-status--na">—</span>
-  }
-  return (
-    <span className={`umag-settlements__pay-status umag-settlements__pay-status--${status}`}>
-      {supplyPaymentStatusLabel(status)}
-    </span>
-  )
-}
-
 function operationDetailsLabel(op) {
   if (op.details) return op.details
   if (op.kind === 'return' || op.kind === 'refund') {
@@ -121,35 +116,41 @@ function operationDetailsLabel(op) {
   )
 }
 
-function operationStatusNode(op) {
+const HISTORY_COLUMNS = [
+  { key: 'date', label: 'Дата', width: 110, mobile: 'hide' },
+  { key: 'op', label: 'Операция', width: 260, flex: true, mobile: 'title' },
+  { key: 'amount', label: 'Сумма', width: 150, align: 'end', mobile: 'end' },
+  { key: 'status', label: 'Статус', width: 200, align: 'end', mobile: 'hide' },
+]
+
+/**
+ * Status column of a history row. Colour is for action only: an open document gets one outlined button
+ * («Оплатить» / «Получили возврат»), a closed one a quiet check mark, UMAG payments nothing at all.
+ */
+function OperationStatusCell({ op, canManage, onOpen }) {
   const settlement = op.settlement
-  if (settlement) {
-    const isPayable = settlement.type === 'payable'
-    const label = isPayable
-      ? settlement.settled
-        ? 'Оплачено'
-        : 'Не оплачено'
-      : settlement.settled
-        ? 'Возврат получен'
-        : 'Ждём возврат'
+  if (!settlement) return null
+  const isPayable = settlement.type === 'payable'
+  if (settlement.settled) {
+    return <span className="umag-settlements__done">✓ {isPayable ? 'Оплачено' : 'Возврат получен'}</span>
+  }
+  if (canManage) {
     return (
-      <span
-        className={`umag-settlements__pay-status umag-settlements__pay-status--${
-          settlement.settled ? 'paid' : 'unpaid'
-        }`}
-      >
-        {label}
-      </span>
+      <button type="button" className="umag-settlements__pay-btn" onClick={() => onOpen(op)}>
+        {isPayable ? 'Оплатить' : 'Получили возврат'}
+      </button>
     )
   }
-  if (op.kind === 'supply' && op.paymentStatus) {
-    return <PaymentStatusBadge status={op.paymentStatus} />
+  return <span className="umag-settlements__pending">{isPayable ? 'Не оплачено' : 'Ждём возврат'}</span>
+}
+
+/** Second line under the operation name: the document number, or who paid and from which account. */
+function operationSubline(op) {
+  if (op.kind === 'payment') {
+    const details = operationDetailsLabel(op)
+    return details && details !== '—' && details !== 'UMAG' ? details : ''
   }
-  return (
-    <span className="umag-settlements__pay-status umag-settlements__pay-status--posted">
-      {op.statusLabel || 'Проведено'}
-    </span>
-  )
+  return op.documentNumber ? `№ ${op.documentNumber}` : ''
 }
 
 function formatAccountNames(value) {
@@ -172,95 +173,81 @@ function formatAccountNames(value) {
 }
 
 /**
- * Supplier identity + edit entry point, structured like the employee profile
- * header (top identity block, edit action) — the piece that used to live only
- * in the standalone «Поставщики» directory, now inside the supplier card.
- * 2026-09-19: absorbed the period-independent «Баланс» (ex-«Текущий долг»)
- * plus legal name/BIN/payment method/payment term — the owner found the
- * separate 5-tile summary block redundant with the operation history below
- * and asked for one denser identity card instead.
+ * Supplier card header: the name, the one number that matters («К оплате») and the details as quiet
+ * text — only the ones that are actually filled in (no rows of «—»).
  */
 function SupplierIdentityCard({ supplier, canEdit, canViewFinance, debtLoading, onEdit }) {
+  const balance = (
+    canViewFinance ? (
+      <div className="umag-settlements__id-balance">
+        <span className="umag-settlements__id-balance-label">К оплате</span>
+        <span
+          className={`umag-settlements__id-balance-amount${
+            supplier.debt > 0 ? '' : ' umag-settlements__id-balance-amount--zero'
+          }`}
+        >
+          {debtLoading ? '…' : formatUmagMoney(supplier.debt ?? 0)}
+        </span>
+      </div>
+    ) : null
+  )
+
   if (supplier.isVirtual) {
     return (
-      <div className="umag-settlements__identity">
-        <div className="umag-settlements__identity-main">
-          <h2 className="umag-settlements__detail-title">{supplier.name}</h2>
+      <div className="umag-settlements__id">
+        <div className="umag-settlements__id-top">
+          <div className="umag-settlements__id-name">
+            <h2 className="umag-settlements__detail-title">{supplier.name}</h2>
+          </div>
+          <div className="umag-settlements__id-side">{balance}</div>
         </div>
-        <p className="umag-settlements__identity-note">
-          Документы UMAG, у которых не выбран поставщик (например, приёмка ещё не оформлена
-          полностью). Выберите поставщика в UMAG — после синхронизации документ перейдёт к нему.
-          Оплатить такой документ можно и здесь.
+        <p className="umag-settlements__id-note">
+          Документы UMAG, у которых не выбран поставщик (например, приёмка ещё не оформлена полностью).
+          Выберите поставщика в UMAG — после синхронизации документ перейдёт к нему. Оплатить такой
+          документ можно и здесь.
         </p>
-        {canViewFinance ? (
-          <dl className="umag-settlements__identity-grid">
-            <div>
-              <dt>Баланс</dt>
-              <dd className={supplier.debt > 0 ? 'umag-settlements__debt' : undefined}>
-                {debtLoading ? '…' : formatUmagMoney(supplier.debt ?? 0)}
-              </dd>
-            </div>
-          </dl>
-        ) : null}
       </div>
     )
   }
+
   const archived = isSupplierDeleted(supplier)
-  const paymentMethodLabel = getPaymentAccountName(supplier.paymentAccountId) || 'Не настроено'
-  const paymentTermLabel = formatDeferralDaysTerm(supplier.deferralDays)
+  const method = getPaymentAccountName(supplier.paymentAccountId)
+  const hasTerm = supplier.deferralDays != null && supplier.deferralDays !== ''
+  const payment = [method, hasTerm ? formatDeferralDaysTerm(supplier.deferralDays) : null].filter(Boolean)
+  // normalizeSupplier renders an empty weekday list as «—»; quiet text shows only what is really filled in.
+  const filled = (value) => {
+    const text = String(value ?? '').trim()
+    return text && text !== '—' ? text : null
+  }
+  const contacts = [
+    filled(supplier.legalName),
+    filled(supplier.bin) ? `БИН ${filled(supplier.bin)}` : null,
+    filled(supplier.managerName),
+    filled(supplier.managerPhone),
+    filled(supplier.orderDays) ? `Заказ: ${filled(supplier.orderDays)}` : null,
+    filled(supplier.deliveryDays) ? `Доставка: ${filled(supplier.deliveryDays)}` : null,
+  ].filter(Boolean)
+
   return (
-    <div className="umag-settlements__identity">
-      <div className="umag-settlements__identity-main">
-        <h2 className="umag-settlements__detail-title">{supplier.name}</h2>
-        {archived ? <span className="umag-settlements__identity-badge">Архив</span> : null}
+    <div className="umag-settlements__id">
+      <div className="umag-settlements__id-top">
+        <div className="umag-settlements__id-name">
+          <h2 className="umag-settlements__detail-title">{supplier.name}</h2>
+          {archived ? <span className="umag-settlements__id-badge">Архив</span> : null}
+        </div>
+        <div className="umag-settlements__id-side">
+          {balance}
+          {canEdit ? (
+            <IconActionButton label="Редактировать поставщика" variant="primary" onClick={onEdit}>
+              <PencilIcon />
+            </IconActionButton>
+          ) : null}
+        </div>
       </div>
-      <dl className="umag-settlements__identity-grid">
-        <div>
-          <dt>Юр. название</dt>
-          <dd>{supplier.legalName || '—'}</dd>
-        </div>
-        <div>
-          <dt>БИН</dt>
-          <dd>{supplier.bin || '—'}</dd>
-        </div>
-        <div>
-          <dt>Менеджер</dt>
-          <dd>{supplier.managerName || '—'}</dd>
-        </div>
-        <div>
-          <dt>Телефон</dt>
-          <dd>{supplier.managerPhone || '—'}</dd>
-        </div>
-        <div>
-          <dt>Дни заказа</dt>
-          <dd>{supplier.orderDays || '—'}</dd>
-        </div>
-        <div>
-          <dt>Дни доставки</dt>
-          <dd>{supplier.deliveryDays || '—'}</dd>
-        </div>
-        <div>
-          <dt>Способ оплаты</dt>
-          <dd>{paymentMethodLabel}</dd>
-        </div>
-        <div>
-          <dt>Срок оплаты</dt>
-          <dd>{paymentTermLabel}</dd>
-        </div>
-        {canViewFinance ? (
-          <div>
-            <dt>Баланс</dt>
-            <dd className={supplier.debt > 0 ? 'umag-settlements__debt' : undefined}>
-              {debtLoading ? '…' : formatUmagMoney(supplier.debt ?? 0)}
-            </dd>
-          </div>
-        ) : null}
-      </dl>
-      {canEdit ? (
-        <IconActionButton label="Редактировать" variant="primary" onClick={onEdit}>
-          <PencilIcon />
-        </IconActionButton>
-      ) : null}
+      <p className="umag-settlements__id-meta">
+        {payment.length > 0 ? `Оплата: ${payment.join(' · ')}` : 'Способ оплаты не настроен'}
+      </p>
+      {contacts.length > 0 ? <p className="umag-settlements__id-meta">{contacts.join(' · ')}</p> : null}
     </div>
   )
 }
@@ -348,14 +335,31 @@ function UmagSupplierDetail({
     }
   }, [canViewFinance, supplier.id, supplier.umagSupplierId, supplier.isVirtual, dateFrom, dateTo, reloadToken])
 
-  const operations = detail?.operations || []
-  const openingBalance = detail?.openingBalance || 0
-  const [opsFilter, setOpsFilter] = useState('all')
+  const operations = useMemo(() => detail?.operations || [], [detail])
+  const [opsFilter, setOpsFilter] = useState('open')
+  const [opsFilterTouched, setOpsFilterTouched] = useState(false)
+  const [opsQuery, setOpsQuery] = useState('')
   const [selectedOperation, setSelectedOperation] = useState(null)
-  const visibleOps = useMemo(
-    () => filterSupplierOperations(operations, opsFilter),
-    [operations, opsFilter]
-  )
+  const openCount = useMemo(() => countOpenOperations(operations), [operations])
+
+  // The card opens on what needs a click («Не закрытые»); with nothing open it opens on everything, and
+  // right after the last document is paid it switches to the full list so the result is visible.
+  useEffect(() => {
+    if (detailLoading || opsFilterTouched) return
+    setOpsFilter(openCount > 0 ? 'open' : 'all')
+  }, [detailLoading, openCount, opsFilterTouched])
+
+  function chooseOpsFilter(id) {
+    setOpsFilterTouched(true)
+    setOpsFilter(id)
+  }
+
+  // A search looks through every operation of the period, whatever chip is active.
+  const searching = opsQuery.trim() !== ''
+  const visibleOps = useMemo(() => {
+    const base = searching ? operations : filterSupplierOperations(operations, opsFilter)
+    return base.filter((op) => matchesOperationQuery(op, opsQuery))
+  }, [operations, opsFilter, opsQuery, searching])
 
   async function handleUnmarkPayment(obligationId) {
     try {
@@ -503,12 +507,15 @@ function UmagSupplierDetail({
       {canViewFinance ? (
         <>
           <section className="umag-settlements__ops" aria-label="История операций">
-            <div className="umag-settlements__ops-head">
-              <h3 className="umag-settlements__section-title">История операций · {periodLabel}</h3>
+            <h3 className="umag-settlements__section-title">
+              История операций<span className="umag-settlements__period">{periodLabel}</span>
+            </h3>
+
+            <div className="umag-settlements__ops-controls">
               <div className="umag-settlements__ops-filters" role="tablist" aria-label="Фильтр операций">
                 {[
+                  { id: 'open', label: 'Не закрытые', count: openCount },
                   { id: 'all', label: 'Все' },
-                  { id: 'open', label: 'Не закрытые' },
                   { id: 'supplies', label: 'Приёмки' },
                   { id: 'payments', label: 'Оплаты' },
                   { id: 'returns', label: 'Возвраты' },
@@ -517,16 +524,28 @@ function UmagSupplierDetail({
                     key={opt.id}
                     type="button"
                     role="tab"
-                    aria-selected={opsFilter === opt.id}
+                    aria-selected={!searching && opsFilter === opt.id}
                     className={`umag-settlements__ops-filter${
-                      opsFilter === opt.id ? ' umag-settlements__ops-filter--active' : ''
+                      !searching && opsFilter === opt.id ? ' umag-settlements__ops-filter--active' : ''
                     }`}
-                    onClick={() => setOpsFilter(opt.id)}
+                    onClick={() => {
+                      setOpsQuery('')
+                      chooseOpsFilter(opt.id)
+                    }}
                   >
                     {opt.label}
+                    {opt.count ? <span className="umag-settlements__ops-filter-count">{opt.count}</span> : null}
                   </button>
                 ))}
               </div>
+              <input
+                type="search"
+                className="umag-settlements__search"
+                value={opsQuery}
+                onChange={(event) => setOpsQuery(event.target.value)}
+                placeholder="Номер документа или сумма"
+                aria-label="Поиск по документам"
+              />
             </div>
 
             {detailLoading ? (
@@ -537,133 +556,63 @@ function UmagSupplierDetail({
               </div>
             ) : visibleOps.length === 0 ? (
               <div className="umag-settlements__empty">
-                За выбранный период операций UMAG не найдено
+                {searching
+                  ? 'Ничего не найдено за выбранный период'
+                  : opsFilter === 'open'
+                    ? 'Неоплаченных документов нет'
+                    : 'За выбранный период операций UMAG не найдено'}
+                {!searching && opsFilter === 'open' ? (
+                  <button type="button" className="umag-settlements__empty-action" onClick={() => chooseOpsFilter('all')}>
+                    Показать все
+                  </button>
+                ) : null}
               </div>
             ) : (
-              <>
-                <div className="umag-settlements__table-wrap">
-                  <table className="umag-settlements__table umag-settlements__table--ops">
-                    <thead>
-                      <tr>
-                        <th>Дата</th>
-                        <th>Операция</th>
-                        <th>Документ</th>
-                        <th className="umag-settlements__money-col">Увеличение</th>
-                        <th className="umag-settlements__money-col">Уменьшение</th>
-                        <th className="umag-settlements__money-col">Сальдо</th>
-                        <th>Статус</th>
-                        <th>Детали</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Number(openingBalance) !== 0 && (
-                        <tr className="umag-settlements__ops-row umag-settlements__ops-row--opening">
-                          <td colSpan={2}>Начальное сальдо</td>
-                          <td>—</td>
-                          <td className="umag-settlements__money-col">—</td>
-                          <td className="umag-settlements__money-col">—</td>
-                          <td className="umag-settlements__money-col">
-                            {formatUmagMoney(openingBalance)}
-                          </td>
-                          <td>
-                            <span className="umag-settlements__pay-status umag-settlements__pay-status--posted">
-                              Сальдо
-                            </span>
-                          </td>
-                          <td className="umag-settlements__ops-meta">На начало периода</td>
-                        </tr>
-                      )}
-                      {visibleOps.map((op) => {
-                        const increase = Number(op.debtIncrease) || 0
-                        const decrease = Number(op.debtDecrease) || 0
-                        return (
-                          <tr
-                            key={op.id}
-                            className="umag-settlements__ops-row"
-                            onClick={() => setSelectedOperation(op)}
-                          >
-                            <td>{formatUmagDate(op.sortAt)}</td>
-                            <td>
-                              <button
-                                type="button"
-                                className={`umag-settlements__op-badge umag-settlements__op-badge--button umag-settlements__op-badge--${op.kind}`}
-                                onClick={(e) => {
-                                  e.stopPropagation()
-                                  setSelectedOperation(op)
-                                }}
-                              >
-                                {op.label}
-                              </button>
-                            </td>
-                            <td>{op.documentNumber ? `№ ${op.documentNumber}` : '—'}</td>
-                            <td className="umag-settlements__money-col umag-settlements__amount-pos">
-                              {increase > 0 ? formatUmagMoney(increase) : '—'}
-                            </td>
-                            <td className="umag-settlements__money-col umag-settlements__amount-neg">
-                              {decrease > 0 ? formatUmagMoney(decrease) : '—'}
-                            </td>
-                            <td className="umag-settlements__money-col">
-                              {formatUmagMoney(op.runningBalance)}
-                            </td>
-                            <td>{operationStatusNode(op)}</td>
-                            <td className="umag-settlements__ops-meta">{operationDetailsLabel(op)}</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="umag-settlements__cards" aria-label="История операций">
-                  {visibleOps.map((op) => {
-                    const increase = Number(op.debtIncrease) || 0
-                    const decrease = Number(op.debtDecrease) || 0
-                    return (
-                      <button
-                        key={op.id}
-                        type="button"
-                        className="umag-settlements__card"
-                        onClick={() => setSelectedOperation(op)}
-                      >
-                        <div className="umag-settlements__card-title">
-                          <span
-                            className={`umag-settlements__op-badge umag-settlements__op-badge--${op.kind}`}
-                          >
-                            {op.label}
+              <PgtTable columns={HISTORY_COLUMNS}>
+                <PgtHead columns={HISTORY_COLUMNS} />
+                {visibleOps.map((op) => {
+                  const sign = operationAmountSign(op)
+                  const sub = operationSubline(op)
+                  const statusNode = (
+                    <OperationStatusCell op={op} canManage={canManagePayments} onOpen={setSelectedOperation} />
+                  )
+                  return (
+                    <PgtRow
+                      key={op.id}
+                      columns={HISTORY_COLUMNS}
+                      cells={{
+                        date: <span className="umag-settlements__date">{formatUmagDate(op.sortAt)}</span>,
+                        op: (
+                          <span className="umag-settlements__op">
+                            <button
+                              type="button"
+                              className="umag-settlements__op-link"
+                              onClick={() => setSelectedOperation(op)}
+                            >
+                              {op.label}
+                            </button>
+                            {sub ? <span className="umag-settlements__op-sub">{sub}</span> : null}
                           </span>
-                          <span className="umag-settlements__card-date">
-                            {formatUmagDate(op.sortAt)}
+                        ),
+                        amount: (
+                          <span className="pgt__money">
+                            {sign}
+                            {formatUmagMoney(op.amount)}
                           </span>
-                        </div>
-                        <div className="umag-settlements__card-finance">
-                          <div>
-                            <span>Документ</span>
-                            <strong>{op.documentNumber ? `№ ${op.documentNumber}` : '—'}</strong>
-                          </div>
-                          <div>
-                            <span>Увеличение</span>
-                            <strong className="umag-settlements__amount-pos">
-                              {increase > 0 ? formatUmagMoney(increase) : '—'}
-                            </strong>
-                          </div>
-                          <div>
-                            <span>Уменьшение</span>
-                            <strong className="umag-settlements__amount-neg">
-                              {decrease > 0 ? formatUmagMoney(decrease) : '—'}
-                            </strong>
-                          </div>
-                          <div>
-                            <span>Сальдо</span>
-                            <strong>{formatUmagMoney(op.runningBalance)}</strong>
-                          </div>
-                        </div>
-                        <div className="umag-settlements__card-status">{operationStatusNode(op)}</div>
-                        <div className="umag-settlements__card-meta">{operationDetailsLabel(op)}</div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </>
+                        ),
+                        status: statusNode,
+                      }}
+                      mobileMeta={
+                        <>
+                          {formatUmagDate(op.sortAt)}
+                          {sub && op.kind === 'payment' ? ` · ${sub}` : ''}
+                          {op.settlement ? <> · {statusNode}</> : null}
+                        </>
+                      }
+                    />
+                  )
+                })}
+              </PgtTable>
             )}
           </section>
         </>
@@ -824,7 +773,13 @@ export default function UmagSettlementsPanel({
   const [lastRun, setLastRun] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [selectedId, setSelectedId] = useState(null)
-  const [debtByPlatformId, setDebtByPlatformId] = useState(new Map())
+  const [debtSummary, setDebtSummary] = useState(new Map())
+  const debtByPlatformId = useMemo(
+    () => new Map([...debtSummary].map(([id, entry]) => [id, entry.amount])),
+    [debtSummary]
+  )
+  const [listQuery, setListQuery] = useState('')
+  const [debtOnly, setDebtOnly] = useState(true)
   const [debtLoading, setDebtLoading] = useState(true)
   const [debtsSettled, setDebtsSettled] = useState(false)
 
@@ -848,7 +803,7 @@ export default function UmagSettlementsPanel({
     }),
     []
   )
-  const filteredUnsorted = useMemo(() => {
+  const baseList = useMemo(() => {
     const base = filterSuppliers(allSuppliers, { search: '', showArchived: appliedShowArchived })
     const list = supplierFilter.size > 0 ? base.filter((s) => supplierFilter.has(s.id)) : base
     // Shown only while there is something unassigned, and only in the default
@@ -858,6 +813,21 @@ export default function UmagSettlementsPanel({
       : list
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allSuppliers, supplierFilter, appliedShowArchived, unassignedDebt, unassignedSupplier, version, dataVersion])
+  const searchingList = listQuery.trim() !== ''
+  const withDebtCount = useMemo(
+    () => baseList.filter((s) => (debtByPlatformId.get(s.id) || 0) !== 0).length,
+    [baseList, debtByPlatformId]
+  )
+  // A search looks at every supplier, with or without debt; otherwise «С долгом» hides the zero-balance tail.
+  const filteredUnsorted = useMemo(() => {
+    const q = listQuery.trim().toLowerCase()
+    return baseList.filter((s) => {
+      if (q) {
+        return `${s.name || ''} ${s.legalName || ''}`.toLowerCase().includes(q)
+      }
+      return !debtOnly || (debtByPlatformId.get(s.id) || 0) !== 0
+    })
+  }, [baseList, listQuery, debtOnly, debtByPlatformId])
   // Biggest balance first so the largest debts stand out; name breaks ties
   // (and orders the all-zero tail) so the list stays stable.
   const filtered = useMemo(
@@ -889,9 +859,9 @@ export default function UmagSettlementsPanel({
     setDebtLoading(true)
     // Needs no supplier ids: every open obligation with a supplier plus the unassigned bucket, so the
     // query starts together with the suppliers load instead of waiting for it.
-    void fetchNativeSupplierDebts({ includeUnassigned: true })
+    void fetchNativeSupplierDebtSummary({ includeUnassigned: true })
       .then((map) => {
-        setDebtByPlatformId(map)
+        setDebtSummary(map)
         setDebtLoading(false)
         setDebtsSettled(true)
       })
@@ -1102,14 +1072,15 @@ export default function UmagSettlementsPanel({
   const listColumns = [
     { key: 'name', label: 'Поставщик', width: 240, flex: true, mobile: 'title' },
     ...(canViewFinance
-      ? [{ key: 'balance', label: 'Баланс', width: 160, align: 'end', mobile: 'end' }]
+      ? [{ key: 'balance', label: 'К оплате', width: 170, align: 'end', mobile: 'end' }]
       : []),
-    ...(canEdit ? [{ key: 'actions', label: '', width: 44, align: 'end', mobile: 'hide' }] : []),
   ]
 
   const emptyMessage = (() => {
     if (supplierFilter.size > 0) return 'По вашему запросу ничего не найдено.'
     if (appliedShowArchived) return 'Удалённых поставщиков нет.'
+    if (searchingList) return 'Поставщик не найден.'
+    if (debtOnly && allSuppliers.length > 0) return 'Долгов нет — всё оплачено.'
     return allSuppliers.length === 0
       ? 'Поставщики ещё не синхронизированы. Выполните синхронизацию с UMAG.'
       : 'По вашему запросу ничего не найдено.'
@@ -1222,6 +1193,43 @@ export default function UmagSettlementsPanel({
             </div>
           )}
 
+          {suppliersReady && debtsSettled ? (
+            <div className="umag-settlements__list-tools">
+              <div className="umag-settlements__ops-filters" role="tablist" aria-label="Какие поставщики показывать">
+                {[
+                  { id: 'debt', label: 'С долгом', count: withDebtCount },
+                  { id: 'all', label: 'Все', count: 0 },
+                ].map((opt) => {
+                  const active = !searchingList && (opt.id === 'debt') === debtOnly
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      className={`umag-settlements__ops-filter${active ? ' umag-settlements__ops-filter--active' : ''}`}
+                      onClick={() => {
+                        setListQuery('')
+                        setDebtOnly(opt.id === 'debt')
+                      }}
+                    >
+                      {opt.label}
+                      {opt.count ? <span className="umag-settlements__ops-filter-count">{opt.count}</span> : null}
+                    </button>
+                  )
+                })}
+              </div>
+              <input
+                type="search"
+                className="umag-settlements__search"
+                value={listQuery}
+                onChange={(event) => setListQuery(event.target.value)}
+                placeholder="Найти поставщика"
+                aria-label="Поиск поставщика"
+              />
+            </div>
+          ) : null}
+
           {(!suppliersReady && filtered.length === 0) || !debtsSettled ? (
             <DelayedLoadingSkeleton variant="table" count={5} />
           ) : filtered.length === 0 ? (
@@ -1231,33 +1239,28 @@ export default function UmagSettlementsPanel({
               <PgtHead columns={listColumns} />
               {filtered.map((s) => {
                 const debt = debtByPlatformId.get(s.id) ?? null
+                const meta = describeOpenDocuments(debtSummary.get(s.id))
                 return (
                   <PgtRow
                     key={s.id}
                     columns={listColumns}
                     cells={{
                       name: (
-                        <button
-                          type="button"
-                          className="pgt__link"
-                          onClick={() => setSelectedId(s.id)}
-                        >
-                          {s.name}
-                        </button>
-                      ),
-                      balance: (
-                        <span className={`pgt__money${debt > 0 ? ' pgt__money--debt' : ''}`}>
-                          {debtLoading ? '…' : formatUmagMoney(debt ?? 0)}
+                        <span className="umag-settlements__supplier">
+                          <button
+                            type="button"
+                            className="pgt__link"
+                            onClick={() => setSelectedId(s.id)}
+                          >
+                            {s.name}
+                          </button>
+                          {meta ? <span className="umag-settlements__supplier-meta">{meta}</span> : null}
                         </span>
                       ),
-                      actions: s.isVirtual ? null : (
-                        <IconActionButton
-                          label="Редактировать"
-                          variant="primary"
-                          onClick={() => openEdit(s)}
-                        >
-                          <PencilIcon />
-                        </IconActionButton>
+                      balance: (
+                        <span className={`pgt__money${debt > 0 ? '' : ' umag-settlements__zero'}`}>
+                          {debtLoading ? '…' : formatUmagMoney(debt ?? 0)}
+                        </span>
                       ),
                     }}
                   />
