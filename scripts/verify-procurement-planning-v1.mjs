@@ -282,20 +282,11 @@ function stageContractFiles() {
     "action: 'sync'",
     'service sync invoke'
   )
-  assertFileContains(
-    'supabase/functions/umag-procurement/index.ts',
-    "action === 'set_norm'",
-    'set_norm action'
-  )
-  assertFileContains(
-    'supabase/functions/umag-procurement/index.ts',
-    'handleSetNorm',
-    'set_norm handler'
-  )
-  assertFileContains(
-    'supabase/functions/umag-procurement/index.ts',
-    'set_procurement_norm_rule_for_snapshot',
-    'Edge calls norm RPC'
+  assert(
+    'the Edge function has no set_norm action, norm rules or ABC any more (stage 24)',
+    !/set_norm|handleSetNorm|procurement_norm|assignSnapshotAbcClasses/.test(
+      read('supabase/functions/umag-procurement/index.ts')
+    )
   )
   assert(
     'the planner no longer invokes set_norm (norms removed from the UI in stage 23; the Edge action stays until the next function deploy)',

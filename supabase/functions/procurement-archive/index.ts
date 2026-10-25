@@ -53,11 +53,11 @@ const ITEM_COLUMNS = [
   'avg_daily',
   'purchase_price',
   'selling_price',
-  'norm_days',
+  'target_days',
   'recommended_qty',
   'final_order_qty',
   'manual_override',
-  'reserve_status',
+  'plan_status',
   'created_at',
 ] as const
 
