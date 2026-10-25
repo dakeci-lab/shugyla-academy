@@ -45,8 +45,16 @@ async function stageFormulas() {
   assert('negative stock → calculation 0', math.calcCalculationStock(-12) === 0)
   assert('positive stock preserved', math.calcCalculationStock(12.5) === 12.5)
   assert(
-    'avg daily = sum/56',
+    'avg daily: equal weeks give the plain mean (7/week = 1/day)',
     Math.abs(math.calcAvgDaily([7, 7, 7, 7, 7, 7, 7, 7]) - 1) < 1e-9
+  )
+  assert(
+    'avg daily: the newest four weeks count twice (growing demand reads higher than the 8-week mean)',
+    Math.abs(math.calcAvgDaily([0, 0, 0, 0, 14, 14, 14, 14]) - 112 / 84) < 1e-9
+  )
+  assert(
+    'avg daily: falling demand reads lower than the 8-week mean',
+    math.calcAvgDaily([14, 14, 14, 14, 0, 0, 0, 0]) < 0.7
   )
 
   assert('calcReserveDays 10/2 → 5', math.calcReserveDays(10, 2) === 5)

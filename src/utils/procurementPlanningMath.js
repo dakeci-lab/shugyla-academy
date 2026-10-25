@@ -1,14 +1,18 @@
 /** Pure planning formulas for Procurement Planning v1. */
 
-export const PLANNING_SALES_DAYS = 56
 export const PLANNING_WEEK_COUNT = 8
 
+/** Oldest week first; the newest four weeks count twice (same weights as the umag-procurement Edge function). */
+export const PLANNING_WEEK_WEIGHTS = Object.freeze([1, 1, 1, 1, 2, 2, 2, 2])
+
 export function calcAvgDaily(weeklySales = []) {
-  const sum = (weeklySales || []).reduce((acc, n) => {
-    const v = Number(n)
-    return acc + (Number.isFinite(v) ? v : 0)
+  const weights = PLANNING_WEEK_WEIGHTS
+  const total = weights.reduce((a, b) => a + b, 0)
+  const weighted = weights.reduce((acc, weight, index) => {
+    const v = Number((weeklySales || [])[index])
+    return acc + weight * (Number.isFinite(v) ? v : 0)
   }, 0)
-  return sum / PLANNING_SALES_DAYS
+  return weighted / (7 * total)
 }
 
 export function calcCalculationStock(rawStock) {
