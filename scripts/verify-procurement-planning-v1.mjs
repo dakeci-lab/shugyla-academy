@@ -349,8 +349,8 @@ function stageContractFiles() {
     'orders tab'
   )
   assert(
-    'procurement tabs order Planning → ABC → Warehouse (Orders is a separate section, norms are gone)',
-    /role="tablist"[\s\S]*Планирование[\s\S]*ABC[\s\S]*Склад/.test(
+    'procurement tabs order Planning → Warehouse (Orders is a separate section; norms and ABC are gone)',
+    /role="tablist"[\s\S]*Планирование[\s\S]*Склад/.test(
       read('src/pages/platform/procurement/ProcurementPage.jsx')
     )
   )

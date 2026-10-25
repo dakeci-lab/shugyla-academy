@@ -94,8 +94,8 @@ function stageTreeMode() {
 
   const ux = read('src/utils/procurementPlannerUx.js')
   assert(
-    'isPlannerTreeViewMode takes reserveStatus and treats it like search/abcSortField',
-    /isPlannerTreeViewMode\(\{ search = '', abcSortField = '', reserveStatus = '' \} = \{\}\) \{\s*\n\s*return !String\(search \|\| ''\)\.trim\(\) && !abcSortField && !reserveStatus/.test(
+    'isPlannerTreeViewMode takes reserveStatus and treats it like search',
+    /isPlannerTreeViewMode\(\{ search = '', reserveStatus = '' \} = \{\}\) \{\s*\n\s*return !String\(search \|\| ''\)\.trim\(\) && !reserveStatus/.test(
       ux
     )
   )
@@ -105,7 +105,7 @@ function stageTreeMode() {
   assert('planner calls isPlannerTreeViewMode at least 3 times (initial render, loadItems, tree-reset effect)', callSites >= 3)
   const reserveStatusPassed = (planner.match(/reserveStatus: filters\.reserveStatus/g) || []).length
   assert('every one of those call sites passes filters.reserveStatus', reserveStatusPassed >= callSites)
-  assert('tree state resets when the bucket filter changes', /filters\.reserveStatus,\s*\n\s*filters\.abcQty/.test(planner))
+  assert('tree state resets when the bucket filter changes', /filters\.reserveStatus,\s*\n\s*resetTreeState/.test(planner))
 
   console.log('')
 }

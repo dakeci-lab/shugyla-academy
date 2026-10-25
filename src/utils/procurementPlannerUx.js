@@ -1355,8 +1355,8 @@ export function plannerSubcategoryTreeKey(categoryName = '', subcategoryName = '
  * "which SKUs exactly", which the tree's per-category counts — cached and
  * unaware of reserve_status — can't honestly reflect).
  */
-export function isPlannerTreeViewMode({ search = '', abcSortField = '', reserveStatus = '' } = {}) {
-  return !String(search || '').trim() && !abcSortField && !reserveStatus
+export function isPlannerTreeViewMode({ search = '', reserveStatus = '' } = {}) {
+  return !String(search || '').trim() && !reserveStatus
 }
 
 /**

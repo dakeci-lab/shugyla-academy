@@ -55,11 +55,10 @@ assert(
 )
 assert('on-screen ABC legend removed', !planner.includes('proc-planner__abc-legend'))
 assert(
-  'ABC three axis columns with permanent sort arrows',
-  layoutSrc.includes('proc-planner__col-abc-axis') &&
-    planner.includes('proc-planner__abc-axis-btn') &&
-    planner.includes('proc-planner__abc-arrow') &&
-    plannerCss.includes('.proc-planner__abc-arrow.is-on')
+  'ABC columns are gone from the planner (stage 23: ABC analysis removed)',
+  !layoutSrc.includes('proc-planner__col-abc-axis') &&
+    !planner.includes('proc-planner__abc-axis-btn') &&
+    !plannerCss.includes('proc-planner__abc-arrow')
 )
 assert(
   'the «?» ABC help icon is gone from the toolbar (removed 2026-09-21)',
@@ -68,12 +67,6 @@ assert(
     !planner.includes('proc-planner__abc-help') &&
     !plannerCss.includes('.proc-planner__abc-help') &&
     !planner.includes('firstVisibleAbcColumnName')
-)
-assert(
-  'desktop ABC cells via renderPlannerSkuCell + AbcBadge',
-  planner.includes("case 'abcQty':") &&
-    planner.includes('AbcBadge') &&
-    !/<AbcBadges item=\{item\} compact \/>/.test(planner)
 )
 assert(
   'order column accent class',
