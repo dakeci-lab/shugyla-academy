@@ -138,10 +138,12 @@ GitHub Actions — только вручную/через MCP.
   (по умолчанию 1; на заказ можно менять и «пропускать визит» = + цикл). Дни — `order_days` (заказ/визит) и `delivery_days` (срок) в карточке поставщика;
   без дней — цикл 7 дней с пометкой «дни не заполнены». «В пути» — заказы не отменённые/не принятые с датой доставки ≥ сегодня (приёмка по статусам не ведётся).
   Считает БД: `procurement_apply_plan` (триггер при `ready` снимке + RPC `procurement_plan_supplier` из панели плана), статус — колонка `plan_status`.
-  **Нормы убраны из интерфейса**; в БД и Edge остаются мёртвыми: `procurement_norm_rules` (копия в `docs/procurement/visit-days-redesign/`), `norm_days`,
-  вычисляемая `reserve_status`, `set_norm`, чтение правил в `umag-procurement` — удалить отдельным этапом после деплоя функции (MCP не делает `drop` без
-  интерактивного подтверждения). Документы: `docs/procurement/visit-days-redesign/`, `docs/db/stage-23-visit-plan/`. Осталось по плану: усреднение продаж с весом
-  последних недель, проверка дней у 133 поставщиков (список в Google Drive и в `suppliers-to-fill.md`), удаление мёртвых норм.
+  **Нормы и ABC удалены полностью** (этап 24, 2026-10-25): из интерфейса, из функций `umag-procurement` / `procurement-archive` (задеплоены), из БД (таблицы норм, функции, колонки
+  `norm_days` / `reserve_status` / `abc_*`, право `procurement.norms.manage`). Копия 100 правил норм — `docs/procurement/visit-days-redesign/`. План считает БД
+  (`procurement_apply_plan`) **вне** оператора «снимок готов» — у API лимит 8 с: cron `procurement-ensure-plan-every-minute` + вызов планировщика после ручной синхронизации
+  (RPC `procurement_ensure_plan`); колонка статуса — `plan_status`. `drop` через MCP требует интерактивного подтверждения, которое не доходит: такие операции выполняет
+  владелец в Supabase → SQL Editor. Документы: `docs/procurement/visit-days-redesign/`, `docs/db/stage-23-visit-plan/`, `docs/db/stage-24-remove-norms-and-abc/`.
+  Осталось: усреднение продаж с весом последних недель; дни у 133 поставщиков заполняет закупщик (список в Google Drive и `suppliers-to-fill.md`).
 - Ускорение синка «Расчётов» (`umag-sync`) выкачено 2026-10-23: 25–29 с вместо 46–53 с. Синк «Расчётов» по расписанию не запускается (только кнопка);
   ночная задача 07:00 синхронизирует только закуп (`umag-procurement`).
 - Вкладка «К оплате» удалена (2026-10-22): оплата — в истории операций карточки поставщика. Сроки оплаты
