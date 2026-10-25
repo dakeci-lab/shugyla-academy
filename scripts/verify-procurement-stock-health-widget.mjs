@@ -107,7 +107,7 @@ assert(
 assert(
   'the table filter keeps negative-stock rows out of the four buckets and has its own group',
   serviceSrc.includes("export const NEGATIVE_STOCK_FILTER = 'negative_stock'") &&
-    serviceSrc.includes(".eq('reserve_status', reserveStatus).eq('negative_stock', false)") &&
+    serviceSrc.includes(".eq('plan_status', reserveStatus).eq('negative_stock', false)") &&
     serviceSrc.includes("query = query.eq('negative_stock', true)")
 )
 assert(

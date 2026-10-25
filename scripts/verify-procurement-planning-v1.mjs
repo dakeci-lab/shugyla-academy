@@ -348,7 +348,7 @@ function stageContractFiles() {
   assert(
     'normalizeItem carries the visit-plan fields (target days, in transit, reserve status)',
     /targetDays: nullableFiniteNumber\(row\.target_days\)/.test(read('src/services/procurementPlanningService.js')) &&
-      /reserveStatus: row\.reserve_status/.test(read('src/services/procurementPlanningService.js'))
+      /reserveStatus: row\.plan_status/.test(read('src/services/procurementPlanningService.js'))
   )
   assert(
     'no Number||DEFAULT for normDays normalize',
