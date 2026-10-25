@@ -105,3 +105,9 @@
     gap: 0.6rem 1rem;
   }
 }
+
+.proc-plan-bar__date-ru {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text, #111827);
+}
