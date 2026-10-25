@@ -6,10 +6,15 @@ const BASIS_NOTE = {
   order_days_only: 'Дни доставки не заполнены — срок доставки 1 день. Заполните их в карточке поставщика («Расчёты»).',
 }
 
+const WEEKDAYS_RU = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
+
+/** «вс, 25.10.2026» — the native date picker follows the device language, so the date is also spelled out in Russian. */
 function formatDay(dateKey) {
   if (!dateKey) return ''
   const [y, m, d] = String(dateKey).split('-')
-  return d && m && y ? `${d}.${m}.${y}` : String(dateKey)
+  if (!(d && m && y)) return String(dateKey)
+  const weekday = WEEKDAYS_RU[new Date(Date.UTC(Number(y), Number(m) - 1, Number(d))).getUTCDay()]
+  return `${weekday}, ${d}.${m}.${y}`
 }
 
 /**
@@ -37,6 +42,7 @@ export default function ProcurementSupplierPlanBar({ plan, supplierName, disable
             disabled={busy}
             onChange={(event) => event.target.value && onChange({ deliveryDate: event.target.value })}
           />
+          <b className="proc-plan-bar__date-ru">{formatDay(plan.deliveryDate)}</b>
         </label>
         {plan.deliveryDateIsCustom ? (
           <button type="button" className="btn btn--ghost btn--sm" disabled={busy} onClick={() => onChange({ deliveryDate: null })}>
