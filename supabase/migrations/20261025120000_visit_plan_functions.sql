@@ -82,6 +82,7 @@ declare
   v_safety integer := greatest(coalesce(p_safety, 1), 0);
   v_skip integer := least(greatest(coalesce(p_skip, 0), 0), 3);
   v_i integer;
+  v_from integer;
 begin
   select public.procurement_weekdays(s.order_days), public.procurement_weekdays(s.delivery_days)
     into v_order, v_deliv
@@ -94,7 +95,9 @@ begin
   if v_delivery is null then
     v_delivery := p_today + 1;
     if cardinality(v_deliv) > 0 then
-      for v_i in 1..7 loop
+      -- Ordering on one of the supplier's order days: the goods may come the same day if that is also a delivery day.
+      v_from := case when extract(isodow from p_today)::int = any (v_order) then 0 else 1 end;
+      for v_i in v_from..7 loop
         if extract(isodow from p_today + v_i)::int = any (v_deliv) then
           v_delivery := p_today + v_i;
           exit;

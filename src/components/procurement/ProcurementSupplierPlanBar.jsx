@@ -31,6 +31,7 @@ export default function ProcurementSupplierPlanBar({ plan, supplierName, disable
           <span>Поставка</span>
           <input
             type="date"
+            lang="ru"
             value={plan.deliveryDate || ''}
             min={plan.today || undefined}
             disabled={busy}

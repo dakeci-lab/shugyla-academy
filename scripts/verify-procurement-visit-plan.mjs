@@ -39,7 +39,8 @@ assert.match(fnSql, /po\.status not in \('cancelled', 'received'\)\s*\n\s*and po
 assert.match(fnSql, /i\.manual_override or i\.generated_purchase_order_id is not null/)
 assert.match(fnSql, /'default_cycle'/)
 assert.match(fnSql, /v_cycle := 7;/)
-ok('SQL: target = days to delivery + cycle×(1+skip) + safety; in transit = open orders not yet past their delivery date; manual / ordered quantities kept; no days → 7-day cycle')
+assert.match(fnSql, /v_from := case when extract\(isodow from p_today\)::int = any \(v_order\) then 0 else 1 end/)
+ok('SQL: same-day delivery when ordering on an order day that is also a delivery day; target = days to delivery + cycle×(1+skip) + safety; in transit = open orders not yet past their delivery date; manual / ordered quantities kept; no days → 7-day cycle')
 
 const cutSql = read('supabase/migrations/20261025130000_visit_plan_cutover.sql')
 assert.match(cutSql, /add column if not exists plan_status text/)
