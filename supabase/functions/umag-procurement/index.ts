@@ -227,9 +227,19 @@ export function buildEightWeekRanges(reference = new Date()): {
   }
 }
 
+/** Oldest week first. The newest four weeks count twice (2026-10: demand follows the recent weeks, not the 8-week mean). */
+const WEEK_WEIGHTS = [1, 1, 1, 1, 2, 2, 2, 2]
+const WEIGHT_TOTAL = WEEK_WEIGHTS.reduce((a, b) => a + b, 0)
+
 export function calcAvgDaily(weeklySales: number[]): number {
-  const sum = weeklySales.reduce((acc, n) => acc + (Number.isFinite(n) ? n : 0), 0)
-  return sum / 56
+  const weighted = WEEK_WEIGHTS.reduce(
+    (acc, weight, index) => {
+      const n = weeklySales[index]
+      return acc + weight * (Number.isFinite(n) ? n : 0)
+    },
+    0
+  )
+  return weighted / (7 * WEIGHT_TOTAL)
 }
 
 export function calcCalculationStock(rawStock: number): number {
