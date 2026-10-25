@@ -7,10 +7,7 @@ import {
   extractFunctionErrorBody,
   resolveEdgeFunctionUserMessage,
 } from '../utils/edgeFunctionErrors'
-import {
-  describeSnapshotItemsAbcQuery,
-  snapshotItemsPageRange,
-} from '../utils/procurementAbc'
+import { snapshotItemsPageRange } from '../utils/snapshotItemsPaging'
 import {
   accumulateSnapshotFilterRow,
   createSnapshotFilterAccumulator,
@@ -40,11 +37,6 @@ function nullableFiniteNumber(value) {
   if (value == null || value === '') return null
   const n = Number(value)
   return Number.isFinite(n) ? n : null
-}
-
-function nullableAbcClass(value) {
-  const cls = String(value || '').trim().toUpperCase()
-  return cls === 'A' || cls === 'B' || cls === 'C' ? cls : null
 }
 
 export const PROCUREMENT_PLANNING_ERROR_CODES = {
@@ -183,9 +175,6 @@ function normalizeItem(row) {
     revenue8w: nullableFiniteNumber(row.revenue_8w),
     cogs8w: nullableFiniteNumber(row.cogs_8w),
     profit8w: nullableFiniteNumber(row.profit_8w),
-    abcQty: nullableAbcClass(row.abc_qty),
-    abcRevenue: nullableAbcClass(row.abc_revenue),
-    abcProfit: nullableAbcClass(row.abc_profit),
     reserveStatus: row.plan_status || null,
     targetDays: nullableFiniteNumber(row.target_days),
     leadDays: nullableFiniteNumber(row.lead_days),
@@ -469,7 +458,7 @@ export async function fetchLatestProcurementSnapshot() {
  * currently mid-sync. umag-procurement inserts the new procurement_snapshots
  * row with status "syncing" *before* it fetches UMAG stock/sales (which can
  * take many seconds) — so "the latest row" briefly means "an empty snapshot
- * with no items yet". Read-only analysis tabs (Нормы, ABC — anything that
+ * with no items yet". Read-only analysis tabs (anything that
  * just wants something to display, not the live editing view) should keep
  * showing the last usable snapshot through that window instead of flashing
  * an empty state, the same "don't blank the screen for an in-flight
@@ -689,11 +678,6 @@ export async function fetchSnapshotItemsPage({
   orderableOnly = false,
   unassignedOnly = false,
   reserveStatus = '',
-  abcQty = [],
-  abcRevenue = [],
-  abcProfit = [],
-  sortField = '',
-  sortDir = 'asc',
 } = {}) {
   ensureClient()
   if (!snapshotId) return { items: [], totalCount: 0, page, pageSize }
@@ -714,11 +698,6 @@ export async function fetchSnapshotItemsPage({
     orderableOnly,
     unassignedOnly,
     reserveStatus,
-    abcQty,
-    abcRevenue,
-    abcProfit,
-    sortField,
-    sortDir,
   })
 
   query = query.range(range.from, range.to)
@@ -741,7 +720,7 @@ export async function fetchSnapshotItemsPage({
 }
 
 /**
- * Apply whitelisted filters/sort. ABC: OR inside an axis, AND across axes.
+ * Apply whitelisted filters; default order is category → subcategory → product.
  * Unknown sort fields fall back to the default category/subcategory/name order.
  */
 export function applySnapshotItemsPageQuery(query, {
@@ -754,11 +733,6 @@ export function applySnapshotItemsPageQuery(query, {
   orderableOnly = false,
   unassignedOnly = false,
   reserveStatus = '',
-  abcQty = [],
-  abcRevenue = [],
-  abcProfit = [],
-  sortField = '',
-  sortDir = 'asc',
 } = {}) {
   query = query.eq('snapshot_id', snapshotId)
 
@@ -779,72 +753,10 @@ export function applySnapshotItemsPageQuery(query, {
     query = query.eq('plan_status', reserveStatus).eq('negative_stock', false)
   }
 
-  const abcQuery = describeSnapshotItemsAbcQuery({
-    abcQty,
-    abcRevenue,
-    abcProfit,
-    sortField,
-    sortDir,
-  })
-  for (const filter of abcQuery.inFilters) {
-    query = query.in(filter.column, filter.values)
-  }
-  for (const order of abcQuery.orders) {
-    query = query.order(order.field, {
-      ascending: order.ascending,
-      ...(order.nullsFirst === false ? { nullsFirst: false } : {}),
-    })
-  }
-
   return query
-}
-
-/**
- * ABC-анализ: read-only ranking AAA → CCC (best to worst across all three
- * axes together), ties broken by revenue. Unlike fetchSnapshotItemsPage this
- * sort is fixed — the ranking itself is the point of the page, not a column
- * the buyer toggles.
- */
-export async function fetchAbcAnalysisPage({
-  snapshotId,
-  page = 1,
-  pageSize = 50,
-  search = '',
-  categoryName = '',
-} = {}) {
-  ensureClient()
-  if (!snapshotId) return { items: [], totalCount: 0, page, pageSize }
-
-  const range = snapshotItemsPageRange(page, pageSize)
-
-  let query = supabase
-    .from('procurement_snapshot_items')
-    .select('*', { count: 'exact' })
-    .eq('snapshot_id', snapshotId)
-
-  const q = sanitizePlanningSearch(search)
-  if (q) {
-    query = query.or(`product_name.ilike.%${q}%,barcode.ilike.%${q}%`)
-  }
-  if (categoryName) query = query.eq('category_name', categoryName)
-
-  query = query
-    .order('abc_qty', { ascending: true, nullsFirst: false })
-    .order('abc_revenue', { ascending: true, nullsFirst: false })
-    .order('abc_profit', { ascending: true, nullsFirst: false })
-    .order('revenue_8w', { ascending: false, nullsFirst: false })
-    .order('barcode', { ascending: true })
-    .range(range.from, range.to)
-
-  const { data, error, count } = await query
-  if (error) throw new Error(error.message || 'Не удалось загрузить ABC-анализ')
-
-  return {
-    items: (data || []).map(normalizeItem),
-    totalCount: count ?? 0,
-    page,
-    pageSize,
-  }
+    .order('category_name', { ascending: true })
+    .order('subcategory_name', { ascending: true })
+    .order('product_name', { ascending: true })
 }
 
 /** Full paginated scan of snapshot filter aggregates (no cache). */

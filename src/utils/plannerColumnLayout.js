@@ -94,10 +94,6 @@ export function getPlannerColumnClassName(columnName) {
       return 'proc-planner__col-product proc-planner__sticky-product'
     case 'barcode':
       return 'proc-planner__col-barcode proc-planner__sticky-barcode'
-    case 'abcQty':
-    case 'abcRevenue':
-    case 'abcProfit':
-      return 'proc-planner__col-abc-axis'
     case 'week0':
     case 'week1':
     case 'week2':
@@ -124,6 +120,3 @@ export function parseWeekColumnIndex(columnName) {
   return Number.isFinite(index) ? index : -1
 }
 
-export function isPlannerAbcColumnName(columnName) {
-  return columnName === 'abcQty' || columnName === 'abcRevenue' || columnName === 'abcProfit'
-}

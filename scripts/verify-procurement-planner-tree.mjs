@@ -107,8 +107,8 @@ assert(
     planner.includes('treeMode')
 )
 assert(
-  'search or ABC sort → flat path',
-  /isPlannerTreeViewMode\(\{\s*search:[\s\S]*?abcSortField:/.test(planner) &&
+  'search → flat path',
+  /isPlannerTreeViewMode\(\{\s*search:[\s\S]*?reserveStatus:/.test(planner) &&
     planner.includes('proc-planner__flat-hint') &&
     /!treeMode \? \(\s*<TablePagination/.test(planner)
 )
@@ -179,10 +179,6 @@ assert('isPlannerTreeViewMode idle → tree', ux.isPlannerTreeViewMode({}) === t
 assert(
   'isPlannerTreeViewMode search → flat',
   ux.isPlannerTreeViewMode({ search: '123' }) === false
-)
-assert(
-  'isPlannerTreeViewMode ABC sort → flat',
-  ux.isPlannerTreeViewMode({ abcSortField: 'abc_qty' }) === false
 )
 assert(
   'plannerCategoryExpandsToSku: ≤1 → SKU',

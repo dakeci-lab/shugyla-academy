@@ -60,8 +60,8 @@ assert(
 )
 
 assert(
-  '22 column defs in registry array',
-  registry.getPlannerColumnRegistry().length === 22
+  '19 column defs in registry array (ABC columns removed)',
+  registry.getPlannerColumnRegistry().length === 19
 )
 
 assert(
@@ -77,8 +77,8 @@ assert(
 )
 
 assert(
-  '19 togglable columns flagged (barcode joined the list, «В пути» added in stage 23)',
-  registry.getTogglablePlannerColumnNames().length === 19
+  '16 togglable columns flagged (barcode joined the list, «В пути» added, ABC removed)',
+  registry.getTogglablePlannerColumnNames().length === 16
 )
 
 assert(
@@ -202,12 +202,12 @@ assert(
 const defaults = registry.getDefaultPlannerColumnSettings()
 const visible = layout.getVisibleColumns(defaults)
 
-assert('default visible columns length 22', visible.length === 22)
+assert('default visible columns length 19', visible.length === 19)
 assert(
   'default barcode sticky left 220px (44+176)',
   layout.computeStickyLeft('barcode', visible) === 220
 )
-assert('default tree tail span 19', layout.plannerTreeTailColSpan(visible) === 19)
+assert('default tree tail span 16', layout.plannerTreeTailColSpan(visible) === 16)
 
 const widenedProduct = merge.mergePlannerColumnSettings({
   columns: defaults.columns.map((col) =>
@@ -237,10 +237,10 @@ const hiddenStock = merge.mergePlannerColumnSettings({
   ),
 })
 const visibleHidden = layout.getVisibleColumns(hiddenStock)
-assert('hidden stock reduces visible count', visibleHidden.length === 21)
+assert('hidden stock reduces visible count', visibleHidden.length === 18)
 assert(
   'tree tail span adjusts when column hidden',
-  layout.plannerTreeTailColSpan(visibleHidden) === 18
+  layout.plannerTreeTailColSpan(visibleHidden) === 15
 )
 
 const hiddenFourWeeks = merge.mergePlannerColumnSettings({
@@ -251,10 +251,10 @@ const hiddenFourWeeks = merge.mergePlannerColumnSettings({
   ),
 })
 const visibleHiddenWeeks = layout.getVisibleColumns(hiddenFourWeeks)
-assert('T4: hide 4 week cols → 18 visible columns', visibleHiddenWeeks.length === 18)
+assert('T4: hide 4 week cols → 15 visible columns', visibleHiddenWeeks.length === 15)
 assert(
-  'T4: tree tail span with 4 hidden week cols is 15',
-  layout.plannerTreeTailColSpan(visibleHiddenWeeks) === 15
+  'T4: tree tail span with 4 hidden week cols is 12',
+  layout.plannerTreeTailColSpan(visibleHiddenWeeks) === 12
 )
 
 assert(
@@ -276,8 +276,8 @@ assert(
 )
 
 assert(
-  'T4: reorderable middle zone is 17 columns (19 togglable − supplier − barcode)',
-  registry.getReorderablePlannerColumnNames().length === 17
+  'T4: reorderable middle zone is 14 columns (16 togglable − supplier − barcode)',
+  registry.getReorderablePlannerColumnNames().length === 14
 )
 
 const edgeFunctionPaths = []
@@ -319,7 +319,7 @@ assert(
     mergeSrc.includes('export function reorderTogglablePlannerColumns')
 )
 
-const reordered = merge.reorderTogglablePlannerColumns(defaults, 'stock', 'abcQty')
+const reordered = merge.reorderTogglablePlannerColumns(defaults, 'stock', 'week0')
 const reorderedNames = reordered.columns
   .sort((a, b) => a.columnOrdinalNumber - b.columnOrdinalNumber)
   .map((col) => col.columnName)
@@ -352,12 +352,6 @@ assert(
   planner.includes('saveTableSettings') &&
     planner.includes('normalizePlannerColumnSettingsForSave') &&
     planner.includes('persistColumnSettings')
-)
-
-assert(
-  'T3: abcSort reset when hiding sorted ABC column',
-  planner.includes('plannerColumnNameToAbcSortField') &&
-    planner.includes("setAbcSort({ field: '', dir: 'asc' })")
 )
 
 assert(

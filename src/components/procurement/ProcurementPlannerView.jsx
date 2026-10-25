@@ -96,14 +96,6 @@ import {
   listTodaysOrderSuppliers,
 } from '../../utils/procurementPlannerUx'
 import { toProcurementUserMessage } from '../../utils/procurementErrors'
-import {
-  ABC_AXES,
-  ABC_UNAVAILABLE_NOTICE,
-  abcSortAriaLabel,
-  nextAbcSortState,
-  snapshotItemsLackAbcFacts,
-} from '../../utils/procurementAbc'
-import { AbcBadge, AbcBadges } from './AbcBadges'
 import { calcReserveDays, reserveHighlightFromStatus } from '../../utils/procurementPlanningMath'
 import {
   getDefaultPlannerColumnSettings,
@@ -124,7 +116,6 @@ import {
   getPlannerColumnClassName,
   getVisibleColumns,
   getVisibleLockedLeftColumns,
-  isPlannerAbcColumnName,
   parseWeekColumnIndex,
   plannerTreeTailColSpan,
 } from '../../utils/plannerColumnLayout'
@@ -137,18 +128,8 @@ const RESERVE_DAYS_TITLE =
 const DEFAULT_PAGE_SIZE = 25
 const TREE_BRANCH_PAGE_SIZE = PLANNER_TREE_BRANCH_PAGE_SIZE
 
-const ABC_COLUMN_BY_NAME = Object.freeze({
-  abcQty: ABC_AXES[0],
-  abcRevenue: ABC_AXES[1],
-  abcProfit: ABC_AXES[2],
-})
-
 const REORDERABLE_PLANNER_COLUMNS = new Set(getReorderablePlannerColumnNames())
 const TOGGLABLE_PLANNER_COLUMNS = getTogglablePlannerColumnNames()
-
-function plannerColumnNameToAbcSortField(columnName) {
-  return ABC_COLUMN_BY_NAME[columnName]?.column || ''
-}
 
 function isPlannerColumnReorderable(columnName) {
   return REORDERABLE_PLANNER_COLUMNS.has(columnName)
@@ -177,7 +158,7 @@ function PlannerColumnSettingsIcon({ size = 18 }) {
 const QUICK_RESERVE_EXTRAS = ['no_demand', 'negative_stock']
 
 /** Scope for hard-clear vs soft keep-previous (excludes page/pageSize). */
-function buildPlannerItemsScopeKey(snapshotId, debouncedSearch, filters, abcSort) {
+function buildPlannerItemsScopeKey(snapshotId, debouncedSearch, filters) {
   return [
     snapshotId || '',
     debouncedSearch || '',
@@ -187,11 +168,6 @@ function buildPlannerItemsScopeKey(snapshotId, debouncedSearch, filters, abcSort
     filters?.warningsOnly ? '1' : '0',
     filters?.orderableOnly ? '1' : '0',
     filters?.unassignedOnly ? '1' : '0',
-    Array.isArray(filters?.abcQty) ? filters.abcQty.join(',') : '',
-    Array.isArray(filters?.abcRevenue) ? filters.abcRevenue.join(',') : '',
-    Array.isArray(filters?.abcProfit) ? filters.abcProfit.join(',') : '',
-    abcSort?.field || '',
-    abcSort?.dir || 'asc',
   ].join('|')
 }
 
@@ -313,9 +289,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     unassignedOnly: false,
     /** Set by a bucket click on the «Соответствие норме запаса» widget. */
     reserveStatus: '',
-    abcQty: [],
-    abcRevenue: [],
-    abcProfit: [],
   })
   // Toolbar «Фильтр»: the rarely used quick filters («Только к заказу», «Без поставщика»).
   const [quickFilterOpen, setQuickFilterOpen] = useState(false)
@@ -325,7 +298,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     reserveExtra: '',
   })
   const quickFilterButtonRef = useRef(null)
-  const [abcSort, setAbcSort] = useState({ field: '', dir: 'asc' })
   const [filterOptions, setFilterOptions] = useState(EMPTY_FILTER_OPTIONS)
   const [filterOptionsLoading, setFilterOptionsLoading] = useState(false)
   const [filterOptionsSnapshotId, setFilterOptionsSnapshotId] = useState('')
@@ -550,12 +522,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         (col) => col.columnName === columnName
       )
       const willHide = current?.visible !== false
-      if (willHide) {
-        const sortField = plannerColumnNameToAbcSortField(columnName)
-        if (sortField && abcSort.field === sortField) {
-          setAbcSort({ field: '', dir: 'asc' })
-        }
-      }
       void persistColumnSettings({
         ...columnSettingsRefState.current,
         columns: columnSettingsRefState.current.columns.map((col) =>
@@ -563,14 +529,13 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         ),
       })
     },
-    [abcSort.field, persistColumnSettings]
+    [persistColumnSettings]
   )
 
   const handleResetColumnSettings = useCallback(() => {
     const defaults = getDefaultPlannerColumnSettings()
     setPage(1)
     setPageSize(defaults.pageSize)
-    setAbcSort({ field: '', dir: 'asc' })
     void persistColumnSettings(defaults)
     setColumnSettingsOpen(false)
   }, [persistColumnSettings])
@@ -580,7 +545,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   const treeMode = isPlannerTreeViewMode({
     search: debouncedSearch,
-    abcSortField: abcSort.field,
     reserveStatus: filters.reserveStatus,
   })
 
@@ -699,7 +663,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
     const treeMode = isPlannerTreeViewMode({
       search: debouncedSearch,
-      abcSortField: abcSort.field,
       reserveStatus: filters.reserveStatus,
     })
     if (treeMode) {
@@ -711,12 +674,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
       return
     }
 
-    const scopeKey = buildPlannerItemsScopeKey(
-      snapshot.id,
-      debouncedSearch,
-      filters,
-      abcSort
-    )
+    const scopeKey = buildPlannerItemsScopeKey(snapshot.id, debouncedSearch, filters)
     if (scopeKey !== lastItemsScopeKeyRef.current) {
       setItems([])
       setTotalCount(0)
@@ -732,8 +690,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         pageSize,
         search: debouncedSearch,
         ...filters,
-        sortField: abcSort.field,
-        sortDir: abcSort.dir,
       })
       if (requestId !== itemsRequestIdRef.current) return
       lastItemsScopeKeyRef.current = scopeKey
@@ -750,7 +706,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         setLoading(false)
       }
     }
-  }, [snapshot, page, pageSize, debouncedSearch, filters, abcSort, showError])
+  }, [snapshot, page, pageSize, debouncedSearch, filters, showError])
 
   useEffect(() => {
     void loadSnapshotMeta()
@@ -762,7 +718,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   useEffect(() => {
     setPage(1)
-  }, [debouncedSearch, filters, abcSort, snapshot?.id])
+  }, [debouncedSearch, filters, snapshot?.id])
 
   const resetTreeState = useCallback(() => {
     setExpandedKeys(new Set())
@@ -779,9 +735,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     filters.warningsOnly,
     filters.unassignedOnly,
     filters.reserveStatus,
-    filters.abcQty,
-    filters.abcRevenue,
-    filters.abcProfit,
     resetTreeState,
   ])
 
@@ -789,13 +742,12 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     if (
       isPlannerTreeViewMode({
         search: debouncedSearch,
-        abcSortField: abcSort.field,
         reserveStatus: filters.reserveStatus,
       })
     ) {
       resetTreeState()
     }
-  }, [debouncedSearch, abcSort.field, filters.reserveStatus, resetTreeState])
+  }, [debouncedSearch, filters.reserveStatus, resetTreeState])
 
   /**
    * An attempt key is bound to the payload it was minted for. As soon as any part of
@@ -1196,14 +1148,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   }
 
   const snapshotEditable = isSnapshotQuantityEditable(snapshot?.status)
-  const abcUnavailable =
-    Boolean(snapshot?.id) &&
-    snapshot.status !== 'syncing' &&
-    snapshot.status !== 'failed' &&
-    !loading &&
-    items.length > 0 &&
-    snapshotItemsLackAbcFacts(items)
-
   async function runPlanExport(format) {
     if (
       getExportDisabledReason({
@@ -1667,39 +1611,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   }
 
   function renderPlannerColumnHeader(col) {
-    if (isPlannerAbcColumnName(col.columnName)) {
-      const axis = ABC_COLUMN_BY_NAME[col.columnName]
-      const active = abcSort.field === axis.column
-      const dir = active ? abcSort.dir : ''
-      return renderPlannerColumnHeaderShell(
-        col,
-        <div className="proc-planner__abc-axis-head" title={axis.label}>
-          <button
-            type="button"
-            className={`proc-planner__abc-axis-btn${active ? ' is-active' : ''}${dir ? ` is-${dir}` : ''}`}
-            aria-pressed={active}
-            aria-label={abcSortAriaLabel(axis.label, abcSort, axis.column)}
-            title={abcSortAriaLabel(axis.label, abcSort, axis.column)}
-            onClick={() => setAbcSort((current) => nextAbcSortState(current, axis.column))}
-          >
-            <span className="proc-planner__abc-axis-label">{axis.shortLabel}</span>
-            <span className="proc-planner__abc-axis-arrows" aria-hidden="true">
-              <span
-                className={`proc-planner__abc-arrow is-up${active && dir === 'asc' ? ' is-on' : ''}`}
-              >
-                ▲
-              </span>
-              <span
-                className={`proc-planner__abc-arrow is-down${active && dir === 'desc' ? ' is-on' : ''}`}
-              >
-                ▼
-              </span>
-            </span>
-          </button>
-        </div>
-      )
-    }
-
     const weekIndex = parseWeekColumnIndex(col.columnName)
     if (weekIndex >= 0) {
       return renderPlannerColumnHeaderShell(
@@ -1742,16 +1653,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             {item.barcode || ''}
           </td>
         )
-      case 'abcQty':
-      case 'abcRevenue':
-      case 'abcProfit': {
-        const axis = ABC_COLUMN_BY_NAME[col.columnName]
-        return (
-          <td key={col.columnName} className={className} style={style}>
-            <AbcBadge axisLabel={axis.label} value={item[axis.itemKey]} />
-          </td>
-        )
-      }
       default: {
         const weekIndex = parseWeekColumnIndex(col.columnName)
         if (weekIndex >= 0) {
@@ -2063,7 +1964,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             {item.productName}
           </strong>
         </div>
-        <AbcBadges item={item} />
         <WeeklySpark values={item.weeklySales} />
         <div className="proc-planner__card-grid">
           <span>
@@ -2767,15 +2667,9 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         <p className="proc-planner__empty">{snapshot.error || 'Синхронизация не удалась.'}</p>
       ) : null}
 
-      {abcUnavailable ? (
-        <p className="proc-planner__abc-unavailable" role="status">
-          {ABC_UNAVAILABLE_NOTICE}
-        </p>
-      ) : null}
-
       {!treeMode ? (
         <p className="proc-planner__flat-hint" role="status">
-          Поиск / сортировка ABC — плоский список
+          Поиск — плоский список
         </p>
       ) : null}
 
