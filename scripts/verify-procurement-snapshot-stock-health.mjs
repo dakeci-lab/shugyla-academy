@@ -169,12 +169,11 @@ function stageStatic() {
   )
   assert('no-demand bucket excludes avg_daily <= 0', /where i\.avg_daily <= 0/.test(sql))
   assert(
-    '±20% tolerance band matches STOCK_HEALTH_NORM_TOLERANCE, not exact equality',
+    '±20% tolerance band in the original (stage 2026-08) migration',
     /< i\.norm_days \* 0\.8/.test(sql) &&
       />= i\.norm_days \* 0\.8/.test(sql) &&
       /<= i\.norm_days \* 1\.2/.test(sql) &&
-      /> i\.norm_days \* 1\.2/.test(sql) &&
-      mathSrc.includes('STOCK_HEALTH_NORM_TOLERANCE = 0.2')
+      /> i\.norm_days \* 1\.2/.test(sql)
   )
 
   // Read-only guarantee: this is an aggregate, not a place to smuggle writes.

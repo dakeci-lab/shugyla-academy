@@ -21,3 +21,11 @@
 | средняя цель | 11 дн. | 9 дн. |
 
 Для поставщиков с днями рекомендация почти вдвое меньше по единицам. Цель зависит от дня недели: в воскресенье до среды 3 дня доставки.
+
+## Нормы из интерфейса убраны (PR «remove norms UI»)
+
+Удалены вкладка «Нормы», сервисы и кэш норм, право `procurement.norms.manage` из каталога прав, формулы норм из `procurementPlanningMath`.
+**В базе и в Edge-функции пока остаются** (мёртвые, ничего не читают): `procurement_norm_rules` (копия — `docs/procurement/visit-days-redesign/norm-rules-backup-2026-10-25.csv`),
+`procurement_norm_changes`, `norm_days` и вычисляемая `reserve_status` в позициях снимка, функции `set_procurement_norm_rule_for_snapshot`, `get_procurement_norm_taxonomy`,
+`procurement_norm_rules_journal`, действие `set_norm` и чтение правил в `umag-procurement`. Удаляем отдельным этапом, когда будет деплой функции
+и интерактивное подтверждение удалений (MCP не даёт делать `drop` без него).

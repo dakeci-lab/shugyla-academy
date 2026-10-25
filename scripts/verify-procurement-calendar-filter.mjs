@@ -58,7 +58,7 @@ function stageBackdropAndToolbar() {
   assert('admin modal uses backdrop token', adminModalCss.includes('var(--platform-modal-backdrop'))
   assert('manual create button removed from orders', !page.includes('procurement-page__desktop-create'))
   assert('planning tab remains entry point', page.includes('ProcurementPlannerView'))
-  assert('norms tab is available', page.includes('ProcurementNormsView'))
+  assert('norms tab is gone (stage 23: planning follows supplier delivery days)', !page.includes('ProcurementNormsView'))
   assert('orders use unified table', ordersPage.includes('<PurchaseTable'))
   assert(
     'Orders tab no plan visit list',

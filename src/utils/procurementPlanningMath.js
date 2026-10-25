@@ -1,15 +1,7 @@
 /** Pure planning formulas for Procurement Planning v1. */
 
-export const DEFAULT_NORM_DAYS = 14
 export const PLANNING_SALES_DAYS = 56
 export const PLANNING_WEEK_COUNT = 8
-
-/** Parse norm days; 0 is valid and must not fall through to default. */
-export function parseNormDays(value, fallback = DEFAULT_NORM_DAYS) {
-  const n = Number(value)
-  if (!Number.isFinite(n) || n < 0) return fallback
-  return Math.round(n)
-}
 
 export function calcAvgDaily(weeklySales = []) {
   const sum = (weeklySales || []).reduce((acc, n) => {
@@ -25,14 +17,6 @@ export function calcCalculationStock(rawStock) {
   return Math.max(0, n)
 }
 
-export function calcRecommendedQty(avgDaily, normDays, calculationStock) {
-  const avg = Number(avgDaily)
-  const days = Number(normDays)
-  const stock = Number(calculationStock)
-  if (!Number.isFinite(avg) || !Number.isFinite(days) || !Number.isFinite(stock)) return 0
-  return Math.max(0, Math.round(avg * days - stock))
-}
-
 /**
  * Days of cover at current demand: round(calculationStock / avgDaily).
  * Returns null when avgDaily <= 0 (UI shows «—»).
@@ -44,73 +28,11 @@ export function calcReserveDays(calculationStock, avgDaily) {
   return Math.round(stock / avg)
 }
 
-/** Retail tolerance band around the norm: within ±20% counts as "on norm".
- * Reserve days is a rounded integer while the norm is a flat per-category
- * target, so exact equality is a near-impossible target in practice — with
- * strict equality, real data showed ~1% of SKUs landing exactly on norm
- * instead of the intended ~80%. */
-export const STOCK_HEALTH_NORM_TOLERANCE = 0.2
-
-/**
- * Highlights «Запас/дн» against the item's norm: meaningfully below the
- * tolerance band means lean stock heading toward a shortage (green),
- * meaningfully above means overstock (red), within the band means no
- * highlight — matches the retail 80/10/10 standard's "точно" bucket.
- * Returns null (no highlight) when reserveDays is unknown (calcReserveDays
- * returned null — no demand data) or normDays isn't a finite number.
- */
-export function compareReserveDaysToNorm(reserveDays, normDays) {
-  if (reserveDays == null) return null
-  const norm = Number(normDays)
-  if (!Number.isFinite(norm)) return null
-  const lower = norm * (1 - STOCK_HEALTH_NORM_TOLERANCE)
-  const upper = norm * (1 + STOCK_HEALTH_NORM_TOLERANCE)
-  if (reserveDays < lower) return 'below-norm'
-  if (reserveDays > upper) return 'above-norm'
-  return null
-}
-
 /** Row highlight for «Запас/дн» from the server-side status (stage 23): under -> below-norm, over -> above-norm. */
 export function reserveHighlightFromStatus(reserveStatus) {
   if (reserveStatus === 'under_norm') return 'below-norm'
   if (reserveStatus === 'over_norm') return 'above-norm'
   return null
-}
-
-/**
- * When norm days change: always recompute recommendation.
- * If manual_override is false, final follows recommendation.
- * If true, final is preserved.
- */
-export function applyNormDaysChange(
-  { avgDaily, calculationStock, finalOrderQty, manualOverride },
-  nextNormDays
-) {
-  const recommendedQty = calcRecommendedQty(avgDaily, nextNormDays, calculationStock)
-  return {
-    normDays: nextNormDays,
-    recommendedQty,
-    finalOrderQty: manualOverride ? finalOrderQty : recommendedQty,
-  }
-}
-
-export function resolveNormDays(categoryName, subcategoryName, rules = []) {
-  const cat = categoryName || ''
-  const sub = subcategoryName || ''
-  if (sub) {
-    const subRule = rules.find(
-      (r) => (r.categoryName || r.category_name || '') === cat &&
-        (r.subcategoryName || r.subcategory_name || '') === sub
-    )
-    if (subRule) return parseNormDays(subRule.normDays ?? subRule.norm_days)
-  }
-  const catRule = rules.find((r) => {
-    const rCat = r.categoryName || r.category_name || ''
-    const rSub = r.subcategoryName || r.subcategory_name || ''
-    return rCat === cat && !rSub
-  })
-  if (catRule) return parseNormDays(catRule.normDays ?? catRule.norm_days)
-  return DEFAULT_NORM_DAYS
 }
 
 /** Group orderable items by platform supplier for generate contract. */
