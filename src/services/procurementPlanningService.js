@@ -191,7 +191,12 @@ function normalizeItem(row) {
     abcQty: nullableAbcClass(row.abc_qty),
     abcRevenue: nullableAbcClass(row.abc_revenue),
     abcProfit: nullableAbcClass(row.abc_profit),
-    normDays: parseNormDays(row.norm_days),
+    reserveStatus: row.reserve_status || null,
+    targetDays: nullableFiniteNumber(row.target_days),
+    leadDays: nullableFiniteNumber(row.lead_days),
+    cycleDays: nullableFiniteNumber(row.cycle_days),
+    inTransitQty: finiteNumber(row.in_transit_qty, 0),
+    planBasis: row.plan_basis || null,
     recommendedQty: finiteNumber(row.recommended_qty, 0),
     finalOrderQty: finiteNumber(row.final_order_qty, 0),
     manualOverride: Boolean(row.manual_override),
@@ -612,6 +617,59 @@ export async function fetchProcurementSnapshotStockHealth(snapshotId) {
     overNorm: Number(row.over_norm_count) || 0,
     negative: { noDemand: negNoDemand, underNorm: negUnder, onNorm: negOn, overNorm: negOver },
   }
+}
+
+/** Supplier plan jsonb -> camelCase (see procurement_supplier_plan in stage 23). */
+function normalizeSupplierPlan(data) {
+  if (!data) return null
+  return {
+    today: data.today || null,
+    deliveryDate: data.deliveryDate || '',
+    deliveryDateIsCustom: Boolean(data.deliveryDateIsCustom),
+    leadDays: finiteNumber(data.leadDays, 0),
+    cycleDays: finiteNumber(data.cycleDays, 7),
+    targetDays: finiteNumber(data.targetDays, 0),
+    basis: data.basis || 'default_cycle',
+    safetyDays: finiteNumber(data.safetyDays, 1),
+    skipCycles: finiteNumber(data.skipCycles, 0),
+    minOrderAmount: nullableFiniteNumber(data.minOrderAmount),
+    orderTotal: finiteNumber(data.orderTotal, 0),
+    orderableCount: finiteNumber(data.orderableCount, 0),
+  }
+}
+
+/** Plan of one supplier for this snapshot: delivery date, cycle, safety days, target days, order total vs minimum. */
+export async function fetchProcurementSupplierPlan(snapshotId, supplierId) {
+  ensureClient()
+  if (!snapshotId || !supplierId) return null
+  const { data, error } = await supabase.rpc('procurement_supplier_plan', {
+    p_snapshot_id: snapshotId,
+    p_supplier_id: supplierId,
+  })
+  if (error) throw new Error(error.message || 'Не удалось загрузить план поставщика')
+  return normalizeSupplierPlan(data)
+}
+
+/** Buyer changes the plan (delivery date / safety days / skip a visit); the server recomputes the supplier's items. */
+export async function saveProcurementSupplierPlan({
+  snapshotId,
+  supplierId,
+  deliveryDate,
+  safetyDays,
+  skipCycles,
+  updatedBy,
+}) {
+  ensureClient()
+  const { data, error } = await supabase.rpc('procurement_plan_supplier', {
+    p_snapshot_id: snapshotId,
+    p_supplier_id: supplierId,
+    p_delivery_date: deliveryDate || null,
+    p_safety_days: safetyDays,
+    p_skip_cycles: skipCycles,
+    p_updated_by: updatedBy || null,
+  })
+  if (error) throw new Error(error.message || 'Не удалось пересчитать план поставщика')
+  return normalizeSupplierPlan(data)
 }
 
 /**

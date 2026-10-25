@@ -147,8 +147,8 @@ assert(
 )
 
 assert(
-  'planner imports compareReserveDaysToNorm',
-  planner.includes('compareReserveDaysToNorm')
+  'planner highlights «Запас/дн» from the server status (reserveHighlightFromStatus)',
+  planner.includes('reserveHighlightFromStatus(item.reserveStatus)')
 )
 assert(
   'desktop reserve cell applies below/above-norm modifier class',

@@ -346,8 +346,9 @@ function stageContractFiles() {
       read('src/services/procurementPlanningService.js').includes('finalizeSnapshotFilterOptions')
   )
   assert(
-    'normalizeItem uses parseNormDays',
-    read('src/services/procurementPlanningService.js').includes('parseNormDays(row.norm_days)')
+    'normalizeItem carries the visit-plan fields (target days, in transit, reserve status)',
+    /targetDays: nullableFiniteNumber\(row\.target_days\)/.test(read('src/services/procurementPlanningService.js')) &&
+      /reserveStatus: row\.reserve_status/.test(read('src/services/procurementPlanningService.js'))
   )
   assert(
     'no Number||DEFAULT for normDays normalize',

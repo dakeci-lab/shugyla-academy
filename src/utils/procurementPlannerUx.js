@@ -1173,7 +1173,7 @@ export function buildStockHealthSummary(stockHealth) {
   const counts = [onNorm, overNorm, underNorm]
   const pcts = sharesSummingTo100(counts)
   const meta = [
-    ['onNorm', 'Точно'],
+    ['onNorm', 'Хватает'],
     ['overNorm', 'Перезатарка'],
     ['underNorm', 'Недостаток'],
   ]
