@@ -191,7 +191,7 @@ function normalizeItem(row) {
     abcQty: nullableAbcClass(row.abc_qty),
     abcRevenue: nullableAbcClass(row.abc_revenue),
     abcProfit: nullableAbcClass(row.abc_profit),
-    reserveStatus: row.reserve_status || null,
+    reserveStatus: row.plan_status || null,
     targetDays: nullableFiniteNumber(row.target_days),
     leadDays: nullableFiniteNumber(row.lead_days),
     cycleDays: nullableFiniteNumber(row.cycle_days),
@@ -598,7 +598,7 @@ export async function fetchProcurementSnapshotStockHealth(snapshotId) {
       .select('id', { count: 'exact', head: true })
       .eq('snapshot_id', snapshotId)
       .eq('negative_stock', true)
-      .eq('reserve_status', reserveStatus)
+      .eq('plan_status', reserveStatus)
     if (countError) throw new Error(countError.message || 'Не удалось загрузить сводку по остаткам')
     return count || 0
   }
@@ -676,7 +676,7 @@ export async function saveProcurementSupplierPlan({
  * Server-side paginated items with filters.
  * @returns {{ items, totalCount, page, pageSize }}
  */
-/** Whitelisted values for reserve_status — a generated column, always exactly one of these. */
+/** Whitelisted values for plan_status (stage 23, set by procurement_apply_plan) — always exactly one of these. */
 export const RESERVE_STATUS_VALUES = ['no_demand', 'under_norm', 'on_norm', 'over_norm']
 
 /** Widget-only filter value: every row with a negative stock, whatever its reserve_status. */
@@ -781,7 +781,7 @@ export function applySnapshotItemsPageQuery(query, {
     query = query.eq('negative_stock', true)
   } else if (reserveStatus && RESERVE_STATUS_VALUES.includes(reserveStatus)) {
     // Rows with a negative stock have their own group and stay out of the four buckets.
-    query = query.eq('reserve_status', reserveStatus).eq('negative_stock', false)
+    query = query.eq('plan_status', reserveStatus).eq('negative_stock', false)
   }
 
   const abcQuery = describeSnapshotItemsAbcQuery({

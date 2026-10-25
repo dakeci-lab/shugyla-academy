@@ -187,7 +187,7 @@ begin
       recommended_qty = c.rec,
       final_order_qty = case when i.manual_override or i.generated_purchase_order_id is not null
                              then i.final_order_qty else c.rec end,
-      reserve_status = c.status
+      plan_status = c.status
   from calc c
   where i.id = c.id;
   get diagnostics v_updated = row_count;

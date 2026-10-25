@@ -6,9 +6,9 @@
 `plan_basis` в `procurement_snapshot_items`; таблица `procurement_supplier_plans`; функции `procurement_weekdays`, `procurement_visit_params`,
 `procurement_apply_plan`, `procurement_supplier_plan`, `procurement_plan_supplier`. Файл: `20261025120000_visit_plan_functions.sql`.
 
-**23b (ещё не применён):** `reserve_status` из вычисляемой колонки в обычную, триггер «снимок готов → пересчёт плана», новая сводка
-`get_procurement_snapshot_stock_health`, первичный пересчёт последнего снимка. Применяется вместе со слиянием нового экрана планирования.
-Пробный прогон 23b на проде завис по таймауту — перед применением проверить состояние таблицы и сессий.
+**23b (применён на проде 2026-10-25):** новая колонка `plan_status` (старую вычисляемую `reserve_status` не удаляем — удаление колонки требует интерактивного подтверждения; уберём вместе с нормами), триггер «снимок готов → пересчёт плана», сводка `get_procurement_snapshot_stock_health` из `plan_status`, первичный пересчёт последнего снимка (8 602 позиции; к заказу 1 652 позиции, 16 598 ед. — совпало с пробным расчётом). Файл: `20261025130000_visit_plan_cutover.sql`.
+
+**Откат 23b:** `drop trigger trg_procurement_snapshot_ready_plan`, вернуть прежнее тело `get_procurement_snapshot_stock_health` (на `reserve_status`/`norm_days`), `drop column plan_status`. Старые `recommended_qty` после отката пересчитает ближайшая ночная синхронизация.
 
 **Откат 23a:** `drop function` пяти функций, `drop table procurement_supplier_plans`, `alter table procurement_snapshot_items drop column` пяти колонок.
 
