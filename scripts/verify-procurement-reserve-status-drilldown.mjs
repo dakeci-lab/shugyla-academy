@@ -82,8 +82,8 @@ function stageService() {
   assert('fetchSnapshotItemsPage forwards reserveStatus to applySnapshotItemsPageQuery', /applySnapshotItemsPageQuery\(query, \{[\s\S]{0,300}reserveStatus,/.test(src))
   assert('applySnapshotItemsPageQuery accepts reserveStatus', /applySnapshotItemsPageQuery\(query, \{[\s\S]{0,400}reserveStatus = ''/.test(src))
   assert(
-    'applySnapshotItemsPageQuery filters by reserve_status only against the whitelist',
-    /\} else if \(reserveStatus && RESERVE_STATUS_VALUES\.includes\(reserveStatus\)\) \{[\s\S]{0,200}query = query\.eq\('reserve_status', reserveStatus\)\.eq\('negative_stock', false\)/.test(src)
+    'applySnapshotItemsPageQuery filters by plan_status (stage 23; the old generated reserve_status is dead) only against the whitelist',
+    /\} else if \(reserveStatus && RESERVE_STATUS_VALUES\.includes\(reserveStatus\)\) \{[\s\S]{0,200}query = query\.eq\('plan_status', reserveStatus\)\.eq\('negative_stock', false\)/.test(src)
   )
 
   console.log('')

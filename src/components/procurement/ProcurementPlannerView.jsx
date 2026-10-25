@@ -17,6 +17,8 @@ import {
   exportSnapshotItemsCsv,
   fetchLatestProcurementSnapshot,
   fetchProcurementSnapshotStockHealth,
+  fetchProcurementSupplierPlan,
+  saveProcurementSupplierPlan,
   fetchSnapshotFilterOptions,
   fetchSnapshotItemsPage,
   fetchSnapshotAttemptItems,
@@ -26,6 +28,7 @@ import {
   updateItemFinalOrderQty,
 } from '../../services/procurementPlanningService'
 import ProcurementStockHealthWidget from './ProcurementStockHealthWidget'
+import ProcurementSupplierPlanBar from './ProcurementSupplierPlanBar'
 import {
   getCachedFilterOptions,
   setCachedFilterOptions,
@@ -102,7 +105,7 @@ import {
   snapshotItemsLackAbcFacts,
 } from '../../utils/procurementAbc'
 import { AbcBadge, AbcBadges } from './AbcBadges'
-import { calcReserveDays, compareReserveDaysToNorm } from '../../utils/procurementPlanningMath'
+import { calcReserveDays, reserveHighlightFromStatus } from '../../utils/procurementPlanningMath'
 import {
   getDefaultPlannerColumnSettings,
   getPlannerColumnDef,
@@ -129,7 +132,8 @@ import {
 import { getTableSettings, saveTableSettings } from '../../services/tableSettingsService'
 import './ProcurementPlannerView.css'
 
-const RESERVE_DAYS_TITLE = 'Запас/дн = round(расч. остаток ÷ спрос/день)'
+const RESERVE_DAYS_TITLE =
+  'Запас/дн = round(расч. остаток ÷ спрос/день). Недостаток — не хватит на цель, перезатарка — больше цели и ещё одного цикла поставок.'
 
 const DEFAULT_PAGE_SIZE = 25
 const TREE_BRANCH_PAGE_SIZE = PLANNER_TREE_BRANCH_PAGE_SIZE
@@ -332,6 +336,8 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
   const [generating, setGenerating] = useState(false)
   const [generateOpen, setGenerateOpen] = useState(false)
   const [deliveryDate, setDeliveryDate] = useState('')
+  const [supplierPlan, setSupplierPlan] = useState(null)
+  const [planSaving, setPlanSaving] = useState(false)
   const [confirmGenerate, setConfirmGenerate] = useState(false)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const [exporting, setExporting] = useState(false)
@@ -1379,6 +1385,53 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     )
   }, [filters.platformSupplierId, supplierSelectOptions, filterOptions.suppliers])
   const selectedSupplierSummary = selectedSupplier || null
+
+  // Plan of the selected supplier (delivery date, cycle, safety days). The date it carries is the one the order is created with.
+  useEffect(() => {
+    const supplierId = filters.platformSupplierId
+    if (!snapshot?.id || !supplierId) {
+      setSupplierPlan(null)
+      return undefined
+    }
+    let cancelled = false
+    fetchProcurementSupplierPlan(snapshot.id, supplierId)
+      .then((plan) => {
+        if (cancelled) return
+        setSupplierPlan(plan)
+        if (plan?.deliveryDate) setDeliveryDate(plan.deliveryDate)
+      })
+      .catch(() => {
+        if (!cancelled) setSupplierPlan(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [snapshot?.id, filters.platformSupplierId, saveStatus])
+
+  async function handlePlanChange(patch) {
+    if (!supplierPlan || !snapshot?.id || !filters.platformSupplierId || planSaving) return
+    const next = {
+      deliveryDate: 'deliveryDate' in patch ? patch.deliveryDate : supplierPlan.deliveryDateIsCustom ? supplierPlan.deliveryDate : null,
+      safetyDays: 'safetyDays' in patch ? patch.safetyDays : supplierPlan.safetyDays,
+      skipCycles: 'skipCycles' in patch ? patch.skipCycles : supplierPlan.skipCycles,
+    }
+    setPlanSaving(true)
+    try {
+      const plan = await saveProcurementSupplierPlan({
+        snapshotId: snapshot.id,
+        supplierId: filters.platformSupplierId,
+        ...next,
+        updatedBy: user?.login || user?.id || '',
+      })
+      setSupplierPlan(plan)
+      if (plan?.deliveryDate) setDeliveryDate(plan.deliveryDate)
+      await loadItems()
+    } catch (err) {
+      showError(toProcurementUserMessage(err, 'Не удалось пересчитать план поставщика.'))
+    } finally {
+      setPlanSaving(false)
+    }
+  }
   const orderableChipCount = getOrderableChipCount({
     supplierId: filters.platformSupplierId,
     summary: selectedSupplierSummary,
@@ -1730,7 +1783,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         }
         if (col.columnName === 'reserveDays') {
           const reserveDays = calcReserveDays(item.calculationStock, item.avgDaily)
-          const reserveStatus = compareReserveDaysToNorm(reserveDays, item.normDays)
+          const reserveStatus = reserveHighlightFromStatus(item.reserveStatus)
           return (
             <td
               key={col.columnName}
@@ -1754,15 +1807,22 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             </td>
           )
         }
-        if (col.columnName === 'normDays') {
+        if (col.columnName === 'targetDays') {
           return (
             <td key={col.columnName} className={className} style={style}>
               <span
                 className="proc-planner__norm-value"
-                title="Настраивается во вкладке «Нормы»"
+                title="Сколько дней должно хватить товара: до поставки + цикл + запас"
               >
-                {item.normDays}
+                {item.targetDays ?? ''}
               </span>
+            </td>
+          )
+        }
+        if (col.columnName === 'inTransitQty') {
+          return (
+            <td key={col.columnName} className={className} style={style}>
+              {item.inTransitQty > 0 ? formatNum(item.inTransitQty, 0) : ''}
             </td>
           )
         }
@@ -1994,7 +2054,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   function renderMobileSkuCard(item, index) {
     const reserveDays = calcReserveDays(item.calculationStock, item.avgDaily)
-    const reserveStatus = compareReserveDaysToNorm(reserveDays, item.normDays)
+    const reserveStatus = reserveHighlightFromStatus(item.reserveStatus)
     return (
       <li key={item.id} className="proc-planner__card proc-planner__sku-row">
         <div className="proc-planner__card-top">
@@ -2033,14 +2093,19 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             Спрос/дн <b>{formatNum(item.avgDaily, 2)}</b>
           </span>
           <label>
-            Норма
+            Цель, дн
             <span
               className="proc-planner__norm-value"
-              title="Настраивается во вкладке «Нормы»"
+              title="Сколько дней должно хватить товара: до поставки + цикл + запас"
             >
-              {item.normDays}
+              {item.targetDays ?? ''}
             </span>
           </label>
+          {item.inTransitQty > 0 ? (
+            <span>
+              В пути <b>{formatNum(item.inTransitQty, 0)}</b>
+            </span>
+          ) : null}
           <label className="proc-planner__card-order">
             Заказ
             {renderQtyCell(item, true)}
@@ -2219,7 +2284,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
     negativeStock: 'negative_stock',
   }
   const RESERVE_STATUS_LABELS = {
-    on_norm: 'Точно',
+    on_norm: 'Хватает',
     over_norm: 'Перезатарка',
     under_norm: 'Недостаток',
     no_demand: 'Нет продаж 8 нед.',
@@ -2690,6 +2755,16 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         ) : null}
       </div>
 
+      {filters.platformSupplierId && supplierPlan ? (
+        <ProcurementSupplierPlanBar
+          plan={supplierPlan}
+          supplierName={selectedSupplier?.name}
+          saving={planSaving}
+          disabled={!snapshotEditable || !canGenerate || pendingSaveCount > 0}
+          onChange={(patch) => void handlePlanChange(patch)}
+        />
+      ) : null}
+
       {snapshot?.status === 'failed' ? (
         <p className="proc-planner__empty">{snapshot.error || 'Синхронизация не удалась.'}</p>
       ) : null}
@@ -2827,15 +2902,11 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
             </>
           }
         >
-          <label className="admin-form__field">
+          <p className="admin-form__field">
             <span>Ожидаемая дата поставки</span>
-            <input
-              type="date"
-              value={deliveryDate}
-              onChange={(e) => setDeliveryDate(e.target.value)}
-              required
-            />
-          </label>
+            <b>{deliveryDate ? deliveryDate.split('-').reverse().join('.') : 'не определена'}</b>
+          </p>
+          <p className="proc-planner__hint">Дату можно изменить в панели плана поставки над таблицей.</p>
           <p className="proc-planner__hint">{selectedSupplier?.name || 'Поставщик не выбран'}</p>
         </AdminModal>
       ) : null}

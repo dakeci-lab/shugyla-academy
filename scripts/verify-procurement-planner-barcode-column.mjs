@@ -41,7 +41,7 @@ const layout = await import(pathToFileURL(path.join(ROOT, 'src/utils/plannerColu
 const defaults = registry.getDefaultPlannerColumnSettings()
 const visible = layout.getVisibleColumns(defaults)
 
-assert('default visible column count 21', visible.length === 21)
+assert('default visible column count 22', visible.length === 22)
 
 assert(
   'dynamic thead via renderPlannerColumnHeader',

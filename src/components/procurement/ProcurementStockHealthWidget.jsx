@@ -78,7 +78,7 @@ export default function ProcurementStockHealthWidget({
     <div className="proc-stock-health">
       <div className="proc-stock-health__head">
         <span className="proc-stock-health__title">
-          Соответствие норме запаса
+          Запас относительно графика поставок
           <span className="proc-stock-health__standard">
             от {summary.rated.toLocaleString('ru-RU')} SKU с продажами
           </span>
@@ -91,7 +91,7 @@ export default function ProcurementStockHealthWidget({
       <div
         className="proc-stock-health__bar"
         role="img"
-        aria-label={`Точно ${formatPct(onNorm.pct)}, перезатарка ${formatPct(overNorm.pct)}, недостаток ${formatPct(underNorm.pct)}`}
+        aria-label={`Хватает ${formatPct(onNorm.pct)}, перезатарка ${formatPct(overNorm.pct)}, недостаток ${formatPct(underNorm.pct)}`}
       >
         {summary.buckets.map((bucket) => (
           <button

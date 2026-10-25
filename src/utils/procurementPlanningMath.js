@@ -70,6 +70,13 @@ export function compareReserveDaysToNorm(reserveDays, normDays) {
   return null
 }
 
+/** Row highlight for «Запас/дн» from the server-side status (stage 23): under -> below-norm, over -> above-norm. */
+export function reserveHighlightFromStatus(reserveStatus) {
+  if (reserveStatus === 'under_norm') return 'below-norm'
+  if (reserveStatus === 'over_norm') return 'above-norm'
+  return null
+}
+
 /**
  * When norm days change: always recompute recommendation.
  * If manual_override is false, final follows recommendation.
