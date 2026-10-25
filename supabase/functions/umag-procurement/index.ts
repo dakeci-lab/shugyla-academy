@@ -29,17 +29,14 @@ import {
 } from '../_shared/umagAuth.ts'
 import {
   accumulateSalesRows,
-  assignSnapshotAbcClasses,
   mergeWeekSalesIntoSnapshot,
   roundMoney,
   shouldIncludeSnapshotBarcode,
-} from './abcClassification.js'
+} from './salesAggregation.js'
 
 const PERMISSION_EDIT = 'procurement.edit'
 const PERMISSION_CREATE = 'procurement.create'
 const PERMISSION_TRANSFER = 'procurement.transfer'
-/** Norms feed the buyer stock-health KPI: director only (see docs/procurement/norms-director-only.md). */
-const PERMISSION_NORMS_MANAGE = 'procurement.norms.manage'
 
 /**
  * Sentinel caller.id for the daily 07:00 (Aqtobe) cron sync — no real employee
@@ -55,7 +52,6 @@ function isProcurementSyncSchedulerEnabled(): boolean {
 const STOCK_PATH = '/rest/cabinet/opr/stock/find'
 const SALES_PATH = '/rest/cabinet/report/list-product-report'
 const PAGE_SIZE = 50_000
-const DEFAULT_NORM_DAYS = 14
 const INSERT_CHUNK = 400
 const UMAG_FETCH_TIMEOUT_MS = 120_000
 const ALMATY_TZ = 'Asia/Almaty'
@@ -63,12 +59,6 @@ const ALMATY_OFFSET_MS = 5 * 60 * 60 * 1000
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const MAX_GENERATE_SUPPLIERS = 500
-
-type NormRule = {
-  category_name: string
-  subcategory_name: string
-  norm_days: number
-}
 
 type StockRow = {
   barcode?: string | null
@@ -246,41 +236,6 @@ export function calcCalculationStock(rawStock: number): number {
   return Math.max(0, Number.isFinite(rawStock) ? rawStock : 0)
 }
 
-export function calcRecommendedQty(
-  avgDaily: number,
-  normDays: number,
-  calculationStock: number
-): number {
-  const raw = avgDaily * normDays - calculationStock
-  return Math.max(0, Math.round(raw))
-}
-
-function parseNormDays(value: unknown, fallback = DEFAULT_NORM_DAYS): number {
-  const n = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(n) || n < 0) return fallback
-  return Math.round(n)
-}
-
-function resolveNormDays(
-  categoryName: string,
-  subcategoryName: string,
-  rules: NormRule[]
-): number {
-  const cat = categoryName || ''
-  const sub = subcategoryName || ''
-  if (sub) {
-    const subRule = rules.find(
-      (r) => r.category_name === cat && r.subcategory_name === sub
-    )
-    if (subRule) return parseNormDays(subRule.norm_days)
-  }
-  const catRule = rules.find(
-    (r) => r.category_name === cat && (!r.subcategory_name || r.subcategory_name === '')
-  )
-  if (catRule) return parseNormDays(catRule.norm_days)
-  return DEFAULT_NORM_DAYS
-}
-
 async function fetchCallerDisplayName(
   // deno-lint-ignore no-explicit-any
   serviceClient: any,
@@ -386,11 +341,8 @@ async function handleSync(
   const snapshotId = snapshot.id as string
 
   try {
-    const [stockResult, rulesResult, suppliersResult] = await Promise.all([
+    const [stockResult, suppliersResult] = await Promise.all([
       fetchAllStock(storeId),
-      authz.serviceClient
-        .from('procurement_norm_rules')
-        .select('category_name, subcategory_name, norm_days'),
       authz.serviceClient
         .from('platform_suppliers')
         .select('id, umag_supplier_id')
@@ -440,7 +392,6 @@ async function handleSync(
       }
     }
 
-    const rules = (rulesResult.data || []) as NormRule[]
     const stockByBarcode = new Map<string, StockRow>()
     for (const row of stockResult) {
       const barcode = asBarcode(row.barcode)
@@ -489,8 +440,9 @@ async function handleSync(
       const avgDaily = calcAvgDaily(weekly)
       const categoryName = asText(stock?.categoryName)
       const subcategoryName = asText(stock?.subCategoryName)
-      const normDays = resolveNormDays(categoryName, subcategoryName, rules)
-      const recommendedQty = calcRecommendedQty(avgDaily, normDays, calculationStock)
+      // The recommendation follows the supplier's delivery schedule (stage 23): the database computes it
+      // (procurement_apply_plan, run by a trigger when this snapshot becomes ready), so facts are inserted with 0.
+      const recommendedQty = 0
       const umagSupplierIdRaw = stock?.supplierId
       const umagSupplierId =
         umagSupplierIdRaw == null || umagSupplierIdRaw === ''
@@ -544,7 +496,6 @@ async function handleSync(
         revenue_8w: revenue8w,
         cogs_8w: cogs8w,
         profit_8w: profit8w,
-        norm_days: normDays,
         recommended_qty: recommendedQty,
         final_order_qty: recommendedQty,
         manual_override: false,
@@ -553,20 +504,7 @@ async function handleSync(
       })
     }
 
-    const abcByBarcode = assignSnapshotAbcClasses(draftItems)
-    const items = draftItems.map((item) => {
-      const abc = abcByBarcode.get(String(item.barcode || '')) || {
-        abc_qty: null,
-        abc_revenue: null,
-        abc_profit: null,
-      }
-      return {
-        ...item,
-        abc_qty: abc.abc_qty,
-        abc_revenue: abc.abc_revenue,
-        abc_profit: abc.abc_profit,
-      }
-    })
+    const items = draftItems
 
     for (let i = 0; i < items.length; i += INSERT_CHUNK) {
       const chunk = items.slice(i, i + INSERT_CHUNK)
@@ -847,84 +785,6 @@ async function handleGenerate(
   })
 }
 
-async function handleSetNorm(
-  authz: Exclude<Awaited<ReturnType<typeof authorizeWorkforceRequest>>, Response>,
-  body: Record<string, unknown>
-): Promise<Response> {
-  if (authz.permissions[PERMISSION_NORMS_MANAGE] !== true) {
-    return adminErrorResponse('forbidden', 403)
-  }
-
-  const snapshotId = asText(body.snapshotId)
-  if (!snapshotId) {
-    return umagErrorResponse('VALIDATION_ERROR', 'Укажите snapshotId.', 400)
-  }
-
-  const categoryName = typeof body.categoryName === 'string' ? body.categoryName : ''
-  const subcategoryName =
-    typeof body.subcategoryName === 'string' ? body.subcategoryName : ''
-
-  const normRaw = body.normDays
-  const normDays =
-    typeof normRaw === 'number'
-      ? normRaw
-      : typeof normRaw === 'string' && normRaw.trim() !== ''
-        ? Number(normRaw)
-        : NaN
-  if (!Number.isInteger(normDays) || normDays < 0) {
-    return umagErrorResponse(
-      'VALIDATION_ERROR',
-      'normDays должен быть целым числом ≥ 0.',
-      400
-    )
-  }
-
-  const updatedBy = String(authz.caller.id)
-  const updatedByName = await fetchCallerDisplayName(authz.serviceClient, authz.caller.id)
-
-  const { data, error } = await authz.serviceClient.rpc(
-    'set_procurement_norm_rule_for_snapshot',
-    {
-      p_snapshot_id: snapshotId,
-      p_category_name: categoryName,
-      p_subcategory_name: subcategoryName,
-      p_norm_days: normDays,
-      p_updated_by: updatedBy,
-      p_updated_by_name: updatedByName || null,
-    }
-  )
-
-  if (error) {
-    console.error('umag_procurement_set_norm_rpc_failed', {
-      message: error.message,
-      code: error.code,
-    })
-    const msg = error.message || ''
-    if (msg.includes('snapshot must be ready')) {
-      return umagErrorResponse(
-        'SNAPSHOT_NOT_READY',
-        'Снимок ещё не готов к изменению норм.',
-        409
-      )
-    }
-    if (msg.includes('snapshot not found')) {
-      return umagErrorResponse('SNAPSHOT_NOT_FOUND', 'Снимок не найден.', 404)
-    }
-    return umagErrorResponse(
-      'SET_NORM_FAILED',
-      'Не удалось сохранить норму планирования.',
-      500
-    )
-  }
-
-  const result = (data || {}) as Record<string, unknown>
-  return jsonResponse({
-    success: true,
-    action: 'set_norm',
-    ...result,
-  })
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return corsPreflightResponse()
   if (req.method !== 'POST') return adminErrorResponse('method_not_allowed', 405)
@@ -977,25 +837,19 @@ Deno.serve(async (req) => {
   }
 
   const action = asText(body.action)
-  if (action !== 'sync' && action !== 'generate' && action !== 'set_norm') {
+  if (action !== 'sync' && action !== 'generate') {
     return umagErrorResponse(
       'VALIDATION_ERROR',
-      'Укажите action: sync, generate или set_norm.',
+      'Укажите action: sync или generate.',
       400
     )
   }
 
-  const needed =
-    action === 'generate'
-      ? [PERMISSION_CREATE, PERMISSION_TRANSFER]
-      : action === 'set_norm'
-        ? [PERMISSION_NORMS_MANAGE]
-        : [PERMISSION_EDIT]
+  const needed = action === 'generate' ? [PERMISSION_CREATE, PERMISSION_TRANSFER] : [PERMISSION_EDIT]
 
   const authz = await authorizeWorkforceRequest(req, needed)
   if (authz instanceof Response) return authz
 
   if (action === 'sync') return handleSync(authz)
-  if (action === 'set_norm') return handleSetNorm(authz, body)
   return handleGenerate(authz, body)
 })
