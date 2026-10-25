@@ -8,11 +8,6 @@ import {
   resolveEdgeFunctionUserMessage,
 } from '../utils/edgeFunctionErrors'
 import {
-  calcRecommendedQty,
-  DEFAULT_NORM_DAYS,
-  parseNormDays,
-} from '../utils/procurementPlanningMath'
-import {
   describeSnapshotItemsAbcQuery,
   snapshotItemsPageRange,
 } from '../utils/procurementAbc'
@@ -959,49 +954,6 @@ export async function resetItemToRecommendation(item) {
   })
 }
 
-/**
- * Persist norm via Edge action set_norm → privileged RPC (never called with a client key).
- * Preserves final_order_qty when manual_override=true.
- */
-export async function persistNormDaysForScope({
-  snapshotId,
-  categoryName,
-  subcategoryName = '',
-  normDays,
-  itemId = null,
-}) {
-  ensureClient()
-  const days = parseNormDays(normDays, DEFAULT_NORM_DAYS)
-
-  const { data, error } = await supabase.functions.invoke('umag-procurement', {
-    body: {
-      action: 'set_norm',
-      snapshotId,
-      categoryName: categoryName || '',
-      subcategoryName: subcategoryName || '',
-      normDays: days,
-    },
-  })
-  if (error) {
-    const mapped = await mapInvokeFailure(error, data)
-    throw new Error(mapped.message || 'Не удалось сохранить норму')
-  }
-  if (data?.success === false) {
-    throw new Error(data.message || 'Не удалось сохранить норму')
-  }
-
-  if (itemId) {
-    const { data: itemRow, error: itemErr } = await supabase
-      .from('procurement_snapshot_items')
-      .select('*')
-      .eq('id', itemId)
-      .maybeSingle()
-    if (itemErr) throw new Error(itemErr.message || 'Не удалось загрузить позицию')
-    return normalizeItem(itemRow)
-  }
-  return { success: true, ...(data || {}), normDays: days }
-}
-
 export async function exportSnapshotItemsCsv(snapshotId, filters = {}) {
   ensureClient()
   const pageSize = 1000
@@ -1056,8 +1008,5 @@ export async function fetchSnapshotItemsTotals({ snapshotId, search = '' } = {})
   return { totalPurchaseValue, totalSellingValue }
 }
 
-export function recalculateRecommendationLocal(item, normDays) {
-  return calcRecommendedQty(item.avgDaily, normDays, item.calculationStock)
-}
 
 export { USER_MESSAGES as PROCUREMENT_PLANNING_USER_MESSAGES }

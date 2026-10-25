@@ -33,7 +33,6 @@ import {
   getCachedFilterOptions,
   setCachedFilterOptions,
 } from '../../services/procurementFilterOptionsCache.js'
-import { invalidateProcurementNormsCache } from '../../services/procurementNormsCache'
 import AdminModal from '../admin/AdminModal'
 import ConfirmDialog from '../admin/ConfirmDialog'
 import SearchableSupplierSelect from '../suppliers/SearchableSupplierSelect'
@@ -826,7 +825,6 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         return
       }
       showSuccess(`Синхронизировано: ${result.itemCount} SKU`)
-      invalidateProcurementNormsCache()
       await loadSnapshotMeta({ forceFilterRefresh: true })
       await loadItems()
     } catch (err) {

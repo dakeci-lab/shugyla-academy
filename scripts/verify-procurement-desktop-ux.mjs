@@ -1148,10 +1148,6 @@ function stageSourceContracts() {
       planner.includes('void handleQtyEnter(item, e.target)')
   )
   assert(
-    'UMAG sync invalidates norms cache',
-    planner.includes('invalidateProcurementNormsCache()')
-  )
-  assert(
     'blur does not full-reload filter options',
     !/handleFinalChange[\s\S]{0,400}loadSnapshotMeta\(/.test(planner)
   )

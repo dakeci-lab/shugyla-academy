@@ -21,7 +21,6 @@ const pagination = read('src/components/procurement/TablePagination.jsx')
 const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
 const plannerCss = read('src/components/procurement/ProcurementPlannerView.css')
 const orders = read('src/pages/platform/orders/OrdersPage.jsx')
-const norms = read('src/components/procurement/ProcurementNormsView.jsx')
 
 assert('page sizes are 25/50/100/500', pagination.includes('[25, 50, 100, 500]'))
 assert('first page navigation exists', pagination.includes('aria-label="Первая страница"'))
@@ -52,7 +51,5 @@ assert('orders are sliced by page', orders.includes('orders.slice(start, start +
 assert('orders use shared pagination', orders.includes('<TablePagination'))
 assert('orders refresh/filter header removed', !orders.includes('procurement-page__header'))
 assert('orders filter popover removed', !orders.includes('PurchaseFilterPopover'))
-
-assert('norms use shared loading skeleton', norms.includes('<DelayedLoadingSkeleton variant="list" count={7} />'))
 
 console.log(`\n${checks}/${checks} checks passed`)

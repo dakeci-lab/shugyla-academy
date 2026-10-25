@@ -5,14 +5,13 @@ import { canViewPurchases } from '../../../config/permissions'
 import { isCloudMode } from '../../../lib/dataMode'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
 import ProcurementPlannerView from '../../../components/procurement/ProcurementPlannerView'
-import ProcurementNormsView from '../../../components/procurement/ProcurementNormsView'
 import ProcurementAbcAnalysisView from '../../../components/procurement/ProcurementAbcAnalysisView'
 import ProcurementWarehouseView from '../../../components/procurement/ProcurementWarehouseView'
 import '../../../components/admin/admin-shared.css'
 import './ProcurementPage.css'
 
 /**
- * Закуп: планирование (по умолчанию), нормы, ABC, склад — /platform/procurement.
+ * Закуп: планирование (по умолчанию), ABC, склад — /platform/procurement.
  * Созданные заказы живут в отдельном разделе «Заказы» (/platform/orders).
  */
 export default function ProcurementPage() {
@@ -55,17 +54,6 @@ export default function ProcurementPage() {
             type="button"
             role="tab"
             className={
-              mainTab === 'norms' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
-            }
-            aria-selected={mainTab === 'norms'}
-            onClick={() => setMainTab('norms')}
-          >
-            Нормы
-          </button>
-          <button
-            type="button"
-            role="tab"
-            className={
               mainTab === 'abc' ? 'procurement-page__tab is-active' : 'procurement-page__tab'
             }
             aria-selected={mainTab === 'abc'}
@@ -95,8 +83,6 @@ export default function ProcurementPage() {
 
       {mainTab === 'planning' ? (
         <ProcurementPlannerView headerSlot={tabsAsideEl} />
-      ) : mainTab === 'norms' ? (
-        <ProcurementNormsView />
       ) : mainTab === 'abc' ? (
         <ProcurementAbcAnalysisView />
       ) : (

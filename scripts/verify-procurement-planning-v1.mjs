@@ -49,32 +49,6 @@ async function stageFormulas() {
     Math.abs(math.calcAvgDaily([7, 7, 7, 7, 7, 7, 7, 7]) - 1) < 1e-9
   )
 
-  const rec = math.calcRecommendedQty(2, 14, 10)
-  assert('recommendation rounds max(0, avg*norm-stock)', rec === 18)
-
-  const negRec = math.calcRecommendedQty(0.1, 14, 5)
-  assert('recommendation never negative', negRec === 0)
-
-  const auto = math.applyNormDaysChange(
-    { avgDaily: 2, calculationStock: 10, finalOrderQty: 18, manualOverride: false },
-    21
-  )
-  assert('norm change updates recommendation', auto.recommendedQty === 32)
-  assert('without override final follows recommendation', auto.finalOrderQty === 32)
-
-  const manual = math.applyNormDaysChange(
-    { avgDaily: 2, calculationStock: 10, finalOrderQty: 40, manualOverride: true },
-    21
-  )
-  assert('manual override preserves final', manual.finalOrderQty === 40)
-  assert('manual override still updates recommendation', manual.recommendedQty === 32)
-
-  assert('parseNormDays keeps zero', math.parseNormDays(0) === 0)
-  assert('parseNormDays keeps string zero', math.parseNormDays('0') === 0)
-  assert('resolveNormDays keeps zero rule', math.resolveNormDays('A', 'B', [
-    { category_name: 'A', subcategory_name: 'B', norm_days: 0 },
-  ]) === 0)
-
   assert('calcReserveDays 10/2 → 5', math.calcReserveDays(10, 2) === 5)
   assert('calcReserveDays 11/4 → 3', math.calcReserveDays(11, 4) === 3)
   assert('calcReserveDays 0/1.5 → 0', math.calcReserveDays(0, 1.5) === 0)
@@ -323,10 +297,9 @@ function stageContractFiles() {
     'set_procurement_norm_rule_for_snapshot',
     'Edge calls norm RPC'
   )
-  assertFileContains(
-    'src/services/procurementPlanningService.js',
-    "action: 'set_norm'",
-    'service invokes set_norm Edge action'
+  assert(
+    'the planner no longer invokes set_norm (norms removed from the UI in stage 23; the Edge action stays until the next function deploy)',
+    !read('src/services/procurementPlanningService.js').includes("action: 'set_norm'")
   )
   assert(
     'service does not call supabase.rpc for norm',
