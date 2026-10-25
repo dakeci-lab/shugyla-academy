@@ -21,6 +21,11 @@ begin
     return new;
   end if;
 
+  -- procurement_apply_plan() sets this transaction-local flag: it only writes planning columns for thousands of rows at once.
+  if current_setting('app.items_guard_skip', true) = '1' then
+    return new;
+  end if;
+
   if new.snapshot_id is distinct from old.snapshot_id
      or new.barcode is distinct from old.barcode
      or new.product_name is distinct from old.product_name
@@ -112,6 +117,10 @@ drop table public.procurement_norm_changes;
 drop table public.procurement_norm_rules;
 drop function public.set_procurement_norm_rule_for_snapshot(uuid, text, text, integer, text, text);
 drop function public.get_procurement_norm_taxonomy(uuid);
+
+-- 2b. The ready trigger is a no-op since stage 23c (the plan is computed by cron / the planner).
+drop trigger trg_procurement_snapshot_ready_plan on public.procurement_snapshots;
+drop function public.procurement_snapshot_ready_plan();
 
 -- 3. Snapshot items: dead columns (their indexes go with them).
 alter table public.procurement_snapshot_items drop column reserve_status;

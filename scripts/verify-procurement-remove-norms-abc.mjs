@@ -47,6 +47,8 @@ assert.match(sql, /drop table public\.procurement_norm_changes;\ndrop table publ
 assert.match(sql, /count\(\*\) filter \(where i\.plan_status = 'under_norm'\)/)
 const guard = sql.slice(sql.indexOf('procurement_snapshot_items_guard_update'), sql.indexOf('compute_procurement_snapshot_rollup'))
 assert.doesNotMatch(guard, /norm_days|abc_/)
+assert.match(sql, /app\.items_guard_skip/)
+assert.match(sql, /drop trigger trg_procurement_snapshot_ready_plan/)
 ok('migration: one transaction, no CASCADE / IF EXISTS, the guard and the rollup no longer mention the dropped columns')
 
 const readme = read('docs/db/stage-24-remove-norms-and-abc/README.md')

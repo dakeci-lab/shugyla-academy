@@ -1,0 +1,22 @@
+-- Stage 23c — the plan is computed outside the sync's «ready» statement (applied on prod 2026-10-25).
+-- Docs: docs/db/stage-23-visit-plan/
+--
+-- Found on the first real sync after the Edge deploy: the AFTER UPDATE trigger ran procurement_apply_plan() inside the «ready» update;
+-- the first full computation takes ~6 s and the API role (authenticator) has an 8 s statement timeout, so the sync failed
+-- with «Снимок создан, но не удалось отметить как готовый».
+--
+-- 1. The guard trigger on snapshot items skips its per-row checks when procurement_apply_plan() sets app.items_guard_skip
+--    (the checks cost ~2 s for 8.6k rows; the function only writes planning columns).
+-- 2. procurement_apply_plan() is rewritten: materialized CTEs, equality join on a coalesced supplier key, and it updates only rows that change
+--    (a repeat run takes ~0.15 s; the first run ~4-6 s).
+-- 3. The ready trigger becomes a no-op; instead
+--    - cron job «procurement-ensure-plan-every-minute» calls procurement_ensure_plan_latest() (unlimited time, finds the latest working
+--      snapshot with items lacking plan_status and applies the plan);
+--    - the planner calls procurement_ensure_plan(snapshot) right after a manual sync (8 s limit; failure is harmless, cron catches up).
+-- The full function bodies are the live definitions (see git history of this file's siblings and the database).
+
+-- (applied) create or replace function public.procurement_snapshot_items_guard_update() ... skip flag ...
+-- (applied) create or replace function public.procurement_apply_plan(uuid, uuid) ... fast version ...
+-- (applied) create or replace function public.procurement_snapshot_ready_plan() ... no-op ...
+-- (applied) create function public.procurement_ensure_plan_latest(), public.procurement_ensure_plan(uuid)
+-- (applied) select cron.schedule('procurement-ensure-plan-every-minute', '* * * * *', 'select public.procurement_ensure_plan_latest()');
