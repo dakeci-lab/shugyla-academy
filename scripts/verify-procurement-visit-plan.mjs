@@ -50,6 +50,11 @@ assert.match(cutSql, /when \(new\.status = 'ready' and old\.status is distinct f
 assert.match(cutSql, /get_procurement_snapshot_stock_health/)
 ok('cutover migration: plan_status column (reserve_status left for the norm removal), plan computed when a snapshot becomes ready, stock-health from plan_status')
 
+const asyncSql = read('supabase/migrations/20261025140000_visit_plan_async_ensure.sql')
+assert.match(asyncSql, /procurement-ensure-plan-every-minute/)
+assert.match(read('src/components/procurement/ProcurementPlannerView.jsx'), /ensureProcurementPlan\(result\.snapshotId\)/)
+ok('the plan is computed by cron and by the planner right after a manual sync, not inside the sync statement')
+
 const service = read('src/services/procurementPlanningService.js')
 assert.match(service, /rpc\('procurement_supplier_plan'/)
 assert.match(service, /rpc\('procurement_plan_supplier'/)

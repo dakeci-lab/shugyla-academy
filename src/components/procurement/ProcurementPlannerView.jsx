@@ -17,6 +17,7 @@ import {
   exportSnapshotItemsCsv,
   fetchLatestProcurementSnapshot,
   fetchProcurementSnapshotStockHealth,
+  ensureProcurementPlan,
   fetchProcurementSupplierPlan,
   saveProcurementSupplierPlan,
   fetchSnapshotFilterOptions,
@@ -777,6 +778,11 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
         return
       }
       showSuccess(`Синхронизировано: ${result.itemCount} SKU`)
+      try {
+        if (result.snapshotId) await ensureProcurementPlan(result.snapshotId)
+      } catch {
+        // the cron job computes the plan within a minute
+      }
       await loadSnapshotMeta({ forceFilterRefresh: true })
       await loadItems()
     } catch (err) {

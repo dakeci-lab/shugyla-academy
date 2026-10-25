@@ -603,6 +603,18 @@ export async function fetchProcurementSnapshotStockHealth(snapshotId) {
   }
 }
 
+/**
+ * After a sync the plan (targets, in transit, recommendation, status) is computed by the database: a cron job does it within a minute,
+ * this call does it right away for the snapshot the user just created. Failure is not fatal — the cron job catches up.
+ */
+export async function ensureProcurementPlan(snapshotId) {
+  ensureClient()
+  if (!snapshotId) return 0
+  const { data, error } = await supabase.rpc('procurement_ensure_plan', { p_snapshot_id: snapshotId })
+  if (error) throw new Error(error.message || 'Не удалось рассчитать план')
+  return Number(data) || 0
+}
+
 /** Supplier plan jsonb -> camelCase (see procurement_supplier_plan in stage 23). */
 function normalizeSupplierPlan(data) {
   if (!data) return null
