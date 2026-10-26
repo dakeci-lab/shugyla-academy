@@ -44,6 +44,7 @@ import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import AdminModal from '../../../components/admin/AdminModal'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
 import { PurchaseStatusBadge } from '../../../components/procurement/PurchaseStatsCards'
+import { ORDER_LABELS } from '../../../config/documentLabels'
 import PurchaseItemsTable from '../../../components/procurement/PurchaseItemsTable'
 import PurchaseItemForm, {
   EMPTY_PURCHASE_ITEM_FORM,
@@ -514,29 +515,29 @@ export default function PurchaseDetailPage() {
 
       <dl className="purchase-detail__meta">
         <div>
-          <dt>Поставщик</dt>
+          <dt>{ORDER_LABELS.supplier}</dt>
           <dd>{order.supplierName || '—'}</dd>
         </div>
         <div>
-          <dt>Дата</dt>
+          <dt>{ORDER_LABELS.orderDate}</dt>
           <dd>{formatPurchaseDate(order.date)}</dd>
         </div>
         <div>
-          <dt>Создал</dt>
+          <dt>{ORDER_LABELS.createdBy}</dt>
           <dd>{order.createdByName || '—'}</dd>
         </div>
         <div>
-          <dt>Ожидаемая доставка</dt>
+          <dt>{ORDER_LABELS.delivery}</dt>
           <dd>{formatPurchaseDate(order.expectedDeliveryDate)}</dd>
         </div>
         {order.comment ? (
           <div className="purchase-detail__meta-wide">
-            <dt>Комментарий</dt>
+            <dt>{ORDER_LABELS.comment}</dt>
             <dd>{order.comment}</dd>
           </div>
         ) : null}
         <div>
-          <dt>Сумма заказа</dt>
+          <dt>{ORDER_LABELS.totalAmount}</dt>
           <dd className="purchase-detail__total">{formatPurchaseAmount(totalAmount)}</dd>
         </div>
       </dl>

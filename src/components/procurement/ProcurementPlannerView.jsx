@@ -29,6 +29,7 @@ import {
   updateItemFinalOrderQty,
 } from '../../services/procurementPlanningService'
 import ProcurementStockHealthWidget from './ProcurementStockHealthWidget'
+import { ORDER_LABELS } from '../../config/documentLabels'
 import ProcurementSupplierPlanBar from './ProcurementSupplierPlanBar'
 import {
   getCachedFilterOptions,
@@ -2801,7 +2802,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
           }
         >
           <p className="admin-form__field">
-            <span>Ожидаемая дата поставки</span>
+            <span>{ORDER_LABELS.delivery}</span>
             <b>{deliveryDate ? deliveryDate.split('-').reverse().join('.') : 'не определена'}</b>
           </p>
           <p className="proc-planner__hint">Дату можно изменить в панели плана поставки над таблицей.</p>

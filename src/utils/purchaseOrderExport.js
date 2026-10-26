@@ -3,6 +3,7 @@
  */
 
 import { mapPurchaseOrderForExport } from './procurementPlanningMath'
+import { ORDER_LABELS as L } from '../config/documentLabels'
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
@@ -22,6 +23,13 @@ function safeFilenamePart(value) {
     .slice(0, 60)
 }
 
+/** dd.mm.yyyy in both formats (the app shows dates this way); empty stays empty. */
+function formatDocDate(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleDateString('ru-RU')
+}
+
 function formatMoney(n) {
   const v = Number(n)
   if (!Number.isFinite(v)) return '0'
@@ -39,13 +47,13 @@ export async function exportPurchaseOrderXlsx(order) {
   const XLSX = await import('xlsx')
   // Column A holds the row number; the order header and totals sit in B/C so the narrow number column does not clip their labels.
   const sheetRows = [
-    ['', 'Поставщик', mapped.supplierName],
-    ['', 'Дата заказа', mapped.purchaseDate],
-    ['', 'Ожидаемая доставка', mapped.expectedDeliveryDate],
-    ['', 'Создал', mapped.createdByName],
-    ['', 'Комментарий', mapped.comment],
+    ['', L.supplier, mapped.supplierName],
+    ['', L.orderDate, formatDocDate(mapped.purchaseDate)],
+    ['', L.delivery, formatDocDate(mapped.expectedDeliveryDate)],
+    ['', L.createdBy, mapped.createdByName],
+    ['', L.comment, mapped.comment],
     [],
-    ['№', 'Товар', 'Штрихкод', 'Кол-во', 'Цена закупки', 'Сумма'],
+    [L.number, L.product, L.barcode, L.qty, L.price, L.amount],
     ...mapped.items.map((item, index) => [
       index + 1,
       item.productName,
@@ -55,8 +63,8 @@ export async function exportPurchaseOrderXlsx(order) {
       item.lineTotal,
     ]),
     [],
-    ['', 'Итого позиций', mapped.itemsCount],
-    ['', 'Итого сумма', mapped.totalAmount],
+    ['', L.totalItems, mapped.itemsCount],
+    ['', L.totalAmount, mapped.totalAmount],
   ]
 
   const wb = XLSX.utils.book_new()
@@ -88,17 +96,17 @@ export async function exportPurchaseOrderPdf(order) {
 
   const body = [
     [
-      { text: '№', style: 'tableHeader' },
-      { text: 'Товар', style: 'tableHeader' },
-      { text: 'Штрихкод', style: 'tableHeader' },
-      { text: 'Кол-во', style: 'tableHeader' },
-      { text: 'Цена', style: 'tableHeader' },
-      { text: 'Сумма', style: 'tableHeader' },
+      { text: L.number, style: 'tableHeader' },
+      { text: L.product, style: 'tableHeader' },
+      { text: L.barcode, style: 'tableHeader' },
+      { text: L.qty, style: 'tableHeader' },
+      { text: L.price, style: 'tableHeader' },
+      { text: L.amount, style: 'tableHeader' },
     ],
     ...mapped.items.map((item, index) => [
       String(index + 1),
-      item.productName || '—',
-      item.barcode || '—',
+      item.productName || '',
+      item.barcode || '',
       formatQty(item.orderedQty),
       formatMoney(item.purchasePrice),
       formatMoney(item.lineTotal),
@@ -108,31 +116,28 @@ export async function exportPurchaseOrderPdf(order) {
   const docDefinition = {
     defaultStyle: { font: 'Roboto', fontSize: 10 },
     content: [
-      { text: 'Заказ поставщику', style: 'title' },
+      { text: L.documentTitle, style: 'title' },
       {
-        text: [
-          { text: 'Поставщик: ', bold: true },
-          mapped.supplierName || '—',
-        ],
+        text: [{ text: `${L.supplier}: `, bold: true }, mapped.supplierName || ''],
         margin: [0, 8, 0, 2],
       },
       {
         text: [
-          { text: 'Дата заказа: ', bold: true },
-          mapped.purchaseDate || '—',
+          { text: `${L.orderDate}: `, bold: true },
+          formatDocDate(mapped.purchaseDate),
           '   ',
-          { text: 'Поставка: ', bold: true },
-          mapped.expectedDeliveryDate || '—',
+          { text: `${L.delivery}: `, bold: true },
+          formatDocDate(mapped.expectedDeliveryDate),
         ],
         margin: [0, 0, 0, 2],
       },
       {
-        text: [
-          { text: 'Создал: ', bold: true },
-          mapped.createdByName || '—',
-        ],
-        margin: [0, 0, 0, 8],
+        text: [{ text: `${L.createdBy}: `, bold: true }, mapped.createdByName || ''],
+        margin: [0, 0, 0, mapped.comment ? 2 : 8],
       },
+      ...(mapped.comment
+        ? [{ text: [{ text: `${L.comment}: `, bold: true }, mapped.comment], margin: [0, 0, 0, 8] }]
+        : []),
       {
         table: {
           headerRows: 1,
@@ -142,7 +147,7 @@ export async function exportPurchaseOrderPdf(order) {
         layout: 'lightHorizontalLines',
       },
       {
-        text: `Итого: ${formatMoney(mapped.totalAmount)} · позиций: ${mapped.itemsCount}`,
+        text: `${L.totalItems}: ${mapped.itemsCount} · ${L.totalAmount}: ${formatMoney(mapped.totalAmount)}`,
         style: 'total',
         margin: [0, 12, 0, 0],
       },
