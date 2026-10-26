@@ -130,8 +130,8 @@ assert(
 )
 
 assert(
-  'PLAN_EXPORT_COLUMNS unchanged (5 cols)',
-  /PLAN_EXPORT_COLUMNS = Object\.freeze\(\[\s*'№',\s*'Товар',\s*'Штрихкод',\s*'Поставщик',\s*'Заказ',?\s*\]\)/.test(
+  'PLAN_EXPORT_COLUMNS unchanged (5 cols, labels come from the document dictionary)',
+  /PLAN_EXPORT_COLUMNS = Object\.freeze\(\[\s*L\.number,\s*L\.product,\s*L\.barcode,\s*L\.supplier,\s*L\.orderQty,?\s*\]\)/.test(
     planExport
   )
 )
