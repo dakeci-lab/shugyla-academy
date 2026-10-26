@@ -1,4 +1,5 @@
 import { formatPurchaseAmount } from '../../utils/purchaseData'
+import { ORDER_LABELS } from '../../config/documentLabels'
 import './ProcurementSupplierPlanBar.css'
 
 const BASIS_NOTE = {
@@ -33,7 +34,7 @@ export default function ProcurementSupplierPlanBar({ plan, supplierName, disable
     <section className="proc-plan-bar" aria-label={`План поставки: ${supplierName || ''}`}>
       <div className="proc-plan-bar__row">
         <label className="proc-plan-bar__field">
-          <span>Поставка</span>
+          <span>{ORDER_LABELS.delivery}</span>
           <input
             type="date"
             lang="ru"

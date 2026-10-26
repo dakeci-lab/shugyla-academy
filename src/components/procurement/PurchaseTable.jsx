@@ -6,6 +6,7 @@ import {
 } from '../../utils/purchaseData'
 import { PurchaseStatusBadge, isPurchaseStatusShown } from './PurchaseStatsCards'
 import { CloseIcon } from '../icons/PlatformIcons'
+import { ORDER_LABELS } from '../../config/documentLabels'
 import { PgtHead, PgtRow, PgtTable } from '../platform/PlatformGridTable'
 
 /**
@@ -27,8 +28,8 @@ export default function PurchaseTable({
 
   // Приёмщику важны «когда привезут» и «от кого»: доставка и поставщик — слева, служебное (кто и когда создал) — справа.
   const columns = [
-    { key: 'delivery', label: 'Доставка', width: 110, mobile: 'hide' },
-    { key: 'supplier', label: 'Поставщик', width: 200, flex: true, mobile: 'title' },
+    { key: 'delivery', label: ORDER_LABELS.deliveryShort, width: 110, mobile: 'hide' },
+    { key: 'supplier', label: ORDER_LABELS.supplier, width: 200, flex: true, mobile: 'title' },
     { key: 'items', label: 'Товаров', width: 80, align: 'end', mobile: 'hide' },
     { key: 'amount', label: 'Сумма', width: 130, align: 'end', mobile: 'end' },
     ...(showStatus ? [{ key: 'status', label: 'Статус', width: 130, mobile: 'hide' }] : []),

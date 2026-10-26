@@ -359,8 +359,8 @@ function stageContractFiles() {
   )
   assert(
     'order exports (PDF and Excel) number the rows',
-    /\{ text: '№', style: 'tableHeader' \}/.test(read('src/utils/purchaseOrderExport.js')) &&
-      read('src/utils/purchaseOrderExport.js').includes("['№', 'Товар', 'Штрихкод', 'Кол-во', 'Цена закупки', 'Сумма']") &&
+    /\{ text: L\.number, style: 'tableHeader' \}/.test(read('src/utils/purchaseOrderExport.js')) &&
+      read('src/utils/purchaseOrderExport.js').includes('[L.number, L.product, L.barcode, L.qty, L.price, L.amount]') &&
       read('src/utils/purchaseOrderExport.js').includes('index + 1')
   )
   assertFileContains(
