@@ -357,6 +357,12 @@ function stageContractFiles() {
     'the PDF total line has no currency sign (the font has no tenge glyph — it printed as an empty box)',
     !read('src/utils/purchaseOrderExport.js').includes('₸ · позиций')
   )
+  assert(
+    'order exports (PDF and Excel) number the rows',
+    /\{ text: '№', style: 'tableHeader' \}/.test(read('src/utils/purchaseOrderExport.js')) &&
+      read('src/utils/purchaseOrderExport.js').includes("['№', 'Товар', 'Штрихкод', 'Кол-во', 'Цена закупки', 'Сумма']") &&
+      read('src/utils/purchaseOrderExport.js').includes('index + 1')
+  )
   assertFileContains(
     'src/utils/purchaseOrderExport.js',
     'exportPurchaseOrderPdf',

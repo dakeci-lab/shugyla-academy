@@ -37,15 +37,17 @@ function formatQty(n) {
 export async function exportPurchaseOrderXlsx(order) {
   const mapped = mapPurchaseOrderForExport(order)
   const XLSX = await import('xlsx')
+  // Column A holds the row number; the order header and totals sit in B/C so the narrow number column does not clip their labels.
   const sheetRows = [
-    ['Поставщик', mapped.supplierName],
-    ['Дата заказа', mapped.purchaseDate],
-    ['Ожидаемая доставка', mapped.expectedDeliveryDate],
-    ['Создал', mapped.createdByName],
-    ['Комментарий', mapped.comment],
+    ['', 'Поставщик', mapped.supplierName],
+    ['', 'Дата заказа', mapped.purchaseDate],
+    ['', 'Ожидаемая доставка', mapped.expectedDeliveryDate],
+    ['', 'Создал', mapped.createdByName],
+    ['', 'Комментарий', mapped.comment],
     [],
-    ['Товар', 'Штрихкод', 'Кол-во', 'Цена закупки', 'Сумма'],
-    ...mapped.items.map((item) => [
+    ['№', 'Товар', 'Штрихкод', 'Кол-во', 'Цена закупки', 'Сумма'],
+    ...mapped.items.map((item, index) => [
+      index + 1,
       item.productName,
       item.barcode,
       item.orderedQty,
@@ -53,13 +55,13 @@ export async function exportPurchaseOrderXlsx(order) {
       item.lineTotal,
     ]),
     [],
-    ['Итого позиций', mapped.itemsCount],
-    ['Итого сумма', mapped.totalAmount],
+    ['', 'Итого позиций', mapped.itemsCount],
+    ['', 'Итого сумма', mapped.totalAmount],
   ]
 
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.aoa_to_sheet(sheetRows)
-  ws['!cols'] = [{ wch: 40 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 14 }]
+  ws['!cols'] = [{ wch: 5 }, { wch: 40 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 14 }]
   XLSX.utils.book_append_sheet(wb, ws, 'Заказ')
   const filename = `zakup_${safeFilenamePart(mapped.supplierName)}_${mapped.purchaseDate || 'export'}.xlsx`
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
@@ -86,13 +88,15 @@ export async function exportPurchaseOrderPdf(order) {
 
   const body = [
     [
+      { text: '№', style: 'tableHeader' },
       { text: 'Товар', style: 'tableHeader' },
       { text: 'Штрихкод', style: 'tableHeader' },
       { text: 'Кол-во', style: 'tableHeader' },
       { text: 'Цена', style: 'tableHeader' },
       { text: 'Сумма', style: 'tableHeader' },
     ],
-    ...mapped.items.map((item) => [
+    ...mapped.items.map((item, index) => [
+      String(index + 1),
       item.productName || '—',
       item.barcode || '—',
       formatQty(item.orderedQty),
@@ -132,7 +136,7 @@ export async function exportPurchaseOrderPdf(order) {
       {
         table: {
           headerRows: 1,
-          widths: ['*', 90, 50, 60, 60],
+          widths: [24, '*', 90, 50, 60, 60],
           body,
         },
         layout: 'lightHorizontalLines',
