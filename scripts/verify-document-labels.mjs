@@ -50,4 +50,15 @@ assert.match(exporter, /\[L\.number, L\.product, L\.barcode, L\.qty, L\.price, L
 assert.match(exporter, /L\.comment/)
 ok('PDF and Excel print the same headers (delivery, price, amount) and both carry the comment')
 
+const planSrc = read('src/utils/procurementPlanExport.js')
+const whSrc = read('src/utils/procurementWarehouseExport.js')
+assert.match(planSrc, /PLAN_LABELS as L/)
+assert.match(whSrc, /WAREHOUSE_LABELS as L/)
+for (const [name, src] of [['plan export', planSrc], ['warehouse export', whSrc]]) {
+  for (const word of [labels.product, labels.barcode, labels.supplier, labels.number]) {
+    assert.doesNotMatch(src, new RegExp(`['"\`]${word}['"\`]`), `${name} retypes «${word}»`)
+  }
+}
+ok('plan and warehouse exports take their headers from the dictionary and share product / barcode / supplier / № with the orders')
+
 console.log(`\nverify:document-labels — ${checks} checks passed`)

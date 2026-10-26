@@ -3,13 +3,9 @@
  * Contract: exactly 5 columns — №, Товар, Штрихкод, Поставщик, Заказ.
  */
 
-export const PLAN_EXPORT_COLUMNS = Object.freeze([
-  '№',
-  'Товар',
-  'Штрихкод',
-  'Поставщик',
-  'Заказ',
-])
+import { PLAN_LABELS as L } from '../config/documentLabels'
+
+export const PLAN_EXPORT_COLUMNS = Object.freeze([L.number, L.product, L.barcode, L.supplier, L.orderQty])
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
@@ -60,7 +56,7 @@ export function parsePositiveFinalOrderQty(item) {
  * Only rows with final order qty strictly greater than 0 are included;
  * numbering is dense 1..N after filtering.
  * @param {Array<object>} items
- * @returns {Array<{ '№': number, 'Товар': string, 'Штрихкод': string, 'Поставщик': string, 'Заказ': number }>}
+ * @returns {Array<object>} rows keyed by the PLAN_EXPORT_COLUMNS labels
  */
 export function mapPlanItemsForExport(items) {
   const list = Array.isArray(items) ? items : []
@@ -69,11 +65,11 @@ export function mapPlanItemsForExport(items) {
     const qty = parsePositiveFinalOrderQty(item)
     if (qty == null) continue
     rows.push({
-      '№': rows.length + 1,
-      Товар: productNameOf(item),
-      Штрихкод: barcodeOf(item),
-      Поставщик: supplierNameOf(item),
-      Заказ: qty,
+      [L.number]: rows.length + 1,
+      [L.product]: productNameOf(item),
+      [L.barcode]: barcodeOf(item),
+      [L.supplier]: supplierNameOf(item),
+      [L.orderQty]: qty,
     })
   }
   return rows
@@ -85,7 +81,7 @@ export function planExportRowsToAoa(rows) {
   return [
     [...PLAN_EXPORT_COLUMNS],
     ...list.map((row) =>
-      PLAN_EXPORT_COLUMNS.map((key) => (key === 'Штрихкод' ? String(row[key] ?? '') : row[key]))
+      PLAN_EXPORT_COLUMNS.map((key) => (key === L.barcode ? String(row[key] ?? '') : row[key]))
     ),
   ]
 }
@@ -137,7 +133,7 @@ export async function exportProcurementPlanXlsx(items, options = {}) {
 
   applyBarcodeTextCells(XLSX, ws, mapped.length)
 
-  XLSX.utils.book_append_sheet(wb, ws, 'План')
+  XLSX.utils.book_append_sheet(wb, ws, L.sheetName)
   const filename = buildFilename('xlsx', options.periodTo)
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true })
   downloadBlob(
@@ -168,11 +164,11 @@ export async function exportProcurementPlanPdf(items, options = {}) {
   const body = [
     PLAN_EXPORT_COLUMNS.map((label) => ({ text: label, style: 'tableHeader' })),
     ...mapped.map((row) => [
-      String(row['№']),
-      row.Товар || '—',
-      String(row.Штрихкод || ''),
-      row.Поставщик || '—',
-      String(row.Заказ ?? 0),
+      String(row[L.number]),
+      row[L.product] || '',
+      String(row[L.barcode] || ''),
+      row[L.supplier] || '',
+      String(row[L.orderQty] ?? 0),
     ]),
   ]
 
@@ -184,10 +180,10 @@ export async function exportProcurementPlanPdf(items, options = {}) {
     pageMargins: [28, 28, 28, 28],
     defaultStyle: { font: 'Roboto', fontSize: 9 },
     content: [
-      { text: 'План закупок', style: 'title' },
+      { text: L.documentTitle, style: 'title' },
       periodLabel
         ? {
-            text: [{ text: 'Период: ', bold: true }, periodLabel],
+            text: [{ text: `${L.period}: `, bold: true }, periodLabel],
             margin: [0, 4, 0, 10],
           }
         : { text: '', margin: [0, 0, 0, 8] },
@@ -200,7 +196,7 @@ export async function exportProcurementPlanPdf(items, options = {}) {
         layout: 'lightHorizontalLines',
       },
       {
-        text: `Позиций: ${mapped.length}`,
+        text: `${L.positions}: ${mapped.length}`,
         margin: [0, 10, 0, 0],
         style: 'footer',
       },

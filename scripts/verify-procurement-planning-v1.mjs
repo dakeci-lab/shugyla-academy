@@ -9,9 +9,12 @@
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath, pathToFileURL } from 'url'
+import { register } from 'node:module'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const ROOT = path.join(__dirname, '..')
+globalThis.__VITE_ENV__ = {}
+register(pathToFileURL(path.join(__dirname, 'lib/extensionlessResolver.mjs')))
 
 let testsRun = 0
 let testsPassed = 0

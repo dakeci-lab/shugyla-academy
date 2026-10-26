@@ -8,18 +8,20 @@
  * so there is nothing real to put in that column. Add it once that's wired.
  */
 
+import { WAREHOUSE_LABELS as L } from '../config/documentLabels'
+
 export const WAREHOUSE_EXPORT_COLUMNS = Object.freeze([
-  '№',
-  'Товар',
-  'Штрихкод',
-  'Категория',
-  'Подкатегория',
-  'Остаток',
-  'Ед. изм.',
-  'Закупочная цена',
-  'Продажная цена',
-  'Сумма закупки',
-  'Сумма продажи',
+  L.number,
+  L.product,
+  L.barcode,
+  L.category,
+  L.subcategory,
+  L.stock,
+  L.unit,
+  L.purchasePrice,
+  L.sellingPrice,
+  L.purchaseSum,
+  L.sellingSum,
 ])
 
 const BARCODE_COL_INDEX = 2
@@ -56,17 +58,17 @@ export function mapWarehouseItemsForExport(items) {
     const purchasePrice = Number(item.purchasePrice) || 0
     const sellingPrice = Number(item.sellingPrice) || 0
     return {
-      '№': index + 1,
-      Товар: item.productName || '',
-      Штрихкод: item.barcode || '',
-      Категория: item.categoryName || '',
-      Подкатегория: item.subcategoryName || '',
-      Остаток: stock,
-      'Ед. изм.': item.measure || '',
-      'Закупочная цена': purchasePrice,
-      'Продажная цена': sellingPrice,
-      'Сумма закупки': round2(stock * purchasePrice),
-      'Сумма продажи': round2(stock * sellingPrice),
+      [L.number]: index + 1,
+      [L.product]: item.productName || '',
+      [L.barcode]: item.barcode || '',
+      [L.category]: item.categoryName || '',
+      [L.subcategory]: item.subcategoryName || '',
+      [L.stock]: stock,
+      [L.unit]: item.measure || '',
+      [L.purchasePrice]: purchasePrice,
+      [L.sellingPrice]: sellingPrice,
+      [L.purchaseSum]: round2(stock * purchasePrice),
+      [L.sellingSum]: round2(stock * sellingPrice),
     }
   })
 }
@@ -75,7 +77,7 @@ function rowsToAoa(rows) {
   return [
     [...WAREHOUSE_EXPORT_COLUMNS],
     ...rows.map((row) =>
-      WAREHOUSE_EXPORT_COLUMNS.map((key) => (key === 'Штрихкод' ? String(row[key] ?? '') : row[key]))
+      WAREHOUSE_EXPORT_COLUMNS.map((key) => (key === L.barcode ? String(row[key] ?? '') : row[key]))
     ),
   ]
 }
@@ -85,13 +87,13 @@ function buildTotalsRow(rows) {
   let totalPurchase = 0
   let totalSelling = 0
   for (const row of rows) {
-    totalPurchase += Number(row['Сумма закупки']) || 0
-    totalSelling += Number(row['Сумма продажи']) || 0
+    totalPurchase += Number(row[L.purchaseSum]) || 0
+    totalSelling += Number(row[L.sellingSum]) || 0
   }
   const arr = new Array(WAREHOUSE_EXPORT_COLUMNS.length).fill('')
-  arr[WAREHOUSE_EXPORT_COLUMNS.indexOf('Товар')] = 'Итого:'
-  arr[WAREHOUSE_EXPORT_COLUMNS.indexOf('Сумма закупки')] = round2(totalPurchase)
-  arr[WAREHOUSE_EXPORT_COLUMNS.indexOf('Сумма продажи')] = round2(totalSelling)
+  arr[WAREHOUSE_EXPORT_COLUMNS.indexOf(L.product)] = L.total
+  arr[WAREHOUSE_EXPORT_COLUMNS.indexOf(L.purchaseSum)] = round2(totalPurchase)
+  arr[WAREHOUSE_EXPORT_COLUMNS.indexOf(L.sellingSum)] = round2(totalSelling)
   return arr
 }
 
@@ -156,7 +158,7 @@ export async function exportWarehouseSnapshotXlsx(items, options = {}) {
     cell.z = '@'
   }
 
-  XLSX.utils.book_append_sheet(wb, ws, 'Склад')
+  XLSX.utils.book_append_sheet(wb, ws, L.sheetName)
   const filename = buildFilename(options.syncedAt)
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array', cellStyles: true })
   downloadBlob(
