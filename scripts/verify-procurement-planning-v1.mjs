@@ -353,6 +353,10 @@ function stageContractFiles() {
       read('src/pages/platform/procurement/ProcurementPage.jsx')
     )
   )
+  assert(
+    'the PDF total line has no currency sign (the font has no tenge glyph — it printed as an empty box)',
+    !read('src/utils/purchaseOrderExport.js').includes('₸ · позиций')
+  )
   assertFileContains(
     'src/utils/purchaseOrderExport.js',
     'exportPurchaseOrderPdf',

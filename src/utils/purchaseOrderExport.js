@@ -138,7 +138,7 @@ export async function exportPurchaseOrderPdf(order) {
         layout: 'lightHorizontalLines',
       },
       {
-        text: `Итого: ${formatMoney(mapped.totalAmount)} ₸ · позиций: ${mapped.itemsCount}`,
+        text: `Итого: ${formatMoney(mapped.totalAmount)} · позиций: ${mapped.itemsCount}`,
         style: 'total',
         margin: [0, 12, 0, 0],
       },
