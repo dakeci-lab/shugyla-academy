@@ -62,7 +62,7 @@ export default function PurchaseDetailPage() {
   const [itemFormError, setItemFormError] = useState('')
   const [itemSaving, setItemSaving] = useState(false)
   const [exporting, setExporting] = useState(false)
-  const [loadedOrder, setLoadedOrder] = useState(null)
+  const [fullOrder, setFullOrder] = useState(null)
   const [loadingOrder, setLoadingOrder] = useState(true)
   const [statusBusy, setStatusBusy] = useState(false)
   const [markingChecked, setMarkingChecked] = useState(false)
@@ -75,9 +75,11 @@ export default function PurchaseDetailPage() {
 
   void version
 
+  // Шапку заказа берём из списка сразу; позиции списком не грузятся — карточка догружает их сама.
   const cachedOrder = useMemo(() => getPurchaseOrderByIdSync(id), [id, version])
-  const order = cachedOrder || loadedOrder
-  const displayItems = order?.items ?? []
+  const itemsReady = fullOrder?.id === id
+  const order = itemsReady ? fullOrder : cachedOrder
+  const displayItems = itemsReady ? fullOrder.items ?? [] : []
   const draft = isOrderDraft(order)
   const saved = isOrderSaved(order)
   // Править можно только черновик; сохранённый сначала «Отменяют» (он возвращается в черновик).
@@ -85,20 +87,18 @@ export default function PurchaseDetailPage() {
   // «Сверено» имеет смысл только у сохранённого заказа — приёмщик сверяет им поставку.
   const canShowCheckedMark = saved
 
-  // Заказ берём из кэша списка; по прямой ссылке (кэш ещё пуст) — одна загрузка. Дальше карточку обновляют сами действия
-  // (кладут свежий заказ в кэш), поэтому повторных загрузок на каждый чих нет — раньше интерфейс мигал.
+  // Полный заказ (с позициями) — две лёгких загрузки при открытии и тихое обновление, когда данные платформы изменились
+  // (само обновление не мигает: пока приходит новое, на экране остаётся прежнее).
   useEffect(() => {
-    if (getPurchaseOrderByIdSync(id)) {
-      setLoadingOrder(false)
-      return undefined
-    }
     let cancelled = false
-    setLoadingOrder(true)
-    setLoadedOrder(null)
+    if (!getPurchaseOrderByIdSync(id)) setLoadingOrder(true)
 
     void getPurchaseOrderById(id)
       .then((result) => {
-        if (!cancelled) setLoadedOrder(result)
+        if (cancelled) return
+        setFullOrder((prev) =>
+          prev && result && prev.id === result.id && prev.updatedAt === result.updatedAt ? prev : result
+        )
       })
       .catch((err) => {
         if (!cancelled) setError(toProcurementUserMessage(err, 'Не удалось загрузить заказ.'))
@@ -110,8 +110,7 @@ export default function PurchaseDetailPage() {
     return () => {
       cancelled = true
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id])
+  }, [id, version])
 
   // Меню скачивания закрывается по клику вне и по Escape.
   useEffect(() => {
@@ -274,7 +273,8 @@ export default function PurchaseDetailPage() {
     setMessage('')
     setMarkingChecked(true)
     try {
-      await setPurchaseOrderChecked(order.id, checked, user)
+      const result = await setPurchaseOrderChecked(order.id, checked, user)
+      if (result?.id) setFullOrder(result)
       notifyChange()
     } catch (err) {
       setError(toProcurementUserMessage(err, 'Не удалось сохранить отметку.'))
@@ -289,7 +289,8 @@ export default function PurchaseDetailPage() {
     setMessage('')
     setStatusBusy(true)
     try {
-      await action()
+      const result = await action()
+      if (result?.id) setFullOrder(result)
       notifyChange()
       if (successMessage) setMessage(successMessage)
     } catch (err) {
@@ -345,7 +346,8 @@ export default function PurchaseDetailPage() {
     if (!canEditItems) return
     setError('')
     try {
-      await updatePurchaseOrder(order.id, patch)
+      const result = await updatePurchaseOrder(order.id, patch)
+      if (result?.id) setFullOrder(result)
       notifyChange()
     } catch (err) {
       setError(toProcurementUserMessage(err, 'Не удалось сохранить изменения.'))
@@ -550,6 +552,9 @@ export default function PurchaseDetailPage() {
             )}
           </p>
         )}
+        {!itemsReady ? (
+          <p className="purchase-detail__hint">Загрузка товаров…</p>
+        ) : (
         <PurchaseItemsTable
           items={displayItems}
           canEditItems={canEditItems}
@@ -558,6 +563,7 @@ export default function PurchaseDetailPage() {
           onAdd={openAddItemModal}
           checklistKey={order.id}
         />
+        )}
       </section>
 
       {itemModalOpen && (

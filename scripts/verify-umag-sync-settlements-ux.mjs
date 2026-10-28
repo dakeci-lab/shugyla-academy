@@ -94,9 +94,7 @@ async function stageChunking() {
   assert('full pages hit maxPages → throw (no infinite loop)', overflowThrown)
 
   const purchase = read('src/services/purchaseSupabaseAdapter.js')
-  assert('purchases uses fetchAllRowsByIdChunks', purchase.includes('fetchAllRowsByIdChunks'))
-  assert('purchases orders by created_at + id', /order\('created_at'[\s\S]*order\('id'/.test(purchase))
-  assert('purchases uses .range(from, to)', purchase.includes('.range(from, to)'))
+  assert('the orders list loads headers only — no items, no chunked fan-out (the card loads its own items)', !purchase.includes('fetchAllRowsByIdChunks') && /fetchPurchasesDataCloud\(\)[\s\S]{0,500}rowToOrder\(row, \[\]\)/.test(purchase))
 }
 
 async function stageErrorNormalization() {

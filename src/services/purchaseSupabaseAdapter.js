@@ -7,11 +7,6 @@ import {
   PROCUREMENT_WORKFLOW_MODE,
 } from '../utils/purchaseData'
 
-import {
-  DEFAULT_IN_FILTER_CHUNK_SIZE,
-  DEFAULT_POSTGREST_PAGE_SIZE,
-  fetchAllRowsByIdChunks,
-} from '../utils/chunkArray'
 import { throwUserError, toUserErrorMessage } from '../utils/userErrorMessage'
 import { toProcurementUserMessage } from '../utils/procurementErrors'
 
@@ -239,7 +234,11 @@ async function syncOrderItems(orderId, items) {
   return recalcOrderTotals(orderId)
 }
 
-/** Загрузка всех закупов с позициями */
+/**
+ * Список заказов — только заголовки (один запрос). Позиции списку не нужны: ему хватает `items_count`,
+ * а карточка заказа догружает свои позиции сама (`fetchOrderById`). Раньше список тянул все ~10 тыс. позиций
+ * двумя десятками запросов при каждой загрузке, поэтому «Заказы» открывались заметно дольше.
+ */
 export async function fetchPurchasesDataCloud() {
   ensureClient()
 
@@ -250,39 +249,7 @@ export async function fetchPurchasesDataCloud() {
 
   const orders = await throwIfError(ordersResult, 'Загрузка закупов')
 
-  if (!orders?.length) {
-    return { orders: [] }
-  }
-
-  const orderIds = orders.map((row) => row.id)
-  const items = await fetchAllRowsByIdChunks({
-    ids: orderIds,
-    idChunkSize: DEFAULT_IN_FILTER_CHUNK_SIZE,
-    pageSize: DEFAULT_POSTGREST_PAGE_SIZE,
-    overflowMessage: 'Не удалось загрузить позиции закупов.',
-    fetchPage: ({ idChunk, from, to }) =>
-      supabase
-        .from('purchase_order_items')
-        .select('*')
-        .in('purchase_order_id', idChunk)
-        .order('created_at', { ascending: true })
-        .order('id', { ascending: true })
-        .range(from, to),
-    onPageResult: (result) =>
-      throwIfError(result, 'Загрузка позиций закупов', 'Не удалось загрузить позиции закупов.'),
-  })
-
-  const itemsByOrder = new Map()
-  for (const row of items) {
-    if (!itemsByOrder.has(row.purchase_order_id)) {
-      itemsByOrder.set(row.purchase_order_id, [])
-    }
-    itemsByOrder.get(row.purchase_order_id).push(row)
-  }
-
-  return {
-    orders: orders.map((row) => rowToOrder(row, itemsByOrder.get(row.id) || [])),
-  }
+  return { orders: (orders || []).map((row) => rowToOrder(row, [])) }
 }
 
 /** Создание закупа */
