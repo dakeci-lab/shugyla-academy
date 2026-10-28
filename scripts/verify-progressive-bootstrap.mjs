@@ -91,7 +91,7 @@ function main() {
   )
   assert('getEmployees does not call fetchAllData', !/export async function getEmployees\(\)[\s\S]*fetchAllData/.test(platformSvc))
   assert('getCourses API removed from platformDataService', !platformSvc.includes('export async function getCourses'))
-  assert('purchase mutations refresh procurement only', purchaseSvc.includes('refreshProcurementData'))
+  assert('purchase mutations update only the one order in the cache (no full reload per click)', purchaseSvc.includes('putCloudPurchase') && !purchaseSvc.includes('refreshProcurementData'))
   assert('TOKEN_REFRESHED does not clear store', /TOKEN_REFRESHED[\s\S]*setSupabaseAuthenticated\(true\)\s*return/.test(session))
   assert('logout clears cloud bootstrap', session.includes('resetCloudBootstrapState'))
 

@@ -1,12 +1,13 @@
 import { isCloudMode } from '../lib/dataMode'
 import {
   getCloudPurchases,
+  putCloudPurchase,
+  dropCloudPurchase,
   isModuleReady,
   getModuleError,
   getModuleLoadState,
   MODULE_STATUS,
 } from '../lib/cloudStore'
-import { refreshProcurementData } from './platformDataService'
 import * as local from './purchaseLocalAdapter'
 import * as cloud from './purchaseSupabaseAdapter'
 
@@ -33,10 +34,15 @@ function getPurchasesSource() {
   return local.getLocalPurchasesBundle().orders
 }
 
-async function afterPurchaseMutation() {
-  if (isCloudMode()) {
-    await refreshProcurementData()
-  }
+/**
+ * После изменения ОДНОГО заказа перечитываем только его и кладём в кэш. Полная перезагрузка закупа (959 заказов,
+ * десятки запросов) на каждое нажатие давала мигание интерфейса; остальное догонит realtime.
+ */
+async function afterOrderChange(orderId, fresh) {
+  if (!isCloudMode()) return
+  const order = fresh === undefined ? await cloud.fetchOrderById(orderId) : fresh
+  if (order) putCloudPurchase(order)
+  else dropCloudPurchase(orderId)
 }
 
 export function getPurchaseOrdersSync() {
@@ -65,7 +71,7 @@ export async function createPurchaseOrder(data) {
   const id = isCloudMode()
     ? await cloud.createPurchaseOrderCloud(data)
     : await local.createPurchaseOrder(data)
-  await afterPurchaseMutation()
+  await afterOrderChange(id)
   return id
 }
 
@@ -73,7 +79,7 @@ export async function updatePurchaseOrder(orderId, updates) {
   const result = isCloudMode()
     ? await cloud.updatePurchaseOrderCloud(orderId, updates)
     : await local.updatePurchaseOrder(orderId, updates)
-  await afterPurchaseMutation()
+  await afterOrderChange(orderId, result)
   return result
 }
 
@@ -84,7 +90,7 @@ export async function updatePurchaseOrder(orderId, updates) {
 export async function setPurchaseOrderChecked(orderId, checked, user) {
   if (isCloudMode()) {
     const result = await cloud.setOrderCheckedCloud(orderId, checked)
-    await afterPurchaseMutation()
+    await afterOrderChange(orderId, result)
     return result
   }
   return updatePurchaseOrder(
@@ -100,7 +106,7 @@ export async function savePurchaseOrder(orderId) {
   const result = isCloudMode()
     ? await cloud.submitPurchaseOrderCloud(orderId)
     : await local.submitPurchaseOrder(orderId)
-  await afterPurchaseMutation()
+  await afterOrderChange(orderId, result)
   return result
 }
 
@@ -109,7 +115,7 @@ export async function cancelSavedPurchaseOrder(orderId) {
   const result = isCloudMode()
     ? await cloud.unsavePurchaseOrderCloud(orderId)
     : await local.unsavePurchaseOrder(orderId)
-  await afterPurchaseMutation()
+  await afterOrderChange(orderId, result)
   return result
 }
 
@@ -119,14 +125,14 @@ export async function deletePurchaseOrder(orderId) {
   } else {
     await local.deletePurchaseOrder(orderId)
   }
-  await afterPurchaseMutation()
+  await afterOrderChange(orderId, null)
 }
 
 export async function addPurchaseOrderItem(orderId, item) {
   const id = isCloudMode()
     ? await cloud.addPurchaseOrderItemCloud(orderId, item)
     : await local.addPurchaseOrderItem(orderId, item)
-  await afterPurchaseMutation()
+  await afterOrderChange(orderId)
   return id
 }
 
@@ -134,7 +140,7 @@ export async function updatePurchaseOrderItem(orderId, itemId, patch) {
   const result = isCloudMode()
     ? await cloud.updatePurchaseOrderItemCloud(orderId, itemId, patch)
     : await local.updatePurchaseOrderItem(orderId, itemId, patch)
-  await afterPurchaseMutation()
+  await afterOrderChange(orderId)
   return result
 }
 
@@ -144,5 +150,5 @@ export async function deletePurchaseOrderItem(orderId, itemId) {
   } else {
     await local.deletePurchaseOrderItem(orderId, itemId)
   }
-  await afterPurchaseMutation()
+  await afterOrderChange(orderId)
 }

@@ -187,6 +187,19 @@ export function upsertCloudPurchase(order) {
   store.purchases = list
 }
 
+/** Положить свежий заказ в кэш (новым массивом — подписчики видят смену) без полной перезагрузки закупа. */
+export function putCloudPurchase(order) {
+  if (!order) return
+  const list = store.purchases || []
+  const idx = list.findIndex((item) => item.id === order.id)
+  store.purchases = idx >= 0 ? list.map((item, i) => (i === idx ? order : item)) : [order, ...list]
+}
+
+/** Убрать заказ из кэша (после удаления). */
+export function dropCloudPurchase(orderId) {
+  store.purchases = (store.purchases || []).filter((item) => item.id !== orderId)
+}
+
 export function patchCloudPurchase(orderId, patch) {
   if (!store.loaded) return
   store.purchases = (store.purchases || []).map((item) =>

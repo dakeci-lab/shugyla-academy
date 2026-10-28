@@ -53,7 +53,7 @@ export default function PurchaseDetailPage() {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { user } = useSession()
-  const { version, refresh } = useAdminRefresh()
+  const { version, notifyChange } = useAdminRefresh()
   const [message, setMessage] = useState('')
   const [error, setError] = useState('')
   const [itemModalOpen, setItemModalOpen] = useState(false)
@@ -85,7 +85,13 @@ export default function PurchaseDetailPage() {
   // «Сверено» имеет смысл только у сохранённого заказа — приёмщик сверяет им поставку.
   const canShowCheckedMark = saved
 
+  // Заказ берём из кэша списка; по прямой ссылке (кэш ещё пуст) — одна загрузка. Дальше карточку обновляют сами действия
+  // (кладут свежий заказ в кэш), поэтому повторных загрузок на каждый чих нет — раньше интерфейс мигал.
   useEffect(() => {
+    if (getPurchaseOrderByIdSync(id)) {
+      setLoadingOrder(false)
+      return undefined
+    }
     let cancelled = false
     setLoadingOrder(true)
     setLoadedOrder(null)
@@ -104,7 +110,8 @@ export default function PurchaseDetailPage() {
     return () => {
       cancelled = true
     }
-  }, [id, version])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id])
 
   // Меню скачивания закрывается по клику вне и по Escape.
   useEffect(() => {
@@ -210,7 +217,7 @@ export default function PurchaseDetailPage() {
         setMessage('Товар добавлен.')
       }
       closeItemModal()
-      await refresh()
+      notifyChange()
     } catch (err) {
       setItemFormError(toProcurementUserMessage(err, 'Не удалось сохранить товар.'))
     } finally {
@@ -224,7 +231,7 @@ export default function PurchaseDetailPage() {
     setMessage('')
     try {
       await deletePurchaseOrderItem(order.id, item.id)
-      await refresh()
+      notifyChange()
       setMessage('Товар удалён.')
     } catch (err) {
       setError(toProcurementUserMessage(err, 'Не удалось удалить товар.'))
@@ -268,7 +275,7 @@ export default function PurchaseDetailPage() {
     setMarkingChecked(true)
     try {
       await setPurchaseOrderChecked(order.id, checked, user)
-      await refresh()
+      notifyChange()
     } catch (err) {
       setError(toProcurementUserMessage(err, 'Не удалось сохранить отметку.'))
     } finally {
@@ -283,7 +290,7 @@ export default function PurchaseDetailPage() {
     setStatusBusy(true)
     try {
       await action()
-      await refresh()
+      notifyChange()
       if (successMessage) setMessage(successMessage)
     } catch (err) {
       setError(toProcurementUserMessage(err, failMessage))
@@ -339,7 +346,7 @@ export default function PurchaseDetailPage() {
     setError('')
     try {
       await updatePurchaseOrder(order.id, patch)
-      await refresh()
+      notifyChange()
     } catch (err) {
       setError(toProcurementUserMessage(err, 'Не удалось сохранить изменения.'))
     }
