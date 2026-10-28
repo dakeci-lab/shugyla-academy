@@ -9,11 +9,6 @@ import {
 import { refreshProcurementData } from './platformDataService'
 import * as local from './purchaseLocalAdapter'
 import * as cloud from './purchaseSupabaseAdapter'
-import {
-  getOptimisticOverlayForMerge,
-  getOptimisticDeletedOrderIds,
-  mergePurchaseOrders,
-} from './purchaseOptimisticStore'
 
 export function isPurchasesDataReady() {
   return !isCloudMode() || isModuleReady('procurement')
@@ -33,10 +28,7 @@ export function getPurchasesDataError() {
 function getPurchasesSource() {
   if (isCloudMode()) {
     if (!isModuleReady('procurement')) return []
-    const orders = getCloudPurchases() || []
-    const overlay = getOptimisticOverlayForMerge()
-    const deletedOrderIds = getOptimisticDeletedOrderIds()
-    return mergePurchaseOrders(orders, overlay.orders, deletedOrderIds)
+    return getCloudPurchases() || []
   }
   return local.getLocalPurchasesBundle().orders
 }
@@ -128,21 +120,6 @@ export async function deletePurchaseOrder(orderId) {
     await local.deletePurchaseOrder(orderId)
   }
   await afterPurchaseMutation()
-}
-
-export async function createSimplePurchase(data, user) {
-  const id = isCloudMode()
-    ? await cloud.createSimplePurchaseCloud(data, user)
-    : await local.createSimplePurchase(data, user)
-  await afterPurchaseMutation()
-  return id
-}
-
-export async function transferPurchaseToReceiving(orderId, user) {
-  const { transferFromPurchase } = await import('./receivingDataService')
-  const result = await transferFromPurchase(orderId, user)
-  await afterPurchaseMutation()
-  return result
 }
 
 export async function addPurchaseOrderItem(orderId, item) {

@@ -1,5 +1,5 @@
 /**
- * How long procurement / receiving data counts as fresh for passive refresh
+ * How long procurement data counts as fresh for passive refresh
  * triggers (page mount, window focus, tab visibility, realtime re-subscribe).
  *
  * Each full reload pages through every order item, so passive triggers must not

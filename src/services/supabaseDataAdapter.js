@@ -93,12 +93,6 @@ export async function fetchPurchasesModuleData() {
   return { purchases: data.orders }
 }
 
-export async function fetchReceivingModuleData() {
-  const { fetchReceivingDataCloud } = await import('./receivingSupabaseAdapter')
-  const data = await fetchReceivingDataCloud()
-  return { receivingDocuments: data.documents }
-}
-
 /**
  * Full dump for legacy callers. Soft-isolates optional modules (including procurement).
  * Prefer progressive bootstrap via platformDataService.ensureModuleLoaded.
@@ -106,10 +100,9 @@ export async function fetchReceivingModuleData() {
 export async function fetchAllData() {
   const { employees } = await fetchCoreEmployeeData()
 
-  const [suppliersResult, purchasesResult, receivingResult] = await Promise.allSettled([
+  const [suppliersResult, purchasesResult] = await Promise.allSettled([
     fetchSuppliersModuleData(),
     fetchPurchasesModuleData(),
-    fetchReceivingModuleData(),
   ])
 
   const suppliers =
@@ -118,26 +111,17 @@ export async function fetchAllData() {
   if (purchasesResult.status === 'rejected') {
     console.error('[Загрузка закупов]', purchasesResult.reason)
   }
-  if (receivingResult.status === 'rejected') {
-    console.error('[Загрузка приёмки]', receivingResult.reason)
-  }
 
   const purchases =
     purchasesResult.status === 'fulfilled' ? purchasesResult.value : { purchases: [] }
-  const receiving =
-    receivingResult.status === 'fulfilled'
-      ? receivingResult.value
-      : { receivingDocuments: [] }
 
   return {
     employees,
     ...suppliers,
     ...purchases,
-    ...receiving,
     _moduleFailures: {
       suppliers: suppliersResult.status === 'rejected' ? suppliersResult.reason : null,
       procurement: purchasesResult.status === 'rejected' ? purchasesResult.reason : null,
-      receiving: receivingResult.status === 'rejected' ? receivingResult.reason : null,
     },
   }
 }

@@ -15,8 +15,6 @@
     "supabase:local:verify-production-auth-cutover": "node scripts/verify-production-auth-cutover.mjs",
     "verify:auth-first-frontend-production-readiness": "node scripts/verify-auth-first-frontend-production-readiness.mjs",
     "verify:platform-mobile-drawer": "node scripts/verify-platform-mobile-drawer.mjs",
-    "verify:receiving-row-display": "node scripts/verify-receiving-row-display.mjs",
-    "verify:receiving-v1-foundation": "node scripts/verify-receiving-v1-foundation.mjs",
     "verify:mobile-page-header": "node scripts/verify-mobile-page-header.mjs",
     "verify:procurement-calendar-filter": "node scripts/verify-procurement-calendar-filter.mjs",
     "verify:procurement-visit-plan": "node scripts/verify-procurement-visit-plan.mjs",

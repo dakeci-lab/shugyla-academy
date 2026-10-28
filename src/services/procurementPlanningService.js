@@ -190,14 +190,8 @@ function normalizeItem(row) {
   }
 }
 
-const COUNTED_ORDER_STATUSES = new Set([
-  'draft',
-  'formed',
-  'sent',
-  'awaiting_receiving',
-  'partially_received',
-  'received',
-])
+// A draft still holds the quantities that left the plan, so it counts as ordered.
+const COUNTED_ORDER_STATUSES = new Set(['draft', 'saved'])
 
 function normalizeHistoryRow(row) {
   const order = row.purchase_orders || {}
@@ -420,7 +414,6 @@ export async function generateProcurementOrders(
         nothingToOrder: Boolean(data.nothing_to_order),
         snapshotId: data.snapshot_id || snapshotId,
         purchaseOrderIds: data.purchase_order_ids || [],
-        receivingDocumentIds: data.receiving_document_ids || [],
         ordersCreated: data.orders_created ?? 0,
         ordersExisting: data.orders_existing ?? 0,
         skippedNoSupplier: data.skipped_no_supplier ?? 0,

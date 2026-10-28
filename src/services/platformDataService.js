@@ -47,7 +47,7 @@ const modulePromises = {}
 let backgroundPrefetchScheduled = false
 let onModulesChanged = null
 
-/** Prefetched after shell; procurement/receiving stay route-triggered. */
+/** Prefetched after shell; procurement stays route-triggered. */
 const BACKGROUND_MODULES = ['suppliers']
 
 function notifyModulesChanged() {
@@ -73,8 +73,8 @@ export function resetCloudBootstrapState() {
 /** Map pathname → modules needed before page can show real empty/error states. */
 export function getRouteCriticalModules(pathname = '') {
   const path = String(pathname || '')
-  if (path.includes('/platform/procurement') || path.includes('/platform/orders') || path.includes('/platform/receiving')) {
-    return ['suppliers', 'procurement', 'receiving']
+  if (path.includes('/platform/procurement') || path.includes('/platform/orders')) {
+    return ['suppliers', 'procurement']
   }
   if (path.includes('/platform/suppliers')) {
     return ['suppliers']
@@ -143,12 +143,6 @@ async function loadModule(moduleName) {
       const data = await supabaseAdapter.fetchPurchasesModuleData()
       patchCloudStore(data)
       markModuleReady('procurement')
-      return
-    }
-    case 'receiving': {
-      const data = await supabaseAdapter.fetchReceivingModuleData()
-      patchCloudStore(data)
-      markModuleReady('receiving')
       return
     }
     default:
@@ -292,9 +286,6 @@ function applyFullFetchResult(data) {
 
   if (failures.procurement) markModuleError('procurement', failures.procurement)
   else markModuleReady('procurement')
-
-  if (failures.receiving) markModuleError('receiving', failures.receiving)
-  else markModuleReady('receiving')
 }
 
 let procurementRefreshInFlight = null
@@ -316,13 +307,14 @@ async function withOneRetry(load, delayMs = 700) {
 
 async function runProcurementRefresh() {
   markModuleLoading('procurement')
-  markModuleLoading('receiving')
   notifyModulesChanged()
 
-  const [purchasesResult, receivingResult] = await Promise.allSettled([
-    withOneRetry(() => supabaseAdapter.fetchPurchasesModuleData()),
-    withOneRetry(() => supabaseAdapter.fetchReceivingModuleData()),
-  ])
+  let purchasesResult
+  try {
+    purchasesResult = { status: 'fulfilled', value: await withOneRetry(() => supabaseAdapter.fetchPurchasesModuleData()) }
+  } catch (reason) {
+    purchasesResult = { status: 'rejected', reason }
+  }
 
   ensureCloudStoreReady()
 
@@ -333,39 +325,23 @@ async function runProcurementRefresh() {
     markModuleError('procurement', purchasesResult.reason)
   }
 
-  if (receivingResult.status === 'fulfilled') {
-    patchCloudStore(receivingResult.value)
-    markModuleReady('receiving')
-  } else {
-    markModuleError('receiving', receivingResult.reason)
-  }
-
   notifyModulesChanged()
 
   if (purchasesResult.status === 'rejected') {
     throw purchasesResult.reason
   }
-  if (receivingResult.status === 'rejected') {
-    throw receivingResult.reason
-  }
 
-  return {
-    purchases: purchasesResult.value.purchases,
-    receivingDocuments: receivingResult.value.receivingDocuments,
-  }
+  return { purchases: purchasesResult.value.purchases }
 }
 
 function cachedProcurementResult() {
-  return {
-    purchases: getCloudStore().purchases,
-    receivingDocuments: getCloudStore().receivingDocuments,
-  }
+  return { purchases: getCloudStore().purchases }
 }
 
 /**
- * Обновить только закуп и приёмку (Realtime / foreground refresh / после мутаций).
+ * Обновить только закуп (Realtime / foreground refresh / после мутаций).
  *
- * - `maxAgeMs > 0`: если закуп И приёмка уже загружены не позже `maxAgeMs` назад —
+ * - `maxAgeMs > 0`: если закуп уже загружен не позже `maxAgeMs` назад —
  *   сеть не трогаем. Для монтирования страницы, focus/visibility и т.п.
  * - без `maxAgeMs` (по умолчанию): принудительная загрузка — для мутаций и
  *   realtime-событий, которым нужны актуальные данные.
@@ -377,7 +353,7 @@ export async function refreshProcurementData({ maxAgeMs = 0 } = {}) {
   if (!isCloudMode()) return null
 
   const soft = maxAgeMs > 0
-  if (soft && isModuleFresh('procurement', maxAgeMs) && isModuleFresh('receiving', maxAgeMs)) {
+  if (soft && isModuleFresh('procurement', maxAgeMs)) {
     return cachedProcurementResult()
   }
 

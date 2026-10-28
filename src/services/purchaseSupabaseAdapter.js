@@ -37,8 +37,6 @@ function rowToOrder(row, items = []) {
     created_by: row.created_by,
     created_by_name: row.created_by_name,
     comment: row.comment,
-    transferred_to_receiving: row.transferred_to_receiving,
-    receiving_document_id: row.receiving_document_id,
     checked_at: row.checked_at,
     checked_by_name: row.checked_by_name,
     workflow_mode: row.workflow_mode,
@@ -64,8 +62,6 @@ function orderToRow(order, extras = {}) {
     created_by: order.createdBy ?? null,
     created_by_name: order.createdByName ?? null,
     comment: (order.comment ?? '').trim(),
-    transferred_to_receiving: order.transferredToReceiving ?? false,
-    receiving_document_id: order.receivingDocumentId ?? null,
     workflow_mode: order.workflowMode ?? PROCUREMENT_WORKFLOW_MODE.ANALYTICS,
   }
 
@@ -97,12 +93,6 @@ function orderPatchToRow(patch) {
     row.created_by_name = patch.createdByName || null
   }
   if (patch.comment !== undefined) row.comment = (patch.comment ?? '').trim()
-  if (patch.transferredToReceiving !== undefined) {
-    row.transferred_to_receiving = Boolean(patch.transferredToReceiving)
-  }
-  if (patch.receivingDocumentId !== undefined) {
-    row.receiving_document_id = patch.receivingDocumentId || null
-  }
   if (patch.checkedAt !== undefined) row.checked_at = patch.checkedAt || null
   if (patch.checkedByName !== undefined) row.checked_by_name = patch.checkedByName || null
   if (patch.workflowMode !== undefined) {
@@ -315,8 +305,6 @@ export async function createPurchaseOrderCloud(data) {
       createdBy: data.createdBy,
       createdByName: data.createdByName,
       comment: data.comment,
-      transferredToReceiving: false,
-      receivingDocumentId: null,
       workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
     },
     { id, created_at: now, updated_at: now }
@@ -352,102 +340,6 @@ export async function updatePurchaseOrderCloud(orderId, patch) {
   const updated = await fetchOrderById(orderId)
 
   return updated
-}
-
-/** Синхронизация заранее созданной простой закупки (optimistic UI) */
-export async function syncSimplePurchaseCloud(order, document) {
-  ensureClient()
-  if (!order?.id) throw new Error('Закуп не найден')
-
-  const existing = await fetchOrderById(order.id)
-  if (existing) return existing.id
-
-  const now = new Date().toISOString()
-  const today = now.slice(0, 10)
-
-  const row = orderToRow(
-    {
-      supplierId: order.supplierId,
-      supplierName: order.supplierName,
-      status: PURCHASE_STATUS.AWAITING_RECEIVING,
-      date: order.date || today,
-      expectedDeliveryDate: order.expectedDeliveryDate,
-      totalAmount: order.totalAmount ?? 0,
-      itemsCount: 0,
-      createdBy: order.createdBy,
-      createdByName: order.createdByName,
-      comment: order.comment,
-      transferredToReceiving: true,
-      receivingDocumentId: document?.id ?? null,
-      workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
-    },
-    { id: order.id, created_at: order.createdAt || now, updated_at: now }
-  )
-
-  await throwIfError(
-    await supabase.from('purchase_orders').insert(row),
-    'Создание закупа'
-  )
-
-  if (document?.id) {
-    const { syncSimpleReceivingDocumentCloud } = await import('./receivingSupabaseAdapter')
-    await syncSimpleReceivingDocumentCloud(document, order)
-  }
-
-  return order.id
-}
-
-/** Простая закупка: сразу в приёмку без позиций */
-export async function createSimplePurchaseCloud(data, user) {
-  ensureClient()
-
-  const id = crypto.randomUUID()
-  const now = new Date().toISOString()
-  const today = now.slice(0, 10)
-  const totalAmount = Math.max(0, Number(data.totalAmount) || 0)
-
-  const row = orderToRow(
-    {
-      supplierId: data.supplierId,
-      supplierName: data.supplierName,
-      status: PURCHASE_STATUS.AWAITING_RECEIVING,
-      date: today,
-      expectedDeliveryDate: data.expectedDeliveryDate,
-      totalAmount,
-      itemsCount: 0,
-      createdBy: data.createdBy,
-      createdByName: data.createdByName,
-      comment: data.comment,
-      transferredToReceiving: true,
-      receivingDocumentId: null,
-      workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
-    },
-    { id, created_at: now, updated_at: now }
-  )
-
-  await throwIfError(
-    await supabase.from('purchase_orders').insert(row),
-    'Создание закупа'
-  )
-
-  const { createSimpleReceivingFromPurchaseCloud } = await import('./receivingSupabaseAdapter')
-  const { receivingDocumentId } = await createSimpleReceivingFromPurchaseCloud(
-    await fetchOrderById(id),
-    user
-  )
-
-  await throwIfError(
-    await supabase
-      .from('purchase_orders')
-      .update({
-        receiving_document_id: receivingDocumentId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id),
-    'Привязка документа приёмки'
-  )
-
-  return id
 }
 
 /** Удаление черновика насовсем (серверная функция возвращает количества в план, если заказ из «Закупа») */

@@ -94,13 +94,9 @@ async function stageChunking() {
   assert('full pages hit maxPages → throw (no infinite loop)', overflowThrown)
 
   const purchase = read('src/services/purchaseSupabaseAdapter.js')
-  const receiving = read('src/services/receivingSupabaseAdapter.js')
   assert('purchases uses fetchAllRowsByIdChunks', purchase.includes('fetchAllRowsByIdChunks'))
-  assert('receiving uses fetchAllRowsByIdChunks', receiving.includes('fetchAllRowsByIdChunks'))
   assert('purchases orders by created_at + id', /order\('created_at'[\s\S]*order\('id'/.test(purchase))
-  assert('receiving orders by created_at + id', /order\('created_at'[\s\S]*order\('id'/.test(receiving))
   assert('purchases uses .range(from, to)', purchase.includes('.range(from, to)'))
-  assert('receiving uses .range(from, to)', receiving.includes('.range(from, to)'))
 }
 
 async function stageErrorNormalization() {

@@ -46,7 +46,7 @@ const RULES = [
     message: 'Недостаточно прав для изменения плана закупа. Обратитесь к администратору.',
   },
   {
-    test: /permission denied for table (purchase_orders|receiving_documents)/i,
+    test: /permission denied for table purchase_orders/i,
     message: 'Недостаточно прав для изменения заказа. Обратитесь к администратору.',
   },
   {

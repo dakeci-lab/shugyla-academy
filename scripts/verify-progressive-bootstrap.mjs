@@ -40,7 +40,6 @@ function main() {
   const adapter = read('src/services/supabaseDataAdapter.js')
   const layout = read('src/layouts/PlatformLayout.jsx')
   const purchaseSvc = read('src/services/purchaseDataService.js')
-  const receivingSvc = read('src/services/receivingDataService.js')
   const session = read('src/context/SessionContext.jsx')
   const sessionGate = read('src/components/platform/PlatformSessionGate.jsx')
   const procurementPage = read('src/pages/platform/orders/OrdersPage.jsx')
@@ -49,7 +48,7 @@ function main() {
   assert('cloudStore exports getModuleLoadState', cloudStore.includes('export function getModuleLoadState'))
   assert('cloudStore exports isModuleReady', cloudStore.includes('export function isModuleReady'))
   assert('cloudStore has procurement module', cloudStore.includes("'procurement'"))
-  assert('cloudStore has receiving module', cloudStore.includes("'receiving'"))
+  assert('cloudStore no longer has a receiving module (stage 25c)', !cloudStore.includes("'receiving'"))
   assert('isCloudStoreLoaded kept for compatibility', cloudStore.includes('export function isCloudStoreLoaded'))
 
   console.log('Stage 2: Shell does not wait for full dump')
@@ -71,14 +70,12 @@ function main() {
 
   console.log('Stage 3: Failure isolation')
   assert('fetchAllData does not throw on purchases reject', !/purchasesResult\.status === 'rejected'[\s\S]{0,80}throw/.test(adapter))
-  assert('fetchAllData does not throw on receiving reject', !/receivingResult\.status === 'rejected'[\s\S]{0,80}throw/.test(adapter))
   assert('ensureModuleLoaded exists', platformSvc.includes('export async function ensureModuleLoaded'))
   assert('progressive initializeData mode', platformSvc.includes("mode = 'progressive'"))
 
   console.log('Stage 4: Loading vs empty')
   assert('purchases ready helper', purchaseSvc.includes('isPurchasesDataReady'))
   assert('purchases loading helper', purchaseSvc.includes('isPurchasesDataLoading'))
-  assert('receiving ready helper', receivingSvc.includes('isReceivingDataReady'))
   assert(
     'procurement empty waits for module ready',
     procurementPage.includes('isPurchasesDataLoading') &&
