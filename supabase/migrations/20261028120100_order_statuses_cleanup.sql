@@ -1,4 +1,4 @@
--- Stage 25b (part 2): destructive cleanup, run by the owner in the Supabase SQL Editor (one transaction, no CASCADE, no IF EXISTS).
+-- Stage 25b (part 2): destructive cleanup, run by the owner in the Supabase SQL Editor (one transaction; strict statements).
 -- Precondition: part 1 (20261028120000_order_statuses_cutover.sql) applied; the only non-«saved»/«draft» orders left are the 20 cancelled.
 begin;
 
