@@ -333,6 +333,8 @@ function stageListPage() {
   assert('«Новый заказ» creates a draft and opens it', src.includes('+ Новый заказ') && /createPurchaseOrder\(/.test(src) && /navigate\(`\/platform\/orders\/\$\{id\}`\)/.test(src))
   assert('the list no longer loads the receiving module', !/'receiving'\]/.test(src))
   assert('the «show cancelled» filter is gone (no cancelled status any more)', !/showCancelled/.test(src))
+  assert('the orders list can be retried after a failed load (the error banner has «Повторить»)', />\s*Повторить\s*</.test(src) && /reloadProcurement\(\)/.test(src))
+  assert('a failed procurement reload is retried once before the module is marked as failed', /withOneRetry\(\(\) => supabaseAdapter\.fetchPurchasesModuleData\(\)\)/.test(read('src/services/platformDataService.js')))
   assert('the legacy analytics page is gone and its URLs redirect to the orders list', !fs.existsSync(path.join(ROOT, 'src/pages/platform/procurement/AnalyticsProcurementPage.jsx')) && /path="procurement\/analytics" element=\{<Navigate to="\/platform\/orders"/.test(read('src/App.jsx')))
 
   console.log('')

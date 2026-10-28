@@ -300,14 +300,28 @@ function applyFullFetchResult(data) {
 let procurementRefreshInFlight = null
 let procurementRefreshQueued = null
 
+/**
+ * Загрузка закупа — это десятки параллельных запросов; на планшете (WebKit) один из них изредка обрывается
+ * («Load failed»), и тогда весь список оставался заглушкой с ошибкой. Один повтор после короткой паузы это снимает.
+ */
+async function withOneRetry(load, delayMs = 700) {
+  try {
+    return await load()
+  } catch (error) {
+    console.warn('[Загрузка закупа] повтор после ошибки', error)
+    await new Promise((resolve) => setTimeout(resolve, delayMs))
+    return load()
+  }
+}
+
 async function runProcurementRefresh() {
   markModuleLoading('procurement')
   markModuleLoading('receiving')
   notifyModulesChanged()
 
   const [purchasesResult, receivingResult] = await Promise.allSettled([
-    supabaseAdapter.fetchPurchasesModuleData(),
-    supabaseAdapter.fetchReceivingModuleData(),
+    withOneRetry(() => supabaseAdapter.fetchPurchasesModuleData()),
+    withOneRetry(() => supabaseAdapter.fetchReceivingModuleData()),
   ])
 
   ensureCloudStoreReady()
