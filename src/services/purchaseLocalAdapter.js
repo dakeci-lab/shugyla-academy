@@ -1,14 +1,9 @@
 import {
   normalizePurchaseOrder,
   normalizePurchaseItem,
-  isPurchaseStatusReturnableToDraft,
   PURCHASE_STATUS,
   calcOrderTotal,
   PROCUREMENT_WORKFLOW_MODE,
-  RECEIVING_STARTED_MESSAGE,
-  ANALYTICS_DIRECT_WRITE_MESSAGE,
-  ANALYTICS_RETURN_TO_DRAFT_MESSAGE,
-  isSimpleWorkflow,
 } from '../utils/purchaseData'
 import { SYNC_STATUS } from '../utils/syncStatus'
 import { isCloudMode } from '../lib/dataMode'
@@ -17,8 +12,6 @@ import {
   createSimpleReceivingFromPurchaseLocal,
   syncSimpleReceivingFromPurchaseLocal,
   deleteReceivingByPurchaseIdLocal,
-  cancelReceivingByPurchaseIdLocal,
-  getReceivingLockStateByPurchaseIdLocal,
   getLocalReceivingDocumentById,
 } from './receivingLocalAdapter'
 
@@ -294,7 +287,9 @@ export function deletePurchaseOrderSync(orderId) {
   const orders = readOrders()
   const order = orders.find((o) => o.id === orderId)
   if (!order) throw new Error('Закуп не найден')
-  if (!isSimpleWorkflow(order)) throw new Error(ANALYTICS_DIRECT_WRITE_MESSAGE)
+  if (order.status !== PURCHASE_STATUS.DRAFT) {
+    throw new Error('Удалить можно только черновик. Сначала отмените сохранённый заказ.')
+  }
 
   deleteReceivingByPurchaseIdLocal(orderId)
   writeOrders(orders.filter((o) => o.id !== orderId))
@@ -334,41 +329,37 @@ export async function updatePurchaseOrder(orderId, updates) {
   orders[idx] = merged
   writeOrders(orders)
 
-  if (merged.workflowMode === PROCUREMENT_WORKFLOW_MODE.SIMPLE) {
-    syncSimpleReceivingFromPurchaseLocal(merged)
-  }
-
   return merged
 }
 
-export async function cancelPurchaseOrder(orderId) {
-  cancelReceivingByPurchaseIdLocal(orderId)
-  await updatePurchaseOrder(orderId, { status: PURCHASE_STATUS.CANCELLED })
+/** «Сохранить»: черновик → «Сохранён» (не пустой, без нулевых количеств). */
+export async function submitPurchaseOrder(orderId) {
+  const orders = readOrders()
+  const current = orders.find((o) => o.id === orderId)
+  if (!current) throw new Error('Закуп не найден')
+  const order = normalizePurchaseOrder(current)
+  if (order.status !== PURCHASE_STATUS.DRAFT) return order
+  if (order.items.length === 0) {
+    throw new Error('В заказе нет товаров. Добавьте товары или удалите черновик.')
+  }
+  if (order.items.some((item) => !(Number(item.orderQty) > 0))) {
+    throw new Error('В заказе есть товары с нулевым количеством. Исправьте или удалите их.')
+  }
+  return updatePurchaseOrder(orderId, { status: PURCHASE_STATUS.SAVED })
 }
 
-/** Возврат заказа в черновик, пока склад не начал приёмку */
-export async function returnPurchaseOrderToDraft(orderId) {
+/** «Отменить»: «Сохранён» → черновик, отметка «Сверено» снимается. */
+export async function unsavePurchaseOrder(orderId) {
   const orders = readOrders()
-  const idx = orders.findIndex((o) => o.id === orderId)
-  if (idx < 0) throw new Error('Закуп не найден')
-
-  const current = normalizePurchaseOrder(orders[idx])
-  if (current.status === PURCHASE_STATUS.DRAFT) return current
-  if (!isSimpleWorkflow(current)) throw new Error(ANALYTICS_RETURN_TO_DRAFT_MESSAGE)
-
-  if (!isPurchaseStatusReturnableToDraft(current.status)) {
-    throw new Error('Этот заказ уже нельзя вернуть в черновик.')
-  }
-
-  const lock = getReceivingLockStateByPurchaseIdLocal(orderId)
-  if (lock.receivingStarted) throw new Error(RECEIVING_STARTED_MESSAGE)
-
-  cancelReceivingByPurchaseIdLocal(orderId)
-
+  const current = orders.find((o) => o.id === orderId)
+  if (!current) throw new Error('Закуп не найден')
+  if (normalizePurchaseOrder(current).status === PURCHASE_STATUS.DRAFT) return normalizePurchaseOrder(current)
   return updatePurchaseOrder(orderId, {
     status: PURCHASE_STATUS.DRAFT,
     transferredToReceiving: false,
     receivingDocumentId: null,
+    checkedAt: null,
+    checkedByName: null,
   })
 }
 

@@ -189,3 +189,10 @@
   border: 1px solid #a7f3d0;
   border-radius: 8px;
 }
+
+.purchase-detail__date-edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}

@@ -98,26 +98,20 @@ export async function setPurchaseOrderChecked(orderId, checked, user) {
   )
 }
 
-export async function cancelPurchaseOrder(orderId) {
-  if (isCloudMode()) {
-    await cloud.cancelPurchaseOrderCloud(orderId)
-  } else {
-    await local.cancelPurchaseOrder(orderId)
-  }
+/** «Сохранить»: черновик → «Сохранён». */
+export async function savePurchaseOrder(orderId) {
+  const result = isCloudMode()
+    ? await cloud.submitPurchaseOrderCloud(orderId)
+    : await local.submitPurchaseOrder(orderId)
   await afterPurchaseMutation()
+  return result
 }
 
-/**
- * Возврат заказа в черновик для правки количеств.
- * Ожидаемая приёмка при этом снимается — новый документ создастся при
- * повторной передаче в приёмку.
- */
-export async function returnPurchaseOrderToDraft(orderId) {
+/** «Отменить»: «Сохранён» → черновик. Отметка «Сверено» снимается на сервере. */
+export async function cancelSavedPurchaseOrder(orderId) {
   const result = isCloudMode()
-    ? await cloud.returnPurchaseOrderToDraftCloud(orderId)
-    : await local.returnPurchaseOrderToDraft(orderId)
-  // A draft is changed and sent again — the old «сверено» no longer describes it.
-  await updatePurchaseOrder(orderId, { checkedAt: null, checkedByName: null }).catch(() => {})
+    ? await cloud.unsavePurchaseOrderCloud(orderId)
+    : await local.unsavePurchaseOrder(orderId)
   await afterPurchaseMutation()
   return result
 }

@@ -36,9 +36,6 @@ const SupplierFinancePage = lazy(
 )
 const SalesPage = lazy(() => import('./pages/platform/sales/SalesPage'))
 const ProcurementPage = lazy(() => import('./pages/platform/procurement/ProcurementPage'))
-const AnalyticsProcurementPage = lazy(
-  () => import('./pages/platform/procurement/AnalyticsProcurementPage')
-)
 const PurchaseDetailPage = lazy(
   () => import('./pages/platform/procurement/PurchaseDetailPage')
 )
@@ -154,22 +151,8 @@ export default function App() {
                     </PlatformRoute>
                   }
                 />
-                <Route
-                  path="procurement/analytics"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <AnalyticsProcurementPage />
-                    </PlatformRoute>
-                  }
-                />
-                <Route
-                  path="procurement/analytics/:id"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <PurchaseDetailPage />
-                    </PlatformRoute>
-                  }
-                />
+                <Route path="procurement/analytics" element={<Navigate to="/platform/orders" replace />} />
+                <Route path="procurement/analytics/:id" element={<ProcurementOrderRedirect />} />
                 <Route
                   path="procurement/:id"
                   element={<ProcurementOrderRedirect />}
