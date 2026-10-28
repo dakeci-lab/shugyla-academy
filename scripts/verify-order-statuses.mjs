@@ -332,6 +332,7 @@ function stageListPage() {
   assert('the «show cancelled» filter is gone (no cancelled status any more)', !/showCancelled/.test(src))
   assert('the orders list can be retried after a failed load (the error banner has «Повторить»)', />\s*Повторить\s*</.test(src) && /reloadProcurement\(\)/.test(src))
   assert('a failed procurement reload is retried once before the module is marked as failed', /withOneRetry\(\(\) => supabaseAdapter\.fetchPurchasesModuleData\(\)\)/.test(read('src/services/platformDataService.js')))
+  assert('the card loads its own items and keeps the previous order on screen while refreshing', /itemsReady/.test(read(DETAIL_PAGE)) && /setFullOrder\(\(prev\) =>/.test(read(DETAIL_PAGE)) && /Загрузка товаров/.test(read(DETAIL_PAGE)))
   assert('the legacy analytics page is gone and its URLs redirect to the orders list', !fs.existsSync(path.join(ROOT, 'src/pages/platform/procurement/AnalyticsProcurementPage.jsx')) && /path="procurement\/analytics" element=\{<Navigate to="\/platform\/orders"/.test(read('src/App.jsx')))
 
   console.log('')
