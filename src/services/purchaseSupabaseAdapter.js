@@ -554,6 +554,20 @@ async function callOrderStateRpc(fnName, orderId, context) {
   return { order: updated, result: data ?? null }
 }
 
+/** «Сверено» ставится серверной функцией: прямая запись в заказ из планирования закрыта правами (RLS). */
+export async function setOrderCheckedCloud(orderId, checked) {
+  ensureClient()
+  const { error } = await supabase.rpc('procurement_set_order_checked', {
+    p_order_id: orderId,
+    p_checked: Boolean(checked),
+  })
+  if (error) {
+    console.error('[Отметка «Сверено»]', error)
+    throw new Error(toProcurementUserMessage(error, 'Не удалось сохранить отметку.'))
+  }
+  return fetchOrderById(orderId)
+}
+
 /** «Сохранить»: черновик → «Сохранён». Сервер проверяет, что заказ не пустой и без нулевых количеств. */
 export async function submitPurchaseOrderCloud(orderId) {
   const { order } = await callOrderStateRpc('procurement_submit_order', orderId, 'Сохранение заказа')

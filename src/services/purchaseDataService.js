@@ -90,6 +90,11 @@ export async function updatePurchaseOrder(orderId, updates) {
  * `checked = false` снимает отметку.
  */
 export async function setPurchaseOrderChecked(orderId, checked, user) {
+  if (isCloudMode()) {
+    const result = await cloud.setOrderCheckedCloud(orderId, checked)
+    await afterPurchaseMutation()
+    return result
+  }
   return updatePurchaseOrder(
     orderId,
     checked

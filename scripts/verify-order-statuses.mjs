@@ -328,11 +328,11 @@ function stageListPage() {
   const src = read(LIST_PAGE)
 
   assert('the receiver gets only saved orders (drafts are filtered by role)', /isOrderVisibleToRole\(order, canEdit\)/.test(src))
-  assert('drafts are listed first and ignore the period', /drafts = showCancelled \? \[\] : visible\.filter\(isOrderDraft\)/.test(src) && /\[\.\.\.sortedDrafts, \.\.\.saved\]/.test(src))
+  assert('drafts are listed first and ignore the period', /const drafts = visible\.filter\(isOrderDraft\)/.test(src) && /\[\.\.\.drafts, \.\.\.saved\]/.test(src))
   assert('the «Сегодня ждём…» summary counts saved orders only', /summarizeOrders\(orders\.filter\(isOrderSaved\)\)/.test(src))
   assert('«Новый заказ» creates a draft and opens it', src.includes('+ Новый заказ') && /createPurchaseOrder\(/.test(src) && /navigate\(`\/platform\/orders\/\$\{id\}`\)/.test(src))
   assert('the list no longer loads the receiving module', !/'receiving'\]/.test(src))
-  assert('leftover cancelled orders are reachable only through the filter (default off)', /showCancelled: false/.test(src))
+  assert('the «show cancelled» filter is gone (no cancelled status any more)', !/showCancelled/.test(src))
   assert('the legacy analytics page is gone and its URLs redirect to the orders list', !fs.existsSync(path.join(ROOT, 'src/pages/platform/procurement/AnalyticsProcurementPage.jsx')) && /path="procurement\/analytics" element=\{<Navigate to="\/platform\/orders"/.test(read('src/App.jsx')))
 
   console.log('')
@@ -343,7 +343,7 @@ function stageListPage() {
 // ---------------------------------------------------------------------------
 
 function stageMigration() {
-  console.log('Stage 5: Stage 25a migration')
+  console.log('Stage 5: Stage 25 migrations')
   const sql = read('supabase/migrations/20261028100000_order_statuses_rpc.sql')
   assert('submit refuses an empty order and zero quantities', /procurement_submit_order/.test(sql) && /нет товаров/.test(sql) && /нулевым количеством/.test(sql))
   const unsave = sql.slice(sql.indexOf('function public.procurement_unsave_order'), sql.indexOf('function public.procurement_submit_order'))
@@ -352,6 +352,14 @@ function stageMigration() {
   assert('draft editing policies exist for orders and items', ['purchase_orders_update_draft', 'purchase_order_items_insert_draft', 'purchase_order_items_update_draft', 'purchase_order_items_delete_draft'].every((name) => sql.includes(name)))
   const del = read('supabase/migrations/20261028100100_order_delete_draft.sql')
   assert('deleting a draft refuses a saved order and gives planner quantities back', /v_order\.status <> 'draft'/.test(del) && /generated_purchase_order_id = null/.test(del))
+  const cut = read('supabase/migrations/20261028120000_order_statuses_cutover.sql')
+  assert('planner orders are created as saved, without receiving documents', /'saved',\s*v_today/.test(cut) && !/insert into public\.receiving_/.test(cut))
+  assert('«в пути» counts saved orders only after the cutover', /po\.status = 'saved'/.test(cut))
+  assert('legacy statuses are renamed to saved', /set status = 'saved'[\s\S]{0,200}'awaiting_receiving', 'received'/.test(cut))
+  assert('«Сверено» goes through a server function', /procurement_set_order_checked/.test(cut) && /setOrderCheckedCloud/.test(read(PURCHASE_CLOUD)) && /procurement_set_order_checked/.test(read(PURCHASE_CLOUD)))
+  const clean = read('supabase/migrations/20261028120100_order_statuses_cleanup.sql')
+  assert('cleanup runs in one transaction without CASCADE / IF EXISTS', /^begin;/m.test(clean) && /^commit;/m.test(clean) && !/cascade|if exists/i.test(clean))
+  assert('cleanup limits the status to draft / saved and closes the old direct-edit policies', /check \(status in \('draft', 'saved'\)\)/.test(clean) && (clean.match(/drop policy/g) || []).length === 5)
   console.log('')
 }
 
