@@ -305,7 +305,23 @@ export default function OrdersPage() {
 
       {errorMessage ? (
         <p className="orders-page__error" role="alert">
-          {errorMessage}
+          {errorMessage}{' '}
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm"
+            disabled={refreshing}
+            onClick={() => {
+              setRefreshing(true)
+              reloadProcurement()
+                .then(() => setProcurementLoadError(null))
+                .catch((error) =>
+                  setProcurementLoadError(toUserErrorMessage(error, 'Не удалось загрузить заказы с сервера.'))
+                )
+                .finally(() => setRefreshing(false))
+            }}
+          >
+            Повторить
+          </button>
         </p>
       ) : null}
 
