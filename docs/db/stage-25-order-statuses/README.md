@@ -26,3 +26,12 @@
 список «Заказы» (приёмщику — только «Сохранён»; закупщику — ещё черновики сверху, вне периода; «+ Новый заказ»),
 старые статусы читаются как «Сохранён». Удалены: страница аналитических закупов, карточки-счётчики, история закупов, «Передать в приёмку».
 `verify:order-statuses` заменил `verify:procurement-order-actions`.
+
+## 25b (применено 2026-10-28)
+Часть 1 (`20261028120000_order_statuses_cutover.sql`, без удалений, применена через MCP): заказы из «Закупа» создаются сразу `saved` без документов приёмки;
+«в пути» — только `saved`; старые статусы → `saved` (939 заказов); `procurement_set_order_checked` — «Сверено» через серверную функцию
+(находка: прямая запись отметки не проходила RLS для заказов из планирования — отмеченных заказов в базе не было ни одного).
+Часть 2 (`20261028120100_order_statuses_cleanup.sql`, выполняет владелец в SQL Editor): удаление 20 отменённых, `CHECK (status in ('draft','saved'))`, снятие 5 старых `*_simple` политик.
+
+Проверка после части 2: `select status, count(*) from purchase_orders group by 1;` → только `saved` (и `draft`); `select polname from pg_policy where polrelid in ('purchase_orders'::regclass,'purchase_order_items'::regclass);` → select, `insert_simple` (заказы), `update_draft`, три `*_draft` (позиции).
+Откат части 2: вернуть политики из `20260812*`/этапа 7 (тексты в истории миграций) и `alter table purchase_orders drop constraint purchase_orders_status_check`; удалённые заказы — только из бэкапа.

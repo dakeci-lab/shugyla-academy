@@ -16,7 +16,6 @@ import {
 import { isCloudMode } from '../../../lib/dataMode'
 import { toUserErrorMessage } from '../../../utils/userErrorMessage'
 import {
-  PURCHASE_STATUS,
   isOrderDraft,
   isOrderSaved,
   isOrderVisibleToRole,
@@ -43,7 +42,7 @@ import './OrdersPage.css'
 
 function ordersFilterDefaults() {
   const dates = getSettlementsPeriodDates(SETTLEMENTS_PERIOD_PRESET.TODAY)
-  return { periodPreset: SETTLEMENTS_PERIOD_PRESET.TODAY, ...dates, showCancelled: false }
+  return { periodPreset: SETTLEMENTS_PERIOD_PRESET.TODAY, ...dates }
 }
 
 /**
@@ -73,14 +72,14 @@ export default function OrdersPage() {
   }, [ensureModules])
 
   const [filter, setFilter] = useState(() => {
-    const { dateFrom, dateTo, showCancelled } = ordersFilterDefaults()
-    return { dateFrom, dateTo, showCancelled }
+    const { dateFrom, dateTo } = ordersFilterDefaults()
+    return { dateFrom, dateTo }
   })
   const [filterDraft, setFilterDraft] = useState(ordersFilterDefaults)
   const [filterOpen, setFilterOpen] = useState(false)
   const filterButtonRef = useRef(null)
   const todayKey = ordersFilterDefaults().dateFrom
-  const { dateFrom: periodFrom, dateTo: periodTo, showCancelled } = filter
+  const { dateFrom: periodFrom, dateTo: periodTo } = filter
 
   const [procurementLoadError, setProcurementLoadError] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -127,13 +126,14 @@ export default function OrdersPage() {
   /**
    * Сохранённые заказы — за период (по дате ожидаемой доставки). Черновики (их видит только закупщик)
    * показываются всегда и сверху: иначе черновик с прошедшей датой доставки потерялся бы.
-   * Остаток старых отменённых — только по галочке в фильтре.
    */
   const orders = useMemo(() => {
     const visible = stableOrders.filter((order) => isOrderVisibleToRole(order, canEdit))
-    const drafts = showCancelled ? [] : visible.filter(isOrderDraft)
-    const cancelled = showCancelled ? stableOrders.filter((o) => o.status === PURCHASE_STATUS.CANCELLED) : []
-    const saved = (showCancelled ? cancelled : visible.filter(isOrderSaved))
+    const drafts = visible.filter(isOrderDraft).sort(
+      (a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')
+    )
+    const saved = visible
+      .filter(isOrderSaved)
       .filter(
         (order) =>
           order.expectedDeliveryDate &&
@@ -145,11 +145,8 @@ export default function OrdersPage() {
           (b.expectedDeliveryDate || '').localeCompare(a.expectedDeliveryDate || '') ||
           (a.supplierName || '').localeCompare(b.supplierName || '', 'ru')
       )
-    const sortedDrafts = [...drafts].sort(
-      (a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')
-    )
-    return [...sortedDrafts, ...saved]
-  }, [stableOrders, showCancelled, periodFrom, periodTo, canEdit, version, dataVersion])
+    return [...drafts, ...saved]
+  }, [stableOrders, periodFrom, periodTo, canEdit, version, dataVersion])
 
   function closeCreate() {
     setShowCreate(false)
@@ -193,20 +190,19 @@ export default function OrdersPage() {
 
   useEffect(() => {
     setPage(1)
-  }, [periodFrom, periodTo, pageSize, showCancelled])
+  }, [periodFrom, periodTo, pageSize])
 
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
   }, [page, totalPages])
 
   const periodChanged = periodFrom !== todayKey || periodTo !== todayKey
-  const filterActive = periodChanged || showCancelled
-  const filterCount = (periodChanged ? 1 : 0) + (showCancelled ? 1 : 0)
+  const filterActive = periodChanged
+  const filterCount = periodChanged ? 1 : 0
   const periodLabel = describeSettlementsPeriod(periodFrom, periodTo)
   const summaryText = describeOrdersSummary(summarizeOrders(orders.filter(isOrderSaved)), {
     periodLabel,
     isToday: !periodChanged,
-    cancelled: showCancelled,
   })
 
   function toggleFilter() {
@@ -223,7 +219,6 @@ export default function OrdersPage() {
     setFilter({
       dateFrom: filterDraft.dateFrom,
       dateTo: filterDraft.dateTo,
-      showCancelled: Boolean(filterDraft.showCancelled),
     })
     setFilterOpen(false)
   }
@@ -231,7 +226,7 @@ export default function OrdersPage() {
   function resetFilter() {
     const defaults = ordersFilterDefaults()
     setFilterDraft(defaults)
-    setFilter({ dateFrom: defaults.dateFrom, dateTo: defaults.dateTo, showCancelled: false })
+    setFilter({ dateFrom: defaults.dateFrom, dateTo: defaults.dateTo })
     setFilterOpen(false)
   }
 
@@ -272,18 +267,6 @@ export default function OrdersPage() {
                 </span>
               </>
             ) : null}
-            {showCancelled ? (
-              <span className="pf-filter-chip">
-                Отменённые
-                <button
-                  type="button"
-                  aria-label="Скрыть отменённые"
-                  onClick={() => setFilter((current) => ({ ...current, showCancelled: false }))}
-                >
-                  ×
-                </button>
-              </span>
-            ) : null}
             <button type="button" className="pf-filter-clear" onClick={resetFilter}>
               Очистить всё
             </button>
@@ -316,16 +299,6 @@ export default function OrdersPage() {
             anchorRef={filterButtonRef}
             getDefaults={ordersFilterDefaults}
           >
-            <label className="period-filter-popover__option">
-              <input
-                type="checkbox"
-                checked={Boolean(filterDraft.showCancelled)}
-                onChange={(event) =>
-                  setFilterDraft((current) => ({ ...current, showCancelled: event.target.checked }))
-                }
-              />
-              Показать отменённые заказы
-            </label>
           </PeriodFilterPopover>
         </div>
       </div>
