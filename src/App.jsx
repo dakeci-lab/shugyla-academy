@@ -40,9 +40,6 @@ const PurchaseDetailPage = lazy(
   () => import('./pages/platform/procurement/PurchaseDetailPage')
 )
 const OrdersPage = lazy(() => import('./pages/platform/orders/OrdersPage'))
-const ReceivingDocumentRedirect = lazy(
-  () => import('./pages/platform/receiving/ReceivingDocumentRedirect')
-)
 /**
  * Маршрутизация Shugyla Platform
  */
@@ -175,7 +172,7 @@ export default function App() {
                 />
                 {/* «Приёмка» merged into «Заказы» (2026-09-20): old links keep working. */}
                 <Route path="receiving" element={<Navigate to="/platform/orders" replace />} />
-                <Route path="receiving/:id" element={<ReceivingDocumentRedirect />} />
+                <Route path="receiving/:id" element={<Navigate to="/platform/orders" replace />} />
                 {/* The standalone supplier directory was merged into supplier-finance
                     (see UmagSettlementsPanel). These two routes are kept only as
                     redirects for old links/bookmarks; location.state (openEditId/

@@ -61,20 +61,14 @@ async function stageRules() {
   console.log('Stage 1: Two statuses')
 
   const purchase = await load('src/utils/purchaseData.js')
-  const { PURCHASE_STATUS, orderViewStatus, isOrderDraft, isOrderSaved, isOrderVisibleToRole } = purchase
+  const { PURCHASE_STATUS, isOrderDraft, isOrderSaved, isOrderVisibleToRole } = purchase
 
-  assert('draft reads as draft', orderViewStatus(PURCHASE_STATUS.DRAFT) === 'draft')
-  assert('saved reads as saved', orderViewStatus('saved') === 'saved')
-  for (const legacy of ['awaiting_receiving', 'received', 'formed', 'sent', 'partially_received']) {
-    assert(`legacy «${legacy}» reads as saved`, orderViewStatus(legacy) === 'saved')
-  }
-  assert('legacy cancelled stays cancelled (hidden, to be deleted)', orderViewStatus('cancelled') === 'cancelled')
-
+  assert('there are exactly two statuses: draft and saved', JSON.stringify(Object.values(PURCHASE_STATUS).sort()) === JSON.stringify(['draft', 'saved']))
   assert('the buyer sees drafts', isOrderVisibleToRole({ status: 'draft' }, true))
   assert('the receiver never sees drafts', !isOrderVisibleToRole({ status: 'draft' }, false))
-  assert('both see saved orders', isOrderVisibleToRole({ status: 'saved' }, false) && isOrderVisibleToRole({ status: 'awaiting_receiving' }, true))
-  assert('cancelled is hidden from lists for everyone', !isOrderVisibleToRole({ status: 'cancelled' }, true))
-  assert('isOrderDraft / isOrderSaved are exclusive', isOrderDraft({ status: 'draft' }) && !isOrderSaved({ status: 'draft' }) && isOrderSaved({ status: 'received' }))
+  assert('both see saved orders', isOrderVisibleToRole({ status: 'saved' }, false) && isOrderVisibleToRole({ status: 'saved' }, true))
+  assert('an unknown status is visible to nobody', !isOrderVisibleToRole({ status: 'cancelled' }, true))
+  assert('isOrderDraft / isOrderSaved are exclusive', isOrderDraft({ status: 'draft' }) && !isOrderSaved({ status: 'draft' }) && isOrderSaved({ status: 'saved' }))
 
   const labels = purchase.PURCHASE_STATUS_LABELS
   assert('labels are «Черновик» and «Сохранён»', labels.draft === 'Черновик' && labels.saved === 'Сохранён')
@@ -101,6 +95,8 @@ function stageServices() {
   assert('caches are refreshed after each transition', /export async function savePurchaseOrder[\s\S]{0,300}afterPurchaseMutation\(\)/.test(service) && /export async function cancelSavedPurchaseOrder[\s\S]{0,300}afterPurchaseMutation\(\)/.test(service))
   assert('the client no longer syncs receiving documents on order updates', !/syncSimpleReceivingFromPurchaseCloud/.test(cloud) && !/syncSimpleReceivingFromPurchaseLocal\(/.test(local))
   assert('a manually created order is «simple» (RLS allows its insert)', /workflowMode: PROCUREMENT_WORKFLOW_MODE\.SIMPLE,\s*\},\s*\{ id, created_at/.test(cloud))
+  assert('the receiving layer is gone from the app (stage 25c)', ['src/services/receivingDataService.js', 'src/services/receivingSupabaseAdapter.js', 'src/services/receivingLocalAdapter.js', 'src/utils/receivingData.js', 'src/services/purchaseOptimisticStore.js'].every((file) => !fs.existsSync(path.join(ROOT, file))))
+  assert('orders no longer carry receiving fields', !/receiving_document_id|transferred_to_receiving/.test(cloud) && !/transferredToReceiving|receivingDocumentId/.test(read("src/utils/purchaseData.js")))
   assert('local delete only allows a draft', /status !== PURCHASE_STATUS\.DRAFT[\s\S]{0,200}Удалить можно только черновик/.test(local))
   assert('local save refuses an empty order and zero quantities', /нет товаров/.test(local) && /нулевым количеством/.test(local))
 
@@ -362,6 +358,12 @@ function stageMigration() {
   const clean = read('supabase/migrations/20261028120100_order_statuses_cleanup.sql')
   assert('cleanup runs in one transaction without CASCADE / IF EXISTS', /^begin;/m.test(clean) && /^commit;/m.test(clean) && !/cascade|if exists/i.test(clean))
   assert('cleanup limits the status to draft / saved and closes the old direct-edit policies', /check \(status in \('draft', 'saved'\)\)/.test(clean) && (clean.match(/drop policy/g) || []).length === 5)
+  const rm = read('supabase/migrations/20261028140100_remove_receiving.sql')
+  assert('stage 25c removal runs in one transaction without CASCADE / IF EXISTS', /^begin;/m.test(rm) && /^commit;/m.test(rm) && !/cascade|if exists/i.test(rm.replace(/--.*$/gm, '')))
+  assert('stage 25c drops the four receiving tables children-first', ['receiving_umag_exports', 'receiving_document_versions', 'receiving_items', 'receiving_documents'].map((t) => rm.indexOf(`drop table public.${t};`)).every((v, i, a) => v > -1 && (i === 0 || v > a[i - 1])))
+  assert('deleting a draft no longer touches receiving documents', !/delete from public\.receiving_documents/.test(rm))
+  const rpc2 = read('supabase/migrations/20261028140000_order_rpc_without_receiving.sql')
+  assert('save / cancel functions do not touch receiving documents', !/receiving/.test(rpc2.replace(/--.*$/gm, '')))
   console.log('')
 }
 

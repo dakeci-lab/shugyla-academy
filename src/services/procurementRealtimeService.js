@@ -13,12 +13,10 @@ const RECONNECT_BASE_MS = 1_500
 const RECONNECT_MAX_MS = 30_000
 const CHANNEL_NAME = 'procurement-sync'
 
-/** Tables that drive procurement / receiving UI in cloudStore. */
+/** Tables that drive the procurement UI in cloudStore. */
 export const PROCUREMENT_REALTIME_TABLES = [
   'purchase_orders',
   'purchase_order_items',
-  'receiving_documents',
-  'receiving_items',
 ]
 
 /**
@@ -26,7 +24,7 @@ export const PROCUREMENT_REALTIME_TABLES = [
  */
 
 /**
- * Subscribe to procurement/receiving postgres_changes with debounced refetch.
+ * Subscribe to procurement postgres_changes with debounced refetch.
  * No 5–15s polling. Foreground / online / reconnect triggers a stale-guarded refresh.
  *
  * @param {(meta: { source: string }) => void | Promise<void>} onSync

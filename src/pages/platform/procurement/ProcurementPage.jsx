@@ -25,7 +25,7 @@ export default function ProcurementPage() {
 
   useEffect(() => {
     if (!isCloudMode()) return
-    void ensureModules(['suppliers', 'procurement', 'receiving'])
+    void ensureModules(['suppliers', 'procurement'])
   }, [ensureModules])
 
   if (!canViewPurchases(user)) {

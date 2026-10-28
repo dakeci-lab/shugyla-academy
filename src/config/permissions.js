@@ -400,10 +400,6 @@ export function canEditPurchases(user) {
   return canEditPurchase(user)
 }
 
-export function canTransferToReceiving(user) {
-  return canCreatePurchase(user)
-}
-
 export function canViewReceivingDocuments(user) {
   return canAccessRoute(user, ROUTE_KEYS.RECEIVING)
 }

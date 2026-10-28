@@ -55,10 +55,6 @@ function main() {
     'fetchAllData does not hard-throw purchases',
     !/purchasesResult\.status === 'rejected'[\s\S]{0,120}throw purchasesResult/.test(supabaseAdapter)
   )
-  assert(
-    'fetchAllData does not hard-throw receiving',
-    !/receivingResult\.status === 'rejected'[\s\S]{0,120}throw receivingResult/.test(supabaseAdapter)
-  )
   assert('module load states for procurement', cloudStore.includes("'procurement'"))
   assert('purchases loading vs ready helpers', purchaseService.includes('isPurchasesDataReady'))
 
@@ -91,8 +87,7 @@ function main() {
   const layout = read('src/layouts/PlatformLayout.jsx')
   assert('subscribes to purchase_orders', realtime.includes("'purchase_orders'"))
   assert('subscribes to purchase_order_items', realtime.includes("'purchase_order_items'"))
-  assert('subscribes to receiving_documents', realtime.includes("'receiving_documents'"))
-  assert('subscribes to receiving_items', realtime.includes("'receiving_items'"))
+  assert('no longer subscribes to receiving tables (stage 25c)', !realtime.includes('receiving_'))
   assert('debounced sync', realtime.includes('DEBOUNCE_MS'))
   assert('no 5s polling', !/\b5000\b/.test(realtime) && !realtime.includes('setInterval'))
   assert('no 10s polling', !/\b10000\b/.test(realtime))
@@ -117,9 +112,9 @@ function main() {
   assert('receiving_items publication migration', itemPub.includes('receiving_items'))
 
   console.log('Stage 5: Source of truth')
-  assert('cloud list reads cloudStore + overlay', purchaseService.includes('getCloudPurchases()'))
+  assert('cloud list reads cloudStore', purchaseService.includes('getCloudPurchases()'))
   assert('sync source gated on module ready', purchaseService.includes("isModuleReady('procurement')"))
-  assert('overlay is merge-only for pending/error', read('src/services/purchaseOptimisticStore.js').includes('getOptimisticOverlayForMerge'))
+  assert('the optimistic overlay store is gone (stage 25c)', !fs.existsSync(path.join(ROOT, 'src/services/purchaseOptimisticStore.js')))
   console.log('Stage 6: Secure RLS migration')
   assert('migration revokes anon purchase_orders', migration.includes('revoke all on table public.purchase_orders from anon'))
   assert('migration requires active employee helper', migration.includes('current_employee_is_active'))

@@ -2,78 +2,32 @@ import { getWorkflowMode, isSimpleWorkflow } from './procurementWorkflow'
 
 export { PROCUREMENT_WORKFLOW_MODE, getWorkflowMode, isSimpleWorkflow } from './procurementWorkflow'
 
-/** Статусы закупочного документа (purchase_orders.status) */
-
+/**
+ * Заказ бывает только «Черновик» или «Сохранён» (схема владельца, этап 25;
+ * `docs/procurement/order-lifecycle/final-statuses.md`). Другие значения база не принимает (CHECK).
+ */
 export const PURCHASE_STATUS = {
   DRAFT: 'draft',
   SAVED: 'saved',
-  FORMED: 'formed',
-  SENT: 'sent',
-  AWAITING_RECEIVING: 'awaiting_receiving',
-  PARTIALLY_RECEIVED: 'partially_received',
-  RECEIVED: 'received',
-  CANCELLED: 'cancelled',
 }
 
 export const PURCHASE_STATUS_LABELS = {
   draft: 'Черновик',
   saved: 'Сохранён',
-  formed: 'Сформирован',
-  sent: 'Отправлен поставщику',
-  awaiting_receiving: 'Ожидает приёмки',
-  partially_received: 'Частично принят',
-  received: 'Принят',
-  cancelled: 'Отменён',
 }
 
 export const PURCHASE_STATUS_BADGE = {
   draft: 'warning',
   saved: 'done',
-  formed: 'warning',
-  sent: 'info',
-  awaiting_receiving: 'warning',
-  partially_received: 'warning',
-  received: 'done',
-  cancelled: 'idle',
 }
 
-export const ACTIVE_PURCHASE_STATUSES = [
-  PURCHASE_STATUS.DRAFT,
-  PURCHASE_STATUS.FORMED,
-  PURCHASE_STATUS.SENT,
-  PURCHASE_STATUS.AWAITING_RECEIVING,
-  PURCHASE_STATUS.PARTIALLY_RECEIVED,
-]
-
-/**
- * Заказ бывает только «Черновик» или «Сохранён» (схема владельца, этап 25).
- * Старые значения в базе (ожидает приёмки, принят, сформирован, отправлен, частично принят) читаются как «Сохранён»,
- * пока миграция этапа 25b не переименует их; «Отменён» — остаток старых данных, он скрыт и будет удалён.
- */
-/** Остаётся для адаптеров приёмки до этапа 25c (удаление приёмки). */
-export const ANALYTICS_DIRECT_WRITE_MESSAGE =
-  'Заказ из планирования нельзя менять напрямую. Верните его в черновик.'
-
-export const ORDER_VIEW_STATUS = Object.freeze({
-  DRAFT: 'draft',
-  SAVED: 'saved',
-  CANCELLED: 'cancelled',
-})
-
-export function orderViewStatus(status) {
-  if (status === PURCHASE_STATUS.DRAFT) return ORDER_VIEW_STATUS.DRAFT
-  if (status === PURCHASE_STATUS.CANCELLED) return ORDER_VIEW_STATUS.CANCELLED
-  return ORDER_VIEW_STATUS.SAVED
-}
-
-export const isOrderDraft = (order) => orderViewStatus(order?.status) === ORDER_VIEW_STATUS.DRAFT
-export const isOrderSaved = (order) => orderViewStatus(order?.status) === ORDER_VIEW_STATUS.SAVED
+export const isOrderDraft = (order) => order?.status === PURCHASE_STATUS.DRAFT
+export const isOrderSaved = (order) => order?.status === PURCHASE_STATUS.SAVED
 
 /** Приёмщик видит только сохранённые заказы; закупщик — и черновики. */
 export function isOrderVisibleToRole(order, canEdit) {
-  const view = orderViewStatus(order?.status)
-  if (view === ORDER_VIEW_STATUS.SAVED) return true
-  return view === ORDER_VIEW_STATUS.DRAFT && Boolean(canEdit)
+  if (isOrderSaved(order)) return true
+  return isOrderDraft(order) && Boolean(canEdit)
 }
 
 export function formatPurchaseAmount(amount) {
@@ -135,8 +89,6 @@ export function normalizePurchaseOrder(raw) {
     createdByName: raw.createdByName ?? raw.created_by_name ?? '',
     expectedDeliveryDate: raw.expectedDeliveryDate ?? raw.expected_delivery_date ?? '',
     comment: orderCommentForDisplay(raw.comment),
-    transferredToReceiving: raw.transferredToReceiving ?? raw.transferred_to_receiving ?? false,
-    receivingDocumentId: raw.receivingDocumentId ?? raw.receiving_document_id ?? null,
     checkedAt: raw.checkedAt ?? raw.checked_at ?? null,
     checkedByName: raw.checkedByName ?? raw.checked_by_name ?? '',
     workflowMode: getWorkflowMode(raw),
@@ -176,23 +128,4 @@ export function normalizePurchaseItem(raw) {
     createdAt: raw.createdAt ?? raw.created_at ?? null,
     updatedAt: raw.updatedAt ?? raw.updated_at ?? null,
   }
-}
-
-export function countPurchasesByStatus(orders) {
-  return {
-    drafts: orders.filter((o) => o.status === PURCHASE_STATUS.DRAFT).length,
-    pendingSend: orders.filter((o) => o.status === PURCHASE_STATUS.FORMED).length,
-    pendingReceiving: orders.filter((o) =>
-      [
-        PURCHASE_STATUS.SENT,
-        PURCHASE_STATUS.AWAITING_RECEIVING,
-        PURCHASE_STATUS.PARTIALLY_RECEIVED,
-      ].includes(o.status)
-    ).length,
-    completed: orders.filter((o) => o.status === PURCHASE_STATUS.RECEIVED).length,
-  }
-}
-
-export function filterActivePurchases(orders) {
-  return orders.filter((o) => ACTIVE_PURCHASE_STATUSES.includes(o.status))
 }

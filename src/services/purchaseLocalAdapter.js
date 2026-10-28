@@ -3,17 +3,8 @@ import {
   normalizePurchaseItem,
   PURCHASE_STATUS,
   calcOrderTotal,
-  PROCUREMENT_WORKFLOW_MODE,
 } from '../utils/purchaseData'
-import { SYNC_STATUS } from '../utils/syncStatus'
 import { isCloudMode } from '../lib/dataMode'
-import { normalizeReceivingDocument, RECEIVING_STATUS } from '../utils/receivingData'
-import {
-  createSimpleReceivingFromPurchaseLocal,
-  syncSimpleReceivingFromPurchaseLocal,
-  deleteReceivingByPurchaseIdLocal,
-  getLocalReceivingDocumentById,
-} from './receivingLocalAdapter'
 
 const ORDERS_KEY = 'shugyla_purchase_orders'
 
@@ -123,7 +114,7 @@ function seedIfEmpty() {
       date: today,
       supplierId: null,
       supplierName: 'ИП «Bakaleya Plus»',
-      status: PURCHASE_STATUS.AWAITING_RECEIVING,
+      status: PURCHASE_STATUS.SAVED,
       createdBy: 'admin',
       createdByName: 'Администратор',
       expectedDeliveryDate: '2026-07-11',
@@ -181,104 +172,6 @@ export async function createPurchaseOrder(data) {
   return order.id
 }
 
-export function buildSimplePurchaseEntities(data, user) {
-  const now = new Date().toISOString()
-  const today = now.slice(0, 10)
-  const totalAmount = Math.max(0, Number(data.totalAmount) || 0)
-  const orderId = genId()
-  const docId = genId()
-
-  const order = normalizePurchaseOrder({
-    id: orderId,
-    date: today,
-    supplierId: data.supplierId || null,
-    supplierName: data.supplierName?.trim() || '',
-    status: PURCHASE_STATUS.AWAITING_RECEIVING,
-    createdBy: data.createdBy || user?.login || user?.id || '',
-    createdByName: data.createdByName || user?.name || '',
-    expectedDeliveryDate: data.expectedDeliveryDate || '',
-    comment: data.comment?.trim() || '',
-    totalAmount,
-    itemsCount: 0,
-    items: [],
-    workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
-    transferredToReceiving: true,
-    receivingDocumentId: docId,
-    syncStatus: data.syncStatus ?? SYNC_STATUS.SYNCED,
-    syncError: data.syncError ?? null,
-    created_at: now,
-    updated_at: now,
-  })
-
-  const document = normalizeReceivingDocument({
-    id: docId,
-    purchaseOrderId: orderId,
-    supplierId: order.supplierId,
-    supplierName: order.supplierName,
-    status: RECEIVING_STATUS.AWAITING_RECEIVING,
-    expectedDeliveryDate: order.expectedDeliveryDate,
-    createdBy: order.createdBy,
-    createdByName: order.createdByName,
-    comment: order.comment,
-    totalAmount: order.totalAmount,
-    workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
-    created_at: now,
-    updated_at: now,
-  })
-
-  return { order, document }
-}
-
-export function createSimplePurchaseSync(data, user) {
-  if (isCloudMode()) {
-    return buildSimplePurchaseEntities(data, user)
-  }
-
-  seedIfEmpty()
-  const orders = readOrders()
-  const now = new Date().toISOString()
-  const today = now.slice(0, 10)
-  const totalAmount = Math.max(0, Number(data.totalAmount) || 0)
-
-  const order = normalizePurchaseOrder({
-    id: genId(),
-    date: today,
-    supplierId: data.supplierId || null,
-    supplierName: data.supplierName?.trim() || '',
-    status: PURCHASE_STATUS.AWAITING_RECEIVING,
-    createdBy: data.createdBy || user?.login || user?.id || '',
-    createdByName: data.createdByName || user?.name || '',
-    expectedDeliveryDate: data.expectedDeliveryDate || '',
-    comment: data.comment?.trim() || '',
-    totalAmount,
-    itemsCount: 0,
-    items: [],
-    workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
-    transferredToReceiving: true,
-    syncStatus: data.syncStatus ?? SYNC_STATUS.SYNCED,
-    syncError: data.syncError ?? null,
-    created_at: now,
-    updated_at: now,
-  })
-
-  orders.unshift(order)
-  writeOrders(orders)
-
-  const { receivingDocumentId } = createSimpleReceivingFromPurchaseLocal(order, user)
-  const savedOrder = normalizePurchaseOrder({
-    ...readOrders().find((item) => item.id === order.id),
-    receivingDocumentId,
-  })
-  const document = getLocalReceivingDocumentById(receivingDocumentId)
-
-  return { order: savedOrder, document }
-}
-
-export async function createSimplePurchase(data, user) {
-  const { order } = createSimplePurchaseSync(data, user)
-  return order.id
-}
-
 export async function deletePurchaseOrder(orderId) {
   deletePurchaseOrderSync(orderId)
 }
@@ -291,7 +184,6 @@ export function deletePurchaseOrderSync(orderId) {
     throw new Error('Удалить можно только черновик. Сначала отмените сохранённый заказ.')
   }
 
-  deleteReceivingByPurchaseIdLocal(orderId)
   writeOrders(orders.filter((o) => o.id !== orderId))
 }
 
@@ -356,8 +248,6 @@ export async function unsavePurchaseOrder(orderId) {
   if (normalizePurchaseOrder(current).status === PURCHASE_STATUS.DRAFT) return normalizePurchaseOrder(current)
   return updatePurchaseOrder(orderId, {
     status: PURCHASE_STATUS.DRAFT,
-    transferredToReceiving: false,
-    receivingDocumentId: null,
     checkedAt: null,
     checkedByName: null,
   })

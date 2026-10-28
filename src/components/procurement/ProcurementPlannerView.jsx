@@ -9,7 +9,6 @@ import { useToast } from '../../context/ToastContext'
 import {
   can,
   canCreatePurchase,
-  canTransferToReceiving,
   PERMISSION_CODES,
 } from '../../config/permissions'
 import { isCloudMode } from '../../lib/dataMode'
@@ -267,7 +266,7 @@ export default function ProcurementPlannerView({ headerSlot = null }) {
 
   const canEditPlan = can(user, PERMISSION_CODES.PROCUREMENT_EDIT)
   const canSync = canEditPlan
-  const canGenerate = canCreatePurchase(user) && canTransferToReceiving(user)
+  const canGenerate = canCreatePurchase(user)
 
   const [snapshot, setSnapshot] = useState(null)
   const [stockHealth, setStockHealth] = useState(null)
