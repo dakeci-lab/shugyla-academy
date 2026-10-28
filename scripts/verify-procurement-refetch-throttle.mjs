@@ -113,7 +113,7 @@ async function main() {
   assert('realtime debounce is >= 2s', freshness.PROCUREMENT_REALTIME_DEBOUNCE_MS >= 2_000)
   assert('realtime stale window is >= 60s', freshness.PROCUREMENT_FRESH_MS >= 60_000)
   assert('realtime burst has a max-wait cap', realtime.includes('MAX_WAIT_MS') && realtime.includes('burstStartedAt'))
-  assert('mutation paths still force a refresh', /async function afterPurchaseMutation\(\)\s*\{\s*if \(isCloudMode\(\)\) \{\s*await refreshProcurementData\(\)/.test(read('src/services/purchaseDataService.js')))
+  assert('mutation paths refetch just the changed order into the cache (realtime reconciles the rest)', /async function afterOrderChange\(orderId, fresh\)[\s\S]{0,400}putCloudPurchase\(order\)/.test(read('src/services/purchaseDataService.js')))
   assert('verify script registered', read('package.json').includes('verify:procurement-refetch-throttle'))
 
   console.log(`\nAll ${testsRun} checks passed.`)
