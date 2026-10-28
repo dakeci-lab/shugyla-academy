@@ -60,7 +60,6 @@ const MIGRATED_ALL = [
   ['src/components/suppliers/payments/SupplierPaymentsPanel.jsx', 'cards'],
   ['src/components/platform/notifications/NotificationPanel.jsx', 'list'],
   ['src/pages/platform/PlatformNotificationsInbox.jsx', 'list'],
-  ['src/pages/platform/procurement/AnalyticsProcurementPage.jsx', 'table'],
   ['src/pages/platform/orders/OrdersPage.jsx', 'list'],
   ['src/components/admin/sections/TimeTrackerSection.jsx', 'cards'],
   ['src/components/admin/sections/TimeTrackerHomeCard.jsx', 'cards'],
@@ -141,15 +140,9 @@ function main() {
 
   console.log('Stage 4: Procurement / receiving refresh safety')
   const procurement = read('src/pages/platform/procurement/ProcurementPage.jsx')
-  const analytics = read('src/pages/platform/procurement/AnalyticsProcurementPage.jsx')
   const receiving = read('src/pages/platform/orders/OrdersPage.jsx') // «Приёмка» is part of «Заказы» now
   assert('Receiving uses useStableWhenReady', receiving.includes('useStableWhenReady'))
   assert('Receiving initial skeleton gated after first load', receiving.includes('hasLoadedOnce.current'))
-  assert('Analytics uses useStableWhenReady', analytics.includes('useStableWhenReady'))
-  assert(
-    'Analytics does not wipe with purchasesLoading ? []',
-    !analytics.includes('purchasesLoading ? []'),
-  )
 
   console.log('Stage 5: No page-specific shimmer leftovers (migrated)')
   assert('no umag-settlements skeleton CSS', !read('src/components/suppliers/settlements/UmagSettlementsPanel.css').includes('umag-settlements__skeleton'))

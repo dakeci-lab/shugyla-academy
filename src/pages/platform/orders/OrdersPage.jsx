@@ -1,19 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { usePlatformData } from '../../../context/PlatformDataContext'
 import { useToast } from '../../../context/ToastContext'
 import useStableWhenReady from '../../../hooks/useStableWhenReady'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
-import { canViewOrders, canEditPurchase } from '../../../config/permissions'
+import { canViewOrders, canEditPurchase, canCreatePurchase } from '../../../config/permissions'
 import {
   getPurchaseOrdersSync,
+  createPurchaseOrder,
   isPurchasesDataReady,
   isPurchasesDataLoading,
   getPurchasesDataError,
 } from '../../../services/purchaseDataService'
 import { isCloudMode } from '../../../lib/dataMode'
 import { toUserErrorMessage } from '../../../utils/userErrorMessage'
-import { PURCHASE_STATUS } from '../../../utils/purchaseData'
+import {
+  PURCHASE_STATUS,
+  isOrderDraft,
+  isOrderSaved,
+  isOrderVisibleToRole,
+} from '../../../utils/purchaseData'
 import { PROCUREMENT_FRESH_MS } from '../../../lib/procurementFreshness'
 import {
   describeSettlementsPeriod,
@@ -25,6 +32,8 @@ import PlatformAccessDenied from '../../../components/platform/PlatformAccessDen
 import PlatformFilterTrigger from '../../../components/platform/PlatformFilterTrigger'
 import PeriodFilterPopover from '../../../components/platform/PeriodFilterPopover'
 import PurchaseTable from '../../../components/procurement/PurchaseTable'
+import AdminModal from '../../../components/admin/AdminModal'
+import CreatePurchaseForm, { EMPTY_PURCHASE_FORM } from '../../../components/procurement/CreatePurchaseForm'
 import TablePagination from '../../../components/procurement/TablePagination'
 import { DelayedLoadingSkeleton } from '../../../components/loading/LoadingSkeleton'
 import '../../../components/platform/FilterComboField.css'
@@ -51,10 +60,16 @@ export default function OrdersPage() {
   const { version } = useAdminRefresh()
   const canView = canViewOrders(user)
   const canEdit = canEditPurchase(user)
+  const canCreate = canCreatePurchase(user)
+  const navigate = useNavigate()
+  const [showCreate, setShowCreate] = useState(false)
+  const [createForm, setCreateForm] = useState(EMPTY_PURCHASE_FORM)
+  const [createError, setCreateError] = useState('')
+  const [creating, setCreating] = useState(false)
 
   useEffect(() => {
     if (!isCloudMode()) return
-    void ensureModules(['suppliers', 'procurement', 'receiving'])
+    void ensureModules(['suppliers', 'procurement'])
   }, [ensureModules])
 
   const [filter, setFilter] = useState(() => {
@@ -109,14 +124,16 @@ export default function OrdersPage() {
   if (purchasesReady) hasLoadedOnce.current = true
   const showInitialSkeleton = purchasesLoading && !hasLoadedOnce.current
 
-  /** Заказы периода; отменённые — только по галочке в фильтре. */
+  /**
+   * Сохранённые заказы — за период (по дате ожидаемой доставки). Черновики (их видит только закупщик)
+   * показываются всегда и сверху: иначе черновик с прошедшей датой доставки потерялся бы.
+   * Остаток старых отменённых — только по галочке в фильтре.
+   */
   const orders = useMemo(() => {
-    return stableOrders
-      .filter((order) =>
-        showCancelled
-          ? order.status === PURCHASE_STATUS.CANCELLED
-          : order.status !== PURCHASE_STATUS.CANCELLED
-      )
+    const visible = stableOrders.filter((order) => isOrderVisibleToRole(order, canEdit))
+    const drafts = showCancelled ? [] : visible.filter(isOrderDraft)
+    const cancelled = showCancelled ? stableOrders.filter((o) => o.status === PURCHASE_STATUS.CANCELLED) : []
+    const saved = (showCancelled ? cancelled : visible.filter(isOrderSaved))
       .filter(
         (order) =>
           order.expectedDeliveryDate &&
@@ -128,7 +145,43 @@ export default function OrdersPage() {
           (b.expectedDeliveryDate || '').localeCompare(a.expectedDeliveryDate || '') ||
           (a.supplierName || '').localeCompare(b.supplierName || '', 'ru')
       )
-  }, [stableOrders, showCancelled, periodFrom, periodTo, version, dataVersion])
+    const sortedDrafts = [...drafts].sort(
+      (a, b) => (b.updatedAt || '').localeCompare(a.updatedAt || '')
+    )
+    return [...sortedDrafts, ...saved]
+  }, [stableOrders, showCancelled, periodFrom, periodTo, canEdit, version, dataVersion])
+
+  function closeCreate() {
+    setShowCreate(false)
+    setCreateForm(EMPTY_PURCHASE_FORM)
+    setCreateError('')
+  }
+
+  async function handleCreateDraft() {
+    setCreateError('')
+    if (!createForm.supplierId && !createForm.supplierName.trim()) {
+      setCreateError('Выберите поставщика')
+      return
+    }
+    setCreating(true)
+    try {
+      const id = await createPurchaseOrder({
+        supplierId: createForm.supplierId || null,
+        supplierName: createForm.supplierName,
+        date: createForm.date,
+        expectedDeliveryDate: createForm.expectedDeliveryDate,
+        comment: createForm.comment,
+        createdBy: user?.login || user?.id || '',
+        createdByName: user?.name || '',
+      })
+      closeCreate()
+      navigate(`/platform/orders/${id}`)
+    } catch (err) {
+      setCreateError(err.message || 'Не удалось создать заказ')
+    } finally {
+      setCreating(false)
+    }
+  }
 
   const totalPages = Math.max(1, Math.ceil(orders.length / pageSize))
   const visibleOrders = useMemo(() => {
@@ -150,7 +203,7 @@ export default function OrdersPage() {
   const filterActive = periodChanged || showCancelled
   const filterCount = (periodChanged ? 1 : 0) + (showCancelled ? 1 : 0)
   const periodLabel = describeSettlementsPeriod(periodFrom, periodTo)
-  const summaryText = describeOrdersSummary(summarizeOrders(orders), {
+  const summaryText = describeOrdersSummary(summarizeOrders(orders.filter(isOrderSaved)), {
     periodLabel,
     isToday: !periodChanged,
     cancelled: showCancelled,
@@ -236,6 +289,15 @@ export default function OrdersPage() {
             </button>
           </div>
         ) : null}
+        {canCreate ? (
+          <button
+            type="button"
+            className="btn btn--primary btn--sm orders-page__new"
+            onClick={() => setShowCreate(true)}
+          >
+            + Новый заказ
+          </button>
+        ) : null}
         <div className="pf-filter-anchor orders-page__filter">
           <PlatformFilterTrigger
             ref={filterButtonRef}
@@ -279,7 +341,7 @@ export default function OrdersPage() {
       ) : (
         <div className="procurement-list-panel">
           {summaryText ? <p className="orders-page__summary">{summaryText}</p> : null}
-          <PurchaseTable orders={visibleOrders} canEdit={false} />
+          <PurchaseTable orders={visibleOrders} />
           <TablePagination
             page={page}
             totalPages={totalPages}
@@ -291,6 +353,25 @@ export default function OrdersPage() {
             onPageSizeChange={setPageSize}
           />
         </div>
+      )}
+      {showCreate && canCreate && (
+        <AdminModal
+          title="Новый заказ"
+          onClose={closeCreate}
+          wide
+          footer={
+            <>
+              <button type="button" className="btn btn--ghost" onClick={closeCreate}>
+                Отмена
+              </button>
+              <button type="button" className="btn btn--primary" disabled={creating} onClick={handleCreateDraft}>
+                {creating ? 'Создание…' : 'Создать черновик'}
+              </button>
+            </>
+          }
+        >
+          <CreatePurchaseForm form={createForm} onChange={setCreateForm} error={createError} />
+        </AdminModal>
       )}
     </div>
   )

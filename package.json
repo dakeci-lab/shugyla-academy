@@ -29,7 +29,7 @@
     "verify:careers-intake-closed": "node scripts/verify-careers-intake-closed.mjs",
     "verify:hide-personnel-modules": "node scripts/verify-hide-personnel-modules.mjs",
     "verify:parallel-id-chunk-fetch": "node scripts/verify-parallel-id-chunk-fetch.mjs",
-    "verify:procurement-order-actions": "node scripts/verify-procurement-order-actions.mjs",
+    "verify:order-statuses": "node scripts/verify-order-statuses.mjs",
     "verify:supplier-save-no-full-reload": "node scripts/verify-supplier-save-no-full-reload.mjs",
     "verify:rbac-database-source": "node scripts/verify-rbac-database-source.mjs",
     "verify:roles-crud-matrix-redesign": "node scripts/verify-roles-crud-matrix-redesign.mjs",

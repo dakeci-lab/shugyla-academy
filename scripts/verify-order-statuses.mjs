@@ -1,13 +1,11 @@
 #!/usr/bin/env node
 /**
- * Verification for purchase order actions: return to draft, honest cancel,
- * cancelled-orders filter.
- *
- * Covers PR 2 of docs/procurement/order-actions-ux.md.
+ * Verification for order statuses «Черновик / Сохранён» (stage 25, docs/procurement/order-lifecycle/final-statuses.md):
+ * who sees which status, which action leads where, server transitions, planning «в пути».
  * Pure-logic checks run the real helpers; UI checks assert on source.
  *
  * Usage:
- *   npm run verify:procurement-order-actions
+ *   npm run verify:order-statuses
  */
 
 import fs from 'fs'
@@ -60,74 +58,26 @@ async function load(relPath) {
 // ---------------------------------------------------------------------------
 
 async function stageRules() {
-  console.log('Stage 1: Editing boundary')
+  console.log('Stage 1: Two statuses')
 
   const purchase = await load('src/utils/purchaseData.js')
-  const receiving = await load('src/utils/receivingData.js')
-  const { PURCHASE_STATUS, canReturnPurchaseToDraft, isPurchaseStatusReturnableToDraft } = purchase
-  const { RECEIVING_STATUS, isReceivingStarted } = receiving
+  const { PURCHASE_STATUS, orderViewStatus, isOrderDraft, isOrderSaved, isOrderVisibleToRole } = purchase
 
-  assert(
-    'awaiting_receiving can be returned to draft',
-    isPurchaseStatusReturnableToDraft(PURCHASE_STATUS.AWAITING_RECEIVING)
-  )
-  assert(
-    'partially received cannot be returned to draft',
-    !isPurchaseStatusReturnableToDraft(PURCHASE_STATUS.PARTIALLY_RECEIVED)
-  )
-  assert(
-    'received cannot be returned to draft',
-    !isPurchaseStatusReturnableToDraft(PURCHASE_STATUS.RECEIVED)
-  )
-  assert(
-    'cancelled cannot be returned to draft',
-    !isPurchaseStatusReturnableToDraft(PURCHASE_STATUS.CANCELLED)
-  )
-  assert(
-    'a draft is not offered the return action',
-    !isPurchaseStatusReturnableToDraft(PURCHASE_STATUS.DRAFT)
-  )
+  assert('draft reads as draft', orderViewStatus(PURCHASE_STATUS.DRAFT) === 'draft')
+  assert('saved reads as saved', orderViewStatus('saved') === 'saved')
+  for (const legacy of ['awaiting_receiving', 'received', 'formed', 'sent', 'partially_received']) {
+    assert(`legacy «${legacy}» reads as saved`, orderViewStatus(legacy) === 'saved')
+  }
+  assert('legacy cancelled stays cancelled (hidden, to be deleted)', orderViewStatus('cancelled') === 'cancelled')
 
-  const order = { status: PURCHASE_STATUS.AWAITING_RECEIVING, workflowMode: 'simple' }
-  assert(
-    'return allowed while the warehouse has not started',
-    canReturnPurchaseToDraft(order, { receivingStarted: false })
-  )
-  assert(
-    'return blocked once the warehouse started',
-    !canReturnPurchaseToDraft(order, { receivingStarted: true })
-  )
-  assert('missing order is never returnable', !canReturnPurchaseToDraft(null))
-  assert(
-    'analytics orders cannot be returned to draft',
-    !canReturnPurchaseToDraft(
-      { status: PURCHASE_STATUS.AWAITING_RECEIVING, workflowMode: 'analytics' },
-      { receivingStarted: false }
-    )
-  )
+  assert('the buyer sees drafts', isOrderVisibleToRole({ status: 'draft' }, true))
+  assert('the receiver never sees drafts', !isOrderVisibleToRole({ status: 'draft' }, false))
+  assert('both see saved orders', isOrderVisibleToRole({ status: 'saved' }, false) && isOrderVisibleToRole({ status: 'awaiting_receiving' }, true))
+  assert('cancelled is hidden from lists for everyone', !isOrderVisibleToRole({ status: 'cancelled' }, true))
+  assert('isOrderDraft / isOrderSaved are exclusive', isOrderDraft({ status: 'draft' }) && !isOrderSaved({ status: 'draft' }) && isOrderSaved({ status: 'received' }))
 
-  // isReceivingStarted is the single definition shared by UI and adapters.
-  assert(
-    'awaiting receiving with nothing received is not started',
-    !isReceivingStarted({ status: RECEIVING_STATUS.AWAITING_RECEIVING, totalReceivedQty: 0 })
-  )
-  assert(
-    'a partial receipt counts as started',
-    isReceivingStarted({ status: RECEIVING_STATUS.AWAITING_RECEIVING, totalReceivedQty: 3 })
-  )
-  assert(
-    'in_progress counts as started',
-    isReceivingStarted({ status: RECEIVING_STATUS.IN_PROGRESS, totalReceivedQty: 0 })
-  )
-  assert(
-    'snake_case rows from the database are understood',
-    isReceivingStarted({ status: RECEIVING_STATUS.AWAITING_RECEIVING, total_received_qty: 5 })
-  )
-  assert(
-    'a cancelled document never blocks editing',
-    !isReceivingStarted({ status: RECEIVING_STATUS.CANCELLED, totalReceivedQty: 99 })
-  )
-  assert('no document means nothing started', !isReceivingStarted(null))
+  const labels = purchase.PURCHASE_STATUS_LABELS
+  assert('labels are «Черновик» and «Сохранён»', labels.draft === 'Черновик' && labels.saved === 'Сохранён')
 
   console.log('')
 }
@@ -142,68 +92,17 @@ function stageServices() {
   const cloud = read(PURCHASE_CLOUD)
   const local = read(PURCHASE_LOCAL)
   const service = read(PURCHASE_SERVICE)
-  const receivingCloud = read(RECEIVING_CLOUD)
-  const receivingLocal = read(RECEIVING_LOCAL)
 
-  assert(
-    'cloud exposes returnPurchaseOrderToDraftCloud',
-    cloud.includes('export async function returnPurchaseOrderToDraftCloud')
-  )
-  assert(
-    'local exposes returnPurchaseOrderToDraft',
-    local.includes('export async function returnPurchaseOrderToDraft')
-  )
-  assert(
-    'orchestrator routes both modes',
-    /returnPurchaseOrderToDraftCloud\(orderId\)/.test(service) &&
-      /local\.returnPurchaseOrderToDraft\(orderId\)/.test(service)
-  )
-  assert(
-    'orchestrator refreshes caches after the return',
-    /export async function returnPurchaseOrderToDraft[\s\S]{0,400}afterPurchaseMutation\(\)/.test(service)
-  )
-
-  // The defect found alongside: cancelling an order left the warehouse waiting.
-  // In cloud mode that guarantee now lives in the RPC (see stage 2b).
-  assert(
-    'local cancel also cancels the receiving document',
-    /export async function cancelPurchaseOrder\(orderId\)[\s\S]{0,300}cancelReceivingByPurchaseIdLocal\(orderId\)/.test(local)
-  )
-
-  // Atomicity: the cloud path must not write two tables from the client.
-  assert(
-    'cloud transitions go through a single RPC call',
-    /supabase\.rpc\(fnName, \{ p_order_id: orderId \}\)/.test(cloud)
-  )
-  assert(
-    'cancel calls procurement_cancel_order',
-    /cancelPurchaseOrderCloud[\s\S]{0,400}'procurement_cancel_order'/.test(cloud)
-  )
-  assert(
-    'return to draft calls procurement_return_order_to_draft',
-    /returnPurchaseOrderToDraftCloud[\s\S]{0,400}'procurement_return_order_to_draft'/.test(cloud)
-  )
-  assert(
-    'the client no longer stitches receiving and order writes together',
-    !/cancelReceivingByPurchaseIdCloud\(orderId\)/.test(cloud),
-    'that sequence could half-apply'
-  )
-
-  // Soft, not destructive: no delete on the cancel path.
-  assert(
-    'receiving documents are cancelled, not deleted',
-    /export async function cancelReceivingByPurchaseIdCloud[\s\S]{0,900}status: RECEIVING_STATUS\.CANCELLED/.test(receivingCloud) &&
-      !/export async function cancelReceivingByPurchaseIdCloud[\s\S]{0,900}\.delete\(\)/.test(receivingCloud)
-  )
-  assert(
-    'local cancel keeps the documents in storage',
-    /export function cancelReceivingByPurchaseIdLocal[\s\S]{0,700}RECEIVING_STATUS\.CANCELLED/.test(receivingLocal)
-  )
-  assert(
-    'both adapters use the shared isReceivingStarted definition',
-    receivingCloud.includes('isReceivingStarted') && receivingLocal.includes('isReceivingStarted'),
-    'no duplicated ad-hoc status arithmetic'
-  )
+  assert('«Сохранить» goes through procurement_submit_order', /submitPurchaseOrderCloud[\s\S]{0,300}'procurement_submit_order'/.test(cloud))
+  assert('«Отменить» goes through procurement_unsave_order', /unsavePurchaseOrderCloud[\s\S]{0,300}'procurement_unsave_order'/.test(cloud))
+  assert('deleting a draft goes through procurement_delete_draft_order', /procurement_delete_draft_order/.test(cloud))
+  assert('cloud transitions use one RPC call (no client-side two-table writes)', /supabase\.rpc\(fnName, \{ p_order_id: orderId \}\)/.test(cloud))
+  assert('the orchestrator routes both modes', /submitPurchaseOrderCloud\(orderId\)/.test(service) && /local\.submitPurchaseOrder\(orderId\)/.test(service) && /unsavePurchaseOrderCloud\(orderId\)/.test(service) && /local\.unsavePurchaseOrder\(orderId\)/.test(service))
+  assert('caches are refreshed after each transition', /export async function savePurchaseOrder[\s\S]{0,300}afterPurchaseMutation\(\)/.test(service) && /export async function cancelSavedPurchaseOrder[\s\S]{0,300}afterPurchaseMutation\(\)/.test(service))
+  assert('the client no longer syncs receiving documents on order updates', !/syncSimpleReceivingFromPurchaseCloud/.test(cloud) && !/syncSimpleReceivingFromPurchaseLocal\(/.test(local))
+  assert('a manually created order is «simple» (RLS allows its insert)', /workflowMode: PROCUREMENT_WORKFLOW_MODE\.SIMPLE,\s*\},\s*\{ id, created_at/.test(cloud))
+  assert('local delete only allows a draft', /status !== PURCHASE_STATUS\.DRAFT[\s\S]{0,200}Удалить можно только черновик/.test(local))
+  assert('local save refuses an empty order and zero quantities', /нет товаров/.test(local) && /нулевым количеством/.test(local))
 
   console.log('')
 }
@@ -309,35 +208,15 @@ function stageDetailPage() {
 
   const src = read(DETAIL_PAGE)
 
-  assert('card calls returnPurchaseOrderToDraft', src.includes('returnPurchaseOrderToDraft'))
-  assert(
-    'edit button is gated by canReturnToDraft',
-    /canReturnToDraft && \(/.test(src)
-  )
-  assert(
-    'edit availability comes from the shared helper',
-    /canReturnPurchaseToDraft\(order, \{ receivingStarted \}\)/.test(src)
-  )
-  assert(
-    'a hint replaces the button once receiving started',
-    src.includes('editingBlockedByReceiving') && src.includes('RECEIVING_STARTED_MESSAGE')
-  )
-
-  // The original complaint: the page ran away and the order looked deleted.
-  assert('cancel no longer navigates away', !/navigate\(/.test(src))
-  assert('useNavigate is no longer imported', !src.includes('useNavigate'))
-  assert(
-    'cancel refreshes the card in place',
-    /async function handleCancel[\s\S]{0,900}await refresh\(\)/.test(src)
-  )
-  assert('cancel wording is explicit', src.includes('Отменить заказ'))
-  assert('draft removal is a separate label', src.includes('Удалить черновик'))
-  assert(
-    'cancel and draft removal never show together',
-    src.includes('canCancelOrder') &&
-      src.includes('canDiscardDraft') &&
-      /canCancelOrder =[\s\S]{0,400}status !== PURCHASE_STATUS\.DRAFT/.test(src)
-  )
+  assert('card has «Сохранить» for a draft', /canEdit && draft && \(/.test(src) && />\s*Сохранить\s*</.test(src))
+  assert('card has «Отменить» for a saved order', /canEdit && saved && \(/.test(src) && />\s*Отменить\s*</.test(src))
+  assert('a draft can be deleted for good, with a confirmation', src.includes('Удалить черновик') && /handleDeleteDraft[\s\S]{0,600}window\.confirm/.test(src))
+  assert('«Отменить» explains the order goes back to a draft', /Он вернётся в черновик/.test(src))
+  assert('items are editable only in a draft', /const canEditItems = canEdit && draft/.test(src))
+  assert('the «Сверено» mark exists only on a saved order', /const canShowCheckedMark = saved/.test(src))
+  assert('delivery date and comment are editable in a draft', /canEditItems \? \(\s*<span className="purchase-detail__date-edit"/.test(src) && /handleMetaChange\(\{ comment/.test(src))
+  assert('the receiver cannot open a draft', /isOrderDraft\(order\) && !canEdit/.test(src))
+  assert('no receiving handoff left in the card', !/transferPurchaseToReceiving|canTransferToReceiving|RECEIVING_STARTED_MESSAGE|receivingStarted/.test(src))
 
   // One download button with a compact menu — owner's requirement.
   assert('single download button', src.includes('aria-label="Скачать заказ"'))
@@ -444,34 +323,47 @@ async function stagePlanner() {
 // ---------------------------------------------------------------------------
 
 function stageListPage() {
-  console.log('Stage 4: Cancelled filter')
+  console.log('Stage 4: Orders list')
 
   const src = read(LIST_PAGE)
 
-  // The orders list now lives in OrdersPage (orders + receiving merged); the filter works the same way.
-  assert(
-    'list switches between cancelled and active orders by the filter',
-    /showCancelled\s*\?\s*order\.status === PURCHASE_STATUS\.CANCELLED\s*:\s*order\.status !== PURCHASE_STATUS\.CANCELLED/.test(src)
-  )
-  assert('cancelled filter state lives in the shared filter', /showCancelled: Boolean\(filterDraft\.showCancelled\)/.test(src))
-  assert('filter checkbox is labelled «Показать отменённые заказы»', src.includes('Показать отменённые заказы'))
-  assert(
-    'switching the filter resets pagination',
-    /\[periodFrom, periodTo, pageSize, showCancelled\]/.test(src) && /setPage\(1\)/.test(src)
-  )
-  assert('cancelled orders are shown only through the filter (default off)', /showCancelled: false/.test(src))
+  assert('the receiver gets only saved orders (drafts are filtered by role)', /isOrderVisibleToRole\(order, canEdit\)/.test(src))
+  assert('drafts are listed first and ignore the period', /drafts = showCancelled \? \[\] : visible\.filter\(isOrderDraft\)/.test(src) && /\[\.\.\.sortedDrafts, \.\.\.saved\]/.test(src))
+  assert('the «Сегодня ждём…» summary counts saved orders only', /summarizeOrders\(orders\.filter\(isOrderSaved\)\)/.test(src))
+  assert('«Новый заказ» creates a draft and opens it', src.includes('+ Новый заказ') && /createPurchaseOrder\(/.test(src) && /navigate\(`\/platform\/orders\/\$\{id\}`\)/.test(src))
+  assert('the list no longer loads the receiving module', !/'receiving'\]/.test(src))
+  assert('leftover cancelled orders are reachable only through the filter (default off)', /showCancelled: false/.test(src))
+  assert('the legacy analytics page is gone and its URLs redirect to the orders list', !fs.existsSync(path.join(ROOT, 'src/pages/platform/procurement/AnalyticsProcurementPage.jsx')) && /path="procurement\/analytics" element=\{<Navigate to="\/platform\/orders"/.test(read('src/App.jsx')))
 
   console.log('')
 }
 
+// ---------------------------------------------------------------------------
+// Stage 5 — database migration
+// ---------------------------------------------------------------------------
+
+function stageMigration() {
+  console.log('Stage 5: Stage 25a migration')
+  const sql = read('supabase/migrations/20261028100000_order_statuses_rpc.sql')
+  assert('submit refuses an empty order and zero quantities', /procurement_submit_order/.test(sql) && /нет товаров/.test(sql) && /нулевым количеством/.test(sql))
+  const unsave = sql.slice(sql.indexOf('function public.procurement_unsave_order'), sql.indexOf('function public.procurement_submit_order'))
+  assert('unsave clears the «Сверено» mark and does not give quantities back to the plan', /checked_at = null/.test(unsave) && !/procurement_snapshot_items/.test(unsave))
+  assert('«в пути» counts saved orders only (drafts and cancelled do not)', /po\.status in \('saved', 'awaiting_receiving', 'formed', 'sent', 'partially_received'\)/.test(sql))
+  assert('draft editing policies exist for orders and items', ['purchase_orders_update_draft', 'purchase_order_items_insert_draft', 'purchase_order_items_update_draft', 'purchase_order_items_delete_draft'].every((name) => sql.includes(name)))
+  const del = read('supabase/migrations/20261028100100_order_delete_draft.sql')
+  assert('deleting a draft refuses a saved order and gives planner quantities back', /v_order\.status <> 'draft'/.test(del) && /generated_purchase_order_id = null/.test(del))
+  console.log('')
+}
+
 async function main() {
-  console.log('=== Purchase order actions verification ===\n')
+  console.log('=== Order statuses verification ===\n')
   await stageRules()
   stageServices()
   stageRpcMigration()
   stageDetailPage()
   await stagePlanner()
   stageListPage()
+  stageMigration()
   console.log(`=== All ${checks} checks passed ===\n`)
 }
 

@@ -6,6 +6,7 @@ export { PROCUREMENT_WORKFLOW_MODE, getWorkflowMode, isSimpleWorkflow } from './
 
 export const PURCHASE_STATUS = {
   DRAFT: 'draft',
+  SAVED: 'saved',
   FORMED: 'formed',
   SENT: 'sent',
   AWAITING_RECEIVING: 'awaiting_receiving',
@@ -16,6 +17,7 @@ export const PURCHASE_STATUS = {
 
 export const PURCHASE_STATUS_LABELS = {
   draft: 'Черновик',
+  saved: 'Сохранён',
   formed: 'Сформирован',
   sent: 'Отправлен поставщику',
   awaiting_receiving: 'Ожидает приёмки',
@@ -25,7 +27,8 @@ export const PURCHASE_STATUS_LABELS = {
 }
 
 export const PURCHASE_STATUS_BADGE = {
-  draft: 'idle',
+  draft: 'warning',
+  saved: 'done',
   formed: 'warning',
   sent: 'info',
   awaiting_receiving: 'warning',
@@ -43,35 +46,34 @@ export const ACTIVE_PURCHASE_STATUSES = [
 ]
 
 /**
- * Статусы, из которых закуп можно вернуть в черновик.
- * Заказы из планирования создаются сразу в awaiting_receiving, поэтому именно
- * этот статус — основной случай. Частично или полностью принятый заказ править
- * нельзя: цифры закупщика и приёмщика разойдутся.
+ * Заказ бывает только «Черновик» или «Сохранён» (схема владельца, этап 25).
+ * Старые значения в базе (ожидает приёмки, принят, сформирован, отправлен, частично принят) читаются как «Сохранён»,
+ * пока миграция этапа 25b не переименует их; «Отменён» — остаток старых данных, он скрыт и будет удалён.
  */
-export const RETURNABLE_TO_DRAFT_STATUSES = [
-  PURCHASE_STATUS.FORMED,
-  PURCHASE_STATUS.SENT,
-  PURCHASE_STATUS.AWAITING_RECEIVING,
-]
-
-export const RECEIVING_STARTED_MESSAGE = 'Склад начал приёмку — заказ изменить нельзя.'
-
-export const ANALYTICS_RETURN_TO_DRAFT_MESSAGE =
-  'Аналитический заказ нельзя вернуть в черновик. Отмените его и создайте заново.'
-
+/** Остаётся для адаптеров приёмки до этапа 25c (удаление приёмки). */
 export const ANALYTICS_DIRECT_WRITE_MESSAGE =
-  'Аналитический заказ нельзя менять напрямую. Отмените его и создайте заново либо работайте через приёмку склада.'
+  'Заказ из планирования нельзя менять напрямую. Верните его в черновик.'
 
-export function isPurchaseStatusReturnableToDraft(status) {
-  return RETURNABLE_TO_DRAFT_STATUSES.includes(status)
+export const ORDER_VIEW_STATUS = Object.freeze({
+  DRAFT: 'draft',
+  SAVED: 'saved',
+  CANCELLED: 'cancelled',
+})
+
+export function orderViewStatus(status) {
+  if (status === PURCHASE_STATUS.DRAFT) return ORDER_VIEW_STATUS.DRAFT
+  if (status === PURCHASE_STATUS.CANCELLED) return ORDER_VIEW_STATUS.CANCELLED
+  return ORDER_VIEW_STATUS.SAVED
 }
 
-/** Можно ли вернуть заказ в черновик: только simple, и пока склад не начал приёмку. */
-export function canReturnPurchaseToDraft(order, { receivingStarted = false } = {}) {
-  if (!order) return false
-  if (!isSimpleWorkflow(order)) return false
-  if (receivingStarted) return false
-  return isPurchaseStatusReturnableToDraft(order.status)
+export const isOrderDraft = (order) => orderViewStatus(order?.status) === ORDER_VIEW_STATUS.DRAFT
+export const isOrderSaved = (order) => orderViewStatus(order?.status) === ORDER_VIEW_STATUS.SAVED
+
+/** Приёмщик видит только сохранённые заказы; закупщик — и черновики. */
+export function isOrderVisibleToRole(order, canEdit) {
+  const view = orderViewStatus(order?.status)
+  if (view === ORDER_VIEW_STATUS.SAVED) return true
+  return view === ORDER_VIEW_STATUS.DRAFT && Boolean(canEdit)
 }
 
 export function formatPurchaseAmount(amount) {

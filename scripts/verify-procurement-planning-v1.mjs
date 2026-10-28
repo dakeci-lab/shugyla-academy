@@ -387,12 +387,6 @@ function stageContractFiles() {
       'Экспорт Excel будет доступен'
     )
   )
-  assert(
-    'analytics page no umag import button',
-    !read('src/pages/platform/procurement/AnalyticsProcurementPage.jsx').includes(
-      'Импорт из Umag'
-    )
-  )
 }
 
 async function stagePlanExportAndPlannerUi() {

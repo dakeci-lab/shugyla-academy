@@ -5,8 +5,6 @@ import {
   calcLineTotal,
   PURCHASE_STATUS,
   PROCUREMENT_WORKFLOW_MODE,
-  ANALYTICS_DIRECT_WRITE_MESSAGE,
-  isSimpleWorkflow,
 } from '../utils/purchaseData'
 
 import {
@@ -319,6 +317,7 @@ export async function createPurchaseOrderCloud(data) {
       comment: data.comment,
       transferredToReceiving: false,
       receivingDocumentId: null,
+      workflowMode: PROCUREMENT_WORKFLOW_MODE.SIMPLE,
     },
     { id, created_at: now, updated_at: now }
   )
@@ -351,10 +350,6 @@ export async function updatePurchaseOrderCloud(orderId, patch) {
   }
 
   const updated = await fetchOrderById(orderId)
-  if (updated?.workflowMode === PROCUREMENT_WORKFLOW_MODE.SIMPLE) {
-    const { syncSimpleReceivingFromPurchaseCloud } = await import('./receivingSupabaseAdapter')
-    await syncSimpleReceivingFromPurchaseCloud(updated)
-  }
 
   return updated
 }
@@ -455,20 +450,15 @@ export async function createSimplePurchaseCloud(data, user) {
   return id
 }
 
-/** Удаление закупа (каскадно удалит позиции) */
+/** Удаление черновика насовсем (серверная функция возвращает количества в план, если заказ из «Закупа») */
 export async function deletePurchaseOrderCloud(orderId) {
   ensureClient()
-  const order = await fetchOrderById(orderId)
-  if (!order) throw new Error('Закуп не найден')
-  if (!isSimpleWorkflow(order)) throw new Error(ANALYTICS_DIRECT_WRITE_MESSAGE)
-
-  const { deleteReceivingByPurchaseIdCloud } = await import('./receivingSupabaseAdapter')
-  await deleteReceivingByPurchaseIdCloud(orderId)
-
-  await throwIfError(
-    await supabase.from('purchase_orders').delete().eq('id', orderId),
-    'Удаление закупа'
-  )
+  if (!orderId) throw new Error('Заказ не найден')
+  const { error } = await supabase.rpc('procurement_delete_draft_order', { p_order_id: orderId })
+  if (error) {
+    console.error('[Удаление черновика]', error)
+    throw new Error(toProcurementUserMessage(error, 'Не удалось удалить черновик.'))
+  }
 }
 
 /** Добавление позиции */
@@ -564,29 +554,15 @@ async function callOrderStateRpc(fnName, orderId, context) {
   return { order: updated, result: data ?? null }
 }
 
-/**
- * Отмена заказа вместе со связанными документами приёмки.
- * Без этого склад продолжал ждать поставку по отменённому заказу.
- */
-export async function cancelPurchaseOrderCloud(orderId) {
-  const { order } = await callOrderStateRpc(
-    'procurement_cancel_order',
-    orderId,
-    'Отмена заказа закупа'
-  )
+/** «Сохранить»: черновик → «Сохранён». Сервер проверяет, что заказ не пустой и без нулевых количеств. */
+export async function submitPurchaseOrderCloud(orderId) {
+  const { order } = await callOrderStateRpc('procurement_submit_order', orderId, 'Сохранение заказа')
   return order
 }
 
-/**
- * Возврат заказа в черновик, чтобы закупщик мог поправить количества.
- * Сервер сам откажет, если склад уже начал приёмку.
- */
-export async function returnPurchaseOrderToDraftCloud(orderId) {
-  const { order } = await callOrderStateRpc(
-    'procurement_return_order_to_draft',
-    orderId,
-    'Возврат заказа в черновик'
-  )
+/** «Отменить»: «Сохранён» → черновик. Количества в план не возвращаются. */
+export async function unsavePurchaseOrderCloud(orderId) {
+  const { order } = await callOrderStateRpc('procurement_unsave_order', orderId, 'Отмена сохранённого заказа')
   return order
 }
 
