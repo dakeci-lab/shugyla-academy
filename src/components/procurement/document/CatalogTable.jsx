@@ -1,4 +1,4 @@
-import { calcReserveDays } from '../../../utils/procurementPlanningMath'
+import { calcReserveDays, reserveHighlightFromStatus } from '../../../utils/procurementPlanningMath'
 import { catalogGroupKey } from '../../../utils/purchaseCatalog'
 import './CatalogTable.css'
 
@@ -38,6 +38,8 @@ export default function CatalogTable({
     const reason = inDoc ? 'Уже в заказе' : disabledReason?.(item) || ''
     const disabled = Boolean(reason)
     const reserve = calcReserveDays(item.calculationStock, item.avgDaily)
+    const reserveTone = reserveHighlightFromStatus(item.reserveStatus)
+    const weekMax = Math.max(0, ...(item.weeklySales || []).map((v) => Number(v) || 0))
     return (
       <tr key={item.barcode || item.id} className={disabled ? 'is-disabled' : ''} title={reason || undefined}>
         <td>
@@ -51,13 +53,33 @@ export default function CatalogTable({
         </td>
         <td className="num">{rowNumber}</td>
         <td className="ctbl__name">{item.productName}</td>
-        {weekLabels.map((label, index) => (
-          <td key={label + index} className="r num ctbl__week">
-            {item.weeklySales?.[index] ? num(item.weeklySales[index]) : ''}
-          </td>
-        ))}
+        {weekLabels.map((label, index) => {
+          const value = Number(item.weeklySales?.[index]) || 0
+          // Heat shade per row: the eight weeks read as one block (a trend), not as eight separate numbers.
+          const shade = weekMax > 0 && value > 0 ? 0.08 + (value / weekMax) * 0.22 : 0
+          return (
+            <td
+              key={label + index}
+              className={`r num ctbl__week${index === 0 ? ' ctbl__week--first' : ''}${index === weekLabels.length - 1 ? ' ctbl__week--last' : ''}`}
+              style={shade ? { backgroundColor: `rgba(5, 150, 105, ${shade.toFixed(3)})` } : undefined}
+            >
+              {value ? num(value) : ''}
+            </td>
+          )
+        })}
         <td className={`r num${item.negativeStock ? ' ctbl__neg' : ''}`}>{num(item.rawStock)}</td>
-        <td className="r num">{reserve == null ? '—' : reserve}</td>
+        <td
+          className={`r num${reserveTone ? ` ctbl__reserve--${reserveTone}` : ''}`}
+          title={
+            reserveTone === 'below-norm'
+              ? 'Запаса меньше цели — пора заказывать'
+              : reserveTone === 'above-norm'
+                ? 'Запаса больше цели'
+                : undefined
+          }
+        >
+          {reserve == null ? '—' : reserve}
+        </td>
         <td className="r num">{num(item.avgDaily, 2)}</td>
         <td className="r num">{num(item.recommendedQty)}</td>
         <td className="r num">{item.targetDays == null ? '—' : num(item.targetDays)}</td>
@@ -81,10 +103,28 @@ export default function CatalogTable({
   const colSpan = 11 + weekLabels.length
 
   return (
+    <>
+    <p className="ctbl__legend">
+      <span className="ctbl__legend-item">
+        <i className="ctbl__legend-box ctbl__legend-box--below" aria-hidden="true" />
+        Запаса меньше цели — пора заказывать
+      </span>
+      <span className="ctbl__legend-item">
+        <i className="ctbl__legend-box ctbl__legend-box--above" aria-hidden="true" />
+        Запаса больше цели
+      </span>
+    </p>
     <div className="ctbl__wrap">
       <table className="ctbl">
         <thead>
-          <tr>
+          <tr className="ctbl__h1">
+            <th colSpan={3} />
+            <th colSpan={weekLabels.length} className="ctbl__weeks-title">
+              Продажи по неделям, шт.
+            </th>
+            <th colSpan={7} />
+          </tr>
+          <tr className="ctbl__h2">
             <th>
               <input
                 type="checkbox"
@@ -97,7 +137,10 @@ export default function CatalogTable({
             <th>№</th>
             <th>Товар</th>
             {weekLabels.map((label, index) => (
-              <th key={label + index} className="r">
+              <th
+                key={label + index}
+                className={`r ctbl__week${index === 0 ? ' ctbl__week--first' : ''}${index === weekLabels.length - 1 ? ' ctbl__week--last' : ''}`}
+              >
                 {label}
               </th>
             ))}
@@ -169,6 +212,7 @@ export default function CatalogTable({
         </tbody>
       </table>
     </div>
+    </>
   )
 }
 

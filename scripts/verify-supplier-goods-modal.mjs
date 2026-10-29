@@ -54,8 +54,8 @@ for (const label of ['Остаток', 'Запас/дн', 'Спрос/дн', 'Р
 }
 assert.match(table, /weekLabels\.map/)
 ok('columns: 8 weekly sales, Остаток, Запас/дн, Спрос/дн, Рек., Цель дн, В пути, Заказ')
-assert.doesNotMatch(table, /below-norm|above-norm|reserveHighlight|shelf-bar|ShelfBar/i)
-ok('no norm colours and no shelf bar')
+assert.doesNotMatch(table, /ShelfBar|shelf-bar/i)
+ok('no shelf bar')
 assert.match(modal, /placeholder="Товар или штрихкод…"/)
 assert.match(modal, /ProcurementSupplierPlanBar/)
 assert.match(modal, /PlatformSyncButton[\s\S]*Обновить данные UMAG/)
@@ -98,5 +98,15 @@ ok('the recommendation is a placeholder; ticking a row takes it as the quantity 
 const css = read('src/components/procurement/document/CatalogTable.css')
 assert.match(css, /th:nth-child\(-n \+ 3\)[\s\S]*?position: sticky/)
 ok('checkbox, number and product columns stay in view on horizontal scroll')
+
+assert.match(table, /reserveHighlightFromStatus\(item\.reserveStatus\)/)
+assert.match(table, /ctbl__reserve--\$\{reserveTone\}/)
+const tcss = read('src/components/procurement/document/CatalogTable.css')
+assert.match(tcss, /ctbl__reserve--below-norm \{\s*background: #c2ecd0/)
+assert.match(tcss, /ctbl__reserve--above-norm \{\s*background: #f6bcbc/)
+ok('«Запас/дн» is tinted by the server plan status (green: stock below target, red: above), with a legend')
+assert.match(table, /Продажи по неделям, шт\./)
+assert.match(table, /rgba\(5, 150, 105/)
+ok('the eight weeks sit under one title with a per-row heat shade (one block, not eight separate numbers)')
 
 console.log(`\n${checks} checks passed`)
