@@ -2,11 +2,11 @@
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
-  padding: 0.75rem 1rem;
+  padding: 0.6rem 0.75rem;
   margin: 0 0 0.75rem;
   background: var(--color-surface, #fff);
   border: 1px solid var(--color-border, #e5e7eb);
-  border-radius: 12px;
+  border-radius: 6px;
 }
 
 .proc-plan-bar__row {
@@ -46,8 +46,9 @@
   font-size: 1.1rem;
   line-height: 1;
   border: 1px solid var(--color-border, #d1d5db);
-  border-radius: 8px;
+  border-radius: 4px;
   background: var(--color-surface, #fff);
+  color: var(--color-text, #111827);
   cursor: pointer;
 }
 
@@ -110,4 +111,12 @@
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--color-text, #111827);
+}
+
+.proc-plan-bar__spacer {
+  flex: 1 1 auto;
+}
+
+.proc-plan-bar__field .docdate {
+  min-width: 190px;
 }

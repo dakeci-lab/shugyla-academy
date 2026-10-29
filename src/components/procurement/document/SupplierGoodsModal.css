@@ -35,3 +35,23 @@
   padding: 16px 0;
   color: var(--color-text-muted, #6b7280);
 }
+
+.sgm__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.875rem;
+}
+
+.sgm__summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-right: auto;
+  font-size: 0.875rem;
+}
+
+.sgm__summary--warn {
+  color: #b45309;
+  font-weight: 600;
+}
