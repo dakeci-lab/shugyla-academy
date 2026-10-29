@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import {
   SUPPLIER_STATUS,
   SUPPLIER_STATUS_LABELS,
+  formatMinOrderAmountInput,
+  parseMinOrderAmount,
   parseSupplierWeekdays,
   serializeSupplierWeekdays,
 } from '../../utils/supplierData'
@@ -43,6 +45,7 @@ export const EMPTY_SUPPLIER_FORM = {
   // '0' — same default a brand-new supplier got before this field existed
   // (способ по умолчанию «Наличные», срок настроен — 0 дней), not '' (unconfigured).
   deferralDays: '0',
+  minOrderAmount: '',
   status: SUPPLIER_STATUS.ACTIVE,
 }
 
@@ -64,6 +67,7 @@ export function supplierToForm(supplier) {
     deliveryWeekdays: parseSupplierWeekdays(supplier.deliveryWeekdays ?? supplier.deliveryDays),
     paymentAccountId: supplier.paymentAccountId || '',
     deferralDays: supplier.deferralDays == null ? '' : String(supplier.deferralDays),
+    minOrderAmount: formatMinOrderAmountInput(supplier.minOrderAmount),
     status: supplier.status || SUPPLIER_STATUS.ACTIVE,
   }
 }
@@ -86,6 +90,7 @@ function buildVisibleSupplierPayload(form) {
     deliveryDays: serializeSupplierWeekdays(deliveryWeekdays),
     paymentAccountId: form.paymentAccountId || null,
     deferralDays: validDays ? days : null,
+    minOrderAmount: parseMinOrderAmount(form.minOrderAmount),
     status: form.status,
   }
 }
@@ -299,6 +304,19 @@ export default function SupplierForm({
           </label>
         </div>
         <div className="admin-form__row">
+          <label className="admin-form__label">
+            Минимальная сумма заказа (₸)
+            <input
+              className="admin-form__input"
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="1"
+              placeholder="Не задана"
+              value={form.minOrderAmount}
+              onChange={(e) => setField('minOrderAmount', e.target.value)}
+            />
+          </label>
           <label className="admin-form__label">
             Статус
             <select

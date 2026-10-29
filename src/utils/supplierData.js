@@ -351,3 +351,14 @@ export function categoriesToInputValue(categories) {
 export function inputValueToCategories(value) {
   return parseCategories(value)
 }
+
+/** Поле формы → число (> 0) или null: пусто, 0, отрицательное и мусор очищают минимум. */
+export function parseMinOrderAmount(value) {
+  const n = Number(String(value ?? '').replace(/\s/g, '').replace(',', '.'))
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
+export function formatMinOrderAmountInput(value) {
+  const n = Number(value)
+  return Number.isFinite(n) && n > 0 ? String(n) : ''
+}
