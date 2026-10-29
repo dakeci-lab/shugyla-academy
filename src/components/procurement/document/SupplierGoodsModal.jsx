@@ -11,7 +11,7 @@ import {
   syncProcurementPlanning,
 } from '../../../services/procurementPlanningService'
 import { buildPlannerWeekColumnLabels } from '../../../utils/procurementPlannerUx'
-import { filterCatalogItems } from '../../../utils/purchaseCatalog'
+import { filterCatalogItems, groupCatalogItems } from '../../../utils/purchaseCatalog'
 import { toProcurementUserMessage } from '../../../utils/procurementErrors'
 import AdminModal from '../../admin/AdminModal'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
@@ -127,6 +127,7 @@ export default function SupplierGoodsModal({ order, existingBarcodes, onAdd, onD
   )
   const visible = useMemo(() => filterCatalogItems(items, search), [items, search])
   const searching = search.trim().length > 0
+  const groups = useMemo(() => groupCatalogItems(visible), [visible])
 
   const quantityOf = (item) => {
     if (item.barcode in qtyEdits) return qtyEdits[item.barcode]
@@ -291,7 +292,7 @@ export default function SupplierGoodsModal({ order, existingBarcodes, onAdd, onD
           <p className="sgm__hint">Данных UMAG пока нет. Обновите их кнопкой справа.</p>
         ) : (
           <CatalogTable
-            items={visible}
+            groups={groups}
             weekLabels={weekLabels}
             expanded={expanded}
             expandAll={searching}
