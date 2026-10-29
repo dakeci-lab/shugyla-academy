@@ -5,7 +5,6 @@ import {
   formatPurchaseDateTime,
 } from '../../utils/purchaseData'
 import { ORDER_LABELS } from '../../config/documentLabels'
-import '../platform/PlatformGridTableLight.css'
 import { PgtHead, PgtRow, PgtTable } from '../platform/PlatformGridTable'
 
 /**
@@ -29,7 +28,7 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
   ]
 
   return (
-    <PgtTable columns={columns} className="pgt--light">
+    <PgtTable columns={columns}>
       <PgtHead columns={columns} />
       {orders.length === 0 ? <p className="pgt__empty">Заказов за этот период нет.</p> : null}
       {orders.map((order) => {
