@@ -69,6 +69,7 @@ export default function CatalogTable({
             className="ctbl__qty num"
             aria-label="Заказать"
             value={disabled ? '' : quantityOf(item)}
+            placeholder={disabled || item.recommendedQty <= 0 ? '' : String(item.recommendedQty)}
             disabled={disabled}
             onChange={(event) => onQuantity(item, event.target.value)}
           />

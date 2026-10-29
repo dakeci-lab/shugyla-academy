@@ -146,9 +146,10 @@ export default function SupplierGoodsModal({
   const searching = search.trim().length > 0
   const groups = useMemo(() => groupCatalogItems(visible), [visible])
 
+  // The recommendation is only a hint until the row is ticked; ticking takes it as the quantity.
   const quantityOf = (item) => {
     if (item.barcode in qtyEdits) return qtyEdits[item.barcode]
-    return item.recommendedQty > 0 ? String(item.recommendedQty) : ''
+    return selected.has(item.barcode) && item.recommendedQty > 0 ? String(item.recommendedQty) : ''
   }
 
   /** One click: every row with a recommendation is ticked and takes the recommended quantity. */

@@ -99,3 +99,53 @@
   padding: 16px 8px;
   color: var(--color-text-muted, #6b7280);
 }
+
+.ctbl__qty::placeholder {
+  color: var(--color-text-muted, #9ca3af);
+}
+
+/* Checkbox, row number and product name stay in view while the weekly columns scroll sideways. */
+.ctbl th:nth-child(-n + 3),
+.ctbl tbody tr:not(.ctbl__group) td:nth-child(-n + 3) {
+  position: sticky;
+  background: var(--color-white, #fff);
+}
+
+.ctbl th:nth-child(1),
+.ctbl td:nth-child(1) {
+  left: 0;
+  width: 40px;
+  min-width: 40px;
+}
+
+.ctbl th:nth-child(2),
+.ctbl td:nth-child(2) {
+  left: 40px;
+  width: 44px;
+  min-width: 44px;
+}
+
+.ctbl th:nth-child(3),
+.ctbl td:nth-child(3) {
+  left: 84px;
+  box-shadow: 1px 0 0 var(--color-border, #e2e8f0);
+}
+
+.ctbl th:nth-child(-n + 3) {
+  z-index: 4;
+}
+
+.ctbl tbody tr:not(.ctbl__group) td:nth-child(-n + 3) {
+  z-index: 1;
+}
+
+.ctbl .is-disabled td:nth-child(-n + 3) {
+  background: #fafafa;
+}
+
+/* Group headers stay readable while the table is scrolled sideways: the button is as wide as the visible window. */
+.ctbl__group button {
+  position: sticky;
+  left: 0;
+  width: min(1264px, calc(100vw - 100px));
+}

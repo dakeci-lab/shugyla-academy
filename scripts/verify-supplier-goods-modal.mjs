@@ -91,4 +91,12 @@ ok('plan bar is one row with the Russian date field (no native English date, no 
 assert.match(read('src/components/procurement/document/CatalogTable.css'), /\.ctbl__group button \{[^}]*color: var\(--color-text/)
 ok('group buttons use the text colour (not the browser default blue)')
 
+assert.match(modal, /selected\.has\(item\.barcode\) && item\.recommendedQty > 0 \? String\(item\.recommendedQty\)/)
+assert.match(table, /placeholder=\{disabled \|\| item\.recommendedQty <= 0 \? '' : String\(item\.recommendedQty\)\}/)
+assert.match(read('src/components/procurement/document/NomenclatureModal.jsx'), /selected\.has\(item\.barcode\) && item\.recommendedQty > 0/)
+ok('the recommendation is a placeholder; ticking a row takes it as the quantity (both windows)')
+const css = read('src/components/procurement/document/CatalogTable.css')
+assert.match(css, /th:nth-child\(-n \+ 3\)[\s\S]*?position: sticky/)
+ok('checkbox, number and product columns stay in view on horizontal scroll')
+
 console.log(`\n${checks} checks passed`)
