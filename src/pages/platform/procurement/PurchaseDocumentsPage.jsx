@@ -48,7 +48,7 @@ import './ProcurementPage.css'
 import './PurchaseDocumentsPage.css'
 
 /** Where a document opens. Stage 4 moves this to the new document page. */
-const DOCUMENT_PATH_PREFIX = '/platform/orders'
+const DOCUMENT_PATH_PREFIX = '/platform/procurement/documents'
 
 function defaultPeriod() {
   return {
@@ -259,7 +259,7 @@ export default function PurchaseDocumentsPage() {
       : '')
 
   const columns = [
-    { key: 'number', label: 'Номер', width: 90, mobile: 'hide' },
+    { key: 'number', label: 'Номер', width: 130, mobile: 'hide' },
     { key: 'created', label: 'Создан', width: 110, mobile: 'hide' },
     { key: 'supplier', label: 'Поставщик', width: 200, flex: true, mobile: 'title' },
     { key: 'delivery', label: 'Доставка', width: 110, mobile: 'hide' },

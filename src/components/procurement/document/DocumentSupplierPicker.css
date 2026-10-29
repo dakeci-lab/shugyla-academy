@@ -1,0 +1,113 @@
+.docsup {
+  position: relative;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.docsup__button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 4px;
+  background: var(--color-white, #fff);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.docsup__button span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.docsup__placeholder {
+  color: var(--color-text-muted, #6b7280);
+}
+
+.docsup__fixed {
+  font-weight: 600;
+}
+
+.docsup__box {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  width: max(100%, 280px);
+  padding: 8px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-white, #fff);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.docsup__tabs {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.docsup__tabs button {
+  flex: 1;
+  min-height: 30px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.docsup__tabs button[aria-selected='true'] {
+  border-color: var(--color-primary, #059669);
+  color: var(--color-primary, #059669);
+  font-weight: 600;
+}
+
+.docsup__search {
+  width: 100%;
+  min-height: 32px;
+  margin-bottom: 6px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 4px;
+  font: inherit;
+  box-sizing: border-box;
+}
+
+.docsup__list {
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.docsup__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.docsup__option:hover,
+.docsup__option.is-on {
+  background: var(--color-bg-subtle, #f1f5f9);
+}
+
+.docsup__empty {
+  padding: 10px 8px;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.875rem;
+}
