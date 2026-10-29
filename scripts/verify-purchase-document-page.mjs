@@ -80,4 +80,21 @@ const list = read('src/pages/platform/procurement/PurchaseDocumentsPage.jsx')
 assert.match(list, /DOCUMENT_PATH_PREFIX = '\/platform\/procurement\/documents'/)
 ok('route registered; the list opens documents on the new page')
 
+// Lesson: a <button> without an explicit colour is drawn in the browser's default blue (Safari).
+for (const file of [
+  'src/components/procurement/document/DocumentSupplierPicker.css',
+  'src/components/procurement/document/CatalogTable.css',
+  'src/pages/platform/procurement/PurchaseDocumentPage.css',
+]) {
+  const css = read(file).replace(/\/\*[\s\S]*?\*\//g, '')
+  for (const m of css.matchAll(/([^{}]*\bbutton\b[^{}]*|[^{}]*(?:__button|__option|__remove|__link)\b[^{}]*)\{([^}]*)\}/g)) {
+    const selector = m[1].trim()
+    if (/:hover|:disabled|::|\[aria-selected='true'\]/.test(selector)) continue
+    if (!/\bcolor:/.test(m[2]) && /background|border|cursor/.test(m[2])) {
+      assert.fail(`${file}: "${selector}" styles a button without an explicit text colour`)
+    }
+  }
+}
+ok('every styled button in the document UI has an explicit text colour (no default blue)')
+
 console.log(`\n${checks} checks passed`)
