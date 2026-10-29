@@ -15,7 +15,6 @@ import {
   cancelSavedPurchaseOrder,
   deletePurchaseOrder,
   updatePurchaseOrder,
-  addPurchaseOrderItem,
   addPurchaseOrderItems,
   updatePurchaseOrderItem,
   deletePurchaseOrderItem,
@@ -207,12 +206,19 @@ export default function PurchaseDocumentPage() {
     }
   }
 
+  /** The row disappears at once; the server answer (the fresh order) replaces the list, a failure restores it. */
   async function handleDeleteItem(item) {
-    const done = await run(async () => {
-      await deletePurchaseOrderItem(order.id, item.id)
-      return reloadOrder()
+    const before = fullOrder
+    setFullOrder((prev) => (prev ? { ...prev, items: prev.items.filter((row) => row.id !== item.id) } : prev))
+    const fresh = await run(async () => {
+      try {
+        return await deletePurchaseOrderItem(order.id, item.id)
+      } catch (error) {
+        setFullOrder(before)
+        throw error
+      }
     }, 'Не удалось удалить товар.')
-    return done
+    if (fresh?.id) setFullOrder(fresh)
   }
 
   /** Adds one catalog product; the first item also fixes the supplier of an empty document. */
@@ -222,7 +228,7 @@ export default function PurchaseDocumentPage() {
       showError('Этот товар уже есть в заказе.')
       return
     }
-    await run(async () => {
+    const fresh = await run(async () => {
       let current = order
       if (!current.supplierId && product.platformSupplierId) {
         const supplier = suppliers.find((row) => row.id === product.platformSupplierId)
@@ -234,13 +240,15 @@ export default function PurchaseDocumentPage() {
       } else if (current.supplierId && product.platformSupplierId && product.platformSupplierId !== current.supplierId) {
         throw new Error('Товар другого поставщика. Выберите товар выбранного поставщика.')
       }
-      await addPurchaseOrderItem(order.id, {
-        ...catalogProductToItem(product),
-        supplierId: current.supplierId,
-        supplierName: current.supplierName,
-      })
-      return reloadOrder()
+      return addPurchaseOrderItems(order.id, [
+        {
+          ...catalogProductToItem(product),
+          supplierId: current.supplierId,
+          supplierName: current.supplierName,
+        },
+      ])
     }, 'Не удалось добавить товар.')
+    if (fresh?.id) setFullOrder(fresh)
   }
 
   /** Rows ticked in «Товары поставщика»: one request, the totals are recalculated once. */
@@ -250,8 +258,9 @@ export default function PurchaseDocumentPage() {
       supplierId: order.supplierId,
       supplierName: order.supplierName,
     }))
-    await addPurchaseOrderItems(order.id, payload)
-    await reloadOrder()
+    const fresh = await addPurchaseOrderItems(order.id, payload)
+    if (fresh?.id) setFullOrder(fresh)
+    else await reloadOrder()
     showSuccess(`Добавлено товаров: ${payload.length}`)
   }
 
@@ -273,8 +282,9 @@ export default function PurchaseDocumentPage() {
       supplierId: current.supplierId,
       supplierName: current.supplierName,
     }))
-    await addPurchaseOrderItems(order.id, payload)
-    await reloadOrder()
+    const fresh = await addPurchaseOrderItems(order.id, payload)
+    if (fresh?.id) setFullOrder(fresh)
+    else await reloadOrder()
     showSuccess(`Добавлено товаров: ${payload.length}`)
   }
 

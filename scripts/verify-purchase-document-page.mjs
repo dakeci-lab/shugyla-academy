@@ -97,4 +97,16 @@ for (const file of [
 }
 ok('every styled button in the document UI has an explicit text colour (no default blue)')
 
+// Speed of add / remove: the row disappears at once, the server answer is reused (no second read), reads run in parallel.
+assert.match(page, /setFullOrder\(\(prev\) => \(prev \? \{ \.\.\.prev, items: prev\.items\.filter/)
+assert.match(page, /setFullOrder\(before\)/)
+assert.doesNotMatch(page.slice(page.indexOf('async function handleDeleteItem'), page.indexOf('async function addProduct')), /reloadOrder\(\)/)
+ok('removing a row is instant (optimistic) and restores the list on failure; no extra read after it')
+const adapter = read('src/services/purchaseSupabaseAdapter.js')
+assert.match(adapter, /Promise\.all\(\[\s*supabase\.from\('purchase_orders'\)/)
+assert.match(adapter, /const needsOrder = items\.some/)
+const service = read('src/services/purchaseDataService.js')
+assert.match(service, /return afterOrderChange\(orderId\)/)
+ok('fewer round trips: header + items read in parallel, the order is not read before a bulk insert, the fresh order is returned once')
+
 console.log(`\n${checks} checks passed`)
