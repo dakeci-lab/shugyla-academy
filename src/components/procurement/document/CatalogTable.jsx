@@ -1,6 +1,5 @@
-import { useMemo } from 'react'
 import { calcReserveDays } from '../../../utils/procurementPlanningMath'
-import { groupCatalogItems, catalogGroupKey } from '../../../utils/purchaseCatalog'
+import { catalogGroupKey } from '../../../utils/purchaseCatalog'
 import './CatalogTable.css'
 
 const num = (value, digits = 0) =>
@@ -14,7 +13,8 @@ const num = (value, digits = 0) =>
  * No norm colours and no stock bar: only the numbers the buyer needs to decide a quantity.
  */
 export default function CatalogTable({
-  items,
+  groups,
+  loadingKeys = null,
   weekLabels,
   expanded,
   expandAll = false,
@@ -27,7 +27,7 @@ export default function CatalogTable({
   inDocument,
   disabledReason,
 }) {
-  const groups = useMemo(() => groupCatalogItems(items), [items])
+  const items = groups.flatMap((category) => category.subcategories.flatMap((sub) => sub.items))
   const selectable = items.filter((item) => !inDocument.has(item.barcode) && !disabledReason?.(item))
   const allSelected = selectable.length > 0 && selectable.every((item) => selected.has(item.barcode))
   let rowNumber = 0
@@ -110,7 +110,7 @@ export default function CatalogTable({
           </tr>
         </thead>
         <tbody>
-          {items.length === 0 ? (
+          {groups.length === 0 ? (
             <tr>
               <td colSpan={colSpan} className="ctbl__empty">
                 Ничего не найдено.
@@ -128,7 +128,7 @@ export default function CatalogTable({
                       <span className="ctbl__sign">{catOpen ? '−' : '+'}</span>
                       <b>{category.name}</b>
                       <span className="ctbl__count">
-                        {category.count} поз · {category.toOrder} к заказу
+                        {category.count} поз{category.toOrder ? ` · ${category.toOrder} к заказу` : ''}
                       </span>
                     </button>
                   </td>
@@ -145,11 +145,18 @@ export default function CatalogTable({
                                 <span className="ctbl__sign">{subOpen ? '−' : '+'}</span>
                                 <b>{sub.name}</b>
                                 <span className="ctbl__count">
-                                  {sub.count} поз · {sub.toOrder} к заказу
+                                  {sub.count} поз{sub.toOrder ? ` · ${sub.toOrder} к заказу` : ''}
                                 </span>
                               </button>
                             </td>
                           </tr>
+                          {subOpen && loadingKeys?.has(subKey) ? (
+                            <tr>
+                              <td colSpan={colSpan} className="ctbl__empty">
+                                Загрузка…
+                              </td>
+                            </tr>
+                          ) : null}
                           {subOpen ? sub.items.map(renderRow) : null}
                         </FragmentRows>
                       )

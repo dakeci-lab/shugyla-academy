@@ -50,3 +50,31 @@ export function filterCatalogItems(items, text) {
     (item) => (item.productName || '').toLowerCase().includes(q) || String(item.barcode || '').includes(q)
   )
 }
+
+/**
+ * Tree of the whole nomenclature before any row is loaded: groups come from the snapshot's category/subcategory counts,
+ * rows appear in `loaded[subKey]` once a subcategory is opened.
+ */
+export function buildNomenclatureTree(pairs, loaded) {
+  const byCategory = new Map()
+  for (const pair of pairs) {
+    const category = pair.categoryName || NO_CATEGORY
+    const subcategory = pair.subcategoryName || NO_CATEGORY
+    if (!byCategory.has(category)) byCategory.set(category, [])
+    const items = loaded[catalogGroupKey(category, subcategory)] || []
+    byCategory.get(category).push({
+      name: subcategory,
+      count: pair.itemCount || 0,
+      items: [...items].sort((a, b) => (a.productName || '').localeCompare(b.productName || '', 'ru')),
+      toOrder: items.filter((item) => item.recommendedQty > 0).length,
+    })
+  }
+  return [...byCategory.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, 'ru'))
+    .map(([name, subcategories]) => ({
+      name,
+      subcategories: subcategories.sort((a, b) => a.name.localeCompare(b.name, 'ru')),
+      count: subcategories.reduce((sum, sub) => sum + sub.count, 0),
+      toOrder: subcategories.reduce((sum, sub) => sum + sub.toOrder, 0),
+    }))
+}

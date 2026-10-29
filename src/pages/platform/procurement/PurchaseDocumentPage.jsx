@@ -34,6 +34,7 @@ import PlatformAccessDenied from '../../../components/platform/PlatformAccessDen
 import AdminModal from '../../../components/admin/AdminModal'
 import ConfirmDialog from '../../../components/admin/ConfirmDialog'
 import DocumentDateBox from '../../../components/procurement/document/DocumentDateBox'
+import NomenclatureModal from '../../../components/procurement/document/NomenclatureModal'
 import SupplierGoodsModal from '../../../components/procurement/document/SupplierGoodsModal'
 import DocumentSupplierPicker from '../../../components/procurement/document/DocumentSupplierPicker'
 import { ORDER_LABELS } from '../../../config/documentLabels'
@@ -67,6 +68,7 @@ export default function PurchaseDocumentPage() {
   const [commentText, setCommentText] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
   const [goodsOpen, setGoodsOpen] = useState(false)
+  const [nomenclatureOpen, setNomenclatureOpen] = useState(false)
   const [qtyDraft, setQtyDraft] = useState({})
   const exportRef = useRef(null)
 
@@ -216,6 +218,29 @@ export default function PurchaseDocumentPage() {
       ...catalogProductToItem(item, { orderQty: qty }),
       supplierId: order.supplierId,
       supplierName: order.supplierName,
+    }))
+    await addPurchaseOrderItems(order.id, payload)
+    await reloadOrder()
+    showSuccess(`Добавлено товаров: ${payload.length}`)
+  }
+
+  /** Rows ticked in «Добавить из номенклатуры»: the first product fixes the supplier of an empty document. */
+  async function addNomenclatureItems(rows) {
+    let current = order
+    if (!current.supplierId) {
+      const ids = new Set(rows.map(({ item }) => item.platformSupplierId || null))
+      if (ids.size !== 1 || ids.has(null)) {
+        throw new Error('Выберите товары одного поставщика (у поставщика товара должна быть привязка).')
+      }
+      const supplier = suppliers.find((row) => row.id === [...ids][0])
+      if (!supplier) throw new Error('Поставщик товара не найден в справочнике.')
+      current =
+        (await updatePurchaseOrder(order.id, { supplierId: supplier.id, supplierName: supplier.name })) || current
+    }
+    const payload = rows.map(({ item, qty }) => ({
+      ...catalogProductToItem(item, { orderQty: qty }),
+      supplierId: current.supplierId,
+      supplierName: current.supplierName,
     }))
     await addPurchaseOrderItems(order.id, payload)
     await reloadOrder()
@@ -474,7 +499,14 @@ export default function PurchaseDocumentPage() {
             </table>
           </div>
         )}
-        {editable && itemsReady ? <AddItemRow supplierId={order.supplierId} disabled={busy} onPick={addProduct} /> : null}
+        {editable && itemsReady ? (
+          <AddItemRow
+            supplierId={order.supplierId}
+            disabled={busy}
+            onPick={addProduct}
+            onOpenNomenclature={isCloudMode() ? () => setNomenclatureOpen(true) : null}
+          />
+        ) : null}
       </section>
 
       {goodsOpen ? (
@@ -484,6 +516,15 @@ export default function PurchaseDocumentPage() {
           onAdd={addPlannedItems}
           onDeliveryDate={(value) => void saveMeta({ expectedDeliveryDate: value })}
           onClose={() => setGoodsOpen(false)}
+        />
+      ) : null}
+
+      {nomenclatureOpen ? (
+        <NomenclatureModal
+          order={order}
+          existingBarcodes={new Set(items.map((row) => row.barcode).filter(Boolean))}
+          onAdd={addNomenclatureItems}
+          onClose={() => setNomenclatureOpen(false)}
         />
       ) : null}
 
@@ -547,7 +588,7 @@ export default function PurchaseDocumentPage() {
 }
 
 /** Add-row under the table: search by name or barcode in the platform's nomenclature (the UMAG snapshot). */
-function AddItemRow({ supplierId, disabled, onPick }) {
+function AddItemRow({ supplierId, disabled, onPick, onOpenNomenclature }) {
   const { error: showError } = useToast()
   const [text, setText] = useState('')
   const [barcode, setBarcode] = useState('')
@@ -648,9 +689,11 @@ function AddItemRow({ supplierId, disabled, onPick }) {
           }}
         />
       </div>
-      <button type="button" className="btn btn--outline" disabled={disabled || !barcode.trim()} onClick={() => void addByBarcode()}>
-        Добавить
-      </button>
+      {onOpenNomenclature ? (
+        <button type="button" className="btn btn--outline" disabled={disabled} onClick={onOpenNomenclature}>
+          Добавить из номенклатуры
+        </button>
+      ) : null}
     </div>
   )
 }
