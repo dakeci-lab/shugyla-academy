@@ -87,6 +87,7 @@
     "verify:app-bootstrap": "node scripts/verify-app-bootstrap.mjs",
     "verify:progressive-bootstrap": "node scripts/verify-progressive-bootstrap.mjs",
     "verify:employee-admin-edge-performance": "node scripts/verify-employee-admin-edge-performance.mjs",
+    "verify:supplier-min-order-amount": "node scripts/verify-supplier-min-order-amount.mjs",
     "verify:supplier-form-focus": "node scripts/verify-supplier-form-focus.mjs",
     "verify:supplier-form-single-payment-terms-field": "node scripts/verify-supplier-form-single-payment-terms-field.mjs",
     "verify:hidden-scrollbars": "node scripts/verify-hidden-scrollbars.mjs",
