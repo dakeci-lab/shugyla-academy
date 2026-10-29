@@ -28,7 +28,7 @@ export const PLATFORM_NAV = [
         label: 'Закуп',
         routeKey: ROUTE_KEYS.PROCUREMENT,
         title: 'Закуп',
-        description: 'Формирование заказов поставщикам на основе остатков и продаж.',
+        description: 'Документы закупа: заказы поставщикам.',
       },
       {
         id: 'orders',

@@ -21,7 +21,7 @@ const ROOT = path.join(__dirname, '..')
 globalThis.__VITE_ENV__ = {}
 register(pathToFileURL(path.join(__dirname, 'lib/extensionlessResolver.mjs')))
 
-const DETAIL_PAGE = 'src/pages/platform/procurement/PurchaseDetailPage.jsx'
+const DETAIL_PAGE = 'src/pages/platform/procurement/PurchaseDocumentPage.jsx'
 const LIST_PAGE = 'src/pages/platform/orders/OrdersPage.jsx'
 const PURCHASE_CLOUD = 'src/services/purchaseSupabaseAdapter.js'
 const PURCHASE_LOCAL = 'src/services/purchaseLocalAdapter.js'
@@ -93,7 +93,7 @@ function stageServices() {
   assert('cloud transitions use one RPC call (no client-side two-table writes)', /supabase\.rpc\(fnName, \{ p_order_id: orderId \}\)/.test(cloud))
   assert('the orchestrator routes both modes', /submitPurchaseOrderCloud\(orderId\)/.test(service) && /local\.submitPurchaseOrder\(orderId\)/.test(service) && /unsavePurchaseOrderCloud\(orderId\)/.test(service) && /local\.unsavePurchaseOrder\(orderId\)/.test(service))
   assert('each transition puts the returned order into the cache (no full reload)', /export async function savePurchaseOrder[\s\S]{0,300}afterOrderChange\(orderId, result\)/.test(service) && /export async function cancelSavedPurchaseOrder[\s\S]{0,300}afterOrderChange\(orderId, result\)/.test(service) && /export async function deletePurchaseOrder[\s\S]{0,300}afterOrderChange\(orderId, null\)/.test(service))
-  assert('the order card does not trigger a full reload after an action', !/\brefresh\(\)/.test(read(DETAIL_PAGE)) && /notifyChange\(\)/.test(read(DETAIL_PAGE)))
+  assert('the order card does not trigger a full reload after an action', !/\brefresh\(\)|notifyChange|reloadProcurement/.test(read(DETAIL_PAGE)))
   assert('the client no longer syncs receiving documents on order updates', !/syncSimpleReceivingFromPurchaseCloud/.test(cloud) && !/syncSimpleReceivingFromPurchaseLocal\(/.test(local))
   assert('a manually created order is «simple» (RLS allows its insert)', /workflowMode: PROCUREMENT_WORKFLOW_MODE\.SIMPLE,\s*\},\s*\{ id, created_at/.test(cloud))
   assert('the receiving layer is gone from the app (stage 25c)', ['src/services/receivingDataService.js', 'src/services/receivingSupabaseAdapter.js', 'src/services/receivingLocalAdapter.js', 'src/utils/receivingData.js', 'src/services/purchaseOptimisticStore.js'].every((file) => !fs.existsSync(path.join(ROOT, file))))
@@ -205,23 +205,18 @@ function stageDetailPage() {
 
   const src = read(DETAIL_PAGE)
 
-  assert('card has «Сохранить» for a draft', /canEdit && draft && \(/.test(src) && />\s*Сохранить\s*</.test(src))
-  assert('card has «Отменить» for a saved order', /canEdit && saved && \(/.test(src) && />\s*Отменить\s*</.test(src))
-  assert('a draft can be deleted for good, with a confirmation', src.includes('Удалить черновик') && /handleDeleteDraft[\s\S]{0,600}window\.confirm/.test(src))
-  assert('«Отменить» explains the order goes back to a draft', /Он вернётся в черновик/.test(src))
-  assert('items are editable only in a draft', /const canEditItems = canEdit && draft/.test(src))
-  assert('the «Сверено» mark exists only on a saved order', /const canShowCheckedMark = saved/.test(src))
-  assert('delivery date and comment are editable in a draft', /canEditItems \? \(\s*<span className="purchase-detail__date-edit"/.test(src) && /handleMetaChange\(\{ comment/.test(src))
+  assert('card has «Сохранить» for a draft', />\s*Сохранить\s*</.test(src) && /onClick=\{handleSave\}/.test(src) && /editable \?/.test(src))
+  assert('card has «Отменить» for a saved order', /canEdit && saved \?/.test(src) && />\s*Отменить\s*</.test(src))
+  assert('a draft can be deleted for good, with a confirmation', src.includes('Удалить черновик?') && /confirm === 'delete'/.test(src))
+  assert('«Отменить» explains the order goes back to a draft', /вернётся в черновик/.test(src))
+  assert('items are editable only in a draft', /const editable = canEdit && draft/.test(src))
+  assert('the «Сверено» mark exists only on a saved order', /const showChecklist = saved && !canEdit && canMarkChecked/.test(src))
+  assert('delivery date and comment are editable in a draft', /saveMeta\(\{ expectedDeliveryDate: value \}\)/.test(src) && /saveMeta\(\{ comment: commentText \}/.test(src))
   assert('the receiver cannot open a draft', /isOrderDraft\(order\) && !canEdit/.test(src))
   assert('no receiving handoff left in the card', !/transferPurchaseToReceiving|canTransferToReceiving|RECEIVING_STARTED_MESSAGE|receivingStarted/.test(src))
 
   // One download button with a compact menu — owner's requirement.
-  assert('single download button', src.includes('aria-label="Скачать заказ"'))
-  assert(
-    'the two separate export icons are gone',
-    !src.includes('aria-label="Экспорт Excel"') && !src.includes('aria-label="Экспорт PDF"')
-  )
-  assert('download button opens a menu', /aria-haspopup="menu"/.test(src))
+  assert('single download button with a menu', src.includes('Скачать ▾') && /aria-haspopup="menu"/.test(src))
   assert(
     'menu offers Excel and PDF',
     /role="menuitem"[\s\S]{0,200}Excel/.test(src) && /role="menuitem"[\s\S]{0,200}PDF/.test(src)
@@ -230,7 +225,7 @@ function stageDetailPage() {
     'menu closes on outside click and Escape',
     /mousedown/.test(src) && /event\.key === 'Escape'/.test(src)
   )
-  assert('menu closes once an export starts', /setExportMenuOpen\(false\)/.test(src))
+  assert('menu closes once an export starts', /setExportOpen\(false\)/.test(src))
 
   // No raw error text reaches the buyer.
   assert(
@@ -324,7 +319,7 @@ function stageListPage() {
 
   const src = read(LIST_PAGE)
 
-  assert('the receiver list holds saved orders only (drafts belong to the buyer\'s «Закуп»)', /\.filter\(isOrderSaved\)/.test(src) && !/isOrderDraft/.test(src))
+  assert('the receiver list holds saved orders only (drafts belong to the buyer\'s «Закуп»)', /\.filter\(isOrderSaved\)/.test(read('src/utils/purchaseDocumentsList.js')) && /selectReceiverOrders/.test(src) && !/isOrderDraft/.test(src))
   assert('the «Сегодня ждём…» summary is built from the list (saved orders only)', /summarizeOrders\(orders\)/.test(src))
   assert('the receiver list has no «Новый заказ» (the buyer creates documents in «Закуп»)', !src.includes('+ Новый заказ') && !/createPurchaseOrder\(/.test(src))
   assert('the list no longer loads the receiving module', !/'receiving'\]/.test(src))
@@ -370,7 +365,7 @@ function stageMigration() {
   assert('a number is unique and never reused (sequence, partial unique index)', /create unique index purchase_orders_number_key/.test(num) && /nextval\('public\.purchase_order_number_seq'\)/.test(num))
   assert('existing saved orders are numbered in creation order', /row_number\(\) over \(order by created_at, id\)/.test(num))
   const labelsSrc = read('src/config/documentLabels.js')
-  assert('exports and the card show the number («Заказ поставщику №N», file name, card title)', /formatOrderTitle\(mapped\.number\)/.test(read('src/utils/purchaseOrderExport.js')) && /Заказ №\{order\.number\}/.test(read(DETAIL_PAGE)) && /export function formatOrderTitle/.test(labelsSrc))
+  assert('exports and the card show the number («Заказ поставщику №N», file name, card title)', /formatOrderTitle\(mapped\.number\)/.test(read('src/utils/purchaseOrderExport.js')) && /Заказ №\$\{order\.number\}/.test(read('src/utils/purchaseDocument.js')) && /export function formatOrderTitle/.test(labelsSrc))
   assert('the orders list has a «Номер» column', /key: 'number'/.test(read('src/components/procurement/PurchaseTable.jsx')))
   // Lesson of the 25c incident: PostgreSQL does not check function bodies when a column is dropped, so the LATEST definition of every
   // function that writes purchase_orders must not name the dropped receiving columns.

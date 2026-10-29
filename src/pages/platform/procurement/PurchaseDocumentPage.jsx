@@ -49,7 +49,7 @@ import { ORDER_LABELS } from '../../../config/documentLabels'
 import '../../../components/admin/admin-shared.css'
 import './PurchaseDocumentPage.css'
 
-const BUYER_LIST_PATH = '/platform/procurement/documents'
+const BUYER_LIST_PATH = '/platform/procurement'
 const RECEIVER_LIST_PATH = '/platform/orders'
 
 /**
