@@ -15,6 +15,7 @@ import {
   deletePurchaseOrder,
   updatePurchaseOrder,
   addPurchaseOrderItem,
+  addPurchaseOrderItems,
   updatePurchaseOrderItem,
   deletePurchaseOrderItem,
 } from '../../../services/purchaseDataService'
@@ -33,6 +34,7 @@ import PlatformAccessDenied from '../../../components/platform/PlatformAccessDen
 import AdminModal from '../../../components/admin/AdminModal'
 import ConfirmDialog from '../../../components/admin/ConfirmDialog'
 import DocumentDateBox from '../../../components/procurement/document/DocumentDateBox'
+import SupplierGoodsModal from '../../../components/procurement/document/SupplierGoodsModal'
 import DocumentSupplierPicker from '../../../components/procurement/document/DocumentSupplierPicker'
 import { ORDER_LABELS } from '../../../config/documentLabels'
 import '../../../components/admin/admin-shared.css'
@@ -64,6 +66,7 @@ export default function PurchaseDocumentPage() {
   const [commentOpen, setCommentOpen] = useState(false)
   const [commentText, setCommentText] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
+  const [goodsOpen, setGoodsOpen] = useState(false)
   const [qtyDraft, setQtyDraft] = useState({})
   const exportRef = useRef(null)
 
@@ -205,6 +208,18 @@ export default function PurchaseDocumentPage() {
       })
       return reloadOrder()
     }, 'Не удалось добавить товар.')
+  }
+
+  /** Rows ticked in «Товары поставщика»: one request, the totals are recalculated once. */
+  async function addPlannedItems(rows) {
+    const payload = rows.map(({ item, qty }) => ({
+      ...catalogProductToItem(item, { orderQty: qty }),
+      supplierId: order.supplierId,
+      supplierName: order.supplierName,
+    }))
+    await addPurchaseOrderItems(order.id, payload)
+    await reloadOrder()
+    showSuccess(`Добавлено товаров: ${payload.length}`)
   }
 
   async function handleSave() {
@@ -354,6 +369,11 @@ export default function PurchaseDocumentPage() {
           ) : (
             <span className="pdoc__value">{order.supplierName || '—'}</span>
           )}
+          {editable && order.supplierId && isCloudMode() ? (
+            <button type="button" className="pdoc__link" onClick={() => setGoodsOpen(true)}>
+              ＋ Товары поставщика
+            </button>
+          ) : null}
         </div>
         <div className="pdoc__card">
           <span className="pdoc__label">
@@ -456,6 +476,16 @@ export default function PurchaseDocumentPage() {
         )}
         {editable && itemsReady ? <AddItemRow supplierId={order.supplierId} disabled={busy} onPick={addProduct} /> : null}
       </section>
+
+      {goodsOpen ? (
+        <SupplierGoodsModal
+          order={order}
+          existingBarcodes={new Set(items.map((row) => row.barcode).filter(Boolean))}
+          onAdd={addPlannedItems}
+          onDeliveryDate={(value) => void saveMeta({ expectedDeliveryDate: value })}
+          onClose={() => setGoodsOpen(false)}
+        />
+      ) : null}
 
       {commentOpen ? (
         <AdminModal

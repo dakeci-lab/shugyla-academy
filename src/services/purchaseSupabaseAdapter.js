@@ -346,6 +346,35 @@ export async function addPurchaseOrderItemCloud(orderId, item) {
   return row.id
 }
 
+/** Добавление нескольких позиций одним запросом (окно «Товары поставщика»): итоги пересчитываются один раз. */
+export async function addPurchaseOrderItemsCloud(orderId, items) {
+  ensureClient()
+  if (!items.length) return []
+
+  const order = await fetchOrderById(orderId)
+  if (!order) throw new Error('Закуп не найден')
+
+  const now = new Date().toISOString()
+  const rows = items.map((item) => {
+    const enriched = normalizePurchaseItem({
+      ...item,
+      supplierId: item.supplierId ?? order.supplierId ?? null,
+      supplierName: item.supplierName ?? order.supplierName ?? '',
+    })
+    const row = itemToRow(enriched, orderId)
+    if (!row.created_at) row.created_at = now
+    return row
+  })
+
+  await throwIfError(
+    await supabase.from('purchase_order_items').insert(rows),
+    'Добавление позиций закупа'
+  )
+
+  await recalcOrderTotals(orderId)
+  return rows.map((row) => row.id)
+}
+
 /** Обновление позиции */
 export async function updatePurchaseOrderItemCloud(orderId, itemId, patch) {
   ensureClient()

@@ -25,6 +25,12 @@
   max-width: min(560px, calc(100% - 32px));
 }
 
+.admin-modal--huge {
+  width: min(1320px, calc(100% - 32px));
+  max-width: min(1320px, calc(100% - 32px));
+  max-height: calc(100vh - 32px);
+}
+
 .admin-modal--xwide {
   max-width: min(720px, calc(100% - 32px));
 }

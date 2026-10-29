@@ -152,6 +152,19 @@ export async function addPurchaseOrderItem(orderId, item) {
   return id
 }
 
+/** Несколько позиций сразу (один запрос в облаке). */
+export async function addPurchaseOrderItems(orderId, items) {
+  if (!items.length) return []
+  if (isCloudMode()) {
+    const ids = await cloud.addPurchaseOrderItemsCloud(orderId, items)
+    await afterOrderChange(orderId)
+    return ids
+  }
+  const ids = []
+  for (const item of items) ids.push(await local.addPurchaseOrderItem(orderId, item))
+  return ids
+}
+
 export async function updatePurchaseOrderItem(orderId, itemId, patch) {
   const result = isCloudMode()
     ? await cloud.updatePurchaseOrderItemCloud(orderId, itemId, patch)
