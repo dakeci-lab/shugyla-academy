@@ -47,6 +47,14 @@ export const PLATFORM_NAV = [
         description:
           'Справочник поставщиков, сроки оплаты и взаиморасчёты по данным UMAG.',
       },
+      {
+        id: 'warehouse',
+        path: '/platform/warehouse',
+        label: 'Склад',
+        routeKey: ROUTE_KEYS.WAREHOUSE,
+        title: 'Склад',
+        description: 'Остатки и себестоимость по данным UMAG.',
+      },
     ],
   },
   {

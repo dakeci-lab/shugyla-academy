@@ -351,10 +351,9 @@ function stageContractFiles() {
     'orders tab'
   )
   assert(
-    'procurement tabs order Planning → Warehouse (Orders is a separate section; norms and ABC are gone)',
-    /role="tablist"[\s\S]*Планирование[\s\S]*Склад/.test(
-      read('src/pages/platform/procurement/ProcurementPage.jsx')
-    )
+    'procurement page has no tab switcher (Склад is its own page, Orders a separate section; norms and ABC are gone)',
+    !/role="tablist"/.test(read('src/pages/platform/procurement/ProcurementPage.jsx')) &&
+      /ProcurementWarehouseView/.test(read('src/pages/platform/procurement/WarehousePage.jsx'))
   )
   assert(
     'the PDF total line has no currency sign (the font has no tenge glyph — it printed as an empty box)',

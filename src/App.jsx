@@ -35,6 +35,7 @@ const SupplierFinancePage = lazy(
   () => import('./pages/platform/supplier-finance/SupplierFinancePage')
 )
 const SalesPage = lazy(() => import('./pages/platform/sales/SalesPage'))
+const WarehousePage = lazy(() => import('./pages/platform/procurement/WarehousePage'))
 const ProcurementPage = lazy(() => import('./pages/platform/procurement/ProcurementPage'))
 const PurchaseDetailPage = lazy(
   () => import('./pages/platform/procurement/PurchaseDetailPage')
@@ -145,6 +146,14 @@ export default function App() {
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
                       <ProcurementPage />
+                    </PlatformRoute>
+                  }
+                />
+                <Route
+                  path="warehouse"
+                  element={
+                    <PlatformRoute routeKey={ROUTE_KEYS.WAREHOUSE}>
+                      <WarehousePage />
                     </PlatformRoute>
                   }
                 />
