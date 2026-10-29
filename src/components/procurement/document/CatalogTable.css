@@ -128,6 +128,9 @@
 .ctbl .ctbl__h2 th:nth-child(3),
 .ctbl td:nth-child(3) {
   left: 84px;
+  width: 240px;
+  min-width: 240px;
+  max-width: 240px;
   box-shadow: 1px 0 0 var(--color-border, #e2e8f0);
 }
 
@@ -231,4 +234,15 @@
 
 .ctbl__legend-box--above {
   background: #f6bcbc;
+}
+
+/* The title of the weeks block stays next to the pinned columns while the weeks scroll under it. */
+.ctbl .ctbl__weeks-title {
+  text-align: left;
+}
+
+.ctbl__weeks-label {
+  position: sticky;
+  left: 332px;
+  display: inline-block;
 }
