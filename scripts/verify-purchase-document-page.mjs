@@ -109,4 +109,11 @@ const service = read('src/services/purchaseDataService.js')
 assert.match(service, /return afterOrderChange\(orderId\)/)
 ok('fewer round trips: header + items read in parallel, the order is not read before a bulk insert, the fresh order is returned once')
 
+const trig = read('supabase/migrations/20261029160000_purchase_order_totals_trigger.sql')
+for (const kind of ['after insert', 'after update', 'after delete']) assert.ok(trig.includes(`${kind} on public.purchase_order_items`), kind)
+assert.match(trig, /for each statement execute function public\.purchase_order_items_recalc_totals\(\)/)
+const callers = adapter.split('\n').filter((line) => /await recalcOrderTotals\(/.test(line))
+assert.equal(callers.length, 0)
+ok('order totals are kept by statement-level triggers (insert / update / delete); the client no longer re-reads and rewrites them')
+
 console.log(`\n${checks} checks passed`)
