@@ -364,6 +364,7 @@ export default function PurchaseDetailPage() {
 
       <div className="purchase-detail__header">
         <div>
+          {order.number ? <p className="purchase-detail__number">Заказ №{order.number}</p> : null}
           <h2 className="purchase-detail__title">{order.supplierName || 'Закуп'}</h2>
           <PurchaseStatusBadge status={order.status} />
         </div>

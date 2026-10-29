@@ -3,7 +3,7 @@
  */
 
 import { mapPurchaseOrderForExport } from './procurementPlanningMath'
-import { ORDER_LABELS as L } from '../config/documentLabels'
+import { ORDER_LABELS as L, formatOrderTitle } from '../config/documentLabels'
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob)
@@ -47,6 +47,7 @@ export async function exportPurchaseOrderXlsx(order) {
   const XLSX = await import('xlsx')
   // Column A holds the row number; the order header and totals sit in B/C so the narrow number column does not clip their labels.
   const sheetRows = [
+    ...(mapped.number ? [['', L.docNumber, mapped.number]] : []),
     ['', L.supplier, mapped.supplierName],
     ['', L.orderDate, formatDocDate(mapped.purchaseDate)],
     ['', L.delivery, formatDocDate(mapped.expectedDeliveryDate)],
@@ -71,7 +72,7 @@ export async function exportPurchaseOrderXlsx(order) {
   const ws = XLSX.utils.aoa_to_sheet(sheetRows)
   ws['!cols'] = [{ wch: 5 }, { wch: 40 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 14 }]
   XLSX.utils.book_append_sheet(wb, ws, 'Заказ')
-  const filename = `zakup_${safeFilenamePart(mapped.supplierName)}_${mapped.purchaseDate || 'export'}.xlsx`
+  const filename = `zakup_${mapped.number ? `${mapped.number}_` : ''}${safeFilenamePart(mapped.supplierName)}_${mapped.purchaseDate || 'export'}.xlsx`
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
   downloadBlob(
     new Blob([out], {
@@ -116,7 +117,7 @@ export async function exportPurchaseOrderPdf(order) {
   const docDefinition = {
     defaultStyle: { font: 'Roboto', fontSize: 10 },
     content: [
-      { text: L.documentTitle, style: 'title' },
+      { text: formatOrderTitle(mapped.number), style: 'title' },
       {
         text: [{ text: `${L.supplier}: `, bold: true }, mapped.supplierName || ''],
         margin: [0, 8, 0, 2],
@@ -159,7 +160,7 @@ export async function exportPurchaseOrderPdf(order) {
     },
   }
 
-  const filename = `zakup_${safeFilenamePart(mapped.supplierName)}_${mapped.purchaseDate || 'export'}.pdf`
+  const filename = `zakup_${mapped.number ? `${mapped.number}_` : ''}${safeFilenamePart(mapped.supplierName)}_${mapped.purchaseDate || 'export'}.pdf`
 
   await new Promise((resolve, reject) => {
     try {

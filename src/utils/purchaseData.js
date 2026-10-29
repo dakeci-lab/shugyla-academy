@@ -78,6 +78,7 @@ export function normalizePurchaseOrder(raw) {
   const items = (raw.items || []).map(normalizePurchaseItem)
   return {
     id: raw.id,
+    number: raw.number ?? null,
     date: raw.date ?? raw.purchaseDate ?? raw.purchase_date ?? '',
     purchaseDate: raw.purchaseDate ?? raw.purchase_date ?? raw.date ?? '',
     supplierId: raw.supplierId ?? raw.supplier_id ?? null,

@@ -196,3 +196,10 @@
   gap: 0.6rem;
   flex-wrap: wrap;
 }
+
+.purchase-detail__number {
+  margin: 0 0 2px;
+  color: var(--color-text-muted, #5f6f67);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

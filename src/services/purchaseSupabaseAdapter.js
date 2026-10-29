@@ -22,6 +22,7 @@ function ensureClient() {
 function rowToOrder(row, items = []) {
   return normalizePurchaseOrder({
     id: row.id,
+    number: row.number,
     supplier_id: row.supplier_id,
     supplier_name: row.supplier_name,
     status: row.status,

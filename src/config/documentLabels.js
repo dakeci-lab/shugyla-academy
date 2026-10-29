@@ -4,6 +4,8 @@
  */
 export const ORDER_LABELS = Object.freeze({
   documentTitle: 'Заказ поставщику',
+  docNumber: 'Номер заказа',
+  orderNum: 'Номер',
   supplier: 'Поставщик',
   orderDate: 'Дата заказа',
   delivery: 'Ожидаемая доставка',
@@ -50,3 +52,8 @@ export const WAREHOUSE_LABELS = Object.freeze({
   sellingSum: 'Сумма продажи',
   total: 'Итого:',
 })
+
+/** «Заказ поставщику №1048»; без номера (черновик) — просто название документа. */
+export function formatOrderTitle(number) {
+  return number ? `${ORDER_LABELS.documentTitle} №${number}` : ORDER_LABELS.documentTitle
+}

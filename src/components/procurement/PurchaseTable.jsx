@@ -26,6 +26,7 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
     { key: 'amount', label: 'Сумма', width: 130, align: 'end', mobile: 'end' },
     ...(showStatus ? [{ key: 'status', label: 'Статус', width: 130, mobile: 'hide' }] : []),
     ...(showChecked ? [{ key: 'checked', label: 'Сверено', width: 150, mobile: 'hide' }] : []),
+    { key: 'number', label: ORDER_LABELS.orderNum, width: 90, mobile: 'hide' },
     { key: 'created', label: 'Создан', width: 150, mobile: 'hide' },
     { key: 'creator', label: 'Создал', width: 170, mobile: 'hide' },
   ]
@@ -44,6 +45,7 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
             cells={{
               created: <span>{formatPurchaseDateTime(order.createdAt || order.date)}</span>,
               supplier: <span className="pgt__title">{order.supplierName || '—'}</span>,
+              number: <span className="num">{order.number ?? ''}</span>,
               items: <span>{order.itemsCount ?? order.items?.length ?? 0}</span>,
               amount: <span className="pgt__money">{formatPurchaseAmount(order.totalAmount)}</span>,
               status: <PurchaseStatusBadge status={order.status} />,
@@ -57,6 +59,7 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
             }}
             mobileMeta={[
               isPurchaseStatusShown(order.status) ? 'Черновик' : '',
+              order.number ? `№${order.number}` : '',
               `${order.itemsCount ?? order.items?.length ?? 0} тов.`,
               formatPurchaseDate(order.expectedDeliveryDate),
               order.checkedAt ? '✓ сверено' : '',
