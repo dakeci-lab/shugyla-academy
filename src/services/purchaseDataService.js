@@ -43,6 +43,7 @@ async function afterOrderChange(orderId, fresh) {
   const order = fresh === undefined ? await cloud.fetchOrderById(orderId) : fresh
   if (order) putCloudPurchase(order)
   else dropCloudPurchase(orderId)
+  return order
 }
 
 export function getPurchaseOrdersSync() {
@@ -154,15 +155,13 @@ export async function addPurchaseOrderItem(orderId, item) {
 
 /** Несколько позиций сразу (один запрос в облаке). */
 export async function addPurchaseOrderItems(orderId, items) {
-  if (!items.length) return []
+  if (!items.length) return getPurchaseOrderByIdSync(orderId)
   if (isCloudMode()) {
-    const ids = await cloud.addPurchaseOrderItemsCloud(orderId, items)
-    await afterOrderChange(orderId)
-    return ids
+    await cloud.addPurchaseOrderItemsCloud(orderId, items)
+    return afterOrderChange(orderId)
   }
-  const ids = []
-  for (const item of items) ids.push(await local.addPurchaseOrderItem(orderId, item))
-  return ids
+  for (const item of items) await local.addPurchaseOrderItem(orderId, item)
+  return getPurchaseOrderByIdSync(orderId)
 }
 
 export async function updatePurchaseOrderItem(orderId, itemId, patch) {
@@ -179,5 +178,6 @@ export async function deletePurchaseOrderItem(orderId, itemId) {
   } else {
     await local.deletePurchaseOrderItem(orderId, itemId)
   }
-  await afterOrderChange(orderId)
+  if (!isCloudMode()) return getPurchaseOrderByIdSync(orderId)
+  return afterOrderChange(orderId)
 }

@@ -182,20 +182,18 @@ async function recalcOrderTotals(orderId) {
 async function fetchOrderById(orderId) {
   ensureClient()
 
-  const orderResult = await supabase
-    .from('purchase_orders')
-    .select('*')
-    .eq('id', orderId)
-    .maybeSingle()
+  // The header and the items do not depend on each other: one round trip instead of two.
+  const [orderResult, itemsResult] = await Promise.all([
+    supabase.from('purchase_orders').select('*').eq('id', orderId).maybeSingle(),
+    supabase
+      .from('purchase_order_items')
+      .select('*')
+      .eq('purchase_order_id', orderId)
+      .order('created_at', { ascending: true }),
+  ])
 
   const orderRow = await throwIfError(orderResult, 'Загрузка закупа')
   if (!orderRow) return null
-
-  const itemsResult = await supabase
-    .from('purchase_order_items')
-    .select('*')
-    .eq('purchase_order_id', orderId)
-    .order('created_at', { ascending: true })
 
   const items = await throwIfError(itemsResult, 'Загрузка позиций закупа')
   return rowToOrder(orderRow, items || [])
@@ -351,15 +349,17 @@ export async function addPurchaseOrderItemsCloud(orderId, items) {
   ensureClient()
   if (!items.length) return []
 
-  const order = await fetchOrderById(orderId)
-  if (!order) throw new Error('Закуп не найден')
+  // The callers pass the supplier with every row, so the order is read only when something is missing.
+  const needsOrder = items.some((item) => item.supplierId == null && !item.supplierName)
+  const order = needsOrder ? await fetchOrderById(orderId) : null
+  if (needsOrder && !order) throw new Error('Закуп не найден')
 
   const now = new Date().toISOString()
   const rows = items.map((item) => {
     const enriched = normalizePurchaseItem({
       ...item,
-      supplierId: item.supplierId ?? order.supplierId ?? null,
-      supplierName: item.supplierName ?? order.supplierName ?? '',
+      supplierId: item.supplierId ?? order?.supplierId ?? null,
+      supplierName: item.supplierName ?? order?.supplierName ?? '',
     })
     const row = itemToRow(enriched, orderId)
     if (!row.created_at) row.created_at = now
