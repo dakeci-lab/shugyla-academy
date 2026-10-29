@@ -1,4 +1,4 @@
-import { calcReserveDays, reserveHighlightFromStatus } from '../../../utils/procurementPlanningMath'
+import { calcReserveDays, shelfToneFromItem } from '../../../utils/procurementPlanningMath'
 import { useEffect, useRef, useState } from 'react'
 import { catalogGroupKey } from '../../../utils/purchaseCatalog'
 import './CatalogTable.css'
@@ -53,7 +53,7 @@ export default function CatalogTable({
     const reason = inDoc ? 'Уже в заказе' : disabledReason?.(item) || ''
     const disabled = Boolean(reason)
     const reserve = calcReserveDays(item.calculationStock, item.avgDaily)
-    const reserveTone = reserveHighlightFromStatus(item.reserveStatus)
+    const reserveTone = shelfToneFromItem(item)
     const weekMax = Math.max(0, ...(item.weeklySales || []).map((v) => Number(v) || 0))
     return (
       <tr key={item.barcode || item.id} className={disabled ? 'is-disabled' : ''} title={reason || undefined}>
@@ -87,9 +87,9 @@ export default function CatalogTable({
           className={`r num${reserveTone ? ` ctbl__reserve--${reserveTone}` : ''}`}
           title={
             reserveTone === 'below-norm'
-              ? 'Запаса меньше цели — пора заказывать'
+              ? 'На полке меньше цели — пора заказывать (поставка в пути не учитывается)'
               : reserveTone === 'above-norm'
-                ? 'Запаса больше цели'
+                ? 'На полке больше цели'
                 : undefined
           }
         >
@@ -122,11 +122,11 @@ export default function CatalogTable({
     <p className="ctbl__legend">
       <span className="ctbl__legend-item">
         <i className="ctbl__legend-box ctbl__legend-box--below" aria-hidden="true" />
-        Запаса меньше цели — пора заказывать
+        На полке меньше цели — пора заказывать
       </span>
       <span className="ctbl__legend-item">
         <i className="ctbl__legend-box ctbl__legend-box--above" aria-hidden="true" />
-        Запаса больше цели
+        На полке больше цели
       </span>
     </p>
     <div className="ctbl__wrap" ref={wrapRef} style={viewWidth ? { '--ctbl-view': `${viewWidth}px` } : undefined}>
