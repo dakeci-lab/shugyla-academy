@@ -41,7 +41,7 @@ function stageReceivingMonthCalendar() {
   console.log('Stage 3: «Приёмка» merged into «Заказы» (2026-09-20)')
 
   const orders = read('src/pages/platform/orders/OrdersPage.jsx')
-  assert('orders period comes from the shared period filter', orders.includes('PeriodFilterPopover') && !orders.includes('WeekScheduleNav'))
+  assert('orders period comes from the shared period presets', orders.includes('SETTLEMENTS_PERIOD_PRESET_OPTIONS') && !orders.includes('WeekScheduleNav'))
   assert('the receiving pages and month calendar are gone', !fs.existsSync(path.join(ROOT, 'src/pages/platform/receiving/ReceivingPage.jsx')) && !fs.existsSync(path.join(ROOT, 'src/components/receiving')))
 }
 
@@ -65,9 +65,9 @@ function stageBackdropAndToolbar() {
     !ordersPage.includes('ProcurementPlanDayList') && !ordersPage.includes('Визиты поставщиков')
   )
   assert(
-    'orders are filtered by delivery period from the shared «Фильтр», cancelled only via checkbox',
-    ordersPage.includes('PeriodFilterPopover') &&
-      ordersPage.includes('Показать отменённые заказы') &&
+    'orders are filtered by delivery period with the quick presets (saved orders only)',
+    ordersPage.includes('SETTLEMENTS_PERIOD_PRESET_OPTIONS') &&
+      ordersPage.includes('expectedDeliveryDate') &&
       !ordersPage.includes('WeekScheduleNav') &&
       !page.includes('const expectedEntriesByDate')
   )

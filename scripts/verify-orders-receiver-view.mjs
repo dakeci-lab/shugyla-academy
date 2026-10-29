@@ -57,7 +57,7 @@ ok('the order card shows the comment row only when there is a comment (or the dr
 
 const list = read('src/components/procurement/PurchaseTable.jsx')
 const keys = [...list.slice(list.indexOf('const columns = ['), list.indexOf(']\n\n  return (')).matchAll(/key: '(\w+)'/g)].map((m) => m[1])
-assert.deepEqual(keys.filter((key) => key !== 'actions'), ['delivery', 'supplier', 'items', 'amount', 'status', 'checked', 'number', 'created', 'creator'])
+assert.deepEqual(keys.filter((key) => key !== 'actions'), ['delivery', 'supplier', 'items', 'amount', 'checked', 'number', 'created', 'creator'])
 ok('orders list: delivery and supplier first, created / creator last')
 
 // Checklist: checkbox first, row number second, nothing persisted.
@@ -118,7 +118,7 @@ assert.equal(describeOrdersSummary({ deliveries: 12, items: 120 }, { periodLabel
 assert.equal(describeOrdersSummary({ deliveries: 3, items: 9 }, { ...label, cancelled: true }), 'Отменено: 3 поставки, 9 товаров')
 assert.equal(describeOrdersSummary({ deliveries: 0, items: 0 }, label), null)
 ok('summary text: «Сегодня ждём N поставок, M товаров» with correct Russian plurals; other period and cancelled wording; nothing when empty')
-assert.match(read('src/pages/platform/orders/OrdersPage.jsx'), /summarizeOrders\(orders\.filter\(isOrderSaved\)\)/)
+assert.match(read('src/pages/platform/orders/OrdersPage.jsx'), /summarizeOrders\(orders\)/)
 ok('the orders list shows the summary of exactly the orders on screen (after period / cancelled filters)')
 
 // --- «Сверено» mark on the order (stage 22) -------------------------------------------------------

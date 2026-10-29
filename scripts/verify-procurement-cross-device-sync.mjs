@@ -68,8 +68,8 @@ function main() {
   console.log('Stage 4: Procurement page sync + error UX')
   assert('page reloads procurement on open', page.includes('reloadProcurement('))
   assert('page shows toast on load error', page.includes('showError(message)'))
-  assert('empty state uses load error message', page.includes('procurementLoadError ||'))
-  assert('does not treat load error as empty catalog only', page.includes('procurementLoadError'))
+  assert('empty state uses load error message', page.includes('loadErrorText ||'))
+  assert('does not treat load error as empty catalog only', page.includes('loadErrorText'))
   assert('empty state waits for module loading', page.includes('isPurchasesDataLoading'))
   assert(
     'initial load uses the shared loading skeleton',

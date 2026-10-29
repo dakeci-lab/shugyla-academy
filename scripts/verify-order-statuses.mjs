@@ -324,10 +324,9 @@ function stageListPage() {
 
   const src = read(LIST_PAGE)
 
-  assert('the receiver gets only saved orders (drafts are filtered by role)', /isOrderVisibleToRole\(order, canEdit\)/.test(src))
-  assert('drafts are listed first and ignore the period', /const drafts = visible\.filter\(isOrderDraft\)/.test(src) && /\[\.\.\.drafts, \.\.\.saved\]/.test(src))
-  assert('the «Сегодня ждём…» summary counts saved orders only', /summarizeOrders\(orders\.filter\(isOrderSaved\)\)/.test(src))
-  assert('«Новый заказ» creates a draft and opens it', src.includes('+ Новый заказ') && /createPurchaseOrder\(/.test(src) && /navigate\(`\/platform\/orders\/\$\{id\}`\)/.test(src))
+  assert('the receiver list holds saved orders only (drafts belong to the buyer\'s «Закуп»)', /\.filter\(isOrderSaved\)/.test(src) && !/isOrderDraft/.test(src))
+  assert('the «Сегодня ждём…» summary is built from the list (saved orders only)', /summarizeOrders\(orders\)/.test(src))
+  assert('the receiver list has no «Новый заказ» (the buyer creates documents in «Закуп»)', !src.includes('+ Новый заказ') && !/createPurchaseOrder\(/.test(src))
   assert('the list no longer loads the receiving module', !/'receiving'\]/.test(src))
   assert('the «show cancelled» filter is gone (no cancelled status any more)', !/showCancelled/.test(src))
   assert('the orders list can be retried after a failed load (the error banner has «Повторить»)', />\s*Повторить\s*</.test(src) && /reloadProcurement\(\)/.test(src))
