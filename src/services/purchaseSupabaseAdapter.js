@@ -440,6 +440,25 @@ export async function unsavePurchaseOrderCloud(orderId) {
   return order
 }
 
+/**
+ * id заказов, в позициях которых есть текст (название или штрихкод). Список заказов грузится без позиций,
+ * поэтому поиск по товару делает сервер.
+ */
+export async function searchOrderIdsByItemTextCloud(text) {
+  ensureClient()
+  const q = String(text || '')
+    .trim()
+    .replace(/[%,()]/g, ' ')
+  if (!q) return []
+  const result = await supabase
+    .from('purchase_order_items')
+    .select('purchase_order_id')
+    .or(`product_name.ilike.%${q}%,barcode.ilike.%${q}%`)
+    .limit(5000)
+  await throwIfError(result, 'Поиск по позициям заказов', 'Не удалось выполнить поиск по товарам.')
+  return [...new Set((result.data || []).map((row) => row.purchase_order_id))]
+}
+
 export function getCloudPurchasesBundleFromOrders(orders) {
   return { orders: orders || [] }
 }

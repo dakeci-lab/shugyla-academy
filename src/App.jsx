@@ -35,6 +35,9 @@ const SupplierFinancePage = lazy(
   () => import('./pages/platform/supplier-finance/SupplierFinancePage')
 )
 const SalesPage = lazy(() => import('./pages/platform/sales/SalesPage'))
+const PurchaseDocumentsPage = lazy(
+  () => import('./pages/platform/procurement/PurchaseDocumentsPage')
+)
 const WarehousePage = lazy(() => import('./pages/platform/procurement/WarehousePage'))
 const ProcurementPage = lazy(() => import('./pages/platform/procurement/ProcurementPage'))
 const PurchaseDetailPage = lazy(
@@ -146,6 +149,15 @@ export default function App() {
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
                       <ProcurementPage />
+                    </PlatformRoute>
+                  }
+                />
+                {/* New «Закуп» (documents list). Becomes the «Закуп» menu page at stage 8. */}
+                <Route
+                  path="procurement/documents"
+                  element={
+                    <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
+                      <PurchaseDocumentsPage />
                     </PlatformRoute>
                   }
                 />

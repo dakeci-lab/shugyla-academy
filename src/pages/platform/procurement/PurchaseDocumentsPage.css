@@ -1,0 +1,72 @@
+.pdl-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pdl-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.pdl-bar .btn,
+.pdl-bar .pf-trigger {
+  border-radius: 4px;
+}
+
+.pdl-bar__chip {
+  font-variant-numeric: tabular-nums;
+}
+
+.pdl-error {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  background: #fef2f2;
+  color: #b91c1c;
+  font-size: 0.875rem;
+}
+
+.pdl-table {
+  border-radius: 6px;
+}
+
+.pdl-row--draft .pgt__row-main,
+.pdl-row--draft .pgt__cell {
+  color: var(--color-text-muted, #6b7280);
+  font-style: italic;
+}
+
+.pdl-number {
+  color: var(--color-primary, #059669);
+  font-weight: 600;
+}
+
+.pdl-nonumber {
+  color: var(--color-text-muted, #6b7280);
+  font-style: italic;
+}
+
+.pdl-comment {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Status is a line under the sum, not a pill: gray — draft, green — saved. */
+.pdl-sum {
+  display: inline-block;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+}
+
+.pdl-sum--draft {
+  border-bottom-color: #9ca3af;
+}
+
+.pdl-sum--saved {
+  border-bottom-color: #059669;
+}
