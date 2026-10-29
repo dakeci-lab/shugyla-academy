@@ -105,33 +105,33 @@
 }
 
 /* Checkbox, row number and product name stay in view while the weekly columns scroll sideways. */
-.ctbl th:nth-child(-n + 3),
+.ctbl .ctbl__h2 th:nth-child(-n + 3),
 .ctbl tbody tr:not(.ctbl__group) td:nth-child(-n + 3) {
   position: sticky;
   background: var(--color-white, #fff);
 }
 
-.ctbl th:nth-child(1),
+.ctbl .ctbl__h2 th:nth-child(1),
 .ctbl td:nth-child(1) {
   left: 0;
   width: 40px;
   min-width: 40px;
 }
 
-.ctbl th:nth-child(2),
+.ctbl .ctbl__h2 th:nth-child(2),
 .ctbl td:nth-child(2) {
   left: 40px;
   width: 44px;
   min-width: 44px;
 }
 
-.ctbl th:nth-child(3),
+.ctbl .ctbl__h2 th:nth-child(3),
 .ctbl td:nth-child(3) {
   left: 84px;
   box-shadow: 1px 0 0 var(--color-border, #e2e8f0);
 }
 
-.ctbl th:nth-child(-n + 3) {
+.ctbl .ctbl__h2 th:nth-child(-n + 3) {
   z-index: 4;
 }
 
@@ -148,4 +148,87 @@
   position: sticky;
   left: 0;
   width: min(1264px, calc(100vw - 100px));
+}
+
+/* Two-row header: the eight weeks sit under one title. */
+.ctbl .ctbl__h1 th {
+  top: 0;
+  z-index: 3;
+  height: 26px;
+  padding: 4px 8px;
+  border-bottom: 0;
+  background: var(--color-white, #fff);
+}
+
+.ctbl .ctbl__h1 th:first-child {
+  left: 0;
+  z-index: 5;
+}
+
+.ctbl .ctbl__h2 th {
+  top: 26px;
+}
+
+.ctbl .ctbl__weeks-title {
+  text-align: center;
+  color: var(--color-text-secondary, #64748b);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(5, 150, 105, 0.07);
+  border-left: 1px solid var(--color-border, #e2e8f0);
+  border-right: 1px solid var(--color-border, #e2e8f0);
+}
+
+.ctbl .ctbl__week--first {
+  border-left: 1px solid var(--color-border, #e2e8f0);
+}
+
+.ctbl .ctbl__week--last {
+  border-right: 1px solid var(--color-border, #e2e8f0);
+}
+
+.ctbl .ctbl__h2 th.ctbl__week {
+  background: rgba(5, 150, 105, 0.07);
+}
+
+.ctbl .ctbl__week {
+  color: var(--color-text-secondary, #475569);
+}
+
+/* «Запас/дн» tone from the server plan status (the shades the owner approved for the planner). */
+.ctbl .ctbl__reserve--below-norm {
+  background: #c2ecd0;
+}
+
+.ctbl .ctbl__reserve--above-norm {
+  background: #f6bcbc;
+}
+
+.ctbl__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0 0 6px;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.75rem;
+}
+
+.ctbl__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ctbl__legend-box {
+  width: 12px;
+  height: 12px;
+  border-radius: 2px;
+}
+
+.ctbl__legend-box--below {
+  background: #c2ecd0;
+}
+
+.ctbl__legend-box--above {
+  background: #f6bcbc;
 }
