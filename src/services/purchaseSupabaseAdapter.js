@@ -340,7 +340,7 @@ export async function addPurchaseOrderItemCloud(orderId, item) {
     'Добавление позиции закупа'
   )
 
-  await recalcOrderTotals(orderId)
+  // totals (total_amount, items_count) are kept by the database triggers on purchase_order_items
   return row.id
 }
 
@@ -371,7 +371,7 @@ export async function addPurchaseOrderItemsCloud(orderId, items) {
     'Добавление позиций закупа'
   )
 
-  await recalcOrderTotals(orderId)
+  // totals (total_amount, items_count) are kept by the database triggers on purchase_order_items
   return rows.map((row) => row.id)
 }
 
@@ -398,7 +398,7 @@ export async function updatePurchaseOrderItemCloud(orderId, itemId, patch) {
     'Обновление позиции закупа'
   )
 
-  await recalcOrderTotals(orderId)
+  // totals (total_amount, items_count) are kept by the database triggers on purchase_order_items
   return merged
 }
 
@@ -415,7 +415,7 @@ export async function deletePurchaseOrderItemCloud(orderId, itemId) {
     'Удаление позиции закупа'
   )
 
-  await recalcOrderTotals(orderId)
+  // totals (total_amount, items_count) are kept by the database triggers on purchase_order_items
 }
 
 /**
