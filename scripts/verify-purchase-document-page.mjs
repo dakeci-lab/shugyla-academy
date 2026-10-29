@@ -60,7 +60,7 @@ for (const label of ['Сохранить', 'Закрыть', 'Удалить', '
 }
 assert.doesNotMatch(page, /Сохранить как черновик/)
 ok('buttons: Сохранить, Закрыть, Удалить, Отменить, Скачать; no «Сохранить как черновик»')
-assert.match(page, /disabled=\{items\.length > 0\}/)
+assert.match(page, /disabled=\{!itemsReady || items\.length > 0\}/)
 ok('supplier is locked once the document has items')
 assert.match(page, /Добавить комментарий/)
 assert.match(page, /<AdminModal\s+title="Комментарий"/)
