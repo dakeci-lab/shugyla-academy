@@ -148,16 +148,18 @@ export default function App() {
                   path="procurement"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <ProcurementPage />
+                      <PurchaseDocumentsPage />
                     </PlatformRoute>
                   }
                 />
-                {/* New «Закуп» (documents list). Becomes the «Закуп» menu page at stage 8. */}
+                {/* The documents list became «Закуп» (stage 8); the old address keeps working. */}
+                <Route path="procurement/documents" element={<Navigate to="/platform/procurement" replace />} />
+                {/* The former planner stays reachable for a transition period, then it is removed. */}
                 <Route
-                  path="procurement/documents"
+                  path="procurement/plan"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <PurchaseDocumentsPage />
+                      <ProcurementPage />
                     </PlatformRoute>
                   }
                 />

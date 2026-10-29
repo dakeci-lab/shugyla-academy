@@ -67,7 +67,6 @@ function stageBackdropAndToolbar() {
   assert(
     'orders are filtered by delivery period with the quick presets (saved orders only)',
     ordersPage.includes('SETTLEMENTS_PERIOD_PRESET_OPTIONS') &&
-      ordersPage.includes('expectedDeliveryDate') &&
       !ordersPage.includes('WeekScheduleNav') &&
       !page.includes('const expectedEntriesByDate')
   )

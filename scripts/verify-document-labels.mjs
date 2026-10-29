@@ -27,7 +27,7 @@ ok('the dictionary holds the canonical terms (delivery = «Ожидаемая д
 
 const exporter = read('src/utils/purchaseOrderExport.js')
 const consumers = {
-  'order card': read('src/pages/platform/procurement/PurchaseDetailPage.jsx'),
+  'order card': read('src/pages/platform/procurement/PurchaseDocumentPage.jsx'),
   'planner bar': read('src/components/procurement/ProcurementSupplierPlanBar.jsx'),
   'planner modal': read('src/components/procurement/ProcurementPlannerView.jsx'),
   'orders list': read('src/components/procurement/PurchaseTable.jsx'),

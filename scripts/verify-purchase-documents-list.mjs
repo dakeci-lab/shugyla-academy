@@ -91,7 +91,8 @@ assert.match(cloud, /searchOrderIdsByItemTextCloud[\s\S]*purchase_order_items[\s
 ok('item-text search is served by the server (list holds headers only)')
 
 const app = read('src/App.jsx')
-assert.match(app, /path="procurement\/documents"[\s\S]*?ROUTE_KEYS\.PROCUREMENT[\s\S]*?<PurchaseDocumentsPage \/>/)
-ok('route /platform/procurement/documents behind the «Закуп» route key')
+assert.match(app, /path="procurement"[\s\S]*?ROUTE_KEYS\.PROCUREMENT[\s\S]*?<PurchaseDocumentsPage \/>/)
+assert.match(app, /path="procurement\/documents" element=\{<Navigate to="\/platform\/procurement"/)
+ok('the list is the «Закуп» page /platform/procurement (behind its route key); the old /documents address redirects')
 
 console.log(`\n${checks} checks passed`)

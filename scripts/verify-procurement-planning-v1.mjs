@@ -376,13 +376,13 @@ function stageContractFiles() {
     'xlsx export'
   )
   assertFileContains(
-    'src/pages/platform/procurement/PurchaseDetailPage.jsx',
+    'src/pages/platform/procurement/PurchaseDocumentPage.jsx',
     'exportPurchaseOrderPdf',
     'detail pdf'
   )
   assert(
     'no fake excel alert',
-    !read('src/pages/platform/procurement/PurchaseDetailPage.jsx').includes(
+    !read('src/pages/platform/procurement/PurchaseDocumentPage.jsx').includes(
       'Экспорт Excel будет доступен'
     )
   )
@@ -547,7 +547,7 @@ async function stagePlanExportAndPlannerUi() {
   assert(
     'purchase order export untouched',
     read('src/utils/purchaseOrderExport.js').includes('exportPurchaseOrderXlsx') &&
-      read('src/pages/platform/procurement/PurchaseDetailPage.jsx').includes(
+      read('src/pages/platform/procurement/PurchaseDocumentPage.jsx').includes(
         'exportPurchaseOrderPdf'
       )
   )
