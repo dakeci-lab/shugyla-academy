@@ -366,6 +366,11 @@ function stageMigration() {
   assert('deleting a draft no longer touches receiving documents', !/delete from public\.receiving_documents/.test(rm))
   const rpc2 = read('supabase/migrations/20261028140000_order_rpc_without_receiving.sql')
   assert('save / cancel functions do not touch receiving documents', !/receiving/.test(rpc2.replace(/--.*$/gm, '')))
+  // Lesson of the 25c incident: PostgreSQL does not check function bodies when a column is dropped, so the LATEST definition of every
+  // function that writes purchase_orders must not name the dropped receiving columns.
+  const migrationsDir = path.join(ROOT, 'supabase/migrations')
+  const latestGenerate = fs.readdirSync(migrationsDir).filter((f) => f.endsWith('.sql')).sort().map((f) => ({ f, sql: read(`supabase/migrations/${f}`) })).filter(({ sql }) => /create or replace function public\.generate_procurement_orders_from_snapshot\(p_snapshot_id uuid, p_expected_delivery_date date, p_supplier_ids/.test(sql)).pop()
+  assert('the latest order-generation function no longer writes the dropped receiving columns', latestGenerate && !/transferred_to_receiving|receiving_document_id\b/.test(latestGenerate.sql.replace(/--.*$/gm, '')), latestGenerate?.f)
   console.log('')
 }
 

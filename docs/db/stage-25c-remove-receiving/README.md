@@ -25,3 +25,16 @@ select status, count(*) from purchase_orders group by 1;                        
 
 ## Откат
 Удалённые таблицы восстанавливаются только из резервной копии Supabase (Database → Backups). Данных приёмки в других местах нет. Миграции создания — в истории `supabase/migrations/*receiving*`.
+
+## Инцидент после 25c (2026-10-28 15:42 → 2026-10-29, исправлен)
+`generate_procurement_orders_from_snapshot` (переписана в 25b) в `INSERT INTO purchase_orders` всё ещё называла колонки `transferred_to_receiving` и `receiving_document_id`, которые удалил скрипт 25c.
+PostgreSQL не проверяет тексты plpgsql-функций при удалении колонки, поэтому скрипт прошёл, а «Создать заказ» в планировании падало («column … does not exist»): 32 неудачные попытки, ни одного заказа за это время.
+Исправление: `supabase/migrations/20261029100000_generate_orders_without_receiving_columns.sql` (применено через MCP; проверено созданием заказа в транзакции с откатом).
+**Урок и обязательный шаг postcheck при любом удалении колонки/таблицы/функции** — искать удалённые имена в текстах всех функций:
+```sql
+select n.nspname || '.' || p.proname as function
+from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+where n.nspname in ('public', 'auth_private') and p.prokind = 'f'
+  and (p.prosrc ilike '%transferred_to_receiving%' or p.prosrc ilike '%receiving_document_id%'
+       or p.prosrc ilike '%receiving_documents%' or p.prosrc ilike '%receiving_items%');   -- должно быть пусто
+```
