@@ -12,6 +12,7 @@ import {
 } from '../../../services/procurementPlanningService'
 import { buildPlannerWeekColumnLabels } from '../../../utils/procurementPlannerUx'
 import { filterCatalogItems, groupCatalogItems } from '../../../utils/purchaseCatalog'
+import { formatPurchaseAmount, calcLineTotal } from '../../../utils/purchaseData'
 import { toProcurementUserMessage } from '../../../utils/procurementErrors'
 import AdminModal from '../../admin/AdminModal'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
@@ -50,7 +51,14 @@ async function loadSupplierItems(snapshotId, supplierId) {
  * demand, recommendation, target days and quantity to order. The plan bar (delivery date, safety stock, skip a visit)
  * recomputes the recommendation on the server; ticked rows go into the document with the «Заказ» quantity.
  */
-export default function SupplierGoodsModal({ order, existingBarcodes, onAdd, onDeliveryDate, onClose }) {
+export default function SupplierGoodsModal({
+  order,
+  existingBarcodes,
+  existingTotal = 0,
+  onAdd,
+  onDeliveryDate,
+  onClose,
+}) {
   const { user } = useSession()
   const { error: showError, success: showSuccess } = useToast()
   const canSync = can(user, PERMISSION_CODES.PROCUREMENT_EDIT)
@@ -67,6 +75,8 @@ export default function SupplierGoodsModal({ order, existingBarcodes, onAdd, onD
   const [expanded, setExpanded] = useState(() => new Set())
   const [selected, setSelected] = useState(() => new Set())
   const [qtyEdits, setQtyEdits] = useState({})
+  const [onlyOrder, setOnlyOrder] = useState(false)
+  const [openAll, setOpenAll] = useState(false)
 
   const reload = useCallback(
     async (snap) => {
@@ -125,13 +135,35 @@ export default function SupplierGoodsModal({ order, existingBarcodes, onAdd, onD
     () => buildPlannerWeekColumnLabels(snapshot?.periodFrom, snapshot?.periodTo).labels,
     [snapshot?.periodFrom, snapshot?.periodTo]
   )
-  const visible = useMemo(() => filterCatalogItems(items, search), [items, search])
+  const toOrderCount = useMemo(
+    () => items.filter((item) => item.recommendedQty > 0 && !existingBarcodes.has(item.barcode)).length,
+    [items, existingBarcodes]
+  )
+  const visible = useMemo(() => {
+    const found = filterCatalogItems(items, search)
+    return onlyOrder ? found.filter((item) => item.recommendedQty > 0) : found
+  }, [items, search, onlyOrder])
   const searching = search.trim().length > 0
   const groups = useMemo(() => groupCatalogItems(visible), [visible])
 
   const quantityOf = (item) => {
     if (item.barcode in qtyEdits) return qtyEdits[item.barcode]
     return item.recommendedQty > 0 ? String(item.recommendedQty) : ''
+  }
+
+  /** One click: every row with a recommendation is ticked and takes the recommended quantity. */
+  function selectRecommended() {
+    const rows = items.filter((item) => item.recommendedQty > 0 && !existingBarcodes.has(item.barcode))
+    setQtyEdits((current) => {
+      const next = { ...current }
+      for (const item of rows) delete next[item.barcode]
+      return next
+    })
+    setSelected((current) => {
+      const next = new Set(current)
+      for (const item of rows) next.add(item.barcode)
+      return next
+    })
   }
 
   function toggleGroup(key) {
@@ -242,7 +274,12 @@ export default function SupplierGoodsModal({ order, existingBarcodes, onAdd, onD
     }
   }
 
-  const picked = items.filter((item) => selected.has(item.barcode) && !existingBarcodes.has(item.barcode)).length
+  const chosen = items.filter((item) => selected.has(item.barcode) && !existingBarcodes.has(item.barcode))
+  const picked = chosen.length
+  const pickedSum = chosen.reduce((sum, item) => sum + calcLineTotal(Number(quantityOf(item)) || 0, item.purchasePrice), 0)
+  const min = plan?.minOrderAmount > 0 ? plan.minOrderAmount : 0
+  const orderSum = existingTotal + pickedSum
+  const shortToMin = min > 0 && orderSum < min ? min - orderSum : 0
 
   return (
     <AdminModal
@@ -251,6 +288,17 @@ export default function SupplierGoodsModal({ order, existingBarcodes, onAdd, onD
       huge
       footer={
         <>
+          <div className="sgm__summary" aria-live="polite">
+            <span>
+              Выбрано: <b>{picked}</b> · <b>{formatPurchaseAmount(pickedSum)}</b>
+            </span>
+            {min > 0 ? (
+              <span className={shortToMin > 0 ? 'sgm__summary--warn' : ''}>
+                Минимальный заказ {formatPurchaseAmount(min)}
+                {shortToMin > 0 ? ` · не хватает ${formatPurchaseAmount(shortToMin)}` : ' · набран'}
+              </span>
+            ) : null}
+          </div>
           <button type="button" className="btn btn--outline" onClick={onClose}>
             Закрыть
           </button>
@@ -270,6 +318,16 @@ export default function SupplierGoodsModal({ order, existingBarcodes, onAdd, onD
             onChange={(event) => setSearch(event.target.value)}
             autoComplete="off"
           />
+          <label className="sgm__toggle">
+            <input type="checkbox" checked={onlyOrder} onChange={(event) => setOnlyOrder(event.target.checked)} />
+            <span>Только к заказу ({toOrderCount})</span>
+          </label>
+          <button type="button" className="btn btn--outline btn--sm" disabled={toOrderCount === 0} onClick={selectRecommended}>
+            Выбрать рекомендованные
+          </button>
+          <button type="button" className="btn btn--outline btn--sm" onClick={() => setOpenAll((value) => !value)}>
+            {openAll || onlyOrder ? 'Свернуть всё' : 'Развернуть всё'}
+          </button>
           <span className="sgm__spacer" />
           {snapshot ? (
             <span className="sgm__synced">
@@ -285,7 +343,7 @@ export default function SupplierGoodsModal({ order, existingBarcodes, onAdd, onD
             />
           ) : null}
         </div>
-        <ProcurementSupplierPlanBar plan={plan} supplierName={order.supplierName} saving={planSaving} onChange={handlePlanChange} />
+        <ProcurementSupplierPlanBar plan={plan} supplierName={order.supplierName} saving={planSaving} showMinimum={false} onChange={handlePlanChange} />
         {loading ? (
           <p className="sgm__hint">Загрузка…</p>
         ) : !snapshot?.id ? (
@@ -295,7 +353,7 @@ export default function SupplierGoodsModal({ order, existingBarcodes, onAdd, onD
             groups={groups}
             weekLabels={weekLabels}
             expanded={expanded}
-            expandAll={searching}
+            expandAll={searching || onlyOrder || openAll}
             onToggleGroup={toggleGroup}
             selected={selected}
             onToggleItem={toggleItem}

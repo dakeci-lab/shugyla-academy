@@ -588,6 +588,7 @@ export default function PurchaseDocumentPage() {
         <SupplierGoodsModal
           order={order}
           existingBarcodes={new Set(items.map((row) => row.barcode).filter(Boolean))}
+          existingTotal={total}
           onAdd={addPlannedItems}
           onDeliveryDate={(value) => void saveMeta({ expectedDeliveryDate: value })}
           onClose={() => setGoodsOpen(false)}

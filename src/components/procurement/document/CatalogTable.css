@@ -59,6 +59,7 @@
   padding: 7px 8px;
   border: 0;
   background: transparent;
+  color: var(--color-text, #0f172a);
   font: inherit;
   text-align: left;
   cursor: pointer;
