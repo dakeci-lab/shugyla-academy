@@ -135,7 +135,7 @@ export default function CatalogTable({
           <tr className="ctbl__h1">
             <th colSpan={3} />
             <th colSpan={weekLabels.length} className="ctbl__weeks-title">
-              Продажи по неделям, шт.
+              <span className="ctbl__weeks-label">Продажи по неделям, шт.</span>
             </th>
             <th colSpan={7} />
           </tr>

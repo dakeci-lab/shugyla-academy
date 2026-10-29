@@ -114,4 +114,8 @@ assert.match(table, /--ctbl-view/)
 assert.match(read('src/components/procurement/document/CatalogTable.css'), /width: var\(--ctbl-view, 100%\)/)
 ok('group headers are as wide as the visible table, so they stay in view at any horizontal scroll position')
 
+assert.match(table, /ctbl__weeks-label/)
+assert.match(read('src/components/procurement/document/CatalogTable.css'), /\.ctbl__weeks-label \{\s*position: sticky;\s*left: 332px/)
+ok('the «Продажи по неделям» title is pinned next to the fixed columns while the weeks scroll')
+
 console.log(`\n${checks} checks passed`)
