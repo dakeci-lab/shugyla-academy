@@ -147,7 +147,7 @@
 .ctbl__group button {
   position: sticky;
   left: 0;
-  width: min(1264px, calc(100vw - 100px));
+  width: var(--ctbl-view, 100%);
 }
 
 /* Two-row header: the eight weeks sit under one title. */

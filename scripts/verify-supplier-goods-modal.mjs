@@ -109,4 +109,9 @@ assert.match(table, /Продажи по неделям, шт\./)
 assert.match(table, /rgba\(5, 150, 105/)
 ok('the eight weeks sit under one title with a per-row heat shade (one block, not eight separate numbers)')
 
+assert.match(table, /ResizeObserver/)
+assert.match(table, /--ctbl-view/)
+assert.match(read('src/components/procurement/document/CatalogTable.css'), /width: var\(--ctbl-view, 100%\)/)
+ok('group headers are as wide as the visible table, so they stay in view at any horizontal scroll position')
+
 console.log(`\n${checks} checks passed`)
