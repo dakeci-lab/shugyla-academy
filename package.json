@@ -56,6 +56,7 @@
     "verify:modal-scroll-lock": "node scripts/verify-modal-scroll-lock.mjs",
     "verify:mobile-profile": "node scripts/verify-mobile-profile.mjs",
     "verify:mobile-shell": "node scripts/verify-mobile-shell.mjs",
+    "verify:supplier-goods-modal": "node scripts/verify-supplier-goods-modal.mjs",
     "verify:purchase-document-page": "node scripts/verify-purchase-document-page.mjs",
     "verify:purchase-documents-list": "node scripts/verify-purchase-documents-list.mjs",
     "verify:warehouse-page": "node scripts/verify-warehouse-page.mjs",

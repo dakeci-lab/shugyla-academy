@@ -11,10 +11,11 @@ export default function AdminModal({
   footer,
   wide = false,
   xwide = false,
+  huge = false,
   returnFocusRef,
   autoFocusClose = true,
 }) {
-  const sizeClass = xwide ? 'admin-modal--xwide' : wide ? 'admin-modal--wide' : ''
+  const sizeClass = huge ? 'admin-modal--huge' : xwide ? 'admin-modal--xwide' : wide ? 'admin-modal--wide' : ''
   const titleId = useId()
   const closeButtonRef = useRef(null)
   const onCloseRef = useRef(onClose)

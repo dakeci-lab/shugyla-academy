@@ -1,0 +1,98 @@
+.ctbl__wrap {
+  overflow: auto;
+  max-height: 56vh;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+}
+
+.ctbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.ctbl th,
+.ctbl td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  white-space: nowrap;
+  text-align: left;
+}
+
+.ctbl th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--color-white, #fff);
+  font-weight: 700;
+}
+
+.ctbl .r {
+  text-align: right;
+}
+
+.ctbl__name {
+  white-space: normal;
+  min-width: 220px;
+}
+
+.ctbl__week {
+  color: var(--color-text-muted, #6b7280);
+}
+
+.ctbl__neg {
+  color: #b91c1c;
+}
+
+.ctbl__group td {
+  background: var(--color-bg-subtle, #f1f5f9);
+  padding: 0;
+}
+
+.ctbl__group button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ctbl__group--sub button {
+  padding-left: 28px;
+}
+
+.ctbl__sign {
+  width: 14px;
+  text-align: center;
+  font-weight: 700;
+}
+
+.ctbl__count {
+  margin-left: auto;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.ctbl .is-disabled {
+  color: var(--color-text-muted, #6b7280);
+  background: #fafafa;
+}
+
+.ctbl__qty {
+  width: 72px;
+  min-height: 28px;
+  padding: 0 6px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 4px;
+  font: inherit;
+  text-align: right;
+}
+
+.ctbl__empty {
+  padding: 16px 8px;
+  color: var(--color-text-muted, #6b7280);
+}

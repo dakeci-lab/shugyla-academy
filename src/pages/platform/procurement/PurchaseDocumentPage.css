@@ -253,3 +253,15 @@
     grid-template-columns: 1fr;
   }
 }
+
+.pdoc__link {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary, #059669);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
