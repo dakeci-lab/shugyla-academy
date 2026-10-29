@@ -1,4 +1,5 @@
 import { calcReserveDays, reserveHighlightFromStatus } from '../../../utils/procurementPlanningMath'
+import { useEffect, useRef, useState } from 'react'
 import { catalogGroupKey } from '../../../utils/purchaseCatalog'
 import './CatalogTable.css'
 
@@ -27,6 +28,20 @@ export default function CatalogTable({
   inDocument,
   disabledReason,
 }) {
+  // Group headers must be exactly as wide as the visible part of the table: a sticky element wider than that
+  // is pushed out of view again once the table is scrolled far to the right.
+  const wrapRef = useRef(null)
+  const [viewWidth, setViewWidth] = useState(0)
+  useEffect(() => {
+    const node = wrapRef.current
+    if (!node) return undefined
+    const update = () => setViewWidth(node.clientWidth)
+    update()
+    if (typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver(update)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
   const items = groups.flatMap((category) => category.subcategories.flatMap((sub) => sub.items))
   const selectable = items.filter((item) => !inDocument.has(item.barcode) && !disabledReason?.(item))
   const allSelected = selectable.length > 0 && selectable.every((item) => selected.has(item.barcode))
@@ -114,7 +129,7 @@ export default function CatalogTable({
         Запаса больше цели
       </span>
     </p>
-    <div className="ctbl__wrap">
+    <div className="ctbl__wrap" ref={wrapRef} style={viewWidth ? { '--ctbl-view': `${viewWidth}px` } : undefined}>
       <table className="ctbl">
         <thead>
           <tr className="ctbl__h1">
