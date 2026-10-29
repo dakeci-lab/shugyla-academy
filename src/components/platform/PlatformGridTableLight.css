@@ -1,0 +1,39 @@
+/*
+ * Light typography for the document lists of «Закуп» / «Заказы» (approved in the prototype): regular-weight text,
+ * small gray semibold headers, bold only for the totals row. The shared table (PlatformGridTable.css, also used by «Расчёты»)
+ * stays as it is; the modifier is added by these two pages.
+ */
+.pgt--light {
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.pgt--light .pgt__head {
+  border-radius: 6px 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.pgt--light .pgt__title {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.pgt--light .pgt__money {
+  font-weight: 400;
+}
+
+.pgt--light .pgt__foot {
+  border-radius: 0 0 6px 6px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.pgt--light .pgt__foot .pgt__money {
+  font-weight: 700;
+}
+
+.pgt--light .pgt__checked {
+  font-weight: 400;
+}
