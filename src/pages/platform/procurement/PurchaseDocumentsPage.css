@@ -11,9 +11,11 @@
   gap: 8px 12px;
 }
 
-.pdl-bar .btn,
-.pdl-bar .pf-trigger {
+.pdl-bar .btn {
+  height: 38px;
+  padding: 0 16px;
   border-radius: 4px;
+  font-size: 13.5px;
 }
 
 .pdl-bar__chip {
