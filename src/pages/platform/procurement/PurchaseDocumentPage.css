@@ -1,0 +1,255 @@
+.pdoc {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pdoc__head,
+.pdoc__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+
+.pdoc__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.pdoc__meta {
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.875rem;
+}
+
+/* Status is plain gray italic text, not a pill. */
+.pdoc__status {
+  color: var(--color-text-muted, #6b7280);
+  font-style: italic;
+  font-size: 0.875rem;
+}
+
+.pdoc__spacer {
+  flex: 1 1 auto;
+}
+
+.pdoc .btn {
+  border-radius: 4px;
+}
+
+.pdoc__danger {
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.pdoc__menu {
+  position: relative;
+}
+
+.pdoc__menu-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 140px;
+  padding: 4px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-white, #fff);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.pdoc__menu-list button {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pdoc__menu-list button:hover {
+  background: var(--color-bg-subtle, #f1f5f9);
+}
+
+.pdoc__cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pdoc__card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-white, #fff);
+}
+
+.pdoc__label {
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.8125rem;
+}
+
+.pdoc__value {
+  font-weight: 600;
+}
+
+.pdoc__items {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-white, #fff);
+}
+
+.pdoc__items-title {
+  margin: 0;
+  padding: 12px 12px 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.pdoc__hint,
+.pdoc__empty {
+  padding: 14px 12px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.pdoc__table-wrap {
+  overflow-x: auto;
+}
+
+.pdoc__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.pdoc__table th,
+.pdoc__table td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.pdoc__table th {
+  font-weight: 700;
+}
+
+.pdoc__table td:nth-child(2) {
+  white-space: normal;
+}
+
+.pdoc__table .r {
+  text-align: right;
+}
+
+.pdoc__table tfoot td {
+  font-weight: 700;
+  border-bottom: 0;
+}
+
+.pdoc__qty {
+  width: 84px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 4px;
+  font: inherit;
+  text-align: right;
+}
+
+.pdoc__remove {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 1.125rem;
+  cursor: pointer;
+}
+
+.pdoc__remove:hover {
+  background: var(--color-bg-subtle, #f1f5f9);
+  color: #b91c1c;
+}
+
+.pdoc__add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 12px;
+}
+
+.pdoc__add-field {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 200px;
+  flex: 1 1 240px;
+}
+
+.pdoc__add-field label {
+  color: var(--color-text-muted, #6b7280);
+  font-size: 0.8125rem;
+}
+
+.pdoc__input {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.pdoc__suggest {
+  position: absolute;
+  z-index: 30;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-white, #fff);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+.pdoc__suggest button {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pdoc__suggest button:hover {
+  background: var(--color-bg-subtle, #f1f5f9);
+}
+
+.pdoc__suggest-empty {
+  padding: 10px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+@media (max-width: 720px) {
+  .pdoc__cards {
+    grid-template-columns: 1fr;
+  }
+}
