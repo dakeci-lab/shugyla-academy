@@ -68,6 +68,7 @@
   border: 0;
   border-radius: 4px;
   background: transparent;
+  color: var(--color-text, #0f172a);
   font: inherit;
   text-align: left;
   cursor: pointer;
@@ -236,6 +237,7 @@
   padding: 8px 10px;
   border: 0;
   background: transparent;
+  color: var(--color-text, #0f172a);
   font: inherit;
   text-align: left;
   cursor: pointer;
