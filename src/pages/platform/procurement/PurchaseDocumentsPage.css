@@ -70,3 +70,8 @@
 .pdl-sum--saved {
   border-bottom-color: #059669;
 }
+
+.pdl-row--draft .pgt__title,
+.pdl-row--draft .pgt__money {
+  color: var(--color-text-muted, #6b7280);
+}

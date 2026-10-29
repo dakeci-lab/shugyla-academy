@@ -45,6 +45,7 @@ import { DelayedLoadingSkeleton } from '../../../components/loading/LoadingSkele
 import '../../../components/platform/FilterComboField.css'
 import '../../../components/admin/admin-shared.css'
 import './ProcurementPage.css'
+import '../../../components/platform/PlatformGridTableLight.css'
 import './PurchaseDocumentsPage.css'
 
 /** Where a document opens. Stage 4 moves this to the new document page. */
@@ -396,7 +397,7 @@ export default function PurchaseDocumentsPage() {
         <DelayedLoadingSkeleton variant="list" count={5} />
       ) : (
         <div className="procurement-list-panel">
-          <PgtTable columns={columns} className="pdl-table">
+          <PgtTable columns={columns} className="pdl-table pgt--light">
             <PgtHead columns={columns} />
             {documents.length === 0 ? (
               <p className="pgt__empty">Документов за этот период нет.</p>

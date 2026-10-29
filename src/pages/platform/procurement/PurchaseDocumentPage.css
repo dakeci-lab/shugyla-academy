@@ -141,7 +141,9 @@
 }
 
 .pdoc__table th {
-  font-weight: 700;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
 }
 
 .pdoc__table td:nth-child(2) {
