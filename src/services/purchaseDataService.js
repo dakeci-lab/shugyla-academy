@@ -67,6 +67,22 @@ export async function loadPurchases() {
   return local.fetchPurchasesData()
 }
 
+/** id заказов, у которых в позициях встречается текст (название или штрихкод). */
+export async function findPurchaseOrderIdsByItemText(text) {
+  const q = String(text || '').trim().toLowerCase()
+  if (!q) return []
+  if (isCloudMode()) return cloud.searchOrderIdsByItemTextCloud(q)
+  return getPurchaseOrdersSync()
+    .filter((order) =>
+      (order.items || []).some(
+        (item) =>
+          String(item.productName || '').toLowerCase().includes(q) ||
+          String(item.barcode || '').includes(q)
+      )
+    )
+    .map((order) => order.id)
+}
+
 export async function createPurchaseOrder(data) {
   const id = isCloudMode()
     ? await cloud.createPurchaseOrderCloud(data)
