@@ -39,6 +39,22 @@ export function reserveHighlightFromStatus(reserveStatus) {
   return null
 }
 
+/**
+ * Tone of «Запас/дн» in the product windows, from what is on the SHELF only (stock vs the target), without what is on its way:
+ * 'below-norm' (green) — less than the target, time to order; 'above-norm' (red) — more than target + one cycle. The goods in
+ * transit are shown in their own column, so an empty shelf is never painted as «too much».
+ */
+export function shelfToneFromItem(item) {
+  const avg = Number(item?.avgDaily)
+  const target = Number(item?.targetDays)
+  if (!Number.isFinite(avg) || avg <= 0 || !Number.isFinite(target)) return null
+  const stock = Math.max(0, Number(item?.calculationStock) || 0)
+  const cycle = Number.isFinite(Number(item?.cycleDays)) ? Number(item.cycleDays) : 0
+  if (stock < avg * target) return 'below-norm'
+  if (stock > avg * (target + cycle)) return 'above-norm'
+  return null
+}
+
 /** Group orderable items by platform supplier for generate contract. */
 export function groupOrderableBySupplier(items = []) {
   const groups = new Map()
