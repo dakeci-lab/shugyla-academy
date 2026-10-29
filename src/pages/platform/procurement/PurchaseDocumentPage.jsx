@@ -425,7 +425,7 @@ export default function PurchaseDocumentPage() {
               suppliers={suppliers}
               valueId={order.supplierId}
               valueName={order.supplierName}
-              disabled={items.length > 0}
+              disabled={!itemsReady || items.length > 0}
               onSelect={handleSelectSupplier}
             />
           ) : (
@@ -455,7 +455,7 @@ export default function PurchaseDocumentPage() {
 
       <section className="pdoc__items">
         <div className="pdoc__items-head">
-          <h2 className="pdoc__items-title">Товары ({items.length})</h2>
+          <h2 className="pdoc__items-title">{itemsReady ? `Товары (${items.length})` : 'Товары'}</h2>
           {showChecklist ? (
             <>
               <span className="pdoc__spacer" />
