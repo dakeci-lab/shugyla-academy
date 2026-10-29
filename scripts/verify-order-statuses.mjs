@@ -366,6 +366,13 @@ function stageMigration() {
   assert('deleting a draft no longer touches receiving documents', !/delete from public\.receiving_documents/.test(rm))
   const rpc2 = read('supabase/migrations/20261028140000_order_rpc_without_receiving.sql')
   assert('save / cancel functions do not touch receiving documents', !/receiving/.test(rpc2.replace(/--.*$/gm, '')))
+  const num = read('supabase/migrations/20261029120000_order_numbers.sql')
+  assert('document numbers start at 1001 and are given by a trigger when an order becomes saved (any path)', /start with 1001/.test(num) && /new\.status = 'saved' and new\.number is null/.test(num) && /before insert or update of status/.test(num))
+  assert('a number is unique and never reused (sequence, partial unique index)', /create unique index purchase_orders_number_key/.test(num) && /nextval\('public\.purchase_order_number_seq'\)/.test(num))
+  assert('existing saved orders are numbered in creation order', /row_number\(\) over \(order by created_at, id\)/.test(num))
+  const labelsSrc = read('src/config/documentLabels.js')
+  assert('exports and the card show the number («Заказ поставщику №N», file name, card title)', /formatOrderTitle\(mapped\.number\)/.test(read('src/utils/purchaseOrderExport.js')) && /Заказ №\{order\.number\}/.test(read(DETAIL_PAGE)) && /export function formatOrderTitle/.test(labelsSrc))
+  assert('the orders list has a «Номер» column', /key: 'number'/.test(read('src/components/procurement/PurchaseTable.jsx')))
   // Lesson of the 25c incident: PostgreSQL does not check function bodies when a column is dropped, so the LATEST definition of every
   // function that writes purchase_orders must not name the dropped receiving columns.
   const migrationsDir = path.join(ROOT, 'supabase/migrations')

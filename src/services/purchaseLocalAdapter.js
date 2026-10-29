@@ -237,7 +237,8 @@ export async function submitPurchaseOrder(orderId) {
   if (order.items.some((item) => !(Number(item.orderQty) > 0))) {
     throw new Error('В заказе есть товары с нулевым количеством. Исправьте или удалите их.')
   }
-  return updatePurchaseOrder(orderId, { status: PURCHASE_STATUS.SAVED })
+  const number = order.number ?? Math.max(1000, ...readOrders().map((o) => Number(o.number) || 0)) + 1
+  return updatePurchaseOrder(orderId, { status: PURCHASE_STATUS.SAVED, number })
 }
 
 /** «Отменить»: «Сохранён» → черновик, отметка «Сверено» снимается. */

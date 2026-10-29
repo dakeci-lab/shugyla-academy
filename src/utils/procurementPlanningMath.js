@@ -91,6 +91,7 @@ export function mapPurchaseOrderForExport(order) {
   })
   const totalAmount = items.reduce((sum, row) => sum + row.lineTotal, 0)
   return {
+    number: order?.number ?? null,
     supplierName: order?.supplierName ?? order?.supplier_name ?? '',
     purchaseDate: order?.date ?? order?.purchase_date ?? '',
     expectedDeliveryDate: order?.expectedDeliveryDate ?? order?.expected_delivery_date ?? '',
