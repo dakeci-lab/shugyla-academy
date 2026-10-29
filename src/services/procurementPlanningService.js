@@ -339,6 +339,31 @@ export async function fetchSnapshotAttemptItems(snapshotId, supplierId) {
   }))
 }
 
+/**
+ * Refresh the stock of one supplier from UMAG (one UMAG request) and recompute that supplier's plan.
+ * Sales of the last eight weeks stay from the daily sync.
+ */
+export async function refreshSupplierStock(supplierId) {
+  if (!isSupabaseConfigured() || !supabase) {
+    return fail(PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN, 'Сервер не настроен')
+  }
+  try {
+    const { data, error } = await supabase.functions.invoke('umag-procurement', {
+      body: { action: 'refresh-supplier-stock', supplierId },
+    })
+    if (error) return mapInvokeFailure(error, data)
+    if (data?.success === true) {
+      return { success: true, updated: data.updated, refreshedAt: data.refreshedAt, snapshotId: data.snapshotId }
+    }
+    return mapInvokeFailure(null, data)
+  } catch (err) {
+    return fail(
+      PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN,
+      err?.message || USER_MESSAGES[PROCUREMENT_PLANNING_ERROR_CODES.SYNC_FAILED]
+    )
+  }
+}
+
 export async function syncProcurementPlanning() {
   if (!isSupabaseConfigured() || !supabase) {
     return fail(PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN, 'Сервер не настроен')
