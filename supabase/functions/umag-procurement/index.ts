@@ -795,6 +795,93 @@ async function handleGenerate(
   })
 }
 
+/**
+ * «Обновить остатки поставщика» (окно «Товары поставщика»): one UMAG stock request for the store, then only the rows of
+ * the chosen supplier go into the latest snapshot and only this supplier's plan is recomputed (procurement_refresh_supplier_stock).
+ * The eight weeks of sales stay from the daily sync, so this is one UMAG request instead of nine.
+ */
+async function handleRefreshSupplierStock(
+  authz: Exclude<Awaited<ReturnType<typeof authorizeWorkforceRequest>>, Response>,
+  body: Record<string, unknown>
+): Promise<Response> {
+  const supplierId = asText(body.supplierId)
+  if (!UUID_PATTERN.test(supplierId)) {
+    return umagErrorResponse('VALIDATION_ERROR', 'Некорректный поставщик.', 400)
+  }
+
+  const { data: supplier, error: supplierErr } = await authz.serviceClient
+    .from('platform_suppliers')
+    .select('id, umag_supplier_id')
+    .eq('id', supplierId)
+    .maybeSingle()
+  if (supplierErr || !supplier) {
+    return umagErrorResponse('SUPPLIER_NOT_FOUND', 'Поставщик не найден.', 404)
+  }
+  const umagSupplierId = Number(supplier.umag_supplier_id)
+  if (!Number.isFinite(umagSupplierId)) {
+    return umagErrorResponse(
+      'SUPPLIER_NOT_LINKED',
+      'Поставщик не связан с UMAG — остатки обновить нельзя.',
+      409
+    )
+  }
+
+  const { data: snapshot } = await authz.serviceClient
+    .from('procurement_snapshots')
+    .select('id')
+    .in('status', ['ready', 'partially_generated', 'generated'])
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (!snapshot?.id) {
+    return umagErrorResponse(
+      'SNAPSHOT_NOT_FOUND',
+      'Данных планирования ещё нет — дождитесь ночной синхронизации.',
+      409
+    )
+  }
+
+  const session = await acquireUmagSession()
+  if ('error' in session) return mapUmagAuthError(session.error)
+
+  const stock = await fetchAllStock(session.storeId)
+  if (stock instanceof Response) return stock
+
+  const rows = stock
+    .filter((row) => Number(row.supplierId) === umagSupplierId)
+    .map((row) => ({
+      barcode: asBarcode(row.barcode),
+      stock: asNumber(row.stockQuantity, 0),
+      cost: row.productDetails?.arrivalCost == null ? null : asNumber(row.productDetails.arrivalCost, 0),
+      price: row.productDetails?.sellingPrice == null ? null : asNumber(row.productDetails.sellingPrice, 0),
+    }))
+    .filter((row) => row.barcode)
+
+  const { data, error } = await authz.serviceClient.rpc('procurement_refresh_supplier_stock', {
+    p_snapshot_id: snapshot.id,
+    p_supplier_id: supplierId,
+    p_rows: rows,
+  })
+  if (error) {
+    console.error('umag_procurement_refresh_supplier_failed', { message: error.message, code: error.code })
+    return umagErrorResponse('REFRESH_FAILED', 'Не удалось обновить остатки поставщика.', 500)
+  }
+
+  console.log('umag_procurement_refresh_supplier_ok', {
+    snapshotId: snapshot.id,
+    umagRows: rows.length,
+    updated: data?.updated,
+  })
+  return jsonResponse({
+    success: true,
+    action: 'refresh-supplier-stock',
+    snapshotId: snapshot.id,
+    supplierId,
+    updated: Number(data?.updated) || 0,
+    refreshedAt: new Date().toISOString(),
+  })
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return corsPreflightResponse()
   if (req.method !== 'POST') return adminErrorResponse('method_not_allowed', 405)
@@ -847,10 +934,10 @@ Deno.serve(async (req) => {
   }
 
   const action = asText(body.action)
-  if (action !== 'sync' && action !== 'generate') {
+  if (action !== 'sync' && action !== 'generate' && action !== 'refresh-supplier-stock') {
     return umagErrorResponse(
       'VALIDATION_ERROR',
-      'Укажите action: sync или generate.',
+      'Укажите action: sync, generate или refresh-supplier-stock.',
       400
     )
   }
@@ -861,5 +948,6 @@ Deno.serve(async (req) => {
   if (authz instanceof Response) return authz
 
   if (action === 'sync') return handleSync(authz)
+  if (action === 'refresh-supplier-stock') return handleRefreshSupplierStock(authz, body)
   return handleGenerate(authz, body)
 })

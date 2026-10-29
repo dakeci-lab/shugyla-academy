@@ -7,8 +7,7 @@ import {
   fetchSnapshotItemsPage,
   fetchProcurementSupplierPlan,
   saveProcurementSupplierPlan,
-  ensureProcurementPlan,
-  syncProcurementPlanning,
+  refreshSupplierStock,
 } from '../../../services/procurementPlanningService'
 import { buildPlannerWeekColumnLabels } from '../../../utils/procurementPlannerUx'
 import { filterCatalogItems, groupCatalogItems } from '../../../utils/purchaseCatalog'
@@ -144,6 +143,12 @@ export default function SupplierGoodsModal({
     return onlyOrder ? found.filter((item) => item.recommendedQty > 0) : found
   }, [items, search, onlyOrder])
   const searching = search.trim().length > 0
+  // When the supplier's stock was last refreshed: the newest row update (a refresh touches every row), else the daily sync.
+  const stockUpdatedAt = useMemo(() => {
+    let latest = snapshot?.syncedAt || null
+    for (const item of items) if (item.updatedAt && (!latest || item.updatedAt > latest)) latest = item.updatedAt
+    return latest
+  }, [items, snapshot?.syncedAt])
   const groups = useMemo(() => groupCatalogItems(visible), [visible])
 
   // The recommendation is only a hint until the row is ticked; ticking takes it as the quantity.
@@ -229,27 +234,21 @@ export default function SupplierGoodsModal({
     }
   }
 
-  async function handleSync() {
-    if (!canSync || syncing) return
+  /** One UMAG request: the stock of THIS supplier only, then its plan is recomputed (sales stay from the daily sync). */
+  async function handleRefreshStock() {
+    if (!canSync || syncing || !snapshot?.id) return
     setSyncing(true)
     try {
-      const result = await syncProcurementPlanning()
+      const result = await refreshSupplierStock(supplierId)
       if (!result.success) {
         showError(result.message)
         return
       }
-      showSuccess(`Синхронизировано: ${result.itemCount} SKU`)
-      try {
-        if (result.snapshotId) await ensureProcurementPlan(result.snapshotId)
-      } catch {
-        // the scheduled job computes the plan within a minute
-      }
-      const snap = await fetchLatestReadyProcurementSnapshot()
-      setSnapshot(snap)
+      showSuccess('Остатки поставщика обновлены')
       setQtyEdits({})
-      if (snap?.id) await reload(snap)
+      await reload(snapshot)
     } catch (error) {
-      showError(error?.message || 'Не удалось обновить данные UMAG')
+      showError(error?.message || 'Не удалось обновить остатки')
     } finally {
       setSyncing(false)
     }
@@ -332,15 +331,15 @@ export default function SupplierGoodsModal({
           <span className="sgm__spacer" />
           {snapshot ? (
             <span className="sgm__synced">
-              UMAG: {formatSynced(snapshot.syncedAt)} · {snapshot.itemCount} SKU
+              Остатки: {formatSynced(stockUpdatedAt)}
             </span>
           ) : null}
           {canSync ? (
             <PlatformSyncButton
-              onClick={() => void handleSync()}
+              onClick={() => void handleRefreshStock()}
               syncing={syncing}
-              title="Обновить остатки и продажи из UMAG"
-              aria-label="Обновить данные UMAG"
+              title="Обновить остатки этого поставщика из UMAG"
+              aria-label="Обновить остатки поставщика"
             />
           ) : null}
         </div>
