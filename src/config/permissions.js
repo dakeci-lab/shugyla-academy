@@ -31,6 +31,7 @@ export const ROUTE_KEYS = {
   HR_CANDIDATES: 'hr_candidates',
   PROCUREMENT_GROUP: 'procurement_group',
   PROCUREMENT: 'procurement',
+  WAREHOUSE: 'warehouse',
   RECEIVING: 'receiving',
   ORDERS: 'orders',
   SUPPLIERS: 'suppliers',
@@ -76,6 +77,8 @@ const ROUTE_ACCESS = {
     ROLE_IDS.RECEIVER,
   ],
   [ROUTE_KEYS.PROCUREMENT]: [ROLE_IDS.ADMIN, ROLE_IDS.BUYER],
+  // «Склад» — own page after «Расчёты» (was a tab inside «Закуп»); same access as «Закуп».
+  [ROUTE_KEYS.WAREHOUSE]: [ROLE_IDS.ADMIN, ROLE_IDS.BUYER],
   [ROUTE_KEYS.RECEIVING]: [
     ROLE_IDS.ADMIN,
     ROLE_IDS.BUYER,
@@ -243,6 +246,7 @@ export function canAccessRoute(user, routeKey) {
       P.SUPPLIERS_VIEW,
     ],
     [ROUTE_KEYS.PROCUREMENT]: [P.PROCUREMENT_VIEW],
+    [ROUTE_KEYS.WAREHOUSE]: [P.PROCUREMENT_VIEW],
     [ROUTE_KEYS.RECEIVING]: [P.RECEIVING_VIEW],
     [ROUTE_KEYS.ORDERS]: [P.PROCUREMENT_VIEW, P.RECEIVING_VIEW],
     [ROUTE_KEYS.SUPPLIERS]: [P.SUPPLIERS_VIEW],
