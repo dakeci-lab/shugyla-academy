@@ -6,11 +6,12 @@ import { usePlatformPageTitle } from '../../../context/PlatformPageTitleContext'
 import { useToast } from '../../../context/ToastContext'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import { getPlatformSection } from '../../../platform/platformNav'
-import { canViewPurchases, canEditPurchase } from '../../../config/permissions'
+import { canViewOrders, canEditPurchase, canMarkOrderChecked } from '../../../config/permissions'
 import {
   getPurchaseOrderByIdSync,
   getPurchaseOrderById,
   savePurchaseOrder,
+  setPurchaseOrderChecked,
   cancelSavedPurchaseOrder,
   deletePurchaseOrder,
   updatePurchaseOrder,
@@ -22,7 +23,14 @@ import {
 import { getSuppliers } from '../../../services/platformDataService'
 import { searchCatalogProducts, catalogProductToItem } from '../../../services/purchaseCatalogService'
 import { isCloudMode } from '../../../lib/dataMode'
-import { formatPurchaseAmount, calcLineTotal, isOrderDraft, isOrderSaved } from '../../../utils/purchaseData'
+import {
+  formatPurchaseAmount,
+  formatPurchaseDateTime,
+  calcLineTotal,
+  isOrderDraft,
+  isOrderSaved,
+} from '../../../utils/purchaseData'
+import { loadOrderChecklist, saveOrderChecklist } from '../../../utils/orderChecklistStorage'
 import {
   documentTitle,
   documentTotal,
@@ -41,12 +49,15 @@ import { ORDER_LABELS } from '../../../config/documentLabels'
 import '../../../components/admin/admin-shared.css'
 import './PurchaseDocumentPage.css'
 
-const LIST_PATH = '/platform/procurement/documents'
+const BUYER_LIST_PATH = '/platform/procurement/documents'
+const RECEIVER_LIST_PATH = '/platform/orders'
 
 /**
  * Документ закупа — /platform/procurement/documents/:id. Черновик правится целиком и сохраняет каждое
  * изменение сразу (отдельного «сохранить как черновик» нет); «Сохранить» присваивает номер и отдаёт заказ приёмщику.
  * Сохранённый заказ только читается: «Отменить» возвращает его в черновик (номер остаётся).
+ * Приёмщик (/platform/orders/:id) видит тот же документ только для чтения: галочки по строкам (помнятся в браузере)
+ * и общая отметка «Сверено».
  */
 export default function PurchaseDocumentPage() {
   const { id } = useParams()
@@ -57,8 +68,10 @@ export default function PurchaseDocumentPage() {
   const { version } = useAdminRefresh()
   const { success: showSuccess, error: showError } = useToast()
 
-  const canView = canViewPurchases(user)
+  const canView = canViewOrders(user)
   const canEdit = canEditPurchase(user)
+  const canMarkChecked = canMarkOrderChecked(user)
+  const LIST_PATH = canEdit ? BUYER_LIST_PATH : RECEIVER_LIST_PATH
 
   const [fullOrder, setFullOrder] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -68,6 +81,7 @@ export default function PurchaseDocumentPage() {
   const [commentText, setCommentText] = useState('')
   const [exportOpen, setExportOpen] = useState(false)
   const [goodsOpen, setGoodsOpen] = useState(false)
+  const [ticks, setTicks] = useState(() => new Set())
   const [nomenclatureOpen, setNomenclatureOpen] = useState(false)
   const [qtyDraft, setQtyDraft] = useState({})
   const exportRef = useRef(null)
@@ -79,6 +93,23 @@ export default function PurchaseDocumentPage() {
   const draft = isOrderDraft(order)
   const saved = isOrderSaved(order)
   const editable = canEdit && draft
+  // Приёмщик сверяет сохранённый заказ с накладной: галочки по строкам и общая отметка «Сверено».
+  const showChecklist = saved && !canEdit && canMarkChecked
+  const readerView = !canEdit
+
+  useEffect(() => {
+    setTicks(loadOrderChecklist(id))
+  }, [id])
+
+  function toggleTick(itemId) {
+    setTicks((current) => {
+      const next = new Set(current)
+      if (next.has(itemId)) next.delete(itemId)
+      else next.add(itemId)
+      saveOrderChecklist(id, next)
+      return next
+    })
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -287,6 +318,11 @@ export default function PurchaseDocumentPage() {
     )
   }
 
+  async function handleChecked(checked) {
+    const result = await run(() => setPurchaseOrderChecked(order.id, checked, user), 'Не удалось сохранить отметку.')
+    if (result?.id) setFullOrder(result)
+  }
+
   async function handleSaveComment() {
     const result = await saveMeta({ comment: commentText }, 'Не удалось сохранить комментарий.')
     if (result) setCommentOpen(false)
@@ -306,7 +342,8 @@ export default function PurchaseDocumentPage() {
   }
 
   const total = documentTotal(items)
-  const commentLabel = order.comment ? 'Комментарий' : editable ? 'Добавить комментарий' : ''
+  const commentLabel = readerView ? '' : order.comment ? 'Комментарий' : editable ? 'Добавить комментарий' : ''
+  const doneCount = items.filter((item) => ticks.has(item.id)).length
 
   return (
     <div className="pdoc">
@@ -414,8 +451,35 @@ export default function PurchaseDocumentPage() {
         </div>
       </div>
 
+      {readerView && order.comment ? <div className="pdoc__banner">Комментарий: {order.comment}</div> : null}
+
       <section className="pdoc__items">
-        <h2 className="pdoc__items-title">Товары ({items.length})</h2>
+        <div className="pdoc__items-head">
+          <h2 className="pdoc__items-title">Товары ({items.length})</h2>
+          {showChecklist ? (
+            <>
+              <span className="pdoc__spacer" />
+              {order.checkedAt ? (
+                <span className="pdoc__checked">
+                  ✓ Сверено{order.checkedByName ? `: ${order.checkedByName}` : ''}, {formatPurchaseDateTime(order.checkedAt)}
+                </span>
+              ) : (
+                <span className="pdoc__meta">
+                  Сверено: {doneCount} из {items.length}
+                </span>
+              )}
+              {order.checkedAt ? (
+                <button type="button" className="btn btn--outline btn--sm" disabled={busy} onClick={() => void handleChecked(false)}>
+                  Снять отметку
+                </button>
+              ) : (
+                <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={() => void handleChecked(true)}>
+                  Всё сверено
+                </button>
+              )}
+            </>
+          ) : null}
+        </div>
         {!itemsReady ? (
           <p className="pdoc__hint">Загрузка товаров…</p>
         ) : (
@@ -423,12 +487,13 @@ export default function PurchaseDocumentPage() {
             <table className="pdoc__table">
               <thead>
                 <tr>
+                  {showChecklist ? <th aria-label="Сверено" /> : null}
                   <th>№</th>
                   <th>Название товара</th>
                   <th>{ORDER_LABELS.barcode}</th>
-                  <th className="r">Остаток</th>
-                  <th className="r">Продажи/день</th>
-                  <th className="r">Заказать</th>
+                  {readerView ? null : <th className="r">Остаток</th>}
+                  {readerView ? null : <th className="r">Продажи/день</th>}
+                  <th className="r">{readerView ? 'Заказано' : 'Заказать'}</th>
                   <th className="r">Закупочная цена</th>
                   <th className="r">{ORDER_LABELS.amount}</th>
                   {editable ? <th aria-label="Удалить" /> : null}
@@ -437,18 +502,28 @@ export default function PurchaseDocumentPage() {
               <tbody>
                 {items.length === 0 ? (
                   <tr>
-                    <td colSpan={editable ? 9 : 8} className="pdoc__empty">
+                    <td colSpan={9} className="pdoc__empty">
                       Товаров пока нет.
                     </td>
                   </tr>
                 ) : null}
                 {items.map((item, index) => (
-                  <tr key={item.id}>
+                  <tr key={item.id} className={showChecklist && ticks.has(item.id) ? 'is-done' : ''}>
+                    {showChecklist ? (
+                      <td>
+                        <input
+                          type="checkbox"
+                          aria-label={`Сверено: ${item.productName}`}
+                          checked={ticks.has(item.id)}
+                          onChange={() => toggleTick(item.id)}
+                        />
+                      </td>
+                    ) : null}
                     <td className="num">{index + 1}</td>
                     <td>{item.productName}</td>
                     <td className="num">{item.barcode}</td>
-                    <td className="r num">{item.stock}</td>
-                    <td className="r num">{Number(item.salesPerDay || 0).toFixed(2)}</td>
+                    {readerView ? null : <td className="r num">{item.stock}</td>}
+                    {readerView ? null : <td className="r num">{Number(item.salesPerDay || 0).toFixed(2)}</td>}
                     <td className="r">
                       {editable ? (
                         <input
@@ -491,7 +566,7 @@ export default function PurchaseDocumentPage() {
               </tbody>
               <tfoot>
                 <tr>
-                  <td colSpan={7}>Итого</td>
+                  <td colSpan={(showChecklist ? 1 : 0) + (readerView ? 5 : 7)}>Итого</td>
                   <td className="r num">{formatPurchaseAmount(total)}</td>
                   {editable ? <td /> : null}
                 </tr>

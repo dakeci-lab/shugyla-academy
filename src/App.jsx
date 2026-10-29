@@ -43,9 +43,6 @@ const PurchaseDocumentPage = lazy(
 )
 const WarehousePage = lazy(() => import('./pages/platform/procurement/WarehousePage'))
 const ProcurementPage = lazy(() => import('./pages/platform/procurement/ProcurementPage'))
-const PurchaseDetailPage = lazy(
-  () => import('./pages/platform/procurement/PurchaseDetailPage')
-)
 const OrdersPage = lazy(() => import('./pages/platform/orders/OrdersPage'))
 /**
  * Маршрутизация Shugyla Platform
@@ -198,7 +195,7 @@ export default function App() {
                   path="orders/:id"
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.ORDERS}>
-                      <PurchaseDetailPage />
+                      <PurchaseDocumentPage />
                     </PlatformRoute>
                   }
                 />

@@ -4,18 +4,15 @@ import {
   formatPurchaseDate,
   formatPurchaseDateTime,
 } from '../../utils/purchaseData'
-import { PurchaseStatusBadge, isPurchaseStatusShown } from './PurchaseStatusBadge'
 import { ORDER_LABELS } from '../../config/documentLabels'
 import { PgtHead, PgtRow, PgtTable } from '../platform/PlatformGridTable'
 
 /**
  * Список заказов — общая таблица платформы (как «К оплате» и «Приёмка»).
- * Колонка «Статус» появляется, только если у каких-то заказов есть что
- * сообщить (черновик): «Сохранён» — обычное состояние и не показывается.
+ * Список приёмщика: только сохранённые заказы, «Сверено» — обычный зелёный текст, без плашек статусов.
  */
 export default function PurchaseTable({ orders, detailPathPrefix = '/platform/orders' }) {
   const navigate = useNavigate()
-  const showStatus = orders.some((order) => isPurchaseStatusShown(order.status))
   const showChecked = orders.some((order) => order.checkedAt)
 
   // Приёмщику важны «когда привезут» и «от кого»: доставка и поставщик — слева, служебное (кто и когда создал) — справа.
@@ -24,7 +21,6 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
     { key: 'supplier', label: ORDER_LABELS.supplier, width: 200, flex: true, mobile: 'title' },
     { key: 'items', label: 'Товаров', width: 80, align: 'end', mobile: 'hide' },
     { key: 'amount', label: 'Сумма', width: 130, align: 'end', mobile: 'end' },
-    ...(showStatus ? [{ key: 'status', label: 'Статус', width: 130, mobile: 'hide' }] : []),
     ...(showChecked ? [{ key: 'checked', label: 'Сверено', width: 150, mobile: 'hide' }] : []),
     { key: 'number', label: ORDER_LABELS.orderNum, width: 90, mobile: 'hide' },
     { key: 'created', label: 'Создан', width: 150, mobile: 'hide' },
@@ -48,7 +44,6 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
               number: <span className="num">{order.number ?? ''}</span>,
               items: <span>{order.itemsCount ?? order.items?.length ?? 0}</span>,
               amount: <span className="pgt__money">{formatPurchaseAmount(order.totalAmount)}</span>,
-              status: <PurchaseStatusBadge status={order.status} />,
               checked: order.checkedAt ? (
                 <span className="pgt__checked" title={order.checkedByName || undefined}>
                   ✓ {formatPurchaseDateTime(order.checkedAt)}
@@ -58,7 +53,6 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
               delivery: <span>{formatPurchaseDate(order.expectedDeliveryDate)}</span>,
             }}
             mobileMeta={[
-              isPurchaseStatusShown(order.status) ? 'Черновик' : '',
               order.number ? `№${order.number}` : '',
               `${order.itemsCount ?? order.items?.length ?? 0} тов.`,
               formatPurchaseDate(order.expectedDeliveryDate),

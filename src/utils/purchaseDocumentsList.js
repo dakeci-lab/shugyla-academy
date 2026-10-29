@@ -47,3 +47,21 @@ export function selectPurchaseDocuments(orders, filter, itemOrderIds) {
     .sort((a, b) => (b.number || 0) - (a.number || 0))
   return [...drafts, ...saved]
 }
+
+/**
+ * Pure list logic of the receiver's «Заказы»: saved orders only, cut by the expected delivery date,
+ * the nearest delivery last-to-first, then by supplier.
+ */
+export function selectReceiverOrders(orders, { dateFrom, dateTo }) {
+  return orders
+    .filter(isOrderSaved)
+    .filter(
+      (order) =>
+        order.expectedDeliveryDate && order.expectedDeliveryDate >= dateFrom && order.expectedDeliveryDate <= dateTo
+    )
+    .sort(
+      (a, b) =>
+        (b.expectedDeliveryDate || '').localeCompare(a.expectedDeliveryDate || '') ||
+        (a.supplierName || '').localeCompare(b.supplierName || '', 'ru')
+    )
+}

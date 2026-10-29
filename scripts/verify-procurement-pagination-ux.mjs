@@ -46,8 +46,8 @@ assert('planner soft-fetch CSS class on mobile', planner.includes('proc-planner_
 assert('planner CSS soft-fetch opacity', plannerCss.includes('proc-planner__table-wrap--fetching') && /opacity:\s*0\.6/.test(plannerCss))
 assert('planner CSS soft-fetch top bar', plannerCss.includes('proc-planner-fetch-bar'))
 
-assert('orders default to 25 rows', orders.includes('useState(25)'))
-assert('orders are sliced by page', orders.includes('orders.slice(start, start + pageSize)'))
+assert('orders default to 50 rows', orders.includes('useState(50)'))
+assert('orders are sliced by page', orders.includes('orders.slice((page - 1) * pageSize, page * pageSize)'))
 assert('orders use shared pagination', orders.includes('<TablePagination'))
 assert('orders refresh/filter header removed', !orders.includes('procurement-page__header'))
 assert('orders filter popover removed', !orders.includes('PurchaseFilterPopover'))
