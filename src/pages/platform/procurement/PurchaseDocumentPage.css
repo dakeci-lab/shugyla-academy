@@ -477,3 +477,139 @@
     font-size: 16px;
   }
 }
+
+.pdoc__mbar,
+.pdoc__c-meta {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  /* «Закрыть» is the back arrow of the header; «Сохранить» lives in the bottom bar. */
+  .pdoc__bar-close,
+  .pdoc--editable .pdoc__bar-save {
+    display: none;
+  }
+
+  .pdoc__bar {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .pdoc__head .btn,
+  .pdoc__bar > .btn,
+  .pdoc__bar .pdoc__menu .btn {
+    min-height: 38px;
+    white-space: nowrap;
+  }
+
+  .pdoc__bar .pdoc__spacer {
+    display: none;
+  }
+
+  .pdoc__c-meta {
+    display: block;
+    grid-area: stock;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 12px;
+  }
+
+  .pdoc__table .pdoc__c-stock,
+  .pdoc__table .pdoc__c-sales {
+    display: none;
+  }
+
+  .pdoc__table tbody tr {
+    grid-template-areas:
+      'check name  qty   del'
+      'check code  price del'
+      'check stock sum   del';
+  }
+
+  .pdoc__c-name {
+    cursor: pointer;
+  }
+
+  /* Adding goes first: the search and the dropdown open downwards, the list follows. */
+  .pdoc__items {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .pdoc__items-head {
+    order: -3;
+  }
+
+  .pdoc__add {
+    order: -2;
+    flex-direction: column;
+    align-items: stretch;
+    padding: 8px 12px 12px;
+    border-bottom: 1px solid var(--color-border, #e2e8f0);
+  }
+
+  .pdoc__add-field {
+    min-width: 0;
+    flex: none;
+  }
+
+  /* One search field: it finds by name and by barcode alike. */
+  .pdoc__add-field > label,
+  .pdoc__add-field:nth-child(2) {
+    display: none;
+  }
+
+  .pdoc__input {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .pdoc__add .btn {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .pdoc__table-wrap {
+    order: 0;
+  }
+
+  /* The bottom bar replaces the pinned «Итого» row for whoever edits. */
+  .pdoc--editable .pdoc__table tfoot {
+    display: none;
+  }
+
+  .pdoc__mbar {
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 -12px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--color-border, #e2e8f0);
+    background: var(--color-white, #fff);
+    box-shadow: 0 -2px 8px rgba(15, 23, 42, 0.06);
+  }
+
+  .pdoc__mbar-total {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+  }
+
+  .pdoc__mbar-total span {
+    color: var(--color-text-muted, #6b7280);
+    font-size: 12px;
+  }
+
+  .pdoc__mbar-total strong {
+    font-size: 18px;
+  }
+
+  .pdoc__mbar .btn {
+    min-height: 48px;
+    padding: 0 28px;
+    font-size: 16px;
+  }
+}
