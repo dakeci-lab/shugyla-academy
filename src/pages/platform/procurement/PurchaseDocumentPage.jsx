@@ -5,6 +5,7 @@ import { usePlatformData } from '../../../context/PlatformDataContext'
 import { usePlatformPageTitle } from '../../../context/PlatformPageTitleContext'
 import { useToast } from '../../../context/ToastContext'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
+import useMediaQuery from '../../../hooks/useMediaQuery'
 import { getPlatformSection } from '../../../platform/platformNav'
 import { canViewOrders, canEditPurchase, canMarkOrderChecked } from '../../../config/permissions'
 import {
@@ -43,6 +44,7 @@ import ConfirmDialog from '../../../components/admin/ConfirmDialog'
 import DocumentDateBox from '../../../components/procurement/document/DocumentDateBox'
 import NomenclatureModal from '../../../components/procurement/document/NomenclatureModal'
 import SupplierGoodsModal from '../../../components/procurement/document/SupplierGoodsModal'
+import ItemDetailSheet from '../../../components/procurement/document/ItemDetailSheet'
 import DocumentSupplierPicker from '../../../components/procurement/document/DocumentSupplierPicker'
 import { ORDER_LABELS } from '../../../config/documentLabels'
 import '../../../components/admin/admin-shared.css'
@@ -83,6 +85,8 @@ export default function PurchaseDocumentPage() {
   const [ticks, setTicks] = useState(() => new Set())
   const [nomenclatureOpen, setNomenclatureOpen] = useState(false)
   const [qtyDraft, setQtyDraft] = useState({})
+  const [detailId, setDetailId] = useState(null)
+  const isPhone = useMediaQuery('(max-width: 640px)')
   const exportRef = useRef(null)
 
   const cachedOrder = useMemo(() => getPurchaseOrderByIdSync(id), [id, version, dataVersion])
@@ -356,7 +360,7 @@ export default function PurchaseDocumentPage() {
   const doneCount = items.filter((item) => ticks.has(item.id)).length
 
   return (
-    <div className="pdoc">
+    <div className={`pdoc${editable ? ' pdoc--editable' : ''}`}>
       <div className="pdoc__head">
         <h1 className="pdoc__title">{documentTitle(order)}</h1>
         <span className="pdoc__meta">{order.createdByName || ''}</span>
@@ -378,11 +382,11 @@ export default function PurchaseDocumentPage() {
 
       <div className="pdoc__bar">
         {editable ? (
-          <button type="button" className="btn btn--primary" disabled={busy} onClick={handleSave}>
+          <button type="button" className="btn btn--primary pdoc__bar-save" disabled={busy} onClick={handleSave}>
             Сохранить
           </button>
         ) : null}
-        <button type="button" className="btn btn--outline" onClick={() => navigate(LIST_PATH)}>
+        <button type="button" className="btn btn--outline pdoc__bar-close" onClick={() => navigate(LIST_PATH)}>
           Закрыть
         </button>
         <span className="pdoc__spacer" />
@@ -530,8 +534,18 @@ export default function PurchaseDocumentPage() {
                       </td>
                     ) : null}
                     <td className="num pdoc__c-index">{index + 1}</td>
-                    <td className="pdoc__c-name">{item.productName}</td>
+                    <td
+                      className="pdoc__c-name"
+                      onClick={isPhone ? () => setDetailId(item.id) : undefined}
+                    >
+                      {item.productName}
+                    </td>
                     <td className="num pdoc__c-code">{item.barcode}</td>
+                    {readerView ? null : (
+                      <td className="pdoc__c-meta">
+                        Остаток {item.stock} · {Number(item.salesPerDay || 0).toFixed(1)}/дн
+                      </td>
+                    )}
                     {readerView ? null : (
                       <td className="r num pdoc__c-stock" data-label="Остаток">
                         {item.stock}
@@ -604,6 +618,31 @@ export default function PurchaseDocumentPage() {
           />
         ) : null}
       </section>
+
+      {editable && itemsReady ? (
+        <div className="pdoc__mbar">
+          <div className="pdoc__mbar-total">
+            <span>Итого</span>
+            <strong className="num">{formatPurchaseAmount(total)}</strong>
+          </div>
+          <button type="button" className="btn btn--primary" disabled={busy} onClick={handleSave}>
+            Сохранить
+          </button>
+        </div>
+      ) : null}
+
+      {detailId && items.some((row) => row.id === detailId) ? (
+        <ItemDetailSheet
+          item={items.find((row) => row.id === detailId)}
+          editable={editable}
+          busy={busy}
+          qtyValue={qtyDraft[detailId]}
+          onQtyChange={(itemId, value) => setQtyDraft((cur) => ({ ...cur, [itemId]: value }))}
+          onQtyCommit={(row) => void handleQtyCommit(row)}
+          onRemove={(row) => void handleDeleteItem(row)}
+          onClose={() => setDetailId(null)}
+        />
+      ) : null}
 
       {goodsOpen ? (
         <SupplierGoodsModal
@@ -687,6 +726,7 @@ export default function PurchaseDocumentPage() {
 /** Add-row under the table: search by name or barcode in the platform's nomenclature (the UMAG snapshot). */
 function AddItemRow({ supplierId, disabled, onPick, onOpenNomenclature }) {
   const { error: showError } = useToast()
+  const isPhone = useMediaQuery('(max-width: 640px)')
   const [text, setText] = useState('')
   const [barcode, setBarcode] = useState('')
   const [found, setFound] = useState([])
@@ -742,7 +782,7 @@ function AddItemRow({ supplierId, disabled, onPick, onOpenNomenclature }) {
         <input
           id="pdoc-add-name"
           className="pdoc__input"
-          placeholder="Поиск по названию"
+          placeholder={isPhone ? 'Название или штрихкод' : 'Поиск по названию'}
           value={text}
           autoComplete="off"
           disabled={disabled}
