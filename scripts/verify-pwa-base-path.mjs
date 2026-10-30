@@ -54,7 +54,6 @@ function main() {
   const recovery = read('src/pwa/pwaRecovery.js')
   const errorBoundary = read('src/components/platform/PlatformErrorBoundary.jsx')
   const platformLayout = read('src/layouts/PlatformLayout.jsx')
-  const appInstallBanner = read('src/components/platform/AppInstallBanner.jsx')
   const authService = read('src/services/authService.js')
 
   const fallbackOrigin = 'https://dakeci-lab.github.io'
@@ -123,10 +122,13 @@ function main() {
     isInsideAppBase('/login', 'http://localhost:5173', '/')
   )
 
-  console.log('Stage 6: AppInstallBanner standalone guard')
+  console.log('Stage 6: install banner removed (2026-10-30)')
 
-  assert('AppInstallBanner uses isPwaStandalone in render', appInstallBanner.includes('isPwaStandalone()'))
-  assert('AppInstallBanner has no isStandalone typo', !appInstallBanner.includes('isStandalone()'))
+  assert(
+    'no «Открыть в приложении» banner in the platform layout',
+    !platformLayout.includes('AppInstallBanner') &&
+      !fs.existsSync(path.join(ROOT, 'src/components/platform/AppInstallBanner.jsx'))
+  )
 
   console.log(`\nVerification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

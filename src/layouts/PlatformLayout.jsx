@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import PlatformHeaderActions from '../components/platform/PlatformHeaderActions'
 import PlatformMobileHeader from '../components/platform/PlatformMobileHeader'
-import AppInstallBanner from '../components/platform/AppInstallBanner'
 import PlatformDesktopNav, {
   PlatformDesktopLogo,
 } from '../components/platform/PlatformDesktopNav'
@@ -171,8 +170,6 @@ function PlatformLayoutShell({ onLogout }) {
 
       <PullToRefreshProvider onGlobalRefresh={reload}>
         <div className="platform-layout__main">
-          <AppInstallBanner />
-
           {/* Header stays outside PullToRefresh so it never translates/unmounts. */}
           <PlatformMobileHeader
             title={pageTitle}
