@@ -84,7 +84,7 @@ export default function CatalogTable({
         </td>
         <td className="num ctbl__hide-m">{rowNumber}</td>
         <td className="ctbl__name" onClick={isPhone ? () => toggleDetail(rowKey) : undefined}>
-          {item.productName}
+          <span title={item.productName}>{item.productName}</span>
         </td>
         {weekLabels.map((label, index) => {
           const value = Number(item.weeklySales?.[index]) || 0
