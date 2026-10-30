@@ -52,15 +52,19 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
               creator: <span>{order.createdByName || '—'}</span>,
               delivery: <span>{formatPurchaseDate(order.expectedDeliveryDate)}</span>,
             }}
-            mobileMeta={[
-              order.number ? `№${order.number}` : '',
-              `${order.itemsCount ?? order.items?.length ?? 0} тов.`,
-              formatPurchaseDate(order.expectedDeliveryDate),
-              order.checkedAt ? '✓ сверено' : '',
-              order.createdByName,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
+            mobileMeta={
+              <>
+                {order.checkedAt ? <span className="pgt__pill pgt__pill--ok">✓ сверено</span> : null}
+                {[
+                  order.number ? `№${order.number}` : '',
+                  `${order.itemsCount ?? order.items?.length ?? 0} тов.`,
+                  formatPurchaseDate(order.expectedDeliveryDate),
+                  order.createdByName,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </>
+            }
           />
         )
       })}

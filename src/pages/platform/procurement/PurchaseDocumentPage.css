@@ -253,8 +253,15 @@
 }
 
 @media (max-width: 720px) {
+  /* Date and delivery side by side, the supplier on its own row. */
   .pdoc__cards {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .pdoc__cards > .pdoc__card:nth-child(2) {
+    grid-column: 1 / -1;
+    grid-row: 1;
   }
 }
 
@@ -294,4 +301,179 @@
 .pdoc__table tr.is-done td {
   color: var(--color-text-muted, #6b7280);
   text-decoration: line-through;
+}
+
+.pdoc__unit {
+  display: none;
+}
+
+/* Phones: the items table becomes a list of cards — name and barcode on the left,
+   quantity, price and line total on the right; the «Итого» row stays pinned to the bottom. */
+@media (max-width: 640px) {
+  .pdoc__items {
+    overflow: visible;
+  }
+
+  .pdoc__table-wrap {
+    overflow: visible;
+  }
+
+  .pdoc__table,
+  .pdoc__table tbody,
+  .pdoc__table tfoot {
+    display: block;
+  }
+
+  .pdoc__table thead {
+    display: none;
+  }
+
+  .pdoc__table tbody tr {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'check name  qty   del'
+      'check code  price del'
+      'check stock sum   del'
+      'check sales sum   del';
+    column-gap: 10px;
+    row-gap: 2px;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-border, #e2e8f0);
+  }
+
+  .pdoc__table tbody td {
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+
+  .pdoc__c-index {
+    display: none;
+  }
+
+  .pdoc__c-check {
+    grid-area: check;
+  }
+
+  .pdoc__c-check input {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+  }
+
+  .pdoc__c-name {
+    grid-area: name;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text, #0f172a);
+  }
+
+  .pdoc__c-code {
+    grid-area: code;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 13px;
+  }
+
+  .pdoc__c-qty {
+    grid-area: qty;
+    font-size: 16px;
+    font-weight: 700;
+  }
+
+  .pdoc__unit {
+    display: inline;
+    font-weight: 400;
+  }
+
+  .pdoc__c-price {
+    grid-area: price;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 13px;
+  }
+
+  .pdoc__c-sum {
+    grid-area: sum;
+    align-self: start;
+    font-size: 14px;
+  }
+
+  .pdoc__table .pdoc__c-stock {
+    grid-area: stock;
+    text-align: left;
+  }
+
+  .pdoc__table .pdoc__c-sales {
+    grid-area: sales;
+    text-align: left;
+  }
+
+  .pdoc__c-stock,
+  .pdoc__c-sales {
+    color: var(--color-text-muted, #6b7280);
+    font-size: 12px;
+  }
+
+  .pdoc__c-stock::before,
+  .pdoc__c-sales::before {
+    content: attr(data-label) ': ';
+  }
+
+  .pdoc__c-del {
+    grid-area: del;
+  }
+
+  .pdoc__qty {
+    width: 80px;
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .pdoc__remove {
+    width: 40px;
+    height: 40px;
+  }
+
+  .pdoc__table tr.is-done .pdoc__c-name,
+  .pdoc__table tr.is-done .pdoc__c-qty {
+    opacity: 0.55;
+  }
+
+  .pdoc__table tfoot {
+    position: sticky;
+    bottom: 0;
+    z-index: 5;
+    background: var(--color-white, #fff);
+    border-top: 1px solid var(--color-border, #e2e8f0);
+    box-shadow: 0 -2px 8px rgba(15, 23, 42, 0.06);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .pdoc__total-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 14px 12px;
+  }
+
+  .pdoc__total-row td {
+    padding: 0;
+    font-size: 16px;
+  }
+
+  .pdoc__total-row td[colspan] {
+    display: block;
+    flex: 1 1 auto;
+  }
+
+  .pdoc__total-row td:not([colspan]) {
+    flex: none;
+    text-align: right;
+  }
+
+  .pdoc__items-head .btn {
+    flex: 1 1 100%;
+    min-height: 44px;
+    font-size: 16px;
+  }
 }
