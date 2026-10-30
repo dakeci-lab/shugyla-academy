@@ -73,6 +73,7 @@ import { PgtFoot, PgtHead, PgtRow, PgtTable } from '../../platform/PlatformGridT
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import AdminModal from '../../admin/AdminModal'
+import useMediaQuery from '../../../hooks/useMediaQuery'
 import ConfirmDialog from '../../admin/ConfirmDialog'
 import IconActionButton from '../../admin/IconActionButton'
 import { PencilIcon } from '../../icons/PlatformIcons'
@@ -904,10 +905,11 @@ function SuppliersFilterPopover({
   anchorRef,
 }) {
   const popoverRef = useRef(null)
+  const isPhone = useMediaQuery('(max-width: 900px)')
   const [expanded, setExpanded] = useState(false)
 
   useEffect(() => {
-    if (!open) return undefined
+    if (!open || isPhone) return undefined
     function handlePointerDown(event) {
       if (popoverRef.current?.contains(event.target)) return
       if (anchorRef.current?.contains(event.target)) return
@@ -922,7 +924,7 @@ function SuppliersFilterPopover({
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('keydown', handleEscape)
     }
-  }, [open, onClose, anchorRef])
+  }, [open, isPhone, onClose, anchorRef])
 
   useEffect(() => {
     if (!open) setExpanded(false)
@@ -930,8 +932,19 @@ function SuppliersFilterPopover({
 
   if (!open) return null
 
-  return (
-    <div ref={popoverRef} className="spo-filter-pop" role="dialog" aria-label="Фильтр">
+  const actions = (
+    <>
+      <button type="button" className="btn btn--ghost btn--sm" onClick={onReset}>
+        Сбросить
+      </button>
+      <button type="button" className="btn btn--primary btn--sm" onClick={onApply}>
+        Применить
+      </button>
+    </>
+  )
+
+  const fields = (
+    <>
       <FilterComboField
         label="Поставщик"
         searchable
@@ -953,14 +966,22 @@ function SuppliersFilterPopover({
         />
         <span>Показать удалённых поставщиков</span>
       </label>
-      <div className="spo-filter-pop__actions">
-        <button type="button" className="btn btn--ghost btn--sm" onClick={onReset}>
-          Сбросить
-        </button>
-        <button type="button" className="btn btn--primary btn--sm" onClick={onApply}>
-          Применить
-        </button>
-      </div>
+    </>
+  )
+
+  // Phones: the same fields in a bottom sheet, like the period filter.
+  if (isPhone) {
+    return (
+      <AdminModal sheet title="Фильтр" onClose={onClose} returnFocusRef={anchorRef} footer={actions}>
+        {fields}
+      </AdminModal>
+    )
+  }
+
+  return (
+    <div ref={popoverRef} className="spo-filter-pop" role="dialog" aria-label="Фильтр">
+      {fields}
+      <div className="spo-filter-pop__actions">{actions}</div>
     </div>
   )
 }
@@ -1581,6 +1602,7 @@ export default function UmagSettlementsPanel({
 
       {showForm && canEdit && (
         <AdminModal
+          sheet
           title="Редактировать поставщика"
           onClose={closeForm}
           wide

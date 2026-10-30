@@ -24,7 +24,7 @@ Edge Functions и складываются в собственные табли�
 | Backend | Supabase (Postgres + Auth + RLS + Edge Functions на Deno/TypeScript) |
 | Прод-хостинг | PS.kz / Plesk — деплой артефактом в ветку `ps-production` через GitHub Actions |
 | CI | GitHub Actions: `deploy-ps-production.yml` (сборка + `verify:domain-deployment` + публикация артефакта) |
-| Тесты | 100 самописных `verify:*` node-скриптов в `scripts/` (99 проходят, см. §8) |
+| Тесты | 101 самописных `verify:*` node-скриптов в `scripts/` (100 проходят, см. §8) |
 | Прочее | PWA (sw.js, manifest), xlsx, pdfmake, qrcode |
 
 Зависимости намеренно минимальны — нет TypeScript на фронте, нет state-библиотек, нет Tailwind.
@@ -131,7 +131,7 @@ GitHub Actions — только вручную/через MCP.
 `generate_procurement_orders_from_snapshot` и правку итогового количества в снимке (удаления в БД выполняет владелец в SQL Editor; перед удалением — поиск по телам функций, урок stage 25c).
 
 Остаётся (`docs/platform/stage-14-polish.md`):
-- `verify:*`: из 100 проходят 99; `auth-first-frontend-production-readiness` требует локальную Supabase (Docker).
+- `verify:*`: из 101 проходят 100; `auth-first-frontend-production-readiness` требует локальную Supabase (Docker).
   Новые проверки писать через `scripts/lib/extensionlessResolver.mjs` (реальные модули, не регулярки).
 - Лишние колонки `academy_users` (этап 18) и `password` + таблица `platform_work_locations` (этап 19) удалены.
   Пароли, лежавшие открытым текстом, считать скомпрометированными — сбросить через «Сбросить пароль».

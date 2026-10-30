@@ -619,3 +619,14 @@
 .umag-settlements__due--today {
   white-space: nowrap;
 }
+
+/* Phones: 16px fields (iOS Safari does not zoom the page on focus) and a comfortable row height. */
+@media (max-width: 640px) {
+  .umag-settlements input[type='text'],
+  .umag-settlements input[type='search'],
+  .umag-settlements input[type='number'],
+  .umag-settlements select {
+    min-height: 44px;
+    font-size: 16px;
+  }
+}
