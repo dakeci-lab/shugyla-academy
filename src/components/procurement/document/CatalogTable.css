@@ -246,3 +246,183 @@
   left: 332px;
   display: inline-block;
 }
+
+.ctbl__c-meta,
+.ctbl__detail {
+  display: none;
+}
+
+/* Phones: every product is a card — checkbox, name and a short stock line on the left, the quantity field on the
+   right. The numbers behind the line open under the name when it is tapped. */
+@media (max-width: 640px) {
+  .ctbl__wrap {
+    overflow: visible;
+    max-height: none;
+    border: 0;
+  }
+
+  .ctbl__legend {
+    display: none;
+  }
+
+  .ctbl,
+  .ctbl tbody,
+  .ctbl tbody tr,
+  .ctbl__group td {
+    display: block;
+  }
+
+  .ctbl thead {
+    display: none;
+  }
+
+  .ctbl .ctbl__group td:nth-child(n) {
+    position: static;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    border-bottom: 1px solid var(--color-border, #e2e8f0);
+    box-shadow: none;
+  }
+
+  .ctbl__group button {
+    position: static;
+    width: 100%;
+    padding: 12px;
+    font-size: 15px;
+  }
+
+  .ctbl__group--sub button {
+    padding-left: 28px;
+  }
+
+  .ctbl tbody tr:not(.ctbl__group):not(.ctbl__detail) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      'check name qty'
+      'check meta qty';
+    column-gap: 12px;
+    row-gap: 2px;
+    align-items: center;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--color-border, #e2e8f0);
+    border-left: 4px solid transparent;
+  }
+
+  .ctbl tbody tr.ctbl__row--below-norm {
+    border-left-color: #c2ecd0;
+    background: rgba(194, 236, 208, 0.18);
+  }
+
+  .ctbl tbody tr.ctbl__row--above-norm {
+    border-left-color: #f6bcbc;
+  }
+
+  .ctbl tbody tr:not(.ctbl__group) td:nth-child(n) {
+    position: static;
+    left: auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    padding: 0;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+    white-space: normal;
+  }
+
+  .ctbl .ctbl__hide-m {
+    display: none;
+  }
+
+  .ctbl__c-check {
+    grid-area: check;
+  }
+
+  .ctbl__c-check input {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+  }
+
+  .ctbl tbody tr:not(.ctbl__group) td.ctbl__name {
+    grid-area: name;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--color-text, #0f172a);
+    cursor: pointer;
+  }
+
+  .ctbl tbody tr:not(.ctbl__group) td.ctbl__c-meta {
+    display: block;
+    grid-area: meta;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 12px;
+  }
+
+  .ctbl tbody tr:not(.ctbl__group) td.ctbl__c-qty {
+    grid-area: qty;
+  }
+
+  .ctbl__qty {
+    width: 84px;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .ctbl tbody tr.ctbl__detail {
+    display: block;
+    padding: 8px 12px 12px 48px;
+    border-bottom: 1px solid var(--color-border, #e2e8f0);
+    background: var(--color-bg-subtle, #f8fafc);
+  }
+
+  .ctbl tbody tr.ctbl__detail td {
+    display: block;
+    padding: 0;
+    border: 0;
+    white-space: normal;
+  }
+
+  .ctbl__detail dl {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 16px;
+    margin: 0 0 8px;
+  }
+
+  .ctbl__detail dl div {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .ctbl__detail dt {
+    color: var(--color-text-muted, #6b7280);
+  }
+
+  .ctbl__detail dd {
+    margin: 0;
+    font-weight: 600;
+  }
+
+  .ctbl__detail-weeks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 12px;
+    margin: 0;
+    color: var(--color-text-muted, #6b7280);
+    font-size: 12px;
+  }
+
+  .ctbl__detail-weeks span {
+    color: var(--color-text, #0f172a);
+    font-weight: 600;
+  }
+
+  .ctbl__detail-weeks small {
+    color: var(--color-text-muted, #6b7280);
+    font-weight: 400;
+  }
+}

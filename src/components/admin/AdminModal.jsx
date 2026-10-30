@@ -54,7 +54,7 @@ export default function AdminModal({
 
   return createPortal(
     <div
-      className={`admin-modal-overlay${sheet ? ' admin-modal-overlay--sheet' : ''}`}
+      className={`admin-modal-overlay${sheet ? ' admin-modal-overlay--sheet' : ''}${huge ? ' admin-modal-overlay--huge' : ''}`}
       onClick={onClose}
       role="presentation"
     >

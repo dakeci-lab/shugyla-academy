@@ -1,5 +1,6 @@
 import { calcReserveDays, shelfToneFromItem } from '../../../utils/procurementPlanningMath'
 import { useEffect, useRef, useState } from 'react'
+import useMediaQuery from '../../../hooks/useMediaQuery'
 import { catalogGroupKey } from '../../../utils/purchaseCatalog'
 import './CatalogTable.css'
 
@@ -31,6 +32,15 @@ export default function CatalogTable({
   // Group headers must be exactly as wide as the visible part of the table: a sticky element wider than that
   // is pushed out of view again once the table is scrolled far to the right.
   const wrapRef = useRef(null)
+  const isPhone = useMediaQuery('(max-width: 640px)')
+  const [detailOpen, setDetailOpen] = useState(() => new Set())
+  const toggleDetail = (key) =>
+    setDetailOpen((current) => {
+      const next = new Set(current)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   const [viewWidth, setViewWidth] = useState(0)
   useEffect(() => {
     const node = wrapRef.current
@@ -55,9 +65,15 @@ export default function CatalogTable({
     const reserve = calcReserveDays(item.calculationStock, item.avgDaily)
     const reserveTone = shelfToneFromItem(item)
     const weekMax = Math.max(0, ...(item.weeklySales || []).map((v) => Number(v) || 0))
+    const rowKey = item.barcode || item.id
+    const showDetail = isPhone && detailOpen.has(rowKey)
     return (
-      <tr key={item.barcode || item.id} className={disabled ? 'is-disabled' : ''} title={reason || undefined}>
-        <td>
+      <FragmentRows key={rowKey}>
+      <tr
+        className={`${disabled ? 'is-disabled' : ''}${reserveTone ? ` ctbl__row--${reserveTone}` : ''}`}
+        title={reason || undefined}
+      >
+        <td className="ctbl__c-check">
           <input
             type="checkbox"
             aria-label={`Выбрать «${item.productName}»`}
@@ -66,8 +82,10 @@ export default function CatalogTable({
             onChange={() => onToggleItem(item)}
           />
         </td>
-        <td className="num">{rowNumber}</td>
-        <td className="ctbl__name">{item.productName}</td>
+        <td className="num ctbl__hide-m">{rowNumber}</td>
+        <td className="ctbl__name" onClick={isPhone ? () => toggleDetail(rowKey) : undefined}>
+          {item.productName}
+        </td>
         {weekLabels.map((label, index) => {
           const value = Number(item.weeklySales?.[index]) || 0
           // Heat shade per row: the eight weeks read as one block (a trend), not as eight separate numbers.
@@ -75,16 +93,16 @@ export default function CatalogTable({
           return (
             <td
               key={label + index}
-              className={`r num ctbl__week${index === 0 ? ' ctbl__week--first' : ''}${index === weekLabels.length - 1 ? ' ctbl__week--last' : ''}`}
+              className={`r num ctbl__hide-m ctbl__week${index === 0 ? ' ctbl__week--first' : ''}${index === weekLabels.length - 1 ? ' ctbl__week--last' : ''}`}
               style={shade ? { backgroundColor: `rgba(5, 150, 105, ${shade.toFixed(3)})` } : undefined}
             >
               {value ? num(value) : ''}
             </td>
           )
         })}
-        <td className={`r num${item.negativeStock ? ' ctbl__neg' : ''}`}>{num(item.rawStock)}</td>
+        <td className={`r num ctbl__hide-m${item.negativeStock ? ' ctbl__neg' : ''}`}>{num(item.rawStock)}</td>
         <td
-          className={`r num${reserveTone ? ` ctbl__reserve--${reserveTone}` : ''}`}
+          className={`r num ctbl__hide-m${reserveTone ? ` ctbl__reserve--${reserveTone}` : ''}`}
           title={
             reserveTone === 'below-norm'
               ? 'На полке меньше цели — пора заказывать (поставка в пути не учитывается)'
@@ -95,11 +113,17 @@ export default function CatalogTable({
         >
           {reserve == null ? '—' : reserve}
         </td>
-        <td className="r num">{num(item.avgDaily, 2)}</td>
-        <td className="r num">{num(item.recommendedQty)}</td>
-        <td className="r num">{item.targetDays == null ? '—' : num(item.targetDays)}</td>
-        <td className="r num">{item.inTransitQty ? num(item.inTransitQty) : ''}</td>
-        <td className="r">
+        <td className="r num ctbl__hide-m">{num(item.avgDaily, 2)}</td>
+        <td className="r num ctbl__hide-m">{num(item.recommendedQty)}</td>
+        <td className="r num ctbl__hide-m">{item.targetDays == null ? '—' : num(item.targetDays)}</td>
+        <td className="r num ctbl__hide-m">{item.inTransitQty ? num(item.inTransitQty) : ''}</td>
+        <td className="ctbl__c-meta">
+          Остаток {num(item.rawStock)}
+          {reserve == null ? '' : ` · запас ${reserve} дн`}
+          {item.recommendedQty > 0 ? ` · рек. ${num(item.recommendedQty)}` : ''}
+          {item.inTransitQty ? ` · в пути ${num(item.inTransitQty)}` : ''}
+        </td>
+        <td className="r ctbl__c-qty">
           <input
             type="number"
             min="0"
@@ -112,6 +136,29 @@ export default function CatalogTable({
           />
         </td>
       </tr>
+      {showDetail ? (
+        <tr className="ctbl__detail">
+          <td colSpan={11 + weekLabels.length}>
+            <dl>
+              <div><dt>Остаток</dt><dd>{num(item.rawStock)}</dd></div>
+              <div><dt>Запас, дн</dt><dd>{reserve == null ? '—' : reserve}</dd></div>
+              <div><dt>Спрос в день</dt><dd>{num(item.avgDaily, 2)}</dd></div>
+              <div><dt>Рекомендация</dt><dd>{num(item.recommendedQty)}</dd></div>
+              <div><dt>Цель, дн</dt><dd>{item.targetDays == null ? '—' : num(item.targetDays)}</dd></div>
+              <div><dt>В пути</dt><dd>{item.inTransitQty ? num(item.inTransitQty) : '—'}</dd></div>
+            </dl>
+            <p className="ctbl__detail-weeks">
+              Продажи по неделям:{' '}
+              {weekLabels.map((label, index) => (
+                <span key={label + index}>
+                  <small>{label}</small> {num(item.weeklySales?.[index] || 0)}
+                </span>
+              ))}
+            </p>
+          </td>
+        </tr>
+      ) : null}
+      </FragmentRows>
     )
   }
 
