@@ -85,6 +85,11 @@
 
 /* Phones: one filter row, day groups, a status pill instead of the underlined sum, «+» as a round button. */
 @media (max-width: 640px) {
+  /* Room under the last row, so the «+» button never covers the pagination. */
+  .pdl-page {
+    padding-bottom: 72px;
+  }
+
   .pdl-bar {
     flex-wrap: nowrap;
     overflow-x: auto;
