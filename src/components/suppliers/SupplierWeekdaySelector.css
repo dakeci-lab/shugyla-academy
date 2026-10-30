@@ -62,14 +62,10 @@
   cursor: default;
 }
 
+/* All seven days in one row, also on a 360px phone: «Пн … Вс» are two letters wide. */
 @media (max-width: 640px) {
   .supplier-weekday-selector__grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 400px) {
-  .supplier-weekday-selector__grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 4px;
   }
 }

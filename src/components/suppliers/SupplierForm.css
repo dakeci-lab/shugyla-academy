@@ -60,3 +60,21 @@
     grid-template-columns: 1fr;
   }
 }
+
+.supplier-form__identity,
+.supplier-form__ours {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Phones: what the buyer fills in («Наши настройки») comes first; the read-only UMAG data goes below. */
+@media (max-width: 640px) {
+  .supplier-form__identity--locked {
+    order: 2;
+  }
+
+  .supplier-form .admin-form__error {
+    order: 3;
+  }
+}

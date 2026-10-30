@@ -174,6 +174,7 @@ export default function SupplierForm({
         </div>
       )}
 
+      <div className={`supplier-form__identity${umagLocked ? ' supplier-form__identity--locked' : ''}`}>
       {umagLocked ? <h3 className="supplier-form__section-title">Данные UMAG</h3> : null}
 
       <div className="admin-form__row">
@@ -231,6 +232,9 @@ export default function SupplierForm({
         </>
       ) : null}
 
+      </div>
+
+      <div className="supplier-form__ours">
       <h3 className="supplier-form__section-title">Наши настройки</h3>
 
       <div className="admin-form__row">
@@ -332,6 +336,8 @@ export default function SupplierForm({
             </select>
           </label>
         </div>
+      </div>
+
       </div>
 
       {error && <p className="admin-form__error">{error}</p>}
