@@ -520,7 +520,7 @@ export default function PurchaseDocumentPage() {
                 {items.map((item, index) => (
                   <tr key={item.id} className={showChecklist && ticks.has(item.id) ? 'is-done' : ''}>
                     {showChecklist ? (
-                      <td>
+                      <td className="pdoc__c-check">
                         <input
                           type="checkbox"
                           aria-label={`Сверено: ${item.productName}`}
@@ -529,12 +529,20 @@ export default function PurchaseDocumentPage() {
                         />
                       </td>
                     ) : null}
-                    <td className="num">{index + 1}</td>
-                    <td>{item.productName}</td>
-                    <td className="num">{item.barcode}</td>
-                    {readerView ? null : <td className="r num">{item.stock}</td>}
-                    {readerView ? null : <td className="r num">{Number(item.salesPerDay || 0).toFixed(2)}</td>}
-                    <td className="r">
+                    <td className="num pdoc__c-index">{index + 1}</td>
+                    <td className="pdoc__c-name">{item.productName}</td>
+                    <td className="num pdoc__c-code">{item.barcode}</td>
+                    {readerView ? null : (
+                      <td className="r num pdoc__c-stock" data-label="Остаток">
+                        {item.stock}
+                      </td>
+                    )}
+                    {readerView ? null : (
+                      <td className="r num pdoc__c-sales" data-label="Продажи/день">
+                        {Number(item.salesPerDay || 0).toFixed(2)}
+                      </td>
+                    )}
+                    <td className="r pdoc__c-qty">
                       {editable ? (
                         <input
                           type="number"
@@ -549,17 +557,20 @@ export default function PurchaseDocumentPage() {
                           }}
                         />
                       ) : (
-                        <span className="num">{item.orderQty}</span>
+                        <span className="num">
+                          {item.orderQty}
+                          <span className="pdoc__unit"> {item.unit || 'шт.'}</span>
+                        </span>
                       )}
                     </td>
-                    <td className="r num">{formatPurchaseAmount(item.purchasePrice)}</td>
-                    <td className="r num">
+                    <td className="r num pdoc__c-price">{formatPurchaseAmount(item.purchasePrice)}</td>
+                    <td className="r num pdoc__c-sum">
                       {formatPurchaseAmount(
                         calcLineTotal(qtyDraft[item.id] !== undefined ? qtyDraft[item.id] : item.orderQty, item.purchasePrice)
                       )}
                     </td>
                     {editable ? (
-                      <td>
+                      <td className="pdoc__c-del">
                         <button
                           type="button"
                           className="pdoc__remove"
@@ -575,7 +586,7 @@ export default function PurchaseDocumentPage() {
                 ))}
               </tbody>
               <tfoot>
-                <tr>
+                <tr className="pdoc__total-row">
                   <td colSpan={(showChecklist ? 1 : 0) + (readerView ? 5 : 7)}>Итого</td>
                   <td className="r num">{formatPurchaseAmount(total)}</td>
                   {editable ? <td /> : null}
