@@ -173,3 +173,77 @@
     );
   }
 }
+
+.admin-modal__grabber {
+  display: none;
+}
+
+/* Bottom sheet: only phones; desktop keeps the centered dialog. */
+@media (max-width: 900px) {
+  .admin-modal-overlay--sheet {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .admin-modal--sheet {
+    display: flex;
+    flex-direction: column;
+    max-width: 100%;
+    max-height: calc(100dvh - max(24px, env(safe-area-inset-top, 0px)));
+    overflow: hidden;
+    border-radius: 16px 16px 0 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .admin-modal--sheet .admin-modal__grabber {
+    display: block;
+    flex: none;
+    width: 40px;
+    height: 4px;
+    margin: 8px auto 0;
+    border-radius: 2px;
+    background: #cbd5e1;
+  }
+
+  .admin-modal--sheet .admin-modal__header {
+    flex: none;
+    padding: 12px 16px;
+  }
+
+  .admin-modal--sheet .admin-modal__title {
+    font-size: 17px;
+  }
+
+  .admin-modal--sheet .admin-modal__close {
+    width: 40px;
+    height: 40px;
+    margin-right: -8px;
+    color: var(--color-text, #0f172a);
+  }
+
+  .admin-modal--sheet .admin-modal__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 16px;
+  }
+
+  .admin-modal--sheet .admin-modal__footer {
+    flex: none;
+    padding: 12px 16px;
+  }
+
+  .admin-modal--sheet .admin-modal__footer .btn {
+    flex: 1 1 0;
+    height: 48px;
+    font-size: 16px;
+  }
+
+  /* 16px keeps iOS Safari from zooming the page when a field gets focus. */
+  .admin-modal--sheet input,
+  .admin-modal--sheet select,
+  .admin-modal--sheet textarea {
+    font-size: 16px;
+  }
+}

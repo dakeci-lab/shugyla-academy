@@ -248,7 +248,7 @@ export default function PeriodFilterPopover({
 
   if (isMobile) {
     return (
-      <AdminModal title="Фильтр" onClose={onClose} returnFocusRef={anchorRef} footer={actions}>
+      <AdminModal sheet title="Фильтр" onClose={onClose} returnFocusRef={anchorRef} footer={actions}>
         {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} /> : null}
         {children}
       </AdminModal>

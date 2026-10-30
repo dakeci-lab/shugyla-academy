@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { usePlatformData } from '../../../context/PlatformDataContext'
@@ -31,9 +31,12 @@ import {
 } from '../../../utils/settlementsPeriod'
 import {
   DEFAULT_DOCUMENTS_FILTER,
+  documentGroupKey,
+  formatDocumentGroupLabel,
   selectPurchaseDocuments,
 } from '../../../utils/purchaseDocumentsList'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
+import PlatformFab from '../../../components/platform/PlatformFab'
 import PlatformFilterTrigger from '../../../components/platform/PlatformFilterTrigger'
 import PeriodFilterPopover, {
   resolveSettlementsPeriodPreset,
@@ -370,6 +373,8 @@ export default function PurchaseDocumentsPage() {
         </span>
       </div>
 
+      {canCreate ? <PlatformFab label="Создать заказ" disabled={creating} onClick={handleCreate} /> : null}
+
       {errorMessage ? (
         <p className="pdl-error" role="alert">
           {errorMessage}{' '}
@@ -401,48 +406,62 @@ export default function PurchaseDocumentsPage() {
             {documents.length === 0 ? (
               <p className="pgt__empty">Документов за этот период нет.</p>
             ) : null}
-            {visible.map((order) => {
+            {visible.map((order, index) => {
               const isDraft = isOrderDraft(order)
               const count = order.itemsCount ?? order.items?.length ?? 0
+              const groupKey = documentGroupKey(order)
+              const startsGroup = index === 0 || documentGroupKey(visible[index - 1]) !== groupKey
               return (
-                <PgtRow
-                  key={order.id}
-                  columns={columns}
-                  className={isDraft ? 'pdl-row pdl-row--draft' : 'pdl-row'}
-                  onClick={() => navigate(`${DOCUMENT_PATH_PREFIX}/${order.id}`)}
-                  cells={{
-                    number: order.number ? (
-                      <span className="num pdl-number">{order.number}</span>
-                    ) : (
-                      <span className="pdl-nonumber">Без номера</span>
-                    ),
-                    created: <span className="num">{formatPurchaseDate(order.createdAt || order.date)}</span>,
-                    supplier: order.supplierName ? (
-                      <span className="pgt__title">{order.supplierName}</span>
-                    ) : (
-                      <span className="pdl-nonumber">Поставщик не выбран</span>
-                    ),
-                    delivery: <span className="num">{order.expectedDeliveryDate ? formatPurchaseDate(order.expectedDeliveryDate) : '—'}</span>,
-                    items: <span className="num">{count}</span>,
-                    amount: (
-                      <span
-                        className={`pgt__money pdl-sum ${isDraft ? 'pdl-sum--draft' : 'pdl-sum--saved'}`}
-                      >
-                        {formatPurchaseAmount(order.totalAmount)}
-                      </span>
-                    ),
-                    creator: <span>{order.createdByName || '—'}</span>,
-                    comment: <span className="pdl-comment">{order.comment || ''}</span>,
-                  }}
-                  mobileMeta={[
-                    isDraft ? 'Черновик' : order.number ? `№${order.number}` : '',
-                    `${count} поз.`,
-                    order.expectedDeliveryDate ? formatPurchaseDate(order.expectedDeliveryDate) : '',
-                    order.createdByName,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                />
+                <Fragment key={order.id}>
+                  {startsGroup ? (
+                    <div className="pdl-day" role="presentation">
+                      {formatDocumentGroupLabel(groupKey)}
+                    </div>
+                  ) : null}
+                  <PgtRow
+                    columns={columns}
+                    className={isDraft ? 'pdl-row pdl-row--draft' : 'pdl-row'}
+                    onClick={() => navigate(`${DOCUMENT_PATH_PREFIX}/${order.id}`)}
+                    cells={{
+                      number: order.number ? (
+                        <span className="num pdl-number">{order.number}</span>
+                      ) : (
+                        <span className="pdl-nonumber">Без номера</span>
+                      ),
+                      created: <span className="num">{formatPurchaseDate(order.createdAt || order.date)}</span>,
+                      supplier: order.supplierName ? (
+                        <span className="pgt__title">{order.supplierName}</span>
+                      ) : (
+                        <span className="pdl-nonumber">Поставщик не выбран</span>
+                      ),
+                      delivery: <span className="num">{order.expectedDeliveryDate ? formatPurchaseDate(order.expectedDeliveryDate) : '—'}</span>,
+                      items: <span className="num">{count}</span>,
+                      amount: (
+                        <span
+                          className={`pgt__money pdl-sum ${isDraft ? 'pdl-sum--draft' : 'pdl-sum--saved'}`}
+                        >
+                          {formatPurchaseAmount(order.totalAmount)}
+                        </span>
+                      ),
+                      creator: <span>{order.createdByName || '—'}</span>,
+                      comment: <span className="pdl-comment">{order.comment || ''}</span>,
+                    }}
+                    mobileMeta={
+                      <>
+                        <span className={`pdl-pill ${isDraft ? 'pdl-pill--draft' : 'pdl-pill--saved'}`}>
+                          {isDraft ? 'Черновик' : order.number ? `№${order.number}` : 'Сохранён'}
+                        </span>
+                        {[
+                          `${count} поз.`,
+                          order.expectedDeliveryDate ? `доставка ${formatPurchaseDate(order.expectedDeliveryDate)}` : '',
+                          order.createdByName,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </>
+                    }
+                  />
+                </Fragment>
               )
             })}
             <PgtFoot

@@ -3,7 +3,10 @@ import { createPortal } from 'react-dom'
 import { lockModalScroll, unlockModalScroll } from '../../utils/modalScrollLock'
 import './AdminModal.css'
 
-/** Модальное окно для форм админ-панели (portal → document.body) */
+/**
+ * Модальное окно для форм админ-панели (portal → document.body).
+ * `sheet` — на телефоне (≤900px) окно выезжает снизу на всю ширину (фильтры, выбор); на десктопе обычное.
+ */
 export default function AdminModal({
   title,
   children,
@@ -12,6 +15,7 @@ export default function AdminModal({
   wide = false,
   xwide = false,
   huge = false,
+  sheet = false,
   returnFocusRef,
   autoFocusClose = true,
 }) {
@@ -49,14 +53,19 @@ export default function AdminModal({
   }, [autoFocusClose])
 
   return createPortal(
-    <div className="admin-modal-overlay" onClick={onClose} role="presentation">
+    <div
+      className={`admin-modal-overlay${sheet ? ' admin-modal-overlay--sheet' : ''}`}
+      onClick={onClose}
+      role="presentation"
+    >
       <div
-        className={`admin-modal ${sizeClass}`}
+        className={`admin-modal ${sizeClass}${sheet ? ' admin-modal--sheet' : ''}`}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
       >
+        {sheet ? <span className="admin-modal__grabber" aria-hidden="true" /> : null}
         <div className="admin-modal__header">
           <h2 className="admin-modal__title" id={titleId}>
             {title}
