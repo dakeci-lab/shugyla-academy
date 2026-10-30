@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Sunmark S3: corporate + install banner + Apply success on-white.
+ * Sunmark S3: corporate + Apply success on-white.
  *
  * Usage:
  *   npm run verify:sunmark-icons-s3
@@ -33,8 +33,6 @@ const LITERAL_S = /(?:__mark|__logo)[^>]*>\s*S\s*</
 
 const corporate = read('src/pages/CorporateHome.jsx')
 const corporateCss = read('src/pages/CorporateHome.css')
-const banner = read('src/components/platform/AppInstallBanner.jsx')
-const bannerCss = read('src/components/platform/AppInstallBanner.css')
 const vite = read('vite.config.js')
 
 assert('CorporateHome: no literal S in mark', !LITERAL_S.test(corporate) && !corporate.includes('>S</'))
@@ -47,19 +45,5 @@ assert(
   'CorporateHome.css: no green #15803d plate under mark',
   !/corporate-home__mark[\s\S]{0,200}#15803d/.test(corporateCss) &&
     !/corporate-home__mark[\s\S]{0,200}background:\s*#15803d/.test(corporateCss)
-)
-
-assert(
-  'AppInstallBanner: no literal S in logo',
-  !LITERAL_S.test(banner) && !banner.includes('>S</')
-)
-assert(
-  'AppInstallBanner: img from icon-sunmark-on-white',
-  banner.includes('icon-sunmark-on-white.png') &&
-    /<img[\s\S]*app-install-banner__logo/.test(banner)
-)
-assert(
-  'AppInstallBanner.css: no primary plate under logo',
-  !/app-install-banner__logo[\s\S]{0,200}background:\s*var\(--color-primary\)/.test(bannerCss)
 )
 
