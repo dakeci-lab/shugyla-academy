@@ -185,3 +185,9 @@
 .pf-filter-clear:hover {
   color: var(--color-text, #0f172a);
 }
+
+/* Inside a bottom sheet the sheet body already has the side padding. */
+.admin-modal--sheet .pf-field {
+  padding-left: 0;
+  padding-right: 0;
+}

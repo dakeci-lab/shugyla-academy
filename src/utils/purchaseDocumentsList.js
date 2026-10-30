@@ -14,6 +14,21 @@ function createdDateKey(order) {
   return Number.isNaN(date.getTime()) ? String(value).slice(0, 10) : toSettlementsDateKey(date)
 }
 
+/** Group a list row belongs to on phones: all drafts together, saved documents by creation day. */
+export function documentGroupKey(order) {
+  return isOrderDraft(order) ? 'draft' : createdDateKey(order) || 'none'
+}
+
+/** «Черновики» or «Пт, 30 октября» for a group key. */
+export function formatDocumentGroupLabel(key) {
+  if (key === 'draft') return 'Черновики'
+  if (key === 'none') return 'Без даты'
+  const date = new Date(`${key}T00:00:00`)
+  if (Number.isNaN(date.getTime())) return key
+  const text = date.toLocaleDateString('ru-RU', { weekday: 'short', day: 'numeric', month: 'long' })
+  return text.charAt(0).toUpperCase() + text.slice(1)
+}
+
 /**
  * Pure list logic: drafts always stay on top (a draft created last month must not vanish with the period),
  * saved documents are cut by the creation period; supplier / status / number / text filters apply to both.
