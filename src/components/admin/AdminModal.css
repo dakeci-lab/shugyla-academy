@@ -247,3 +247,54 @@
     font-size: 16px;
   }
 }
+
+/* Big windows («Товары поставщика», «Номенклатура») take the whole screen on phones. */
+@media (max-width: 640px) {
+  .admin-modal-overlay--huge {
+    align-items: stretch;
+    padding: 0;
+  }
+
+  .admin-modal--huge {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 100%;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
+    overflow: hidden;
+  }
+
+  .admin-modal--huge .admin-modal__header {
+    flex: none;
+    padding: 10px 12px;
+    padding-top: max(10px, env(safe-area-inset-top, 0px));
+  }
+
+  .admin-modal--huge .admin-modal__title {
+    font-size: 16px;
+    line-height: 1.25;
+  }
+
+  .admin-modal--huge .admin-modal__close {
+    width: 44px;
+    height: 44px;
+    color: var(--color-text, #0f172a);
+  }
+
+  .admin-modal--huge .admin-modal__body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 12px;
+  }
+
+  .admin-modal--huge .admin-modal__footer {
+    flex: none;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+}

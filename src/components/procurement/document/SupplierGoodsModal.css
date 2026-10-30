@@ -55,3 +55,64 @@
   color: #b45309;
   font-weight: 600;
 }
+
+.sgm__plan > summary {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-white, #fff);
+  color: var(--color-text, #0f172a);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sgm__plan[open] > summary {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 640px) {
+  .sgm__top {
+    gap: 8px;
+  }
+
+  .sgm__search {
+    flex: 1 1 100%;
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .sgm__toggle {
+    flex: none;
+    min-height: 40px;
+  }
+
+  .sgm__top .btn {
+    flex: none;
+    min-height: 40px;
+    white-space: nowrap;
+  }
+
+  .sgm__spacer {
+    display: none;
+  }
+
+  .sgm__synced {
+    flex: 1 1 auto;
+  }
+
+  .sgm__close {
+    display: none;
+  }
+
+  .sgm__summary {
+    flex: 1 1 100%;
+    margin-right: 0;
+  }
+
+  .admin-modal__footer .btn--primary {
+    flex: 1 1 100%;
+    min-height: 48px;
+    font-size: 16px;
+  }
+}

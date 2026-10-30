@@ -11,7 +11,8 @@ import {
 } from '../../../services/procurementPlanningService'
 import { buildPlannerWeekColumnLabels } from '../../../utils/procurementPlannerUx'
 import { filterCatalogItems, groupCatalogItems } from '../../../utils/purchaseCatalog'
-import { formatPurchaseAmount, calcLineTotal } from '../../../utils/purchaseData'
+import { formatPurchaseAmount, formatPurchaseDate, calcLineTotal } from '../../../utils/purchaseData'
+import useMediaQuery from '../../../hooks/useMediaQuery'
 import { toProcurementUserMessage } from '../../../utils/procurementErrors'
 import AdminModal from '../../admin/AdminModal'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
@@ -63,6 +64,7 @@ export default function SupplierGoodsModal({
   const canSync = can(user, PERMISSION_CODES.PROCUREMENT_EDIT)
   const supplierId = order.supplierId
 
+  const isPhone = useMediaQuery('(max-width: 640px)')
   const [snapshot, setSnapshot] = useState(null)
   const [plan, setPlan] = useState(null)
   const [items, setItems] = useState([])
@@ -299,7 +301,7 @@ export default function SupplierGoodsModal({
               </span>
             ) : null}
           </div>
-          <button type="button" className="btn btn--outline" onClick={onClose}>
+          <button type="button" className="btn btn--outline sgm__close" onClick={onClose}>
             Закрыть
           </button>
           <button type="button" className="btn btn--primary" disabled={adding || picked === 0} onClick={() => void handleAdd()}>
@@ -343,7 +345,17 @@ export default function SupplierGoodsModal({
             />
           ) : null}
         </div>
-        <ProcurementSupplierPlanBar plan={plan} supplierName={order.supplierName} saving={planSaving} showMinimum={false} onChange={handlePlanChange} />
+        {isPhone && plan ? (
+          <details className="sgm__plan">
+            <summary>
+              План поставки · цель запаса {plan.targetDays} дн.
+              {plan.deliveryDate ? ` · доставка ${formatPurchaseDate(plan.deliveryDate)}` : ''}
+            </summary>
+            <ProcurementSupplierPlanBar plan={plan} supplierName={order.supplierName} saving={planSaving} showMinimum={false} onChange={handlePlanChange} />
+          </details>
+        ) : (
+          <ProcurementSupplierPlanBar plan={plan} supplierName={order.supplierName} saving={planSaving} showMinimum={false} onChange={handlePlanChange} />
+        )}
         {loading ? (
           <p className="sgm__hint">Загрузка…</p>
         ) : !snapshot?.id ? (

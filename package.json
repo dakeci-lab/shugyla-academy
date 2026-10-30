@@ -87,6 +87,7 @@
     "verify:app-bootstrap": "node scripts/verify-app-bootstrap.mjs",
     "verify:progressive-bootstrap": "node scripts/verify-progressive-bootstrap.mjs",
     "verify:employee-admin-edge-performance": "node scripts/verify-employee-admin-edge-performance.mjs",
+    "verify:mobile-supplier-goods": "node scripts/verify-mobile-supplier-goods.mjs",
     "verify:mobile-document": "node scripts/verify-mobile-document.mjs",
     "verify:mobile-orders": "node scripts/verify-mobile-orders.mjs",
     "verify:mobile-foundation": "node scripts/verify-mobile-foundation.mjs",
