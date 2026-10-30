@@ -55,4 +55,10 @@ assert.match(goodsCss, /max-width: 640px[\s\S]*\.sgm__close\s*\{\s*display: none
 assert.match(goodsCss, /\.admin-modal__footer \.btn--primary\s*\{[^}]*flex: 1 1 100%/)
 ok('the plan folds into one line, the footer is one column with a full-width «Добавить в документ»')
 
+// Long product names must wrap inside the pinned name column, never run over the week columns.
+assert.match(css, /\.ctbl td\.ctbl__name\s*\{[^}]*white-space: normal/)
+assert.match(css, /\.ctbl td\.ctbl__name > span\s*\{[^}]*-webkit-line-clamp: 3/)
+assert.match(table, /<span title=\{item\.productName\}>\{item\.productName\}<\/span>/)
+ok('a long product name wraps in its column (three lines, then «…», full name in the tooltip) and does not cover the week columns; phones show it in full')
+
 console.log(`\nverify:mobile-supplier-goods — ${checks} checks passed`)

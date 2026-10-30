@@ -33,9 +33,20 @@
   text-align: right;
 }
 
-.ctbl__name {
+/* `.ctbl td` sets nowrap with the same weight, so the name needs the longer selector: a long product name must wrap
+   inside its pinned 240px column (three lines, then «…»), never run over the week columns. */
+.ctbl td.ctbl__name {
   white-space: normal;
   min-width: 220px;
+  overflow-wrap: anywhere;
+  display: table-cell;
+}
+
+.ctbl td.ctbl__name > span {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
 }
 
 .ctbl__week {
@@ -344,6 +355,12 @@
     width: 24px;
     height: 24px;
     margin: 0;
+  }
+
+  /* The card is as tall as the name needs: no clamp on phones. */
+  .ctbl td.ctbl__name > span {
+    display: block;
+    overflow: visible;
   }
 
   .ctbl tbody tr:not(.ctbl__group) td.ctbl__name {
