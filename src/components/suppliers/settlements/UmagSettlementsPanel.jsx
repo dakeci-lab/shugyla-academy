@@ -368,6 +368,7 @@ function UmagSupplierDetail({
   showError,
   showSuccess,
 }) {
+  const isPhoneList = useMediaQuery('(max-width: 640px)')
   const defaultPeriod = useMemo(() => getSettlementsPeriodDefaults(), [])
   const [dateFrom, setDateFrom] = useState(defaultPeriod.dateFrom)
   const [dateTo, setDateTo] = useState(defaultPeriod.dateTo)
@@ -773,6 +774,46 @@ function UmagSupplierDetail({
                 ) : null}
               </div>
             ) : (
+              isPhoneList ? (
+                <div className="sd-ops">
+                  {visibleOps.map((op) => {
+                    const sign = operationAmountSign(op)
+                    const selectable = isBulkPayable(op, canManagePayments)
+                    const picked = selectable && selectedIds.has(op.id)
+                    return (
+                      <div key={op.id} className={`sd-op${picked ? ' is-selected' : ''}`}>
+                        {selectable ? (
+                          <input
+                            type="checkbox"
+                            className="umag-settlements__check"
+                            checked={picked}
+                            onChange={() => toggleSelected(op.id)}
+                            aria-label={`Выбрать накладную № ${op.documentNumber}`}
+                          />
+                        ) : (
+                          <span className="sd-op__gap" aria-hidden="true" />
+                        )}
+                        <button type="button" className="sd-op__main" onClick={() => setSelectedOperation(op)}>
+                          <span className="sd-op__l1">
+                            <b>{op.label}</b>
+                            <span className="sd-op__money">
+                              {sign}
+                              {formatUmagMoney(op.amount)}
+                            </span>
+                          </span>
+                          <span className="sd-op__l2">
+                            {formatUmagDate(op.sortAt)}
+                            <OperationSubline op={op} todayKey={todayKey} />
+                          </span>
+                        </button>
+                        <span className="sd-op__status">
+                          <OperationStatusCell op={op} canManage={canManagePayments} onOpen={setSelectedOperation} />
+                        </span>
+                      </div>
+                    )
+                  })}
+                </div>
+              ) : (
               <PgtTable columns={historyColumns}>
                 <PgtHead columns={historyColumns} />
                 {visibleOps.map((op) => {
@@ -833,6 +874,7 @@ function UmagSupplierDetail({
                   )
                 })}
               </PgtTable>
+              )
             )}
 
             {selectedOps.length > 0 ? (

@@ -569,26 +569,137 @@
 
   .umag-settlements__bulk {
     display: grid;
-    grid-template-columns: 1fr 1.7fr;
+    grid-template-columns: minmax(0, 1fr) auto;
     gap: 8px;
-  }
-
-  .umag-settlements__bulk-sum,
-  .umag-settlements__bulk-account {
-    grid-column: 1 / -1;
+    padding: 10px 12px;
+    border-radius: 12px;
   }
 
   .umag-settlements__bulk-sum {
-    flex-direction: row;
-    align-items: baseline;
-    justify-content: space-between;
+    flex-direction: column;
     margin-right: 0;
   }
 
+  .umag-settlements__bulk-sum strong {
+    font-size: 12px;
+  }
+
+  .umag-settlements__bulk-sum span {
+    font-size: 17px;
+  }
+
+  .umag-settlements__bulk-account {
+    grid-column: 1;
+    grid-row: 2;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .umag-settlements__bulk .btn--primary {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .umag-settlements__bulk .btn--outline {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
   .umag-settlements__bulk .btn {
-    min-height: 44px;
+    min-height: 40px;
   }
 }
+
+/* ---- Phone operation rows: tick | name + amount / sub-line | «Оплатить» ---- */
+.sd-ops {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-white, #fff);
+  overflow: hidden;
+}
+
+.sd-op {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  min-height: 56px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+}
+
+.sd-op:last-child {
+  border-bottom: none;
+}
+
+.sd-op.is-selected {
+  background: var(--row-selected-bg);
+}
+
+.sd-op__gap {
+  width: 18px;
+}
+
+.sd-op__main {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  min-width: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.sd-op__l1 {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.sd-op__l1 b {
+  font-weight: 700;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sd-op__money {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sd-op__l2 {
+  display: block;
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.sd-op__l2 .umag-settlements__op-sub {
+  display: block;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+.sd-op__status .umag-settlements__pay-btn {
+  height: var(--pf-control-h);
+  padding: 0 12px;
+  font-size: 14px;
+}
+
 
 /* ---- Payment deadlines ---- */
 .umag-settlements__due--overdue {

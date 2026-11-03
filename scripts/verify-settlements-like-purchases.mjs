@@ -63,4 +63,11 @@ assert.match(bar, /sfp-panel__tools-slot/)
 assert.match(panel, /toolsSlot && listTools \? createPortal\(listTools, toolsSlot\) : listTools/)
 ok('the list chips and search sit in the same row as «Фильтр» and the UMAG refresh')
 
+assert.match(panel, /isPhoneList \? \(\s*<div className="sd-ops">/)
+assert.match(panel, /className="sd-op__main"/)
+assert.match(panel, /<span className="sd-op__status">\s*<OperationStatusCell/)
+assert.match(css, /\.sd-op\s*\{[^}]*grid-template-columns: 18px minmax\(0, 1fr\) auto/)
+assert.match(css, /\.sd-op__status \.umag-settlements__pay-btn\s*\{\s*height: var\(--pf-control-h\)/)
+ok('phone operation rows: tick | name + amount / sub-line | «Оплатить» word button; bulk bar is compact')
+
 console.log(`\nverify:settlements-like-purchases — ${checks} checks passed`)
