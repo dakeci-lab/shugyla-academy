@@ -35,7 +35,6 @@ export const ROUTE_KEYS = {
   RECEIVING: 'receiving',
   ORDERS: 'orders',
   SUPPLIERS: 'suppliers',
-  SALES: 'sales',
   SUPPLIER_FINANCE: 'supplier_finance',
   FINANCES_GROUP: 'finance_group',
   SETTINGS: 'settings',
@@ -88,9 +87,6 @@ const ROUTE_ACCESS = {
   // could see either one; editing stays behind procurement.create.
   [ROUTE_KEYS.ORDERS]: [ROLE_IDS.ADMIN, ROLE_IDS.BUYER, ROLE_IDS.RECEIVER],
   [ROUTE_KEYS.SUPPLIERS]: [ROLE_IDS.ADMIN, ROLE_IDS.BUYER],
-  // Sales: permission-first (sales.view); role fallback admin-only, matching
-  // the sales.* permission grants seeded by 20260829120000_sales_category_month_facts.sql.
-  [ROUTE_KEYS.SALES]: [ROLE_IDS.ADMIN],
   // «Поставщики» tab merged the old standalone suppliers directory in here
   // (2026-09-19) — BUYER needs this route for supplier contacts, same as
   // ROUTE_KEYS.SUPPLIERS used to grant directly.
@@ -250,7 +246,6 @@ export function canAccessRoute(user, routeKey) {
     [ROUTE_KEYS.RECEIVING]: [P.RECEIVING_VIEW],
     [ROUTE_KEYS.ORDERS]: [P.PROCUREMENT_VIEW, P.RECEIVING_VIEW],
     [ROUTE_KEYS.SUPPLIERS]: [P.SUPPLIERS_VIEW],
-    [ROUTE_KEYS.SALES]: [P.SALES_VIEW],
     // «Расчёты» — any of umag.settlements.view (Поставщики tab, merged with
     // the old standalone suppliers directory 2026-09-19), supplier_payments.view
     // (К оплате tab), or suppliers.view (directory-only access) is enough;
@@ -354,14 +349,6 @@ export function canArchiveSuppliers(user) {
 
 export function canDeleteSuppliers(user) {
   return canEditSuppliers(user)
-}
-
-export function canViewSales(user) {
-  return canAccessRoute(user, ROUTE_KEYS.SALES)
-}
-
-export function canSyncSales(user) {
-  return can(user, PERMISSION_CODES.SALES_SYNC)
 }
 
 export function canViewUmagSettlements(user) {

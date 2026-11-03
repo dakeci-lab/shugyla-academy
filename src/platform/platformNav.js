@@ -3,14 +3,6 @@ import { ROUTE_KEYS } from '../config/permissions'
 /** Разделы Shugyla Platform — иерархическая навигация */
 export const PLATFORM_NAV = [
   {
-    id: 'sales',
-    path: '/platform/sales',
-    label: 'Главная',
-    routeKey: ROUTE_KEYS.SALES,
-    title: 'Главная',
-    description: 'Выручка и маржа по категориям, аналитика и синхронизация с UMAG.',
-  },
-  {
     id: 'procurement-group',
     label: 'Закупки',
     routeKey: ROUTE_KEYS.PROCUREMENT_GROUP,

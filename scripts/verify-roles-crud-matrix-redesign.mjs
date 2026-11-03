@@ -367,38 +367,15 @@ async function stagePageChromeRemoved() {
 }
 
 async function stageSalesModuleVisible() {
-  console.log('Stage 9: sales.view/sales.sync module is editable in the roles matrix')
+  console.log('Stage 9: the sales module is gone from the roles matrix (the «Главная» section was removed)')
 
-  const {
-    PERMISSION_MODULES,
-    RBAC_MATRIX_MODULES,
-    PERMISSION_CATALOG,
-    groupPermissionsForMatrix,
-    groupModulePermissionsIntoRows,
-  } = await load(CATALOG)
+  const { PERMISSION_MODULES, RBAC_MATRIX_MODULES, PERMISSION_CATALOG } = await load(CATALOG)
 
+  assert('PERMISSION_MODULES has no "sales"', PERMISSION_MODULES.sales === undefined)
+  assert('RBAC_MATRIX_MODULES has no "sales"', !RBAC_MATRIX_MODULES.includes('sales'))
   assert(
-    'PERMISSION_MODULES has a Russian label for "sales"',
-    PERMISSION_MODULES.sales === 'Продажи',
-  )
-  assert(
-    'RBAC_MATRIX_MODULES includes "sales" (module tabs render it)',
-    RBAC_MATRIX_MODULES.includes('sales'),
-  )
-
-  const groups = groupPermissionsForMatrix(PERMISSION_CATALOG)
-  const salesGroup = groups.find((g) => g.module === 'sales')
-  assert('sales module group is produced by groupPermissionsForMatrix', Boolean(salesGroup))
-  assert(
-    'sales group carries both sales.view and sales.sync',
-    salesGroup.items.some((p) => p.code === 'sales.view') &&
-      salesGroup.items.some((p) => p.code === 'sales.sync'),
-  )
-
-  const salesRows = groupModulePermissionsIntoRows(salesGroup)
-  assert(
-    'sales permissions collapse into a single row (2-part codes, no resource segment)',
-    salesRows.length === 1 && salesRows[0].label === 'Продажи',
+    'no sales.* permission in the catalog',
+    !PERMISSION_CATALOG.some((p) => String(p.code).startsWith('sales.')),
   )
 }
 

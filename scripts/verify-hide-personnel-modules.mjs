@@ -44,13 +44,12 @@ for (const gone of ['home', 'employees', 'employees-list', 'employees-schedule',
   'settings-general', 'settings-notifications']) {
   assert(`menu has no "${gone}"`, !ids.includes(gone))
 }
-for (const kept of ['sales', 'procurement', 'orders', 'supplier-finance', 'finance-payment-accounts',
+for (const kept of ['procurement', 'orders', 'supplier-finance', 'finance-payment-accounts',
   'settings-users', 'settings-roles']) {
   assert(`menu keeps "${kept}"`, ids.includes(kept))
 }
-const sales = PLATFORM_NAV.find((i) => i.id === 'sales')
-assert('sales is renamed «Главная»', sales.label === 'Главная' && sales.title === 'Главная')
-assert('«Главная» is the first menu item', PLATFORM_NAV[0].id === 'sales')
+assert('no «Главная» (sales) in the menu — it was removed', !PLATFORM_NAV.some((i) => i.id === 'sales'))
+assert('«Закупки» is the first menu item', PLATFORM_NAV[0].id === 'procurement-group')
 assert('no menu path points at hidden modules',
   !flatPaths(PLATFORM_NAV).some((p) => /\/platform\/(hr|time-tracker|notifications)|employees\/(schedule|payroll)/.test(p)))
 
@@ -64,7 +63,7 @@ assert('no item of the procurement group is web-only (it has narrow-screen layou
 
 console.log('\nlanding: each role opens its first allowed section')
 const land = (role) => getFirstAllowedPlatformPath({ role })
-assert('admin lands on «Главная» (sales)', land('admin') === '/platform/sales')
+assert('admin lands on «Закуп» (the sales section is removed)', land('admin') === '/platform/procurement')
 assert('buyer lands on a procurement section', land('buyer') === '/platform/procurement')
 assert('receiver lands on «Заказы»', land('receiver') === '/platform/orders')
 for (const role of ['cashier', 'seller', 'floor_admin']) {
