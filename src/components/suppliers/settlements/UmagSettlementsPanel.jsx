@@ -455,6 +455,7 @@ function UmagSupplierDetail({
   const [opsFilter, setOpsFilter] = useState('open')
   const [opsFilterTouched, setOpsFilterTouched] = useState(false)
   const [opsQuery, setOpsQuery] = useState('')
+  const [draftOpsFilter, setDraftOpsFilter] = useState('open')
   const [selectedOperation, setSelectedOperation] = useState(null)
   const openCount = useMemo(() => countOpenOperations(operations), [operations])
   const todayKey = useMemo(() => toAqtobeDateKey(), [])
@@ -653,6 +654,7 @@ function UmagSupplierDetail({
       dateFrom,
       dateTo,
     })
+    setDraftOpsFilter(opsFilter)
     setFilterOpen((open) => !open)
   }
 
@@ -669,6 +671,11 @@ function UmagSupplierDetail({
     }
     setDateFrom(nextFrom)
     setDateTo(nextTo)
+    // Phones: the type of operations is chosen in the same sheet.
+    if (isPhoneList) {
+      setOpsQuery('')
+      if (draftOpsFilter !== opsFilter) chooseOpsFilter(draftOpsFilter)
+    }
     setFilterOpen(false)
   }
 
@@ -677,10 +684,33 @@ function UmagSupplierDetail({
     setDraftFilter(defaults)
     setDateFrom(defaults.dateFrom)
     setDateTo(defaults.dateTo)
+    if (isPhoneList) {
+      // Back to what the card opens on: what needs a click, or everything when nothing is open.
+      setOpsFilterTouched(false)
+      setOpsFilter(openCount > 0 ? 'open' : 'all')
+    }
     setFilterOpen(false)
   }
 
-  const filterTrigger = (
+  const opsFilterOptions = [
+    { id: 'open', label: 'Не закрытые', count: openCount },
+    ...(overdueCount > 0 ? [{ id: 'overdue', label: 'Просрочено', count: overdueCount, tone: 'danger' }] : []),
+    { id: 'all', label: 'Все' },
+    { id: 'supplies', label: 'Приёмки' },
+    { id: 'payments', label: 'Оплаты' },
+    { id: 'returns', label: 'Возвраты' },
+  ]
+
+  const opsFilterChanged = opsFilterTouched && opsFilter !== (openCount > 0 ? 'open' : 'all')
+  const filterTrigger = isPhoneList ? (
+    <PlatformFilterRow
+      ref={filterButtonRef}
+      count={(filterActive ? 1 : 0) + (opsFilterChanged ? 1 : 0)}
+      open={filterOpen}
+      onClick={openFilter}
+      hint="Период, Тип операций"
+    />
+  ) : (
     <PlatformFilterTrigger
       ref={filterButtonRef}
       active={filterActive}
@@ -699,7 +729,30 @@ function UmagSupplierDetail({
       onReset={resetFilter}
       onClose={() => setFilterOpen(false)}
       anchorRef={filterButtonRef}
-    />
+    >
+      {isPhoneList ? (
+        <div className="period-filter-popover__section period-filter-popover__section--phone">
+          <span className="period-filter-popover__label">Показать</span>
+          <div className="period-filter-popover__presets period-filter-popover__presets--wrap" role="group" aria-label="Тип операций">
+            {opsFilterOptions.map((option) => {
+              const active = draftOpsFilter === option.id
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  aria-pressed={active}
+                  className={`period-filter-popover__preset${active ? ' period-filter-popover__preset--active' : ''}`}
+                  onClick={() => setDraftOpsFilter(option.id)}
+                >
+                  {option.label}
+                  {option.count ? <span className="sfp-chip-count">{option.count}</span> : null}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
+    </PeriodFilterPopover>
   )
 
   return (
@@ -726,20 +779,15 @@ function UmagSupplierDetail({
       {canViewFinance ? (
         <>
           <section className="umag-settlements__ops" aria-label="История операций">
+            {isPhoneList ? null : (
+              <>
             <h3 className="umag-settlements__section-title">
               История операций<span className="umag-settlements__period">{periodLabel}</span>
             </h3>
 
             <div className="umag-settlements__ops-controls">
               <div className="umag-settlements__ops-filters" role="tablist" aria-label="Фильтр операций">
-                {[
-                  { id: 'open', label: 'Не закрытые', count: openCount },
-                  ...(overdueCount > 0 ? [{ id: 'overdue', label: 'Просрочено', count: overdueCount, tone: 'danger' }] : []),
-                  { id: 'all', label: 'Все' },
-                  { id: 'supplies', label: 'Приёмки' },
-                  { id: 'payments', label: 'Оплаты' },
-                  { id: 'returns', label: 'Возвраты' },
-                ].map((opt) => (
+                {opsFilterOptions.map((opt) => (
                   <button
                     key={opt.id}
                     type="button"
@@ -775,6 +823,17 @@ function UmagSupplierDetail({
                 aria-label="Поиск по документам"
               />
             </div>
+              </>
+            )}
+
+            {isPhoneList && !detailLoading && selectedOps.length === 0 ? (
+              <PlatformFloatingSearch
+                value={opsQuery}
+                onChange={setOpsQuery}
+                placeholder="Номер или сумма"
+                label="Поиск по документам"
+              />
+            ) : null}
 
             {detailLoading ? (
               <DelayedLoadingSkeleton variant="table" count={5} />
