@@ -6,6 +6,7 @@ import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
 import useStableWhenReady from '../../../hooks/useStableWhenReady'
 import useMediaQuery from '../../../hooks/useMediaQuery'
+import useInfiniteSlice from '../../../hooks/useInfiniteSlice'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import { canViewPurchases, canCreatePurchase, canDeletePurchase } from '../../../config/permissions'
 import {
@@ -181,10 +182,13 @@ export default function PurchaseDocumentsPage() {
   )
 
   const totalPages = Math.max(1, Math.ceil(documents.length / pageSize))
-  const visible = useMemo(
+  const pagedVisible = useMemo(
     () => documents.slice((page - 1) * pageSize, page * pageSize),
     [documents, page, pageSize]
   )
+  // Phones: no pages — the first 25 rows, the next 25 appear as you scroll to the end (UMAG's behaviour).
+  const infinite = useInfiniteSlice(documents, { enabled: isPhone, resetKey: JSON.stringify(filter) })
+  const visible = isPhone ? infinite.visible : pagedVisible
   const from = documents.length === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, documents.length)
 
@@ -603,16 +607,20 @@ export default function PurchaseDocumentsPage() {
               }}
             />
           </PgtTable>
-          <TablePagination
-            page={page}
-            totalPages={totalPages}
-            from={from}
-            to={to}
-            totalCount={documents.length}
-            onPageChange={setPage}
-            pageSize={pageSize}
-            onPageSizeChange={setPageSize}
-          />
+          {isPhone ? (
+            infinite.hasMore ? <div ref={infinite.sentinelRef} className="pgt__more" aria-hidden="true" /> : null
+          ) : (
+            <TablePagination
+              page={page}
+              totalPages={totalPages}
+              from={from}
+              to={to}
+              totalCount={documents.length}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </div>
       )}
 

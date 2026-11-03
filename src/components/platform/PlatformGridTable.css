@@ -254,3 +254,8 @@
 .pgt__foot .pgt__money {
   font-weight: 700;
 }
+
+/* End marker of a phone list: when it comes near the screen the next rows are added (infinite scroll). */
+.pgt__more {
+  height: 1px;
+}
