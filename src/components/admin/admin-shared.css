@@ -536,7 +536,7 @@
 }
 
 .admin-form__course-chip input {
-  accent-color: var(--color-primary);
+  margin: 0;
 }
 
 .admin-form__label--inline {

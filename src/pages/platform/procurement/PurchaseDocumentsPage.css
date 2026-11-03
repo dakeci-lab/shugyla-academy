@@ -199,16 +199,12 @@
   }
 }
 
-.pdl-check {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: var(--color-primary, #059669);
-  cursor: pointer;
+.pdl-row.is-selected .pgt__row-main {
+  background: var(--row-selected-bg);
 }
 
-.pdl-row.is-selected .pgt__row-main {
-  background: #f0fdf4;
+.pdl-row.is-selected:hover > .pgt__row-main {
+  background: var(--row-selected-hover);
 }
 
 /* An empty number is three dashes, quiet and upright (draft rows are otherwise gray italic). */
