@@ -642,7 +642,8 @@ export default function PurchaseDocumentPage() {
                 </tr>
               </thead>
               <tbody>
-                {items.length === 0 ? (
+                {/* On phones «Товары (0)» already says it; the extra line is only for the desktop table. */}
+                {items.length === 0 && !isPhone ? (
                   <tr>
                     <td colSpan={9} className="pdoc__empty">
                       Товаров пока нет.

@@ -48,4 +48,7 @@ ok('phones no longer show the big «Добавить комментарий», �
 assert.match(page, /phoneHandlersRef\.current = \{/)
 ok('header handlers are read through a ref (the header node stays stable, no render loop)')
 
+assert.match(page, /items\.length === 0 && !isPhone \? \(\s*<tr>\s*<td colSpan=\{9\} className="pdoc__empty">/)
+ok('phones: no «Товаров пока нет.» line under «Товары (0)» (the heading already says it)')
+
 console.log(`\nverify:mobile-document-header-actions — ${checks} checks passed`)
