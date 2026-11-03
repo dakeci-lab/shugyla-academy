@@ -161,8 +161,8 @@ export default function EmployeeListTable({
                       <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
                         {canEdit && onEdit ? (
                           <IconActionButton
+                            variant="edit"
                             label="Редактировать сотрудника"
-                            variant="primary"
                             onClick={(event) => openEdit(employee, event)}
                           >
                             <PencilIcon />
@@ -211,8 +211,8 @@ export default function EmployeeListTable({
                   <Can permission={PERMISSION_CODES.EMPLOYEES_EDIT}>
                     {canEdit && onEdit ? (
                       <IconActionButton
+                        variant="edit"
                         label="Редактировать сотрудника"
-                        variant="primary"
                         onClick={(event) => openEdit(employee, event)}
                       >
                         <PencilIcon />

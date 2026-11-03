@@ -529,6 +529,7 @@ export default function PurchaseDocumentsPage() {
                       ),
                       edit: (
                         <IconActionButton
+                          variant="edit"
                           label={isDraft ? 'Редактировать' : 'Открыть'}
                           onClick={(event) => {
                             event.stopPropagation()

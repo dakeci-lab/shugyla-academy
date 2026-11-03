@@ -460,6 +460,7 @@ export default function ProcurementWarehouseView() {
                       <td className="proc-wh__col-actions">
                         <span className="proc-wh__actions">
                           <IconActionButton
+                            variant="edit"
                             label="Открыть"
                             disabled={snapshot.status === 'syncing'}
                             onClick={() => openSnapshot(snapshot)}

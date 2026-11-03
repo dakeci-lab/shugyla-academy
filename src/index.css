@@ -24,6 +24,9 @@
   --pf-control-fs: 13.5px;
   --pf-control-radius: 4px;
   --pf-control-px: 14px;
+  /* The pencil («Редактировать / Открыть») is blue everywhere, like UMAG's. */
+  --color-action: #1976d2;
+  --color-action-light: #e3f2fd;
   /* A ticked row of a list (like UMAG: clearly green, not a faint tint). */
   --row-selected-bg: #d1fae5;
   --row-selected-hover: #bbf7d0;
