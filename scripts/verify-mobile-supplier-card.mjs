@@ -13,7 +13,11 @@ ok('phones: the filter is an icon of the page header next to the pencil, only on
 
 assert.match(panel, /\{ id: 'pay', label: 'Платежи' \},\s*\{ id: 'info', label: 'Информация' \}/)
 assert.match(panel, /setPhoneTab\(dx < 0 \? 'info' : 'pay'\)/)
-ok('phones: two pages like UMAG — «Платежи» first, «Информация» second; a swipe moves between them')
+assert.match(panel, /onTouchMove/)
+assert.match(panel, /translateX\(calc\(\$\{phoneTab === 'pay' \? 0 : -50\}% \+ \$\{dragX \?\? 0\}px\)\)/)
+assert.match(panel, /sd-tabs__bar/)
+assert.match(read('src/components/suppliers/settlements/UmagSettlementsPanel.css'), /\.sd-pages\s*\{[^}]*touch-action: pan-y/)
+ok('phones: two pages like UMAG — «Платежи» first, «Информация» second; the pages follow the finger and settle on release; the tab underline moves with them')
 
 assert.match(panel, /const opsFilterOptions = \[/)
 assert.match(panel, /period-filter-popover__label">Показать<\/span>/)
@@ -24,7 +28,7 @@ ok('phones: period and the type of operations («Не закрытые / Про�
 assert.match(panel, /\{isPhoneList \? null : \(\s*<>\s*<h3 className="umag-settlements__section-title">/)
 ok('phones: no «История операций · период» caption and no row of chips above the list')
 
-assert.match(panel, /isPhoneList && !detailLoading \? \(\s*<PlatformFloatingSearch/)
+assert.match(panel, /isPhoneList && phoneTab === 'pay' && !detailLoading \? \(\s*<PlatformFloatingSearch/)
 assert.match(panel, /total=\{formatUmagMoney\(supplier\.debt \?\? 0\)\}/)
 ok('phones: the search floats at the bottom and the debt total is pinned under it')
 

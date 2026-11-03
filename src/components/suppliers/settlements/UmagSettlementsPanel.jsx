@@ -400,7 +400,17 @@ function UmagSupplierDetail({
   const filterButtonRef = useRef(null)
   // Phones: the card has two pages like UMAG's customer card — «Платежи» (first) and «Информация».
   const [phoneTab, setPhoneTab] = useState('pay')
+  // Swipe between the pages follows the finger (like UMAG): dragX is the live offset in px, null when not dragging.
   const swipeRef = useRef(null)
+  const [dragX, setDragX] = useState(null)
+  const [pageWidth, setPageWidth] = useState(0)
+  // The page that is out of sight is collapsed only after the slide ends (so it does not vanish mid-slide).
+  const [settled, setSettled] = useState(true)
+  useEffect(() => {
+    setSettled(false)
+    const timer = setTimeout(() => setSettled(true), 320)
+    return () => clearTimeout(timer)
+  }, [phoneTab])
 
   const periodLabel = useMemo(() => describeSettlementsPeriod(dateFrom, dateTo), [dateFrom, dateTo])
   const filterActive = isSettlementsFilterActive(dateFrom, dateTo)
@@ -845,36 +855,87 @@ function UmagSupplierDetail({
               {tab.label}
             </button>
           ))}
+          <span
+            className={`sd-tabs__bar${dragX != null ? ' is-dragging' : ''}`}
+            aria-hidden="true"
+            style={{
+              transform: `translateX(${
+                Math.min(1, Math.max(0, (phoneTab === 'pay' ? 0 : 1) - (dragX ?? 0) / (pageWidth || 1))) * 100
+              }%)`,
+            }}
+          />
         </div>
       ) : null}
 
       <div
         className="sd-pages"
         onTouchStart={(event) => {
+          if (!isPhoneList) return
           const t = event.touches[0]
-          swipeRef.current = isPhoneList ? { x: t.clientX, y: t.clientY } : null
+          swipeRef.current = {
+            x: t.clientX,
+            y: t.clientY,
+            t: Date.now(),
+            width: event.currentTarget.clientWidth || 1,
+            axis: null,
+          }
+        }}
+        onTouchMove={(event) => {
+          const st = swipeRef.current
+          if (!st) return
+          const t = event.touches[0]
+          const dx = t.clientX - st.x
+          const dy = t.clientY - st.y
+          if (!st.axis) {
+            if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
+            st.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
+          }
+          if (st.axis !== 'x') return
+          // At the first/last page the content only gives a little (resistance).
+          const atStart = phoneTab === 'pay' && dx > 0
+          const atEnd = phoneTab === 'info' && dx < 0
+          setPageWidth(st.width)
+          setDragX(atStart || atEnd ? dx * 0.25 : dx)
         }}
         onTouchEnd={(event) => {
-          const start = swipeRef.current
+          const st = swipeRef.current
           swipeRef.current = null
-          if (!start) return
-          const t = event.changedTouches[0]
-          const dx = t.clientX - start.x
-          const dy = t.clientY - start.y
-          if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return
-          setPhoneTab(dx < 0 ? 'info' : 'pay')
+          if (!st || st.axis !== 'x') {
+            setDragX(null)
+            return
+          }
+          const dx = event.changedTouches[0].clientX - st.x
+          const speed = Math.abs(dx) / Math.max(1, Date.now() - st.t)
+          const far = Math.abs(dx) > st.width * 0.3 || (speed > 0.4 && Math.abs(dx) > 30)
+          if (far) setPhoneTab(dx < 0 ? 'info' : 'pay')
+          setDragX(null)
+        }}
+        onTouchCancel={() => {
+          swipeRef.current = null
+          setDragX(null)
         }}
       >
-      {isPhoneList && phoneTab === 'pay' ? null : <SupplierDocHeader
+      <div
+        className={`sd-track${dragX != null ? ' is-dragging' : ''}`}
+        style={
+          isPhoneList
+            ? { transform: `translateX(calc(${phoneTab === 'pay' ? 0 : -50}% + ${dragX ?? 0}px))` }
+            : undefined
+        }
+      >
+      <div className={`sd-page sd-page--info${isPhoneList && phoneTab !== 'info' && dragX == null && settled ? ' is-off' : ''}`}>
+      <SupplierDocHeader
         supplier={supplier}
         canEdit={canEditSupplier}
         canViewFinance={canViewFinance}
         debtLoading={debtLoading}
         onBack={onBack}
         onEdit={onEdit}
-      />}
+      />
+      </div>
 
-      {canViewFinance && !(isPhoneList && phoneTab === 'info') ? (
+      <div className={`sd-page sd-page--pay${isPhoneList && phoneTab !== 'pay' && dragX == null && settled ? ' is-off' : ''}`}>
+      {canViewFinance ? (
         <>
           <section className="umag-settlements__ops" aria-label="История операций">
             {isPhoneList ? null : (
@@ -924,7 +985,7 @@ function UmagSupplierDetail({
               </>
             )}
 
-            {isPhoneList && !detailLoading ? (
+            {isPhoneList && phoneTab === 'pay' && !detailLoading ? (
               <PlatformFloatingSearch
                 value={opsQuery}
                 onChange={setOpsQuery}
@@ -1125,6 +1186,8 @@ function UmagSupplierDetail({
           </section>
         </>
       ) : null}
+      </div>
+      </div>
       </div>
 
       {selectedOperation ? (
