@@ -41,4 +41,9 @@ ok('phones: one flat list — no day groups, no ticks, no «Оплатить» b
 assert.match(panel, /sd-info__card/)
 ok('phones: the supplier data lives on the «Информация» page')
 
+const headerCss = read('src/components/platform/PlatformMobileHeader.css')
+assert.match(headerCss, /\.platform-mobile-header__actions\s*\{[^}]*gap: 8px/)
+assert.doesNotMatch(read('src/components/suppliers/settlements/UmagSettlementsPanel.css'), /header-filter\s*\{[^}]*margin/)
+ok('the gap between header icons is set once, in the header container (no page adds its own margin)')
+
 console.log(`\nverify:mobile-supplier-card — ${checks} checks passed`)

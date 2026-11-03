@@ -1,7 +1,6 @@
 .pdoc-phone-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  /* The gap between the icons comes from .platform-mobile-header__actions. */
+  display: contents;
 }
 
 .pdoc-phone-actions__delete {
