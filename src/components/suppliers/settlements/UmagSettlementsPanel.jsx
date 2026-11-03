@@ -70,6 +70,8 @@ import {
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformFilterTrigger from '../../platform/PlatformFilterTrigger'
 import FilterComboField from '../../platform/FilterComboField'
+import PlatformFilterRow from '../../platform/PlatformFilterRow'
+import PlatformFloatingSearch from '../../platform/PlatformFloatingSearch'
 import { PgtFoot, PgtHead, PgtRow, PgtTable } from '../../platform/PlatformGridTable'
 import PlatformSyncButton from '../../platform/PlatformSyncButton'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
@@ -239,7 +241,6 @@ function formatAccountNames(value) {
  */
 function SupplierDocHeader({ supplier, canEdit, canViewFinance, debtLoading, onBack, onEdit }) {
   const isPhone = useMediaQuery('(max-width: 640px)')
-  usePlatformPageTitle('Расчёты', '', { showBack: true, backFallback: '/platform/supplier-finance' })
 
   const balance = canViewFinance ? (
     <div className="umag-settlements__id-balance">
@@ -1001,6 +1002,9 @@ function SuppliersFilterPopover({
   onReset,
   onClose,
   anchorRef,
+  viewDraft = 'all',
+  onViewChange,
+  viewOptions = [],
 }) {
   const popoverRef = useRef(null)
   const isPhone = useMediaQuery('(max-width: 900px)')
@@ -1046,7 +1050,7 @@ function SuppliersFilterPopover({
       <FilterComboField
         label="Поставщик"
         searchable
-        placeholder="Введите название"
+        placeholder={isPhone ? 'Поставщик' : 'Введите название'}
         searchValue={searchValue}
         onSearchChange={onSearchChange}
         options={supplierOptions}
@@ -1067,11 +1071,51 @@ function SuppliersFilterPopover({
     </>
   )
 
-  // Phones: the same fields in a bottom sheet, like the period filter.
+  // Phones: the same bottom sheet as every other filter («Фильтры» + «Очистить», one «Применить»); the
+  // «С долгом / Просрочено / Все» choice moved here from the top bar.
   if (isPhone) {
     return (
-      <AdminModal sheet title="Фильтр" onClose={onClose} returnFocusRef={anchorRef} footer={actions}>
-        {fields}
+      <AdminModal
+        sheet
+        title="Фильтры"
+        onClose={onClose}
+        returnFocusRef={anchorRef}
+        headerAction={
+          <button type="button" className="period-sheet__clear" onClick={onReset}>
+            Очистить
+          </button>
+        }
+        footer={
+          <button type="button" className="btn btn--primary period-sheet__apply" onClick={onApply}>
+            Применить
+          </button>
+        }
+      >
+        <div className="period-sheet">
+          {viewOptions.length ? (
+            <div className="period-filter-popover__section period-filter-popover__section--phone">
+              <span className="period-filter-popover__label">Показать</span>
+              <div className="period-filter-popover__presets" role="group" aria-label="Какие поставщики показывать">
+                {viewOptions.map((option) => {
+                  const active = viewDraft === option.id
+                  return (
+                    <button
+                      key={option.id}
+                      type="button"
+                      aria-pressed={active}
+                      className={`period-filter-popover__preset${active ? ' period-filter-popover__preset--active' : ''}`}
+                      onClick={() => onViewChange?.(option.id)}
+                    >
+                      {option.label}
+                      {option.count ? <span className="sfp-chip-count">{option.count}</span> : null}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ) : null}
+          {fields}
+        </div>
       </AdminModal>
     )
   }
@@ -1104,6 +1148,7 @@ export default function UmagSettlementsPanel({
   refreshToken = null,
   filterSlot = null,
   toolsSlot = null,
+  headerActions = null,
 } = {}) {
   const { user } = useSession()
   const toast = useToast()
@@ -1123,6 +1168,15 @@ export default function UmagSettlementsPanel({
 
   const { version: dataVersion } = usePlatformData()
   const { version } = useAdminRefresh()
+
+  const { supplierId: titleSupplierId } = useParams()
+  usePlatformPageTitle(
+    'Расчёты',
+    '',
+    titleSupplierId
+      ? { showBack: true, backFallback: '/platform/supplier-finance' }
+      : { actions: headerActions }
+  )
 
   const suppliersReady = !isCloudMode() || isModuleReady('suppliers')
   useEffect(() => {
@@ -1155,7 +1209,13 @@ export default function UmagSettlementsPanel({
     [debtSummary]
   )
   const [listQuery, setListQuery] = useState('')
-  const [listView, setListView] = useState('debt')
+  // Phones open on the whole list (the debt / overdue choice lives in the filter sheet); the web keeps «С долгом».
+  const isPhoneMain = useMediaQuery('(max-width: 640px)')
+  const defaultListView = isPhoneMain ? 'all' : 'debt'
+  const [listView, setListView] = useState(() =>
+    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 640px)').matches ? 'all' : 'debt'
+  )
+  const [draftListView, setDraftListView] = useState('all')
   const [debtLoading, setDebtLoading] = useState(true)
   const [debtsSettled, setDebtsSettled] = useState(false)
 
@@ -1221,7 +1281,6 @@ export default function UmagSettlementsPanel({
     [filteredUnsorted, debtByPlatformId]
   )
   // Phones: the first 25 suppliers, 25 more as you scroll to the end.
-  const isPhoneMain = useMediaQuery('(max-width: 640px)')
   const listInfinite = useInfiniteSlice(filtered, {
     enabled: isPhoneMain,
     resetKey: `${listQuery}|${listView}`,
@@ -1433,6 +1492,7 @@ export default function UmagSettlementsPanel({
     }
     setDraftShowArchived(appliedShowArchived)
     setSupplierFilterDraft(new Set(supplierFilter))
+    setDraftListView(listView)
     setFilterSearch('')
     setFilterOpen(true)
   }
@@ -1449,6 +1509,10 @@ export default function UmagSettlementsPanel({
   function applyListFilter() {
     setAppliedShowArchived(draftShowArchived)
     setSupplierFilter(new Set(supplierFilterDraft))
+    if (isPhoneMain) {
+      setListQuery('')
+      setListView(draftListView)
+    }
     setFilterOpen(false)
   }
 
@@ -1458,6 +1522,10 @@ export default function UmagSettlementsPanel({
     setSupplierFilterDraft(new Set())
     setSupplierFilter(new Set())
     setFilterSearch('')
+    if (isPhoneMain) {
+      setListView(defaultListView)
+      setDraftListView(defaultListView)
+    }
     setFilterOpen(false)
   }
 
@@ -1484,7 +1552,15 @@ export default function UmagSettlementsPanel({
       : 'По вашему запросу ничего не найдено.'
   })()
 
-  const listFilterTrigger = (
+  const listFilterTrigger = isPhoneMain ? (
+    <PlatformFilterRow
+      ref={filterButtonRef}
+      count={supplierFilter.size + (appliedShowArchived ? 1 : 0) + (listView !== defaultListView ? 1 : 0)}
+      open={filterOpen}
+      onClick={toggleFilter}
+      hint="Показать, Поставщик, Удалённые"
+    />
+  ) : (
     <PlatformFilterTrigger
       ref={filterButtonRef}
       active={filtersActive}
@@ -1511,11 +1587,21 @@ export default function UmagSettlementsPanel({
       onReset={resetListFilter}
       onClose={() => setFilterOpen(false)}
       anchorRef={filterButtonRef}
+      viewDraft={draftListView}
+      onViewChange={setDraftListView}
+      viewOptions={[
+        { id: 'debt', label: 'С долгом', count: withDebtCount },
+        ...(overdueSuppliersCount > 0
+          ? [{ id: 'overdue', label: 'Просрочено', count: overdueSuppliersCount }]
+          : []),
+        { id: 'all', label: 'Все', count: 0 },
+      ]}
     />
   )
 
+  // Phones: no chips and no search box in the top bar — the chips are in the filter sheet, the search floats at the bottom.
   const listTools =
-    suppliersReady && debtsSettled ? (
+    suppliersReady && debtsSettled && !isPhoneMain ? (
             <div className="umag-settlements__list-tools">
         <div className="umag-settlements__ops-filters" role="tablist" aria-label="Какие поставщики показывать">
                 {[
@@ -1649,6 +1735,15 @@ export default function UmagSettlementsPanel({
           )}
 
           {toolsSlot && listTools ? createPortal(listTools, toolsSlot) : listTools}
+
+          {isPhoneMain && suppliersReady && debtsSettled ? (
+            <PlatformFloatingSearch
+              value={listQuery}
+              onChange={setListQuery}
+              placeholder="Поиск по поставщику"
+              label="Поиск поставщика"
+            />
+          ) : null}
 
           {(!suppliersReady && filtered.length === 0) || !debtsSettled ? (
             <DelayedLoadingSkeleton variant="table" count={5} />

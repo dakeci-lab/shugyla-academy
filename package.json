@@ -60,6 +60,7 @@
     "verify:supplier-finance-nav-cutover": "node scripts/verify-supplier-finance-nav-cutover.mjs",
     "verify:supplier-ledger": "node scripts/verify-supplier-ledger.mjs",
     "verify:supplier-centralization": "node scripts/verify-supplier-centralization.mjs",
+    "verify:mobile-settlements-list": "node scripts/verify-mobile-settlements-list.mjs",
     "verify:mobile-infinite-scroll": "node scripts/verify-mobile-infinite-scroll.mjs",
     "verify:mobile-document-header-actions": "node scripts/verify-mobile-document-header-actions.mjs",
     "verify:pull-refresh-indicator": "node scripts/verify-pull-refresh-indicator.mjs",

@@ -106,3 +106,33 @@
     flex-wrap: wrap;
   }
 }
+
+/* Phones: the bar is only the «Фильтры» row; the sync button is in the page header, the last-sync line is not shown. */
+@media (max-width: 640px) {
+  .sfp-panel__bar {
+    border-bottom: 0;
+  }
+
+  .sfp-panel__sync-status,
+  .sfp-panel__tools-slot {
+    display: none;
+  }
+
+  .sfp-panel__sync {
+    padding-bottom: 0;
+  }
+
+  .sfp-panel__filter-slot {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .sfp-panel__filter-slot .pf-filter-anchor {
+    width: 100%;
+  }
+}
+
+/* The sync icon in the phone header: the same spin as everywhere. */
+.sfp-header-sync--busy {
+  opacity: 0.7;
+}
