@@ -140,12 +140,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 10px 14px;
+  box-sizing: border-box;
+  height: var(--pf-control-h, 40px);
+  padding: 0 var(--pf-control-px, 14px);
   border: 1px solid var(--color-border);
-  border-radius: 10px;
+  border-radius: var(--pf-control-radius, 10px);
   background: var(--color-white);
   color: var(--color-text);
-  font-size: 0.95rem;
+  font-size: var(--pf-control-fs, 0.95rem);
   font-weight: 700;
   cursor: pointer;
   text-align: left;

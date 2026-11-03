@@ -5,7 +5,7 @@ import './PlatformSettings.css'
 /** Настройки — справочник «Счета оплаты» поставщикам */
 export default function PlatformSettingsPaymentAccounts() {
   return (
-    <div className="platform-settings">
+    <div className="platform-settings platform-settings--wide">
       <PaymentAccountsPanel />
     </div>
   )

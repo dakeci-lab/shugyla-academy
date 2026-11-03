@@ -98,11 +98,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: var(--pf-control-h, 44px);
+  height: var(--pf-control-h, 44px);
   padding: 0;
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--pf-control-radius, 12px);
   background: var(--color-white);
   color: var(--color-text);
   cursor: pointer;
