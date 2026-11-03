@@ -24,4 +24,14 @@ assert.match(panel, /isPhoneList && !detailLoading && selectedOps\.length === 0 
 assert.match(panel, /placeholder="Номер или сумма"/)
 ok('phones: the document search floats at the bottom (hidden while rows are ticked, the pay bar takes that place)')
 
+assert.match(panel, /usePlatformPageTitle\(\s*selected && isPhoneMain \? selected\.name : 'Расчёты'/)
+assert.match(panel, /umag-settlements__header-edit/)
+assert.match(panel, /sd-head--phone/)
+ok('phones: the supplier name is the page title and the pencil is a header icon (not in the card body)')
+
+assert.match(panel, /className="pgt__day"/)
+assert.match(panel, /formatDocumentGroupLabel\(dayKey\)/)
+assert.match(panel, /sd-pill sd-pill--overdue/)
+ok('phones: operations are grouped by day like «Закуп», overdue is a red pill')
+
 console.log(`\nverify:mobile-supplier-card — ${checks} checks passed`)

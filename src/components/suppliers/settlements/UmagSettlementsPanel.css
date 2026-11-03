@@ -957,3 +957,47 @@
     padding-bottom: 88px;
   }
 }
+
+/* ---- Phone supplier card: name lives in the page header ---- */
+.sd-head--phone {
+  justify-content: flex-start;
+}
+
+.sd-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sd-pill--overdue {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.sd-due {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.sd-due--today {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.sd-due--overdue {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.umag-settlements__header-edit {
+  color: var(--color-primary, #16a34a);
+}
+
+.sd-op__l1 b {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
