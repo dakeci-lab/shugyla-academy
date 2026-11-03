@@ -68,4 +68,12 @@ const real = offenders.filter((line) => !allowed.test(line))
 assert.deepEqual(real, [], 'a button class sets its own pixel height:\n' + real.join('\n'))
 ok('no page stylesheet gives a button its own fixed height (only the shared token decides)')
 
+// --- every «Удалить» button: filled red with white text, one red ---
+assert.match(index, /--color-danger: #c03c34/)
+assert.match(index, /\.btn--danger\s*\{\s*color: #fff;\s*background: var\(--color-danger\)/)
+assert.match(read('src/components/admin/ConfirmDialog.jsx'), /'btn--danger'/)
+assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.jsx'), /className="btn btn--danger" disabled=\{busy\} onClick=\{\(\) => setConfirm\('delete'\)\}/)
+assert.match(read('src/components/ProfileAvatarEditor.jsx'), /className="btn btn--danger btn--sm"/)
+ok('«Удалить» (in the document, in every confirmation, «Удалить фото») is one filled red button, #c03c34')
+
 console.log(`\nverify:button-size — ${checks} checks passed`)

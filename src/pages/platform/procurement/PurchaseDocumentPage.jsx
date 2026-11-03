@@ -392,7 +392,7 @@ export default function PurchaseDocumentPage() {
         </button>
         <span className="pdoc__spacer" />
         {canEdit && draft ? (
-          <button type="button" className="btn btn--outline pdoc__danger" disabled={busy} onClick={() => setConfirm('delete')}>
+          <button type="button" className="btn btn--danger" disabled={busy} onClick={() => setConfirm('delete')}>
             Удалить
           </button>
         ) : null}

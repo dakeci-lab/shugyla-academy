@@ -130,7 +130,7 @@ export default function ProfileAvatarEditor({
         {avatarUrl && (
           <button
             type="button"
-            className="btn btn--outline btn--sm admin-table__danger"
+            className="btn btn--danger btn--sm"
             disabled={uploading}
             onClick={async () => {
               setUploading(true)
