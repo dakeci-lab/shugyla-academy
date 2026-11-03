@@ -363,8 +363,10 @@
   cursor: pointer;
 }
 
-.umag-settlements__op-link:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .umag-settlements__op-link:hover {
+    text-decoration: underline;
+  }
 }
 
 .umag-settlements__op-sub {
@@ -514,8 +516,10 @@
   background: var(--row-selected-bg);
 }
 
-.umag-settlements__row--selected:hover > .pgt__row-main {
-  background: var(--row-selected-hover);
+@media (hover: hover) {
+  .umag-settlements__row--selected:hover > .pgt__row-main {
+    background: var(--row-selected-hover);
+  }
 }
 
 .umag-settlements__bulk {
@@ -872,8 +876,10 @@
   font-weight: 600;
 }
 
-.umag-settlements--list .pgt__row:hover .pgt__link {
-  color: var(--color-primary-dark, #047857);
+@media (hover: hover) {
+  .umag-settlements--list .pgt__row:hover .pgt__link {
+    color: var(--color-primary-dark, #047857);
+  }
 }
 
 .umag-settlements__ops-filter--active {
@@ -908,14 +914,15 @@
   }
 }
 
-/* Phones, supplier list: room under the last row for the floating search; the total is not pinned (the pill would cover it). */
+/* Phones, supplier list: room under the last row for the floating search and the pinned total. */
 @media (max-width: 640px) {
   .umag-settlements--list {
-    padding-bottom: 88px;
+    padding-bottom: 150px;
   }
 
+  /* The total is pinned under the search (PlatformFloatingSearch), not at the end of the table. */
   .umag-settlements--list .pgt__foot {
-    position: static;
+    display: none;
   }
 }
 

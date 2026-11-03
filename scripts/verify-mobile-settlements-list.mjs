@@ -33,4 +33,24 @@ ok('phones: the UMAG sync button is an icon in the page header next to «Рас�
 assert.match(shellCss, /max-width: 640px\)\s*\{[\s\S]*\.sfp-panel__sync-status,\s*\.sfp-panel__tools-slot\s*\{\s*display: none/)
 ok('phones: the «UMAG · дата синка» line is not shown')
 
+const fsCss = read('src/components/platform/PlatformFloatingSearch.css')
+assert.match(panel, /total=\{canViewFinance \? \(debtLoading \? '…' : formatUmagMoney\(totalDebt\)\) : null\}/)
+assert.match(read('src/components/platform/PlatformFloatingSearch.jsx'), /className="pfs-total"/)
+assert.match(fsCss, /\.pfs-total\s*\{[^}]*position: fixed[^}]*bottom: 0/s)
+assert.match(fsCss, /\.pfs\.pfs--with-total\s*\{\s*bottom: calc\(62px/)
+assert.match(read('src/components/suppliers/settlements/UmagSettlementsPanel.css'), /\.umag-settlements--list \.pgt__foot\s*\{\s*display: none/)
+ok('phones: the total of the list is pinned at the bottom of the screen under the search pill (not at the end of the table)')
+
+assert.match(panel, /describeOpenDocuments\(\{ count: entry\?\.count \|\| 0 \}\)/)
+assert.match(panel, /entry\?\.overdueCount && !isPhoneMain/)
+ok('phones: a supplier row is the name, the number of unpaid documents and the sum — no «с 03.11», no «просрочено N»')
+
+for (const [file, rule] of [
+  ['src/components/platform/PlatformGridTable.css', /@media \(hover: hover\) \{\s*\.pgt__link:hover \{\s*text-decoration: underline/],
+  ['src/components/platform/PlatformGridTable.css', /@media \(hover: hover\) \{\s*\.pgt__row:hover > \.pgt__row-main/],
+  ['src/components/suppliers/settlements/UmagSettlementsPanel.css', /@media \(hover: hover\) \{\s*\.umag-settlements--list \.pgt__row:hover \.pgt__link/],
+  ['src/components/suppliers/settlements/UmagSettlementsPanel.css', /@media \(hover: hover\) \{\s*\.umag-settlements__op-link:hover/],
+]) assert.match(read(file), rule, `${file} ${rule}`)
+ok('the underline / green name / row highlight appear only where there is a real mouse hover — no sticky green underline after a tap on a phone')
+
 console.log(`\nverify:mobile-settlements-list — ${checks} checks passed`)

@@ -1742,6 +1742,7 @@ export default function UmagSettlementsPanel({
               onChange={setListQuery}
               placeholder="Поиск по поставщику"
               label="Поиск поставщика"
+              total={canViewFinance ? (debtLoading ? '…' : formatUmagMoney(totalDebt)) : null}
             />
           ) : null}
 
@@ -1755,7 +1756,10 @@ export default function UmagSettlementsPanel({
               {listInfinite.visible.map((s) => {
                 const debt = debtByPlatformId.get(s.id) ?? null
                 const entry = debtSummary.get(s.id)
-                const meta = describeOpenDocuments(entry)
+                // Phones: only the number of unpaid documents (no «since» date, no overdue count).
+                const meta = isPhoneMain
+                  ? describeOpenDocuments({ count: entry?.count || 0 })
+                  : describeOpenDocuments(entry)
                 return (
                   <PgtRow
                     key={s.id}
@@ -1773,7 +1777,7 @@ export default function UmagSettlementsPanel({
                           {meta ? (
                             <span className="umag-settlements__supplier-meta">
                               {meta}
-                              {entry?.overdueCount ? (
+                              {entry?.overdueCount && !isPhoneMain ? (
                                 <>
                                   {' · '}
                                   <span className="umag-settlements__due umag-settlements__due--overdue">
