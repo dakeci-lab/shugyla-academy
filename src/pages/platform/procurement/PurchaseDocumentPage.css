@@ -704,25 +704,29 @@
     bottom: 0;
     z-index: 6;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
     margin: 0 -12px;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+    padding: 12px 14px calc(12px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--color-border, #e2e8f0);
     background: var(--color-white, #fff);
     box-shadow: 0 -2px 8px rgba(15, 23, 42, 0.06);
   }
 
+  /* «Итого» on the left, the sum on the right, in one line (like UMAG). */
   .pdoc__mbar-total {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    align-items: baseline;
+    justify-content: space-between;
     line-height: 1.2;
   }
 
   .pdoc__mbar-total span {
-    color: var(--color-text-muted, #6b7280);
-    font-size: 12px;
+    color: var(--color-text, #0f172a);
+    font-size: 16px;
+    font-weight: 700;
   }
 
   .pdoc__mbar-total strong {
@@ -735,12 +739,23 @@
     font-size: 16px;
   }
 
-  /* Saved document: «Итого» on the left, the green «Скачать» takes the rest of the bar (like UMAG). */
+  /* The bar belongs to the very bottom of the screen even when the document is short (like in UMAG):
+     the page fills the screen under the header (52px + paddings of the content area), the bar is pushed down
+     and covers the bottom padding of the content area. */
+  .pdoc--editable,
+  .pdoc--has-download-bar {
+    min-height: calc(100dvh - 52px - env(safe-area-inset-top, 0px) - 14px - 40px);
+  }
+
+  .pdoc--editable .pdoc__mbar,
+  .pdoc--has-download-bar .pdoc__mbar {
+    margin: auto -12px -40px;
+  }
+
+  /* Saved document: «Итого» row, then the full-width green «Скачать» under it (like UMAG). */
   .pdoc__mexport {
     position: relative;
-    flex: 1 1 auto;
-    max-width: 220px;
-    margin-left: auto;
+    width: 100%;
   }
 
   .pdoc__mexport .btn {
