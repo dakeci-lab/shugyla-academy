@@ -223,7 +223,7 @@ export default function OrdersPage() {
         <DelayedLoadingSkeleton variant="list" count={5} />
       ) : (
         <div className="procurement-list-panel">
-          {summaryText ? <p className="orders-page__summary">{summaryText}</p> : null}
+          {summaryText && !isPhone ? <p className="orders-page__summary">{summaryText}</p> : null}
           <PurchaseTable orders={visibleOrders} />
           <TablePagination
             page={page}
