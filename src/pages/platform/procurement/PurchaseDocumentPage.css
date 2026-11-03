@@ -164,8 +164,10 @@
   cursor: pointer;
 }
 
-.pdoc__goods-btn:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .pdoc__goods-btn:hover {
+    text-decoration: underline;
+  }
 }
 
 .pdoc__label--row {

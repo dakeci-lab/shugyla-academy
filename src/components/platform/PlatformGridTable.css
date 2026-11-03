@@ -74,8 +74,10 @@
   outline-offset: -2px;
 }
 
-.pgt__row:hover > .pgt__row-main {
-  background: #f8fafc;
+@media (hover: hover) {
+  .pgt__row:hover > .pgt__row-main {
+    background: #f8fafc;
+  }
 }
 
 .pgt__subtotal {
@@ -136,8 +138,10 @@
   max-width: 100%;
 }
 
-.pgt__link:hover {
-  text-decoration: underline;
+@media (hover: hover) {
+  .pgt__link:hover {
+    text-decoration: underline;
+  }
 }
 
 .pgt__money {

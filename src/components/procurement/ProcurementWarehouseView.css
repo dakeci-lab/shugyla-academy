@@ -157,8 +157,10 @@
   white-space: nowrap;
 }
 
-.proc-wh__date-link:hover:not(:disabled) {
-  text-decoration: underline;
+@media (hover: hover) {
+  .proc-wh__date-link:hover:not(:disabled) {
+    text-decoration: underline;
+  }
 }
 
 .proc-wh__date-link:disabled {

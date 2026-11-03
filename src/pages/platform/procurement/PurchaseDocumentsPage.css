@@ -207,8 +207,10 @@
   background: var(--row-selected-bg);
 }
 
-.pdl-row.is-selected:hover > .pgt__row-main {
-  background: var(--row-selected-hover);
+@media (hover: hover) {
+  .pdl-row.is-selected:hover > .pgt__row-main {
+    background: var(--row-selected-hover);
+  }
 }
 
 /* An empty number is three dashes, quiet and upright (draft rows are otherwise gray italic). */
