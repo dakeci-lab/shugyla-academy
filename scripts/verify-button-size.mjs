@@ -76,4 +76,11 @@ assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.jsx'), /c
 assert.match(read('src/components/ProfileAvatarEditor.jsx'), /className="btn btn--danger btn--sm"/)
 ok('«Удалить» (in the document, in every confirmation, «Удалить фото») is one filled red button, #c03c34')
 
+// --- fields share the height of the buttons on the web ---
+const web = index.slice(index.indexOf('@media (min-width: 641px)'))
+assert.match(web, /input:not\(\[type='checkbox'\]\)[\s\S]{0,420}select\s*\{[^}]*height: var\(--pf-control-h\)[^}]*min-height: var\(--pf-control-h\)/)
+assert.match(read('src/components/procurement/document/DocumentDateBox.css'), /min-height: var\(--pf-control-h, 36px\)/)
+assert.match(read('src/components/procurement/document/DocumentSupplierPicker.css'), /min-height: var\(--pf-control-h, 36px\)/)
+ok('text / search / number / date / select fields (also inputs without a type) have the button height on the web; textareas keep theirs')
+
 console.log(`\nverify:button-size — ${checks} checks passed`)
