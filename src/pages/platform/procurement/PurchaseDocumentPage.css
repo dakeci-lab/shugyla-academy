@@ -79,15 +79,23 @@
 }
 
 .pdoc__cards {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  /* date | supplier (takes what is left, so a long name and the goods block always fit) | delivery */
+  grid-template-columns: 260px minmax(400px, 1fr) 260px;
   align-items: stretch;
   gap: 12px;
 }
 
-/* Compact cards, left to right, each its own width (like UMAG), not three stretched thirds. */
-.pdoc__cards > .pdoc__card {
-  flex: 0 0 270px;
+/* Narrower windows: the supplier row on top, date and delivery under it. */
+@media (max-width: 1080px) {
+  .pdoc__cards {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .pdoc__cards > .pdoc__group {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
 }
 
 /* The supplier card and the «＋ Товары поставщика» block share one frame; the block appears once a supplier is chosen. */
@@ -100,11 +108,12 @@
 }
 
 .pdoc__group {
-  flex: 0 0 auto;
+  min-width: 0;
 }
 
 .pdoc__group > .pdoc__card--supplier {
-  flex: 0 0 350px;
+  flex: 1 1 auto;
+  min-width: 0;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -348,16 +357,13 @@
 @media (max-width: 720px) {
   /* Date and delivery side by side, the supplier (with its goods block under it) on its own row on top. */
   .pdoc__cards {
+    grid-template-columns: 1fr 1fr;
     gap: 8px;
   }
 
-  .pdoc__cards > .pdoc__card {
-    flex: 1 1 calc(50% - 4px);
-  }
-
-  .pdoc__group {
-    order: -1;
-    flex: 1 1 100%;
+  .pdoc__cards > .pdoc__group {
+    grid-column: 1 / -1;
+    grid-row: 1;
     flex-direction: column;
   }
 
