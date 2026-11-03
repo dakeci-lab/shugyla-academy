@@ -359,7 +359,6 @@ function stageSyncButton() {
   assert('reduced motion', syncCss.includes('prefers-reduced-motion'))
 
   const sites = [
-    'src/components/procurement/ProcurementPlannerView.jsx',
     'src/components/suppliers/settlements/UmagSettlementsPanel.jsx',
   ]
   for (const rel of sites) {
@@ -372,10 +371,6 @@ function stageSyncButton() {
     )
   }
 
-  assert(
-    'planner removed local sync spin css',
-    !read('src/components/procurement/ProcurementPlannerView.css').includes('proc-planner-sync-spin')
-  )
   assert(
     'unused umag sync-btn css removed',
     !read('src/components/suppliers/settlements/UmagSettlementsPanel.css').includes(

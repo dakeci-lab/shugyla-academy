@@ -24,7 +24,7 @@ Edge Functions и складываются в собственные табли�
 | Backend | Supabase (Postgres + Auth + RLS + Edge Functions на Deno/TypeScript) |
 | Прод-хостинг | PS.kz / Plesk — деплой артефактом в ветку `ps-production` через GitHub Actions |
 | CI | GitHub Actions: `deploy-ps-production.yml` (сборка + `verify:domain-deployment` + публикация артефакта) |
-| Тесты | 109 самописных `verify:*` node-скриптов в `scripts/` (108 проходят, см. §8) |
+| Тесты | 93 самописных `verify:*` node-скриптов в `scripts/` (92 проходят, см. §8) |
 | Прочее | PWA (sw.js, manifest), xlsx, pdfmake, qrcode |
 
 Зависимости намеренно минимальны — нет TypeScript на фронте, нет state-библиотек, нет Tailwind.
@@ -127,11 +127,12 @@ GitHub Actions — только вручную/через MCP.
 
 **Закуп как документы (этапы 1–8, 2026-10-29; `docs/procurement/purchase-documents/`):** статусы заказа `draft`/`saved`, номер при сохранении (с 1001, триггер), документ с автосохранением правок,
 окна «Товары поставщика» (таблица планирования по поставщику, панель плана, кнопка обновления данных UMAG) и «Добавить из номенклатуры» (последний снимок UMAG, ~8,6 тыс. SKU; полный каталог UMAG 27,7 тыс. — возможный отдельный этап).
-Приёмку (receiving) и «нормы/ABC» из интерфейса и БД убрали. Старый планировщик ещё доступен по `/procurement/plan` на переходный период; после него удалить `ProcurementPage`/`ProcurementPlannerView`,
-`generate_procurement_orders_from_snapshot` и правку итогового количества в снимке (удаления в БД выполняет владелец в SQL Editor; перед удалением — поиск по телам функций, урок stage 25c).
+Приёмку (receiving) и «нормы/ABC» из интерфейса и БД убрали. Старый планировщик удалён (этап 27, 2026-11-03, `docs/db/stage-27-remove-old-planner/`): `/procurement/plan` перенаправляет на «Закуп»,
+из `umag-procurement` убрано действие `generate`. Функцию `generate_procurement_orders_from_snapshot` в БД удаляет владелец (SQL из документа этапа); колонки `final_order_qty`/`manual_override`/`generated_purchase_order_id` не трогать — их читает расчёт плана.
+Ручной полной синхронизации остатков в интерфейсе больше нет: ночная 07:00, кнопка обновления одного поставщика в «Товары поставщика» и cron расчёта плана.
 
 Остаётся (`docs/platform/stage-14-polish.md`):
-- `verify:*`: из 109 проходят 108; `auth-first-frontend-production-readiness` требует локальную Supabase (Docker).
+- `verify:*`: из 93 проходят 92; `auth-first-frontend-production-readiness` требует локальную Supabase (Docker).
   Новые проверки писать через `scripts/lib/extensionlessResolver.mjs` (реальные модули, не регулярки).
 - Лишние колонки `academy_users` (этап 18) и `password` + таблица `platform_work_locations` (этап 19) удалены.
   Пароли, лежавшие открытым текстом, считать скомпрометированными — сбросить через «Сбросить пароль».

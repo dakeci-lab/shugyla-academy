@@ -42,7 +42,6 @@ const PurchaseDocumentPage = lazy(
   () => import('./pages/platform/procurement/PurchaseDocumentPage')
 )
 const WarehousePage = lazy(() => import('./pages/platform/procurement/WarehousePage'))
-const ProcurementPage = lazy(() => import('./pages/platform/procurement/ProcurementPage'))
 const OrdersPage = lazy(() => import('./pages/platform/orders/OrdersPage'))
 /**
  * Маршрутизация Shugyla Platform
@@ -154,15 +153,7 @@ export default function App() {
                 />
                 {/* The documents list became «Закуп» (stage 8); the old address keeps working. */}
                 <Route path="procurement/documents" element={<Navigate to="/platform/procurement" replace />} />
-                {/* The former planner stays reachable for a transition period, then it is removed. */}
-                <Route
-                  path="procurement/plan"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
-                      <ProcurementPage />
-                    </PlatformRoute>
-                  }
-                />
+                <Route path="procurement/plan" element={<Navigate to="/platform/procurement" replace />} />
                 <Route
                   path="procurement/documents/:id"
                   element={

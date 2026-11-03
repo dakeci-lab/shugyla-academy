@@ -20,10 +20,11 @@ const ok = (name) => {
 
 const app = read('src/App.jsx')
 assert.match(app, /path="procurement"[\s\S]*?<PurchaseDocumentsPage \/>/)
-assert.match(app, /path="procurement\/plan"[\s\S]*?<ProcurementPage \/>/)
+assert.match(app, /path="procurement\/plan" element=\{<Navigate to="\/platform\/procurement" replace \/>\}/)
+assert.doesNotMatch(app, /ProcurementPage\b/)
 assert.match(app, /path="procurement\/documents\/:id"[\s\S]*?<PurchaseDocumentPage \/>/)
 assert.match(app, /path="orders\/:id"[\s\S]*?<PurchaseDocumentPage \/>/)
-ok('«Закуп» = documents list; the old planner only at /procurement/plan; both document addresses use the document page')
+ok('«Закуп» = documents list; the old planner is removed (/procurement/plan redirects to the list); both document addresses use the document page')
 
 const nav = read('src/platform/platformNav.js')
 const order = ['procurement', 'orders', 'supplier-finance', 'warehouse'].map((id) => nav.indexOf(`id: '${id}'`))

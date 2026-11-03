@@ -28,7 +28,6 @@ const PURCHASE_LOCAL = 'src/services/purchaseLocalAdapter.js'
 const PURCHASE_SERVICE = 'src/services/purchaseDataService.js'
 const RECEIVING_CLOUD = 'src/services/receivingSupabaseAdapter.js'
 const RECEIVING_LOCAL = 'src/services/receivingLocalAdapter.js'
-const PLANNER_VIEW = 'src/components/procurement/ProcurementPlannerView.jsx'
 const RPC_MIGRATION = 'supabase/migrations/20260812041000_procurement_order_state_rpc.sql'
 
 let checks = 0
@@ -237,80 +236,6 @@ function stageDetailPage() {
 }
 
 // ---------------------------------------------------------------------------
-// Stage 3b — planner: quantity needs a selected supplier
-// ---------------------------------------------------------------------------
-
-async function stagePlanner() {
-  console.log('Stage 3b: Planning quantity gate')
-
-  const ux = await load('src/utils/procurementPlannerUx.js')
-  const { canEditItemQuantity, QUANTITY_REQUIRES_SUPPLIER_HINT } = ux
-
-  const supplierA = 'aaaaaaaa-0000-4000-8000-000000000001'
-  const supplierB = 'bbbbbbbb-0000-4000-8000-000000000002'
-  const item = { id: 'i1', platform_supplier_id: supplierA }
-  const filterOptions = { suppliers: [{ id: supplierA }, { id: supplierB }] }
-
-  assert(
-    'no supplier selected → quantity is not editable',
-    !canEditItemQuantity(item, { filterOptions, selectedSupplierId: '' })
-  )
-  assert(
-    'supplier selected → its own rows are editable',
-    canEditItemQuantity(item, { filterOptions, selectedSupplierId: supplierA })
-  )
-  assert(
-    'rows of another supplier stay locked',
-    !canEditItemQuantity(item, { filterOptions, selectedSupplierId: supplierB })
-  )
-  // Повторный заказ тому же поставщику разрешён: прошлый заказ больше не блокирует ввод.
-  assert(
-    'a row already in a generated order stays editable for the next order',
-    canEditItemQuantity(
-      { ...item, generated_purchase_order_id: 'po-1' },
-      { filterOptions, selectedSupplierId: supplierA }
-    )
-  )
-  assert(
-    'a supplier whose order is created can be ordered again',
-    canEditItemQuantity(item, {
-      filterOptions: { suppliers: [{ id: supplierA, generatedOrderId: 'po-1' }] },
-      selectedSupplierId: supplierA,
-    })
-  )
-  assert('missing item is never editable', !canEditItemQuantity(null, { selectedSupplierId: supplierA }))
-  assert('hint text is Russian', /[А-Яа-яЁё]/.test(QUANTITY_REQUIRES_SUPPLIER_HINT))
-
-  const view = read(PLANNER_VIEW)
-  assert(
-    'the input is replaced by a dash when not editable',
-    /!canEditQuantity\(item\)/.test(view) && /proc-planner__qty-value is-empty/.test(view)
-  )
-  // Раньше проверялось имя handleFinalChange — обработчик давно называется
-  // commitQuantity, из-за чего проверка была «красной» ещё до этой задачи.
-  assert(
-    'the save handler guards against a stale blur event',
-    /async function commitQuantity[\s\S]{0,600}if \(!canEditQuantity\(item\)\)[\s\S]{0,400}return \{ ok: false/.test(
-      view
-    )
-  )
-  assert(
-    'reset is guarded too',
-    /async function handleReset[\s\S]{0,120}if \(!canEditQuantity\(item\)\) return/.test(view)
-  )
-  assert(
-    'the gate consults the selected supplier filter',
-    /selectedSupplierId: filters\.platformSupplierId/.test(view)
-  )
-  assert(
-    'planner errors are mapped to Russian',
-    !/err\.message \|\|/.test(view) && view.includes('toProcurementUserMessage')
-  )
-
-  console.log('')
-}
-
-// ---------------------------------------------------------------------------
 // Stage 4 — list filter
 // ---------------------------------------------------------------------------
 
@@ -381,7 +306,6 @@ async function main() {
   stageServices()
   stageRpcMigration()
   stageDetailPage()
-  await stagePlanner()
   stageListPage()
   stageMigration()
   console.log(`=== All ${checks} checks passed ===\n`)

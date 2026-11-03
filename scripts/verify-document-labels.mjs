@@ -29,7 +29,6 @@ const exporter = read('src/utils/purchaseOrderExport.js')
 const consumers = {
   'order card': read('src/pages/platform/procurement/PurchaseDocumentPage.jsx'),
   'planner bar': read('src/components/procurement/ProcurementSupplierPlanBar.jsx'),
-  'planner modal': read('src/components/procurement/ProcurementPlannerView.jsx'),
   'orders list': read('src/components/procurement/PurchaseTable.jsx'),
 }
 // The words must come from the dictionary, not be retyped: none of these screens/exporters may contain the literals for the shared terms.
@@ -43,22 +42,18 @@ for (const [name, src] of Object.entries(consumers)) {
   assert.match(src, /ORDER_LABELS/, `${name} does not use the dictionary`)
 }
 assert.match(exporter, /ORDER_LABELS as L/)
-ok('PDF and Excel export, order card, planner bar / modal and the orders list take the shared terms from the dictionary')
+ok('PDF and Excel export, order card, planner bar and the orders list take the shared terms from the dictionary')
 
 assert.match(exporter, /\$\{L\.delivery\}: /)
 assert.match(exporter, /\[L\.number, L\.product, L\.barcode, L\.qty, L\.price, L\.amount\]/)
 assert.match(exporter, /L\.comment/)
 ok('PDF and Excel print the same headers (delivery, price, amount) and both carry the comment')
 
-const planSrc = read('src/utils/procurementPlanExport.js')
 const whSrc = read('src/utils/procurementWarehouseExport.js')
-assert.match(planSrc, /PLAN_LABELS as L/)
 assert.match(whSrc, /WAREHOUSE_LABELS as L/)
-for (const [name, src] of [['plan export', planSrc], ['warehouse export', whSrc]]) {
-  for (const word of [labels.product, labels.barcode, labels.supplier, labels.number]) {
-    assert.doesNotMatch(src, new RegExp(`['"\`]${word}['"\`]`), `${name} retypes «${word}»`)
-  }
+for (const word of [labels.product, labels.barcode, labels.supplier, labels.number]) {
+  assert.doesNotMatch(whSrc, new RegExp(`['"\`]${word}['"\`]`), `warehouse export retypes «${word}»`)
 }
-ok('plan and warehouse exports take their headers from the dictionary and share product / barcode / supplier / № with the orders')
+ok('the warehouse export takes its headers from the dictionary and shares product / barcode / supplier / № with the orders')
 
 console.log(`\nverify:document-labels — ${checks} checks passed`)

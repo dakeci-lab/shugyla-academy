@@ -13,11 +13,7 @@ import {
   createSnapshotFilterAccumulator,
   finalizeSnapshotFilterOptions,
 } from '../utils/procurementPlannerUx'
-import {
-  createEmptyFilterOptions,
-  loadSnapshotFilterOptionsCached,
-  revalidateSnapshotFilterOptions,
-} from './procurementFilterOptionsCache.js'
+import { createEmptyFilterOptions, loadSnapshotFilterOptionsCached } from './procurementFilterOptionsCache.js'
 
 /** Strip PostgREST .or / filter metacharacters from free-text search. */
 export function sanitizePlanningSearch(value) {
@@ -193,53 +189,6 @@ function normalizeItem(row) {
 // A draft still holds the quantities that left the plan, so it counts as ordered.
 const COUNTED_ORDER_STATUSES = new Set(['draft', 'saved'])
 
-function normalizeHistoryRow(row) {
-  const order = row.purchase_orders || {}
-  const status = order.status || ''
-  return {
-    id: row.id,
-    purchaseOrderId: row.purchase_order_id || order.id,
-    barcode: row.barcode || '',
-    productName: row.product_name || '',
-    orderedQty: finiteNumber(row.ordered_qty, 0),
-    purchasePrice: finiteNumber(row.purchase_price, 0),
-    totalAmount: finiteNumber(row.total_amount, 0),
-    createdAt: row.created_at,
-    status,
-    supplierId: order.supplier_id || null,
-    supplierName: order.supplier_name || '',
-    attemptKey: order.attempt_key || null,
-    expectedDeliveryDate: order.expected_delivery_date || null,
-    countsAsOrdered: COUNTED_ORDER_STATUSES.has(status),
-  }
-}
-
-/**
- * Order journal for one SKU inside a snapshot.
- * Cancelled rows are returned with countsAsOrdered=false so the UI can show
- * history separately from "already ordered" totals.
- */
-export async function fetchSnapshotSkuOrderHistory(snapshotId, barcode) {
-  ensureClient()
-  if (!snapshotId || !barcode) return []
-
-  const { data, error } = await supabase
-    .from('purchase_order_items')
-    .select(
-      [
-        'id, purchase_order_id, barcode, product_name, ordered_qty, purchase_price, total_amount, created_at',
-        'purchase_orders!inner(id, status, supplier_id, supplier_name, workflow_mode, source_snapshot_id, attempt_key, expected_delivery_date)',
-      ].join(', ')
-    )
-    .eq('barcode', barcode)
-    .eq('purchase_orders.source_snapshot_id', snapshotId)
-    .eq('purchase_orders.workflow_mode', 'analytics')
-    .order('created_at', { ascending: false })
-
-  if (error) throw new Error(error.message || 'Не удалось загрузить историю заказов')
-  return (data || []).map(normalizeHistoryRow)
-}
-
 /**
  * Fold purchase_order_items rows into per-barcode { qty, documents }.
  * Cancelled (and any status outside COUNTED_ORDER_STATUSES) are ignored.
@@ -317,29 +266,6 @@ export async function fetchSnapshotSkuOrderAggregates(snapshotId, barcodes) {
 }
 
 /**
- * Barcode + qty for the selected supplier's next order (full snapshot, not one page).
- * Used to compute the attempt fingerprint from the same set the RPC will consume.
- */
-export async function fetchSnapshotAttemptItems(snapshotId, supplierId) {
-  ensureClient()
-  if (!snapshotId || !supplierId) return []
-
-  const { data, error } = await supabase
-    .from('procurement_snapshot_items')
-    .select('barcode, final_order_qty')
-    .eq('snapshot_id', snapshotId)
-    .eq('platform_supplier_id', supplierId)
-    .gt('final_order_qty', 0)
-    .order('barcode', { ascending: true })
-
-  if (error) throw new Error(error.message || 'Не удалось загрузить состав заказа')
-  return (data || []).map((row) => ({
-    barcode: row.barcode || '',
-    qty: finiteNumber(row.final_order_qty, 0),
-  }))
-}
-
-/**
  * Refresh the stock of one supplier from UMAG (one UMAG request) and recompute that supplier's plan.
  * Sales of the last eight weeks stay from the daily sync.
  */
@@ -360,101 +286,6 @@ export async function refreshSupplierStock(supplierId) {
     return fail(
       PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN,
       err?.message || USER_MESSAGES[PROCUREMENT_PLANNING_ERROR_CODES.SYNC_FAILED]
-    )
-  }
-}
-
-export async function syncProcurementPlanning() {
-  if (!isSupabaseConfigured() || !supabase) {
-    return fail(PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN, 'Сервер не настроен')
-  }
-
-  try {
-    const { data, error } = await supabase.functions.invoke('umag-procurement', {
-      body: { action: 'sync' },
-    })
-    if (error) return mapInvokeFailure(error, data)
-    if (data?.success === true) {
-      return {
-        success: true,
-        snapshotId: data.snapshotId,
-        periodFrom: data.periodFrom,
-        periodTo: data.periodTo,
-        itemCount: data.itemCount,
-        negativeStockCount: data.negativeStockCount,
-        orderableCount: data.orderableCount,
-        syncedAt: data.syncedAt,
-      }
-    }
-    return mapInvokeFailure(null, data)
-  } catch (err) {
-    return fail(
-      PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN,
-      err?.message || USER_MESSAGES[PROCUREMENT_PLANNING_ERROR_CODES.SYNC_FAILED]
-    )
-  }
-}
-
-export async function generateProcurementOrders(
-  snapshotId,
-  expectedDeliveryDate,
-  { supplierId = '', supplierIds = [], attemptKey = '', payloadFingerprint = '' } = {}
-) {
-  if (!isSupabaseConfigured() || !supabase) {
-    return fail(PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN, 'Сервер не настроен')
-  }
-  if (!snapshotId || !expectedDeliveryDate) {
-    return fail(PROCUREMENT_PLANNING_ERROR_CODES.VALIDATION)
-  }
-  if (!supplierId && supplierIds.length === 0) {
-    return fail(
-      PROCUREMENT_PLANNING_ERROR_CODES.VALIDATION,
-      'Выберите хотя бы одного поставщика.'
-    )
-  }
-  if (attemptKey && !payloadFingerprint) {
-    return fail(
-      PROCUREMENT_PLANNING_ERROR_CODES.VALIDATION,
-      'Повторное формирование требует отпечаток состава заказа.'
-    )
-  }
-
-  try {
-    const { data, error } = await supabase.functions.invoke('umag-procurement', {
-      body: {
-        action: 'generate',
-        snapshotId,
-        expectedDeliveryDate,
-        ...(supplierId ? { supplierId } : {}),
-        ...(supplierIds.length ? { supplierIds } : {}),
-        ...(attemptKey ? { attemptKey, payloadFingerprint } : {}),
-      },
-    })
-    if (error) return mapInvokeFailure(error, data)
-    if (data?.success === true) {
-      return {
-        success: true,
-        alreadyGenerated: Boolean(data.already_generated),
-        idempotentReplay: Boolean(data.idempotent_replay),
-        nothingToOrder: Boolean(data.nothing_to_order),
-        snapshotId: data.snapshot_id || snapshotId,
-        purchaseOrderIds: data.purchase_order_ids || [],
-        ordersCreated: data.orders_created ?? 0,
-        ordersExisting: data.orders_existing ?? 0,
-        skippedNoSupplier: data.skipped_no_supplier ?? 0,
-        itemsOrdered: data.items_ordered ?? 0,
-        snapshotStatus: data.snapshot_status,
-        remainingSuppliers: data.remaining_suppliers ?? 0,
-        requestedSupplierIds: data.requested_supplier_ids || [],
-        attemptKey: data.attempt_key || attemptKey || null,
-        payloadFingerprint: data.payload_fingerprint || payloadFingerprint || null,
-      }
-    }
-    return mapInvokeFailure(null, data)
-  } catch (err) {
-    return fail(
-      PROCUREMENT_PLANNING_ERROR_CODES.UNKNOWN,
-      err?.message || USER_MESSAGES[PROCUREMENT_PLANNING_ERROR_CODES.GENERATE_FAILED]
     )
   }
 }
@@ -560,77 +391,6 @@ export async function fetchProcurementSnapshotTotals(snapshotIds) {
     })
   }
   return map
-}
-
-export async function fetchProcurementSnapshotById(snapshotId) {
-  ensureClient()
-  const { data, error } = await supabase
-    .from('procurement_snapshots')
-    .select('*')
-    .eq('id', snapshotId)
-    .maybeSingle()
-  if (error) throw new Error(error.message || 'Не удалось загрузить снимок')
-  return normalizeSnapshot(data)
-}
-
-/**
- * Retail 80/10/10 stock-health buckets for the planner's KPI widget.
- * Computed fresh on the server from the same columns the table shows
- * (calculation_stock/avg_daily/norm_days) — never cached, since editing a
- * norm via the "Нормы" tab updates norm_days on existing snapshot items
- * immediately, between UMAG syncs.
- */
-export async function fetchProcurementSnapshotStockHealth(snapshotId) {
-  ensureClient()
-  if (!snapshotId) return null
-
-  const { data, error } = await supabase.rpc('get_procurement_snapshot_stock_health', {
-    p_snapshot_id: snapshotId,
-  })
-  if (error) throw new Error(error.message || 'Не удалось загрузить сводку по остаткам')
-  const row = Array.isArray(data) ? data[0] : data
-  if (!row) return null
-
-  // Negative stock is an accounting error, not a real bucket member: count how many
-  // rows of each server bucket have it so the widget can leave them out of the
-  // 100% scale (see buildStockHealthSummary).
-  const negativeCount = async (reserveStatus) => {
-    const { count, error: countError } = await supabase
-      .from('procurement_snapshot_items')
-      .select('id', { count: 'exact', head: true })
-      .eq('snapshot_id', snapshotId)
-      .eq('negative_stock', true)
-      .eq('plan_status', reserveStatus)
-    if (countError) throw new Error(countError.message || 'Не удалось загрузить сводку по остаткам')
-    return count || 0
-  }
-  const [negNoDemand, negUnder, negOn, negOver] = await Promise.all([
-    negativeCount('no_demand'),
-    negativeCount('under_norm'),
-    negativeCount('on_norm'),
-    negativeCount('over_norm'),
-  ])
-
-  return {
-    total: Number(row.total_count) || 0,
-    noDemand: Number(row.no_demand_count) || 0,
-    underNorm: Number(row.under_norm_count) || 0,
-    onNorm: Number(row.on_norm_count) || 0,
-    overNorm: Number(row.over_norm_count) || 0,
-    negative: { noDemand: negNoDemand, underNorm: negUnder, onNorm: negOn, overNorm: negOver },
-  }
-}
-
-/**
- * After a sync the plan (targets, in transit, recommendation, status) is computed by the database: a cron job does it within a minute,
- * this call does it right away for the snapshot the user just created. Failure is not fatal — the cron job catches up.
- */
-export async function ensureProcurementPlan(snapshotId) {
-  ensureClient()
-  if (!snapshotId) return 0
-  const { data, error } = await supabase.rpc('procurement_ensure_plan', { p_snapshot_id: snapshotId })
-  if (error) throw new Error(error.message || 'Не удалось рассчитать план')
-  return Number(data) || 0
 }
 
 /** Supplier plan jsonb -> camelCase (see procurement_supplier_plan in stage 23). */
@@ -853,49 +613,6 @@ export async function fetchSnapshotFilterOptions(
   return result.options
 }
 
-/** Force a fresh scan and cache write (sync/generate). */
-export async function revalidateSnapshotFilterOptionsCache(
-  snapshotId,
-  { scan = scanSnapshotFilterOptions } = {}
-) {
-  if (!snapshotId) return createEmptyFilterOptions()
-  return revalidateSnapshotFilterOptions(snapshotId, scan)
-}
-
-/** Direct client UPDATE is limited to final qty / override (column grants). */
-export async function updateSnapshotItemPlanning(itemId, patch) {
-  ensureClient()
-  const row = {}
-  if (patch.finalOrderQty != null) row.final_order_qty = patch.finalOrderQty
-  if (patch.manualOverride != null) row.manual_override = patch.manualOverride
-  row.updated_at = new Date().toISOString()
-
-  const { data, error } = await supabase
-    .from('procurement_snapshot_items')
-    .update(row)
-    .eq('id', itemId)
-    .select('*')
-    .single()
-  if (error) throw new Error(error.message || 'Не удалось сохранить позицию')
-  return normalizeItem(data)
-}
-
-export async function updateItemFinalOrderQty(item, nextQty) {
-  const qty = Math.max(0, finiteNumber(nextQty, 0))
-  const recommended = finiteNumber(item.recommendedQty, 0)
-  return updateSnapshotItemPlanning(item.id, {
-    finalOrderQty: qty,
-    manualOverride: qty !== recommended,
-  })
-}
-
-export async function resetItemToRecommendation(item) {
-  return updateSnapshotItemPlanning(item.id, {
-    finalOrderQty: finiteNumber(item.recommendedQty, 0),
-    manualOverride: false,
-  })
-}
-
 export async function exportSnapshotItemsCsv(snapshotId, filters = {}) {
   ensureClient()
   const pageSize = 1000
@@ -949,6 +666,5 @@ export async function fetchSnapshotItemsTotals({ snapshotId, search = '' } = {})
 
   return { totalPurchaseValue, totalSellingValue }
 }
-
 
 export { USER_MESSAGES as PROCUREMENT_PLANNING_USER_MESSAGES }
