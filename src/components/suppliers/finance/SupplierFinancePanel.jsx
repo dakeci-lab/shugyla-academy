@@ -7,9 +7,11 @@
  * статуса синка UMAG и единственной кнопкой ↻ (пайплайн syncUmagSettlements()).
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
+import useMediaQuery from '../../../hooks/useMediaQuery'
+import { RefreshIcon } from '../../icons/PlatformIcons'
 import { canSyncUmagSettlements, canViewUmagSettlements } from '../../../config/permissions'
 import {
   UMAG_SETTLEMENTS_ERROR_CODES,
@@ -33,6 +35,7 @@ export default function SupplierFinancePanel() {
   const canView = canViewUmagSettlements(user)
   const canSync = canSyncUmagSettlements(user)
 
+  const isPhone = useMediaQuery('(max-width: 640px)')
   const [lastSync, setLastSync] = useState(null)
   const [syncing, setSyncing] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
@@ -85,6 +88,28 @@ export default function SupplierFinancePanel() {
     }
   }
 
+  // Phones: the sync button lives in the page header next to «Расчёты» (like the icons of a document); the handler goes through a ref.
+  const syncRef = useRef(null)
+  syncRef.current = handleSync
+  const headerActions = useMemo(
+    () =>
+      isPhone && canSync ? (
+        <button
+          type="button"
+          className={`platform-mobile-header__icon-btn${syncing ? ' sfp-header-sync--busy' : ''}`}
+          aria-label="Синхронизация UMAG"
+          aria-busy={syncing || undefined}
+          disabled={syncing}
+          onClick={() => void syncRef.current?.()}
+        >
+          <span className={`platform-sync-button__icon${syncing ? ' platform-sync-button__icon--spinning' : ''}`} aria-hidden="true">
+            <RefreshIcon size={20} />
+          </span>
+        </button>
+      ) : null,
+    [isPhone, canSync, syncing]
+  )
+
   if (!canView) {
     return null
   }
@@ -103,7 +128,7 @@ export default function SupplierFinancePanel() {
           >
             {syncStatus.text}
           </span>
-          {canSync ? (
+          {canSync && !isPhone ? (
             <PlatformSyncButton
               onClick={() => void handleSync()}
               syncing={syncing}
@@ -115,7 +140,13 @@ export default function SupplierFinancePanel() {
         </div>
       </div>
 
-      <UmagSettlementsPanel embedded refreshToken={refreshToken} filterSlot={filterSlot} toolsSlot={toolsSlot} />
+      <UmagSettlementsPanel
+        embedded
+        refreshToken={refreshToken}
+        filterSlot={filterSlot}
+        toolsSlot={toolsSlot}
+        headerActions={headerActions}
+      />
     </div>
   )
 }

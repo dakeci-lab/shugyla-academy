@@ -907,3 +907,39 @@
     flex: none;
   }
 }
+
+/* Phones, supplier list: room under the last row for the floating search; the total is not pinned (the pill would cover it). */
+@media (max-width: 640px) {
+  .umag-settlements--list {
+    padding-bottom: 88px;
+  }
+
+  .umag-settlements--list .pgt__foot {
+    position: static;
+  }
+}
+
+/* Count inside a chip of the phone filter sheet. */
+.sfp-chip-count {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.75;
+}
+
+/* Phones, supplier list: the same text sizes as the other lists (bold 14px name, 14px sum, a quiet second line). */
+@media (max-width: 640px) {
+  .umag-settlements--list .pgt__link {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .umag-settlements--list .pgt__money {
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  .umag-settlements--list .umag-settlements__supplier-meta {
+    font-size: 12.5px;
+  }
+}

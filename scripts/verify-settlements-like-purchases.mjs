@@ -38,7 +38,7 @@ assert.doesNotMatch(panel, /SupplierIdentityCard|← К списку поста�
 assert.match(panel, /className="sd-head"/)
 assert.match(panel, /Закрыть\s*<\/button>/)
 assert.match(panel, /Редактировать\s*<\/button>/)
-assert.match(panel, /usePlatformPageTitle\('Расчёты', '', \{ showBack: true, backFallback: '\/platform\/supplier-finance' \}\)/)
+assert.match(panel, /usePlatformPageTitle\(\s*'Расчёты',\s*'',\s*titleSupplierId\s*\? \{ showBack: true, backFallback: '\/platform\/supplier-finance' \}\s*: \{ actions: headerActions \}/)
 ok('the supplier page has a document header with «Закрыть» / «Редактировать» (no «← К списку»); phones get the back arrow of the header')
 assert.match(panel, /!isPhone \? \(\s*<div className="sd-bar">/)
 assert.match(panel, /isPhone && editable \? \(\s*<IconActionButton variant="edit"/)

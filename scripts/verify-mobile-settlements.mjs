@@ -23,7 +23,7 @@ const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8')
 
 const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
 assert.match(panel, /const isPhone = useMediaQuery\('\(max-width: 900px\)'\)/)
-assert.match(panel, /if \(isPhone\) \{\s*return \(\s*<AdminModal sheet title="Фильтр"/)
+assert.match(panel, /if \(isPhone\) \{\s*return \(\s*<AdminModal\s+sheet\s+title="Фильтры"/)
 assert.match(panel, /if \(!open \|\| isPhone\) return undefined/)
 ok('the supplier list filter opens as a bottom sheet on phones (the click-outside popover is desktop only)')
 assert.match(panel, /<AdminModal\s+sheet\s+title="Редактировать поставщика"/)

@@ -84,7 +84,7 @@ async function main() {
 
   // Case 8 — unified UX panels untouched (zero-diff preference)
   const financePanel = read('src/components/suppliers/finance/SupplierFinancePanel.jsx')
-  assert.match(financePanel, /<UmagSettlementsPanel embedded/)
+  assert.match(financePanel, /<UmagSettlementsPanel\s+embedded/)
   assert.doesNotMatch(financePanel, /Navigate/)
   ok('Case 8: SupplierFinancePanel is the sync bar around the supplier list, with no redirects')
 

@@ -1,0 +1,53 @@
+.pfs {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .pfs {
+    position: fixed;
+    left: 50%;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-sizing: border-box;
+    width: min(calc(100% - 32px), 520px);
+    height: 52px;
+    padding: 0 18px;
+    transform: translateX(-50%);
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 999px;
+    background: var(--color-white, #fff);
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.16);
+    color: var(--color-text-secondary, #64748b);
+  }
+
+  .pfs svg {
+    flex: none;
+  }
+
+  .pfs__input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    font: inherit;
+    /* 16px keeps iOS Safari from zooming the page when the field gets focus. */
+    font-size: 16px;
+    color: var(--color-text, #0f172a);
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .pfs__input::placeholder {
+    color: var(--color-text-secondary, #64748b);
+  }
+
+  .pfs__input::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+  }
+}
