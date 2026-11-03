@@ -1,4 +1,6 @@
+import { Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { formatDocumentGroupLabel } from '../../utils/purchaseDocumentsList'
 import {
   formatPurchaseAmount,
   formatPurchaseDate,
@@ -34,11 +36,19 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
     <PgtTable columns={columns}>
       <PgtHead columns={columns} />
       {orders.length === 0 ? <p className="pgt__empty">Заказов за этот период нет.</p> : null}
-      {orders.map((order) => {
+      {orders.map((order, index) => {
         const path = `${detailPathPrefix}/${order.id}`
+        // Phone: the list is grouped by delivery day («Ср, 4 Ноября»), so the row itself does not repeat the date.
+        const day = order.expectedDeliveryDate || ''
+        const startsDay = index === 0 || (orders[index - 1].expectedDeliveryDate || '') !== day
         return (
+          <Fragment key={order.id}>
+            {startsDay ? (
+              <div className="pgt__day" role="presentation">
+                {day ? formatDocumentGroupLabel(day) : 'Без даты доставки'}
+              </div>
+            ) : null}
           <PgtRow
-            key={order.id}
             columns={columns}
             interactive
             onClick={() => navigate(path)}
@@ -70,18 +80,12 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
             }}
             mobileMeta={
               <>
-                {order.checkedAt ? <span className="pgt__pill pgt__pill--ok">✓ сверено</span> : null}
-                {[
-                  order.number ? `№${order.number}` : '',
-                  `${order.itemsCount ?? order.items?.length ?? 0} тов.`,
-                  formatPurchaseDate(order.expectedDeliveryDate),
-                  order.createdByName,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
+                <span className="pgt-items">{order.itemsCount ?? order.items?.length ?? 0} тов.</span>
+                {order.checkedAt ? <span className="pgt__pill pgt__pill--ok">✓ Сверено</span> : null}
               </>
             }
           />
+          </Fragment>
         )
       })}
     </PgtTable>

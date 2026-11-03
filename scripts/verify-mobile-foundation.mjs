@@ -70,7 +70,7 @@ assert.match(read('src/components/procurement/TablePagination.css'), /\.table-pa
 ok('the pagination page-size label stays visually hidden on every page')
 
 const listPage = read('src/pages/platform/procurement/PurchaseDocumentsPage.jsx')
-assert.match(listPage, /isPhone \? \(\s*<button[\s\S]*className="pdl-filter-row"/)
+assert.match(listPage, /isPhone \? \(\s*<PlatformFilterRow/)
 assert.match(listPage, /Дата, Поставщик, Статус документа, Название/)
 assert.match(pageCss, /\.pdl-bar__chip\s*\{\s*display: none/)
 const meta = listPage.slice(listPage.indexOf('mobileMeta={'), listPage.indexOf('</Fragment>'))
