@@ -41,3 +41,11 @@ export function validateDocumentForSave(order, items) {
 export function suppliersOrderedToday(suppliers, weekdayId) {
   return suppliers.filter((supplier) => (supplier.orderWeekdays || []).includes(weekdayId))
 }
+
+/**
+ * The list a document page returns to — by the address it was opened at, not by the user's rights:
+ * /platform/orders/:id → «Заказы», /platform/procurement/documents/:id (or anything else) → «Закуп».
+ */
+export function documentListPath(pathname) {
+  return /^\/platform\/orders(\/|$)/.test(pathname || '') ? '/platform/orders' : '/platform/procurement'
+}
