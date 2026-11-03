@@ -18,6 +18,19 @@
 - Журнал синка: 49 строк `umag_sync_runs` с `entity = 'sales_facts'` (все `success`).
 - Код: единственные читатели таблиц — `salesDataService` и `umag-sales-sync` (оба удалены этим PR); `grep` по `.from('sales_` — пусто.
 
+## Аудит связей (2026-11-03, перед удалением данных)
+- **БД:** внешних ключей к `sales_*` и от них нет; представлений, зависящих от них, нет; единственные триггеры — `updated_at` на самих таблицах
+  (общая функция `academy_set_updated_at` остаётся — она нужна ещё 10 таблицам); функций/процедур во всех схемах с упоминанием `sales_category_month`,
+  `sales_month_receipt`, `sales_facts` нет; cron-задач 3 (`procurement-sync…0700`, `procurement-archive…0730`, `procurement-ensure-plan…`), ни одна не про продажи.
+- **Права:** `sales.view` / `sales.sync` выданы ролям `admin` и `buyer` (закупщик тоже видел «Главная»); других таблиц со ссылкой на `permissions` кроме `role_permissions` нет.
+- **Журнал синка:** `umag_sync_runs` содержит 213 строк `all`, 2 `obligations` и 49 `sales_facts`. Удаляются только `sales_facts`. `fetchLastUmagSyncRun`
+  («последний синк» в «Расчётах») читает последнюю строку **без фильтра по entity** — строки `sales_facts` могли подменять статус синка «Расчётов»; после удаления
+  показывается именно синк «Расчётов».
+- **Другие страницы:** «Закуп», «Заказы», «Расчёты», «Склад», «Счета оплаты», «Пользователи», «Роли и доступы» к `sales_*` и `umag-sales-sync` не обращаются
+  (`grep` по `src` и `supabase/functions` пуст; колонки `weekly_sales`, `sales_8w`, `sales_per_day` — в снимках закупа и позициях заказов, не затрагиваются).
+- **Edge Functions в проде:** `umag-sales-sync` активна (v14), но вызывалась только удалённой страницей.
+- **Единственный риск:** вкладка браузера/PWA со старой версией фронта, открытая на «Главной», после `drop` покажет ошибку загрузки до перезагрузки страницы.
+
 ## Что делает владелец (SQL Editor; `drop` через MCP не проходит)
 1. **После слияния** убедиться, что фронт задеплоен (старая страница уже не читает таблицы).
 2. Удалить Edge Function `umag-sales-sync`: Supabase → Edge Functions → `umag-sales-sync` → Delete (или `npx supabase functions delete umag-sales-sync --project-ref cxadzerxndlscwvdaymk`).
