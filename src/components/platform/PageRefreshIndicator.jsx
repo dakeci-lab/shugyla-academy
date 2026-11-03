@@ -1,53 +1,77 @@
 import './PageRefreshIndicator.css'
 
+const RADIUS = 15
+const CIRCUMFERENCE = 2 * Math.PI * RADIUS
+
 /**
- * Компактный индикатор обновления под Header (Umag-style).
+ * Индикатор свайп-обновления: белая круглая «таблетка» с кольцом, которое заполняется по мере натяжения,
+ * подпись по этапам («Потяните» → «Отпустите» → «Обновляем…» → «Обновлено»), по окончании — зелёная галочка.
  * Не fullscreen, не затемняет контент.
  */
 export default function PageRefreshIndicator({
   visible = false,
   refreshing = false,
+  done = false,
   dragging = false,
   hiding = false,
   height = 0,
   pullProgress = 0,
-  pullRotation = 0,
-  label = 'Обновление',
 }) {
+  const reached = pullProgress >= 1
+  const state = done ? 'done' : refreshing ? 'refreshing' : reached ? 'ready' : 'pulling'
+  const label = done ? 'Обновлено' : refreshing ? 'Обновляем…' : reached ? 'Отпустите' : 'Потяните'
+
   const className = [
     'page-refresh-indicator',
     visible ? 'page-refresh-indicator--visible' : '',
     dragging ? 'page-refresh-indicator--dragging' : '',
-    refreshing ? 'page-refresh-indicator--refreshing' : '',
+    refreshing || done ? 'page-refresh-indicator--refreshing' : '',
     hiding ? 'page-refresh-indicator--hiding' : '',
   ]
     .filter(Boolean)
     .join(' ')
 
   return (
-    <div
-      className={className}
-      aria-hidden={!visible}
-      style={{ height: visible ? height : 0 }}
-    >
+    <div className={className} aria-hidden={!visible} style={{ height: visible ? height : 0 }}>
       <div
-        className="page-refresh-indicator__inner"
-        style={{
-          '--refresh-opacity': refreshing || hiding ? 1 : pullProgress,
-        }}
+        className={`page-refresh-indicator__inner page-refresh-indicator__inner--${state}`}
+        style={{ '--refresh-opacity': refreshing || done || hiding ? 1 : Math.min(1, pullProgress * 1.4) }}
       >
-        <span
-          className={`page-refresh-indicator__spinner${
-            refreshing ? ' page-refresh-indicator__spinner--loading' : ''
-          }`}
-          style={refreshing ? undefined : { '--refresh-rotation': pullRotation }}
-          aria-hidden="true"
-        />
-        {refreshing && (
-          <span className="page-refresh-indicator__label" role="status" aria-live="polite">
-            {label}
-          </span>
-        )}
+        <span className="page-refresh-indicator__chip" aria-hidden="true">
+          <svg className="page-refresh-indicator__svg" viewBox="0 0 36 36" width="36" height="36">
+            <circle className="page-refresh-indicator__track" cx="18" cy="18" r={RADIUS} />
+            {state === 'pulling' || state === 'ready' ? (
+              <circle
+                className="page-refresh-indicator__arc"
+                cx="18"
+                cy="18"
+                r={RADIUS}
+                strokeDasharray={`${Math.min(1, pullProgress) * CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+              />
+            ) : null}
+            {state === 'refreshing' ? (
+              <circle
+                className="page-refresh-indicator__arc page-refresh-indicator__arc--spin"
+                cx="18"
+                cy="18"
+                r={RADIUS}
+                strokeDasharray={`${CIRCUMFERENCE * 0.28} ${CIRCUMFERENCE}`}
+              />
+            ) : null}
+            {state === 'done' ? (
+              <path className="page-refresh-indicator__check" d="M11.5 18.5l4.5 4.5 8.5-9.5" />
+            ) : null}
+            {state === 'pulling' || state === 'ready' ? (
+              <path
+                className={`page-refresh-indicator__arrow${reached ? ' page-refresh-indicator__arrow--up' : ''}`}
+                d="M18 12v11M13.5 18.5L18 23l4.5-4.5"
+              />
+            ) : null}
+          </svg>
+        </span>
+        <span className="page-refresh-indicator__label" role="status" aria-live="polite">
+          {label}
+        </span>
       </div>
     </div>
   )
