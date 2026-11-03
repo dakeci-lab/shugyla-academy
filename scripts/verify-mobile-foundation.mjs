@@ -79,4 +79,9 @@ assert.match(meta, /isDraft \? 'Черновик' : 'Сохранён'/)
 assert.doesNotMatch(meta, /поз\.|доставка|createdByName|number/)
 ok('phones: one «Фильтры» row (the period lives inside the filter); a list row is the supplier, the sum, the creation time and the status')
 
+assert.match(pageCss, /\.pdl-row \.pgt__title\s*\{\s*font-size: 14px;\s*font-weight: 700/)
+assert.match(pageCss, /\.pdl-row \.pgt__money\s*\{\s*font-size: 14px;\s*font-weight: 400/)
+assert.match(pageCss, /\.pdl-row \.pdl-nonumber\s*\{[^}]*font-style: normal[^}]*color: var\(--color-text/)
+ok('phone list text sizes follow UMAG (supplier 14px bold, sum 14px); «Поставщик не выбран» is not gray italic')
+
 console.log(`\nverify:mobile-foundation — ${checks} checks passed`)

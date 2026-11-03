@@ -173,20 +173,20 @@
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 15px;
+    font-weight: 500;
   }
 
   .pdl-filter-row__hint {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-size: 13px;
+    font-size: 12.5px;
     color: var(--color-text-secondary, #64748b);
   }
 
   .pdl-time {
-    font-size: 15px;
+    font-size: 14px;
     font-variant-numeric: tabular-nums;
     color: var(--color-text, #0f172a);
   }
@@ -212,14 +212,23 @@
     color: var(--color-text, #0f172a);
   }
 
+  /* Sizes like UMAG's list: bold 14px supplier, regular 14px sum and time. */
   .pdl-row .pgt__title {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 700;
   }
 
   .pdl-row .pgt__money {
-    font-size: 16px;
-    font-weight: 600;
+    font-size: 14px;
+    font-weight: 400;
+  }
+
+  /* «Поставщик не выбран» reads like any other document: same size, weight and colour (no gray italic). */
+  .pdl-row .pdl-nonumber {
+    font-size: 14px;
+    font-weight: 700;
+    font-style: normal;
+    color: var(--color-text, #0f172a);
   }
 
   .pdl-sum {
