@@ -6,6 +6,7 @@ import { usePlatformPageTitle } from '../../../context/PlatformPageTitleContext'
 import { useToast } from '../../../context/ToastContext'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import useMediaQuery from '../../../hooks/useMediaQuery'
+import PurchaseDocumentPhoneActions from './PurchaseDocumentPhoneActions'
 import { getPlatformSection } from '../../../platform/platformNav'
 import {
   canViewOrders,
@@ -96,6 +97,7 @@ export default function PurchaseDocumentPage() {
   const [supplierDebt, setSupplierDebt] = useState(null)
   const isPhone = useMediaQuery('(max-width: 640px)')
   const exportRef = useRef(null)
+  const phoneHandlersRef = useRef({})
 
   const cachedOrder = useMemo(() => getPurchaseOrderByIdSync(id), [id, version, dataVersion])
   const itemsReady = fullOrder?.id === id
@@ -180,9 +182,30 @@ export default function PurchaseDocumentPage() {
     }
   }, [exportOpen])
 
+  // On phones the document actions live in the header as icons (trash, check, «⋯»); the node is memoized, handlers go through a ref.
+  const phoneCommentLabel = readerView ? '' : order?.comment ? 'Комментарий' : editable ? 'Добавить комментарий' : ''
+  const phoneActions = useMemo(
+    () =>
+      isPhone && order ? (
+        <PurchaseDocumentPhoneActions
+          handlersRef={phoneHandlersRef}
+          busy={busy}
+          showSave={editable}
+          showDelete={canEdit && draft}
+          showCancel={canEdit && saved}
+          canExport={items.length > 0}
+          commentLabel={phoneCommentLabel}
+          hasComment={Boolean(order?.comment)}
+        />
+      ) : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [isPhone, Boolean(order), busy, editable, canEdit, draft, saved, items.length > 0, phoneCommentLabel]
+  )
+
   usePlatformPageTitle(getPlatformSection(pathname).title, '', {
     showBack: true,
     backFallback: LIST_PATH,
+    actions: phoneActions,
   })
 
   const suppliers = useMemo(
@@ -373,6 +396,17 @@ export default function PurchaseDocumentPage() {
   }
 
   if (!canView) return <PlatformAccessDenied title="Нет доступа к разделу «Закуп»" />
+  phoneHandlersRef.current = {
+    save: handleSave,
+    remove: () => setConfirm('delete'),
+    cancel: () => setConfirm('cancel'),
+    export: (kind) => void handleExport(kind),
+    comment: () => {
+      setCommentText(order?.comment || '')
+      setCommentOpen(true)
+    },
+  }
+
   if (!order && loading) return <div className="pdoc"><p>Загрузка…</p></div>
   if (!order || (isOrderDraft(order) && !canEdit)) {
     return (
@@ -396,7 +430,7 @@ export default function PurchaseDocumentPage() {
         <span className="pdoc__meta">{order.createdByName || ''}</span>
         <span className="pdoc__status">{draft ? 'Черновик' : 'Сохранён'}</span>
         <span className="pdoc__spacer" />
-        {commentLabel ? (
+        {commentLabel && !isPhone ? (
           <button
             type="button"
             className="btn btn--outline btn--sm"
@@ -410,6 +444,7 @@ export default function PurchaseDocumentPage() {
         ) : null}
       </div>
 
+      {!isPhone ? (
       <div className="pdoc__bar">
         {editable ? (
           <button type="button" className="btn btn--primary pdoc__bar-save" disabled={busy} onClick={handleSave}>
@@ -453,6 +488,7 @@ export default function PurchaseDocumentPage() {
           ) : null}
         </div>
       </div>
+      ) : null}
 
       <div className="pdoc__cards">
         <div className="pdoc__card">
@@ -666,9 +702,6 @@ export default function PurchaseDocumentPage() {
             <span>Итого</span>
             <strong className="num">{formatPurchaseAmount(total)}</strong>
           </div>
-          <button type="button" className="btn btn--primary" disabled={busy} onClick={handleSave}>
-            Сохранить
-          </button>
         </div>
       ) : null}
 

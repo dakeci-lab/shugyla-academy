@@ -1,0 +1,73 @@
+.pdoc-phone-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pdoc-phone-actions__delete {
+  color: var(--color-danger, #c03c34);
+}
+
+.pdoc-phone-actions__save {
+  color: var(--color-primary, #059669);
+}
+
+.pdoc-phone-actions__menu-wrap {
+  position: relative;
+}
+
+.pdoc-phone-actions__menu-wrap .platform-mobile-header__icon-btn {
+  position: relative;
+}
+
+.pdoc-phone-actions__dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-action, #1976d2);
+}
+
+.pdoc-phone-actions__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 120;
+  width: max-content;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  padding: 4px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  background: var(--color-white, #fff);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+}
+
+.pdoc-phone-actions__menu button {
+  appearance: none;
+  border: 0;
+  background: none;
+  text-align: left;
+  font: inherit;
+  font-size: 15px;
+  padding: 12px;
+  white-space: nowrap;
+  border-radius: 6px;
+  color: var(--color-text, #0f172a);
+  cursor: pointer;
+}
+
+.pdoc-phone-actions__menu button:active:not(:disabled) {
+  background: var(--color-bg, #f1f5f9);
+}
+
+.pdoc-phone-actions__menu button:disabled {
+  opacity: 0.45;
+}
+
+.pdoc-phone-actions__menu .pdoc-phone-actions__danger {
+  color: var(--color-danger, #c03c34);
+}
