@@ -24,7 +24,7 @@ Edge Functions и складываются в собственные табли�
 | Backend | Supabase (Postgres + Auth + RLS + Edge Functions на Deno/TypeScript) |
 | Прод-хостинг | PS.kz / Plesk — деплой артефактом в ветку `ps-production` через GitHub Actions |
 | CI | GitHub Actions: `deploy-ps-production.yml` (сборка + `verify:domain-deployment` + публикация артефакта) |
-| Тесты | 99 самописных `verify:*` node-скриптов в `scripts/` (98 проходят, см. §8) |
+| Тесты | 100 самописных `verify:*` node-скриптов в `scripts/` (99 проходят, см. §8) |
 | Прочее | PWA (sw.js, manifest), xlsx, pdfmake, qrcode |
 
 Зависимости намеренно минимальны — нет TypeScript на фронте, нет state-библиотек, нет Tailwind.
@@ -45,14 +45,14 @@ Edge Functions и складываются в собственные табли�
 
 Меню (`src/platform/platformNav.js`):
 
-- **Главная** (`/platform/sales`, бывшие «Продажи»; право `sales.view`, по умолчанию администратор) — выручка и маржа, синк продаж UMAG
+- (Раздел «Главная»/«Продажи» удалён 2026-11-03, этап 28, `docs/db/stage-28-remove-sales-home/`: страница, компоненты, функция `umag-sales-sync`, права `sales.*`; таблицы `sales_*` удаляет владелец по документу этапа.)
 - **Закупки**: Закуп (`/procurement` — список документов закупа: заказы поставщикам создаются вручную кнопкой «＋ Создать»; документ — `/procurement/documents/:id`), Заказы (`/orders` — для приёмщика: только сохранённые заказы, документ только для чтения с галочками и «Сверено»), Расчёты (`/supplier-finance`: одна страница — список поставщиков с балансом; в карточке поставщика история операций, где оплачиваются накладные и отмечаются полученные возвраты), Склад (`/warehouse`)
 - **Финансы**: Счета оплаты (`/finance/payment-accounts`)
 - **Настройки**: Пользователи (`/settings/users`), Роли и доступы (`/settings/roles`)
 - Профиль (`/profile`)
 
 `/platform` сам по себе не имеет страницы: `PlatformIndex` отправляет роль в первый доступный раздел
-(админ → Главная, закупщик → Закуп, приёмщик → Заказы). Роли без разделов видят `PlatformNoAccess`.
+(админ и закупщик → Закуп, приёмщик → Заказы; при входе на сайт открывается «Закуп»). Роли без разделов видят `PlatformNoAccess`.
 Роли в БД: `admin` (Директор), `buyer` (закупщик), `receiver` (приёмщик), `buhgalter` (бухгалтер); пользователей 4, по одному на роль.
 
 Отметка оплаты поставщику — **только в платформе** (`platform_paid_at` в `supplier_payment_obligations`);
@@ -87,12 +87,12 @@ Toast, PlatformPageTitle.
 в Edge Functions (`_shared/employeeAuthorization.ts`) и в RLS. Права строкой вида `umag.settlements.sync`.
 `academy_users` — учётные записи (логин, роль, «кто отметил оплату»); таблица остаётся основой авторизации.
 
-## 6. Edge Functions (`supabase/functions/`, всего 9)
+## 6. Edge Functions (`supabase/functions/`, всего 8)
 
 UMAG / закуп (креды UMAG **никогда** не уходят на клиент — `_shared/umagAuth.ts`, секреты
 `UMAG_LOGIN`/`UMAG_PASSWORD`/`UMAG_STORE_ID` в Supabase → Edge Functions → Secrets):
 `umag-sync` (поставщики, поставки, возвраты, платежи, обязательства), `umag-procurement`,
-`umag-sales-sync`, `procurement-archive`.
+`procurement-archive`.
 
 Аккаунты (для «Пользователи»): `admin-create-employee`, `admin-update-employee`, `admin-list-employees`,
 `admin-reset-employee-password`, `admin-check-employee-login`.
@@ -132,7 +132,7 @@ GitHub Actions — только вручную/через MCP.
 Ручной полной синхронизации остатков в интерфейсе больше нет: ночная 07:00, кнопка обновления одного поставщика в «Товары поставщика» и cron расчёта плана.
 
 Остаётся (`docs/platform/stage-14-polish.md`):
-- `verify:*`: из 99 проходят 98; `auth-first-frontend-production-readiness` требует локальную Supabase (Docker).
+- `verify:*`: из 100 проходят 99; `auth-first-frontend-production-readiness` требует локальную Supabase (Docker).
   Новые проверки писать через `scripts/lib/extensionlessResolver.mjs` (реальные модули, не регулярки).
 - Лишние колонки `academy_users` (этап 18) и `password` + таблица `platform_work_locations` (этап 19) удалены.
   Пароли, лежавшие открытым текстом, считать скомпрометированными — сбросить через «Сбросить пароль».

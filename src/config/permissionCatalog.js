@@ -47,8 +47,6 @@ export const PERMISSION_CODES = {
   SUPPLIERS_EDIT: 'suppliers.edit',
   SUPPLIERS_DELETE: 'suppliers.delete',
 
-  SALES_VIEW: 'sales.view',
-  SALES_SYNC: 'sales.sync',
 
   UMAG_SETTLEMENTS_VIEW: 'umag.settlements.view',
   UMAG_SETTLEMENTS_SYNC: 'umag.settlements.sync',
@@ -88,7 +86,6 @@ export const PERMISSION_MODULES = {
   suppliers: 'Поставщики',
   umag: 'UMAG',
   supplier_payments: 'Оплаты поставщикам',
-  sales: 'Продажи',
   payroll: 'Зарплата',
   settings: 'Настройки',
   payment_accounts: 'Счета оплаты',
@@ -107,7 +104,6 @@ export const RBAC_MATRIX_MODULES = [
   'suppliers',
   'umag',
   'supplier_payments',
-  'sales',
   'settings',
   'roles',
   'payment_accounts',
@@ -170,8 +166,6 @@ export const PERMISSION_CATALOG = [
   { code: PERMISSION_CODES.SUPPLIERS_CREATE, name: 'Создание поставщиков', module: 'suppliers', sortOrder: 121 },
   { code: PERMISSION_CODES.SUPPLIERS_EDIT, name: 'Редактирование поставщиков', module: 'suppliers', sortOrder: 122 },
   { code: PERMISSION_CODES.SUPPLIERS_DELETE, name: 'Удаление поставщиков', module: 'suppliers', sortOrder: 123 },
-  { code: PERMISSION_CODES.SALES_VIEW, name: 'Просмотр продаж', module: 'sales', sortOrder: 180 },
-  { code: PERMISSION_CODES.SALES_SYNC, name: 'Синхронизация продаж из UMAG', module: 'sales', sortOrder: 181 },
   { code: PERMISSION_CODES.UMAG_SETTLEMENTS_VIEW, name: 'Просмотр взаиморасчётов UMAG', module: 'umag', sortOrder: 170 },
   { code: PERMISSION_CODES.UMAG_SETTLEMENTS_SYNC, name: 'Синхронизация UMAG', module: 'umag', sortOrder: 171 },
   { code: PERMISSION_CODES.SUPPLIER_PAYMENTS_VIEW, name: 'Просмотр оплат поставщикам', module: 'supplier_payments', sortOrder: 190 },

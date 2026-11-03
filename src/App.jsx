@@ -34,7 +34,6 @@ const PlatformEmployees = lazy(() => import('./pages/platform/PlatformEmployees'
 const SupplierFinancePage = lazy(
   () => import('./pages/platform/supplier-finance/SupplierFinancePage')
 )
-const SalesPage = lazy(() => import('./pages/platform/sales/SalesPage'))
 const PurchaseDocumentsPage = lazy(
   () => import('./pages/platform/procurement/PurchaseDocumentsPage')
 )
@@ -215,14 +214,8 @@ export default function App() {
                     </PlatformRoute>
                   }
                 />
-                <Route
-                  path="sales"
-                  element={
-                    <PlatformRoute routeKey={ROUTE_KEYS.SALES}>
-                      <SalesPage />
-                    </PlatformRoute>
-                  }
-                />
+                {/* The former «Главная» (sales) is removed; an old bookmark lands on the platform entry. */}
+                <Route path="sales" element={<Navigate to="/platform" replace />} />
                 {/* Old standalone pages, replaced by supplier-finance. Not in platformNav.js
                     or linked anywhere — kept as redirects only so a stale bookmark still lands. */}
                 <Route

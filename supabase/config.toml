@@ -467,12 +467,6 @@ verify_jwt = true
 import_map = "./functions/umag-procurement/deno.json"
 entrypoint = "./functions/umag-procurement/index.ts"
 
-[functions.umag-sales-sync]
-enabled = true
-verify_jwt = true
-import_map = "./functions/umag-sales-sync/deno.json"
-entrypoint = "./functions/umag-sales-sync/index.ts"
-
 [functions.procurement-archive]
 enabled = true
 verify_jwt = true

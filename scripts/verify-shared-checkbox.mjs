@@ -49,7 +49,6 @@ for (const [file, selector] of [
   ['src/components/suppliers/settlements/UmagSettlementsPanel.css', '.umag-settlements__check'],
   ['src/components/admin/team/TeamManagementPage.css', '.team-matrix__checkbox'],
   ['src/components/admin/employees/EmployeeFilterPopover.css', '.employee-filter-popover__checkbox-row input'],
-  ['src/components/sales/SalesShared.css', '.sales-bands__check input'],
 ]) {
   const css = read(file)
   const at = css.indexOf(selector)
