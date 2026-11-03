@@ -395,6 +395,11 @@ export function canCreatePurchase(user) {
   return can(user, PERMISSION_CODES.PROCUREMENT_CREATE)
 }
 
+/** Удаление черновиков закупа (массово в списке «Закуп»); сохранённые документы не удаляются никем. */
+export function canDeletePurchase(user) {
+  return can(user, PERMISSION_CODES.PROCUREMENT_DELETE)
+}
+
 export function canEditPurchase(user) {
   return canCreatePurchase(user)
 }

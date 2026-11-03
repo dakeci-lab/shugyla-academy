@@ -31,7 +31,7 @@ export default function ConfirmDialog({
           </button>
           <button
             type="button"
-            className={`btn btn--primary ${confirmVariant === 'danger' ? 'admin-table__danger' : ''}`}
+            className={`btn ${confirmVariant === 'danger' ? 'btn--danger' : 'btn--primary'}`}
             onClick={onConfirm}
             disabled={loading}
           >

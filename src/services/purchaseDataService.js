@@ -145,6 +145,31 @@ export async function deletePurchaseOrder(orderId) {
   await afterOrderChange(orderId, null)
 }
 
+/**
+ * Удаляет несколько черновиков (по пять одновременно). Сохранённый документ не удаляется — ни здесь, ни на сервере.
+ * Возвращает { deleted: [id], failed: [{ id, message }] }: частичный успех не бросает ошибку.
+ */
+export async function deleteDraftPurchaseOrders(orderIds, { concurrency = 5 } = {}) {
+  const deleted = []
+  const failed = []
+  const queue = [...new Set(orderIds)]
+  async function worker() {
+    while (queue.length) {
+      const id = queue.shift()
+      try {
+        const order = getPurchaseOrderByIdSync(id)
+        if (order && order.status !== 'draft') throw new Error('Сохранённый документ удалить нельзя.')
+        await deletePurchaseOrder(id)
+        deleted.push(id)
+      } catch (error) {
+        failed.push({ id, message: error?.message || 'Не удалось удалить.' })
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, queue.length) }, worker))
+  return { deleted, failed }
+}
+
 export async function addPurchaseOrderItem(orderId, item) {
   const id = isCloudMode()
     ? await cloud.addPurchaseOrderItemCloud(orderId, item)

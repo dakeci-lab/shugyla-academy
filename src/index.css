@@ -19,6 +19,11 @@
   --radius-md: 14px;
   --radius-lg: 20px;
   --header-height: 68px;
+  /* One size for the controls of a list's top bar (Создать, Фильтр, Действие, период). */
+  --pf-control-h: 38px;
+  --pf-control-fs: 13.5px;
+  --pf-control-radius: 4px;
+  --pf-control-px: 14px;
   /* Desktop chrome: sidebar brand row + main topbar share one height */
   --platform-topbar-height: 56px;
   --platform-modal-backdrop: rgba(0, 0, 0, 0.4);
