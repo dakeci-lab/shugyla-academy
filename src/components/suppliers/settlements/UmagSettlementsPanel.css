@@ -127,19 +127,6 @@
   margin-left: auto;
 }
 
-.suppliers-modal-footer__status-action {
-  min-height: 44px;
-}
-
-.suppliers-modal-footer__status-action--danger {
-  color: var(--color-danger, #b91c1c);
-  border-color: rgba(185, 28, 28, 0.35);
-}
-
-.suppliers-modal-footer__status-action--danger:hover:not(:disabled) {
-  background: rgba(185, 28, 28, 0.06);
-}
-
 @media (max-width: 480px) {
   .suppliers-modal-footer {
     flex-direction: column;
@@ -148,6 +135,7 @@
 
   .suppliers-modal-footer__status-action {
     width: 100%;
+    min-height: 44px;
   }
 
   .suppliers-modal-footer__actions {

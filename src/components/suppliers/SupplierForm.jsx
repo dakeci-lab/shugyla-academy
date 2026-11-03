@@ -162,11 +162,12 @@ export default function SupplierForm({
   return (
     <div className="supplier-form admin-form">
       {umagLocked ? (
-        <div className="supplier-form__umag-badge" role="status">
-          Синхронизировано с UMAG
-          {form.isUmagActive === false ? ' · неактивен в UMAG' : ''}
-          {form.umagSupplierId != null ? ` · ID ${form.umagSupplierId}` : ''}
-        </div>
+        // Everyone knows these data come from UMAG: no «Синхронизировано» banner; only a real exception is shown.
+        form.isUmagActive === false ? (
+          <div className="supplier-form__umag-badge" role="status">
+            Неактивен в UMAG
+          </div>
+        ) : null
       ) : (
         <div className="supplier-form__local-hint" role="note">
           Не связан с UMAG. Для участия в синхронизации поставщик должен быть создан или связан в

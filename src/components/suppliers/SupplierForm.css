@@ -39,8 +39,9 @@
 .supplier-form__payment-terms {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 2px;
+  gap: 16px;
+  /* The highlight ring (focus-target) is drawn outside, so the block needs no inner padding that shifts it sideways. */
+  padding: 0;
   border-radius: 12px;
   transition: box-shadow 0.25s ease, background 0.25s ease;
 }

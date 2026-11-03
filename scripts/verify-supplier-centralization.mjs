@@ -67,7 +67,7 @@ function main() {
   ok('safe duplicate merge migration present')
 
   const form = read('src/components/suppliers/SupplierForm.jsx')
-  assert.match(form, /Синхронизировано с UMAG/)
+  assert.match(form, /Данные UMAG/)
   assert.match(form, /Наши настройки/)
   assert.match(form, /readOnly=\{umagLocked\}/)
   ok('supplier form separates UMAG vs Shugyla fields')

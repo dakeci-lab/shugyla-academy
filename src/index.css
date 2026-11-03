@@ -254,7 +254,7 @@ html.pwa-standalone textarea {
   /* Fields: the same height as the buttons. Vertical padding is dropped (the height decides); horizontal padding stays
      whatever the component set. Textareas keep their own height. */
   input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='file']):not([type='hidden']):not([type='color']):not([type='button']):not([type='submit']):not([type='image']),
-  select {
+  select:not([multiple]):not([size]) {
     box-sizing: border-box;
     height: var(--pf-control-h);
     min-height: var(--pf-control-h);

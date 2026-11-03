@@ -1285,11 +1285,11 @@ export default function UmagSettlementsPanel({
         {editId && canDelete && (
           <button
             type="button"
-            className="btn suppliers-modal-footer__status-action suppliers-modal-footer__status-action--danger"
+            className="btn btn--danger suppliers-modal-footer__status-action"
             disabled={saving || deleting}
             onClick={requestDelete}
           >
-            Удалить поставщика
+            Удалить
           </button>
         )}
         <div className="suppliers-modal-footer__actions">
