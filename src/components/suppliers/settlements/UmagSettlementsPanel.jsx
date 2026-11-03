@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { usePlatformPageTitle } from '../../../context/PlatformPageTitleContext'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
 import { usePlatformData } from '../../../context/PlatformDataContext'
@@ -189,16 +190,16 @@ function OperationStatusCell({ op, canManage, onOpen }) {
   if (!settlement) return null
   const isPayable = settlement.type === 'payable'
   if (settlement.settled) {
-    return <span className="umag-settlements__done">✓ {isPayable ? 'Оплачено' : 'Возврат получен'}</span>
+    return <span className="umag-settlements__done">✓ Оплачено</span>
   }
   if (canManage) {
     return (
       <button type="button" className="umag-settlements__pay-btn" onClick={() => onOpen(op)}>
-        {isPayable ? 'Оплатить' : 'Получили возврат'}
+        Оплатить
       </button>
     )
   }
-  return <span className="umag-settlements__pending">{isPayable ? 'Не оплачено' : 'Ждём возврат'}</span>
+  return <span className="umag-settlements__pending">{isPayable ? 'Не оплачено' : 'Ждём оплаты'}</span>
 }
 
 /** Second line under the operation name: the document number, or who paid and from which account. */
@@ -230,91 +231,121 @@ function formatAccountNames(value) {
 }
 
 /**
- * Supplier card header: the name, the one number that matters («К оплате») and the details as quiet
- * text — only the ones that are actually filled in (no rows of «—»).
+ * Supplier page header, built like a purchase document: the name on the left, the one number that matters
+ * («К оплате») on the right, a row of buttons («Закрыть» / «Редактировать») and the details as compact cards
+ * (only what is really filled in). On phones the pencil sits next to the name and the cards fold into one.
  */
-function SupplierIdentityCard({ supplier, canEdit, canViewFinance, debtLoading, onEdit }) {
-  const balance = (
-    canViewFinance ? (
-      <div className="umag-settlements__id-balance">
-        <span className="umag-settlements__id-balance-label">К оплате</span>
-        <span
-          className={`umag-settlements__id-balance-amount${
-            supplier.debt > 0 ? '' : ' umag-settlements__id-balance-amount--zero'
-          }`}
-        >
-          {debtLoading ? '…' : formatUmagMoney(supplier.debt ?? 0)}
-        </span>
-        {!debtLoading && supplier.overdueAmount > 0 ? (
-          <span className="umag-settlements__id-balance-overdue">
-            из них просрочено {formatUmagMoney(supplier.overdueAmount)}
-          </span>
-        ) : null}
-      </div>
-    ) : null
-  )
+function SupplierDocHeader({ supplier, canEdit, canViewFinance, debtLoading, onBack, onEdit }) {
+  const isPhone = useMediaQuery('(max-width: 640px)')
+  usePlatformPageTitle('Расчёты', '', { showBack: true, backFallback: '/platform/supplier-finance' })
 
-  if (supplier.isVirtual) {
-    return (
-      <div className="umag-settlements__id">
-        <div className="umag-settlements__id-top">
-          <div className="umag-settlements__id-name">
-            <h2 className="umag-settlements__detail-title">{supplier.name}</h2>
-          </div>
-          <div className="umag-settlements__id-side">{balance}</div>
+  const balance = canViewFinance ? (
+    <div className="umag-settlements__id-balance">
+      <span className="umag-settlements__id-balance-label">К оплате</span>
+      <span
+        className={`umag-settlements__id-balance-amount${
+          supplier.debt > 0 ? '' : ' umag-settlements__id-balance-amount--zero'
+        }`}
+      >
+        {debtLoading ? '…' : formatUmagMoney(supplier.debt ?? 0)}
+      </span>
+      {!debtLoading && supplier.overdueAmount > 0 ? (
+        <span className="umag-settlements__id-balance-overdue">
+          из них просрочено {formatUmagMoney(supplier.overdueAmount)}
+        </span>
+      ) : null}
+    </div>
+  ) : null
+
+  const archived = !supplier.isVirtual && isSupplierDeleted(supplier)
+  const editable = canEdit && !supplier.isVirtual
+
+  const method = supplier.isVirtual ? '' : getPaymentAccountName(supplier.paymentAccountId)
+  const hasTerm = supplier.deferralDays != null && supplier.deferralDays !== ''
+  const payment = [method, hasTerm ? formatDeferralDaysTerm(supplier.deferralDays) : null].filter(Boolean).join(' · ')
+  // normalizeSupplier renders an empty weekday list as «—»; show only what is really filled in.
+  const filled = (value) => {
+    const text = String(value ?? '').trim()
+    return text && text !== '—' ? text : null
+  }
+  const orderDays = filled(supplier.orderDays)
+  const deliveryDays = filled(supplier.deliveryDays)
+  const manager = [filled(supplier.managerName), filled(supplier.managerPhone)].filter(Boolean)
+  const facts = [
+    { key: 'pay', label: 'Оплата', value: payment || 'Не настроено' },
+    { key: 'order', label: 'Дни заказа', value: orderDays || 'Не заполнены' },
+    { key: 'delivery', label: 'Дни поставки', value: deliveryDays || 'Не заполнены' },
+    { key: 'manager', label: 'Менеджер', value: manager.length ? manager.join(' · ') : 'Не указан' },
+  ]
+
+  return (
+    <>
+      <div className="sd-head">
+        <div className="sd-head__name">
+          <h2 className="sd-head__title">{supplier.name}</h2>
+          {archived ? <span className="umag-settlements__id-badge">Архив</span> : null}
+          {isPhone && editable ? (
+            <IconActionButton variant="edit" label="Редактировать поставщика" onClick={onEdit}>
+              <PencilIcon />
+            </IconActionButton>
+          ) : null}
         </div>
+        {balance}
+      </div>
+
+      {!isPhone ? (
+        <div className="sd-bar">
+          <button type="button" className="btn btn--outline" onClick={onBack}>
+            Закрыть
+          </button>
+          <span className="sd-bar__spacer" />
+          {editable ? (
+            <button type="button" className="btn btn--outline" onClick={onEdit}>
+              Редактировать
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {supplier.isVirtual ? (
         <p className="umag-settlements__id-note">
           Документы UMAG, у которых не выбран поставщик (например, приёмка ещё не оформлена полностью).
           Выберите поставщика в UMAG — после синхронизации документ перейдёт к нему. Оплатить такой
           документ можно и здесь.
         </p>
-      </div>
-    )
-  }
-
-  const archived = isSupplierDeleted(supplier)
-  const method = getPaymentAccountName(supplier.paymentAccountId)
-  const hasTerm = supplier.deferralDays != null && supplier.deferralDays !== ''
-  const payment = [method, hasTerm ? formatDeferralDaysTerm(supplier.deferralDays) : null].filter(Boolean)
-  // normalizeSupplier renders an empty weekday list as «—»; quiet text shows only what is really filled in.
-  const filled = (value) => {
-    const text = String(value ?? '').trim()
-    return text && text !== '—' ? text : null
-  }
-  const contacts = [
-    filled(supplier.legalName),
-    filled(supplier.bin) ? `БИН ${filled(supplier.bin)}` : null,
-    filled(supplier.managerName),
-    filled(supplier.managerPhone),
-    filled(supplier.orderDays) ? `Заказ: ${filled(supplier.orderDays)}` : null,
-    filled(supplier.deliveryDays) ? `Доставка: ${filled(supplier.deliveryDays)}` : null,
-  ].filter(Boolean)
-
-  return (
-    <div className="umag-settlements__id">
-      <div className="umag-settlements__id-top">
-        <div className="umag-settlements__id-name">
-          <h2 className="umag-settlements__detail-title">{supplier.name}</h2>
-          {archived ? <span className="umag-settlements__id-badge">Архив</span> : null}
+      ) : isPhone ? (
+        <details className="sd-fold">
+          <summary>
+            <span className="sd-fold__text">
+              <b>{payment || 'Оплата не настроена'}</b>
+              <span>
+                Заказ: {orderDays || '—'} · Поставка: {deliveryDays || '—'}
+              </span>
+            </span>
+            <span className="sd-fold__chev" aria-hidden="true">
+              ⌄
+            </span>
+          </summary>
+          <dl>
+            {facts.map((fact) => (
+              <div key={fact.key}>
+                <dt>{fact.label}</dt>
+                <dd>{fact.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
+      ) : (
+        <div className="sd-cards">
+          {facts.map((fact) => (
+            <div key={fact.key} className="sd-card">
+              <span className="sd-card__label">{fact.label}</span>
+              <span className="sd-card__value">{fact.value}</span>
+            </div>
+          ))}
         </div>
-        <div className="umag-settlements__id-side">
-          {balance}
-          {canEdit ? (
-            <IconActionButton
-              variant="edit"
-              label="Редактировать поставщика"
-              onClick={onEdit}
-            >
-              <PencilIcon />
-            </IconActionButton>
-          ) : null}
-        </div>
-      </div>
-      <p className="umag-settlements__id-meta">
-        {payment.length > 0 ? `Оплата: ${payment.join(' · ')}` : 'Способ оплаты не настроен'}
-      </p>
-      {contacts.length > 0 ? <p className="umag-settlements__id-meta">{contacts.join(' · ')}</p> : null}
-    </div>
+      )}
+    </>
   )
 }
 
@@ -347,7 +378,7 @@ function UmagSupplierDetail({
   const periodLabel = useMemo(() => describeSettlementsPeriod(dateFrom, dateTo), [dateFrom, dateTo])
   const filterActive = isSettlementsFilterActive(dateFrom, dateTo)
 
-  // Warms the payment-accounts cache so SupplierIdentityCard's «Способ
+  // Warms the payment-accounts cache so SupplierDocHeader's «Способ
   // оплаты» resolves even when nothing else on the page has loaded it yet;
   // the setState-on-resolve forces the one re-render needed to show it.
   const [, setAccountsCacheVersion] = useState(0)
@@ -658,15 +689,12 @@ function UmagSupplierDetail({
           )
         : null}
 
-      <button type="button" className="umag-settlements__back" onClick={onBack}>
-        ← К списку поставщиков
-      </button>
-
-      <SupplierIdentityCard
+      <SupplierDocHeader
         supplier={supplier}
         canEdit={canEditSupplier}
         canViewFinance={canViewFinance}
         debtLoading={debtLoading}
+        onBack={onBack}
         onEdit={onEdit}
       />
 
@@ -1009,6 +1037,7 @@ export default function UmagSettlementsPanel({
   embedded = false,
   refreshToken = null,
   filterSlot = null,
+  toolsSlot = null,
 } = {}) {
   const { user } = useSession()
   const toast = useToast()
@@ -1047,7 +1076,13 @@ export default function UmagSettlementsPanel({
 
   const [lastRun, setLastRun] = useState(null)
   const [syncing, setSyncing] = useState(false)
-  const [selectedId, setSelectedId] = useState(null)
+  // The open supplier lives in the address (/platform/supplier-finance/:supplierId), not in component state.
+  const { supplierId: routeSupplierId } = useParams()
+  const selectedId = routeSupplierId || null
+  const setSelectedId = useCallback(
+    (id) => navigate(id ? `/platform/supplier-finance/${encodeURIComponent(id)}` : '/platform/supplier-finance'),
+    [navigate]
+  )
   const [debtSummary, setDebtSummary] = useState(new Map())
   const debtByPlatformId = useMemo(
     () => new Map([...debtSummary].map(([id, entry]) => [id, entry.amount])),
@@ -1398,9 +1433,62 @@ export default function UmagSettlementsPanel({
     />
   )
 
+  const listTools =
+    suppliersReady && debtsSettled ? (
+            <div className="umag-settlements__list-tools">
+        <div className="umag-settlements__ops-filters" role="tablist" aria-label="Какие поставщики показывать">
+                {[
+                  { id: 'debt', label: 'С долгом', count: withDebtCount },
+                  ...(overdueSuppliersCount > 0
+                    ? [{ id: 'overdue', label: 'Просрочено', count: overdueSuppliersCount, tone: 'danger' }]
+                    : []),
+                  { id: 'all', label: 'Все', count: 0 },
+                ].map((opt) => {
+                  const active = !searchingList && opt.id === listView
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active}
+                      className={`umag-settlements__ops-filter${active ? ' umag-settlements__ops-filter--active' : ''}`}
+                      onClick={() => {
+                        setListQuery('')
+                        setListView(opt.id)
+                      }}
+                    >
+                      {opt.label}
+                      {opt.count ? (
+                        <span
+                          className={`umag-settlements__ops-filter-count${
+                            opt.tone === 'danger' ? ' umag-settlements__ops-filter-count--danger' : ''
+                          }`}
+                        >
+                          {opt.count}
+                        </span>
+                      ) : null}
+                    </button>
+                  )
+                })}
+              </div>
+              <input
+                type="search"
+                className="umag-settlements__search"
+                value={listQuery}
+                onChange={(event) => setListQuery(event.target.value)}
+                placeholder="Найти поставщика"
+                aria-label="Поиск поставщика"
+              />
+            </div>
+    ) : null
+
+  // A supplier address opened directly (reload / link): wait for the list instead of flashing the list page.
+  const waitingForSupplier = Boolean(selectedId) && !selected && (!suppliersReady || !debtsSettled)
+
   return (
     <>
-      {selected ? (
+      {waitingForSupplier ? <DelayedLoadingSkeleton variant="table" count={5} /> : null}
+      {waitingForSupplier ? null : selected ? (
         <UmagSupplierDetail
           supplier={{
             ...selected,
@@ -1479,53 +1567,7 @@ export default function UmagSettlementsPanel({
             </div>
           )}
 
-          {suppliersReady && debtsSettled ? (
-            <div className="umag-settlements__list-tools">
-              <div className="umag-settlements__ops-filters" role="tablist" aria-label="Какие поставщики показывать">
-                {[
-                  { id: 'debt', label: 'С долгом', count: withDebtCount },
-                  ...(overdueSuppliersCount > 0
-                    ? [{ id: 'overdue', label: 'Просрочено', count: overdueSuppliersCount, tone: 'danger' }]
-                    : []),
-                  { id: 'all', label: 'Все', count: 0 },
-                ].map((opt) => {
-                  const active = !searchingList && opt.id === listView
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      className={`umag-settlements__ops-filter${active ? ' umag-settlements__ops-filter--active' : ''}`}
-                      onClick={() => {
-                        setListQuery('')
-                        setListView(opt.id)
-                      }}
-                    >
-                      {opt.label}
-                      {opt.count ? (
-                        <span
-                          className={`umag-settlements__ops-filter-count${
-                            opt.tone === 'danger' ? ' umag-settlements__ops-filter-count--danger' : ''
-                          }`}
-                        >
-                          {opt.count}
-                        </span>
-                      ) : null}
-                    </button>
-                  )
-                })}
-              </div>
-              <input
-                type="search"
-                className="umag-settlements__search"
-                value={listQuery}
-                onChange={(event) => setListQuery(event.target.value)}
-                placeholder="Найти поставщика"
-                aria-label="Поиск поставщика"
-              />
-            </div>
-          ) : null}
+          {toolsSlot && listTools ? createPortal(listTools, toolsSlot) : listTools}
 
           {(!suppliersReady && filtered.length === 0) || !debtsSettled ? (
             <DelayedLoadingSkeleton variant="table" count={5} />

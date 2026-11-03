@@ -627,3 +627,172 @@
     font-size: 16px;
   }
 }
+
+/* ---- Supplier page, built like a purchase document ---- */
+.sd-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.sd-head__name {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sd-head__title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.sd-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+}
+
+.sd-bar__spacer {
+  flex: 1 1 auto;
+}
+
+.sd-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.sd-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 8px 14px 10px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-white, #fff);
+}
+
+.sd-card__label {
+  font-size: 12.5px;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.sd-card__value {
+  font-size: 15px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.sd-fold {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-white, #fff);
+}
+
+.sd-fold > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  list-style: none;
+  cursor: pointer;
+}
+
+.sd-fold > summary::-webkit-details-marker {
+  display: none;
+}
+
+.sd-fold__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.sd-fold__text span {
+  font-size: 12px;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.sd-fold__chev {
+  font-size: 18px;
+  color: var(--color-text-secondary, #64748b);
+  transition: transform 0.2s;
+}
+
+.sd-fold[open] .sd-fold__chev {
+  transform: rotate(180deg);
+}
+
+.sd-fold dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 10px 14px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+}
+
+.sd-fold dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.sd-fold dt {
+  color: var(--color-text-secondary, #64748b);
+}
+
+.sd-fold dd {
+  margin: 0;
+  font-weight: 600;
+  text-align: right;
+}
+
+/* ---- Readability: the list names are dark, green only on hover; a chosen chip keeps dark text ---- */
+.umag-settlements--list .pgt__link {
+  color: var(--color-text, #0f172a);
+  font-weight: 600;
+}
+
+.umag-settlements--list .pgt__row:hover .pgt__link {
+  color: var(--color-primary-dark, #047857);
+}
+
+.umag-settlements__ops-filter--active {
+  border-color: var(--color-primary, #059669);
+  background: var(--color-primary-light, #ecfdf5);
+  color: var(--color-text, #0f172a);
+}
+
+.umag-settlements__ops-filter-count {
+  background: var(--color-primary, #059669);
+}
+
+.umag-settlements__ops-filter-count--danger {
+  background: #b91c1c;
+}
+
+@media (max-width: 1080px) and (min-width: 641px) {
+  .sd-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Phones: filter chips are one row that scrolls sideways instead of wrapping into three rows. */
+@media (max-width: 640px) {
+  .umag-settlements__ops-filters {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .umag-settlements__ops-filter {
+    flex: none;
+  }
+}

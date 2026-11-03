@@ -87,6 +87,7 @@
     "verify:app-bootstrap": "node scripts/verify-app-bootstrap.mjs",
     "verify:progressive-bootstrap": "node scripts/verify-progressive-bootstrap.mjs",
     "verify:employee-admin-edge-performance": "node scripts/verify-employee-admin-edge-performance.mjs",
+    "verify:settlements-like-purchases": "node scripts/verify-settlements-like-purchases.mjs",
     "verify:supplier-modal": "node scripts/verify-supplier-modal.mjs",
     "verify:supplier-goods-block": "node scripts/verify-supplier-goods-block.mjs",
     "verify:button-size": "node scripts/verify-button-size.mjs",

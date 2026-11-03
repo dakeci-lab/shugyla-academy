@@ -14,12 +14,29 @@
   border-bottom: 1px solid var(--color-border, #e5e7eb);
 }
 
+/* One row: «Фильтр» | the list's chips and search (they take the free width) | UMAG status | refresh. */
 .sfp-panel__sync {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
-  gap: 8px;
+  gap: 8px 10px;
   min-width: 0;
   padding-bottom: 0.4rem;
+}
+
+.sfp-panel__tools-slot {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  min-width: 0;
+}
+
+.sfp-panel__tools-slot > * {
+  flex: 1 1 auto;
+}
+
+.sfp-panel__sync-status {
+  margin-left: auto;
 }
 
 .sfp-panel__filter-slot {
@@ -64,4 +81,28 @@
   width: var(--pf-control-h);
   height: var(--pf-control-h);
   border-radius: var(--pf-control-radius);
+}
+
+.sfp-panel__tools-slot .umag-settlements__list-tools {
+  flex-wrap: nowrap;
+  width: 100%;
+}
+
+.sfp-panel__tools-slot .umag-settlements__search {
+  flex: 0 1 280px;
+}
+
+@media (max-width: 900px) {
+  .sfp-panel__sync {
+    flex-wrap: wrap;
+  }
+
+  .sfp-panel__tools-slot {
+    order: 5;
+    flex: 1 1 100%;
+  }
+
+  .sfp-panel__tools-slot .umag-settlements__list-tools {
+    flex-wrap: wrap;
+  }
 }

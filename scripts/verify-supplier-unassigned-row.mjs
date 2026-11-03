@@ -45,8 +45,9 @@ ok('history is scoped to documents without a supplier (incl. native paid marks)'
 const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
 assert.match(panel, /includeUnassigned: true/)
 assert.match(panel, /unassignedDebt !== 0 && supplierFilter\.size === 0 && !appliedShowArchived/)
-assert.match(panel, /if \(supplier\.isVirtual\) \{[\s\S]{0,1200}?\n  \}\n\n  const archived/)
-assert.doesNotMatch(panel.slice(panel.indexOf('if (supplier.isVirtual) {'), panel.indexOf('const archived = isSupplierDeleted(supplier)')), /IconActionButton/)
+assert.match(panel, /const editable = canEdit && !supplier\.isVirtual/)
+assert.match(panel, /supplier\.isVirtual \? \(\s*<p className="umag-settlements__id-note">/)
+assert.doesNotMatch(panel, /isVirtual && editable/)
 assert.match(panel, /platformSupplierId: supplier\.isVirtual \? null : supplier\.id/)
 ok('row shown only when there is unassigned debt; no edit action; payments carry a null supplier')
 
