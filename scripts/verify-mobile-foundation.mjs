@@ -95,4 +95,8 @@ assert.match(sheetCss, /\.period-sheet \.period-filter-popover__presets\s*\{\s*f
 assert.match(sheetCss, /\.period-sheet \.pf-field__label\s*\{\s*position: absolute/)
 ok('phone filter sheet like UMAG: «Фильтры» + «Очистить» in the header, «За период», five chips in one row, plain outlined fields (names as placeholders), one full-width «Применить»')
 
+assert.match(sheet, /\{phone \? null : \(\s*<>\s*<span className="period-filter-popover__label">Произвольный период<\/span>/)
+assert.doesNotMatch(sheetCss, /period-filter-popover__date-field > span:first-child/)
+ok('the phone filter has no «С / По» fields (UMAG has none); the desktop popover keeps them')
+
 console.log(`\nverify:mobile-foundation — ${checks} checks passed`)
