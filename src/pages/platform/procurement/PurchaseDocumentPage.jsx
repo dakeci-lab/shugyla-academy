@@ -7,7 +7,13 @@ import { useToast } from '../../../context/ToastContext'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import useMediaQuery from '../../../hooks/useMediaQuery'
 import { getPlatformSection } from '../../../platform/platformNav'
-import { canViewOrders, canEditPurchase, canMarkOrderChecked } from '../../../config/permissions'
+import {
+  canViewOrders,
+  canEditPurchase,
+  canMarkOrderChecked,
+  canViewUmagSettlements,
+} from '../../../config/permissions'
+import { fetchNativeSupplierDebtSummary } from '../../../services/supplierDebtService'
 import {
   getPurchaseOrderByIdSync,
   getPurchaseOrderById,
@@ -87,6 +93,7 @@ export default function PurchaseDocumentPage() {
   const [nomenclatureOpen, setNomenclatureOpen] = useState(false)
   const [qtyDraft, setQtyDraft] = useState({})
   const [detailId, setDetailId] = useState(null)
+  const [supplierDebt, setSupplierDebt] = useState(null)
   const isPhone = useMediaQuery('(max-width: 640px)')
   const exportRef = useRef(null)
 
@@ -135,6 +142,27 @@ export default function PurchaseDocumentPage() {
       cancelled = true
     }
   }, [id, version, showError])
+
+  // What we owe the supplier (open invoices) — shown next to the supplier like UMAG's «Баланс», for whoever sees payments.
+  const canSeeDebt = canViewUmagSettlements(user) && isCloudMode()
+  const debtSupplierId = order?.supplierId || null
+  useEffect(() => {
+    if (!canSeeDebt || !debtSupplierId) {
+      setSupplierDebt(null)
+      return undefined
+    }
+    let cancelled = false
+    fetchNativeSupplierDebtSummary({ platformSupplierIds: [debtSupplierId] })
+      .then((map) => {
+        if (!cancelled) setSupplierDebt(map.get(debtSupplierId)?.amount ?? 0)
+      })
+      .catch(() => {
+        if (!cancelled) setSupplierDebt(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [canSeeDebt, debtSupplierId])
 
   useEffect(() => {
     if (!exportOpen) return undefined
@@ -430,10 +458,18 @@ export default function PurchaseDocumentPage() {
           <span className="pdoc__label">{ORDER_LABELS.orderDate}</span>
           <DocumentDateBox value={(order.date || order.createdAt || '').slice(0, 10)} disabled label={ORDER_LABELS.orderDate} />
         </div>
-        <div className="pdoc__card">
-          <span className="pdoc__label">
-            {ORDER_LABELS.supplier}
-            {editable ? ' *' : ''}
+        <div className="pdoc__group">
+        <div className="pdoc__card pdoc__card--supplier">
+          <span className="pdoc__label pdoc__label--row">
+            <span>
+              {ORDER_LABELS.supplier}
+              {editable ? ' *' : ''}
+            </span>
+            {supplierDebt != null ? (
+              <span className="pdoc__balance" title="Сколько мы должны поставщику по неоплаченным накладным">
+                Баланс: <b className="num">{formatPurchaseAmount(supplierDebt)}</b>
+              </span>
+            ) : null}
           </span>
           {editable ? (
             <DocumentSupplierPicker
@@ -446,11 +482,14 @@ export default function PurchaseDocumentPage() {
           ) : (
             <span className="pdoc__value">{order.supplierName || '—'}</span>
           )}
-          {editable && order.supplierId && isCloudMode() ? (
-            <button type="button" className="pdoc__link" onClick={() => setGoodsOpen(true)}>
+        </div>
+        {editable && order.supplierId && isCloudMode() ? (
+          <div className="pdoc__goods-block">
+            <button type="button" className="pdoc__goods-btn" onClick={() => setGoodsOpen(true)}>
               ＋ Товары поставщика
             </button>
-          ) : null}
+          </div>
+        ) : null}
         </div>
         <div className="pdoc__card">
           <span className="pdoc__label">

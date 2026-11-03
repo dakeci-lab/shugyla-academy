@@ -39,7 +39,8 @@ ok('on phones the items table is a card grid and the «Итого» row is pinne
 assert.match(page, /pdoc__unit/)
 assert.match(css, /\.pdoc__unit\s*\{\s*display: none/)
 ok('the unit next to the quantity is phones-only (desktop table is unchanged)')
-assert.match(css, /\.pdoc__cards > \.pdoc__card:nth-child\(2\)\s*\{[^}]*grid-column: 1 \/ -1/)
+assert.match(css, /max-width: 720px\)[\s\S]*\.pdoc__cards > \.pdoc__card\s*\{\s*flex: 1 1 calc\(50% - 4px\)/)
+assert.match(css, /\.pdoc__group\s*\{\s*order: -1;\s*flex: 1 1 100%/)
 ok('date and delivery sit side by side on phones, the supplier takes its own row')
 
 const table = read('src/components/procurement/PurchaseTable.jsx')
