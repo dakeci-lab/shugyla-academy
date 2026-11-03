@@ -1865,7 +1865,7 @@ type OpenObligationDatePoint = {
 /**
  * Paginated read of every currently open obligation's debt + best-effort date.
  * "Open" mirrors the canonical debt predicate from Этап 2.1: is_source_deleted
- * = false AND current_debt > 0 — closed/soft-deleted rows never widen the range.
+ * = false AND current_debt > 0 AND not marked paid in the platform — closed/soft-deleted rows never widen the range.
  */
 async function fetchOpenObligationDatePoints(
   // deno-lint-ignore no-explicit-any
@@ -1887,6 +1887,8 @@ async function fetchOpenObligationDatePoints(
       .select('current_debt, supply_document_date, umag_supply_row_id')
       .eq('is_source_deleted', false)
       .gt('current_debt', 0)
+      // Paid in the platform = closed (UMAG current_debt is not a payment sign): never widen/warn for it.
+      .is('platform_paid_at', null)
       .range(from, from + pageSize - 1)
     if (error) return { points: [], error }
     const page = data || []
