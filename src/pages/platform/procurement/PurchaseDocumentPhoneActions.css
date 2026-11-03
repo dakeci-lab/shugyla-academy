@@ -8,6 +8,10 @@
   color: var(--color-danger, #c03c34);
 }
 
+.pdoc-phone-actions__cancel {
+  color: var(--color-danger, #c03c34);
+}
+
 .pdoc-phone-actions__save {
   color: var(--color-primary, #059669);
 }

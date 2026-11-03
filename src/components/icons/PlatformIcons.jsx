@@ -390,3 +390,26 @@ export function MoreIcon({ size = 18 }) {
     </svg>
   )
 }
+
+/** Document with a «no» badge — cancel a saved document (like UMAG's «Отменить проведение»). */
+export function CancelDocIcon({ size = 18 }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M13 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h4" />
+      <path d="M13 3l5 5v3" />
+      <path d="M13 3v5h5" />
+      <circle cx="17.5" cy="17.5" r="4" />
+      <path d="M14.7 20.3l5.6-5.6" />
+    </svg>
+  )
+}
