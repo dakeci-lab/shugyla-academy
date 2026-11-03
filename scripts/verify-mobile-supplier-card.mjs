@@ -7,9 +7,13 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
 
 const panel = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
 
-assert.match(panel, /filterTrigger = isPhoneList \? \(\s*<PlatformFilterRow/)
-assert.match(panel, /hint="Период, Тип операций"/)
-ok('phones: the supplier card has the same single «Фильтры» row as the lists')
+assert.match(panel, /showFilterIcon = isPhoneList && canViewFinance && phoneTab === 'pay'/)
+assert.match(panel, /aria-label="Фильтры"/)
+ok('phones: the filter is an icon of the page header next to the pencil, only on the «Платежи» page')
+
+assert.match(panel, /\{ id: 'pay', label: 'Платежи' \},\s*\{ id: 'info', label: 'Информация' \}/)
+assert.match(panel, /setPhoneTab\(dx < 0 \? 'info' : 'pay'\)/)
+ok('phones: two pages like UMAG — «Платежи» first, «Информация» second; a swipe moves between them')
 
 assert.match(panel, /const opsFilterOptions = \[/)
 assert.match(panel, /period-filter-popover__label">Показать<\/span>/)
@@ -20,18 +24,21 @@ ok('phones: period and the type of operations («Не закрытые / Про�
 assert.match(panel, /\{isPhoneList \? null : \(\s*<>\s*<h3 className="umag-settlements__section-title">/)
 ok('phones: no «История операций · период» caption and no row of chips above the list')
 
-assert.match(panel, /isPhoneList && !detailLoading && selectedOps\.length === 0 \? \(\s*<PlatformFloatingSearch/)
-assert.match(panel, /placeholder="Номер или сумма"/)
-ok('phones: the document search floats at the bottom (hidden while rows are ticked, the pay bar takes that place)')
+assert.match(panel, /isPhoneList && !detailLoading \? \(\s*<PlatformFloatingSearch/)
+assert.match(panel, /total=\{formatUmagMoney\(supplier\.debt \?\? 0\)\}/)
+ok('phones: the search floats at the bottom and the debt total is pinned under it')
 
-assert.match(panel, /usePlatformPageTitle\(\s*selected && isPhoneMain \? selected\.name : 'Расчёты'/)
+assert.match(panel, /usePlatformPageTitle\(isPhoneList \? supplier\.name : ''/)
 assert.match(panel, /umag-settlements__header-edit/)
-assert.match(panel, /sd-head--phone/)
-ok('phones: the supplier name is the page title and the pencil is a header icon (not in the card body)')
+ok('phones: the supplier name is the page title and the pencil is a header icon')
 
-assert.match(panel, /className="pgt__day"/)
-assert.match(panel, /formatDocumentGroupLabel\(dayKey\)/)
-assert.match(panel, /sd-pill sd-pill--overdue/)
-ok('phones: operations are grouped by day like «Закуп», overdue is a red pill')
+const rows = panel.slice(panel.indexOf('<div className="sd-ops">'), panel.indexOf('<PgtTable columns={historyColumns}>'))
+assert.doesNotMatch(rows, /checkbox|pgt__day|OperationStatusCell/)
+assert.match(rows, /formatUmagDate\(op\.sortAt\)/)
+assert.match(rows, /sd-pill sd-pill--overdue/)
+ok('phones: one flat list — no day groups, no ticks, no «Оплатить» button; number, amount, date and the red «Просрочено» pill; a tap opens the payment window')
+
+assert.match(panel, /sd-info__card/)
+ok('phones: the supplier data lives on the «Информация» page')
 
 console.log(`\nverify:mobile-supplier-card — ${checks} checks passed`)

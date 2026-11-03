@@ -26,7 +26,7 @@ for (const [file, source] of [
 
 const settlements = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
 assert.match(settlements, /useInfiniteSlice\(visibleOps, \{\s*enabled: isPhoneList/)
-assert.match(settlements, /opsInfinite\.visible\.map\(\(op, index, list\)/)
+assert.match(settlements, /opsInfinite\.visible\.map\(\(op\)/)
 assert.match(settlements, /opsInfinite\.hasMore \? <div ref=\{opsInfinite\.sentinelRef\}/)
 assert.match(settlements, /useInfiniteSlice\(filtered, \{\s*enabled: isPhoneMain/)
 assert.match(settlements, /listInfinite\.visible\.map\(\(s\)/)
