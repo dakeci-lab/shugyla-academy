@@ -82,7 +82,7 @@ import { formatDocumentGroupLabel } from '../../../utils/purchaseDocumentsList'
 import useInfiniteSlice from '../../../hooks/useInfiniteSlice'
 import ConfirmDialog from '../../admin/ConfirmDialog'
 import IconActionButton from '../../admin/IconActionButton'
-import { PencilIcon } from '../../icons/PlatformIcons'
+import { FilterIcon, PencilIcon } from '../../icons/PlatformIcons'
 import '../../admin/IconActionButton.css'
 import OperationDetailSheet from './OperationDetailSheet'
 import PeriodFilterPopover, {
@@ -288,22 +288,57 @@ function SupplierDocHeader({ supplier, canEdit, canViewFinance, debtLoading, onB
     { key: 'manager', label: 'Менеджер', value: manager.length ? manager.join(' · ') : 'Не указан' },
   ]
 
+  // Phones: this is the «Информация» page of the card (the name and the pencil are in the page header).
+  if (isPhone) {
+    const rows = supplier.isVirtual
+      ? []
+      : [
+          ...(canViewFinance
+            ? [
+                { key: 'debt', label: 'К оплате', value: debtLoading ? '…' : formatUmagMoney(supplier.debt ?? 0) },
+                ...(!debtLoading && supplier.overdueAmount > 0
+                  ? [{ key: 'overdue', label: 'Просрочено', value: formatUmagMoney(supplier.overdueAmount), tone: 'danger' }]
+                  : []),
+              ]
+            : []),
+          ...facts,
+        ]
+    return (
+      <div className="sd-info">
+        {supplier.isVirtual ? (
+          <p className="umag-settlements__id-note">
+            Документы UMAG, у которых не выбран поставщик (например, приёмка ещё не оформлена полностью).
+            Выберите поставщика в UMAG — после синхронизации документ перейдёт к нему.
+          </p>
+        ) : (
+          <section className="sd-info__card">
+            <h3 className="sd-info__title">
+              Данные поставщика
+              {archived ? <span className="umag-settlements__id-badge">Архив</span> : null}
+            </h3>
+            {rows.map((row) => (
+              <div key={row.key} className="sd-info__row">
+                <span>{row.label}</span>
+                <b className={row.tone === 'danger' ? 'sd-info__value--danger' : ''}>{row.value}</b>
+              </div>
+            ))}
+          </section>
+        )}
+      </div>
+    )
+  }
+
   return (
     <>
-      <div className={`sd-head${isPhone ? ' sd-head--phone' : ''}`}>
-        {/* Phones: the supplier's name is the page title and the pencil is an icon of the page header. */}
-        {isPhone ? (
-          archived ? <span className="umag-settlements__id-badge">Архив</span> : null
-        ) : (
-          <div className="sd-head__name">
-            <h2 className="sd-head__title">{supplier.name}</h2>
-            {archived ? <span className="umag-settlements__id-badge">Архив</span> : null}
-          </div>
-        )}
+      <div className="sd-head">
+        <div className="sd-head__name">
+          <h2 className="sd-head__title">{supplier.name}</h2>
+          {archived ? <span className="umag-settlements__id-badge">Архив</span> : null}
+        </div>
         {balance}
       </div>
 
-      {!isPhone ? (
+      {true ? (
         <div className="sd-bar">
           <button type="button" className="btn btn--outline" onClick={onBack}>
             Закрыть
@@ -323,28 +358,6 @@ function SupplierDocHeader({ supplier, canEdit, canViewFinance, debtLoading, onB
           Выберите поставщика в UMAG — после синхронизации документ перейдёт к нему. Оплатить такой
           документ можно и здесь.
         </p>
-      ) : isPhone ? (
-        <details className="sd-fold">
-          <summary>
-            <span className="sd-fold__text">
-              <b>{payment || 'Оплата не настроена'}</b>
-              <span>
-                Заказ: {orderDays || '—'} · Поставка: {deliveryDays || '—'}
-              </span>
-            </span>
-            <span className="sd-fold__chev" aria-hidden="true">
-              ⌄
-            </span>
-          </summary>
-          <dl>
-            {facts.map((fact) => (
-              <div key={fact.key}>
-                <dt>{fact.label}</dt>
-                <dd>{fact.value}</dd>
-              </div>
-            ))}
-          </dl>
-        </details>
       ) : (
         <div className="sd-cards">
           {facts.map((fact) => (
@@ -385,6 +398,9 @@ function UmagSupplierDetail({
   const [filterOpen, setFilterOpen] = useState(false)
   const [draftFilter, setDraftFilter] = useState(defaultPeriod)
   const filterButtonRef = useRef(null)
+  // Phones: the card has two pages like UMAG's customer card — «Платежи» (first) and «Информация».
+  const [phoneTab, setPhoneTab] = useState('pay')
+  const swipeRef = useRef(null)
 
   const periodLabel = useMemo(() => describeSettlementsPeriod(dateFrom, dateTo), [dateFrom, dateTo])
   const filterActive = isSettlementsFilterActive(dateFrom, dateTo)
@@ -709,15 +725,51 @@ function UmagSupplierDetail({
   ]
 
   const opsFilterChanged = opsFilterTouched && opsFilter !== (openCount > 0 ? 'open' : 'all')
-  const filterTrigger = isPhoneList ? (
-    <PlatformFilterRow
-      ref={filterButtonRef}
-      count={(filterActive ? 1 : 0) + (opsFilterChanged ? 1 : 0)}
-      open={filterOpen}
-      onClick={openFilter}
-      hint="Период, Тип операций"
-    />
-  ) : (
+  const filterCount = (filterActive ? 1 : 0) + (opsFilterChanged ? 1 : 0)
+  const openFilterRef = useRef(null)
+  openFilterRef.current = openFilter
+  const editRef = useRef(null)
+  editRef.current = onEdit
+  const canEditHere = Boolean(canEditSupplier && !supplier.isVirtual)
+  const showFilterIcon = isPhoneList && canViewFinance && phoneTab === 'pay'
+  const phoneActions = useMemo(
+    () =>
+      isPhoneList ? (
+        <>
+          {showFilterIcon ? (
+            <button
+              type="button"
+              ref={filterButtonRef}
+              className="platform-mobile-header__icon-btn umag-settlements__header-edit umag-settlements__header-filter"
+              aria-label="Фильтры"
+              aria-haspopup="dialog"
+              onClick={() => openFilterRef.current?.()}
+            >
+              <FilterIcon size={20} />
+              {filterCount > 0 ? <span className="umag-settlements__header-badge">{filterCount}</span> : null}
+            </button>
+          ) : null}
+          {canEditHere ? (
+            <button
+              type="button"
+              className="platform-mobile-header__icon-btn umag-settlements__header-edit"
+              aria-label="Редактировать поставщика"
+              onClick={() => editRef.current?.()}
+            >
+              <PencilIcon size={20} />
+            </button>
+          ) : null}
+        </>
+      ) : null,
+    [isPhoneList, showFilterIcon, filterCount, canEditHere]
+  )
+  // Phones: the supplier's name is the page title (the page above passes an empty title for a card).
+  usePlatformPageTitle(isPhoneList ? supplier.name : '', '', {
+    showBack: true,
+    backFallback: '/platform/supplier-finance',
+    actions: phoneActions,
+  })
+  const filterTrigger = isPhoneList ? null : (
     <PlatformFilterTrigger
       ref={filterButtonRef}
       active={filterActive}
@@ -764,7 +816,7 @@ function UmagSupplierDetail({
 
   return (
     <div className="umag-settlements umag-settlements--detail">
-      {canViewFinance && filterSlot
+      {canViewFinance && filterSlot && !isPhoneList
         ? createPortal(
             <div className="pf-filter-anchor">
               {filterTrigger}
@@ -774,16 +826,55 @@ function UmagSupplierDetail({
           )
         : null}
 
-      <SupplierDocHeader
+      {isPhoneList && canViewFinance ? filterPopover : null}
+
+      {isPhoneList ? (
+        <div className="sd-tabs" role="tablist" aria-label="Разделы карточки поставщика">
+          {[
+            { id: 'pay', label: 'Платежи' },
+            { id: 'info', label: 'Информация' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              aria-selected={phoneTab === tab.id}
+              className={`sd-tabs__tab${phoneTab === tab.id ? ' is-active' : ''}`}
+              onClick={() => setPhoneTab(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
+      <div
+        className="sd-pages"
+        onTouchStart={(event) => {
+          const t = event.touches[0]
+          swipeRef.current = isPhoneList ? { x: t.clientX, y: t.clientY } : null
+        }}
+        onTouchEnd={(event) => {
+          const start = swipeRef.current
+          swipeRef.current = null
+          if (!start) return
+          const t = event.changedTouches[0]
+          const dx = t.clientX - start.x
+          const dy = t.clientY - start.y
+          if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+          setPhoneTab(dx < 0 ? 'info' : 'pay')
+        }}
+      >
+      {isPhoneList && phoneTab === 'pay' ? null : <SupplierDocHeader
         supplier={supplier}
         canEdit={canEditSupplier}
         canViewFinance={canViewFinance}
         debtLoading={debtLoading}
         onBack={onBack}
         onEdit={onEdit}
-      />
+      />}
 
-      {canViewFinance ? (
+      {canViewFinance && !(isPhoneList && phoneTab === 'info') ? (
         <>
           <section className="umag-settlements__ops" aria-label="История операций">
             {isPhoneList ? null : (
@@ -833,12 +924,13 @@ function UmagSupplierDetail({
               </>
             )}
 
-            {isPhoneList && !detailLoading && selectedOps.length === 0 ? (
+            {isPhoneList && !detailLoading ? (
               <PlatformFloatingSearch
                 value={opsQuery}
                 onChange={setOpsQuery}
                 placeholder="Номер или сумма"
                 label="Поиск по документам"
+                total={formatUmagMoney(supplier.debt ?? 0)}
               />
             ) : null}
 
@@ -866,13 +958,8 @@ function UmagSupplierDetail({
             ) : (
               isPhoneList ? (
                 <div className="sd-ops">
-                  {opsInfinite.visible.map((op, index, list) => {
+                  {opsInfinite.visible.map((op) => {
                     const sign = operationAmountSign(op)
-                    const selectable = isBulkPayable(op, canManagePayments)
-                    const picked = selectable && selectedIds.has(op.id)
-                    // Rows of the same day sit under one header («Вт, 3 Ноября»), so a row does not repeat the date.
-                    const dayKey = operationDayKey(op)
-                    const startsDay = index === 0 || operationDayKey(list[index - 1]) !== dayKey
                     const title =
                       op.kind === 'payment' || op.kind === 'refund' || !op.documentNumber
                         ? op.label
@@ -884,52 +971,28 @@ function UmagSupplierDetail({
                         : null
                     const note = op.kind === 'payment' ? operationSubline(op) : ''
                     return (
-                      <Fragment key={op.id}>
-                        {startsDay ? (
-                          <div className="pgt__day" role="presentation">
-                            {formatDocumentGroupLabel(dayKey)}
-                          </div>
-                        ) : null}
-                        <div className={`sd-op${picked ? ' is-selected' : ''}`}>
-                          {selectable ? (
-                            <input
-                              type="checkbox"
-                              className="umag-settlements__check"
-                              checked={picked}
-                              onChange={() => toggleSelected(op.id)}
-                              aria-label={`Выбрать накладную № ${op.documentNumber}`}
-                            />
-                          ) : (
-                            <span className="sd-op__gap" aria-hidden="true" />
-                          )}
-                          <button type="button" className="sd-op__main" onClick={() => setSelectedOperation(op)}>
-                            <span className="sd-op__l1">
-                              <b>{title}</b>
-                              <span className="sd-op__money">
-                                {sign}
-                                {formatUmagMoney(op.amount)}
-                              </span>
-                            </span>
-                            {due || note ? (
-                              <span className="sd-op__l2">
-                                {note}
-                                {due ? (
-                                  due.tone === 'overdue' ? (
-                                    <span className="sd-pill sd-pill--overdue">
-                                      {due.text.charAt(0).toUpperCase() + due.text.slice(1)}
-                                    </span>
-                                  ) : (
-                                    <span className={`sd-due sd-due--${due.tone}`}>{due.text}</span>
-                                  )
-                                ) : null}
-                              </span>
-                            ) : null}
-                          </button>
-                          <span className="sd-op__status">
-                            <OperationStatusCell op={op} canManage={canManagePayments} onOpen={setSelectedOperation} />
+                      <button key={op.id} type="button" className="sd-op" onClick={() => setSelectedOperation(op)}>
+                        <span className="sd-op__l1">
+                          <b>{title}</b>
+                          <span className="sd-op__money">
+                            {sign}
+                            {formatUmagMoney(op.amount)}
                           </span>
-                        </div>
-                      </Fragment>
+                        </span>
+                        <span className="sd-op__l2">
+                          <span>{formatUmagDate(op.sortAt)}</span>
+                          {note ? <span>{note}</span> : null}
+                          {due ? (
+                            due.tone === 'overdue' ? (
+                              <span className="sd-pill sd-pill--overdue">
+                                {due.text.charAt(0).toUpperCase() + due.text.slice(1)}
+                              </span>
+                            ) : (
+                              <span className={`sd-due sd-due--${due.tone}`}>{due.text}</span>
+                            )
+                          ) : null}
+                        </span>
+                      </button>
                     )
                   })}
                   {opsInfinite.hasMore ? <div ref={opsInfinite.sentinelRef} className="pgt__more" aria-hidden="true" /> : null}
@@ -1062,6 +1125,7 @@ function UmagSupplierDetail({
           </section>
         </>
       ) : null}
+      </div>
 
       {selectedOperation ? (
         <OperationDetailSheet
@@ -1380,30 +1444,11 @@ export default function UmagSettlementsPanel({
         : null
 
   // Page header: the list has the sync icon; a supplier's card is titled with the supplier's name (phones) and carries the pencil.
-  const editSupplierRef = useRef(null)
-  editSupplierRef.current = () => {
-    if (selected && !selected.isVirtual) openEdit(selected)
-  }
-  const canEditSelected = Boolean(selected && !selected.isVirtual && canEdit)
-  const cardActions = useMemo(
-    () =>
-      isPhoneMain && canEditSelected ? (
-        <button
-          type="button"
-          className="platform-mobile-header__icon-btn umag-settlements__header-edit"
-          aria-label="Редактировать поставщика"
-          onClick={() => editSupplierRef.current?.()}
-        >
-          <PencilIcon size={20} />
-        </button>
-      ) : null,
-    [isPhoneMain, canEditSelected]
-  )
   usePlatformPageTitle(
-    selected && isPhoneMain ? selected.name : 'Расчёты',
+    selectedId && isPhoneMain && selected ? '' : 'Расчёты',
     '',
     selectedId
-      ? { showBack: true, backFallback: '/platform/supplier-finance', actions: cardActions }
+      ? { showBack: true, backFallback: '/platform/supplier-finance' }
       : { actions: headerActions }
   )
   const totalDebt = useMemo(
