@@ -20,7 +20,7 @@
   --radius-lg: 20px;
   --header-height: 68px;
   /* One size for the controls of a list's top bar (Создать, Фильтр, Действие, период). */
-  --pf-control-h: 38px;
+  --pf-control-h: 38px; /* phones; the web value (UMAG's 32px) is set below */
   --pf-control-fs: 13.5px;
   --pf-control-radius: 4px;
   --pf-control-px: 14px;
@@ -240,4 +240,26 @@ html.pwa-standalone textarea {
 
 :where(input[type='checkbox']):disabled:checked {
   opacity: 0.6;
+}
+
+/*
+ * Button size on the web (≥641px): ONE height for every button, 32px like UMAG; the length follows the label.
+ * `btn--sm` / `btn--lg` only differ in look now, never in size. Phones keep their own sizes.
+ */
+@media (min-width: 641px) {
+  :root {
+    --pf-control-h: 32px;
+  }
+
+  .btn,
+  .btn--sm,
+  .btn--lg {
+    box-sizing: border-box;
+    height: var(--pf-control-h);
+    padding: 0 var(--pf-control-px);
+    border-radius: var(--pf-control-radius);
+    font-size: var(--pf-control-fs);
+    line-height: 1;
+    white-space: nowrap;
+  }
 }

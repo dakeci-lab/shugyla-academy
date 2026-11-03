@@ -43,7 +43,8 @@
 
 .roles-access__actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  white-space: nowrap;
   gap: 4px;
   justify-content: flex-end;
 }
@@ -192,6 +193,7 @@
   }
 
   .roles-access__actions {
+    flex-wrap: wrap;
     justify-content: flex-start;
   }
 

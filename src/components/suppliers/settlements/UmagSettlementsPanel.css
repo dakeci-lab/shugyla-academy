@@ -395,9 +395,12 @@
 
 .umag-settlements__pay-btn {
   appearance: none;
-  padding: 5px 12px;
+  box-sizing: border-box;
+  height: var(--pf-control-h);
+  padding: 0 var(--pf-control-px);
+  white-space: nowrap;
   border: 1px solid #047857;
-  border-radius: 8px;
+  border-radius: var(--pf-control-radius);
   background: #fff;
   color: #047857;
   font: inherit;
@@ -494,6 +497,7 @@
   }
 
   .umag-settlements__pay-btn {
+    height: auto;
     padding: 3px 10px;
     font-size: 12px;
   }

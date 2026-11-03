@@ -4,7 +4,10 @@
   .container {
     padding: 0 16px;
   }
+}
 
+/* Touch-size buttons are for phones only; from 641px up every button has the one web height (index.css). */
+@media (max-width: 640px) {
   .btn {
     min-height: 44px;
     padding: 12px 18px;

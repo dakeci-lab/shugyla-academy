@@ -87,6 +87,7 @@
     "verify:app-bootstrap": "node scripts/verify-app-bootstrap.mjs",
     "verify:progressive-bootstrap": "node scripts/verify-progressive-bootstrap.mjs",
     "verify:employee-admin-edge-performance": "node scripts/verify-employee-admin-edge-performance.mjs",
+    "verify:button-size": "node scripts/verify-button-size.mjs",
     "verify:page-controls": "node scripts/verify-page-controls.mjs",
     "verify:document-back-path": "node scripts/verify-document-back-path.mjs",
     "verify:shared-checkbox": "node scripts/verify-shared-checkbox.mjs",

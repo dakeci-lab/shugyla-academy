@@ -15,3 +15,8 @@
 .platform-settings__section {
   margin: 0;
 }
+
+/* A reference table («Счета оплаты») uses the page width; buttons keep one line, so a narrow column would squeeze the names. */
+.platform-settings--wide {
+  max-width: min(1100px, 100%);
+}
