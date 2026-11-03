@@ -87,12 +87,12 @@ Toast, PlatformPageTitle.
 в Edge Functions (`_shared/employeeAuthorization.ts`) и в RLS. Права строкой вида `umag.settlements.sync`.
 `academy_users` — учётные записи (логин, роль, «кто отметил оплату»); таблица остаётся основой авторизации.
 
-## 6. Edge Functions (`supabase/functions/`, всего 10)
+## 6. Edge Functions (`supabase/functions/`, всего 9)
 
 UMAG / закуп (креды UMAG **никогда** не уходят на клиент — `_shared/umagAuth.ts`, секреты
 `UMAG_LOGIN`/`UMAG_PASSWORD`/`UMAG_STORE_ID` в Supabase → Edge Functions → Secrets):
 `umag-sync` (поставщики, поставки, возвраты, платежи, обязательства), `umag-procurement`,
-`umag-operation-details`, `umag-sales-sync`, `procurement-archive`.
+`umag-sales-sync`, `procurement-archive`.
 
 Аккаунты (для «Пользователи»): `admin-create-employee`, `admin-update-employee`, `admin-list-employees`,
 `admin-reset-employee-password`, `admin-check-employee-login`.
@@ -154,6 +154,9 @@ GitHub Actions — только вручную/через MCP.
 - Вкладка «К оплате» удалена (2026-10-22): оплата — в истории операций карточки поставщика. Сроки оплаты
   (`due_date`) по-прежнему считаются, но нигде не показываются.
 - Должности и группы должностей удалены (этап 17, `docs/platform/stage-17-remove-positions.md`): остаётся только роль.
+
+- Состав товаров операции («детализация») убран из платформы (этап 26, 2026-11-03, `docs/db/stage-26-remove-operation-items/`): окно операции — только оплата, состав смотрят в UMAG.
+  Таблицы `umag_supply_items`/`umag_supply_return_items`, колонки `items_*` и функцию `umag-operation-details` в проде удаляет владелец (SQL Editor / Dashboard) по документу этапа.
 
 **Масштаб использования:** платформой пользуются несколько человек (владелец, закупщик, приёмщик,
 бухгалтер). Любой рефакторинг — аккуратно: это рабочий инструмент.
