@@ -40,7 +40,8 @@ for (const file of [
   assert.ok(!fs.existsSync(path.join(ROOT, file)), file)
 }
 ok('the old order card, items table, item form, create form and status badge are deleted')
-assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.jsx'), /BUYER_LIST_PATH = '\/platform\/procurement'/)
-ok('closing / deleting a document returns to «Закуп»')
+assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.jsx'), /const LIST_PATH = documentListPath\(pathname\)/)
+assert.match(read('src/utils/purchaseDocument.js'), /'\/platform\/procurement'/)
+ok('closing / deleting a document returns to the list it was opened from (see verify:document-back-path)')
 
 console.log(`\n${checks} checks passed`)
