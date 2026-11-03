@@ -5,6 +5,7 @@ import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
 import useStableWhenReady from '../../../hooks/useStableWhenReady'
 import useMediaQuery from '../../../hooks/useMediaQuery'
+import useInfiniteSlice from '../../../hooks/useInfiniteSlice'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import { canViewOrders } from '../../../config/permissions'
 import {
@@ -108,10 +109,13 @@ export default function OrdersPage() {
   )
 
   const totalPages = Math.max(1, Math.ceil(orders.length / pageSize))
-  const visibleOrders = useMemo(
+  const pagedOrders = useMemo(
     () => orders.slice((page - 1) * pageSize, page * pageSize),
     [orders, page, pageSize]
   )
+  // Phones: no pages — the first 25, the next 25 appear as you scroll to the end (UMAG's behaviour).
+  const infinite = useInfiniteSlice(orders, { enabled: isPhone, resetKey: preset })
+  const visibleOrders = isPhone ? infinite.visible : pagedOrders
   const from = orders.length === 0 ? 0 : (page - 1) * pageSize + 1
   const to = Math.min(page * pageSize, orders.length)
 
@@ -225,16 +229,20 @@ export default function OrdersPage() {
         <div className="procurement-list-panel">
           {summaryText && !isPhone ? <p className="orders-page__summary">{summaryText}</p> : null}
           <PurchaseTable orders={visibleOrders} />
-          <TablePagination
-            page={page}
-            totalPages={totalPages}
-            from={from}
-            to={to}
-            totalCount={orders.length}
-            onPageChange={setPage}
-            pageSize={pageSize}
-            onPageSizeChange={setPageSize}
-          />
+          {isPhone ? (
+            infinite.hasMore ? <div ref={infinite.sentinelRef} className="pgt__more" aria-hidden="true" /> : null
+          ) : (
+            <TablePagination
+              page={page}
+              totalPages={totalPages}
+              from={from}
+              to={to}
+              totalCount={orders.length}
+              onPageChange={setPage}
+              pageSize={pageSize}
+              onPageSizeChange={setPageSize}
+            />
+          )}
         </div>
       )}
     </div>
