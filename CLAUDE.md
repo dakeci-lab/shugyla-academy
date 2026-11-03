@@ -24,7 +24,7 @@ Edge Functions и складываются в собственные табли�
 | Backend | Supabase (Postgres + Auth + RLS + Edge Functions на Deno/TypeScript) |
 | Прод-хостинг | PS.kz / Plesk — деплой артефактом в ветку `ps-production` через GitHub Actions |
 | CI | GitHub Actions: `deploy-ps-production.yml` (сборка + `verify:domain-deployment` + публикация артефакта) |
-| Тесты | 93 самописных `verify:*` node-скриптов в `scripts/` (92 проходят, см. §8) |
+| Тесты | 94 самописных `verify:*` node-скриптов в `scripts/` (93 проходят, см. §8) |
 | Прочее | PWA (sw.js, manifest), xlsx, pdfmake, qrcode |
 
 Зависимости намеренно минимальны — нет TypeScript на фронте, нет state-библиотек, нет Tailwind.
@@ -132,7 +132,7 @@ GitHub Actions — только вручную/через MCP.
 Ручной полной синхронизации остатков в интерфейсе больше нет: ночная 07:00, кнопка обновления одного поставщика в «Товары поставщика» и cron расчёта плана.
 
 Остаётся (`docs/platform/stage-14-polish.md`):
-- `verify:*`: из 93 проходят 92; `auth-first-frontend-production-readiness` требует локальную Supabase (Docker).
+- `verify:*`: из 94 проходят 93; `auth-first-frontend-production-readiness` требует локальную Supabase (Docker).
   Новые проверки писать через `scripts/lib/extensionlessResolver.mjs` (реальные модули, не регулярки).
 - Лишние колонки `academy_users` (этап 18) и `password` + таблица `platform_work_locations` (этап 19) удалены.
   Пароли, лежавшие открытым текстом, считать скомпрометированными — сбросить через «Сбросить пароль».
@@ -158,6 +158,8 @@ GitHub Actions — только вручную/через MCP.
 
 - Состав товаров операции («детализация») убран из платформы (этап 26, 2026-11-03, `docs/db/stage-26-remove-operation-items/`): окно операции — только оплата, состав смотрят в UMAG.
   Таблицы `umag_supply_items`/`umag_supply_return_items`, колонки `items_*` и функцию `umag-operation-details` в проде удаляет владелец (SQL Editor / Dashboard) по документу этапа.
+
+- Мобильная версия: действия документа закупа — иконки в шапке (корзина, галочка «Сохранить», «⋯» с «Скачать»/«Комментарий»/«Отменить заказ»), слот `actions` в `usePlatformPageTitle`; большие кнопки на телефоне убраны (`PurchaseDocumentPhoneActions`).
 
 **Масштаб использования:** платформой пользуются несколько человек (владелец, закупщик, приёмщик,
 бухгалтер). Любой рефакторинг — аккуратно: это рабочий инструмент.
