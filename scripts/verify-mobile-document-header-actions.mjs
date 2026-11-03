@@ -51,4 +51,10 @@ ok('header handlers are read through a ref (the header node stays stable, no ren
 assert.match(page, /items\.length === 0 && !isPhone \? \(\s*<tr>\s*<td colSpan=\{9\} className="pdoc__empty">/)
 ok('phones: no «Товаров пока нет.» line under «Товары (0)» (the heading already says it)')
 
+const css = read('src/pages/platform/procurement/PurchaseDocumentPage.css')
+assert.match(css, /\.pdoc--editable,\s*\.pdoc--has-download-bar\s*\{\s*min-height: calc\(100dvh - 52px/)
+assert.match(css, /\.pdoc--editable \.pdoc__mbar,\s*\.pdoc--has-download-bar \.pdoc__mbar\s*\{\s*margin: auto -12px -40px/)
+assert.match(css, /\.pdoc__mbar-total\s*\{[^}]*flex-direction: row[^}]*justify-content: space-between/)
+ok('phones: the bottom bar sticks to the bottom of the screen even for a short document; «Итого» on the left, the sum on the right')
+
 console.log(`\nverify:mobile-document-header-actions — ${checks} checks passed`)
