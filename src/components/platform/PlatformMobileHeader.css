@@ -92,6 +92,8 @@
   justify-content: flex-end;
   justify-self: end;
   align-items: center;
+  /* One gap between every icon of the header, on every page (pages must not add their own margins). */
+  gap: 8px;
   min-width: 44px;
   min-height: 44px;
 }
