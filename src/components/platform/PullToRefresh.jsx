@@ -6,7 +6,8 @@ import './PullToRefresh.css'
 const THRESHOLD = 72
 const MAX_PULL = 120
 const RESISTANCE = 0.5
-const REFRESHING_HEIGHT = 56
+const REFRESHING_HEIGHT = 80
+const DONE_HOLD_MS = 650
 const HIDE_DURATION_MS = 320
 const MOBILE_QUERY = '(max-width: 900px)'
 
@@ -26,6 +27,7 @@ export default function PullToRefresh({ children, disabled = false, className = 
   const { performRefresh } = usePullToRefresh()
   const [pull, setPull] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  const [done, setDone] = useState(false)
   const [hiding, setHiding] = useState(false)
   const [dragging, setDragging] = useState(false)
   const [animating, setAnimating] = useState(false)
@@ -53,19 +55,27 @@ export default function PullToRefresh({ children, disabled = false, className = 
     setAnimating(true)
     setPullDistance(REFRESHING_HEIGHT)
 
+    let succeeded = false
     try {
       await performRefresh()
+      succeeded = true
     } catch (error) {
       console.error('[PullToRefresh] refresh failed:', error)
-    } finally {
-      setRefreshing(false)
-      setHiding(true)
-      setPullDistance(0)
-      window.setTimeout(() => {
-        setHiding(false)
-        setAnimating(false)
-      }, HIDE_DURATION_MS)
     }
+
+    // Success: the ring turns into a green check for a moment («Обновлено»), then everything slides up.
+    if (succeeded) {
+      setDone(true)
+      await new Promise((resolve) => window.setTimeout(resolve, DONE_HOLD_MS))
+    }
+    setRefreshing(false)
+    setDone(false)
+    setHiding(true)
+    setPullDistance(0)
+    window.setTimeout(() => {
+      setHiding(false)
+      setAnimating(false)
+    }, HIDE_DURATION_MS)
   }, [performRefresh, setPullDistance])
 
   useEffect(() => {
@@ -140,18 +150,17 @@ export default function PullToRefresh({ children, disabled = false, className = 
   const offset = refreshing ? REFRESHING_HEIGHT : pull
   const showIndicator = offset > 0 || refreshing || hiding
   const pullProgress = Math.min(1, pull / THRESHOLD)
-  const pullRotation = pullProgress * 240
 
   return (
     <div className={`pull-to-refresh ${className}`.trim()}>
       <PageRefreshIndicator
         visible={showIndicator}
-        refreshing={refreshing}
+        refreshing={refreshing && !done}
+        done={done}
         dragging={dragging}
         hiding={hiding}
         height={refreshing ? REFRESHING_HEIGHT : offset}
         pullProgress={pullProgress}
-        pullRotation={pullRotation}
       />
 
       <div
