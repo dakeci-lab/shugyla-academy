@@ -78,7 +78,7 @@ ok('«Удалить» (in the document, in every confirmation, «Удалить
 
 // --- fields share the height of the buttons on the web ---
 const web = index.slice(index.indexOf('@media (min-width: 641px)'))
-assert.match(web, /input:not\(\[type='checkbox'\]\)[\s\S]{0,420}select\s*\{[^}]*height: var\(--pf-control-h\)[^}]*min-height: var\(--pf-control-h\)/)
+assert.match(web, /input:not\(\[type='checkbox'\]\)[\s\S]{0,460}select:not\(\[multiple\]\):not\(\[size\]\)\s*\{[^}]*height: var\(--pf-control-h\)[^}]*min-height: var\(--pf-control-h\)/)
 assert.match(read('src/components/procurement/document/DocumentDateBox.css'), /min-height: var\(--pf-control-h, 36px\)/)
 assert.match(read('src/components/procurement/document/DocumentSupplierPicker.css'), /min-height: var\(--pf-control-h, 36px\)/)
 ok('text / search / number / date / select fields (also inputs without a type) have the button height on the web; textareas keep theirs')

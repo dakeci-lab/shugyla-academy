@@ -364,7 +364,7 @@ export default function EmployeeEditModal({
               <Can permission={PERMISSION_CODES.EMPLOYEES_DEACTIVATE}>
                 <button
                   type="button"
-                  className="btn employees-modal-footer__status-action employees-modal-footer__status-action--danger"
+                  className="btn btn--danger employees-modal-footer__status-action"
                   disabled={submitting || passwordResetting || deactivating || activating}
                   onClick={() => onRequestDeactivate(employee)}
                 >
