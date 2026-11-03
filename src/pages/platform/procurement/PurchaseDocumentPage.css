@@ -87,7 +87,7 @@
 
 /* Compact cards, left to right, each its own width (like UMAG), not three stretched thirds. */
 .pdoc__cards > .pdoc__card {
-  flex: 0 0 280px;
+  flex: 0 0 270px;
 }
 
 /* The supplier card and the «＋ Товары поставщика» block share one frame; the block appears once a supplier is chosen. */
@@ -99,18 +99,48 @@
   background: var(--color-white, #fff);
 }
 
+.pdoc__group {
+  flex: 0 0 auto;
+}
+
 .pdoc__group > .pdoc__card--supplier {
-  flex: 0 0 340px;
+  flex: 0 0 350px;
   border: 0;
   border-radius: 0;
   background: transparent;
 }
 
 .pdoc__goods-block {
+  flex: none;
   display: flex;
   align-items: center;
   padding: 0 16px;
   border-left: 1px solid var(--color-border, #e2e8f0);
+  overflow: hidden;
+  /* Slides out smoothly when a supplier is chosen instead of popping in. */
+  animation: pdoc-goods-in 0.35s ease-out both;
+}
+
+@keyframes pdoc-goods-in {
+  from {
+    max-width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    opacity: 0;
+  }
+
+  to {
+    max-width: 260px;
+    padding-left: 16px;
+    padding-right: 16px;
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pdoc__goods-block {
+    animation: none;
+  }
 }
 
 .pdoc__goods-btn {
@@ -339,6 +369,7 @@
     padding: 0;
     border-left: 0;
     border-top: 1px solid var(--color-border, #e2e8f0);
+    animation: none;
   }
 
   .pdoc__goods-btn {
