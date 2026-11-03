@@ -613,3 +613,18 @@
     font-size: 16px;
   }
 }
+
+/* The receiver's ticked rows: the same clear green as ticked rows in the lists. */
+.pdoc__table tbody tr.is-done td {
+  background: var(--row-selected-bg);
+}
+
+@media (max-width: 640px) {
+  .pdoc__table tbody tr.is-done {
+    background: var(--row-selected-bg);
+  }
+
+  .pdoc__table tbody tr.is-done td {
+    background: transparent;
+  }
+}

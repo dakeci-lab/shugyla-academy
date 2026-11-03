@@ -422,9 +422,6 @@ table.team-matrix td:first-child {
 }
 
 .team-matrix__checkbox {
-  width: 18px;
-  height: 18px;
-  accent-color: var(--color-primary);
   cursor: pointer;
 }
 

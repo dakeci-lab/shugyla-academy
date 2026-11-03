@@ -80,8 +80,6 @@
 }
 
 .employee-filter-popover__checkbox-row input {
-  width: 16px;
-  height: 16px;
   cursor: pointer;
 }
 

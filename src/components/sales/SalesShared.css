@@ -106,9 +106,6 @@
 }
 
 .sales-bands__check input {
-  accent-color: var(--color-primary, #059669);
-  width: 15px;
-  height: 15px;
   cursor: pointer;
 }
 

@@ -116,9 +116,6 @@
 }
 
 .pf-field__item input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--color-primary, #059669);
   cursor: pointer;
   flex-shrink: 0;
 }

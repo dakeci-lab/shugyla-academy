@@ -443,3 +443,18 @@
     font-weight: 400;
   }
 }
+
+/* A ticked product is clearly green (the week cells keep their heat shades: they are data). */
+.ctbl tbody tr.is-selected td:not(.ctbl__week) {
+  background: var(--row-selected-bg);
+}
+
+.ctbl tbody tr.is-selected:hover td:not(.ctbl__week) {
+  background: var(--row-selected-hover);
+}
+
+@media (max-width: 640px) {
+  .ctbl tbody tr.is-selected:not(.ctbl__group) {
+    background: var(--row-selected-bg);
+  }
+}

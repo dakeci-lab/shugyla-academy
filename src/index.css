@@ -24,6 +24,9 @@
   --pf-control-fs: 13.5px;
   --pf-control-radius: 4px;
   --pf-control-px: 14px;
+  /* A ticked row of a list (like UMAG: clearly green, not a faint tint). */
+  --row-selected-bg: #d1fae5;
+  --row-selected-hover: #bbf7d0;
   /* Desktop chrome: sidebar brand row + main topbar share one height */
   --platform-topbar-height: 56px;
   --platform-modal-backdrop: rgba(0, 0, 0, 0.4);
@@ -184,4 +187,54 @@ html.pwa-standalone textarea {
 
 .btn--full {
   width: 100%;
+}
+
+/*
+ * Checkbox — one look for the whole platform, the same as in UMAG: an 18px square with a 4px corner,
+ * gray border; ticked — a white box with a green border and a green tick (our green).
+ * `:where()` keeps the weight at zero, so a component that hides or resizes its own checkbox still wins.
+ */
+:where(input[type='checkbox']) {
+  -webkit-appearance: none;
+  appearance: none;
+  flex: none;
+  box-sizing: border-box;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 1.5px solid #9ca3af;
+  border-radius: 4px;
+  background: #fff center / 14px no-repeat;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+:where(input[type='checkbox']):hover:not(:disabled) {
+  border-color: var(--color-primary, #059669);
+}
+
+:where(input[type='checkbox']):checked {
+  border-color: var(--color-primary, #059669);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.2 8.6l3 3 6.6-7' fill='none' stroke='%23059669' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+:where(input[type='checkbox']):indeterminate {
+  border-color: var(--color-primary, #059669);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M3.6 8h8.8' fill='none' stroke='%23059669' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E");
+}
+
+:where(input[type='checkbox']):focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.25);
+}
+
+:where(input[type='checkbox']):disabled {
+  border-color: #d1d5db;
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+}
+
+:where(input[type='checkbox']):disabled:checked {
+  opacity: 0.6;
 }

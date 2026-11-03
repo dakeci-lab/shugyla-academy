@@ -70,7 +70,7 @@ export default function CatalogTable({
     return (
       <FragmentRows key={rowKey}>
       <tr
-        className={`${disabled ? 'is-disabled' : ''}${reserveTone ? ` ctbl__row--${reserveTone}` : ''}`}
+        className={`${disabled ? 'is-disabled' : ''}${!disabled && selected.has(item.barcode) ? ' is-selected' : ''}${reserveTone ? ` ctbl__row--${reserveTone}` : ''}`}
         title={reason || undefined}
       >
         <td className="ctbl__c-check">
