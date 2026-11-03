@@ -300,7 +300,11 @@ function SupplierIdentityCard({ supplier, canEdit, canViewFinance, debtLoading, 
         <div className="umag-settlements__id-side">
           {balance}
           {canEdit ? (
-            <IconActionButton label="Редактировать поставщика" variant="primary" onClick={onEdit}>
+            <IconActionButton
+              variant="edit"
+              label="Редактировать поставщика"
+              onClick={onEdit}
+            >
               <PencilIcon />
             </IconActionButton>
           ) : null}
@@ -1571,7 +1575,11 @@ export default function UmagSettlementsPanel({
                       // The virtual «Поставщик не выбран» row has no supplier record to edit.
                       edit:
                         canEdit && s.id !== UNASSIGNED_SUPPLIER_ID ? (
-                          <IconActionButton label="Редактировать поставщика" onClick={() => openEdit(s)}>
+                          <IconActionButton
+                            variant="edit"
+                            label="Редактировать поставщика"
+                            onClick={() => openEdit(s)}
+                          >
                             <PencilIcon size={16} />
                           </IconActionButton>
                         ) : null,

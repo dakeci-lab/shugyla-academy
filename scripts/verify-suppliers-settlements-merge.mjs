@@ -146,7 +146,7 @@ function main() {
   assert.match(panel, /`Оплата: \$\{payment\.join\(' · '\)\}`/)
   assert.match(
     panel,
-    /\{canEdit \? \(\s*\n\s*<IconActionButton label="Редактировать поставщика" variant="primary" onClick=\{onEdit\}>/
+    /\{canEdit \? \(\s*\n\s*<IconActionButton\s+variant="edit"\s+label="Редактировать поставщика"\s+onClick=\{onEdit\}\s*>/
   )
   ok('SupplierIdentityCard shows only the details that are filled in (as quiet text), the payment method/term line and the edit action — no rows of «—»')
   assert.doesNotMatch(panel, /<dt>.*[Аа]дрес.*<\/dt>/)

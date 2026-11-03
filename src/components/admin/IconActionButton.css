@@ -65,3 +65,19 @@
     height: 40px;
   }
 }
+
+/* The pencil: blue border and icon on white, like the edit button of UMAG. */
+.icon-action-btn--edit {
+  color: var(--color-action, #1976d2);
+  border-color: var(--color-action, #1976d2);
+  border-radius: 4px;
+}
+
+.icon-action-btn--edit:hover:not(:disabled) {
+  background: var(--color-action-light, #e3f2fd);
+}
+
+.icon-action-btn--edit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

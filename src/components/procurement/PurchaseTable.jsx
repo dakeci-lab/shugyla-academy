@@ -45,6 +45,7 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
             cells={{
               edit: (
                 <IconActionButton
+                  variant="edit"
                   label="Открыть"
                   onClick={(event) => {
                     event.stopPropagation()
