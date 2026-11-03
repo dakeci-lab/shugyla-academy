@@ -218,8 +218,9 @@ export default function PurchaseDocumentPage() {
     return result
   }
 
-  function handleSelectSupplier(supplier) {
-    void saveMeta({ supplierId: supplier.id, supplierName: supplier.name })
+  async function handleSelectSupplier(supplier) {
+    const result = await saveMeta({ supplierId: supplier.id, supplierName: supplier.name })
+    if (result?.id) showSuccess('Поставщик успешно выбран')
   }
 
   async function handleQtyCommit(item) {
