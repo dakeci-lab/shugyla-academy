@@ -22,9 +22,16 @@ assert.match(actions, /aria-label="Сохранить"[\s\S]*<CheckIcon/)
 assert.match(actions, /pdoc-phone-actions__delete/)
 ok('trash can and check mark are icon buttons in the header (no words)')
 
-for (const label of ['Скачать Excel', 'Скачать PDF', 'Отменить заказ']) assert.ok(actions.includes(label), label)
+assert.match(actions, /aria-label="Отменить заказ"[\s\S]*<CancelDocIcon/)
+assert.match(icons, /export function CancelDocIcon/)
+assert.doesNotMatch(actions, /Скачать (Excel|PDF)|call\('export'/)
 assert.match(actions, /commentLabel \? \(/)
-ok('download, comment and cancel live in the «⋯» menu')
+ok('a saved document gets a «cancel» icon in the header; the comment is the only item of the «⋯» menu; «Скачать» is not in the header')
+
+assert.match(page, /\{saved \? \(\s*<div className="pdoc__menu" ref=\{exportRef\}>/)
+assert.match(page, /isPhone && saved && itemsReady && items\.length > 0 \? \(\s*<div className="pdoc__mbar pdoc__mbar--download">/)
+assert.match(page, /className="btn btn--primary"[\s\S]{0,200}Скачать\s*<\/button>/)
+ok('«Скачать» exists only for a saved document: a menu in the desktop bar, the green button of the bottom bar on phones')
 
 assert.match(page, /\{commentLabel && !isPhone \? \(/)
 assert.match(page, /\{!isPhone \? \(\s*<div className="pdoc__bar">/)

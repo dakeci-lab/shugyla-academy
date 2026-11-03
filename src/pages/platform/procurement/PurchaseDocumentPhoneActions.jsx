@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { CheckIcon, MoreIcon, TrashIcon } from '../../../components/icons/PlatformIcons'
+import { CancelDocIcon, CheckIcon, MoreIcon, TrashIcon } from '../../../components/icons/PlatformIcons'
 import './PurchaseDocumentPhoneActions.css'
 
 /**
- * Document actions in the phone header (like UMAG): a trash can and a check mark are always at hand for a draft,
- * everything else («Скачать», «Комментарий», «Отменить») sits in the «⋯» menu.
+ * Document actions in the phone header (like UMAG): a draft has a trash can and a check mark, a saved document a
+ * «cancel» icon; the comment sits in the «⋯» menu. «Скачать» is not here: it is the green button of the bottom bar.
  * The handlers are read from `handlersRef` at click time, so the header node can stay stable between renders.
  */
 export default function PurchaseDocumentPhoneActions({
@@ -13,7 +13,6 @@ export default function PurchaseDocumentPhoneActions({
   showSave,
   showDelete,
   showCancel,
-  canExport,
   commentLabel,
   hasComment,
 }) {
@@ -43,7 +42,7 @@ export default function PurchaseDocumentPhoneActions({
     handlersRef.current?.[name]?.(...args)
   }
 
-  const hasMenu = canExport || Boolean(commentLabel) || showCancel
+  const hasMenu = Boolean(commentLabel)
 
   return (
     <div className="pdoc-phone-actions" ref={rootRef}>
@@ -69,6 +68,17 @@ export default function PurchaseDocumentPhoneActions({
           <CheckIcon size={22} />
         </button>
       ) : null}
+      {showCancel ? (
+        <button
+          type="button"
+          className="platform-mobile-header__icon-btn pdoc-phone-actions__cancel"
+          aria-label="Отменить заказ"
+          disabled={busy}
+          onClick={call('cancel')}
+        >
+          <CancelDocIcon size={22} />
+        </button>
+      ) : null}
       {hasMenu ? (
         <div className="pdoc-phone-actions__menu-wrap">
           <button
@@ -87,27 +97,6 @@ export default function PurchaseDocumentPhoneActions({
               {commentLabel ? (
                 <button type="button" role="menuitem" disabled={busy} onClick={call('comment')}>
                   {commentLabel}
-                </button>
-              ) : null}
-              {canExport ? (
-                <>
-                  <button type="button" role="menuitem" disabled={busy} onClick={call('export', 'xlsx')}>
-                    Скачать Excel
-                  </button>
-                  <button type="button" role="menuitem" disabled={busy} onClick={call('export', 'pdf')}>
-                    Скачать PDF
-                  </button>
-                </>
-              ) : null}
-              {showCancel ? (
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="pdoc-phone-actions__danger"
-                  disabled={busy}
-                  onClick={call('cancel')}
-                >
-                  Отменить заказ
                 </button>
               ) : null}
             </div>

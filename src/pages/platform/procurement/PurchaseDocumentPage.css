@@ -694,6 +694,7 @@
   }
 
   /* The bottom bar replaces the pinned «Итого» row for whoever edits. */
+  .pdoc--has-download-bar .pdoc__table tfoot,
   .pdoc--editable .pdoc__table tfoot {
     display: none;
   }
@@ -732,6 +733,45 @@
     min-height: 48px;
     padding: 0 28px;
     font-size: 16px;
+  }
+
+  /* Saved document: «Итого» on the left, the green «Скачать» takes the rest of the bar (like UMAG). */
+  .pdoc__mexport {
+    position: relative;
+    flex: 1 1 auto;
+    max-width: 220px;
+    margin-left: auto;
+  }
+
+  .pdoc__mexport .btn {
+    width: 100%;
+  }
+
+  .pdoc__mexport-list {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 8px);
+    min-width: 160px;
+    display: flex;
+    flex-direction: column;
+    padding: 4px;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 8px;
+    background: var(--color-white, #fff);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+  }
+
+  .pdoc__mexport-list button {
+    appearance: none;
+    border: 0;
+    background: none;
+    text-align: left;
+    font: inherit;
+    font-size: 16px;
+    padding: 14px 12px;
+    border-radius: 6px;
+    color: var(--color-text, #0f172a);
+    cursor: pointer;
   }
 }
 

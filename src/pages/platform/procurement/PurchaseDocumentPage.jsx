@@ -193,13 +193,12 @@ export default function PurchaseDocumentPage() {
           showSave={editable}
           showDelete={canEdit && draft}
           showCancel={canEdit && saved}
-          canExport={items.length > 0}
           commentLabel={phoneCommentLabel}
           hasComment={Boolean(order?.comment)}
         />
       ) : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isPhone, Boolean(order), busy, editable, canEdit, draft, saved, items.length > 0, phoneCommentLabel]
+    [isPhone, Boolean(order), busy, editable, canEdit, draft, saved, phoneCommentLabel]
   )
 
   usePlatformPageTitle(getPlatformSection(pathname).title, '', {
@@ -424,7 +423,7 @@ export default function PurchaseDocumentPage() {
   const doneCount = items.filter((item) => ticks.has(item.id)).length
 
   return (
-    <div className={`pdoc${editable ? ' pdoc--editable' : ''}`}>
+    <div className={`pdoc${editable ? ' pdoc--editable' : ''}${isPhone && saved && itemsReady && items.length > 0 ? ' pdoc--has-download-bar' : ''}`}>
       <div className="pdoc__head">
         <h1 className="pdoc__title">{documentTitle(order)}</h1>
         <span className="pdoc__meta">{order.createdByName || ''}</span>
@@ -465,6 +464,7 @@ export default function PurchaseDocumentPage() {
             Отменить
           </button>
         ) : null}
+        {saved ? (
         <div className="pdoc__menu" ref={exportRef}>
           <button
             type="button"
@@ -487,6 +487,7 @@ export default function PurchaseDocumentPage() {
             </div>
           ) : null}
         </div>
+        ) : null}
       </div>
       ) : null}
 
@@ -701,6 +702,37 @@ export default function PurchaseDocumentPage() {
           <div className="pdoc__mbar-total">
             <span>Итого</span>
             <strong className="num">{formatPurchaseAmount(total)}</strong>
+          </div>
+        </div>
+      ) : null}
+
+      {isPhone && saved && itemsReady && items.length > 0 ? (
+        <div className="pdoc__mbar pdoc__mbar--download">
+          <div className="pdoc__mbar-total">
+            <span>Итого</span>
+            <strong className="num">{formatPurchaseAmount(total)}</strong>
+          </div>
+          <div className="pdoc__mexport" ref={exportRef}>
+            <button
+              type="button"
+              className="btn btn--primary"
+              disabled={busy}
+              aria-haspopup="menu"
+              aria-expanded={exportOpen}
+              onClick={() => setExportOpen((open) => !open)}
+            >
+              Скачать
+            </button>
+            {exportOpen ? (
+              <div className="pdoc__mexport-list" role="menu">
+                <button type="button" role="menuitem" onClick={() => void handleExport('xlsx')}>
+                  Excel
+                </button>
+                <button type="button" role="menuitem" onClick={() => void handleExport('pdf')}>
+                  PDF
+                </button>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
