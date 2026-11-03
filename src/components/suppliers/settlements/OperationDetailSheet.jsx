@@ -1,28 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
-  buildItemTotals,
-  fetchOperationDetails,
-  filterOperationItems,
+  deriveSupplyPaymentStatus,
   formatSignedUmagMoney,
   formatUmagDateTime,
   formatUmagMoney,
-  OPERATION_DETAIL_ERROR_CODES,
-} from '../../../services/umagOperationDetailsService'
-import {
-  deriveSupplyPaymentStatus,
   supplyPaymentStatusLabel,
 } from '../../../services/umagSettlementsService'
-import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import './OperationDetailSheet.css'
-
-function formatQtyPrice(item) {
-  const qty = Number(item.quantity) || 0
-  const unit = item.unit ? ` ${item.unit}` : ''
-  const price =
-    item.purchasePrice == null ? '—' : formatUmagMoney(item.purchasePrice).replace(' ₸', '')
-  return `${qty}${unit} × ${price} ₸`
-}
 
 function formatAccountNames(value) {
   if (Array.isArray(value)) return value.map(String).filter(Boolean).join(', ') || '—'
@@ -37,19 +22,6 @@ function formatAccountNames(value) {
     return value
   }
   return String(value)
-}
-
-function mapErrorMessage(error) {
-  const code = error?.code
-  if (
-    code === OPERATION_DETAIL_ERROR_CODES.NOT_FOUND ||
-    code === OPERATION_DETAIL_ERROR_CODES.SOURCE_DELETED ||
-    code === 'DOCUMENT_NOT_FOUND' ||
-    code === 'DOCUMENT_SOURCE_DELETED'
-  ) {
-    return 'Документ больше не найден в UMAG'
-  }
-  return error?.message || 'Не удалось загрузить состав документа'
 }
 
 function PaymentStatusBadge({ status }) {
@@ -154,13 +126,6 @@ export default function OperationDetailSheet({
 }) {
   const kind = operation?.kind
   const isPaymentDoc = kind === 'payment' || kind === 'refund'
-  const operationType = kind === 'return' ? 'supply_return' : 'supply'
-  const operationId = isPaymentDoc
-    ? null
-    : kind === 'return'
-      ? Number(operation?.source?.umag_return_id)
-      : Number(operation?.source?.umag_supply_id)
-
   const headerFromHistory = useMemo(() => {
     const source = operation?.source || {}
     if (kind === 'payment' || kind === 'refund') {
@@ -218,58 +183,7 @@ export default function OperationDetailSheet({
     }
   }, [operation, kind, supplierName])
 
-  const [loading, setLoading] = useState(!isPaymentDoc)
-  const [refreshing, setRefreshing] = useState(false)
   const [unmarking, setUnmarking] = useState(false)
-  const [error, setError] = useState('')
-  const [cacheStatus, setCacheStatus] = useState(null)
-  const [document, setDocument] = useState(null)
-  const [items, setItems] = useState([])
-  const [totals, setTotals] = useState(null)
-  const [query, setQuery] = useState('')
-
-  async function load({ forceRefresh = false } = {}) {
-    if (isPaymentDoc) {
-      setLoading(false)
-      return
-    }
-    if (!operationId) {
-      setError('Некорректный идентификатор операции')
-      setLoading(false)
-      return
-    }
-    if (forceRefresh) setRefreshing(true)
-    else setLoading(true)
-    setError('')
-    try {
-      const result = await fetchOperationDetails({
-        operationType,
-        operationId,
-        forceRefresh,
-      })
-      setDocument(result.document)
-      setItems(result.items || [])
-      setTotals(result.totals || buildItemTotals(result.items || [], headerFromHistory.amount))
-      setCacheStatus(result.cache)
-    } catch (err) {
-      setError(mapErrorMessage(err))
-      if (!forceRefresh) {
-        setItems([])
-        setTotals(null)
-      }
-    } finally {
-      setLoading(false)
-      setRefreshing(false)
-    }
-  }
-
-  useEffect(() => {
-    void load({ forceRefresh: false })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [operationType, operationId, isPaymentDoc])
-
-  const visibleItems = useMemo(() => filterOperationItems(items, query), [items, query])
-  const displayTotals = totals || buildItemTotals(items, headerFromHistory.amount)
 
   const canUnmark =
     canManage &&
@@ -415,20 +329,20 @@ export default function OperationDetailSheet({
           {!isPaymentDoc ? (
             <div>
               <span>Сотрудник</span>
-              <strong>{headerFromHistory.userName || document?.userName || '—'}</strong>
+              <strong>{headerFromHistory.userName || '—'}</strong>
             </div>
           ) : null}
           {!isPaymentDoc && kind === 'supply' ? (
             <div>
               <span>Счёт</span>
-              <strong>{headerFromHistory.account || document?.account || '—'}</strong>
+              <strong>{headerFromHistory.account || '—'}</strong>
             </div>
           ) : null}
           {!isPaymentDoc && kind === 'return' ? (
             <div>
               <span>Счета</span>
               <strong>
-                {formatAccountNames(headerFromHistory.accountNames ?? document?.accountNames)}
+                {formatAccountNames(headerFromHistory.accountNames)}
               </strong>
             </div>
           ) : null}
@@ -454,103 +368,13 @@ export default function OperationDetailSheet({
           </>
         ) : (
           <>
-        {(headerFromHistory.comment || headerFromHistory.note || document?.comment || document?.note) ? (
-          <p className="umag-op-detail__comment">
-            {headerFromHistory.comment ||
-              headerFromHistory.note ||
-              document?.comment ||
-              document?.note}
-          </p>
-        ) : null}
-
-        <div className="umag-op-detail__items-head">
-          <h4>Товары</h4>
-          <button
-            type="button"
-            className="btn btn-secondary umag-op-detail__refresh"
-            onClick={() => void load({ forceRefresh: true })}
-            disabled={loading || refreshing}
-          >
-            {refreshing ? 'Обновление…' : 'Обновить детали'}
-          </button>
-        </div>
-
-        {cacheStatus === 'hit' ? (
-          <div className="umag-op-detail__cache-hint">Из кэша</div>
-        ) : null}
-
-        <label className="umag-op-detail__search">
-          <span className="visually-hidden">Поиск по товарам или штрихкоду</span>
-          <input
-            type="search"
-            placeholder="Поиск по товарам или штрихкоду"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-
-        {loading ? (
-          <DelayedLoadingSkeleton variant="list" count={4} />
-        ) : error ? (
-          <div className="umag-op-detail__error" role="alert">
-            {error}
-          </div>
-        ) : visibleItems.length === 0 ? (
-          <div className="umag-op-detail__empty">
-            {items.length === 0
-              ? 'В документе нет товарных позиций'
-              : 'Ничего не найдено по запросу'}
-          </div>
-        ) : (
-          <ul className="umag-op-detail__list">
-            {visibleItems.map((item, index) => (
-              <li key={item.id || `${item.umagLineId || 'i'}-${index}`} className="umag-op-detail__item">
-                <div className="umag-op-detail__item-name">
-                  {item.productName}
-                  {item.isBonus ? <span className="umag-op-detail__bonus">бонус</span> : null}
-                </div>
-                {item.barcode ? (
-                  <div className="umag-op-detail__item-barcode">{item.barcode}</div>
-                ) : null}
-                <div className="umag-op-detail__item-row">
-                  <span>{formatQtyPrice(item)}</span>
-                  <strong>
-                    {item.lineAmount == null ? '—' : formatUmagMoney(item.lineAmount)}
-                  </strong>
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {!loading && !error ? (
-          <div className="umag-op-detail__footer">
-            <div>
-              <span>Позиций</span>
-              <strong>{displayTotals.lineCount}</strong>
-            </div>
-            <div>
-              <span>Кол-во по строкам</span>
-              <strong>{displayTotals.quantitySum}</strong>
-            </div>
-            <div>
-              <span>Сумма строк</span>
-              <strong>{formatUmagMoney(displayTotals.lineAmountSum)}</strong>
-            </div>
-            {displayTotals.differenceNotable ? (
-              <div className="umag-op-detail__diff" role="status">
-                Сумма строк отличается от суммы документа на{' '}
-                {formatUmagMoney(Math.abs(displayTotals.difference))}
-              </div>
-            ) : null}
-          </div>
+        {headerFromHistory.comment || headerFromHistory.note ? (
+          <p className="umag-op-detail__comment">{headerFromHistory.comment || headerFromHistory.note}</p>
         ) : null}
           </>
         )}
       </div>
     </div>,
-    // window.document, not the local `document` state above (the fetched
-    // UMAG document object) — that shadowing made this crash on every open.
     window.document.body
   )
 }

@@ -139,50 +139,10 @@
   color: #334155;
 }
 
-.umag-op-detail__items-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 8px 0 8px;
-}
-
-.umag-op-detail__items-head h4 {
-  margin: 0;
-  font-size: 15px;
-}
-
-.umag-op-detail__refresh {
-  padding: 6px 10px;
-  font-size: 12px;
-}
-
-.umag-op-detail__cache-hint {
-  font-size: 12px;
-  color: #64748b;
-  margin-bottom: 8px;
-}
-
-.umag-op-detail__search input {
-  width: 100%;
-  box-sizing: border-box;
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
-  margin-bottom: 12px;
-}
-
-.umag-op-detail__error,
 .umag-op-detail__empty {
   padding: 14px 12px;
   border-radius: 10px;
   font-size: 14px;
-}
-
-.umag-op-detail__error {
-  background: #fff1f2;
-  color: #9f1239;
 }
 
 .umag-op-detail__empty {
@@ -193,81 +153,6 @@
 .umag-op-detail__unmark {
   margin-top: 12px;
   width: 100%;
-}
-
-.umag-op-detail__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 10px;
-}
-
-.umag-op-detail__item {
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  padding: 12px;
-}
-
-.umag-op-detail__item-name {
-  font-weight: 600;
-  font-size: 14px;
-  line-height: 1.35;
-  color: #0f172a;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  align-items: center;
-}
-
-.umag-op-detail__bonus {
-  font-size: 11px;
-  font-weight: 700;
-  color: #047857;
-  background: #ecfdf5;
-  border-radius: 999px;
-  padding: 1px 6px;
-}
-
-.umag-op-detail__item-barcode {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #64748b;
-}
-
-.umag-op-detail__item-row {
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
-  gap: 10px;
-  align-items: baseline;
-  font-size: 13px;
-  color: #475569;
-}
-
-.umag-op-detail__footer {
-  margin-top: 14px;
-  padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
-  font-size: 12px;
-}
-
-.umag-op-detail__footer span {
-  display: block;
-  color: #64748b;
-  margin-bottom: 2px;
-}
-
-.umag-op-detail__diff {
-  grid-column: 1 / -1;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: #fffbeb;
-  color: #92400e;
-  font-size: 12px;
 }
 
 .visually-hidden {

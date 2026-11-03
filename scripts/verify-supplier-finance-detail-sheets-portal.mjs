@@ -72,7 +72,8 @@ function main() {
   // clicking through the real UI, not by this script — assert the local
   // state still exists so the next person touching this file knows why
   // `window.document.body` (not `document.body`) is required here.
-  assert.match(opSheetSrc, /const \[document, setDocument\] = useState\(/)
+  // The local `document` state is gone (operation items were removed); window.document.body stays correct.
+  assert.doesNotMatch(opSheetSrc, /const \[document, setDocument\]/)
   assert.doesNotMatch(opSheetSrc, /createPortal\([\s\S]*?,\s*\n\s*document\.body/)
   ok('Case 4b: local `document` state (shadowing) confirmed present — portal target correctly qualifies window.document.body, not bare document.body')
 

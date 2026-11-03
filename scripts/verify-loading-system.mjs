@@ -55,7 +55,6 @@ const MIGRATED_ALL = [
   ['src/components/admin/sections/EmployeeProfileSection.jsx', 'cards'],
   ['src/components/admin/RolesAccessSection.jsx', 'table'],
   ['src/components/suppliers/settlements/UmagSettlementsPanel.jsx', 'table'],
-  ['src/components/suppliers/settlements/OperationDetailSheet.jsx', 'list'],
   ['src/components/suppliers/settlements/ReconciliationDetailView.jsx', 'cards'],
   ['src/components/suppliers/payments/SupplierPaymentsPanel.jsx', 'cards'],
   ['src/components/platform/notifications/NotificationPanel.jsx', 'list'],
