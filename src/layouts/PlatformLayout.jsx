@@ -19,6 +19,7 @@ import useBlockMobileBrowserBack, {
 } from '../hooks/useBlockMobileBrowserBack'
 import useMobileDrawerEdgeSwipe from '../hooks/useMobileDrawerEdgeSwipe'
 import { getPlatformSection } from '../platform/platformNav'
+import { getRouteCriticalModules } from '../services/platformDataService'
 import { useSession } from '../context/SessionContext'
 import { LOGIN_PATH } from '../router/authRoutes'
 import { lockModalScroll, unlockModalScroll } from '../utils/modalScrollLock'
@@ -28,7 +29,7 @@ const MOBILE_LAYOUT_QUERY = '(max-width: 900px)'
 
 function PlatformLayoutShell({ onLogout }) {
   const { user } = useSession()
-  const { reload } = usePlatformData()
+  const { reloadModules } = usePlatformData()
   const { pathname } = useLocation()
   const procurementRealtimeEnabled = useMemo(() => {
     if (!user) return false
@@ -42,6 +43,8 @@ function PlatformLayoutShell({ onLogout }) {
   const navigate = useNavigate()
   const titleContext = usePlatformPageTitleContext()
   const section = useMemo(() => getPlatformSection(pathname), [pathname])
+  // Swipe-to-refresh of a page that registered nothing: only the modules of this route.
+  const refreshRoute = useCallback(() => reloadModules(getRouteCriticalModules(pathname)), [reloadModules, pathname])
   const pageTitle = titleContext?.override?.title || section.title || 'Shugyla Platform'
   const showMobileBack = titleContext?.override?.showBack === true
   const mobileBackFallback = titleContext?.override?.backFallback || '/platform'
@@ -168,7 +171,7 @@ function PlatformLayoutShell({ onLogout }) {
         />
       )}
 
-      <PullToRefreshProvider onGlobalRefresh={reload}>
+      <PullToRefreshProvider onGlobalRefresh={refreshRoute}>
         <div className="platform-layout__main">
           {/* Header stays outside PullToRefresh so it never translates/unmounts. */}
           <PlatformMobileHeader

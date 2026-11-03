@@ -383,6 +383,35 @@ function startProcurementRefresh() {
   return run
 }
 
+/**
+ * Refresh only the named modules (pull-to-refresh on a page that needs just those):
+ * «procurement» shares the in-flight guarded procurement refresh, «suppliers» and «employees» are single fetches.
+ * Failures are isolated per module, so one slow table never blocks the others.
+ */
+export async function refreshModules(moduleNames = []) {
+  if (!isCloudMode()) return
+  const unique = [...new Set(moduleNames)]
+  await Promise.allSettled(
+    unique.map(async (name) => {
+      if (name === 'procurement') return refreshProcurementData()
+      if (name === 'suppliers') {
+        const data = await supabaseAdapter.fetchSuppliersModuleData()
+        ensureCloudStoreReady()
+        patchCloudStore(data)
+        markModuleReady('suppliers')
+        notifyModulesChanged()
+        return null
+      }
+      if (name === 'employees') {
+        await loadEmployeesCore()
+        notifyModulesChanged()
+        return null
+      }
+      return null
+    })
+  )
+}
+
 export async function refreshData() {
   if (!isCloudMode()) {
     return initializeData()

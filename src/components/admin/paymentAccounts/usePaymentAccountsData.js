@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import {
   listPaymentAccounts,
   PAYMENT_ACCOUNTS_MIGRATION_MESSAGE,
@@ -48,6 +49,11 @@ export function usePaymentAccountsData() {
   useEffect(() => {
     void loadPaidTotals()
   }, [loadPaidTotals])
+
+  // Swipe-to-refresh: only the accounts and their paid totals.
+  usePlatformPageRefresh(async () => {
+    await Promise.allSettled([load(), loadPaidTotals()])
+  })
 
   return {
     accounts,

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '../../../context/SessionContext'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { canViewSales, canSyncSales } from '../../../config/permissions'
 import { isCloudMode } from '../../../lib/dataMode'
 import {
@@ -71,6 +72,12 @@ export default function SalesPage() {
     }
     void loadFacts()
   }, [canView, loadFacts])
+
+  // Swipe-to-refresh: only the sales figures of this page.
+  usePlatformPageRefresh(async () => {
+    if (!canView || !isCloudMode() || syncing) return
+    await loadFacts()
+  })
 
   async function handleSync() {
     if (syncing) return

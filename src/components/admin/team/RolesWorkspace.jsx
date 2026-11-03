@@ -7,6 +7,7 @@ import {
 import { canAny, PERMISSION_CODES } from '../../../config/permissions'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { reloadRbac, upsertRole } from '../../../services/rbacService'
 import { useRoleEditor } from '../roles/useRoleEditor'
 import ConfirmRoleActionModal from './ConfirmRoleActionModal'
@@ -76,6 +77,12 @@ export default function RolesWorkspace({
   )
 
   const isDirty = !idsEqual(selectedPermissionIds, savedPermissionIds)
+
+  // Swipe-to-refresh: only roles and permissions, and never over unsaved edits of the matrix.
+  usePlatformPageRefresh(async () => {
+    if (isDirty) return
+    await onReload?.()
+  })
 
   useEffect(() => {
     if (!roles.length) return

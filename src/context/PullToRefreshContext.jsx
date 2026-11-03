@@ -15,25 +15,27 @@ const PullToRefreshContext = createContext({
 })
 
 export function PullToRefreshProvider({ children, onGlobalRefresh }) {
-  const handlerRef = useRef(null)
+  // A page (and parts of it, e.g. the list and the open card) register their own refresh; all of them run together.
+  const handlersRef = useRef(new Set())
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const registerHandler = useCallback((handler) => {
-    handlerRef.current = handler
+    handlersRef.current.add(handler)
     return () => {
-      if (handlerRef.current === handler) {
-        handlerRef.current = null
-      }
+      handlersRef.current.delete(handler)
     }
   }, [])
 
   const performRefresh = useCallback(async () => {
     setIsRefreshing(true)
     try {
-      await onGlobalRefresh?.()
-      if (handlerRef.current) {
-        // Quiet refresh: keep stale UI visible while new data loads.
-        await handlerRef.current({ quiet: true })
+      const handlers = [...handlersRef.current]
+      if (handlers.length === 0) {
+        // The page registered nothing: refresh only what this route needs (the layout decides), never everything.
+        await onGlobalRefresh?.()
+      } else {
+        // Quiet refresh: keep stale UI visible while new data loads. Only the current page's data is reloaded.
+        await Promise.allSettled(handlers.map((handler) => handler({ quiet: true })))
       }
     } finally {
       setIsRefreshing(false)
@@ -57,8 +59,9 @@ export function PullToRefreshProvider({ children, onGlobalRefresh }) {
 }
 
 /**
- * Регистрация локального обновления текущей страницы (поверх глобального reload).
- * При pull-to-refresh handler вызывается с `{ quiet: true }` — не очищайте UI.
+ * Регистрация обновления текущей страницы (или её части). Свайп обновляет ТОЛЬКО то, что зарегистрировано
+ * на открытой странице; без регистраций — только модули маршрута (см. PlatformLayout).
+ * Handler вызывается с `{ quiet: true }` — не очищайте UI. Возвращайте промис: по нему гаснет индикатор.
  */
 export function usePlatformPageRefresh(refreshFn) {
   const { registerHandler } = useContext(PullToRefreshContext)
