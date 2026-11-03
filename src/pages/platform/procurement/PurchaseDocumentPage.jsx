@@ -8,6 +8,7 @@ import { useToast } from '../../../context/ToastContext'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import useMediaQuery from '../../../hooks/useMediaQuery'
 import PurchaseDocumentPhoneActions from './PurchaseDocumentPhoneActions'
+import { ChevronDownIcon } from '../../../components/icons/PlatformIcons'
 import { getPlatformSection } from '../../../platform/platformNav'
 import {
   canViewOrders,
@@ -89,6 +90,7 @@ export default function PurchaseDocumentPage() {
   const [confirm, setConfirm] = useState(null)
   const [commentOpen, setCommentOpen] = useState(false)
   const [commentText, setCommentText] = useState('')
+  const [commentBlockOpen, setCommentBlockOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [goodsOpen, setGoodsOpen] = useState(false)
   const [ticks, setTicks] = useState(() => new Set())
@@ -201,7 +203,6 @@ export default function PurchaseDocumentPage() {
   }, [exportOpen])
 
   // On phones the document actions live in the header as icons (trash, check, «⋯»); the node is memoized, handlers go through a ref.
-  const phoneCommentLabel = readerView ? '' : order?.comment ? 'Комментарий' : editable ? 'Добавить комментарий' : ''
   const phoneActions = useMemo(
     () =>
       isPhone && order ? (
@@ -211,12 +212,10 @@ export default function PurchaseDocumentPage() {
           showSave={editable}
           showDelete={canEdit && draft}
           showCancel={canEdit && saved}
-          commentLabel={phoneCommentLabel}
-          hasComment={Boolean(order?.comment)}
         />
       ) : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isPhone, Boolean(order), busy, editable, canEdit, draft, saved, phoneCommentLabel]
+    [isPhone, Boolean(order), busy, editable, canEdit, draft, saved]
   )
 
   usePlatformPageTitle(getPlatformSection(pathname).title, '', {
@@ -418,10 +417,6 @@ export default function PurchaseDocumentPage() {
     remove: () => setConfirm('delete'),
     cancel: () => setConfirm('cancel'),
     export: (kind) => void handleExport(kind),
-    comment: () => {
-      setCommentText(order?.comment || '')
-      setCommentOpen(true)
-    },
   }
 
   if (!order && loading) return <div className="pdoc"><p>Загрузка…</p></div>
@@ -561,7 +556,44 @@ export default function PurchaseDocumentPage() {
         </div>
       </div>
 
-      {readerView && order.comment ? <div className="pdoc__banner">Комментарий: {order.comment}</div> : null}
+      {readerView && order.comment && !isPhone ? <div className="pdoc__banner">Комментарий: {order.comment}</div> : null}
+
+      {isPhone ? (
+        <section className="pdoc__mcomment">
+          <button
+            type="button"
+            className="pdoc__mcomment-head"
+            aria-expanded={commentBlockOpen}
+            onClick={() => {
+              if (!commentBlockOpen) setCommentText(order.comment || '')
+              setCommentBlockOpen((open) => !open)
+            }}
+          >
+            <span>Комментарий</span>
+            {order.comment ? <i className="pdoc__mcomment-dot" aria-hidden="true" /> : null}
+            <ChevronDownIcon size={20} />
+          </button>
+          {commentBlockOpen ? (
+            editable ? (
+              <textarea
+                className="admin-form__input pdoc__mcomment-field"
+                rows={3}
+                value={commentText}
+                placeholder="Комментарий к заказу"
+                disabled={busy}
+                onChange={(event) => setCommentText(event.target.value)}
+                onBlur={() => {
+                  if (commentText !== (order.comment || '')) {
+                    void saveMeta({ comment: commentText }, 'Не удалось сохранить комментарий.')
+                  }
+                }}
+              />
+            ) : (
+              <p className="pdoc__mcomment-text">{order.comment || 'Комментария нет'}</p>
+            )
+          ) : null}
+        </section>
+      ) : null}
 
       <section className="pdoc__items">
         <div className="pdoc__items-head">
