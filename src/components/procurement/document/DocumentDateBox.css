@@ -4,7 +4,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  min-height: 36px;
+  min-height: var(--pf-control-h, 36px);
   padding: 0 10px;
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: 4px;
@@ -40,4 +40,10 @@
     white-space: nowrap;
     font-size: 14px;
   }
+}
+
+/* The invisible date input fills the box; the shared field height must not shrink it. */
+.docdate .docdate__input {
+  height: 100%;
+  min-height: 0;
 }
