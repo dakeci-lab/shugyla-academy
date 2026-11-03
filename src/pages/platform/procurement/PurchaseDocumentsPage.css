@@ -11,11 +11,25 @@
   gap: 8px 12px;
 }
 
-.pdl-bar .btn {
-  height: 38px;
-  padding: 0 16px;
-  border-radius: 4px;
-  font-size: 13.5px;
+/* Every control of the top bar has the same height, font and corner radius (tokens in index.css). */
+.pdl-bar .btn,
+.pdl-bar .pf-trigger,
+.pdl-bar .pf-filter-chip,
+.pdl-bar .pact {
+  box-sizing: border-box;
+  height: var(--pf-control-h);
+  border-radius: var(--pf-control-radius);
+  font-size: var(--pf-control-fs);
+}
+
+.pdl-bar .btn,
+.pdl-bar .pf-trigger,
+.pdl-bar .pf-filter-chip {
+  padding: 0 var(--pf-control-px);
+}
+
+.pdl-bar .pf-filter-chip {
+  align-items: center;
 }
 
 .pdl-bar__chip {
@@ -34,6 +48,17 @@
 
 .pdl-table {
   border-radius: 6px;
+}
+
+/* Ten columns now (checkbox and pencil): a tighter gap keeps the pencil inside a 1180px tablet. */
+@media (min-width: 641px) {
+  .pdl-table .pgt__head,
+  .pdl-table .pgt__row-main,
+  .pdl-table .pgt__foot {
+    gap: 8px 10px;
+    padding-left: 10px;
+    padding-right: 10px;
+  }
 }
 
 .pdl-row--draft .pgt__row-main,
@@ -172,4 +197,49 @@
     background: #dcfce7;
     color: #166534;
   }
+}
+
+.pdl-check {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--color-primary, #059669);
+  cursor: pointer;
+}
+
+.pdl-row.is-selected .pgt__row-main {
+  background: #f0fdf4;
+}
+
+/* An empty number is three dashes, quiet and upright (draft rows are otherwise gray italic). */
+.pdl-dash {
+  color: var(--color-text-muted, #9ca3af);
+  letter-spacing: 1px;
+}
+
+.pdl-row--draft .pdl-dash {
+  font-style: normal;
+}
+
+@media (max-width: 640px) {
+  /* Selecting and bulk actions are for the wide screen; on a phone a draft is deleted inside the document. */
+  .pdl-bar__actions {
+    display: none;
+  }
+
+  /* The total's label is the second cell now (the first is the checkbox column, hidden on phones). */
+  .pdl-table .pgt__foot .pgt__cell--m-hide:nth-child(2):not(:empty) {
+    display: block;
+  }
+
+  .pdl-bar .pf-filter-chip {
+    padding: 0 10px;
+    font-size: 13px;
+  }
+}
+
+/* The total's label sits in a narrow column: let it run on into the empty cells next to it. */
+.pdl-table .pgt__foot .pgt__cell:nth-child(2) {
+  overflow: visible;
+  white-space: nowrap;
 }

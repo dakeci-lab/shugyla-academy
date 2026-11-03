@@ -5,10 +5,11 @@ import { usePlatformData } from '../../../context/PlatformDataContext'
 import { useToast } from '../../../context/ToastContext'
 import useStableWhenReady from '../../../hooks/useStableWhenReady'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
-import { canViewPurchases, canCreatePurchase } from '../../../config/permissions'
+import { canViewPurchases, canCreatePurchase, canDeletePurchase } from '../../../config/permissions'
 import {
   getPurchaseOrdersSync,
   createPurchaseOrder,
+  deleteDraftPurchaseOrders,
   findPurchaseOrderIdsByItemText,
   isPurchasesDataReady,
   isPurchasesDataLoading,
@@ -36,6 +37,10 @@ import {
   selectPurchaseDocuments,
 } from '../../../utils/purchaseDocumentsList'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
+import IconActionButton from '../../../components/admin/IconActionButton'
+import ConfirmDialog from '../../../components/admin/ConfirmDialog'
+import PlatformActionsMenu from '../../../components/platform/PlatformActionsMenu'
+import { PencilIcon } from '../../../components/icons/PlatformIcons'
 import PlatformFab from '../../../components/platform/PlatformFab'
 import PlatformFilterTrigger from '../../../components/platform/PlatformFilterTrigger'
 import PeriodFilterPopover, {
@@ -66,12 +71,13 @@ function defaultPeriod() {
  */
 export default function PurchaseDocumentsPage() {
   const { user } = useSession()
-  const { error: showError } = useToast()
+  const { error: showError, success: showSuccess } = useToast()
   const { loadError, reloadProcurement, ensureModules, version: dataVersion } = usePlatformData()
   const { version } = useAdminRefresh()
   const navigate = useNavigate()
   const canView = canViewPurchases(user)
   const canCreate = canCreatePurchase(user)
+  const canDelete = canDeletePurchase(user)
 
   useEffect(() => {
     if (!isCloudMode()) return
@@ -94,6 +100,10 @@ export default function PurchaseDocumentsPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
   const [itemOrderIds, setItemOrderIds] = useState(null)
+  const [selected, setSelected] = useState(() => new Set())
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const selectAllRef = useRef(null)
 
   useEffect(() => {
     if (!canView || !isCloudMode()) return undefined
@@ -172,6 +182,10 @@ export default function PurchaseDocumentsPage() {
   useEffect(() => {
     setPage(1)
   }, [filter, pageSize])
+  // A selection belongs to the page on screen: another page, filter or page size starts clean.
+  useEffect(() => {
+    setSelected(new Set())
+  }, [filter, page, pageSize])
   useEffect(() => {
     if (page > totalPages) setPage(totalPages)
   }, [page, totalPages])
@@ -251,6 +265,54 @@ export default function PurchaseDocumentsPage() {
     }
   }
 
+  const visibleIds = visible.map((order) => order.id)
+  const pickedOrders = visible.filter((order) => selected.has(order.id))
+  const allPicked = visibleIds.length > 0 && pickedOrders.length === visibleIds.length
+  const hasSavedPicked = pickedOrders.some((order) => !isOrderDraft(order))
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = pickedOrders.length > 0 && !allPicked
+    }
+  }, [pickedOrders.length, allPicked])
+
+  function toggleOne(id) {
+    setSelected((current) => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleAll() {
+    setSelected(allPicked ? new Set() : new Set(visibleIds))
+  }
+
+  /** Why «Удалить» is unavailable right now ('' — it is available). */
+  const deleteBlockReason = !canDelete
+    ? 'Нет прав на удаление'
+    : pickedOrders.length === 0
+      ? 'Отметьте документы в списке'
+      : hasSavedPicked
+        ? 'Сохранённые документы удалить нельзя'
+        : ''
+
+  async function handleDeleteSelected() {
+    const ids = pickedOrders.map((order) => order.id)
+    setDeleting(true)
+    try {
+      const { deleted, failed } = await deleteDraftPurchaseOrders(ids)
+      setSelected((current) => new Set([...current].filter((id) => !deleted.includes(id))))
+      if (deleted.length) showSuccess(`Удалено черновиков: ${deleted.length}`)
+      if (failed.length) {
+        showError(`Не удалено: ${failed.length}. ${failed[0].message}`)
+      }
+    } finally {
+      setDeleting(false)
+      setConfirmDelete(false)
+    }
+  }
+
   if (!canView) {
     return <PlatformAccessDenied title="Нет доступа к разделу «Закуп»" />
   }
@@ -262,14 +324,31 @@ export default function PurchaseDocumentsPage() {
       : '')
 
   const columns = [
-    { key: 'number', label: 'Номер', width: 130, mobile: 'hide' },
-    { key: 'created', label: 'Создан', width: 110, mobile: 'hide' },
-    { key: 'supplier', label: 'Поставщик', width: 200, flex: true, mobile: 'title' },
-    { key: 'delivery', label: 'Доставка', width: 110, mobile: 'hide' },
-    { key: 'items', label: 'Позиций', width: 80, align: 'end', mobile: 'hide' },
-    { key: 'amount', label: 'Сумма', width: 130, align: 'end', mobile: 'end' },
-    { key: 'creator', label: 'Создал', width: 160, mobile: 'hide' },
-    { key: 'comment', label: 'Комментарий', width: 220, mobile: 'hide' },
+    {
+      key: 'select',
+      label: (
+        <input
+          ref={selectAllRef}
+          type="checkbox"
+          className="pdl-check"
+          checked={allPicked}
+          disabled={visibleIds.length === 0}
+          onChange={toggleAll}
+          aria-label="Выбрать все документы на странице"
+        />
+      ),
+      width: 36,
+      mobile: 'hide',
+    },
+    { key: 'number', label: 'Номер', width: 90, mobile: 'hide' },
+    { key: 'created', label: 'Создан', width: 100, mobile: 'hide' },
+    { key: 'supplier', label: 'Поставщик', width: 160, flex: true, mobile: 'title' },
+    { key: 'delivery', label: 'Доставка', width: 100, mobile: 'hide' },
+    { key: 'items', label: 'Позиций', width: 64, align: 'end', mobile: 'hide' },
+    { key: 'amount', label: 'Сумма', width: 120, align: 'end', mobile: 'end' },
+    { key: 'creator', label: 'Создал', width: 140, mobile: 'hide' },
+    { key: 'comment', label: 'Комментарий', width: 140, mobile: 'hide' },
+    { key: 'edit', label: '', width: 44, align: 'end', mobile: 'hide' },
   ]
 
   return (
@@ -358,6 +437,20 @@ export default function PurchaseDocumentsPage() {
             </div>
           </PeriodFilterPopover>
         </div>
+        <PlatformActionsMenu
+          className="pdl-bar__actions"
+          count={pickedOrders.length}
+          items={[
+            {
+              key: 'delete',
+              label: 'Удалить',
+              danger: true,
+              disabled: Boolean(deleteBlockReason),
+              reason: deleteBlockReason,
+              onSelect: () => setConfirmDelete(true),
+            },
+          ]}
+        />
         <span className="pf-filter-chip pdl-bar__chip">
           С {formatPurchaseDate(filter.dateFrom)} по {formatPurchaseDate(filter.dateTo)}
           <button
@@ -420,13 +513,37 @@ export default function PurchaseDocumentsPage() {
                   ) : null}
                   <PgtRow
                     columns={columns}
-                    className={isDraft ? 'pdl-row pdl-row--draft' : 'pdl-row'}
+                    className={`${isDraft ? 'pdl-row pdl-row--draft' : 'pdl-row'}${selected.has(order.id) ? ' is-selected' : ''}`}
+                    interactive
                     onClick={() => navigate(`${DOCUMENT_PATH_PREFIX}/${order.id}`)}
                     cells={{
+                      select: (
+                        <input
+                          type="checkbox"
+                          className="pdl-check"
+                          checked={selected.has(order.id)}
+                          onChange={() => toggleOne(order.id)}
+                          onClick={(event) => event.stopPropagation()}
+                          aria-label={`Выбрать документ: ${order.supplierName || 'без поставщика'}`}
+                        />
+                      ),
+                      edit: (
+                        <IconActionButton
+                          label={isDraft ? 'Редактировать' : 'Открыть'}
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            navigate(`${DOCUMENT_PATH_PREFIX}/${order.id}`)
+                          }}
+                        >
+                          <PencilIcon size={16} />
+                        </IconActionButton>
+                      ),
                       number: order.number ? (
                         <span className="num pdl-number">{order.number}</span>
                       ) : (
-                        <span className="pdl-nonumber">Без номера</span>
+                        <span className="pdl-dash" aria-label="Без номера">
+                          ---
+                        </span>
                       ),
                       created: <span className="num">{formatPurchaseDate(order.createdAt || order.date)}</span>,
                       supplier: order.supplierName ? (
@@ -484,6 +601,17 @@ export default function PurchaseDocumentsPage() {
           />
         </div>
       )}
+
+      {confirmDelete ? (
+        <ConfirmDialog
+          title={`Удалить черновиков: ${pickedOrders.length}?`}
+          message="Черновики будут удалены безвозвратно. Сохранённые документы удалить нельзя."
+          confirmLabel="Удалить"
+          loading={deleting}
+          onConfirm={() => void handleDeleteSelected()}
+          onCancel={() => setConfirmDelete(false)}
+        />
+      ) : null}
     </div>
   )
 }

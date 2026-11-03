@@ -69,6 +69,11 @@
   cursor: pointer;
 }
 
+.pgt__row-main--button:focus-visible {
+  outline: 2px solid var(--color-primary, #059669);
+  outline-offset: -2px;
+}
+
 .pgt__row:hover > .pgt__row-main {
   background: #f8fafc;
 }

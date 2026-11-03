@@ -66,8 +66,18 @@ export function PgtHead({ columns }) {
  *                    own controls (suppliers: name link + edit pencil).
  * @param mobileMeta  extra line shown under the title on phones only.
  * @param extra       rendered under the row (e.g. «Настроить отсрочку»).
+ * @param interactive the cells hold their own controls (checkbox, icon button): the row is then a clickable div
+ *                    (Enter / Space work too) instead of one <button>, and the controls stop the click themselves.
  */
-export function PgtRow({ columns, cells, onClick, className = '', mobileMeta = null, extra = null }) {
+export function PgtRow({
+  columns,
+  cells,
+  onClick,
+  className = '',
+  mobileMeta = null,
+  extra = null,
+  interactive = false,
+}) {
   const inner = (
     <>
       {columns.map((col) => (
@@ -80,7 +90,23 @@ export function PgtRow({ columns, cells, onClick, className = '', mobileMeta = n
   )
   return (
     <div className={`pgt__row${className ? ` ${className}` : ''}`}>
-      {onClick ? (
+      {onClick && interactive ? (
+        <div
+          role="button"
+          tabIndex={0}
+          className="pgt__row-main pgt__row-main--button"
+          onClick={onClick}
+          onKeyDown={(event) => {
+            if (event.target !== event.currentTarget) return
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              onClick(event)
+            }
+          }}
+        >
+          {inner}
+        </div>
+      ) : onClick ? (
         <button type="button" className="pgt__row-main pgt__row-main--button" onClick={onClick}>
           {inner}
         </button>
