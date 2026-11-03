@@ -9,8 +9,11 @@ const view = read('src/components/platform/PageRefreshIndicator.jsx')
 const css = read('src/components/platform/PageRefreshIndicator.css')
 const ptr = read('src/components/platform/PullToRefresh.jsx')
 
-for (const label of ['Потяните', 'Отпустите', 'Обновляем…', 'Обновлено']) assert.ok(view.includes(label), label)
-ok('the indicator has four stages: «Потяните» → «Отпустите» → «Обновляем…» → «Обновлено»')
+assert.doesNotMatch(view, /page-refresh-indicator__label/)
+assert.doesNotMatch(css, /page-refresh-indicator__label/)
+for (const visible of ['Потяните</', 'Отпустите</', 'Обновляем…</', 'Обновлено</']) assert.ok(!view.includes(visible), visible)
+assert.match(view, /className="page-refresh-indicator__sr" role="status"/)
+ok('no visible text: only the ring, the spinner and the check (a hidden status line stays for screen readers)')
 
 assert.match(view, /stroke-?[Dd]asharray=\{`\$\{Math\.min\(1, pullProgress\) \* CIRCUMFERENCE\}/)
 assert.match(css, /page-refresh-indicator__chip\s*\{[^}]*border-radius: 50%[^}]*box-shadow/)

@@ -5,7 +5,7 @@ const CIRCUMFERENCE = 2 * Math.PI * RADIUS
 
 /**
  * Индикатор свайп-обновления: белая круглая «таблетка» с кольцом, которое заполняется по мере натяжения,
- * подпись по этапам («Потяните» → «Отпустите» → «Обновляем…» → «Обновлено»), по окончании — зелёная галочка.
+ * затем крутилка, по окончании — зелёная галочка. Без видимого текста.
  * Не fullscreen, не затемняет контент.
  */
 export default function PageRefreshIndicator({
@@ -19,7 +19,8 @@ export default function PageRefreshIndicator({
 }) {
   const reached = pullProgress >= 1
   const state = done ? 'done' : refreshing ? 'refreshing' : reached ? 'ready' : 'pulling'
-  const label = done ? 'Обновлено' : refreshing ? 'Обновляем…' : reached ? 'Отпустите' : 'Потяните'
+  // Без текста: только кольцо, спиннер и в конце галочка. Для скринридеров — скрытая подпись.
+  const srLabel = done ? 'Обновлено' : refreshing ? 'Обновляем' : 'Потяните для обновления'
 
   const className = [
     'page-refresh-indicator',
@@ -69,8 +70,8 @@ export default function PageRefreshIndicator({
             ) : null}
           </svg>
         </span>
-        <span className="page-refresh-indicator__label" role="status" aria-live="polite">
-          {label}
+        <span className="page-refresh-indicator__sr" role="status" aria-live="polite">
+          {srLabel}
         </span>
       </div>
     </div>
