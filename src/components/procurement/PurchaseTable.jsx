@@ -79,10 +79,10 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
               delivery: <span>{formatPurchaseDate(order.expectedDeliveryDate)}</span>,
             }}
             mobileMeta={
-              <>
-                <span className="pgt-items">{order.itemsCount ?? order.items?.length ?? 0} тов.</span>
-                {order.checkedAt ? <span className="pgt__pill pgt__pill--ok">✓ Сверено</span> : null}
-              </>
+              // Phone row = supplier, sum and the status of the document (the day is the group header).
+              <span className={`pgt__pill ${order.checkedAt ? 'pgt__pill--ok' : 'pgt__pill--wait'}`}>
+                {order.checkedAt ? 'Сверено' : 'Не сверено'}
+              </span>
             }
           />
           </Fragment>

@@ -101,15 +101,13 @@
   color: #166534;
 }
 
-/* Phones: the same list look as «Закуп»: day groups, bold 14px supplier, 14px sum, a quiet second line. */
-@media (max-width: 640px) {
-  .orders-page__summary {
-    padding: 10px 14px;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--color-text-secondary, #64748b);
-  }
+.pgt__pill--wait {
+  background: #f1f5f9;
+  color: #475569;
+}
 
+/* Phones: the same list look as «Закуп»: day groups, bold 14px supplier, 14px sum, the status pill on the second line. */
+@media (max-width: 640px) {
   .orders-page .pgt__title {
     font-size: 14px;
     font-weight: 700;
@@ -127,11 +125,6 @@
     gap: 4px 8px;
     margin-top: 2px;
     font-size: 13px;
-  }
-
-  .orders-page .pgt-items {
-    font-size: 14px;
-    color: var(--color-text-secondary, #64748b);
   }
 
   .orders-page .pgt__pill {
