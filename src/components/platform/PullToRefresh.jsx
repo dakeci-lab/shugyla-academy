@@ -6,7 +6,7 @@ import './PullToRefresh.css'
 const THRESHOLD = 72
 const MAX_PULL = 120
 const RESISTANCE = 0.5
-const REFRESHING_HEIGHT = 80
+const REFRESHING_HEIGHT = 64
 const DONE_HOLD_MS = 650
 const HIDE_DURATION_MS = 320
 const MOBILE_QUERY = '(max-width: 900px)'
