@@ -1201,6 +1201,13 @@ function UmagSupplierDetail({
           defaultAccountId={supplier.isVirtual ? null : supplier.paymentAccountId ?? null}
           onSettle={(accountId) => handleSettle(selectedOperation, accountId)}
           onUnsettle={() => handleUnsettle(selectedOperation)}
+          due={
+            selectedOperation.settlement &&
+            !selectedOperation.settlement.settled &&
+            selectedOperation.settlement.type === 'payable'
+              ? describeDue(selectedOperation.settlement.dueDate, todayKey)
+              : null
+          }
         />
       ) : null}
     </div>

@@ -113,6 +113,90 @@ function SettleBlock({ settlement, accounts, defaultAccountId = null, onSettle, 
   )
 }
 
+/**
+ * The window for an open document — the one thing to do here is to pay (or to mark a return received): the document,
+ * the sum, the deadline, the account and one big button. UMAG's own details (who received it, UMAG's account) are
+ * not shown: they only confused the account being paid from.
+ */
+function PayDialog({ operation, headline, due, accounts, defaultAccountId, onSettle, onClose }) {
+  const settlement = operation.settlement
+  const isPayable = settlement.type === 'payable'
+  const [accountId, setAccountId] = useState('')
+  const [accountTouched, setAccountTouched] = useState(false)
+  const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    if (accountTouched) return
+    const known = defaultAccountId && accounts.some((account) => account.id === defaultAccountId)
+    setAccountId(known ? defaultAccountId : '')
+  }, [accounts, defaultAccountId, accountTouched])
+
+  async function pay() {
+    if (busy) return
+    setBusy(true)
+    try {
+      await onSettle(accountId || null)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const amount = Math.abs(Number(operation.amount) || 0)
+  return (
+    <>
+      <div className="umag-op-detail__head">
+        <div>
+          <h3 className="umag-op-detail__title">{headline.title}</h3>
+          <p className="umag-op-detail__muted">
+            {headline.when ? formatUmagDateTime(headline.when) : 'Дата неизвестна'}
+          </p>
+        </div>
+        <button type="button" className="umag-op-detail__close" onClick={onClose} aria-label="Закрыть">
+          ×
+        </button>
+      </div>
+
+      <div className="umag-op-detail__pay-amount">
+        <strong>{formatUmagMoney(amount)}</strong>
+        {due ? (
+          <span className={`umag-op-detail__pay-due umag-op-detail__pay-due--${due.tone}`}>
+            {due.text.charAt(0).toUpperCase() + due.text.slice(1)}
+          </span>
+        ) : null}
+      </div>
+
+      <label className="umag-op-detail__pay-field">
+        <span>{isPayable ? 'Счёт оплаты' : 'Счёт, на который пришёл возврат'}</span>
+        <select
+          className="umag-op-detail__settle-account"
+          value={accountId}
+          onChange={(e) => {
+            setAccountTouched(true)
+            setAccountId(e.target.value)
+          }}
+          disabled={busy}
+        >
+          <option value="">Без счёта</option>
+          {accounts.map((account) => (
+            <option key={account.id} value={account.id}>
+              {account.name}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <div className="umag-op-detail__pay-actions">
+        <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void pay()}>
+          {busy ? 'Сохранение…' : isPayable ? 'Оплатить' : 'Получили возврат'}
+        </button>
+        <button type="button" className="btn btn--outline" disabled={busy} onClick={onClose}>
+          Отмена
+        </button>
+      </div>
+    </>
+  )
+}
+
 export default function OperationDetailSheet({
   operation,
   supplierName,
@@ -123,6 +207,7 @@ export default function OperationDetailSheet({
   defaultAccountId = null,
   onSettle,
   onUnsettle,
+  due = null,
 }) {
   const kind = operation?.kind
   const isPaymentDoc = kind === 'payment' || kind === 'refund'
@@ -185,6 +270,15 @@ export default function OperationDetailSheet({
 
   const [unmarking, setUnmarking] = useState(false)
 
+  // An open supply / return that this person may close: the focused pay dialog instead of the full details.
+  const openToSettle = Boolean(
+    !isPaymentDoc && canManage && operation?.settlement && !operation.settlement.settled && onSettle
+  )
+  const docTitle =
+    kind === 'supply' || kind === 'return'
+      ? `${headerFromHistory.title}${operation?.documentNumber ? ` № ${operation.documentNumber}` : ''}`
+      : headerFromHistory.title
+
   const canUnmark =
     canManage &&
     kind === 'payment' &&
@@ -215,6 +309,18 @@ export default function OperationDetailSheet({
         aria-label={headerFromHistory.title}
         onClick={(e) => e.stopPropagation()}
       >
+        {openToSettle ? (
+          <PayDialog
+            operation={operation}
+            headline={{ title: docTitle, when: headerFromHistory.when }}
+            due={due}
+            accounts={paymentAccounts}
+            defaultAccountId={defaultAccountId}
+            onSettle={onSettle}
+            onClose={onClose}
+          />
+        ) : (
+        <>
         <div className="umag-op-detail__head">
           <div>
             <div className={`umag-op-detail__badge umag-op-detail__badge--${kind}`}>
@@ -372,6 +478,8 @@ export default function OperationDetailSheet({
           <p className="umag-op-detail__comment">{headerFromHistory.comment || headerFromHistory.note}</p>
         ) : null}
           </>
+        )}
+        </>
         )}
       </div>
     </div>,

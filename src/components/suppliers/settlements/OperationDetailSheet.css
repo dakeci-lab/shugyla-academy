@@ -3,9 +3,9 @@
   inset: 0;
   z-index: 80;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
-  padding: 0;
+  padding: 16px;
   background: rgba(15, 23, 42, 0.45);
 }
 
@@ -14,9 +14,9 @@
   max-height: min(92vh, 920px);
   overflow: auto;
   background: #fff;
-  border-radius: 16px 16px 0 0;
-  padding: 16px 16px 24px;
-  box-shadow: 0 -8px 28px rgba(15, 23, 42, 0.18);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 12px 36px rgba(15, 23, 42, 0.22);
 }
 
 .umag-op-detail__head {
@@ -204,4 +204,75 @@
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   background: #fff;
+}
+
+/* ---- Pay dialog (an open supply / return): document, sum, deadline, account, one big button ---- */
+.umag-op-detail__pay-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 18px;
+}
+
+.umag-op-detail__pay-amount strong {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.umag-op-detail__pay-due {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #f1f5f9;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.umag-op-detail__pay-due--overdue {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.umag-op-detail__pay-due--today {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.umag-op-detail__pay-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.umag-op-detail__pay-field > span {
+  font-size: 13px;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.umag-op-detail__pay-field .umag-op-detail__settle-account {
+  flex: none;
+  width: 100%;
+  min-height: 44px;
+  font-size: 16px;
+}
+
+.umag-op-detail__pay-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.umag-op-detail__pay-actions .btn {
+  width: 100%;
+  min-height: 46px;
+  font-size: 16px;
+  justify-content: center;
+}
+
+.umag-op-detail:has(.umag-op-detail__pay-amount) {
+  width: min(440px, 100%);
 }

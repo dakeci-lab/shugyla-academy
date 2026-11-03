@@ -50,4 +50,13 @@ assert.match(headerCss, /\.platform-mobile-header__actions\s*\{[^}]*gap: 8px/)
 assert.doesNotMatch(read('src/components/suppliers/settlements/UmagSettlementsPanel.css'), /header-filter\s*\{[^}]*margin/)
 ok('the gap between header icons is set once, in the header container (no page adds its own margin)')
 
+const sheet = read('src/components/suppliers/settlements/OperationDetailSheet.jsx')
+const sheetCss = read('src/components/suppliers/settlements/OperationDetailSheet.css')
+assert.match(sheet, /function PayDialog\(/)
+const dialog = sheet.slice(sheet.indexOf('function PayDialog('), sheet.indexOf('export default function OperationDetailSheet'))
+assert.doesNotMatch(dialog, /userName|account\b|Сотрудник/)
+assert.match(sheet, /openToSettle \? \(\s*<PayDialog/)
+assert.match(sheetCss, /\.umag-op-detail__backdrop\s*\{[^}]*align-items: center/)
+ok('the payment window of an open document is a centred dialog: document, big sum, deadline, account, «Оплатить» / «Отмена»; no UMAG employee / account')
+
 console.log(`\nverify:mobile-supplier-card — ${checks} checks passed`)
