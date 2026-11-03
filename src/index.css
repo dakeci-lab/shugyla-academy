@@ -11,7 +11,7 @@
   --color-text-secondary: #64748b;
   --color-text-muted: #94a3b8;
   --color-border: #e2e8f0;
-  --color-danger: #d32f2f;
+  --color-danger: #c03c34; /* every «Удалить» button: filled red with white text (owner's pick, 2026-11-03) */
   --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.06);
   --shadow-md: 0 8px 24px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 16px 40px rgba(15, 23, 42, 0.1);
