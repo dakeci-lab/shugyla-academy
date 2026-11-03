@@ -50,7 +50,7 @@ ok('the document shows the comment only when there is one; no «—» placeholde
 
 const list = read('src/components/procurement/PurchaseTable.jsx')
 const keys = [...list.slice(list.indexOf('const columns = ['), list.indexOf(']\n\n  return (')).matchAll(/key: '(\w+)'/g)].map((m) => m[1])
-assert.deepEqual(keys.filter((key) => key !== 'actions'), ['delivery', 'supplier', 'items', 'amount', 'checked', 'number', 'created', 'creator'])
+assert.deepEqual(keys.filter((key) => key !== 'actions' && key !== 'edit'), ['delivery', 'supplier', 'items', 'amount', 'checked', 'number', 'created', 'creator'])
 ok('orders list: delivery and supplier first, created / creator last')
 
 // Checklist: checkbox first, row number second, nothing persisted in the database.

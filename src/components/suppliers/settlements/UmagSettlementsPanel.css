@@ -304,10 +304,12 @@
   gap: 6px;
   border: 1px solid var(--color-border, #e2e8f0);
   background: var(--color-white, #fff);
-  border-radius: 999px;
-  padding: 6px 12px;
+  box-sizing: border-box;
+  height: var(--pf-control-h);
+  border-radius: var(--pf-control-radius);
+  padding: 0 var(--pf-control-px);
   font: inherit;
-  font-size: 13px;
+  font-size: var(--pf-control-fs);
   font-weight: 600;
   color: var(--color-text-secondary, #64748b);
   cursor: pointer;
@@ -336,12 +338,14 @@
   min-width: 0;
   width: 100%;
   max-width: 320px;
-  padding: 8px 12px;
+  box-sizing: border-box;
+  height: var(--pf-control-h);
+  padding: 0 var(--pf-control-px);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--pf-control-fs);
   color: var(--color-text, #0f172a);
   border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 10px;
+  border-radius: var(--pf-control-radius);
   background: var(--color-white, #fff);
 }
 

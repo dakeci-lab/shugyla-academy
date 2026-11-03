@@ -151,7 +151,7 @@
   padding: 0;
   font: inherit;
   font-weight: 600;
-  color: #2563eb;
+  color: #047857;
   cursor: pointer;
   text-align: left;
   white-space: nowrap;
@@ -251,4 +251,11 @@
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+
+/* Two icon buttons at the right end of a row: open (pencil) and download. */
+.proc-wh__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
