@@ -267,6 +267,31 @@
   font-weight: 500;
 }
 
+/* «С» and «По» sit inside their boxes, like plain fields. */
+.period-sheet .period-filter-popover__date-field {
+  flex-direction: row;
+  align-items: center;
+  gap: 0;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.period-sheet .period-filter-popover__date-field > span:first-child {
+  display: none;
+}
+
+.period-sheet .period-filter-popover__date-wrap {
+  flex: 1;
+  min-height: 52px;
+  border-radius: 6px;
+}
+
+.period-sheet .period-filter-popover__date {
+  font-size: 15px;
+  font-weight: 500;
+}
+
 .period-sheet .pf-field {
   padding: 0;
 }

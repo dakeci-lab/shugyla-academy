@@ -111,36 +111,31 @@ function PeriodFilterFields({ draft, onChange, phone = false }) {
         </button>
       </div>
 
-      {/* Phones: no «С / По» fields (UMAG has none) — presets and the ‹ › navigator are enough. */}
-      {phone ? null : (
-        <>
-          <span className="period-filter-popover__label">Произвольный период</span>
-          <div className="period-filter-popover__dates">
-            <label className="period-filter-popover__date-field">
-              <span>С</span>
-              <span className="period-filter-popover__date-wrap">
-                <input
-                  type="date"
-                  className="period-filter-popover__date"
-                  value={draft.dateFrom}
-                  onChange={(e) => updateDate('dateFrom', e.target.value)}
-                />
-              </span>
-            </label>
-            <label className="period-filter-popover__date-field">
-              <span>По</span>
-              <span className="period-filter-popover__date-wrap">
-                <input
-                  type="date"
-                  className="period-filter-popover__date"
-                  value={draft.dateTo}
-                  onChange={(e) => updateDate('dateTo', e.target.value)}
-                />
-              </span>
-            </label>
-          </div>
-        </>
-      )}
+      {phone ? null : <span className="period-filter-popover__label">Произвольный период</span>}
+      <div className="period-filter-popover__dates">
+        <label className="period-filter-popover__date-field">
+          <span>С</span>
+          <span className="period-filter-popover__date-wrap">
+            <input
+              type="date"
+              className="period-filter-popover__date"
+              value={draft.dateFrom}
+              onChange={(e) => updateDate('dateFrom', e.target.value)}
+            />
+          </span>
+        </label>
+        <label className="period-filter-popover__date-field">
+          <span>По</span>
+          <span className="period-filter-popover__date-wrap">
+            <input
+              type="date"
+              className="period-filter-popover__date"
+              value={draft.dateTo}
+              onChange={(e) => updateDate('dateTo', e.target.value)}
+            />
+          </span>
+        </label>
+      </div>
     </div>
   )
 }
