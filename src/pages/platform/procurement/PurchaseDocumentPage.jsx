@@ -32,6 +32,7 @@ import {
 } from '../../../utils/purchaseData'
 import { loadOrderChecklist, saveOrderChecklist } from '../../../utils/orderChecklistStorage'
 import {
+  documentListPath,
   documentTitle,
   documentTotal,
   validateDocumentForSave,
@@ -50,8 +51,6 @@ import { ORDER_LABELS } from '../../../config/documentLabels'
 import '../../../components/admin/admin-shared.css'
 import './PurchaseDocumentPage.css'
 
-const BUYER_LIST_PATH = '/platform/procurement'
-const RECEIVER_LIST_PATH = '/platform/orders'
 
 /**
  * Документ закупа — /platform/procurement/documents/:id. Черновик правится целиком и сохраняет каждое
@@ -72,7 +71,9 @@ export default function PurchaseDocumentPage() {
   const canView = canViewOrders(user)
   const canEdit = canEditPurchase(user)
   const canMarkChecked = canMarkOrderChecked(user)
-  const LIST_PATH = canEdit ? BUYER_LIST_PATH : RECEIVER_LIST_PATH
+  // Back goes to the list the document was opened from (by the address), not by the user's rights:
+  // a director opening an order from «Заказы» must return to «Заказы», not to «Закуп».
+  const LIST_PATH = documentListPath(pathname)
 
   const [fullOrder, setFullOrder] = useState(null)
   const [loading, setLoading] = useState(true)
