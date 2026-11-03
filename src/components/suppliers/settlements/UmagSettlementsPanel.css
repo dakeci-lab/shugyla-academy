@@ -1021,9 +1021,8 @@
 .sd-tabs__tab {
   appearance: none;
   border: 0;
-  border-bottom: 3px solid transparent;
   background: none;
-  padding: 12px 0 10px;
+  padding: 12px 0 13px;
   font: inherit;
   font-size: 16px;
   font-weight: 700;
@@ -1033,11 +1032,64 @@
 
 .sd-tabs__tab.is-active {
   color: var(--color-primary, #16a34a);
-  border-bottom-color: var(--color-primary, #16a34a);
 }
 
-.sd-pages {
-  min-height: 60vh;
+.sd-tabs {
+  position: relative;
+}
+
+.sd-tabs__bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 50%;
+  height: 3px;
+  background: var(--color-primary, #16a34a);
+  transition: transform 0.25s ease;
+}
+
+.sd-tabs__bar.is-dragging {
+  transition: none;
+}
+
+/* Phones: both pages sit side by side; the track follows the finger and settles on a page. */
+@media (max-width: 640px) {
+  .sd-pages {
+    overflow: hidden;
+    touch-action: pan-y;
+    min-height: 60vh;
+  }
+
+  .sd-track {
+    display: flex;
+    width: 200%;
+    transition: transform 0.25s ease;
+  }
+
+  .sd-track.is-dragging {
+    transition: none;
+  }
+
+  .sd-page {
+    width: 50%;
+    flex: none;
+    min-width: 0;
+    padding: 0 0 0;
+  }
+
+  .sd-page--pay {
+    order: 1;
+  }
+
+  .sd-page--info {
+    order: 2;
+  }
+
+  /* The page that is out of sight does not stretch the scroll length. */
+  .sd-page.is-off {
+    height: 0;
+    overflow: hidden;
+  }
 }
 
 .sd-info__card {

@@ -13,7 +13,11 @@ ok('phones: the filter is an icon of the page header next to the pencil, only on
 
 assert.match(panel, /\{ id: 'pay', label: 'Платежи' \},\s*\{ id: 'info', label: 'Информация' \}/)
 assert.match(panel, /setPhoneTab\(dx < 0 \? 'info' : 'pay'\)/)
-ok('phones: two pages like UMAG — «Платежи» first, «Информация» second; a swipe moves between them')
+assert.match(panel, /onTouchMove/)
+assert.match(panel, /translateX\(calc\(\$\{phoneTab === 'pay' \? 0 : -50\}% \+ \$\{dragX \?\? 0\}px\)\)/)
+assert.match(panel, /sd-tabs__bar/)
+assert.match(read('src/components/suppliers/settlements/UmagSettlementsPanel.css'), /\.sd-pages\s*\{[^}]*touch-action: pan-y/)
+ok('phones: two pages like UMAG — «Платежи» first, «Информация» second; the pages follow the finger and settle on release; the tab underline moves with them')
 
 assert.match(panel, /const opsFilterOptions = \[/)
 assert.match(panel, /period-filter-popover__label">Показать<\/span>/)
