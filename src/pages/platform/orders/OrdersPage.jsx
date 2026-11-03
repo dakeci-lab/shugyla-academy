@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from '../../../context/SessionContext'
 import { usePlatformData } from '../../../context/PlatformDataContext'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
 import useStableWhenReady from '../../../hooks/useStableWhenReady'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
@@ -38,6 +39,8 @@ export default function OrdersPage() {
   const { user } = useSession()
   const { error: showError } = useToast()
   const { loadError, reloadProcurement, ensureModules, version: dataVersion } = usePlatformData()
+  // Swipe reloads just the orders (not suppliers, not employees).
+  usePlatformPageRefresh(() => reloadProcurement())
   const { version } = useAdminRefresh()
   const canView = canViewOrders(user)
 

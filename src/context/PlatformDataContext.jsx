@@ -4,6 +4,7 @@ import { isCloudMode } from '../lib/dataMode'
 import {
   initializeData,
   refreshProcurementData,
+  refreshModules,
   ensureModulesLoaded,
   getRouteCriticalModules,
   setCloudBootstrapListener,
@@ -23,6 +24,7 @@ const PlatformDataContext = createContext({
   moduleStates: {},
   reload: async () => {},
   reloadProcurement: async () => {},
+  reloadModules: async () => {},
   ensureModules: async () => {},
   notifyChange: () => {},
 })
@@ -105,6 +107,18 @@ export function PlatformDataProvider({ children }) {
     async (options) => {
       if (cloudMode) {
         await refreshProcurementData(options)
+        setLoadError(null)
+      }
+      bumpVersion()
+    },
+    [cloudMode, bumpVersion]
+  )
+
+  // Pull-to-refresh: only the modules the current page uses (not the whole dump).
+  const reloadModules = useCallback(
+    async (moduleNames) => {
+      if (cloudMode) {
+        await refreshModules(moduleNames)
         setLoadError(null)
       }
       bumpVersion()
@@ -240,6 +254,7 @@ export function PlatformDataProvider({ children }) {
         moduleStates,
         reload,
         reloadProcurement,
+        reloadModules,
         ensureModules,
         notifyChange,
       }}

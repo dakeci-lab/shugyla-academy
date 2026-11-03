@@ -24,7 +24,7 @@ Edge Functions и складываются в собственные табли�
 | Backend | Supabase (Postgres + Auth + RLS + Edge Functions на Deno/TypeScript) |
 | Прод-хостинг | PS.kz / Plesk — деплой артефактом в ветку `ps-production` через GitHub Actions |
 | CI | GitHub Actions: `deploy-ps-production.yml` (сборка + `verify:domain-deployment` + публикация артефакта) |
-| Тесты | 94 самописных `verify:*` node-скриптов в `scripts/` (93 проходят, см. §8) |
+| Тесты | 95 самописных `verify:*` node-скриптов в `scripts/` (94 проходят, см. §8) |
 | Прочее | PWA (sw.js, manifest), xlsx, pdfmake, qrcode |
 
 Зависимости намеренно минимальны — нет TypeScript на фронте, нет state-библиотек, нет Tailwind.
@@ -132,7 +132,7 @@ GitHub Actions — только вручную/через MCP.
 Ручной полной синхронизации остатков в интерфейсе больше нет: ночная 07:00, кнопка обновления одного поставщика в «Товары поставщика» и cron расчёта плана.
 
 Остаётся (`docs/platform/stage-14-polish.md`):
-- `verify:*`: из 94 проходят 93; `auth-first-frontend-production-readiness` требует локальную Supabase (Docker).
+- `verify:*`: из 95 проходят 94; `auth-first-frontend-production-readiness` требует локальную Supabase (Docker).
   Новые проверки писать через `scripts/lib/extensionlessResolver.mjs` (реальные модули, не регулярки).
 - Лишние колонки `academy_users` (этап 18) и `password` + таблица `platform_work_locations` (этап 19) удалены.
   Пароли, лежавшие открытым текстом, считать скомпрометированными — сбросить через «Сбросить пароль».
@@ -160,6 +160,8 @@ GitHub Actions — только вручную/через MCP.
   Таблицы `umag_supply_items`/`umag_supply_return_items`, колонки `items_*` и функцию `umag-operation-details` в проде удаляет владелец (SQL Editor / Dashboard) по документу этапа.
 
 - Мобильная версия: действия документа закупа — иконки в шапке (черновик: корзина, галочка «Сохранить», «⋯» с комментарием; сохранённый: иконка «Отменить заказ»), слот `actions` в `usePlatformPageTitle` (`PurchaseDocumentPhoneActions`); «Скачать» (Excel/PDF) только у сохранённого документа — зелёная кнопка нижней панели на телефоне, меню в панели на вебе.
+
+- Свайп-обновление (мобильный pull-to-refresh) обновляет только данные открытой страницы: страница регистрирует свой `usePlatformPageRefresh(...)` (несколько обработчиков работают вместе); без регистрации — только модули маршрута (`refreshModules(getRouteCriticalModules(path))`). Раньше любой свайп грузил всё (сотрудники, все поставщики, все заказы ~1 тыс. с ~11 тыс. позиций).
 
 **Масштаб использования:** платформой пользуются несколько человек (владелец, закупщик, приёмщик,
 бухгалтер). Любой рефакторинг — аккуратно: это рабочий инструмент.

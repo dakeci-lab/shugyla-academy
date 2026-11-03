@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { isCloudMode } from '../../lib/dataMode'
+import { usePlatformPageRefresh } from '../../context/PullToRefreshContext'
 import {
   exportSnapshotItemsCsv,
   fetchProcurementSnapshotsPage,
@@ -168,6 +169,12 @@ export default function ProcurementWarehouseView() {
   useEffect(() => {
     void loadDetailTotals()
   }, [loadDetailTotals])
+
+  // Swipe-to-refresh: only the warehouse history (and the open snapshot), nothing else of the platform.
+  usePlatformPageRefresh(async () => {
+    if (!isCloudMode()) return
+    await Promise.allSettled([loadHistory(), selected?.id ? loadDetail() : null, selected?.id ? loadDetailTotals() : null])
+  })
 
   function openSnapshot(snapshot) {
     setSelected(snapshot)

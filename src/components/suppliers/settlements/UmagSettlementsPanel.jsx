@@ -75,6 +75,7 @@ import PlatformSyncButton from '../../platform/PlatformSyncButton'
 import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import AdminModal from '../../admin/AdminModal'
 import useMediaQuery from '../../../hooks/useMediaQuery'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import ConfirmDialog from '../../admin/ConfirmDialog'
 import IconActionButton from '../../admin/IconActionButton'
 import { PencilIcon } from '../../icons/PlatformIcons'
@@ -432,6 +433,21 @@ function UmagSupplierDetail({
       cancelled = true
     }
   }, [canViewFinance, supplier.id, supplier.umagSupplierId, supplier.isVirtual, dateFrom, dateTo, reloadToken])
+
+  // Swipe-to-refresh on the supplier card: only this supplier's operations (quietly, the list stays on screen).
+  usePlatformPageRefresh(async () => {
+    if (!canViewFinance) return
+    const result = await fetchUmagSupplierOperationHistory({
+      platformSupplierId: supplier.isVirtual ? null : supplier.id,
+      umagSupplierId: supplier.umagSupplierId,
+      unassigned: Boolean(supplier.isVirtual),
+      dateFrom,
+      dateTo,
+    })
+    if (result.error) setDetailError(result.error)
+    else setDetailError('')
+    setDetail(result)
+  })
 
   const operations = useMemo(() => detail?.operations || [], [detail])
   const [opsFilter, setOpsFilter] = useState('open')
@@ -1238,6 +1254,15 @@ export default function UmagSettlementsPanel({
     if (!canView) return
     void fetchLastUmagSyncRun().then(setLastRun)
   }, [canView, refreshToken])
+
+  // Swipe-to-refresh on the list: only the balances and the time of the last UMAG sync (suppliers change via the sync button).
+  usePlatformPageRefresh(async () => {
+    if (!canViewFinance) return
+    await Promise.allSettled([
+      fetchNativeSupplierDebtSummary({ includeUnassigned: true }).then(setDebtSummary),
+      fetchLastUmagSyncRun().then(setLastRun),
+    ])
+  })
 
   // Legacy deep link from «К оплате»: open the edit modal directly (payment
   // terms focus), same as the old standalone directory used to.

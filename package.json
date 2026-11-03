@@ -61,6 +61,7 @@
     "verify:supplier-ledger": "node scripts/verify-supplier-ledger.mjs",
     "verify:supplier-centralization": "node scripts/verify-supplier-centralization.mjs",
     "verify:mobile-document-header-actions": "node scripts/verify-mobile-document-header-actions.mjs",
+    "verify:page-scoped-refresh": "node scripts/verify-page-scoped-refresh.mjs",
     "verify:old-planner-removed": "node scripts/verify-old-planner-removed.mjs",
     "verify:operation-items-removed": "node scripts/verify-operation-items-removed.mjs",
     "verify:umag-supply-returns": "node scripts/verify-umag-supply-returns.mjs",

@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { usePlatformData } from '../../../context/PlatformDataContext'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
 import useStableWhenReady from '../../../hooks/useStableWhenReady'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
@@ -73,6 +74,8 @@ export default function PurchaseDocumentsPage() {
   const { user } = useSession()
   const { error: showError, success: showSuccess } = useToast()
   const { loadError, reloadProcurement, ensureModules, version: dataVersion } = usePlatformData()
+  // Swipe reloads just the orders (not suppliers, not employees).
+  usePlatformPageRefresh(() => reloadProcurement())
   const { version } = useAdminRefresh()
   const navigate = useNavigate()
   const canView = canViewPurchases(user)

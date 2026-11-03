@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { usePlatformData } from '../../../context/PlatformDataContext'
 import { usePlatformPageTitle } from '../../../context/PlatformPageTitleContext'
+import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import useMediaQuery from '../../../hooks/useMediaQuery'
@@ -165,6 +166,23 @@ export default function PurchaseDocumentPage() {
       cancelled = true
     }
   }, [canSeeDebt, debtSupplierId])
+
+  // Swipe-to-refresh: only this order (and the supplier balance next to it), not the whole platform.
+  usePlatformPageRefresh(async () => {
+    if (busy) return
+    const tasks = [reloadOrder()]
+    if (canSeeDebt && debtSupplierId) {
+      tasks.push(
+        fetchNativeSupplierDebtSummary({ platformSupplierIds: [debtSupplierId] }).then((map) =>
+          setSupplierDebt(map.get(debtSupplierId)?.amount ?? 0)
+        )
+      )
+    }
+    const results = await Promise.allSettled(tasks)
+    if (results[0].status === 'rejected') {
+      showError(toProcurementUserMessage(results[0].reason, 'Не удалось обновить заказ.'))
+    }
+  })
 
   useEffect(() => {
     if (!exportOpen) return undefined
