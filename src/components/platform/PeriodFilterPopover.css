@@ -341,3 +341,12 @@
 .period-sheet__apply {
   width: 100%;
 }
+
+/* A longer set of choices (six types of operations) wraps into rows instead of squeezing into one. */
+.period-sheet .period-filter-popover__presets--wrap {
+  flex-wrap: wrap;
+}
+
+.period-sheet .period-filter-popover__presets--wrap .period-filter-popover__preset {
+  flex: 1 1 calc(33.333% - 8px);
+}

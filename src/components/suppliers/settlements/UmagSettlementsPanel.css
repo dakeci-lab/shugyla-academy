@@ -950,3 +950,10 @@
     font-size: 12.5px;
   }
 }
+
+/* Phones, supplier card: room under the last operation for the floating search. */
+@media (max-width: 640px) {
+  .umag-settlements--detail {
+    padding-bottom: 88px;
+  }
+}
