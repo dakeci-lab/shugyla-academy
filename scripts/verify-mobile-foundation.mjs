@@ -29,15 +29,14 @@ const { documentGroupKey, formatDocumentGroupLabel } = await import(
   pathToFileURL(path.join(ROOT, 'src/utils/purchaseDocumentsList.js')).href
 )
 
-assert.equal(documentGroupKey({ status: 'draft', createdAt: '2026-10-30T10:00:00Z' }), 'draft')
+assert.equal(documentGroupKey({ status: 'draft', createdAt: '2026-10-30T10:00:00' }), '2026-10-30')
 assert.equal(documentGroupKey({ status: 'saved', createdAt: '2026-10-28T12:00:00' }), '2026-10-28')
 assert.equal(documentGroupKey({ status: 'saved' }), 'none')
-ok('drafts form one group, saved documents are grouped by creation day')
-assert.equal(formatDocumentGroupLabel('draft'), 'Черновики')
+ok('drafts and saved documents are grouped by creation day (no separate «Черновики» group)')
 assert.equal(formatDocumentGroupLabel('none'), 'Без даты')
-assert.match(formatDocumentGroupLabel('2026-10-30'), /^Пт, 30 октября$/)
-assert.match(formatDocumentGroupLabel('2026-10-28'), /^Ср, 28 октября$/)
-ok('group label reads «Пт, 30 октября»')
+assert.match(formatDocumentGroupLabel('2026-10-30'), /^Пт, 30 Октября$/)
+assert.match(formatDocumentGroupLabel('2026-10-28'), /^Ср, 28 Октября$/)
+ok('group label reads «Пт, 30 Октября» (like UMAG)')
 
 const modal = read('src/components/admin/AdminModal.jsx')
 const modalCss = read('src/components/admin/AdminModal.css')
@@ -69,5 +68,15 @@ assert.match(pageCss, /\.pdl-row--draft \.pgt__cell[\s\S]{0,80}font-style: norma
 ok('on phones the top «Создать» button is hidden and drafts are not gray italic')
 assert.match(read('src/components/procurement/TablePagination.css'), /\.table-pagination \.sr-only/)
 ok('the pagination page-size label stays visually hidden on every page')
+
+const listPage = read('src/pages/platform/procurement/PurchaseDocumentsPage.jsx')
+assert.match(listPage, /isPhone \? \(\s*<button[\s\S]*className="pdl-filter-row"/)
+assert.match(listPage, /Дата, Поставщик, Статус документа, Название/)
+assert.match(pageCss, /\.pdl-bar__chip\s*\{\s*display: none/)
+const meta = listPage.slice(listPage.indexOf('mobileMeta={'), listPage.indexOf('</Fragment>'))
+assert.match(meta, /formatDocumentTime\(order\)/)
+assert.match(meta, /isDraft \? 'Черновик' : 'Сохранён'/)
+assert.doesNotMatch(meta, /поз\.|доставка|createdByName|number/)
+ok('phones: one «Фильтры» row (the period lives inside the filter); a list row is the supplier, the sum, the creation time and the status')
 
 console.log(`\nverify:mobile-foundation — ${checks} checks passed`)

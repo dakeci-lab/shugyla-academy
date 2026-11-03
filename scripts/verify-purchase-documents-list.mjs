@@ -96,4 +96,21 @@ assert.match(app, /path="procurement"[\s\S]*?ROUTE_KEYS\.PROCUREMENT[\s\S]*?<Pur
 assert.match(app, /path="procurement\/documents" element=\{<Navigate to="\/platform\/procurement"/)
 ok('the list is the «Закуп» page /platform/procurement (behind its route key); the old /documents address redirects')
 
+
+{
+  const lib = await import(pathToFileURL(path.join(ROOT, 'src/utils/purchaseDocumentsList.js')).href)
+  const orders = [
+    { id: 'a', status: 'saved', number: 1001, createdAt: '2026-11-03T05:00:00Z', supplierId: 's' },
+    { id: 'b', status: 'draft', createdAt: '2026-11-03T09:00:00Z', supplierId: 's' },
+    { id: 'c', status: 'saved', number: 1002, createdAt: '2026-11-03T07:00:00Z', supplierId: 's' },
+    { id: 'd', status: 'draft', createdAt: '2026-11-02T09:00:00Z', supplierId: 's' },
+  ]
+  const f = { dateFrom: '2026-11-02', dateTo: '2026-11-08', supplierIds: [], status: '', q: '' }
+  const phone = lib.selectPurchaseDocuments(orders, f, new Set(), { chronological: true }).map((o) => o.id)
+  assert.deepEqual(phone, ['b', 'c', 'a', 'd'])
+  const desktop = lib.selectPurchaseDocuments(orders, f, new Set()).map((o) => o.id)
+  assert.deepEqual(desktop, ['b', 'd', 'c', 'a'])
+  console.log('  ✓ phones: one list by creation time (a draft can sit below a saved document); desktop keeps drafts first')
+}
+
 console.log(`\n${checks} checks passed`)
