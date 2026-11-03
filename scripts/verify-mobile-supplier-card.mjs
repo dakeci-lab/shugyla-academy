@@ -28,7 +28,7 @@ ok('phones: period and the type of operations («Не закрытые / Про�
 assert.match(panel, /\{isPhoneList \? null : \(\s*<>\s*<h3 className="umag-settlements__section-title">/)
 ok('phones: no «История операций · период» caption and no row of chips above the list')
 
-assert.match(panel, /isPhoneList && !detailLoading \? \(\s*<PlatformFloatingSearch/)
+assert.match(panel, /isPhoneList && phoneTab === 'pay' && !detailLoading \? \(\s*<PlatformFloatingSearch/)
 assert.match(panel, /total=\{formatUmagMoney\(supplier\.debt \?\? 0\)\}/)
 ok('phones: the search floats at the bottom and the debt total is pinned under it')
 
