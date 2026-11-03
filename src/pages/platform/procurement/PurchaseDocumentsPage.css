@@ -117,7 +117,6 @@
 
   .pdl-bar {
     flex-wrap: nowrap;
-    overflow-x: auto;
     gap: 8px;
   }
 
@@ -125,13 +124,71 @@
     display: none;
   }
 
-  .pdl-bar .pf-filter-anchor {
-    flex: none;
+  /* One «Фильтры» row like UMAG (the period lives inside the filter): no separate period chip on phones. */
+  .pdl-bar__chip {
+    display: none;
   }
 
-  .pdl-bar__chip {
+  .pdl-bar .pf-filter-anchor {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  .pdl-filter-row {
+    appearance: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 56px;
+    padding: 6px 14px;
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 6px;
+    background: var(--color-white, #fff);
+    font: inherit;
+    text-align: left;
+    color: var(--color-text, #0f172a);
+    cursor: pointer;
+  }
+
+  .pdl-filter-row > svg:first-child {
     flex: none;
+    color: var(--color-primary, #059669);
+  }
+
+  .pdl-filter-row > svg:last-child {
+    flex: none;
+    margin-left: auto;
+    color: var(--color-text-secondary, #64748b);
+  }
+
+  .pdl-filter-row__text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .pdl-filter-row__title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .pdl-filter-row__hint {
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
+    font-size: 13px;
+    color: var(--color-text-secondary, #64748b);
+  }
+
+  .pdl-time {
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    color: var(--color-text, #0f172a);
   }
 
   .pdl-day {

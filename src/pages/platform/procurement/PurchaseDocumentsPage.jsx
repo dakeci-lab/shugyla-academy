@@ -5,6 +5,7 @@ import { usePlatformData } from '../../../context/PlatformDataContext'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
 import useStableWhenReady from '../../../hooks/useStableWhenReady'
+import useMediaQuery from '../../../hooks/useMediaQuery'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import { canViewPurchases, canCreatePurchase, canDeletePurchase } from '../../../config/permissions'
 import {
@@ -35,13 +36,14 @@ import {
   DEFAULT_DOCUMENTS_FILTER,
   documentGroupKey,
   formatDocumentGroupLabel,
+  formatDocumentTime,
   selectPurchaseDocuments,
 } from '../../../utils/purchaseDocumentsList'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
 import IconActionButton from '../../../components/admin/IconActionButton'
 import ConfirmDialog from '../../../components/admin/ConfirmDialog'
 import PlatformActionsMenu from '../../../components/platform/PlatformActionsMenu'
-import { PencilIcon } from '../../../components/icons/PlatformIcons'
+import { ChevronDownIcon, FilterIcon, PencilIcon } from '../../../components/icons/PlatformIcons'
 import PlatformFab from '../../../components/platform/PlatformFab'
 import PlatformFilterTrigger from '../../../components/platform/PlatformFilterTrigger'
 import PeriodFilterPopover, {
@@ -81,6 +83,7 @@ export default function PurchaseDocumentsPage() {
   const canView = canViewPurchases(user)
   const canCreate = canCreatePurchase(user)
   const canDelete = canDeletePurchase(user)
+  const isPhone = useMediaQuery('(max-width: 640px)')
 
   useEffect(() => {
     if (!isCloudMode()) return
@@ -166,8 +169,8 @@ export default function PurchaseDocumentsPage() {
   const showInitialSkeleton = purchasesLoading && !hasLoadedOnce.current
 
   const documents = useMemo(
-    () => selectPurchaseDocuments(stableOrders, filter, itemOrderIds),
-    [stableOrders, filter, itemOrderIds, version, dataVersion]
+    () => selectPurchaseDocuments(stableOrders, filter, itemOrderIds, { chronological: isPhone }),
+    [stableOrders, filter, itemOrderIds, version, dataVersion, isPhone]
   )
   const grandTotal = useMemo(
     () => documents.reduce((sum, order) => sum + Number(order.totalAmount || 0), 0),
@@ -368,13 +371,34 @@ export default function PurchaseDocumentsPage() {
           </button>
         ) : null}
         <div className="pf-filter-anchor">
-          <PlatformFilterTrigger
-            ref={filterButtonRef}
-            active={filterCount > 0}
-            count={filterCount}
-            open={filterOpen}
-            onClick={toggleFilter}
-          />
+          {isPhone ? (
+            <button
+              type="button"
+              ref={filterButtonRef}
+              className="pdl-filter-row"
+              aria-expanded={filterOpen}
+              aria-haspopup="dialog"
+              onClick={toggleFilter}
+            >
+              <FilterIcon size={22} />
+              <span className="pdl-filter-row__text">
+                <span className="pdl-filter-row__title">
+                  Фильтры
+                  {filterCount > 0 ? <span className="pf-trigger__count">{filterCount}</span> : null}
+                </span>
+                <span className="pdl-filter-row__hint">Дата, Поставщик, Статус документа, Название</span>
+              </span>
+              <ChevronDownIcon size={20} />
+            </button>
+          ) : (
+            <PlatformFilterTrigger
+              ref={filterButtonRef}
+              active={filterCount > 0}
+              count={filterCount}
+              open={filterOpen}
+              onClick={toggleFilter}
+            />
+          )}
           <PeriodFilterPopover
             open={filterOpen}
             draft={draft}
@@ -569,16 +593,10 @@ export default function PurchaseDocumentsPage() {
                     }}
                     mobileMeta={
                       <>
+                        {formatDocumentTime(order) ? <span className="pdl-time">{formatDocumentTime(order)}</span> : null}
                         <span className={`pdl-pill ${isDraft ? 'pdl-pill--draft' : 'pdl-pill--saved'}`}>
-                          {isDraft ? 'Черновик' : order.number ? `№${order.number}` : 'Сохранён'}
+                          {isDraft ? 'Черновик' : 'Сохранён'}
                         </span>
-                        {[
-                          `${count} поз.`,
-                          order.expectedDeliveryDate ? `доставка ${formatPurchaseDate(order.expectedDeliveryDate)}` : '',
-                          order.createdByName,
-                        ]
-                          .filter(Boolean)
-                          .join(' · ')}
                       </>
                     }
                   />
