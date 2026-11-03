@@ -84,6 +84,8 @@ export default function PurchaseDocumentsPage() {
   const canCreate = canCreatePurchase(user)
   const canDelete = canDeletePurchase(user)
   const isPhone = useMediaQuery('(max-width: 640px)')
+  // The filter opens as a bottom sheet up to 900px; there the field names are placeholders (UMAG).
+  const isSheet = useMediaQuery('(max-width: 900px)')
 
   useEffect(() => {
     if (!isCloudMode()) return
@@ -418,7 +420,7 @@ export default function PurchaseDocumentsPage() {
                   id="pdl-q"
                   type="text"
                   className="pf-field__input"
-                  placeholder="Введите название или штрихкод"
+                  placeholder={isSheet ? 'Название, штрихкод или номер' : 'Введите название или штрихкод'}
                   value={draft.q}
                   onChange={(event) => setDraft((current) => ({ ...current, q: event.target.value }))}
                   autoComplete="off"
@@ -428,7 +430,7 @@ export default function PurchaseDocumentsPage() {
             <FilterComboField
               label="Поставщик"
               searchable
-              placeholder="Введите название"
+              placeholder={isSheet ? 'Поставщик' : 'Введите название'}
               searchValue={supplierSearch}
               onSearchChange={setSupplierSearch}
               options={supplierOptions}
@@ -452,11 +454,11 @@ export default function PurchaseDocumentsPage() {
               <div className="pf-field__control">
                 <select
                   id="pdl-status"
-                  className="pf-field__input"
+                  className={`pf-field__input${draft.status ? '' : ' is-empty'}`}
                   value={draft.status}
                   onChange={(event) => setDraft((current) => ({ ...current, status: event.target.value }))}
                 >
-                  <option value="">Все</option>
+                  <option value="">{isSheet ? 'Статус документа' : 'Все'}</option>
                   <option value={PURCHASE_STATUS.DRAFT}>Черновик</option>
                   <option value={PURCHASE_STATUS.SAVED}>Сохранён</option>
                 </select>

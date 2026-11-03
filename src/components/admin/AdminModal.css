@@ -214,6 +214,24 @@
     font-size: 17px;
   }
 
+  /* Title in the middle, one action on the right («Очистить»), no «×» — like UMAG's filters. */
+  .admin-modal--sheet .admin-modal__header--action {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    border-bottom: 0;
+  }
+
+  .admin-modal--sheet .admin-modal__header--action .admin-modal__title {
+    grid-column: 2;
+    text-align: center;
+  }
+
+  .admin-modal--sheet .admin-modal__header-action {
+    grid-column: 3;
+    justify-self: end;
+  }
+
   .admin-modal--sheet .admin-modal__close {
     width: 40px;
     height: 40px;

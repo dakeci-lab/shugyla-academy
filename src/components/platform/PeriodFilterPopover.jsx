@@ -7,6 +7,7 @@ import {
   SETTLEMENTS_PERIOD_PRESET,
   SETTLEMENTS_PERIOD_PRESET_OPTIONS,
   formatSettlementsPeriodNavigatorLabel,
+  formatSettlementsPeriodRangeLabel,
   getSettlementsPeriodDates,
   getSettlementsPeriodDefaults,
   resolveSettlementsPeriodPreset,
@@ -26,12 +27,10 @@ export {
   getSettlementsPeriodDates,
 }
 
-function PeriodFilterFields({ draft, onChange }) {
-  const navigatorLabel = formatSettlementsPeriodNavigatorLabel(
-    draft.periodPreset,
-    draft.dateFrom,
-    draft.dateTo
-  )
+function PeriodFilterFields({ draft, onChange, phone = false }) {
+  const navigatorLabel = phone
+    ? formatSettlementsPeriodRangeLabel(draft.dateFrom, draft.dateTo)
+    : formatSettlementsPeriodNavigatorLabel(draft.periodPreset, draft.dateFrom, draft.dateTo)
 
   function selectPreset(presetId) {
     const dates = getSettlementsPeriodDates(presetId)
@@ -69,8 +68,8 @@ function PeriodFilterFields({ draft, onChange }) {
   }
 
   return (
-    <div className="period-filter-popover__section">
-      <span className="period-filter-popover__label">Период</span>
+    <div className={`period-filter-popover__section${phone ? ' period-filter-popover__section--phone' : ''}`}>
+      <span className="period-filter-popover__label">{phone ? 'За период' : 'Период'}</span>
       <div className="period-filter-popover__presets" role="group" aria-label="Быстрый период">
         {SETTLEMENTS_PERIOD_PRESET_OPTIONS.map((preset) => {
           const active = draft.periodPreset === preset.id
@@ -84,7 +83,7 @@ function PeriodFilterFields({ draft, onChange }) {
               }`}
               onClick={() => selectPreset(preset.id)}
             >
-              {preset.label}
+              {phone ? preset.shortLabel : preset.label}
             </button>
           )
         })}
@@ -112,7 +111,7 @@ function PeriodFilterFields({ draft, onChange }) {
         </button>
       </div>
 
-      <span className="period-filter-popover__label">Произвольный период</span>
+      {phone ? null : <span className="period-filter-popover__label">Произвольный период</span>}
       <div className="period-filter-popover__dates">
         <label className="period-filter-popover__date-field">
           <span>С</span>
@@ -247,10 +246,29 @@ export default function PeriodFilterPopover({
   )
 
   if (isMobile) {
+    // Phone sheet like UMAG's: «Фильтры» in the middle, «Очистить» on the right, fields as plain outlined rows,
+    // one full-width «Применить» at the bottom.
     return (
-      <AdminModal sheet title="Фильтр" onClose={onClose} returnFocusRef={anchorRef} footer={actions}>
-        {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} /> : null}
-        {children}
+      <AdminModal
+        sheet
+        title="Фильтры"
+        onClose={onClose}
+        returnFocusRef={anchorRef}
+        headerAction={
+          <button type="button" className="period-sheet__clear" onClick={handleReset}>
+            Очистить
+          </button>
+        }
+        footer={
+          <button type="button" className="btn btn--primary period-sheet__apply" onClick={onApply}>
+            Применить
+          </button>
+        }
+      >
+        <div className="period-sheet">
+          {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} phone /> : null}
+          {children}
+        </div>
       </AdminModal>
     )
   }
