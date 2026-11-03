@@ -161,7 +161,22 @@
   border-radius: 12px;
 }
 
+/* Day group header of a phone list («Вт, 3 Ноября»), like UMAG; not shown on the web. */
+.pgt__day {
+  display: none;
+}
+
 @media (max-width: 640px) {
+  .pgt__day {
+    display: block;
+    padding: 8px 14px;
+    background: #f1f5f9;
+    border-bottom: 1px solid var(--color-border, #e2e8f0);
+    color: var(--color-text, #0f172a);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
   .pgt__head {
     display: none;
   }

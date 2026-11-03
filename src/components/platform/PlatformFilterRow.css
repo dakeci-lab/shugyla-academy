@@ -1,0 +1,50 @@
+.pf-row {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 6px 14px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-white, #fff);
+  font: inherit;
+  text-align: left;
+  color: var(--color-text, #0f172a);
+  cursor: pointer;
+}
+
+.pf-row > svg:first-child {
+  flex: none;
+  color: var(--color-primary, #059669);
+}
+
+.pf-row > svg:last-child {
+  flex: none;
+  margin-left: auto;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.pf-row__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pf-row__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.pf-row__hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  color: var(--color-text-secondary, #64748b);
+}

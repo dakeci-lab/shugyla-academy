@@ -43,9 +43,10 @@ import PlatformAccessDenied from '../../../components/platform/PlatformAccessDen
 import IconActionButton from '../../../components/admin/IconActionButton'
 import ConfirmDialog from '../../../components/admin/ConfirmDialog'
 import PlatformActionsMenu from '../../../components/platform/PlatformActionsMenu'
-import { ChevronDownIcon, FilterIcon, PencilIcon } from '../../../components/icons/PlatformIcons'
+import { PencilIcon } from '../../../components/icons/PlatformIcons'
 import PlatformFab from '../../../components/platform/PlatformFab'
 import PlatformFilterTrigger from '../../../components/platform/PlatformFilterTrigger'
+import PlatformFilterRow from '../../../components/platform/PlatformFilterRow'
 import PeriodFilterPopover, {
   resolveSettlementsPeriodPreset,
 } from '../../../components/platform/PeriodFilterPopover'
@@ -374,24 +375,13 @@ export default function PurchaseDocumentsPage() {
         ) : null}
         <div className="pf-filter-anchor">
           {isPhone ? (
-            <button
-              type="button"
+            <PlatformFilterRow
               ref={filterButtonRef}
-              className="pdl-filter-row"
-              aria-expanded={filterOpen}
-              aria-haspopup="dialog"
+              count={filterCount}
+              open={filterOpen}
               onClick={toggleFilter}
-            >
-              <FilterIcon size={22} />
-              <span className="pdl-filter-row__text">
-                <span className="pdl-filter-row__title">
-                  Фильтры
-                  {filterCount > 0 ? <span className="pf-trigger__count">{filterCount}</span> : null}
-                </span>
-                <span className="pdl-filter-row__hint">Дата, Поставщик, Статус документа, Название</span>
-              </span>
-              <ChevronDownIcon size={20} />
-            </button>
+              hint="Дата, Поставщик, Статус документа, Название"
+            />
           ) : (
             <PlatformFilterTrigger
               ref={filterButtonRef}
@@ -536,7 +526,7 @@ export default function PurchaseDocumentsPage() {
               return (
                 <Fragment key={order.id}>
                   {startsGroup ? (
-                    <div className="pdl-day" role="presentation">
+                    <div className="pgt__day" role="presentation">
                       {formatDocumentGroupLabel(groupKey)}
                     </div>
                   ) : null}

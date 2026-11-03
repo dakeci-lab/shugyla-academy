@@ -4,6 +4,7 @@ import { usePlatformData } from '../../../context/PlatformDataContext'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
 import useStableWhenReady from '../../../hooks/useStableWhenReady'
+import useMediaQuery from '../../../hooks/useMediaQuery'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import { canViewOrders } from '../../../config/permissions'
 import {
@@ -25,6 +26,8 @@ import {
 import { describeOrdersSummary, summarizeOrders } from '../../../utils/ordersSummary'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
 import PurchaseTable from '../../../components/procurement/PurchaseTable'
+import PlatformFilterRow from '../../../components/platform/PlatformFilterRow'
+import PeriodFilterPopover from '../../../components/platform/PeriodFilterPopover'
 import TablePagination from '../../../components/procurement/TablePagination'
 import { DelayedLoadingSkeleton } from '../../../components/loading/LoadingSkeleton'
 import '../../../components/admin/admin-shared.css'
@@ -49,7 +52,15 @@ export default function OrdersPage() {
     void ensureModules(['suppliers', 'procurement'])
   }, [ensureModules])
 
+  const isPhone = useMediaQuery('(max-width: 640px)')
   const [preset, setPreset] = useState(SETTLEMENTS_PERIOD_PRESET.TODAY)
+  // Phone: the period lives in the filter sheet (like «Закуп»); the draft is applied with «Применить».
+  const [filterOpen, setFilterOpen] = useState(false)
+  const [draft, setDraft] = useState(() => ({
+    periodPreset: SETTLEMENTS_PERIOD_PRESET.TODAY,
+    ...getSettlementsPeriodDates(SETTLEMENTS_PERIOD_PRESET.TODAY),
+  }))
+  const filterButtonRef = useRef(null)
   const period = useMemo(() => getSettlementsPeriodDates(preset), [preset])
   const [loadErrorText, setLoadErrorText] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
@@ -112,6 +123,25 @@ export default function OrdersPage() {
   }, [page, totalPages])
 
   const isToday = preset === SETTLEMENTS_PERIOD_PRESET.TODAY
+
+  function openFilter() {
+    if (filterOpen) {
+      setFilterOpen(false)
+      return
+    }
+    setDraft({ periodPreset: preset, ...getSettlementsPeriodDates(preset) })
+    setFilterOpen(true)
+  }
+
+  function applyFilter() {
+    if (draft.periodPreset) setPreset(draft.periodPreset)
+    setFilterOpen(false)
+  }
+
+  function resetFilter() {
+    setPreset(SETTLEMENTS_PERIOD_PRESET.TODAY)
+    setFilterOpen(false)
+  }
   const summaryText = describeOrdersSummary(summarizeOrders(orders), {
     periodLabel: describeSettlementsPeriod(period.dateFrom, period.dateTo),
     isToday,
@@ -127,19 +157,45 @@ export default function OrdersPage() {
 
   return (
     <div className="orders-page">
-      <div className="orders-page__presets" role="group" aria-label="Период доставки">
-        {SETTLEMENTS_PERIOD_PRESET_OPTIONS.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            aria-pressed={preset === option.id}
-            className={`orders-page__preset${preset === option.id ? ' is-on' : ''}`}
-            onClick={() => setPreset(option.id)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
+      {isPhone ? (
+        <div className="pf-filter-anchor">
+          <PlatformFilterRow
+            ref={filterButtonRef}
+            count={preset !== SETTLEMENTS_PERIOD_PRESET.TODAY ? 1 : 0}
+            open={filterOpen}
+            onClick={openFilter}
+            hint="Дата доставки"
+          />
+          <PeriodFilterPopover
+            open={filterOpen}
+            draft={draft}
+            onChange={setDraft}
+            onApply={applyFilter}
+            onReset={resetFilter}
+            onClose={() => setFilterOpen(false)}
+            anchorRef={filterButtonRef}
+            getDefaults={() => ({
+              periodPreset: SETTLEMENTS_PERIOD_PRESET.TODAY,
+              ...getSettlementsPeriodDates(SETTLEMENTS_PERIOD_PRESET.TODAY),
+            })}
+            presetsOnly
+          />
+        </div>
+      ) : (
+        <div className="orders-page__presets" role="group" aria-label="Период доставки">
+          {SETTLEMENTS_PERIOD_PRESET_OPTIONS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              aria-pressed={preset === option.id}
+              className={`orders-page__preset${preset === option.id ? ' is-on' : ''}`}
+              onClick={() => setPreset(option.id)}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {errorMessage ? (
         <p className="orders-page__error" role="alert">

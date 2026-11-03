@@ -27,7 +27,7 @@ export {
   getSettlementsPeriodDates,
 }
 
-function PeriodFilterFields({ draft, onChange, phone = false }) {
+function PeriodFilterFields({ draft, onChange, phone = false, presetsOnly = false }) {
   const navigatorLabel = phone
     ? formatSettlementsPeriodRangeLabel(draft.dateFrom, draft.dateTo)
     : formatSettlementsPeriodNavigatorLabel(draft.periodPreset, draft.dateFrom, draft.dateTo)
@@ -89,53 +89,58 @@ function PeriodFilterFields({ draft, onChange, phone = false }) {
         })}
       </div>
 
-      <div className="period-filter-popover__navigator" aria-label="Навигация по периоду">
-        <button
-          type="button"
-          className="period-filter-popover__nav-btn"
-          aria-label="Предыдущий период"
-          onClick={() => shift(-1)}
-        >
-          <ChevronLeftIcon size={18} />
-        </button>
-        <div className="period-filter-popover__nav-label" aria-live="polite">
-          {navigatorLabel}
-        </div>
-        <button
-          type="button"
-          className="period-filter-popover__nav-btn"
-          aria-label="Следующий период"
-          onClick={() => shift(1)}
-        >
-          <ChevronRightIcon size={18} />
-        </button>
-      </div>
+      {/* «Заказы» only know the quick periods: no navigator and no «С / По» there. */}
+      {presetsOnly ? null : (
+        <>
+          <div className="period-filter-popover__navigator" aria-label="Навигация по периоду">
+            <button
+              type="button"
+              className="period-filter-popover__nav-btn"
+              aria-label="Предыдущий период"
+              onClick={() => shift(-1)}
+            >
+              <ChevronLeftIcon size={18} />
+            </button>
+            <div className="period-filter-popover__nav-label" aria-live="polite">
+              {navigatorLabel}
+            </div>
+            <button
+              type="button"
+              className="period-filter-popover__nav-btn"
+              aria-label="Следующий период"
+              onClick={() => shift(1)}
+            >
+              <ChevronRightIcon size={18} />
+            </button>
+          </div>
 
-      {phone ? null : <span className="period-filter-popover__label">Произвольный период</span>}
-      <div className="period-filter-popover__dates">
-        <label className="period-filter-popover__date-field">
-          <span>С</span>
-          <span className="period-filter-popover__date-wrap">
-            <input
-              type="date"
-              className="period-filter-popover__date"
-              value={draft.dateFrom}
-              onChange={(e) => updateDate('dateFrom', e.target.value)}
-            />
-          </span>
-        </label>
-        <label className="period-filter-popover__date-field">
-          <span>По</span>
-          <span className="period-filter-popover__date-wrap">
-            <input
-              type="date"
-              className="period-filter-popover__date"
-              value={draft.dateTo}
-              onChange={(e) => updateDate('dateTo', e.target.value)}
-            />
-          </span>
-        </label>
-      </div>
+          {phone ? null : <span className="period-filter-popover__label">Произвольный период</span>}
+          <div className="period-filter-popover__dates">
+            <label className="period-filter-popover__date-field">
+              <span>С</span>
+              <span className="period-filter-popover__date-wrap">
+                <input
+                  type="date"
+                  className="period-filter-popover__date"
+                  value={draft.dateFrom}
+                  onChange={(e) => updateDate('dateFrom', e.target.value)}
+                />
+              </span>
+            </label>
+            <label className="period-filter-popover__date-field">
+              <span>По</span>
+              <span className="period-filter-popover__date-wrap">
+                <input
+                  type="date"
+                  className="period-filter-popover__date"
+                  value={draft.dateTo}
+                  onChange={(e) => updateDate('dateTo', e.target.value)}
+                />
+              </span>
+            </label>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -168,6 +173,7 @@ function computePopoverStyle(anchorEl, popoverEl) {
  * portal popover / mobile AdminModal. Used by «Поставщики» cards and «Приёмка»;
  * `getDefaults` says what «Сбросить» returns for the page (default: current month).
  * `children` are extra page-specific options shown under the period (e.g. a checkbox).
+ * `presetsOnly` keeps just the quick period chips (a list that has no custom range, like the receiver's «Заказы»).
  * `showPeriod={false}` turns it into a plain option popover (only `children`, e.g. the planner).
  */
 export default function PeriodFilterPopover({
@@ -180,6 +186,7 @@ export default function PeriodFilterPopover({
   anchorRef,
   getDefaults = getSettlementsPeriodDefaults,
   showPeriod = true,
+  presetsOnly = false,
   children = null,
 }) {
   const popoverRef = useRef(null)
@@ -266,7 +273,7 @@ export default function PeriodFilterPopover({
         }
       >
         <div className="period-sheet">
-          {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} phone /> : null}
+          {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} phone presetsOnly={presetsOnly} /> : null}
           {children}
         </div>
       </AdminModal>
@@ -293,7 +300,7 @@ export default function PeriodFilterPopover({
       <h2 id="period-filter-popover-title" className="period-filter-popover__sr-title">
         Фильтр
       </h2>
-      {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} /> : null}
+      {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} presetsOnly={presetsOnly} /> : null}
       {children}
       <div className="period-filter-popover__actions">{actions}</div>
     </div>,
