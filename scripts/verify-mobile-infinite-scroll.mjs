@@ -24,4 +24,13 @@ for (const [file, source] of [
   ok(`${file.split('/').pop()}: phones use infinite scroll (no page buttons), the web keeps «50 / 100 / 500» pagination`)
 }
 
+const settlements = read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx')
+assert.match(settlements, /useInfiniteSlice\(visibleOps, \{\s*enabled: isPhoneList/)
+assert.match(settlements, /opsInfinite\.visible\.map\(\(op\)/)
+assert.match(settlements, /opsInfinite\.hasMore \? <div ref=\{opsInfinite\.sentinelRef\}/)
+assert.match(settlements, /useInfiniteSlice\(filtered, \{\s*enabled: isPhoneMain/)
+assert.match(settlements, /listInfinite\.visible\.map\(\(s\)/)
+assert.match(settlements, /listInfinite\.hasMore \? <div ref=\{listInfinite\.sentinelRef\}/)
+ok('«Расчёты» on phones: the supplier list and the operation history of a supplier both use infinite scroll')
+
 console.log(`\nverify:mobile-infinite-scroll — ${checks} checks passed`)

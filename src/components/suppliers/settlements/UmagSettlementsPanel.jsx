@@ -76,6 +76,7 @@ import { DelayedLoadingSkeleton } from '../../loading/LoadingSkeleton'
 import AdminModal from '../../admin/AdminModal'
 import useMediaQuery from '../../../hooks/useMediaQuery'
 import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
+import useInfiniteSlice from '../../../hooks/useInfiniteSlice'
 import ConfirmDialog from '../../admin/ConfirmDialog'
 import IconActionButton from '../../admin/IconActionButton'
 import { PencilIcon } from '../../icons/PlatformIcons'
@@ -481,6 +482,12 @@ function UmagSupplierDetail({
     return base.filter((op) => matchesOperationQuery(op, opsQuery))
   }, [operations, opsFilter, opsQuery, searching, todayKey])
 
+  // Phones: the first 25 operations, 25 more as you scroll to the end (UMAG's behaviour).
+  const opsInfinite = useInfiniteSlice(visibleOps, {
+    enabled: isPhoneList,
+    resetKey: `${supplier.id}|${opsFilter}|${opsQuery}|${dateFrom}|${dateTo}`,
+  })
+
   // ---- «Оплатить выбранные»: tick unpaid supplies, pay them with one account in one go ----
   const [selectedIds, setSelectedIds] = useState(() => new Set())
   const [bulkAccountId, setBulkAccountId] = useState('')
@@ -792,7 +799,7 @@ function UmagSupplierDetail({
             ) : (
               isPhoneList ? (
                 <div className="sd-ops">
-                  {visibleOps.map((op) => {
+                  {opsInfinite.visible.map((op) => {
                     const sign = operationAmountSign(op)
                     const selectable = isBulkPayable(op, canManagePayments)
                     const picked = selectable && selectedIds.has(op.id)
@@ -828,6 +835,7 @@ function UmagSupplierDetail({
                       </div>
                     )
                   })}
+                  {opsInfinite.hasMore ? <div ref={opsInfinite.sentinelRef} className="pgt__more" aria-hidden="true" /> : null}
                 </div>
               ) : (
               <PgtTable columns={historyColumns}>
@@ -1212,6 +1220,12 @@ export default function UmagSettlementsPanel({
       ),
     [filteredUnsorted, debtByPlatformId]
   )
+  // Phones: the first 25 suppliers, 25 more as you scroll to the end.
+  const isPhoneMain = useMediaQuery('(max-width: 640px)')
+  const listInfinite = useInfiniteSlice(filtered, {
+    enabled: isPhoneMain,
+    resetKey: `${listQuery}|${listView}`,
+  })
   const selected =
     selectedId === UNASSIGNED_SUPPLIER_ID
       ? unassignedSupplier
@@ -1643,7 +1657,7 @@ export default function UmagSettlementsPanel({
           ) : (
             <PgtTable columns={listColumns}>
               <PgtHead columns={listColumns} />
-              {filtered.map((s) => {
+              {listInfinite.visible.map((s) => {
                 const debt = debtByPlatformId.get(s.id) ?? null
                 const entry = debtSummary.get(s.id)
                 const meta = describeOpenDocuments(entry)
@@ -1696,6 +1710,7 @@ export default function UmagSettlementsPanel({
                   />
                 )
               })}
+              {listInfinite.hasMore ? <div ref={listInfinite.sentinelRef} className="pgt__more" aria-hidden="true" /> : null}
               {canViewFinance ? (
                 <PgtFoot
                   columns={listColumns}
