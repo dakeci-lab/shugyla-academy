@@ -136,33 +136,27 @@ function main() {
   ok('the SummaryCard component and its wrapping grid are gone, not left as dead code')
 
   // --- Identity card: quiet details + «К оплате» (2026-10-23 redesign) ----------
-  assert.match(
-    panel,
-    /function SupplierIdentityCard\(\{ supplier, canEdit, canViewFinance, debtLoading, onEdit \}\)/
-  )
-  for (const field of ['supplier.legalName', 'supplier.bin', 'supplier.managerName', 'supplier.managerPhone', 'supplier.orderDays', 'supplier.deliveryDays']) {
-    assert.ok(panel.includes(`filled(${field})`), field)
+  assert.match(panel, /function SupplierDocHeader\(\{ supplier, canEdit, canViewFinance, debtLoading, onBack, onEdit \}\)/)
+  for (const field of ['supplier.managerName', 'supplier.managerPhone', 'supplier.orderDays', 'supplier.deliveryDays']) {
+    assert.ok(panel.includes(field), field)
   }
-  assert.match(panel, /`Оплата: \$\{payment\.join\(' · '\)\}`/)
-  assert.match(
-    panel,
-    /\{canEdit \? \(\s*\n\s*<IconActionButton\s+variant="edit"\s+label="Редактировать поставщика"\s+onClick=\{onEdit\}\s*>/
-  )
-  ok('SupplierIdentityCard shows only the details that are filled in (as quiet text), the payment method/term line and the edit action — no rows of «—»')
+  assert.ok(panel.includes('const filled = (value) =>'))
+  assert.match(panel, /<button type="button" className="btn btn--outline" onClick=\{onEdit\}>\s*Редактировать/)
+  ok('the supplier page header shows payment, order / delivery days and the manager as compact cards (empty ones read «Не заполнены»), «Закрыть» and «Редактировать» — no rows of «—»')
   assert.doesNotMatch(panel, /<dt>.*[Аа]дрес.*<\/dt>/)
-  ok('no address field was added to the identity card, per the owner\'s explicit exclusion')
+  ok("no address field on the supplier page, per the owner's explicit exclusion")
 
   assert.match(
     panel,
-    /<SupplierIdentityCard\s*\n\s*supplier=\{supplier\}\s*\n\s*canEdit=\{canEditSupplier\}\s*\n\s*canViewFinance=\{canViewFinance\}\s*\n\s*debtLoading=\{debtLoading\}\s*\n\s*onEdit=\{onEdit\}\s*\n\s*\/>/
+    /<SupplierDocHeader\s*\n\s*supplier=\{supplier\}\s*\n\s*canEdit=\{canEditSupplier\}\s*\n\s*canViewFinance=\{canViewFinance\}\s*\n\s*debtLoading=\{debtLoading\}\s*\n\s*onBack=\{onBack\}\s*\n\s*onEdit=\{onEdit\}\s*\n\s*\/>/
   )
-  ok('the identity card is always rendered (independent of canViewFinance) but is itself given canViewFinance so only its own «К оплате» number is gated')
+  ok('the header is always rendered (independent of canViewFinance) but is itself given canViewFinance so only its own «К оплате» number is gated')
 
   assert.match(
     panel,
     /canViewFinance \? \(\s*\n\s*<div className="umag-settlements__id-balance">\s*\n\s*<span className="umag-settlements__id-balance-label">К оплате<\/span>/
   )
-  ok('the supplier debt is shown as «К оплате» in the card header and stays gated by canViewFinance')
+  ok('the supplier debt is shown as «К оплате» in the page header and stays gated by canViewFinance')
 
   // --- Nav: one destination, not two ------------------------------------------
   assert.doesNotMatch(nav, /id: 'suppliers',\s*\n\s*path: '\/platform\/suppliers',/)

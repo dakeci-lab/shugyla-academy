@@ -37,6 +37,7 @@ export default function SupplierFinancePanel() {
   const [syncing, setSyncing] = useState(false)
   const [refreshToken, setRefreshToken] = useState(0)
   const [filterSlot, setFilterSlot] = useState(null)
+  const [toolsSlot, setToolsSlot] = useState(null)
 
   const loadLastSync = useCallback(async () => {
     setLastSync(await fetchLastUmagSyncRun())
@@ -94,13 +95,14 @@ export default function SupplierFinancePanel() {
     <div className="sfp-panel">
       <div className="sfp-panel__bar">
         <div className="sfp-panel__sync">
+          <div className="sfp-panel__filter-slot" ref={setFilterSlot} />
+          <div className="sfp-panel__tools-slot" ref={setToolsSlot} />
           <span
             className={`sfp-panel__sync-status sfp-panel__sync-status--${syncStatus.tone}`}
             title={syncStatus.title || undefined}
           >
             {syncStatus.text}
           </span>
-          <div className="sfp-panel__filter-slot" ref={setFilterSlot} />
           {canSync ? (
             <PlatformSyncButton
               onClick={() => void handleSync()}
@@ -113,7 +115,7 @@ export default function SupplierFinancePanel() {
         </div>
       </div>
 
-      <UmagSettlementsPanel embedded refreshToken={refreshToken} filterSlot={filterSlot} />
+      <UmagSettlementsPanel embedded refreshToken={refreshToken} filterSlot={filterSlot} toolsSlot={toolsSlot} />
     </div>
   )
 }

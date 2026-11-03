@@ -250,6 +250,15 @@ export default function App() {
                     </PlatformRoute>
                   }
                 />
+                {/* A supplier opens as its own page, like a purchase document (browser Back / reload keep it). */}
+                <Route
+                  path="supplier-finance/:supplierId"
+                  element={
+                    <PlatformRoute routeKey={ROUTE_KEYS.SUPPLIER_FINANCE}>
+                      <SupplierFinancePage />
+                    </PlatformRoute>
+                  }
+                />
                 <Route path="academy/*" element={<Navigate to="/platform" replace />} />
                 <Route path="courses/:id" element={<Navigate to="/platform" replace />} />
 
