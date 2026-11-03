@@ -75,11 +75,7 @@ function main() {
     'initial load uses the shared loading skeleton',
     page.includes('showInitialSkeleton') && page.includes('DelayedLoadingSkeleton')
   )
-  const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
-  assert(
-    'planning tab keeps an explicit UMAG sync control',
-    read('src/pages/platform/procurement/ProcurementPage.jsx').includes('<ProcurementPlannerView') && planner.includes('<PlatformSyncButton')
-  )
+  assert('the old planner page is removed', !fs.existsSync(path.join(ROOT, 'src/pages/platform/procurement/ProcurementPage.jsx')))
 
   console.log('Stage 4b: Realtime without aggressive polling')
   const realtime = read('src/services/procurementRealtimeService.js')

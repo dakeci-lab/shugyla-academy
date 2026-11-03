@@ -25,14 +25,6 @@ const ok = (name) => {
 }
 const read = (p) => fs.readFileSync(path.join(ROOT, p), 'utf8')
 
-const math = await import(pathToFileURL(path.join(ROOT, 'src/utils/procurementPlanningMath.js')).href)
-assert.equal(math.reserveHighlightFromStatus('under_norm'), 'below-norm')
-assert.equal(math.reserveHighlightFromStatus('over_norm'), 'above-norm')
-assert.equal(math.reserveHighlightFromStatus('on_norm'), null)
-assert.equal(math.reserveHighlightFromStatus('no_demand'), null)
-assert.equal(math.reserveHighlightFromStatus(null), null)
-ok('«Запас/дн» highlight follows the server status (under → below, over → above, otherwise none)')
-
 const fnSql = read('supabase/migrations/20261025120000_visit_plan_functions.sql')
 assert.match(fnSql, /target = lead \+ cycle|\(v_delivery - p_today\)::int \+ v_cycle \* \(1 \+ v_skip\) \+ v_safety/)
 assert.match(fnSql, /po\.status not in \('cancelled', 'received'\)\s*\n\s*and po\.expected_delivery_date >= v_today/)
@@ -52,8 +44,8 @@ ok('cutover migration: plan_status column (reserve_status left for the norm remo
 
 const asyncSql = read('supabase/migrations/20261025140000_visit_plan_async_ensure.sql')
 assert.match(asyncSql, /procurement-ensure-plan-every-minute/)
-assert.match(read('src/components/procurement/ProcurementPlannerView.jsx'), /ensureProcurementPlan\(result\.snapshotId\)/)
-ok('the plan is computed by cron and by the planner right after a manual sync, not inside the sync statement')
+assert.match(read('supabase/migrations/20261025140000_visit_plan_async_ensure.sql'), /procurement_ensure_plan/)
+ok('the plan is computed outside the sync statement (cron + procurement_ensure_plan)')
 
 const service = read('src/services/procurementPlanningService.js')
 assert.match(service, /rpc\('procurement_supplier_plan'/)
@@ -66,11 +58,9 @@ assert.match(bar, /дни заказа и доставки не заполнен
 assert.match(bar, /до минимума не хватает/)
 ok('plan bar: skip a visit, «дни не заполнены, цикл 7 дней» note, minimum order shortfall')
 
-const planner = read('src/components/procurement/ProcurementPlannerView.jsx')
-assert.match(planner, /<ProcurementSupplierPlanBar/)
-assert.match(planner, /fetchProcurementSupplierPlan\(snapshot\.id, supplierId\)/)
-assert.match(planner, /setDeliveryDate\(plan\.deliveryDate\)/)
-assert.doesNotMatch(planner, /compareReserveDaysToNorm/)
-ok('planner shows the plan bar for the selected supplier and creates the order with the plan delivery date')
+const goods = read('src/components/procurement/document/SupplierGoodsModal.jsx')
+assert.match(goods, /<ProcurementSupplierPlanBar/)
+assert.match(goods, /fetchProcurementSupplierPlan\(/)
+ok('the supplier-goods window shows the plan bar for its supplier and takes the plan delivery date')
 
 console.log(`\nverify:procurement-visit-plan — ${checks} checks passed`)

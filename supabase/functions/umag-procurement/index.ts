@@ -3,10 +3,7 @@
  *
  * Actions:
  * - sync: create immutable facts snapshot (requires procurement.edit)
- * - generate: create analytics purchase_orders + receiving_documents from current
- *             snapshot qty. Same attempt_key is idempotent; a new key creates a
- *             new order after the buyer enters qty again.
- *             (requires procurement.create AND procurement.transfer)
+ * - refresh-supplier-stock: refresh one supplier's stock in the latest snapshot (requires procurement.edit)
  *
  * Never writes back to UMAG. Never returns UMAG secrets to the client.
  */
@@ -35,8 +32,6 @@ import {
 } from './salesAggregation.js'
 
 const PERMISSION_EDIT = 'procurement.edit'
-const PERMISSION_CREATE = 'procurement.create'
-const PERMISSION_TRANSFER = 'procurement.transfer'
 
 /**
  * Sentinel caller.id for the daily 07:00 (Aqtobe) cron sync — no real employee
@@ -58,7 +53,6 @@ const ALMATY_TZ = 'Asia/Almaty'
 const ALMATY_OFFSET_MS = 5 * 60 * 60 * 1000
 const UUID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const MAX_GENERATE_SUPPLIERS = 500
 
 type StockRow = {
   barcode?: string | null
@@ -609,192 +603,6 @@ async function markSnapshotFailed(
     .eq('id', snapshotId)
 }
 
-async function handleGenerate(
-  authz: Exclude<Awaited<ReturnType<typeof authorizeWorkforceRequest>>, Response>,
-  body: Record<string, unknown>
-): Promise<Response> {
-  if (
-    authz.permissions[PERMISSION_CREATE] !== true ||
-    authz.permissions[PERMISSION_TRANSFER] !== true
-  ) {
-    return adminErrorResponse('forbidden', 403)
-  }
-
-  const snapshotId = asText(body.snapshotId)
-  const expectedDeliveryDate = asText(body.expectedDeliveryDate)
-  if (!snapshotId) {
-    return umagErrorResponse('VALIDATION_ERROR', 'Укажите snapshotId.', 400)
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(expectedDeliveryDate)) {
-    return umagErrorResponse(
-      'VALIDATION_ERROR',
-      'Укажите корректную дату поставки (YYYY-MM-DD).',
-      400
-    )
-  }
-
-  const singularSupplierId = asText(body.supplierId)
-  const hasSupplierIds = body.supplierIds !== undefined && body.supplierIds !== null
-  if (hasSupplierIds && !Array.isArray(body.supplierIds)) {
-    return umagErrorResponse(
-      'VALIDATION_ERROR',
-      'supplierIds должен быть списком идентификаторов поставщиков.',
-      400
-    )
-  }
-
-  const supplierIds = Array.from(
-    new Set([
-      ...(singularSupplierId ? [singularSupplierId] : []),
-      ...((Array.isArray(body.supplierIds) ? body.supplierIds : [])
-        .map((value) => asText(value))
-        .filter(Boolean)),
-    ])
-  )
-
-  if (supplierIds.length === 0) {
-    return umagErrorResponse(
-      'VALIDATION_ERROR',
-      'Выберите хотя бы одного поставщика.',
-      400
-    )
-  }
-  if (supplierIds.length > MAX_GENERATE_SUPPLIERS) {
-    return umagErrorResponse(
-      'VALIDATION_ERROR',
-      `За один раз можно сформировать не более ${MAX_GENERATE_SUPPLIERS} поставщиков.`,
-      400
-    )
-  }
-  if (supplierIds.some((supplierId) => !UUID_PATTERN.test(supplierId))) {
-    return umagErrorResponse(
-      'VALIDATION_ERROR',
-      'Некорректный идентификатор поставщика.',
-      400
-    )
-  }
-
-  const attemptKey = asText(body.attemptKey || body.attempt_key)
-  if (attemptKey && !UUID_PATTERN.test(attemptKey)) {
-    return umagErrorResponse(
-      'VALIDATION_ERROR',
-      'Некорректный идентификатор попытки формирования заказа.',
-      400
-    )
-  }
-  if (attemptKey && supplierIds.length !== 1) {
-    return umagErrorResponse(
-      'VALIDATION_ERROR',
-      'Повторное формирование с ключом попытки возможно только для одного поставщика.',
-      400
-    )
-  }
-
-  const payloadFingerprintRaw = asText(
-    body.payloadFingerprint || body.payload_fingerprint
-  )
-  const payloadFingerprint = payloadFingerprintRaw ? payloadFingerprintRaw.trim() : ''
-  if (attemptKey && !payloadFingerprint) {
-    return umagErrorResponse(
-      'VALIDATION_ERROR',
-      'Повторное формирование требует отпечаток состава заказа.',
-      400
-    )
-  }
-  if (
-    payloadFingerprint &&
-    (!payloadFingerprint.startsWith('shugyla.procurement.attempt.fp.v1\n') ||
-      payloadFingerprint.length > 100_000)
-  ) {
-    return umagErrorResponse(
-      'VALIDATION_ERROR',
-      'Некорректный отпечаток содержимого попытки.',
-      400
-    )
-  }
-
-  const createdBy = String(authz.caller.id)
-  const createdByName = await fetchCallerDisplayName(authz.serviceClient, authz.caller.id)
-
-  const { data, error } = await authz.serviceClient.rpc(
-    'generate_procurement_orders_from_snapshot',
-    {
-      p_snapshot_id: snapshotId,
-      p_expected_delivery_date: expectedDeliveryDate,
-      p_supplier_ids: supplierIds,
-      p_created_by: createdBy,
-      p_created_by_name: createdByName || null,
-      p_attempt_key: attemptKey || null,
-      p_payload_fingerprint: payloadFingerprint || null,
-    }
-  )
-
-  if (error) {
-    console.error('umag_procurement_generate_rpc_failed', {
-      message: error.message,
-      code: error.code,
-    })
-    const msg = error.message || ''
-    if (msg.includes('snapshot is not available for generation')) {
-      return umagErrorResponse(
-        'SNAPSHOT_NOT_READY',
-        'Снимок сейчас недоступен для формирования заказов.',
-        409
-      )
-    }
-    if (msg.includes('snapshot not found')) {
-      return umagErrorResponse('SNAPSHOT_NOT_FOUND', 'Снимок не найден.', 404)
-    }
-    if (msg.includes('supplier selection is required')) {
-      return umagErrorResponse(
-        'VALIDATION_ERROR',
-        'Выберите хотя бы одного поставщика.',
-        400
-      )
-    }
-    if (msg.includes('attempt_key requires a single supplier')) {
-      return umagErrorResponse(
-        'VALIDATION_ERROR',
-        'Повторное формирование с ключом попытки возможно только для одного поставщика.',
-        400
-      )
-    }
-    if (msg.includes('attempt_key requires payload fingerprint')) {
-      return umagErrorResponse(
-        'VALIDATION_ERROR',
-        'Повторное формирование требует отпечаток состава заказа.',
-        400
-      )
-    }
-    if (msg.includes('attempt_key payload conflict')) {
-      return umagErrorResponse(
-        'ATTEMPT_CONFLICT',
-        'Эта попытка уже использовалась с другим составом заказа. Создайте новую попытку.',
-        409
-      )
-    }
-    if (msg.includes('cannot create an order without items')) {
-      return umagErrorResponse(
-        'GENERATE_FAILED',
-        'Нельзя сформировать заказ без позиций. Укажите количество и повторите.',
-        409
-      )
-    }
-    return umagErrorResponse(
-      'GENERATE_FAILED',
-      'Не удалось сформировать заказы из снимка.',
-      500
-    )
-  }
-
-  const result = (data || {}) as Record<string, unknown>
-  return jsonResponse({
-    success: true,
-    action: 'generate',
-    ...result,
-  })
-}
-
 /**
  * «Обновить остатки поставщика» (окно «Товары поставщика»): one UMAG stock request for the store, then only the rows of
  * the chosen supplier go into the latest snapshot and only this supplier's plan is recomputed (procurement_refresh_supplier_stock).
@@ -934,20 +742,20 @@ Deno.serve(async (req) => {
   }
 
   const action = asText(body.action)
-  if (action !== 'sync' && action !== 'generate' && action !== 'refresh-supplier-stock') {
+  if (action !== 'sync' && action !== 'refresh-supplier-stock') {
     return umagErrorResponse(
       'VALIDATION_ERROR',
-      'Укажите action: sync, generate или refresh-supplier-stock.',
+      'Укажите action: sync или refresh-supplier-stock.',
       400
     )
   }
 
-  const needed = action === 'generate' ? [PERMISSION_CREATE, PERMISSION_TRANSFER] : [PERMISSION_EDIT]
+  const needed = [PERMISSION_EDIT]
 
   const authz = await authorizeWorkforceRequest(req, needed)
   if (authz instanceof Response) return authz
 
   if (action === 'sync') return handleSync(authz)
   if (action === 'refresh-supplier-stock') return handleRefreshSupplierStock(authz, body)
-  return handleGenerate(authz, body)
+  return umagErrorResponse('VALIDATION_ERROR', 'Неизвестное действие.', 400)
 })

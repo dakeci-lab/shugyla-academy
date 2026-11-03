@@ -73,7 +73,6 @@ const MIGRATED_ALL = [
 const MIGRATED = MIGRATED_ALL.filter(([file]) => exists(file))
 
 const FORBIDDEN_TEXT_BY_FILE_ALL = {
-  'src/pages/platform/procurement/ProcurementPage.jsx': ['Загрузка закупов…'],
   'src/pages/platform/receiving/ReceivingPage.jsx': ['Загрузка приёмки…'],
   'src/components/admin/NotificationSettingsPanel.jsx': ['Загрузка настроек…'],
   'src/components/admin/AttendanceSettingsPanel.jsx': ['Загрузка настроек…'],
@@ -138,7 +137,6 @@ function main() {
   }
 
   console.log('Stage 4: Procurement / receiving refresh safety')
-  const procurement = read('src/pages/platform/procurement/ProcurementPage.jsx')
   const receiving = read('src/pages/platform/orders/OrdersPage.jsx') // «Приёмка» is part of «Заказы» now
   assert('Receiving uses useStableWhenReady', receiving.includes('useStableWhenReady'))
   assert('Receiving initial skeleton gated after first load', receiving.includes('hasLoadedOnce.current'))
