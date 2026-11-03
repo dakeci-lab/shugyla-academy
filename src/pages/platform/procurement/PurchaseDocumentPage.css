@@ -789,3 +789,64 @@
     background: transparent;
   }
 }
+
+/* Phone: «Комментарий» is a collapsible block like in UMAG; closed by default. */
+.pdoc__mcomment {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 6px;
+  background: var(--color-white, #fff);
+  overflow: hidden;
+}
+
+.pdoc__mcomment-head {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 52px;
+  padding: 0 14px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+  text-align: left;
+  cursor: pointer;
+}
+
+.pdoc__mcomment-head span {
+  flex: 0 1 auto;
+}
+
+.pdoc__mcomment-head svg {
+  margin-left: auto;
+  transition: transform 0.2s ease;
+}
+
+.pdoc__mcomment-head[aria-expanded='true'] svg {
+  transform: rotate(180deg);
+}
+
+.pdoc__mcomment-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-action, #1976d2);
+}
+
+.pdoc__mcomment-field {
+  display: block;
+  width: calc(100% - 28px);
+  margin: 0 14px 14px;
+  resize: none;
+}
+
+.pdoc__mcomment-text {
+  margin: 0;
+  padding: 0 14px 14px;
+  white-space: pre-line;
+  font-size: 15px;
+  color: var(--color-text, #0f172a);
+}
