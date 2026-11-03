@@ -6,12 +6,14 @@ import './AdminModal.css'
 /**
  * Модальное окно для форм админ-панели (portal → document.body).
  * `sheet` — на телефоне (≤900px) окно выезжает снизу на всю ширину (фильтры, выбор); на десктопе обычное.
+ * `headerAction` — кнопка справа в шапке вместо «×» (заголовок тогда по центру, как у фильтров UMAG).
  */
 export default function AdminModal({
   title,
   children,
   onClose,
   footer,
+  headerAction = null,
   wide = false,
   xwide = false,
   huge = false,
@@ -66,19 +68,23 @@ export default function AdminModal({
         aria-labelledby={titleId}
       >
         {sheet ? <span className="admin-modal__grabber" aria-hidden="true" /> : null}
-        <div className="admin-modal__header">
+        <div className={`admin-modal__header${headerAction ? ' admin-modal__header--action' : ''}`}>
           <h2 className="admin-modal__title" id={titleId}>
             {title}
           </h2>
-          <button
-            ref={closeButtonRef}
-            type="button"
-            className="admin-modal__close"
-            onClick={onClose}
-            aria-label="Закрыть"
-          >
-            ×
-          </button>
+          {headerAction ? (
+            <div className="admin-modal__header-action">{headerAction}</div>
+          ) : (
+            <button
+              ref={closeButtonRef}
+              type="button"
+              className="admin-modal__close"
+              onClick={onClose}
+              aria-label="Закрыть"
+            >
+              ×
+            </button>
+          )}
         </div>
         <div className="admin-modal__body">{children}</div>
         {footer && <div className="admin-modal__footer">{footer}</div>}

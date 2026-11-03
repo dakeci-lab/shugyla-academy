@@ -45,7 +45,7 @@ assert.match(modalCss, /\.admin-modal-overlay--sheet[\s\S]{0,80}align-items: fle
 assert.match(modalCss, /\.admin-modal--sheet[\s\S]{0,300}border-radius: 16px 16px 0 0/)
 assert.match(modalCss, /\.admin-modal--sheet input[\s\S]{0,120}font-size: 16px/)
 ok('AdminModal has a bottom-sheet variant for phones (inputs 16px, safe-area padding)')
-assert.match(read('src/components/platform/PeriodFilterPopover.jsx'), /<AdminModal sheet title="Фильтр"/)
+assert.match(read('src/components/platform/PeriodFilterPopover.jsx'), /<AdminModal\s+sheet\s+title="Фильтры"/)
 ok('the shared period filter opens as a bottom sheet on phones')
 
 const fabCss = read('src/components/platform/PlatformFab.css')
@@ -83,5 +83,16 @@ assert.match(pageCss, /\.pdl-row \.pgt__title\s*\{\s*font-size: 14px;\s*font-wei
 assert.match(pageCss, /\.pdl-row \.pgt__money\s*\{\s*font-size: 14px;\s*font-weight: 400/)
 assert.match(pageCss, /\.pdl-row \.pdl-nonumber\s*\{[^}]*font-style: normal[^}]*color: var\(--color-text/)
 ok('phone list text sizes follow UMAG (supplier 14px bold, sum 14px); «Поставщик не выбран» is not gray italic')
+
+const sheet = read('src/components/platform/PeriodFilterPopover.jsx')
+const sheetCss = read('src/components/platform/PeriodFilterPopover.css')
+assert.match(sheet, /headerAction=\{[\s\S]*Очистить/)
+assert.match(sheet, /period-sheet__apply[\s\S]*Применить/)
+assert.match(sheet, /phone \? 'За период' : 'Период'/)
+assert.match(sheet, /phone \? preset\.shortLabel : preset\.label/)
+assert.match(read('src/utils/settlementsPeriod.js'), /shortLabel: '3 мес'/)
+assert.match(sheetCss, /\.period-sheet \.period-filter-popover__presets\s*\{\s*flex-wrap: nowrap/)
+assert.match(sheetCss, /\.period-sheet \.pf-field__label\s*\{\s*position: absolute/)
+ok('phone filter sheet like UMAG: «Фильтры» + «Очистить» in the header, «За период», five chips in one row, plain outlined fields (names as placeholders), one full-width «Применить»')
 
 console.log(`\nverify:mobile-foundation — ${checks} checks passed`)

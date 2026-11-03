@@ -12,12 +12,13 @@ export const SETTLEMENTS_PERIOD_PRESET = {
   CUSTOM: 'custom',
 }
 
+// `shortLabel` — for the one-row chips of the phone filter sheet (like UMAG: «3 мес»).
 export const SETTLEMENTS_PERIOD_PRESET_OPTIONS = [
-  { id: SETTLEMENTS_PERIOD_PRESET.YESTERDAY, label: 'Вчера' },
-  { id: SETTLEMENTS_PERIOD_PRESET.TODAY, label: 'Сегодня' },
-  { id: SETTLEMENTS_PERIOD_PRESET.WEEK, label: 'Неделя' },
-  { id: SETTLEMENTS_PERIOD_PRESET.MONTH, label: 'Месяц' },
-  { id: SETTLEMENTS_PERIOD_PRESET.THREE_MONTHS, label: 'Три месяца' },
+  { id: SETTLEMENTS_PERIOD_PRESET.YESTERDAY, label: 'Вчера', shortLabel: 'Вчера' },
+  { id: SETTLEMENTS_PERIOD_PRESET.TODAY, label: 'Сегодня', shortLabel: 'Сегодня' },
+  { id: SETTLEMENTS_PERIOD_PRESET.WEEK, label: 'Неделя', shortLabel: 'Неделя' },
+  { id: SETTLEMENTS_PERIOD_PRESET.MONTH, label: 'Месяц', shortLabel: 'Месяц' },
+  { id: SETTLEMENTS_PERIOD_PRESET.THREE_MONTHS, label: 'Три месяца', shortLabel: '3 мес' },
 ]
 
 const MONTHS_RU = [
@@ -318,6 +319,16 @@ export function formatSettlementsPeriodNavigatorLabel(preset, dateFrom, dateTo) 
   }
   if (dateFrom === dateTo) return formatDayMonthYear(dateFrom)
   return `${formatDotDate(dateFrom)} — ${formatDotDate(dateTo)}`
+}
+
+const MONTHS_RU_ABBR = ['янв.', 'февр.', 'март', 'апр.', 'мая', 'июн.', 'июл.', 'авг.', 'сент.', 'окт.', 'нояб.', 'дек.']
+
+/** «2 нояб. - 8 нояб.» — the period line of the phone filter sheet (like UMAG). */
+export function formatSettlementsPeriodRangeLabel(dateFrom, dateTo) {
+  const a = parseKey(dateFrom)
+  const b = parseKey(dateTo)
+  if (!a || !b) return `${dateFrom || '—'} - ${dateTo || '—'}`
+  return `${a.d} ${MONTHS_RU_ABBR[a.m - 1]} - ${b.d} ${MONTHS_RU_ABBR[b.m - 1]}`
 }
 
 /** Compact period label for settlements chrome. */
