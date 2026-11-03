@@ -14,7 +14,8 @@ import { toProcurementUserMessage } from '../../utils/procurementErrors'
 import { DelayedLoadingSkeleton } from '../loading/LoadingSkeleton'
 import PlatformSearchToolbar from '../platform/PlatformSearchToolbar'
 import TablePagination from './TablePagination'
-import { DownloadIcon, ChevronLeftIcon } from '../icons/PlatformIcons'
+import { DownloadIcon, ChevronLeftIcon, PencilIcon } from '../icons/PlatformIcons'
+import IconActionButton from '../admin/IconActionButton'
 import './ProcurementWarehouseView.css'
 
 const HISTORY_PAGE_SIZE = 20
@@ -457,16 +458,22 @@ export default function ProcurementWarehouseView() {
                       </td>
                       <td>{snapshot.createdByName || '—'}</td>
                       <td className="proc-wh__col-actions">
-                        <button
-                          type="button"
-                          className="proc-wh__icon-btn"
-                          onClick={() => void handleExportRow(snapshot)}
-                          disabled={exportingId === snapshot.id || snapshot.status === 'syncing'}
-                          title={snapshot.archivedAt ? 'Скачать архив (CSV)' : 'Скачать Excel'}
-                          aria-label={snapshot.archivedAt ? 'Скачать архив' : 'Скачать Excel'}
-                        >
-                          <DownloadIcon size={18} />
-                        </button>
+                        <span className="proc-wh__actions">
+                          <IconActionButton
+                            label="Открыть"
+                            disabled={snapshot.status === 'syncing'}
+                            onClick={() => openSnapshot(snapshot)}
+                          >
+                            <PencilIcon size={16} />
+                          </IconActionButton>
+                          <IconActionButton
+                            label={snapshot.archivedAt ? 'Скачать архив (CSV)' : 'Скачать Excel'}
+                            disabled={exportingId === snapshot.id || snapshot.status === 'syncing'}
+                            onClick={() => void handleExportRow(snapshot)}
+                          >
+                            <DownloadIcon size={16} />
+                          </IconActionButton>
+                        </span>
                       </td>
                     </tr>
                     )

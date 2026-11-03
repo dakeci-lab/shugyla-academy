@@ -58,3 +58,10 @@
     justify-content: space-between;
   }
 }
+
+/* The refresh button next to «Фильтр»: the same size, corner and font as every control of a top bar. */
+.sfp-panel__sync .platform-search-toolbar__icon-btn {
+  width: var(--pf-control-h);
+  height: var(--pf-control-h);
+  border-radius: var(--pf-control-radius);
+}

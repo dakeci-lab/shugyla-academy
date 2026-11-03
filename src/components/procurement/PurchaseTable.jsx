@@ -6,6 +6,8 @@ import {
 } from '../../utils/purchaseData'
 import { ORDER_LABELS } from '../../config/documentLabels'
 import { PgtHead, PgtRow, PgtTable } from '../platform/PlatformGridTable'
+import IconActionButton from '../admin/IconActionButton'
+import { PencilIcon } from '../icons/PlatformIcons'
 
 /**
  * Список заказов — общая таблица платформы (как «К оплате» и «Приёмка»).
@@ -25,6 +27,7 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
     { key: 'number', label: ORDER_LABELS.orderNum, width: 90, mobile: 'hide' },
     { key: 'created', label: 'Создан', width: 150, mobile: 'hide' },
     { key: 'creator', label: 'Создал', width: 170, mobile: 'hide' },
+    { key: 'edit', label: '', width: 44, align: 'end', mobile: 'hide' },
   ]
 
   return (
@@ -37,8 +40,20 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
           <PgtRow
             key={order.id}
             columns={columns}
+            interactive
             onClick={() => navigate(path)}
             cells={{
+              edit: (
+                <IconActionButton
+                  label="Открыть"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    navigate(path)
+                  }}
+                >
+                  <PencilIcon size={16} />
+                </IconActionButton>
+              ),
               created: <span>{formatPurchaseDateTime(order.createdAt || order.date)}</span>,
               supplier: <span className="pgt__title">{order.supplierName || '—'}</span>,
               number: <span className="num">{order.number ?? ''}</span>,

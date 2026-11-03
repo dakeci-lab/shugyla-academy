@@ -1350,6 +1350,7 @@ export default function UmagSettlementsPanel({
     ...(canViewFinance
       ? [{ key: 'balance', label: 'К оплате', width: 170, align: 'end', mobile: 'end' }]
       : []),
+    ...(canEdit ? [{ key: 'edit', label: '', width: 44, align: 'end', mobile: 'hide' }] : []),
   ]
 
   const emptyMessage = (() => {
@@ -1567,6 +1568,13 @@ export default function UmagSettlementsPanel({
                           {debtLoading ? '…' : formatUmagMoney(debt ?? 0)}
                         </span>
                       ),
+                      // The virtual «Поставщик не выбран» row has no supplier record to edit.
+                      edit:
+                        canEdit && s.id !== UNASSIGNED_SUPPLIER_ID ? (
+                          <IconActionButton label="Редактировать поставщика" onClick={() => openEdit(s)}>
+                            <PencilIcon size={16} />
+                          </IconActionButton>
+                        ) : null,
                     }}
                   />
                 )

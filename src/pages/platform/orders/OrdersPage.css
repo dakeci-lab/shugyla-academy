@@ -69,13 +69,14 @@
 }
 
 .orders-page__preset {
-  min-height: 32px;
-  padding: 0 12px;
+  box-sizing: border-box;
+  height: var(--pf-control-h);
+  padding: 0 var(--pf-control-px);
   border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 4px;
+  border-radius: var(--pf-control-radius);
   background: var(--color-white, #fff);
   font: inherit;
-  font-size: 0.875rem;
+  font-size: var(--pf-control-fs);
   cursor: pointer;
 }
 
