@@ -43,6 +43,21 @@ export function suppliersOrderedToday(suppliers, weekdayId) {
 }
 
 /**
+ * «Товар с собой»: the supplier's order day (the visit) and its delivery day are the same day — the goods arrive with
+ * the visit. A day, not the whole lists: «заказ Пн, Ср / поставка Пн» brings goods with it on Monday only.
+ */
+export function bringsGoodsToday(supplier, weekdayId) {
+  return (supplier.orderWeekdays || []).includes(weekdayId) && (supplier.deliveryWeekdays || []).includes(weekdayId)
+}
+
+/** Today's suppliers with «товар с собой» first (the buyer works through them first); the order inside a group is kept. */
+export function suppliersWithGoodsFirst(suppliers, weekdayId) {
+  const withGoods = suppliers.filter((supplier) => bringsGoodsToday(supplier, weekdayId))
+  const rest = suppliers.filter((supplier) => !bringsGoodsToday(supplier, weekdayId))
+  return [...withGoods, ...rest]
+}
+
+/**
  * The list a document page returns to — by the address it was opened at, not by the user's rights:
  * /platform/orders/:id → «Заказы», /platform/procurement/documents/:id (or anything else) → «Закуп».
  */
