@@ -54,7 +54,7 @@ const pageCss = read('src/pages/platform/procurement/SupplierGoodsPage.css')
 assert.match(goods, /className="sgp__bar"/)
 assert.match(pageCss, /max-width: 640px[\s\S]*\.sgp__bar\s*\{\s*flex-direction: column/)
 assert.match(pageCss, /\.sgp__bar \.btn--primary\s*\{\s*width: 100%/)
-ok('the plan folds into one line, the bottom bar of the page is one column with a full-width «Добавить в документ»')
+ok('the plan folds into one line, the bottom bar of the page is one column with a full-width «Добавить»')
 
 // Long product names must wrap inside the pinned name column, never run over the week columns.
 assert.match(css, /\.ctbl td\.ctbl__name\s*\{[^}]*white-space: normal/)

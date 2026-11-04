@@ -42,7 +42,7 @@
 
 @media (max-width: 640px) {
   .sgp {
-    padding-bottom: 150px;
+    padding-bottom: 230px;
   }
 
   .sgp__bar {
@@ -112,5 +112,12 @@
 
   .sgp .sgm__top > .btn {
     padding-inline: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  /* The search pill sits under the «Добавить» button, at the very bottom (like in UMAG). */
+  .sgp__bar {
+    gap: 8px;
   }
 }
