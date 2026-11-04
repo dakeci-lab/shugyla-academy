@@ -33,9 +33,9 @@ export const PLATFORM_NAV = [
       {
         id: 'supplier-finance',
         path: '/platform/supplier-finance',
-        label: 'Расчёты',
+        label: 'Поставщики',
         routeKey: ROUTE_KEYS.SUPPLIER_FINANCE,
-        title: 'Расчёты',
+        title: 'Поставщики',
         description:
           'Справочник поставщиков, сроки оплаты и взаиморасчёты по данным UMAG.',
       },

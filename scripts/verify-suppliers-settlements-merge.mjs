@@ -160,7 +160,7 @@ function main() {
 
   // --- Nav: one destination, not two ------------------------------------------
   assert.doesNotMatch(nav, /id: 'suppliers',\s*\n\s*path: '\/platform\/suppliers',/)
-  assert.match(nav, /id: 'supplier-finance',\s*\n\s*path: '\/platform\/supplier-finance',\s*\n\s*label: 'Расчёты',/)
+  assert.match(nav, /id: 'supplier-finance',\s*\n\s*path: '\/platform\/supplier-finance',\s*\n\s*label: 'Поставщики',/)
   ok('platformNav.js no longer has a separate «Поставщики» nav item — «Расчёты» is the one destination')
 
   // --- Old directory routes redirect, preserving state for the payment-terms deep link ---

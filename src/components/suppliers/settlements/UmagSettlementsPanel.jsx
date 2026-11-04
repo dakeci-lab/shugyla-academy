@@ -1515,7 +1515,7 @@ export default function UmagSettlementsPanel({
 
   // Page header: the list has the sync icon; a supplier's card is titled with the supplier's name (phones) and carries the pencil.
   usePlatformPageTitle(
-    selectedId && isPhoneMain && selected ? '' : 'Расчёты',
+    selectedId && isPhoneMain && selected ? '' : 'Поставщики',
     '',
     selectedId
       ? { showBack: true, backFallback: '/platform/supplier-finance' }
