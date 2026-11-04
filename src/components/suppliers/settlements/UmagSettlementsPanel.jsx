@@ -1994,16 +1994,23 @@ export default function UmagSettlementsPanel({
                   <PgtRow
                     key={s.id}
                     columns={listColumns}
+                    // Phones: the whole row opens the card (and shows the soft press highlight); the web keeps the name link.
+                    onClick={isPhoneMain ? () => setSelectedId(s.id) : undefined}
+                    interactive={isPhoneMain}
                     cells={{
                       name: (
                         <span className="umag-settlements__supplier">
-                          <button
-                            type="button"
-                            className="pgt__link"
-                            onClick={() => setSelectedId(s.id)}
-                          >
-                            {s.name}
-                          </button>
+                          {isPhoneMain ? (
+                            <span className="pgt__link">{s.name}</span>
+                          ) : (
+                            <button
+                              type="button"
+                              className="pgt__link"
+                              onClick={() => setSelectedId(s.id)}
+                            >
+                              {s.name}
+                            </button>
+                          )}
                           {meta ? (
                             <span className="umag-settlements__supplier-meta">
                               {meta}
