@@ -53,7 +53,6 @@ import AdminModal from '../../../components/admin/AdminModal'
 import ConfirmDialog from '../../../components/admin/ConfirmDialog'
 import DocumentDateBox from '../../../components/procurement/document/DocumentDateBox'
 import NomenclatureModal from '../../../components/procurement/document/NomenclatureModal'
-import SupplierGoodsModal from '../../../components/procurement/document/SupplierGoodsModal'
 import ItemDetailSheet from '../../../components/procurement/document/ItemDetailSheet'
 import DocumentSupplierPicker from '../../../components/procurement/document/DocumentSupplierPicker'
 import { ORDER_LABELS } from '../../../config/documentLabels'
@@ -92,7 +91,6 @@ export default function PurchaseDocumentPage() {
   const [commentText, setCommentText] = useState('')
   const [commentBlockOpen, setCommentBlockOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
-  const [goodsOpen, setGoodsOpen] = useState(false)
   const [ticks, setTicks] = useState(() => new Set())
   const [nomenclatureOpen, setNomenclatureOpen] = useState(false)
   const [qtyDraft, setQtyDraft] = useState({})
@@ -325,18 +323,6 @@ export default function PurchaseDocumentPage() {
   }
 
   /** Rows ticked in «Товары поставщика»: one request, the totals are recalculated once. */
-  async function addPlannedItems(rows) {
-    const payload = rows.map(({ item, qty }) => ({
-      ...catalogProductToItem(item, { orderQty: qty }),
-      supplierId: order.supplierId,
-      supplierName: order.supplierName,
-    }))
-    const fresh = await addPurchaseOrderItems(order.id, payload)
-    if (fresh?.id) setFullOrder(fresh)
-    else await reloadOrder()
-    showSuccess(`Добавлено товаров: ${payload.length}`)
-  }
-
   /** Rows ticked in «Добавить из номенклатуры»: the first product fixes the supplier of an empty document. */
   async function addNomenclatureItems(rows) {
     let current = order
@@ -536,7 +522,7 @@ export default function PurchaseDocumentPage() {
         </div>
         {editable && order.supplierId && isCloudMode() ? (
           <div className="pdoc__goods-block">
-            <button type="button" className="pdoc__goods-btn" onClick={() => setGoodsOpen(true)}>
+            <button type="button" className="pdoc__goods-btn" onClick={() => navigate(`/platform/procurement/documents/${id}/goods`)}>
               ＋ Товары поставщика
             </button>
           </div>
@@ -798,17 +784,6 @@ export default function PurchaseDocumentPage() {
           onQtyCommit={(row) => void handleQtyCommit(row)}
           onRemove={(row) => void handleDeleteItem(row)}
           onClose={() => setDetailId(null)}
-        />
-      ) : null}
-
-      {goodsOpen ? (
-        <SupplierGoodsModal
-          order={order}
-          existingBarcodes={new Set(items.map((row) => row.barcode).filter(Boolean))}
-          existingTotal={total}
-          onAdd={addPlannedItems}
-          onDeliveryDate={(value) => void saveMeta({ expectedDeliveryDate: value })}
-          onClose={() => setGoodsOpen(false)}
         />
       ) : null}
 

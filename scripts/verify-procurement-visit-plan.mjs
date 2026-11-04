@@ -58,9 +58,9 @@ assert.match(bar, /дни заказа и доставки не заполнен
 assert.match(bar, /до минимума не хватает/)
 ok('plan bar: skip a visit, «дни не заполнены, цикл 7 дней» note, minimum order shortfall')
 
-const goods = read('src/components/procurement/document/SupplierGoodsModal.jsx')
+const goods = read('src/pages/platform/procurement/SupplierGoodsPage.jsx')
 assert.match(goods, /<ProcurementSupplierPlanBar/)
 assert.match(goods, /fetchProcurementSupplierPlan\(/)
-ok('the supplier-goods window shows the plan bar for its supplier and takes the plan delivery date')
+ok('the supplier-goods page shows the plan bar for its supplier and takes the plan delivery date')
 
 console.log(`\nverify:procurement-visit-plan — ${checks} checks passed`)
