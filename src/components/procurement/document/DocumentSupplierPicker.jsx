@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDownIcon } from '../../icons/PlatformIcons'
 import { dateToSupplierWeekdayId } from '../../../utils/supplierData'
-import { suppliersOrderedToday } from '../../../utils/purchaseDocument'
+import { bringsGoodsToday, suppliersOrderedToday, suppliersWithGoodsFirst } from '../../../utils/purchaseDocument'
 import './DocumentSupplierPicker.css'
 
 /**
  * Supplier combobox of the document: tabs «Сегодня · N» (order day is today) and «Все», search, check mark on
- * the current one. Disabled once the document has items (the supplier is then fixed).
+ * the current one. Suppliers who bring the goods with them today (visit day = delivery day) come first in «Сегодня»
+ * and carry a soft green tint and the mark «с собой» (the buyer works through them first). Disabled once the document has items (the supplier is then fixed).
  */
 export default function DocumentSupplierPicker({ suppliers, valueId, valueName, onSelect, disabled = false }) {
   const [open, setOpen] = useState(false)
@@ -14,9 +15,10 @@ export default function DocumentSupplierPicker({ suppliers, valueId, valueName, 
   const [query, setQuery] = useState('')
   const rootRef = useRef(null)
 
+  const weekdayId = dateToSupplierWeekdayId(new Date())
   const today = useMemo(
-    () => suppliersOrderedToday(suppliers, dateToSupplierWeekdayId(new Date())),
-    [suppliers]
+    () => suppliersWithGoodsFirst(suppliersOrderedToday(suppliers, weekdayId), weekdayId),
+    [suppliers, weekdayId]
   )
 
   useEffect(() => {
@@ -86,14 +88,19 @@ export default function DocumentSupplierPicker({ suppliers, valueId, valueName, 
                 type="button"
                 role="option"
                 aria-selected={supplier.id === valueId}
-                className={`docsup__option${supplier.id === valueId ? ' is-on' : ''}`}
+                className={`docsup__option${supplier.id === valueId ? ' is-on' : ''}${
+                  bringsGoodsToday(supplier, weekdayId) ? ' is-with-goods' : ''
+                }`}
                 onClick={() => {
                   setOpen(false)
                   setQuery('')
                   onSelect(supplier)
                 }}
               >
-                <span>{supplier.name}</span>
+                <span className="docsup__name">
+                  {supplier.name}
+                  {bringsGoodsToday(supplier, weekdayId) ? <small className="docsup__tag">с собой</small> : null}
+                </span>
                 {supplier.id === valueId ? <span aria-hidden="true">✓</span> : null}
               </button>
             ))}
