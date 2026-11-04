@@ -1152,3 +1152,17 @@
   line-height: 16px;
   text-align: center;
 }
+
+/* Phones: the history of a supplier is a list edge to edge (like the other lists and like UMAG). */
+@media (max-width: 640px) {
+  .sd-ops {
+    margin-inline: calc(-1 * var(--page-gutter, 12px));
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+
+  .sd-op {
+    padding-inline: 16px;
+  }
+}
