@@ -25,6 +25,7 @@ import useMediaQuery from '../../../hooks/useMediaQuery'
 import { toProcurementUserMessage } from '../../../utils/procurementErrors'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
 import PlatformSyncButton from '../../../components/platform/PlatformSyncButton'
+import PlatformFloatingSearch from '../../../components/platform/PlatformFloatingSearch'
 import { RefreshIcon } from '../../../components/icons/PlatformIcons'
 import ProcurementSupplierPlanBar from '../../../components/procurement/ProcurementSupplierPlanBar'
 import CatalogTable from '../../../components/procurement/document/CatalogTable'
@@ -396,14 +397,16 @@ export default function SupplierGoodsPage() {
 
       <div className="sgm">
         <div className="sgm__top">
-          <input
-            type="search"
-            className="sgm__search"
-            placeholder="Товар или штрихкод…"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            autoComplete="off"
-          />
+          {isPhone ? null : (
+            <input
+              type="search"
+              className="sgm__search"
+              placeholder="Товар или штрихкод…"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              autoComplete="off"
+            />
+          )}
           <label className="sgm__toggle">
             <input type="checkbox" checked={onlyOrder} onChange={(event) => setOnlyOrder(event.target.checked)} />
             <span>{isPhone ? 'К заказу' : 'Только к заказу'} ({toOrderCount})</span>
@@ -480,8 +483,17 @@ export default function SupplierGoodsPage() {
           ) : null}
         </div>
         <button type="button" className="btn btn--primary" disabled={adding || picked === 0} onClick={() => void handleAdd()}>
-          {adding ? 'Добавление…' : `Добавить в документ (${picked})`}
+          {adding ? 'Добавление…' : `Добавить (${picked})`}
         </button>
+        {isPhone ? (
+          <PlatformFloatingSearch
+            inline
+            value={search}
+            onChange={setSearch}
+            placeholder="Поиск по товарам"
+            label="Поиск по товарам"
+          />
+        ) : null}
       </div>,
       document.body
       )}

@@ -7,11 +7,12 @@ import './PlatformFloatingSearch.css'
  * edge of the screen. Drawn in document.body: the page wrapper has `will-change: transform`, which would otherwise
  * pin a fixed child to the end of a long list (same reason as PlatformFab).
  * `total` — the sum of the list, pinned under the search at the very bottom of the screen.
+ * `inline` — the same pill, but placed where it is rendered (inside another fixed bottom bar, under its button),
+ * not floating by itself.
  */
-export default function PlatformFloatingSearch({ value, onChange, placeholder = 'Поиск', label, total = null }) {
-  return createPortal(
-    <>
-    <div className={`pfs${total ? ' pfs--with-total' : ''}`} role="search">
+export default function PlatformFloatingSearch({ value, onChange, placeholder = 'Поиск', label, total = null, inline = false }) {
+  const pill = (
+    <div className={`pfs${total ? ' pfs--with-total' : ''}${inline ? ' pfs--inline' : ''}`} role="search">
       <SearchIcon size={22} />
       <input
         type="search"
@@ -24,12 +25,17 @@ export default function PlatformFloatingSearch({ value, onChange, placeholder = 
         enterKeyHint="search"
       />
     </div>
-    {total ? (
-      <div className="pfs-total">
-        <span>Итого</span>
-        <strong>{total}</strong>
-      </div>
-    ) : null}
+  )
+  if (inline) return pill
+  return createPortal(
+    <>
+      {pill}
+      {total ? (
+        <div className="pfs-total">
+          <span>Итого</span>
+          <strong>{total}</strong>
+        </div>
+      ) : null}
     </>,
     document.body
   )

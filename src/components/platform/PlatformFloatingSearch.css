@@ -54,6 +54,18 @@
     color: var(--color-text-secondary, #64748b);
   }
 
+  /* Inside another bottom bar (under its button): in the flow, not floating. */
+  .pfs.pfs--inline {
+    position: static;
+    left: auto;
+    bottom: auto;
+    z-index: auto;
+    width: 100%;
+    transform: none;
+    box-shadow: none;
+    background: var(--color-white, #fff);
+  }
+
   .pfs svg {
     flex: none;
   }
