@@ -10,6 +10,7 @@ const REFRESHING_HEIGHT = 64
 const DONE_HOLD_MS = 650
 const HIDE_DURATION_MS = 320
 const MOBILE_QUERY = '(max-width: 900px)'
+const AXIS_LOCK_PX = 8
 
 function getScrollTop() {
   return window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0
@@ -33,6 +34,10 @@ export default function PullToRefresh({ children, disabled = false, className = 
   const [animating, setAnimating] = useState(false)
 
   const startYRef = useRef(0)
+  const startXRef = useRef(0)
+  // The direction of the gesture is decided once, after the first ~8px: a mostly horizontal one (a swipe between the pages
+  // of a screen) never pulls the page down, a mostly vertical one is the pull — the two never work together.
+  const axisRef = useRef(null)
   const pullingRef = useRef(false)
   const pullRef = useRef(0)
   const refreshingRef = useRef(false)
@@ -91,8 +96,10 @@ export default function PullToRefresh({ children, disabled = false, className = 
     }
 
     function onTouchStart(event) {
+      axisRef.current = null
       if (!canStartPull()) return
       startYRef.current = event.touches[0].clientY
+      startXRef.current = event.touches[0].clientX
       pullingRef.current = false
     }
 
@@ -103,6 +110,13 @@ export default function PullToRefresh({ children, disabled = false, className = 
       const delta = touchY - startYRef.current
 
       if (!pullingRef.current) {
+        if (axisRef.current === 'x') return
+        if (axisRef.current === null) {
+          const dx = event.touches[0].clientX - startXRef.current
+          if (Math.max(Math.abs(dx), Math.abs(delta)) < AXIS_LOCK_PX) return
+          axisRef.current = Math.abs(dx) > Math.abs(delta) ? 'x' : 'y'
+          if (axisRef.current === 'x') return
+        }
         if (delta <= 0 || getScrollTop() > 0) return
         pullingRef.current = true
         setDragging(true)

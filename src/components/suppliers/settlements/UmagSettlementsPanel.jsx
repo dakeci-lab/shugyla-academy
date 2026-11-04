@@ -1062,7 +1062,8 @@ function UmagSupplierDetail({
             if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return
             st.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y'
           }
-          if (st.axis !== 'x') return
+          // A pull-to-refresh that has already started (vertical) is never a swipe between the pages.
+          if (st.axis !== 'x' || document.documentElement.classList.contains('platform-pull-active')) return
           // At the first/last page the content only gives a little (resistance).
           const atStart = phoneTab === 'pay' && dx > 0
           const atEnd = phoneTab === 'info' && dx < 0
