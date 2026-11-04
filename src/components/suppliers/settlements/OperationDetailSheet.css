@@ -291,5 +291,15 @@
     border-radius: 16px 16px 0 0;
     padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
     box-shadow: 0 -8px 28px rgba(15, 23, 42, 0.18);
+    /* The sheet reaches up to about the middle of the screen: the whole content (document, sum, account) stays together
+       at its top — at the middle of the screen — and «Оплатить» is pinned to the very bottom (like UMAG, but half height). */
+    display: flex;
+    flex-direction: column;
+    min-height: 58dvh;
+  }
+
+  .umag-op-detail:has(.umag-op-detail__pay-amount) .umag-op-detail__pay-actions {
+    margin-top: auto;
+    padding-top: 16px;
   }
 }
