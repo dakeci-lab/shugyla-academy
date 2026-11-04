@@ -58,6 +58,7 @@ import {
   formatUmagMoney,
   getMonthPeriodKeys,
   syncUmagSettlements,
+  fetchPlatformUserName,
 } from '../../../services/umagSettlementsService'
 import {
   markObligationPaid,
@@ -66,6 +67,8 @@ import {
   refreshObligationTermsForSupplier,
   unmarkObligationPaid,
   unmarkReturnRefunded,
+  updateObligationPaymentAccount,
+  updateReturnRefundAccount,
 } from '../../../services/supplierPaymentObligationsService'
 import PlatformAccessDenied from '../../platform/PlatformAccessDenied'
 import PlatformFilterTrigger from '../../platform/PlatformFilterTrigger'
@@ -664,6 +667,26 @@ function UmagSupplierDetail({
     }
   }
 
+  /** «Изменить» of a paid document: only the account changes; the sum, the date and who marked it stay. */
+  async function handleChangeAccount(op, accountId) {
+    try {
+      if (op.settlement?.type === 'payable') {
+        await updateObligationPaymentAccount(op.settlement.obligationId, accountId, {
+          employeeName: await fetchPlatformUserName(op.settlement.settledById),
+          accountName: getPaymentAccountName(accountId),
+        })
+      } else {
+        await updateReturnRefundAccount(op.source?.id, accountId)
+      }
+      showSuccess?.('Счёт изменён')
+      setSelectedOperation(null)
+      setReloadToken((token) => token + 1)
+      onSyncComplete?.()
+    } catch (err) {
+      showError?.(err.message || 'Не удалось изменить счёт')
+    }
+  }
+
   async function handleUnsettle(op) {
     try {
       if (op.settlement?.type === 'payable') {
@@ -1201,6 +1224,7 @@ function UmagSupplierDetail({
           defaultAccountId={supplier.isVirtual ? null : supplier.paymentAccountId ?? null}
           onSettle={(accountId) => handleSettle(selectedOperation, accountId)}
           onUnsettle={() => handleUnsettle(selectedOperation)}
+          onChangeAccount={(accountId) => handleChangeAccount(selectedOperation, accountId)}
           due={
             selectedOperation.settlement &&
             !selectedOperation.settlement.settled &&

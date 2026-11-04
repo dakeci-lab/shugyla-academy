@@ -2,11 +2,15 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import {
   deriveSupplyPaymentStatus,
+  fetchPlatformUserName,
   formatSignedUmagMoney,
   formatUmagDateTime,
   formatUmagMoney,
   supplyPaymentStatusLabel,
 } from '../../../services/umagSettlementsService'
+import { getPaymentAccountName } from '../../../services/paymentAccountsService'
+import { ChevronLeftIcon, PencilIcon } from '../../icons/PlatformIcons'
+import ConfirmDialog from '../../admin/ConfirmDialog'
 import './OperationDetailSheet.css'
 
 function formatAccountNames(value) {
@@ -194,6 +198,138 @@ function PayDialog({ operation, headline, due, accounts, defaultAccountId, onSet
   )
 }
 
+/**
+ * The page «Платёж» of a document that is already paid (a full-screen layer on phones, a window on the web), like
+ * the payment page of UMAG: the facts are only read here. Changing anything is a deliberate act: the pencil opens the
+ * edit mode — the account can be changed, and «Отменить оплату» (red) asks once more before it removes the mark.
+ */
+function PaymentLayer({ rows, accounts, accountId, canManage, canChangeAccount, kindLabel, onClose, onChangeAccount, onCancelPayment }) {
+  const [editing, setEditing] = useState(false)
+  const [draftAccount, setDraftAccount] = useState(accountId || '')
+  const [saving, setSaving] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
+  const [cancelling, setCancelling] = useState(false)
+
+  useEffect(() => {
+    setDraftAccount(accountId || '')
+  }, [accountId])
+
+  async function save() {
+    if (saving) return
+    setSaving(true)
+    try {
+      await onChangeAccount(draftAccount || null)
+      setEditing(false)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function cancelPayment() {
+    if (cancelling) return
+    setCancelling(true)
+    try {
+      await onCancelPayment()
+    } finally {
+      setCancelling(false)
+      setConfirmOpen(false)
+    }
+  }
+
+  const unchanged = (draftAccount || '') === (accountId || '')
+  return (
+    <div className="umag-op-detail__backdrop umag-op-detail__backdrop--layer" role="presentation" onClick={onClose}>
+      <div
+        className="umag-op-detail umag-op-detail--layer"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Платёж"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="pay-layer__head">
+          <button type="button" className="pay-layer__icon" onClick={onClose} aria-label="Назад">
+            <ChevronLeftIcon size={20} />
+          </button>
+          <h3 className="pay-layer__title">Платёж</h3>
+          {canManage ? (
+            <button
+              type="button"
+              className={`pay-layer__icon${editing ? ' is-on' : ''}`}
+              onClick={() => setEditing((value) => !value)}
+              aria-label={editing ? 'Закончить редактирование' : 'Редактировать'}
+              aria-pressed={editing}
+            >
+              <PencilIcon size={20} />
+            </button>
+          ) : (
+            <span className="pay-layer__icon pay-layer__icon--gap" aria-hidden="true" />
+          )}
+        </header>
+
+        <section className="pay-layer__card">
+          <h4 className="pay-layer__section">Основная информация</h4>
+          {rows.map((row) => (
+            <div key={row.label} className="pay-layer__row">
+              <span>{row.label}</span>
+              <b>{row.value}</b>
+            </div>
+          ))}
+        </section>
+
+        {editing ? (
+          <section className="pay-layer__card pay-layer__edit">
+            <h4 className="pay-layer__section">Изменить</h4>
+            {canChangeAccount ? (
+              <label className="umag-op-detail__pay-field">
+                <span>{kindLabel === 'return' ? 'Счёт, на который пришёл возврат' : 'Счёт оплаты'}</span>
+                <select
+                  className="umag-op-detail__settle-account"
+                  value={draftAccount}
+                  onChange={(event) => setDraftAccount(event.target.value)}
+                  disabled={saving}
+                >
+                  <option value="">Без счёта</option>
+                  {accounts.map((account) => (
+                    <option key={account.id} value={account.id}>
+                      {account.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
+            <div className="umag-op-detail__pay-actions">
+              {canChangeAccount ? (
+                <button type="button" className="btn btn--primary" disabled={saving || unchanged} onClick={() => void save()}>
+                  {saving ? 'Сохранение…' : 'Сохранить'}
+                </button>
+              ) : null}
+              <button type="button" className="btn btn--danger-outline" disabled={saving} onClick={() => setConfirmOpen(true)}>
+                {kindLabel === 'return' ? 'Отменить получение' : 'Отменить оплату'}
+              </button>
+            </div>
+          </section>
+        ) : null}
+
+        {confirmOpen ? (
+          <ConfirmDialog
+            title={kindLabel === 'return' ? 'Отменить получение возврата?' : 'Отменить оплату?'}
+            message={
+              kindLabel === 'return'
+                ? 'Возврат снова станет неполученным.'
+                : 'Документ снова станет неоплаченным: сумма вернётся в долг поставщику.'
+            }
+            confirmLabel={kindLabel === 'return' ? 'Отменить получение' : 'Отменить оплату'}
+            cancelLabel="Назад"
+            onCancel={() => (cancelling ? null : setConfirmOpen(false))}
+            onConfirm={() => void cancelPayment()}
+            loading={cancelling}
+          />
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
 export default function OperationDetailSheet({
   operation,
   supplierName,
@@ -204,6 +340,7 @@ export default function OperationDetailSheet({
   defaultAccountId = null,
   onSettle,
   onUnsettle,
+  onChangeAccount,
   due = null,
 }) {
   const kind = operation?.kind
@@ -267,6 +404,25 @@ export default function OperationDetailSheet({
 
   const [unmarking, setUnmarking] = useState(false)
 
+  // A paid document opens as the read-only page «Платёж» (see PaymentLayer); who marked it is read on demand.
+  const settledDoc = Boolean(!isPaymentDoc && operation?.settlement?.settled)
+  const platformPayDoc = kind === 'payment' && headerFromHistory.externalSource === 'platform' && headerFromHistory.obligationId != null
+  const settledById = operation?.settlement?.settledById || null
+  const [paidByName, setPaidByName] = useState(null)
+  useEffect(() => {
+    if (!settledDoc || !settledById) {
+      setPaidByName(null)
+      return undefined
+    }
+    let cancelled = false
+    void fetchPlatformUserName(settledById).then((name) => {
+      if (!cancelled) setPaidByName(name)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [settledDoc, settledById])
+
   // An open supply / return that this person may close: the focused pay dialog instead of the full details.
   const openToSettle = Boolean(
     !isPaymentDoc && canManage && operation?.settlement && !operation.settlement.settled && onSettle
@@ -290,6 +446,44 @@ export default function OperationDetailSheet({
     } finally {
       setUnmarking(false)
     }
+  }
+
+  if (settledDoc || platformPayDoc) {
+    const settlement = operation.settlement
+    const isReturn = settledDoc && settlement.type !== 'payable'
+    const docLabel =
+      kind === 'supply' || kind === 'return'
+        ? `${headerFromHistory.title}${operation?.documentNumber ? ` № ${operation.documentNumber}` : ''}`
+        : headerFromHistory.title
+    const rows = settledDoc
+      ? [
+          { label: 'Документ', value: docLabel },
+          { label: 'Сумма', value: formatUmagMoney(Math.abs(Number(operation.amount) || 0)) },
+          { label: isReturn ? 'Дата получения' : 'Дата оплаты', value: settlement.settledAt ? formatUmagDateTime(settlement.settledAt) : '—' },
+          { label: 'Счёт', value: getPaymentAccountName(settlement.accountId) || 'Без счёта' },
+          { label: 'Отметил', value: paidByName || '—' },
+        ]
+      : [
+          { label: 'Документ', value: docLabel },
+          { label: 'Сумма', value: formatUmagMoney(headerFromHistory.amount) },
+          { label: 'Дата', value: headerFromHistory.when ? formatUmagDateTime(headerFromHistory.when) : '—' },
+          { label: 'Счёт', value: headerFromHistory.account || '—' },
+          { label: 'Сотрудник', value: headerFromHistory.userName || '—' },
+        ]
+    return createPortal(
+      <PaymentLayer
+        rows={rows}
+        accounts={paymentAccounts}
+        accountId={settledDoc ? settlement.accountId : null}
+        canManage={settledDoc ? Boolean(canManage && onUnsettle) : canUnmark}
+        canChangeAccount={settledDoc && Boolean(onChangeAccount)}
+        kindLabel={isReturn ? 'return' : 'supply'}
+        onClose={onClose}
+        onChangeAccount={(accountId) => onChangeAccount?.(accountId)}
+        onCancelPayment={() => (settledDoc ? onUnsettle?.() : handleUnmark())}
+      />,
+      window.document.body
+    )
   }
 
   // Portalled to document.body — see the same note in

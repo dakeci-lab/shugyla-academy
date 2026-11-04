@@ -303,3 +303,132 @@
     padding-top: 16px;
   }
 }
+
+/* ---- The page «Платёж» of a paid document (read only; the pencil opens the edit mode) ---- */
+.umag-op-detail--layer {
+  width: min(520px, 100%);
+  padding: 0 0 16px;
+  overflow: auto;
+}
+
+.pay-layer__head {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  background: #fff;
+}
+
+.pay-layer__title {
+  margin: 0;
+  text-align: center;
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.pay-layer__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 50%;
+  background: var(--color-white, #fff);
+  color: var(--color-primary, #059669);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  cursor: pointer;
+}
+
+.pay-layer__icon--gap {
+  visibility: hidden;
+}
+
+.pay-layer__icon.is-on {
+  background: var(--color-primary, #059669);
+  color: #fff;
+}
+
+.pay-layer__card {
+  margin: 12px 16px 0;
+  padding: 12px 16px 6px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.pay-layer__section {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.pay-layer__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 9px 0;
+  font-size: 15px;
+}
+
+.pay-layer__row b {
+  font-weight: 500;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.pay-layer__edit {
+  padding-bottom: 14px;
+}
+
+.btn--danger-outline {
+  border: 1px solid #fca5a5;
+  background: #fff;
+  color: #b91c1c;
+  font-weight: 600;
+}
+
+.btn--danger-outline:hover:not(:disabled) {
+  background: #fef2f2;
+}
+
+@media (max-width: 640px) {
+  /* Phones: a layer over the whole screen (it looks like a page of its own, like UMAG's «Платёж»). */
+  .umag-op-detail__backdrop--layer {
+    /* above the page header of the phone (z-index 100): the layer is a page of its own */
+    z-index: 200;
+    padding: 0;
+    align-items: stretch;
+    background: var(--color-bg, #f1f5f9);
+  }
+
+  .umag-op-detail--layer {
+    width: 100%;
+    max-width: none;
+    max-height: none;
+    height: 100%;
+    border-radius: 0;
+    box-shadow: none;
+    background: var(--color-bg, #f1f5f9);
+  }
+
+  .pay-layer__head {
+    padding-top: calc(10px + env(safe-area-inset-top, 0px));
+  }
+
+  .pay-layer__card {
+    margin: 12px 0 0;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+
+  .umag-op-detail--layer .umag-op-detail__pay-actions .btn {
+    min-height: 48px;
+  }
+}

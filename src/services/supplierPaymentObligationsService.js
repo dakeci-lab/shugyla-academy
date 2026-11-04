@@ -219,6 +219,28 @@ export async function markObligationsPaid(obligations, options = {}, { onProgres
   return { paid, failed }
 }
 
+/**
+ * Change the account a supply was paid from (the «Изменить» of a paid document). Updates the mark and the text of the
+ * matching ledger event; the sum, the date and who marked it stay as they were.
+ */
+export async function updateObligationPaymentAccount(obligationId, accountId, { employeeName, accountName } = {}) {
+  assertCloudReady()
+  if (!obligationId) throw new Error('Обязательство не указано')
+  const { error } = await supabase
+    .from('supplier_payment_obligations')
+    .update({ platform_payment_account_id: accountId ?? null })
+    .eq('id', obligationId)
+  if (error) throw new Error(error.message || 'Не удалось изменить счёт оплаты')
+
+  const { error: ledgerError } = await supabase
+    .from('platform_supplier_ledger_events')
+    .update({ details: [employeeName, accountName].filter(Boolean).join(' · ') || null })
+    .eq('external_source', 'platform')
+    .eq('event_type', 'supplier_payment')
+    .eq('external_id', String(obligationId))
+  if (ledgerError) throw new Error(ledgerError.message || 'Не удалось обновить запись во взаиморасчётах')
+}
+
 export async function unmarkObligationPaid(obligationId) {
   assertCloudReady()
   if (!obligationId) throw new Error('Обязательство не указано')
@@ -261,6 +283,17 @@ export async function markReturnRefunded(returnId, { refundedByEmployeeId, accou
     })
     .eq('id', returnId)
   if (error) throw new Error(error.message || 'Не удалось отметить получение возврата')
+}
+
+/** Change the account a supplier's return money arrived on (the «Изменить» of a received return). */
+export async function updateReturnRefundAccount(returnId, accountId) {
+  assertCloudReady()
+  if (!returnId) throw new Error('Возврат не указан')
+  const { error } = await supabase
+    .from('umag_supply_returns')
+    .update({ platform_refund_account_id: accountId ?? null })
+    .eq('id', returnId)
+  if (error) throw new Error(error.message || 'Не удалось изменить счёт')
 }
 
 export async function unmarkReturnRefunded(returnId) {

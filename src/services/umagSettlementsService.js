@@ -159,6 +159,14 @@ function fail(code, message) {
   }
 }
 
+/** The name of a platform user (who marked a payment): one small read, null when unknown. */
+export async function fetchPlatformUserName(userId) {
+  if (!userId || !isSupabaseConfigured() || !supabase) return null
+  const { data, error } = await supabase.from('academy_users').select('full_name').eq('id', userId).maybeSingle()
+  if (error) return null
+  return data?.full_name || null
+}
+
 function toNumber(value) {
   const n = typeof value === 'number' ? value : Number(value)
   return Number.isFinite(n) ? n : 0
@@ -352,6 +360,8 @@ function buildSupplySettlement(obligation) {
     type: 'payable',
     settled: obligation.platform_paid_at != null,
     settledAt: obligation.platform_paid_at ?? null,
+    settledById: obligation.platform_paid_by ?? null,
+    accountId: obligation.platform_payment_account_id ?? null,
     obligationId: obligation.id,
     dueDate: obligation.due_date ?? null,
   }
@@ -414,6 +424,8 @@ export function buildSupplierOperationHistory(
         type: 'receivable',
         settled: ret.platform_refunded_at != null,
         settledAt: ret.platform_refunded_at ?? null,
+        settledById: ret.platform_refunded_by ?? null,
+        accountId: ret.platform_refund_account_id ?? null,
       },
       source: ret,
     })
@@ -514,7 +526,7 @@ async function attachSupplyObligations(supplies) {
       supabase
         .from('supplier_payment_obligations')
         .select(
-          'id, umag_supply_id, platform_supplier_id, original_supply_amount, due_date, is_source_deleted, platform_paid_at'
+          'id, umag_supply_id, platform_supplier_id, original_supply_amount, due_date, is_source_deleted, platform_paid_at, platform_paid_by, platform_payment_account_id'
         )
         .in('umag_supply_id', chunk)
     )
