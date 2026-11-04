@@ -64,4 +64,7 @@ assert.match(read('src/components/suppliers/settlements/UmagSettlementsPanel.css
 assert.match(read('src/components/platform/PlatformGridTable.css'), /\.pgt__row-main--button:active\s*\{\s*background: var\(--row-pressed-bg\)/)
 ok('a pressed row (touch) gets a soft grey (--row-pressed-bg), not the green of a ticked row; the same in the supplier card and in the lists')
 
+assert.match(read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx'), /onClick=\{isPhoneMain \? \(\) => setSelectedId\(s\.id\) : undefined\}\s*interactive=\{isPhoneMain\}/)
+ok('phones: a row of the «Расчёты» list is one tappable row (opens the card) and gets the same soft press highlight')
+
 console.log(`\nverify:mobile-supplier-card — ${checks} checks passed`)
