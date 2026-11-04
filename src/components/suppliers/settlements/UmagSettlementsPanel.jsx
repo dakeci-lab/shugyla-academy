@@ -85,9 +85,9 @@ import { formatDocumentGroupLabel } from '../../../utils/purchaseDocumentsList'
 import useInfiniteSlice from '../../../hooks/useInfiniteSlice'
 import ConfirmDialog from '../../admin/ConfirmDialog'
 import IconActionButton from '../../admin/IconActionButton'
-import { FilterIcon, PencilIcon } from '../../icons/PlatformIcons'
+import { CheckCheckIcon, CloseIcon, FilterIcon, PencilIcon } from '../../icons/PlatformIcons'
 import '../../admin/IconActionButton.css'
-import OperationDetailSheet from './OperationDetailSheet'
+import OperationDetailSheet, { BulkPayDialog } from './OperationDetailSheet'
 import PeriodFilterPopover, {
   getSettlementsPeriodDefaults,
   resolveSettlementsPeriodPreset,
@@ -142,8 +142,25 @@ function obligationFromOp(op, supplier) {
 }
 
 /** An unpaid supply can be ticked for «Оплатить выбранные» (returns are marked one by one). */
+/** A document that can be ticked for the mass payment: any unpaid one (a supply is paid out, a return is paid in). */
 function isBulkPayable(op, canManage) {
-  return Boolean(canManage && op.settlement?.type === 'payable' && !op.settlement.settled)
+  return Boolean(canManage && op.settlement && !op.settlement.settled)
+}
+
+/** Money out of the cash desk is plus, money coming back (a return) is minus: the total of a mixed selection is the net. */
+function signedPayAmount(op) {
+  const amount = Number(op.amount) || 0
+  return op.settlement?.type === 'payable' ? amount : -amount
+}
+
+/** 1 документ, 2–4 документа, 5+ документов (11–14 документов). */
+function pluralizeDocuments(count) {
+  const n = Math.abs(count) % 100
+  const last = n % 10
+  if (n > 10 && n < 20) return 'документов'
+  if (last === 1) return 'документ'
+  if (last >= 2 && last <= 4) return 'документа'
+  return 'документов'
 }
 
 /** Header checkbox of the selection column: checked / indeterminate / empty. */
@@ -193,6 +210,19 @@ const HISTORY_COLUMNS = [
  * Status column of a history row. Colour is for action only: an open document gets one outlined button
  * («Оплатить» / «Получили возврат»), a closed one a quiet check mark, UMAG payments nothing at all.
  */
+/** Phones: the bar of the selection — one green button with the number of documents and the net sum. */
+function BulkPayBar({ count, total, negative, onPay }) {
+  return createPortal(
+    <div className="sd-selbar" role="region" aria-label="Выбранные документы">
+      <button type="button" className="btn btn--primary" onClick={onPay}>
+        Оплатить · {count} · {negative ? '−' : ''}
+        {total}
+      </button>
+    </div>,
+    document.body
+  )
+}
+
 function OperationStatusCell({ op, canManage, onOpen }) {
   const settlement = op.settlement
   if (!settlement) return null
@@ -530,6 +560,7 @@ function UmagSupplierDetail({
   const [bulkAccountTouched, setBulkAccountTouched] = useState(false)
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false)
   const [bulkProgress, setBulkProgress] = useState(null)
+  const [bulkSheetOpen, setBulkSheetOpen] = useState(false)
   const selectableOps = useMemo(
     () => visibleOps.filter((op) => isBulkPayable(op, canManagePayments)),
     [visibleOps, canManagePayments]
@@ -539,7 +570,7 @@ function UmagSupplierDetail({
     () => selectableOps.filter((op) => selectedIds.has(op.id)),
     [selectableOps, selectedIds]
   )
-  const selectedTotal = selectedOps.reduce((sum, op) => sum + (Number(op.amount) || 0), 0)
+  const selectedTotal = selectedOps.reduce((sum, op) => sum + signedPayAmount(op), 0)
 
   useEffect(() => {
     if (bulkAccountTouched) return
@@ -594,27 +625,47 @@ function UmagSupplierDetail({
   async function handleBulkPay() {
     const accountId = bulkAccountId || null
     const ops = selectedOps
-    setBulkProgress({ done: 0, total: ops.length })
+    const total = ops.length
+    setBulkProgress({ done: 0, total })
     try {
-      const { paid, failed } = await markObligationsPaid(
-        ops.map((op) => obligationFromOp(op, supplier)),
-        {
-          paidByEmployeeId: user?.id ?? null,
-          accountId,
-          employeeName: user?.name ?? null,
-          accountName: getPaymentAccountName(accountId),
-        },
-        { onProgress: (done, total) => setBulkProgress({ done, total }) }
-      )
-      const paidOpIds = new Set(
-        ops.filter((op) => paid.includes(op.settlement.obligationId)).map((op) => op.id)
-      )
-      setSelectedIds((current) => new Set([...current].filter((id) => !paidOpIds.has(id))))
-      if (failed.length === 0) {
-        showSuccess?.(`Оплачено: ${paid.length} ${paid.length === 1 ? 'накладная' : 'накладных'}`)
+      const payables = ops.filter((op) => op.settlement.type === 'payable')
+      const refunds = ops.filter((op) => op.settlement.type !== 'payable')
+      const doneIds = new Set()
+      const failures = []
+      let done = 0
+      if (payables.length > 0) {
+        const { paid, failed } = await markObligationsPaid(
+          payables.map((op) => obligationFromOp(op, supplier)),
+          {
+            paidByEmployeeId: user?.id ?? null,
+            accountId,
+            employeeName: user?.name ?? null,
+            accountName: getPaymentAccountName(accountId),
+          },
+          { onProgress: (count) => setBulkProgress({ done: count, total }) }
+        )
+        for (const op of payables) if (paid.includes(op.settlement.obligationId)) doneIds.add(op.id)
+        failures.push(...failed)
+        done = payables.length
+      }
+      // Returns are paid one by one (money coming back: the account is the one it arrived on).
+      for (const op of refunds) {
+        try {
+          await markReturnRefunded(op.source?.id, { refundedByEmployeeId: user?.id ?? null, accountId })
+          doneIds.add(op.id)
+        } catch (err) {
+          failures.push({ message: err?.message || 'Не удалось отметить возврат' })
+        }
+        done += 1
+        setBulkProgress({ done, total })
+      }
+      setSelectedIds((current) => new Set([...current].filter((id) => !doneIds.has(id))))
+      if (failures.length === 0) {
+        showSuccess?.(`Оплачено: ${doneIds.size} ${pluralizeDocuments(doneIds.size)}`)
+        setBulkSheetOpen(false)
       } else {
         showError?.(
-          `Оплачено ${paid.length} из ${ops.length}. Не удалось отметить ${failed.length}: ${failed[0].message}. Они остались выбранными.`
+          `Оплачено ${doneIds.size} из ${total}. Не удалось отметить ${failures.length}: ${failures[0].message}. Они остались выбранными.`
         )
       }
       setReloadToken((token) => token + 1)
@@ -764,9 +815,88 @@ function UmagSupplierDetail({
   editRef.current = onEdit
   const canEditHere = Boolean(canEditSupplier && !supplier.isVirtual)
   const showFilterIcon = isPhoneList && canViewFinance && phoneTab === 'pay'
+  // Phones: a long press on an unpaid document starts the selection (the ticked row is the first one); while something
+  // is ticked the header shows «Выбрано: N» with «выбрать все» and «выйти», and the bottom bar pays them all at once.
+  const selecting = isPhoneList && phoneTab === 'pay' && selectedOps.length > 0
+  const selectAllRef = useRef(null)
+  selectAllRef.current = toggleSelectAll
+
+  // Long press (about half a second without moving the finger) on an unpaid document ticks it and starts the selection.
+  const pressRef = useRef({ timer: null, x: 0, y: 0, fired: false })
+  function cancelPress() {
+    if (pressRef.current.timer) clearTimeout(pressRef.current.timer)
+    pressRef.current.timer = null
+  }
+  function longPressHandlers(op, selectable) {
+    if (!isPhoneList || !selectable) return {}
+    return {
+      onPointerDown: (event) => {
+        cancelPress()
+        pressRef.current.fired = false
+        pressRef.current.x = event.clientX
+        pressRef.current.y = event.clientY
+        pressRef.current.timer = setTimeout(() => {
+          pressRef.current.timer = null
+          pressRef.current.fired = true
+          toggleSelected(op.id)
+          try {
+            navigator.vibrate?.(12)
+          } catch {
+            /* a phone without vibration: nothing to do */
+          }
+        }, 480)
+      },
+      onPointerMove: (event) => {
+        if (!pressRef.current.timer) return
+        if (Math.abs(event.clientX - pressRef.current.x) > 10 || Math.abs(event.clientY - pressRef.current.y) > 10) cancelPress()
+      },
+      onPointerUp: cancelPress,
+      onPointerCancel: cancelPress,
+      onPointerLeave: cancelPress,
+      // The system menu of a long press (copy / share) must not appear over the selection.
+      onContextMenu: (event) => event.preventDefault(),
+    }
+  }
+  /** A tap: while selecting it ticks / unticks an unpaid document; otherwise it opens the document. */
+  function handleRowTap(op, selectable) {
+    if (pressRef.current.fired) {
+      // The click that ends a long press must not open or untick the row.
+      pressRef.current.fired = false
+      return
+    }
+    if (selecting) {
+      if (selectable) toggleSelected(op.id)
+      return
+    }
+    setSelectedOperation(op)
+  }
+  // Leaving the «Платежи» page drops the selection (it would be invisible).
+  useEffect(() => {
+    if (phoneTab !== 'pay') setSelectedIds(new Set())
+  }, [phoneTab])
+  useEffect(() => cancelPress, [])
   const phoneActions = useMemo(
     () =>
-      isPhoneList ? (
+      selecting ? (
+        <>
+          <button
+            type="button"
+            className="platform-mobile-header__icon-btn umag-settlements__header-edit"
+            aria-label="Выбрать все неоплаченные"
+            onClick={() => selectAllRef.current?.()}
+          >
+            <CheckCheckIcon size={20} />
+          </button>
+          <button
+            type="button"
+            className="platform-mobile-header__icon-btn umag-settlements__header-edit"
+            aria-label="Выйти из выбора"
+            onClick={() => setSelectedIds(new Set())}
+          >
+            <CloseIcon size={20} />
+          </button>
+        </>
+      ) : isPhoneList ? (
         <>
           {showFilterIcon ? (
             <button
@@ -793,10 +923,10 @@ function UmagSupplierDetail({
           ) : null}
         </>
       ) : null,
-    [isPhoneList, showFilterIcon, filterCount, canEditHere]
+    [isPhoneList, showFilterIcon, filterCount, canEditHere, selecting]
   )
   // Phones: the supplier's name is the page title (the page above passes an empty title for a card).
-  usePlatformPageTitle(isPhoneList ? supplier.name : '', '', {
+  usePlatformPageTitle(isPhoneList ? (selecting ? `Выбрано: ${selectedOps.length}` : supplier.name) : '', '', {
     showBack: true,
     backFallback: '/platform/supplier-finance',
     actions: phoneActions,
@@ -1007,7 +1137,16 @@ function UmagSupplierDetail({
               </>
             )}
 
-            {isPhoneList && phoneTab === 'pay' && !detailLoading ? (
+            {selecting ? (
+              <BulkPayBar
+                count={selectedOps.length}
+                total={formatUmagMoney(Math.abs(selectedTotal))}
+                negative={selectedTotal < 0}
+                onPay={() => setBulkSheetOpen(true)}
+              />
+            ) : null}
+
+            {isPhoneList && phoneTab === 'pay' && !detailLoading && !selecting ? (
               <PlatformFloatingSearch
                 value={opsQuery}
                 onChange={setOpsQuery}
@@ -1045,6 +1184,8 @@ function UmagSupplierDetail({
                 <div className="sd-ops">
                   {opsInfinite.visible.map((op) => {
                     const sign = operationAmountSign(op)
+                    const selectable = isBulkPayable(op, canManagePayments)
+                    const picked = selectable && selectedIds.has(op.id)
                     const title =
                       op.kind === 'payment' || op.kind === 'refund' || !op.documentNumber
                         ? op.label
@@ -1055,7 +1196,17 @@ function UmagSupplierDetail({
                         ? describeDue(settlement.dueDate, todayKey)
                         : null
                     return (
-                      <button key={op.id} type="button" className="sd-op" onClick={() => setSelectedOperation(op)}>
+                      <button
+                        key={op.id}
+                        type="button"
+                        className={`sd-op${picked ? ' is-selected' : ''}${selecting && selectable ? ' is-selectable' : ''}${selecting && !selectable ? ' is-muted' : ''}`}
+                        aria-pressed={selecting && selectable ? picked : undefined}
+                        onClick={() => handleRowTap(op, selectable)}
+                        {...longPressHandlers(op, selectable)}
+                      >
+                        {selecting && selectable ? (
+                          <span className={`sd-op__tick${picked ? ' is-on' : ''}`} aria-hidden="true" />
+                        ) : null}
                         <span className="sd-op__l1">
                           <b>{title}</b>
                           <span className="sd-op__money">
@@ -1149,7 +1300,7 @@ function UmagSupplierDetail({
               )
             )}
 
-            {selectedOps.length > 0 ? (
+            {selectedOps.length > 0 && !isPhoneList ? (
               <div className="umag-settlements__bulk" role="region" aria-label="Оплата выбранных накладных">
                 <div className="umag-settlements__bulk-sum">
                   <strong>
@@ -1193,12 +1344,10 @@ function UmagSupplierDetail({
               </div>
             ) : null}
 
-            {bulkConfirmOpen ? (
+            {bulkConfirmOpen && !isPhoneList ? (
               <ConfirmDialog
-                title="Оплатить выбранные накладные?"
-                message={`Будет отмечено оплаченными: ${selectedOps.length} ${
-                  selectedOps.length === 1 ? 'накладная' : 'накладных'
-                } на сумму ${formatUmagMoney(selectedTotal)}. Счёт: ${
+                title="Оплатить выбранные документы?"
+                message={`Будет отмечено оплаченными: ${selectedOps.length} ${pluralizeDocuments(selectedOps.length)} на сумму ${formatUmagMoney(selectedTotal)}. Счёт: ${
                   bulkAccountId ? getPaymentAccountName(bulkAccountId) || 'выбранный' : 'без счёта'
                 }. Каждую оплату можно отменить в окне документа.${
                   bulkProgress ? ` Оплачено ${bulkProgress.done} из ${bulkProgress.total}…` : ''
@@ -1216,6 +1365,23 @@ function UmagSupplierDetail({
       </div>
       </div>
       </div>
+
+      {isPhoneList && bulkSheetOpen && selecting ? (
+        <BulkPayDialog
+          count={selectedOps.length}
+          total={formatUmagMoney(Math.abs(selectedTotal))}
+          negative={selectedTotal < 0}
+          accounts={paymentAccounts}
+          accountId={bulkAccountId}
+          onAccountChange={(value) => {
+            setBulkAccountTouched(true)
+            setBulkAccountId(value)
+          }}
+          progress={bulkProgress}
+          onPay={() => void handleBulkPay()}
+          onClose={() => (bulkProgress ? null : setBulkSheetOpen(false))}
+        />
+      ) : null}
 
       {selectedOperation ? (
         <OperationDetailSheet

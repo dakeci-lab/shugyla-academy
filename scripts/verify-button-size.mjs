@@ -63,7 +63,7 @@ for (const file of cssFiles) {
   }
 }
 // Known intentional exceptions: tabs, pagination arrows, avatar, phone-only sizes.
-const allowed = /mobile\.css|EmployeeEditModal|UmagSettlementsPanel\.css: \.(suppliers-modal-footer|umag-settlements__bulk)|ProcurementPlannerView|DocumentSupplierPicker|TablePagination|PlatformMobileHeader|PlatformSidebar|PlatformUserMenu|SalesShared|PlatformDesktopNav|AdminModal|PeriodFilterPopover|SupplierGoodsModal|SupplierGoodsPage|CatalogTable|ProcurementSupplierPlanBar|PurchaseDocumentPage|OperationDetailSheet|TeamManagementPage|PlatformSyncButton|FilterComboField|IconActionButton|ItemDetailSheet|PlatformGridTable|PullToRefresh|ProfilePage/
+const allowed = /mobile\.css|EmployeeEditModal|UmagSettlementsPanel\.css: \.(suppliers-modal-footer|umag-settlements__bulk|sd-selbar)|ProcurementPlannerView|DocumentSupplierPicker|TablePagination|PlatformMobileHeader|PlatformSidebar|PlatformUserMenu|SalesShared|PlatformDesktopNav|AdminModal|PeriodFilterPopover|SupplierGoodsModal|SupplierGoodsPage|CatalogTable|ProcurementSupplierPlanBar|PurchaseDocumentPage|OperationDetailSheet|TeamManagementPage|PlatformSyncButton|FilterComboField|IconActionButton|ItemDetailSheet|PlatformGridTable|PullToRefresh|ProfilePage/
 const real = offenders.filter((line) => !allowed.test(line))
 assert.deepEqual(real, [], 'a button class sets its own pixel height:\n' + real.join('\n'))
 ok('no page stylesheet gives a button its own fixed height (only the shared token decides)')

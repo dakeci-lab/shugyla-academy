@@ -38,7 +38,7 @@ assert.doesNotMatch(panel, /SupplierIdentityCard|← К списку поста�
 assert.match(panel, /className="sd-head"/)
 assert.match(panel, /Закрыть\s*<\/button>/)
 assert.match(panel, /Редактировать\s*<\/button>/)
-assert.match(panel, /usePlatformPageTitle\(isPhoneList \? supplier\.name : ''/)
+assert.match(panel, /usePlatformPageTitle\(isPhoneList \? \(selecting \? `Выбрано: \$\{selectedOps\.length\}` : supplier\.name\) : ''/)
 ok('the supplier page has a document header with «Закрыть» / «Редактировать» (no «← К списку»); phones get the back arrow of the header')
 assert.match(panel, /<div className="sd-bar">/)
 assert.match(panel, /umag-settlements__header-edit/)
@@ -64,7 +64,8 @@ assert.match(panel, /toolsSlot && listTools \? createPortal\(listTools, toolsSlo
 ok('the list chips and search sit in the same row as «Фильтр» and the UMAG refresh')
 
 assert.match(panel, /isPhoneList \? \(\s*<div className="sd-ops">/)
-assert.match(panel, /<button key=\{op\.id\} type="button" className="sd-op" onClick=\{\(\) => setSelectedOperation\(op\)\}>/)
+assert.match(panel, /<button\s+key=\{op\.id\}\s+type="button"\s+className=\{`sd-op\$\{picked/)
+assert.match(panel, /onClick=\{\(\) => handleRowTap\(op, selectable\)\}/)
 ok('phone operation rows: a tappable row — name + amount / date + overdue pill; payment is done in the operation window')
 
 console.log(`\nverify:settlements-like-purchases — ${checks} checks passed`)
