@@ -38,4 +38,11 @@ assert.match(picker, /docsup__tag">с собой</)
 assert.match(read('src/components/procurement/document/DocumentSupplierPicker.css'), /\.docsup__option\.is-with-goods/)
 ok('the supplier picker of a document shows them first, with a soft tint and the mark «с собой»')
 
+const page = read('src/pages/platform/procurement/SupplierGoodsPage.jsx')
+assert.match(page, /pickedByOrder = new Map\(\)/)
+assert.match(page, /pickedByOrder\.delete\(id\)/)
+assert.doesNotMatch(read('src/pages/platform/procurement/PurchaseDocumentPage.jsx'), /SupplierGoodsModal/)
+assert.match(read('src/App.jsx'), /path="procurement\/documents\/:id\/goods"/)
+ok('«Товары поставщика» is a page of its own (…/documents/:id/goods), the selection is remembered per document and cleared after «Добавить»')
+
 console.log(`\nverify:supplier-with-goods — ${checks} checks passed`)

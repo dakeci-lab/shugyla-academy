@@ -47,7 +47,7 @@ ok('search by name or barcode')
 assert.notEqual(catalogGroupKey('A'), catalogGroupKey('A', 'B'))
 ok('group keys do not collide')
 
-const modal = read('src/components/procurement/document/SupplierGoodsModal.jsx')
+const modal = read('src/pages/platform/procurement/SupplierGoodsPage.jsx')
 const table = read('src/components/procurement/document/CatalogTable.jsx')
 for (const label of ['Остаток', 'Запас/дн', 'Спрос/дн', 'Рек.', 'Цель дн', 'В пути', 'Заказ']) {
   assert.ok(table.includes(`>${label}</th>`), label)
@@ -78,7 +78,7 @@ assert.match(mig, /grant execute on function public\.procurement_refresh_supplie
 assert.doesNotMatch(mig.replace(/--.*$/gm, ''), /\bdrop\b|\bdelete\b/i)
 ok('migration: updates only the supplier\'s rows, recomputes only its plan, service role only, additive')
 assert.match(modal, /Добавить в документ \(\$\{picked\}\)/)
-assert.match(modal, /onDeliveryDate/)
+assert.match(modal, /saveDeliveryDate/)
 ok('«Добавить в документ (N)»; plan delivery date and document date stay in step')
 assert.match(modal, /fetchSnapshotItemsPage\(\{[^}]*platformSupplierId: supplierId/)
 ok('only the document supplier\'s products')

@@ -1,7 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
-import { can, PERMISSION_CODES } from '../../../config/permissions'
+import { usePlatformPageTitle } from '../../../context/PlatformPageTitleContext'
+import { can, canEditPurchase, PERMISSION_CODES } from '../../../config/permissions'
+import {
+  getPurchaseOrderById,
+  updatePurchaseOrder,
+  addPurchaseOrderItems,
+} from '../../../services/purchaseDataService'
+import { catalogProductToItem } from '../../../services/purchaseCatalogService'
 import {
   fetchLatestReadyProcurementSnapshot,
   fetchSnapshotItemsPage,
@@ -11,16 +19,23 @@ import {
 } from '../../../services/procurementPlanningService'
 import { buildPlannerWeekColumnLabels } from '../../../utils/procurementPlannerUx'
 import { filterCatalogItems, groupCatalogItems } from '../../../utils/purchaseCatalog'
-import { formatPurchaseAmount, formatPurchaseDate, calcLineTotal } from '../../../utils/purchaseData'
+import { formatPurchaseAmount, formatPurchaseDate, calcLineTotal, isOrderDraft } from '../../../utils/purchaseData'
 import useMediaQuery from '../../../hooks/useMediaQuery'
 import { toProcurementUserMessage } from '../../../utils/procurementErrors'
-import AdminModal from '../../admin/AdminModal'
-import PlatformSyncButton from '../../platform/PlatformSyncButton'
-import ProcurementSupplierPlanBar from '../ProcurementSupplierPlanBar'
-import CatalogTable from './CatalogTable'
-import './SupplierGoodsModal.css'
+import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
+import PlatformSyncButton from '../../../components/platform/PlatformSyncButton'
+import ProcurementSupplierPlanBar from '../../../components/procurement/ProcurementSupplierPlanBar'
+import CatalogTable from '../../../components/procurement/document/CatalogTable'
+import '../../../components/procurement/document/SupplierGoodsModal.css'
+import './SupplierGoodsPage.css'
 
 const PAGE = 1000
+
+/**
+ * What the buyer has ticked / typed on this page is kept per document while the app is open: leaving the page
+ * (back, a swipe, a tap in the menu) does not lose a long selection; adding the goods to the document clears it.
+ */
+const pickedByOrder = new Map()
 
 function formatSynced(value) {
   if (!value) return 'нет данных'
@@ -47,24 +62,25 @@ async function loadSupplierItems(snapshotId, supplierId) {
 }
 
 /**
- * «Товары поставщика» — the planning table of the document's supplier inside a window: weekly sales, stock,
- * demand, recommendation, target days and quantity to order. The plan bar (delivery date, safety stock, skip a visit)
- * recomputes the recommendation on the server; ticked rows go into the document with the «Заказ» quantity.
+ * «Товары поставщика» — the planning table of the document's supplier on a page of its own (it is the buyer's main
+ * working screen): weekly sales, stock, demand, recommendation, target days and the quantity to order. The plan bar
+ * (delivery date, safety stock, skip a visit) recomputes the recommendation on the server; ticked rows go into the
+ * document with the «Заказ» quantity. Address: /platform/procurement/documents/:id/goods.
  */
-export default function SupplierGoodsModal({
-  order,
-  existingBarcodes,
-  existingTotal = 0,
-  onAdd,
-  onDeliveryDate,
-  onClose,
-}) {
+export default function SupplierGoodsPage() {
+  const { id } = useParams()
+  const navigate = useNavigate()
   const { user } = useSession()
   const { error: showError, success: showSuccess } = useToast()
+  const canEdit = canEditPurchase(user)
   const canSync = can(user, PERMISSION_CODES.PROCUREMENT_EDIT)
-  const supplierId = order.supplierId
-
   const isPhone = useMediaQuery('(max-width: 640px)')
+  const documentPath = `/platform/procurement/documents/${id}`
+
+  const [order, setOrder] = useState(null)
+  const [orderLoading, setOrderLoading] = useState(true)
+  const supplierId = order?.supplierId || null
+
   const [snapshot, setSnapshot] = useState(null)
   const [plan, setPlan] = useState(null)
   const [items, setItems] = useState([])
@@ -74,10 +90,43 @@ export default function SupplierGoodsModal({
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(() => new Set())
-  const [selected, setSelected] = useState(() => new Set())
-  const [qtyEdits, setQtyEdits] = useState({})
+  const [selected, setSelected] = useState(() => new Set(pickedByOrder.get(id)?.selected || []))
+  const [qtyEdits, setQtyEdits] = useState(() => ({ ...(pickedByOrder.get(id)?.qtyEdits || {}) }))
   const [onlyOrder, setOnlyOrder] = useState(false)
   const [openAll, setOpenAll] = useState(false)
+
+  // Remember the selection for this document.
+  useEffect(() => {
+    pickedByOrder.set(id, { selected: [...selected], qtyEdits })
+  }, [id, selected, qtyEdits])
+
+  // The document: this page works on its supplier and its delivery date.
+  useEffect(() => {
+    let cancelled = false
+    setOrderLoading(true)
+    void getPurchaseOrderById(id)
+      .then((result) => {
+        if (!cancelled) setOrder(result)
+      })
+      .catch((error) => {
+        if (!cancelled) showError(toProcurementUserMessage(error, 'Не удалось загрузить заказ.'))
+      })
+      .finally(() => {
+        if (!cancelled) setOrderLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [id, showError])
+
+  const existingBarcodes = useMemo(
+    () => new Set((order?.items || []).map((row) => row.barcode).filter(Boolean)),
+    [order?.items]
+  )
+  const existingTotal = useMemo(
+    () => (order?.items || []).reduce((sum, row) => sum + calcLineTotal(row.orderQty, row.purchasePrice), 0),
+    [order?.items]
+  )
 
   const reload = useCallback(
     async (snap) => {
@@ -92,7 +141,23 @@ export default function SupplierGoodsModal({
     [supplierId]
   )
 
+  const saveDeliveryDate = useCallback(
+    async (value) => {
+      try {
+        const result = await updatePurchaseOrder(id, { expectedDeliveryDate: value })
+        if (result?.id) setOrder(result)
+      } catch {
+        /* the date is a convenience: a failed save must not break the page */
+      }
+    },
+    [id]
+  )
+
+  const deliveryRef = useRef(null)
+  deliveryRef.current = order?.expectedDeliveryDate || null
+
   useEffect(() => {
+    if (!supplierId) return undefined
     let cancelled = false
     void (async () => {
       try {
@@ -102,11 +167,11 @@ export default function SupplierGoodsModal({
         if (!snap?.id) return
         let current = await fetchProcurementSupplierPlan(snap.id, supplierId).catch(() => null)
         // The plan follows the document: its delivery date is the one the buyer already chose.
-        if (current && order.expectedDeliveryDate && current.deliveryDate !== order.expectedDeliveryDate) {
+        if (current && deliveryRef.current && current.deliveryDate !== deliveryRef.current) {
           current = await saveProcurementSupplierPlan({
             snapshotId: snap.id,
             supplierId,
-            deliveryDate: order.expectedDeliveryDate,
+            deliveryDate: deliveryRef.current,
             safetyDays: current.safetyDays,
             skipCycles: current.skipCycles,
             updatedBy: user?.login || user?.id || '',
@@ -116,8 +181,8 @@ export default function SupplierGoodsModal({
         if (cancelled) return
         setPlan(current)
         setItems(nextItems)
-        if (current?.deliveryDate && current.deliveryDate !== order.expectedDeliveryDate) {
-          onDeliveryDate?.(current.deliveryDate)
+        if (current?.deliveryDate && current.deliveryDate !== deliveryRef.current) {
+          void saveDeliveryDate(current.deliveryDate)
         }
       } catch (error) {
         if (!cancelled) showError(toProcurementUserMessage(error, 'Не удалось загрузить товары поставщика.'))
@@ -128,7 +193,7 @@ export default function SupplierGoodsModal({
     return () => {
       cancelled = true
     }
-    // The window is opened for one document and supplier.
+    // The page is opened for one document and supplier.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [supplierId])
 
@@ -228,7 +293,7 @@ export default function SupplierGoodsModal({
       setQtyEdits({})
       await reload(snapshot)
       setPlan(next)
-      if (next?.deliveryDate) onDeliveryDate?.(next.deliveryDate)
+      if (next?.deliveryDate) void saveDeliveryDate(next.deliveryDate)
     } catch (error) {
       showError(toProcurementUserMessage(error, 'Не удалось пересчитать план поставщика.'))
     } finally {
@@ -257,24 +322,36 @@ export default function SupplierGoodsModal({
   }
 
   async function handleAdd() {
-    const chosen = items
+    const rows = items
       .filter((item) => selected.has(item.barcode) && !existingBarcodes.has(item.barcode))
       .map((item) => ({ item, qty: Number(quantityOf(item)) || 0 }))
-    const ready = chosen.filter((row) => row.qty > 0)
-    if (!ready.length) {
+      .filter((row) => row.qty > 0)
+    if (!rows.length) {
       showError('Отметьте товары и укажите количество в столбце «Заказ».')
       return
     }
     setAdding(true)
     try {
-      await onAdd(ready)
-      onClose()
+      const payload = rows.map(({ item, qty }) => ({
+        ...catalogProductToItem(item, { orderQty: qty }),
+        supplierId: order.supplierId,
+        supplierName: order.supplierName,
+      }))
+      await addPurchaseOrderItems(order.id, payload)
+      pickedByOrder.delete(id)
+      showSuccess(`Добавлено товаров: ${payload.length}`)
+      navigate(documentPath)
     } catch (error) {
       showError(toProcurementUserMessage(error, 'Не удалось добавить товары.'))
     } finally {
       setAdding(false)
     }
   }
+
+  usePlatformPageTitle(order?.supplierName ? `Товары · ${order.supplierName}` : 'Товары поставщика', '', {
+    showBack: true,
+    backFallback: documentPath,
+  })
 
   const chosen = items.filter((item) => selected.has(item.barcode) && !existingBarcodes.has(item.barcode))
   const picked = chosen.length
@@ -283,33 +360,41 @@ export default function SupplierGoodsModal({
   const orderSum = existingTotal + pickedSum
   const shortToMin = min > 0 && orderSum < min ? min - orderSum : 0
 
+  if (!canEdit) return <PlatformAccessDenied title="Нет доступа к подбору товаров" />
+  if (orderLoading && !order) return <p className="sgm__hint">Загрузка…</p>
+  if (!order) return <p className="sgm__hint">Заказ не найден.</p>
+  if (!isOrderDraft(order)) {
+    return (
+      <div className="sgp">
+        <p className="sgm__hint">Товары можно подбирать только в черновике заказа.</p>
+        <button type="button" className="btn btn--outline" onClick={() => navigate(documentPath)}>
+          К заказу
+        </button>
+      </div>
+    )
+  }
+  if (!supplierId) {
+    return (
+      <div className="sgp">
+        <p className="sgm__hint">Сначала выберите поставщика в заказе.</p>
+        <button type="button" className="btn btn--outline" onClick={() => navigate(documentPath)}>
+          К заказу
+        </button>
+      </div>
+    )
+  }
+
   return (
-    <AdminModal
-      title={`Товары поставщика · ${order.supplierName}`}
-      onClose={onClose}
-      huge
-      footer={
-        <>
-          <div className="sgm__summary" aria-live="polite">
-            <span>
-              Выбрано: <b>{picked}</b> · <b>{formatPurchaseAmount(pickedSum)}</b>
-            </span>
-            {min > 0 ? (
-              <span className={shortToMin > 0 ? 'sgm__summary--warn' : ''}>
-                Минимальный заказ {formatPurchaseAmount(min)}
-                {shortToMin > 0 ? ` · не хватает ${formatPurchaseAmount(shortToMin)}` : ' · набран'}
-              </span>
-            ) : null}
-          </div>
-          <button type="button" className="btn btn--outline sgm__close" onClick={onClose}>
-            Закрыть
+    <div className="sgp">
+      {!isPhone ? (
+        <div className="sgp__head">
+          <button type="button" className="btn btn--outline" onClick={() => navigate(documentPath)}>
+            ← К заказу
           </button>
-          <button type="button" className="btn btn--primary" disabled={adding || picked === 0} onClick={() => void handleAdd()}>
-            {adding ? 'Добавление…' : `Добавить в документ (${picked})`}
-          </button>
-        </>
-      }
-    >
+          <h1 className="sgp__title">Товары поставщика · {order.supplierName}</h1>
+        </div>
+      ) : null}
+
       <div className="sgm">
         <div className="sgm__top">
           <input
@@ -331,11 +416,7 @@ export default function SupplierGoodsModal({
             {openAll || onlyOrder ? 'Свернуть всё' : 'Развернуть всё'}
           </button>
           <span className="sgm__spacer" />
-          {snapshot ? (
-            <span className="sgm__synced">
-              Остатки: {formatSynced(stockUpdatedAt)}
-            </span>
-          ) : null}
+          {snapshot ? <span className="sgm__synced">Остатки: {formatSynced(stockUpdatedAt)}</span> : null}
           {canSync ? (
             <PlatformSyncButton
               onClick={() => void handleRefreshStock()}
@@ -376,6 +457,23 @@ export default function SupplierGoodsModal({
           />
         )}
       </div>
-    </AdminModal>
+
+      <div className="sgp__bar" role="region" aria-label="Выбранные товары">
+        <div className="sgm__summary" aria-live="polite">
+          <span>
+            Выбрано: <b>{picked}</b> · <b>{formatPurchaseAmount(pickedSum)}</b>
+          </span>
+          {min > 0 ? (
+            <span className={shortToMin > 0 ? 'sgm__summary--warn' : ''}>
+              Минимальный заказ {formatPurchaseAmount(min)}
+              {shortToMin > 0 ? ` · не хватает ${formatPurchaseAmount(shortToMin)}` : ' · набран'}
+            </span>
+          ) : null}
+        </div>
+        <button type="button" className="btn btn--primary" disabled={adding || picked === 0} onClick={() => void handleAdd()}>
+          {adding ? 'Добавление…' : `Добавить в документ (${picked})`}
+        </button>
+      </div>
+    </div>
   )
 }

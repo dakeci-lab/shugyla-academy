@@ -37,6 +37,7 @@ const SupplierFinancePage = lazy(
 const PurchaseDocumentsPage = lazy(
   () => import('./pages/platform/procurement/PurchaseDocumentsPage')
 )
+const SupplierGoodsPage = lazy(() => import('./pages/platform/procurement/SupplierGoodsPage'))
 const PurchaseDocumentPage = lazy(
   () => import('./pages/platform/procurement/PurchaseDocumentPage')
 )
@@ -158,6 +159,14 @@ export default function App() {
                   element={
                     <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
                       <PurchaseDocumentPage />
+                    </PlatformRoute>
+                  }
+                />
+                <Route
+                  path="procurement/documents/:id/goods"
+                  element={
+                    <PlatformRoute routeKey={ROUTE_KEYS.PROCUREMENT}>
+                      <SupplierGoodsPage />
                     </PlatformRoute>
                   }
                 />
