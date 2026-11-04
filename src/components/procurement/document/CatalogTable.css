@@ -449,12 +449,19 @@
   background: var(--row-selected-bg);
 }
 
-.ctbl tbody tr.is-selected:hover td:not(.ctbl__week) {
-  background: var(--row-selected-hover);
+@media (hover: hover) {
+  .ctbl tbody tr.is-selected:hover td:not(.ctbl__week) {
+    background: var(--row-selected-hover);
+  }
 }
 
 @media (max-width: 640px) {
   .ctbl tbody tr.is-selected:not(.ctbl__group) {
     background: var(--row-selected-bg);
+  }
+
+  /* One green for the whole ticked row: the cells do not paint their own shade over it (that made a band). */
+  .ctbl tbody tr.is-selected:not(.ctbl__group) td:not(.ctbl__week) {
+    background: transparent;
   }
 }

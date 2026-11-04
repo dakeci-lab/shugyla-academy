@@ -37,6 +37,16 @@ const PAGE = 1000
  */
 const pickedByOrder = new Map()
 
+/** 1 товар, 2–4 товара, 5+ товаров (and 11–14 товаров). */
+function pluralizeGoods(count) {
+  const n = Math.abs(count) % 100
+  const last = n % 10
+  if (n > 10 && n < 20) return 'товаров'
+  if (last === 1) return 'товар'
+  if (last >= 2 && last <= 4) return 'товара'
+  return 'товаров'
+}
+
 function formatSynced(value) {
   if (!value) return 'нет данных'
   const date = new Date(value)
@@ -353,8 +363,11 @@ export default function SupplierGoodsPage() {
     backFallback: documentPath,
   })
 
-  const chosen = items.filter((item) => selected.has(item.barcode) && !existingBarcodes.has(item.barcode))
+  const ticked = items.filter((item) => selected.has(item.barcode) && !existingBarcodes.has(item.barcode))
+  // Only rows with a quantity go into the document, so only they are counted; a ticked row without one is flagged.
+  const chosen = ticked.filter((item) => (Number(quantityOf(item)) || 0) > 0)
   const picked = chosen.length
+  const withoutQty = ticked.length - picked
   const pickedSum = chosen.reduce((sum, item) => sum + calcLineTotal(Number(quantityOf(item)) || 0, item.purchasePrice), 0)
   const min = plan?.minOrderAmount > 0 ? plan.minOrderAmount : 0
   const orderSum = existingTotal + pickedSum
@@ -407,13 +420,13 @@ export default function SupplierGoodsPage() {
           />
           <label className="sgm__toggle">
             <input type="checkbox" checked={onlyOrder} onChange={(event) => setOnlyOrder(event.target.checked)} />
-            <span>Только к заказу ({toOrderCount})</span>
+            <span>{isPhone ? 'К заказу' : 'Только к заказу'} ({toOrderCount})</span>
           </label>
           <button type="button" className="btn btn--outline btn--sm" disabled={toOrderCount === 0} onClick={selectRecommended}>
-            Выбрать рекомендованные
+            {isPhone ? 'Рекомендованные' : 'Выбрать рекомендованные'}
           </button>
           <button type="button" className="btn btn--outline btn--sm" onClick={() => setOpenAll((value) => !value)}>
-            {openAll || onlyOrder ? 'Свернуть всё' : 'Развернуть всё'}
+            {openAll || onlyOrder ? 'Свернуть' : 'Развернуть'}{isPhone ? '' : ' всё'}
           </button>
           <span className="sgm__spacer" />
           {snapshot ? <span className="sgm__synced">Остатки: {formatSynced(stockUpdatedAt)}</span> : null}
@@ -441,6 +454,11 @@ export default function SupplierGoodsPage() {
           <p className="sgm__hint">Загрузка…</p>
         ) : !snapshot?.id ? (
           <p className="sgm__hint">Данных UMAG пока нет. Обновите их кнопкой справа.</p>
+        ) : items.length === 0 ? (
+          <p className="sgm__hint">
+            У поставщика нет товаров в последних данных UMAG.
+            {canSync ? ' Обновите остатки кнопкой справа или добавьте товары из номенклатуры в самом заказе.' : ''}
+          </p>
         ) : (
           <CatalogTable
             groups={groups}
@@ -460,9 +478,16 @@ export default function SupplierGoodsPage() {
 
       <div className="sgp__bar" role="region" aria-label="Выбранные товары">
         <div className="sgm__summary" aria-live="polite">
-          <span>
-            Выбрано: <b>{picked}</b> · <b>{formatPurchaseAmount(pickedSum)}</b>
-          </span>
+          {picked > 0 ? (
+            <span>
+              Выбрано: <b>{picked}</b> · <b>{formatPurchaseAmount(pickedSum)}</b>
+            </span>
+          ) : ticked.length === 0 ? (
+            <span className="sgm__summary--muted">Отметьте товары, которые нужно заказать</span>
+          ) : null}
+          {withoutQty > 0 ? (
+            <span className="sgm__summary--warn">Укажите количество: без него {withoutQty} {pluralizeGoods(withoutQty)}</span>
+          ) : null}
           {min > 0 ? (
             <span className={shortToMin > 0 ? 'sgm__summary--warn' : ''}>
               Минимальный заказ {formatPurchaseAmount(min)}
