@@ -24,6 +24,7 @@ import useMediaQuery from '../../../hooks/useMediaQuery'
 import { toProcurementUserMessage } from '../../../utils/procurementErrors'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
 import PlatformSyncButton from '../../../components/platform/PlatformSyncButton'
+import { RefreshIcon } from '../../../components/icons/PlatformIcons'
 import ProcurementSupplierPlanBar from '../../../components/procurement/ProcurementSupplierPlanBar'
 import CatalogTable from '../../../components/procurement/document/CatalogTable'
 import '../../../components/procurement/document/SupplierGoodsModal.css'
@@ -323,9 +324,31 @@ export default function SupplierGoodsPage() {
     }
   }
 
+  // Phones: the refresh of the stock is an icon in the top right of the page header (like the sync of «Поставщики»).
+  const syncRef = useRef(null)
+  syncRef.current = handleRefreshStock
+  const headerActions = useMemo(
+    () =>
+      isPhone && canSync && snapshot?.id ? (
+        <button
+          type="button"
+          className={`platform-mobile-header__icon-btn${syncing ? ' sgp-header-sync--busy' : ''}`}
+          aria-label="Обновить остатки поставщика"
+          aria-busy={syncing || undefined}
+          disabled={syncing}
+          onClick={() => void syncRef.current?.()}
+        >
+          <span className={`platform-sync-button__icon${syncing ? ' platform-sync-button__icon--spinning' : ''}`} aria-hidden="true">
+            <RefreshIcon size={20} />
+          </span>
+        </button>
+      ) : null,
+    [isPhone, canSync, snapshot?.id, syncing]
+  )
   usePlatformPageTitle(order?.supplierName ? `Товары · ${order.supplierName}` : 'Товары поставщика', '', {
     showBack: true,
     backFallback: documentPath,
+    actions: headerActions,
   })
 
   const chosen = items.filter((item) => !existingBarcodes.has(item.barcode) && (Number(quantityOf(item)) || 0) > 0)
@@ -392,7 +415,7 @@ export default function SupplierGoodsPage() {
           </button>
           <span className="sgm__spacer" />
           {snapshot ? <span className="sgm__synced">Остатки: {formatSynced(stockUpdatedAt)}</span> : null}
-          {canSync ? (
+          {canSync && !isPhone ? (
             <PlatformSyncButton
               onClick={() => void handleRefreshStock()}
               syncing={syncing}
@@ -445,7 +468,7 @@ export default function SupplierGoodsPage() {
               Выбрано: <b>{picked}</b> · <b>{formatPurchaseAmount(pickedSum)}</b>
             </span>
           ) : (
-            <span className="sgm__summary--muted">Укажите количество у товаров, которые нужно заказать</span>
+            <span className="sgm__summary--muted">Укажите количество у нужных товаров</span>
           )}
           {min > 0 ? (
             <span className={shortToMin > 0 ? 'sgm__summary--warn' : ''}>
