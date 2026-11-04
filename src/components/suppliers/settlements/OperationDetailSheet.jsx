@@ -330,6 +330,77 @@ function PaymentLayer({ rows, accounts, accountId, canManage, canChangeAccount, 
   )
 }
 
+/** 1 документ, 2–4 документа, 5+ документов (11–14 документов). */
+function pluralizeDocs(count) {
+  const n = Math.abs(count) % 100
+  const last = n % 10
+  if (n > 10 && n < 20) return 'документов'
+  if (last === 1) return 'документ'
+  if (last >= 2 && last <= 4) return 'документа'
+  return 'документов'
+}
+
+/**
+ * The same payment window as for one document, for the documents ticked on a phone: only the number and the net
+ * sum (the documents are already seen ticked in the list) and the account everything is paid from.
+ */
+export function BulkPayDialog({ count, total, negative = false, accounts, accountId, onAccountChange, progress, onPay, onClose }) {
+  const busy = progress != null
+  return createPortal(
+    <div className="umag-op-detail__backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="umag-op-detail"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Оплата выбранных документов"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="umag-op-detail__head">
+          <div>
+            <h3 className="umag-op-detail__title">
+              Оплата · {count} {pluralizeDocs(count)}
+            </h3>
+          </div>
+          <button type="button" className="umag-op-detail__close" onClick={onClose} aria-label="Закрыть" disabled={busy}>
+            ×
+          </button>
+        </div>
+
+        <div className="umag-op-detail__pay-amount">
+          <strong>
+            {negative ? '−' : ''}
+            {total}
+          </strong>
+        </div>
+
+        <label className="umag-op-detail__pay-field">
+          <span>Счёт оплаты</span>
+          <select
+            className="umag-op-detail__settle-account"
+            value={accountId}
+            onChange={(event) => onAccountChange(event.target.value)}
+            disabled={busy}
+          >
+            <option value="">Без счёта</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="umag-op-detail__pay-actions">
+          <button type="button" className="btn btn--primary" disabled={busy} onClick={onPay}>
+            {busy ? `Оплачено ${progress.done} из ${progress.total}…` : 'Оплатить'}
+          </button>
+        </div>
+      </div>
+    </div>,
+    window.document.body
+  )
+}
+
 export default function OperationDetailSheet({
   operation,
   supplierName,

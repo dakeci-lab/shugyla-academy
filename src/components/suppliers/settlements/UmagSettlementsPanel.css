@@ -1187,3 +1187,71 @@
   background: #eef1f5;
   color: var(--color-text-secondary, #475569);
 }
+
+/* ---- Phones: selection of documents for the mass payment (a long press starts it) ---- */
+.sd-op {
+  -webkit-touch-callout: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.sd-op.is-selectable {
+  position: relative;
+  padding-left: 52px;
+}
+
+.sd-op__tick {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
+  border: 2px solid var(--color-border-strong, #94a3b8);
+  border-radius: 6px;
+  background: #fff;
+}
+
+.sd-op__tick.is-on {
+  border-color: var(--color-primary, #059669);
+  background: var(--color-primary, #059669);
+}
+
+.sd-op__tick.is-on::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  top: 2px;
+  width: 6px;
+  height: 11px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.sd-op.is-selected {
+  background: var(--row-selected-bg);
+}
+
+.sd-op.is-muted {
+  opacity: 0.45;
+}
+
+.sd-selbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 39;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-white, #fff);
+  box-shadow: 0 -2px 8px rgba(15, 23, 42, 0.06);
+}
+
+.sd-selbar .btn {
+  width: 100%;
+  min-height: 48px;
+  font-size: 16px;
+  justify-content: center;
+}
