@@ -30,6 +30,8 @@
   /* A ticked row of a list (like UMAG: clearly green, not a faint tint). */
   --row-selected-bg: #d1fae5;
   --row-selected-hover: #bbf7d0;
+  /* A row while it is being pressed (touch): a soft neutral grey, not the green of a ticked row. */
+  --row-pressed-bg: #eef1f5;
   /* Desktop chrome: sidebar brand row + main topbar share one height */
   --platform-topbar-height: 56px;
   --platform-modal-backdrop: rgba(0, 0, 0, 0.4);

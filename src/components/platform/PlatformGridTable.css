@@ -67,6 +67,12 @@
 
 .pgt__row-main--button {
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.12s ease;
+}
+
+.pgt__row-main--button:active {
+  background: var(--row-pressed-bg);
 }
 
 .pgt__row-main--button:focus-visible {
