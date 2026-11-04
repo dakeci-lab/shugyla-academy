@@ -214,9 +214,15 @@ const HISTORY_COLUMNS = [
 function BulkPayBar({ count, total, negative, onPay }) {
   return createPortal(
     <div className="sd-selbar" role="region" aria-label="Выбранные документы">
-      <button type="button" className="btn btn--primary" onClick={onPay}>
-        Оплатить · {count} · {negative ? '−' : ''}
-        {total}
+      <button type="button" className="btn btn--primary" disabled={count === 0} onClick={onPay}>
+        {count === 0 ? (
+          'Оплатить'
+        ) : (
+          <>
+            Оплатить · {count} · {negative ? '−' : ''}
+            {total}
+          </>
+        )}
       </button>
     </div>,
     document.body
@@ -561,6 +567,8 @@ function UmagSupplierDetail({
   const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false)
   const [bulkProgress, setBulkProgress] = useState(null)
   const [bulkSheetOpen, setBulkSheetOpen] = useState(false)
+  // Phones: the selection mode is its own state — «select all» pressed twice leaves it with nothing ticked, only «×» exits.
+  const [selectMode, setSelectMode] = useState(false)
   const selectableOps = useMemo(
     () => visibleOps.filter((op) => isBulkPayable(op, canManagePayments)),
     [visibleOps, canManagePayments]
@@ -663,6 +671,7 @@ function UmagSupplierDetail({
       if (failures.length === 0) {
         showSuccess?.(`Оплачено: ${doneIds.size} ${pluralizeDocuments(doneIds.size)}`)
         setBulkSheetOpen(false)
+        setSelectMode(false)
       } else {
         showError?.(
           `Оплачено ${doneIds.size} из ${total}. Не удалось отметить ${failures.length}: ${failures[0].message}. Они остались выбранными.`
@@ -817,7 +826,7 @@ function UmagSupplierDetail({
   const showFilterIcon = isPhoneList && canViewFinance && phoneTab === 'pay'
   // Phones: a long press on an unpaid document starts the selection (the ticked row is the first one); while something
   // is ticked the header shows «Выбрано: N» with «выбрать все» and «выйти», and the bottom bar pays them all at once.
-  const selecting = isPhoneList && phoneTab === 'pay' && selectedOps.length > 0
+  const selecting = isPhoneList && phoneTab === 'pay' && selectMode
   const selectAllRef = useRef(null)
   selectAllRef.current = toggleSelectAll
 
@@ -838,6 +847,7 @@ function UmagSupplierDetail({
         pressRef.current.timer = setTimeout(() => {
           pressRef.current.timer = null
           pressRef.current.fired = true
+          setSelectMode(true)
           toggleSelected(op.id)
           try {
             navigator.vibrate?.(12)
@@ -872,9 +882,16 @@ function UmagSupplierDetail({
   }
   // Leaving the «Платежи» page drops the selection (it would be invisible).
   useEffect(() => {
-    if (phoneTab !== 'pay') setSelectedIds(new Set())
+    if (phoneTab !== 'pay') {
+      setSelectedIds(new Set())
+      setSelectMode(false)
+    }
   }, [phoneTab])
   useEffect(() => cancelPress, [])
+  // The payment window belongs to a non-empty selection: it never stays «open» behind an exited / emptied one.
+  useEffect(() => {
+    if (!selecting || selectedOps.length === 0) setBulkSheetOpen(false)
+  }, [selecting, selectedOps.length])
   const phoneActions = useMemo(
     () =>
       selecting ? (
@@ -891,7 +908,10 @@ function UmagSupplierDetail({
             type="button"
             className="platform-mobile-header__icon-btn umag-settlements__header-edit"
             aria-label="Выйти из выбора"
-            onClick={() => setSelectedIds(new Set())}
+            onClick={() => {
+              setSelectedIds(new Set())
+              setSelectMode(false)
+            }}
           >
             <CloseIcon size={20} />
           </button>
@@ -1366,7 +1386,7 @@ function UmagSupplierDetail({
       </div>
       </div>
 
-      {isPhoneList && bulkSheetOpen && selecting ? (
+      {isPhoneList && bulkSheetOpen && selecting && selectedOps.length > 0 ? (
         <BulkPayDialog
           count={selectedOps.length}
           total={formatUmagMoney(Math.abs(selectedTotal))}
