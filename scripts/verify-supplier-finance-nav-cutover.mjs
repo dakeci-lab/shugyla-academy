@@ -42,7 +42,7 @@ async function main() {
   // Case 1 — single new nav item
   assert.match(groupBlock, /id:\s*'supplier-finance'/)
   assert.match(groupBlock, /path:\s*'\/platform\/supplier-finance'/)
-  assert.match(groupBlock, /label:\s*'Расчёты'/)
+  assert.match(groupBlock, /label:\s*'Поставщики'/)
   assert.match(groupBlock, /routeKey:\s*ROUTE_KEYS\.SUPPLIER_FINANCE/)
   ok('Case 1: «Расчёты» nav item uses ROUTE_KEYS.SUPPLIER_FINANCE → /platform/supplier-finance')
 

@@ -16,7 +16,7 @@ export default function SupplierFinancePage() {
   const { user } = useSession()
 
   if (!canViewUmagSettlements(user)) {
-    return <PlatformAccessDenied title="Нет доступа к разделу «Расчёты»" />
+    return <PlatformAccessDenied title="Нет доступа к разделу «Поставщики»" />
   }
 
   return (
