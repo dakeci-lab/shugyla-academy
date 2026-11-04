@@ -4,6 +4,12 @@ import useMediaQuery from '../../../hooks/useMediaQuery'
 import { catalogGroupKey } from '../../../utils/purchaseCatalog'
 import './CatalogTable.css'
 
+/** UMAG names often start with the article code («4870006632064 Хлеб «Firkan»…»): on a phone the code goes to the grey line. */
+function splitLeadingCode(name) {
+  const match = /^(\d{4,})\s+(.+)$/.exec(String(name || '').trim())
+  return match ? { code: match[1], title: match[2] } : { code: '', title: String(name || '') }
+}
+
 const num = (value, digits = 0) =>
   Number.isFinite(Number(value))
     ? Number(value).toLocaleString('ru-RU', { maximumFractionDigits: digits, minimumFractionDigits: 0 })
@@ -68,10 +74,13 @@ export default function CatalogTable({
     const weekMax = Math.max(0, ...(item.weeklySales || []).map((v) => Number(v) || 0))
     const rowKey = item.barcode || item.id
     const showDetail = isPhone && detailOpen.has(rowKey)
+    const { code: nameCode, title: nameTitle } = isPhone ? splitLeadingCode(item.productName) : { code: '', title: item.productName }
+    // Rows that need action (a recommendation, or a quantity already typed) read first: their name is heavier.
+    const isTodo = !disabled && (item.recommendedQty > 0 || selected.has(item.barcode))
     return (
       <FragmentRows key={rowKey}>
       <tr
-        className={`${disabled ? 'is-disabled' : ''}${!disabled && selected.has(item.barcode) ? ' is-selected' : ''}${reserveTone ? ` ctbl__row--${reserveTone}` : ''}`}
+        className={`${disabled ? 'is-disabled' : ''}${!disabled && selected.has(item.barcode) ? ' is-selected' : ''}${reserveTone ? ` ctbl__row--${reserveTone}` : ''}${isTodo ? ' ctbl__row--todo' : ''}`}
         title={reason || undefined}
       >
         {showChecks ? (
@@ -87,7 +96,7 @@ export default function CatalogTable({
         ) : null}
         <td className="num ctbl__hide-m">{rowNumber}</td>
         <td className="ctbl__name" onClick={isPhone ? () => toggleDetail(rowKey) : undefined}>
-          <span title={item.productName}>{item.productName}</span>
+          <span title={item.productName}>{nameTitle}</span>
         </td>
         {weekLabels.map((label, index) => {
           const value = Number(item.weeklySales?.[index]) || 0
@@ -121,6 +130,7 @@ export default function CatalogTable({
         <td className="r num ctbl__hide-m">{item.targetDays == null ? '—' : num(item.targetDays)}</td>
         <td className="r num ctbl__hide-m">{item.inTransitQty ? num(item.inTransitQty) : ''}</td>
         <td className="ctbl__c-meta">
+          {nameCode ? <span className="ctbl__code">{nameCode} · </span> : null}
           Остаток {num(item.rawStock)}
           {reserve == null ? '' : ` · запас ${reserve} дн`}
           {item.recommendedQty > 0 ? ` · рек. ${num(item.recommendedQty)}` : ''}
