@@ -91,3 +91,12 @@
     font-size: 12px;
   }
 }
+
+/* Phone: the plan line is one line («Доставка 05.11 · цель 9 дн.»). */
+@media (max-width: 640px) {
+  .sgp .sgm__plan > summary {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

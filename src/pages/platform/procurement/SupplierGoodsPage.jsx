@@ -32,19 +32,15 @@ import './SupplierGoodsPage.css'
 const PAGE = 1000
 
 /**
- * What the buyer has ticked / typed on this page is kept per document while the app is open: leaving the page
+ * What the buyer has typed on this page is kept per document while the app is open: leaving the page
  * (back, a swipe, a tap in the menu) does not lose a long selection; adding the goods to the document clears it.
+ * A row is picked by a quantity above zero — there are no ticks.
  */
 const pickedByOrder = new Map()
 
-/** 1 товар, 2–4 товара, 5+ товаров (and 11–14 товаров). */
-function pluralizeGoods(count) {
-  const n = Math.abs(count) % 100
-  const last = n % 10
-  if (n > 10 && n < 20) return 'товаров'
-  if (last === 1) return 'товар'
-  if (last >= 2 && last <= 4) return 'товара'
-  return 'товаров'
+/** «05.11» from a date: the plan line must fit on one line of a phone. */
+function formatPurchaseDay(value) {
+  return String(formatPurchaseDate(value) || '').replace(/\.\d{4}$/, '')
 }
 
 function formatSynced(value) {
@@ -74,7 +70,7 @@ async function loadSupplierItems(snapshotId, supplierId) {
 /**
  * «Товары поставщика» — the planning table of the document's supplier on a page of its own (it is the buyer's main
  * working screen): weekly sales, stock, demand, recommendation, target days and the quantity to order. The plan bar
- * (delivery date, safety stock, skip a visit) recomputes the recommendation on the server; ticked rows go into the
+ * (delivery date, safety stock, skip a visit) recomputes the recommendation on the server; rows with a quantity go into the
  * document with the «Заказ» quantity. Address: /platform/procurement/documents/:id/goods.
  */
 export default function SupplierGoodsPage() {
@@ -100,15 +96,14 @@ export default function SupplierGoodsPage() {
   const [adding, setAdding] = useState(false)
   const [search, setSearch] = useState('')
   const [expanded, setExpanded] = useState(() => new Set())
-  const [selected, setSelected] = useState(() => new Set(pickedByOrder.get(id)?.selected || []))
   const [qtyEdits, setQtyEdits] = useState(() => ({ ...(pickedByOrder.get(id)?.qtyEdits || {}) }))
   const [onlyOrder, setOnlyOrder] = useState(false)
   const [openAll, setOpenAll] = useState(false)
 
   // Remember the selection for this document.
   useEffect(() => {
-    pickedByOrder.set(id, { selected: [...selected], qtyEdits })
-  }, [id, selected, qtyEdits])
+    pickedByOrder.set(id, { qtyEdits })
+  }, [id, qtyEdits])
 
   // The document: this page works on its supplier and its delivery date.
   useEffect(() => {
@@ -228,23 +223,19 @@ export default function SupplierGoodsPage() {
   }, [items, snapshot?.syncedAt])
   const groups = useMemo(() => groupCatalogItems(visible), [visible])
 
-  // The recommendation is only a hint until the row is ticked; ticking takes it as the quantity.
-  const quantityOf = (item) => {
-    if (item.barcode in qtyEdits) return qtyEdits[item.barcode]
-    return selected.has(item.barcode) && item.recommendedQty > 0 ? String(item.recommendedQty) : ''
-  }
+  // A row is picked when it has a quantity; the recommendation is only a hint (the placeholder) until it is typed or taken.
+  const quantityOf = (item) => qtyEdits[item.barcode] ?? ''
+  const selected = useMemo(
+    () => new Set(items.filter((item) => (Number(qtyEdits[item.barcode]) || 0) > 0).map((item) => item.barcode)),
+    [items, qtyEdits]
+  )
 
-  /** One click: every row with a recommendation is ticked and takes the recommended quantity. */
+  /** One click: every row with a recommendation takes the recommended quantity. */
   function selectRecommended() {
     const rows = items.filter((item) => item.recommendedQty > 0 && !existingBarcodes.has(item.barcode))
     setQtyEdits((current) => {
       const next = { ...current }
-      for (const item of rows) delete next[item.barcode]
-      return next
-    })
-    setSelected((current) => {
-      const next = new Set(current)
-      for (const item of rows) next.add(item.barcode)
+      for (const item of rows) next[item.barcode] = String(item.recommendedQty)
       return next
     })
   }
@@ -258,34 +249,8 @@ export default function SupplierGoodsPage() {
     })
   }
 
-  function toggleItem(item) {
-    setSelected((current) => {
-      const next = new Set(current)
-      if (next.has(item.barcode)) next.delete(item.barcode)
-      else next.add(item.barcode)
-      return next
-    })
-  }
-
-  function toggleMany(list, on) {
-    setSelected((current) => {
-      const next = new Set(current)
-      for (const item of list) {
-        if (on) next.add(item.barcode)
-        else next.delete(item.barcode)
-      }
-      return next
-    })
-  }
-
   function changeQuantity(item, value) {
     setQtyEdits((current) => ({ ...current, [item.barcode]: value }))
-    setSelected((current) => {
-      const next = new Set(current)
-      if (Number(value) > 0) next.add(item.barcode)
-      else next.delete(item.barcode)
-      return next
-    })
   }
 
   async function handlePlanChange(patch) {
@@ -333,11 +298,11 @@ export default function SupplierGoodsPage() {
 
   async function handleAdd() {
     const rows = items
-      .filter((item) => selected.has(item.barcode) && !existingBarcodes.has(item.barcode))
+      .filter((item) => !existingBarcodes.has(item.barcode))
       .map((item) => ({ item, qty: Number(quantityOf(item)) || 0 }))
       .filter((row) => row.qty > 0)
     if (!rows.length) {
-      showError('Отметьте товары и укажите количество в столбце «Заказ».')
+      showError('Укажите количество в столбце «Заказ» хотя бы у одного товара.')
       return
     }
     setAdding(true)
@@ -363,11 +328,8 @@ export default function SupplierGoodsPage() {
     backFallback: documentPath,
   })
 
-  const ticked = items.filter((item) => selected.has(item.barcode) && !existingBarcodes.has(item.barcode))
-  // Only rows with a quantity go into the document, so only they are counted; a ticked row without one is flagged.
-  const chosen = ticked.filter((item) => (Number(quantityOf(item)) || 0) > 0)
+  const chosen = items.filter((item) => !existingBarcodes.has(item.barcode) && (Number(quantityOf(item)) || 0) > 0)
   const picked = chosen.length
-  const withoutQty = ticked.length - picked
   const pickedSum = chosen.reduce((sum, item) => sum + calcLineTotal(Number(quantityOf(item)) || 0, item.purchasePrice), 0)
   const min = plan?.minOrderAmount > 0 ? plan.minOrderAmount : 0
   const orderSum = existingTotal + pickedSum
@@ -442,8 +404,7 @@ export default function SupplierGoodsPage() {
         {isPhone && plan ? (
           <details className="sgm__plan">
             <summary>
-              План поставки · цель запаса {plan.targetDays} дн.
-              {plan.deliveryDate ? ` · доставка ${formatPurchaseDate(plan.deliveryDate)}` : ''}
+              {plan.deliveryDate ? `Доставка ${formatPurchaseDay(plan.deliveryDate)} · ` : ''}цель {plan.targetDays} дн.
             </summary>
             <ProcurementSupplierPlanBar plan={plan} supplierName={order.supplierName} saving={planSaving} showMinimum={false} onChange={handlePlanChange} />
           </details>
@@ -467,8 +428,9 @@ export default function SupplierGoodsPage() {
             expandAll={searching || onlyOrder || openAll}
             onToggleGroup={toggleGroup}
             selected={selected}
-            onToggleItem={toggleItem}
-            onToggleMany={toggleMany}
+            showChecks={false}
+            onToggleItem={() => {}}
+            onToggleMany={() => {}}
             quantityOf={quantityOf}
             onQuantity={changeQuantity}
             inDocument={existingBarcodes}
@@ -482,12 +444,9 @@ export default function SupplierGoodsPage() {
             <span>
               Выбрано: <b>{picked}</b> · <b>{formatPurchaseAmount(pickedSum)}</b>
             </span>
-          ) : ticked.length === 0 ? (
-            <span className="sgm__summary--muted">Отметьте товары, которые нужно заказать</span>
-          ) : null}
-          {withoutQty > 0 ? (
-            <span className="sgm__summary--warn">Укажите количество: без него {withoutQty} {pluralizeGoods(withoutQty)}</span>
-          ) : null}
+          ) : (
+            <span className="sgm__summary--muted">Укажите количество у товаров, которые нужно заказать</span>
+          )}
           {min > 0 ? (
             <span className={shortToMin > 0 ? 'sgm__summary--warn' : ''}>
               Минимальный заказ {formatPurchaseAmount(min)}
