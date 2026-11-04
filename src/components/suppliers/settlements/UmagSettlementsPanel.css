@@ -644,8 +644,13 @@
   border-bottom: none;
 }
 
+.sd-op {
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.12s ease;
+}
+
 .sd-op:active {
-  background: var(--row-selected-bg);
+  background: var(--row-pressed-bg);
 }
 
 .sd-op__gap {

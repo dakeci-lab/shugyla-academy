@@ -59,4 +59,9 @@ assert.match(sheet, /openToSettle \? \(\s*<PayDialog/)
 assert.match(sheetCss, /\.umag-op-detail__backdrop\s*\{[^}]*align-items: center/)
 ok('the payment window of an open document is a centred dialog: document, big sum, deadline, account, «Оплатить» / «Отмена»; no UMAG employee / account')
 
+assert.match(read('src/index.css'), /--row-pressed-bg: #eef1f5/)
+assert.match(read('src/components/suppliers/settlements/UmagSettlementsPanel.css'), /\.sd-op:active\s*\{\s*background: var\(--row-pressed-bg\)/)
+assert.match(read('src/components/platform/PlatformGridTable.css'), /\.pgt__row-main--button:active\s*\{\s*background: var\(--row-pressed-bg\)/)
+ok('a pressed row (touch) gets a soft grey (--row-pressed-bg), not the green of a ticked row; the same in the supplier card and in the lists')
+
 console.log(`\nverify:mobile-supplier-card — ${checks} checks passed`)
