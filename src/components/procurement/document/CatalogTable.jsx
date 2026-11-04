@@ -28,6 +28,7 @@ export default function CatalogTable({
   onQuantity,
   inDocument,
   disabledReason,
+  showChecks = true,
 }) {
   // Group headers must be exactly as wide as the visible part of the table: a sticky element wider than that
   // is pushed out of view again once the table is scrolled far to the right.
@@ -73,15 +74,17 @@ export default function CatalogTable({
         className={`${disabled ? 'is-disabled' : ''}${!disabled && selected.has(item.barcode) ? ' is-selected' : ''}${reserveTone ? ` ctbl__row--${reserveTone}` : ''}`}
         title={reason || undefined}
       >
-        <td className="ctbl__c-check">
-          <input
-            type="checkbox"
-            aria-label={`Выбрать «${item.productName}»`}
-            checked={disabled ? inDoc : selected.has(item.barcode)}
-            disabled={disabled}
-            onChange={() => onToggleItem(item)}
-          />
-        </td>
+        {showChecks ? (
+          <td className="ctbl__c-check">
+            <input
+              type="checkbox"
+              aria-label={`Выбрать «${item.productName}»`}
+              checked={disabled ? inDoc : selected.has(item.barcode)}
+              disabled={disabled}
+              onChange={() => onToggleItem(item)}
+            />
+          </td>
+        ) : null}
         <td className="num ctbl__hide-m">{rowNumber}</td>
         <td className="ctbl__name" onClick={isPhone ? () => toggleDetail(rowKey) : undefined}>
           <span title={item.productName}>{item.productName}</span>
@@ -138,7 +141,7 @@ export default function CatalogTable({
       </tr>
       {showDetail ? (
         <tr className="ctbl__detail">
-          <td colSpan={11 + weekLabels.length}>
+          <td colSpan={(showChecks ? 11 : 10) + weekLabels.length}>
             <dl>
               <div><dt>Остаток</dt><dd>{num(item.rawStock)}</dd></div>
               <div><dt>Запас, дн</dt><dd>{reserve == null ? '—' : reserve}</dd></div>
@@ -162,7 +165,7 @@ export default function CatalogTable({
     )
   }
 
-  const colSpan = 11 + weekLabels.length
+  const colSpan = (showChecks ? 11 : 10) + weekLabels.length
 
   return (
     <>
@@ -177,25 +180,27 @@ export default function CatalogTable({
       </span>
     </p>
     <div className="ctbl__wrap" ref={wrapRef} style={viewWidth ? { '--ctbl-view': `${viewWidth}px` } : undefined}>
-      <table className="ctbl">
+      <table className={`ctbl${showChecks ? '' : ' ctbl--no-checks'}`}>
         <thead>
           <tr className="ctbl__h1">
-            <th colSpan={3} />
+            <th colSpan={showChecks ? 3 : 2} />
             <th colSpan={weekLabels.length} className="ctbl__weeks-title">
               <span className="ctbl__weeks-label">Продажи по неделям, шт.</span>
             </th>
             <th colSpan={7} />
           </tr>
           <tr className="ctbl__h2">
-            <th>
-              <input
-                type="checkbox"
-                aria-label="Выбрать все"
-                checked={allSelected}
-                disabled={selectable.length === 0}
-                onChange={() => onToggleMany(selectable, !allSelected)}
-              />
-            </th>
+            {showChecks ? (
+              <th>
+                <input
+                  type="checkbox"
+                  aria-label="Выбрать все"
+                  checked={allSelected}
+                  disabled={selectable.length === 0}
+                  onChange={() => onToggleMany(selectable, !allSelected)}
+                />
+              </th>
+            ) : null}
             <th>№</th>
             <th>Товар</th>
             {weekLabels.map((label, index) => (
