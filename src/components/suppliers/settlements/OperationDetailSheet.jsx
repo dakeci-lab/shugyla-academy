@@ -189,9 +189,6 @@ function PayDialog({ operation, headline, due, accounts, defaultAccountId, onSet
         <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void pay()}>
           {busy ? 'Сохранение…' : isPayable ? 'Оплатить' : 'Получили возврат'}
         </button>
-        <button type="button" className="btn btn--outline" disabled={busy} onClick={onClose}>
-          Отмена
-        </button>
       </div>
     </>
   )

@@ -276,3 +276,20 @@
 .umag-op-detail:has(.umag-op-detail__pay-amount) {
   width: min(440px, 100%);
 }
+
+/* Phones: the payment window is a sheet of the full width of the screen at its bottom edge (like UMAG), as tall as its
+   content; «×» and a tap on the dark background close it, «Оплатить» is the only button and sits at the very bottom. */
+@media (max-width: 640px) {
+  .umag-op-detail__backdrop:has(.umag-op-detail__pay-amount) {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .umag-op-detail:has(.umag-op-detail__pay-amount) {
+    width: 100%;
+    max-width: none;
+    border-radius: 16px 16px 0 0;
+    padding: 16px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -8px 28px rgba(15, 23, 42, 0.18);
+  }
+}
