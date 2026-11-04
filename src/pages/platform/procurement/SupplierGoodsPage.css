@@ -70,7 +70,7 @@
 
   .sgp .sgm__search {
     order: 0;
-    flex: 1 1 calc(100% - 60px);
+    flex: 1 1 100%;
     min-width: 0;
   }
 
@@ -98,5 +98,19 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+}
+
+.sgp-header-sync--busy {
+  opacity: 0.7;
+}
+
+@media (max-width: 640px) {
+  .sgp .sgm__top {
+    gap: 8px 6px;
+  }
+
+  .sgp .sgm__top > .btn {
+    padding-inline: 12px;
   }
 }
