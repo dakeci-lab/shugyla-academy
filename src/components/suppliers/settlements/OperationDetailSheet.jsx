@@ -69,7 +69,7 @@ function SettleBlock({ settlement, accounts, defaultAccountId = null, onSettle, 
     return (
       <div className="umag-op-detail__settle">
         <span className="umag-op-detail__settle-state">
-          {isPayable ? 'Оплачено' : 'Возврат получен'}
+          Оплачено
           {settlement.settledAt ? ` · ${formatUmagDateTime(settlement.settledAt)}` : ''}
         </span>
         {onUnsettle ? (
@@ -79,7 +79,7 @@ function SettleBlock({ settlement, accounts, defaultAccountId = null, onSettle, 
             disabled={busy}
             onClick={() => void run(onUnsettle)}
           >
-            {isPayable ? 'Отменить оплату' : 'Отменить получение'}
+            Отменить оплату
           </button>
         ) : null}
       </div>
@@ -111,7 +111,7 @@ function SettleBlock({ settlement, accounts, defaultAccountId = null, onSettle, 
         disabled={busy}
         onClick={() => void run(() => onSettle(accountId || null))}
       >
-        {busy ? 'Сохранение…' : isPayable ? 'Оплатить' : 'Получили возврат'}
+        {busy ? 'Сохранение…' : 'Оплатить'}
       </button>
     </div>
   )
@@ -191,7 +191,7 @@ function PayDialog({ operation, headline, due, accounts, defaultAccountId, onSet
 
       <div className="umag-op-detail__pay-actions">
         <button type="button" className="btn btn--primary" disabled={busy} onClick={() => void pay()}>
-          {busy ? 'Сохранение…' : isPayable ? 'Оплатить' : 'Получили возврат'}
+          {busy ? 'Сохранение…' : 'Оплатить'}
         </button>
       </div>
     </>
@@ -304,7 +304,7 @@ function PaymentLayer({ rows, accounts, accountId, canManage, canChangeAccount, 
                 </button>
               ) : null}
               <button type="button" className="btn btn--danger-outline" disabled={saving} onClick={() => setConfirmOpen(true)}>
-                {kindLabel === 'return' ? 'Отменить получение' : 'Отменить оплату'}
+                Отменить оплату
               </button>
             </div>
           </section>
@@ -312,13 +312,13 @@ function PaymentLayer({ rows, accounts, accountId, canManage, canChangeAccount, 
 
         {confirmOpen ? (
           <ConfirmDialog
-            title={kindLabel === 'return' ? 'Отменить получение возврата?' : 'Отменить оплату?'}
+            title="Отменить оплату?"
             message={
               kindLabel === 'return'
-                ? 'Возврат снова станет неполученным.'
+                ? 'Возврат снова станет неоплаченным.'
                 : 'Документ снова станет неоплаченным: сумма вернётся в долг поставщику.'
             }
-            confirmLabel={kindLabel === 'return' ? 'Отменить получение' : 'Отменить оплату'}
+            confirmLabel="Отменить оплату"
             cancelLabel="Назад"
             onCancel={() => (cancelling ? null : setConfirmOpen(false))}
             onConfirm={() => void cancelPayment()}
@@ -459,7 +459,7 @@ export default function OperationDetailSheet({
       ? [
           { label: 'Документ', value: docLabel },
           { label: 'Сумма', value: formatUmagMoney(Math.abs(Number(operation.amount) || 0)) },
-          { label: isReturn ? 'Дата получения' : 'Дата оплаты', value: settlement.settledAt ? formatUmagDateTime(settlement.settledAt) : '—' },
+          { label: 'Дата оплаты', value: settlement.settledAt ? formatUmagDateTime(settlement.settledAt) : '—' },
           { label: 'Счёт', value: getPaymentAccountName(settlement.accountId) || 'Без счёта' },
           { label: 'Отметил', value: paidByName || '—' },
         ]
@@ -529,7 +529,7 @@ export default function OperationDetailSheet({
           </button>
         </div>
 
-        {/* The action comes first: «Оплатить» / «Получили возврат» is what this window is opened for. */}
+        {/* The action comes first: «Оплатить» is what this window is opened for. */}
         {!isPaymentDoc && canManage && operation?.settlement && onSettle ? (
           <SettleBlock
             settlement={operation.settlement}

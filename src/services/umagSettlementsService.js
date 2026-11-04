@@ -472,6 +472,9 @@ export function filterSupplierOperations(operations, filter = 'all') {
   if (filter === 'open') {
     return operations.filter((op) => op.settlement && !op.settlement.settled)
   }
+  if (filter === 'paid') {
+    return operations.filter((op) => op.settlement && op.settlement.settled)
+  }
   if (filter === 'supplies') {
     return operations.filter(
       (op) => op.kind === 'supply' || op.eventType === LEDGER_EVENT_TYPES.RECEIVING
