@@ -59,7 +59,7 @@ ok('the plan folds into one line, the bottom bar of the page is one column with 
 // Long product names must wrap inside the pinned name column, never run over the week columns.
 assert.match(css, /\.ctbl td\.ctbl__name\s*\{[^}]*white-space: normal/)
 assert.match(css, /\.ctbl td\.ctbl__name > span\s*\{[^}]*-webkit-line-clamp: 3/)
-assert.match(table, /<span title=\{item\.productName\}>\{item\.productName\}<\/span>/)
+assert.match(table, /<span title=\{item\.productName\}>\{nameTitle\}<\/span>/)
 ok('a long product name wraps in its column (three lines, then «…», full name in the tooltip) and does not cover the week columns; phones show it in full')
 
 console.log(`\nverify:mobile-supplier-goods — ${checks} checks passed`)

@@ -299,8 +299,13 @@
   .ctbl__group button {
     position: static;
     width: 100%;
-    padding: 12px;
-    font-size: 15px;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .ctbl__group button b {
+    font-weight: 600;
+    color: var(--color-text-secondary, #64748b);
   }
 
   .ctbl__group--sub button {
@@ -363,12 +368,21 @@
     overflow: visible;
   }
 
+  /* Hierarchy: a group is a quiet heading, a product that needs no order is regular text, a product to order is heavier. */
   .ctbl tbody tr:not(.ctbl__group) td.ctbl__name {
     grid-area: name;
     font-size: 15px;
-    font-weight: 600;
+    font-weight: 400;
     color: var(--color-text, #0f172a);
     cursor: pointer;
+  }
+
+  .ctbl tbody tr.ctbl__row--todo:not(.ctbl__group) td.ctbl__name {
+    font-weight: 600;
+  }
+
+  .ctbl__code {
+    font-variant-numeric: tabular-nums;
   }
 
   .ctbl tbody tr:not(.ctbl__group) td.ctbl__c-meta {
