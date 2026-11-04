@@ -882,3 +882,13 @@
     background: var(--row-pressed-bg);
   }
 }
+
+/* Phone: the product list of a document runs edge to edge, like in UMAG. */
+@media (max-width: 640px) {
+  .pdoc__items {
+    margin-inline: calc(-1 * var(--page-gutter, 12px));
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+}

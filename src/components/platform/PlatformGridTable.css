@@ -177,9 +177,18 @@
 }
 
 @media (max-width: 640px) {
+  /* Like UMAG: a list is not a block with margins and rounded corners — it runs edge to edge. */
+  .pgt {
+    margin-inline: calc(-1 * var(--page-gutter, 12px));
+    width: auto;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+
   .pgt__day {
     display: block;
-    padding: 8px 14px;
+    padding: 8px 16px;
     background: #f1f5f9;
     border-bottom: 1px solid var(--color-border, #e2e8f0);
     color: var(--color-text, #0f172a);
@@ -198,6 +207,14 @@
     min-height: 52px;
     padding-top: 10px;
     padding-bottom: 10px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .pgt__foot,
+  .pgt__subtotal {
+    padding-left: 16px;
+    padding-right: 16px;
   }
 
   .pgt__cell--m-hide {

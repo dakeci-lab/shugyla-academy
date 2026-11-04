@@ -70,4 +70,12 @@ ok('phones: a row of the «Расчёты» list is one tappable row (opens the 
 assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /tr:not\(\.is-done\):has\(\.pdoc__c-name:active\)\s*\{\s*background: var\(--row-pressed-bg\)/)
 ok('phones: a product row of the purchase / order document gets the same soft press highlight (a row ticked by the receiver stays green)')
 
+const gridCss = read('src/components/platform/PlatformGridTable.css')
+assert.match(gridCss, /\.pgt \{\s*margin-inline: calc\(-1 \* var\(--page-gutter, 12px\)\);[^}]*border-left: 0;[^}]*border-radius: 0;/)
+assert.match(read('src/components/platform/PlatformFilterRow.css'), /margin-inline: calc\(-1 \* var\(--page-gutter, 12px\)\);[^}]*border-radius: 0;/)
+assert.match(read('src/pages/platform/procurement/ProcurementPage.css'), /\.procurement-list-panel \{\s*margin-inline: calc\(-1 \* var\(--page-gutter, 12px\)\)/)
+assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /\.pdoc__items \{\s*margin-inline: calc\(-1 \* var\(--page-gutter, 12px\)\)/)
+assert.match(read('src/layouts/PlatformLayout.css'), /--page-gutter: 12px/)
+ok('phones: lists (tables, the filter row, the supplier history, the product list of a document) run edge to edge like UMAG — no block with margins and rounded corners')
+
 console.log(`\nverify:mobile-supplier-card — ${checks} checks passed`)

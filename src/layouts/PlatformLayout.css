@@ -154,6 +154,7 @@
 
   .platform-layout__content {
     padding: 16px;
+    --page-gutter: 16px;
   }
 }
 
@@ -218,5 +219,6 @@
 @media (max-width: 600px) {
   .platform-layout__content {
     padding: 14px 12px 40px;
+    --page-gutter: 12px;
   }
 }
