@@ -118,6 +118,7 @@
 /* «Товар с собой» today: a soft green tint (visible, but not loud) and a small mark. */
 .docsup__option.is-with-goods {
   background: #f0faf4;
+  color: var(--color-text, #0f172a);
 }
 
 .docsup__option.is-with-goods:hover,
