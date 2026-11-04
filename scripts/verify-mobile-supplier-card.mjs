@@ -82,5 +82,7 @@ ok('phones: lists (tables, the filter row, the supplier history, the product lis
 
 assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /\.pdoc__items-title \{\s*padding-inline: 16px;[\s\S]*\.pdoc__add \{\s*padding-inline: 16px;[\s\S]*tbody tr:not\(:has\(\.pdoc__c-check\)\)/)
 ok('phones: the title, the search, the button and the rows of a document product list start at one left edge (16px), no empty ticks column')
+assert.match(sheetCss, /min-height: 72dvh;[\s\S]*\.umag-op-detail__pay-amount \{\s*flex: 1 1 auto;\s*justify-content: center;/)
+ok('phones: the payment sheet reaches up to the middle of the screen — the sum is at eye level, the account and «Оплатить» at the bottom')
 
 console.log(`\nverify:mobile-supplier-card — ${checks} checks passed`)
