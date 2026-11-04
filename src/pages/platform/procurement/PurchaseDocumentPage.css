@@ -892,3 +892,27 @@
     border-radius: 0;
   }
 }
+
+/* Phone: the title, the search, the button and the rows of the product list start at one left edge (16px). */
+@media (max-width: 640px) {
+  .pdoc__items-title {
+    padding-inline: 16px;
+  }
+
+  .pdoc__add {
+    padding-inline: 16px;
+  }
+
+  .pdoc__table tbody tr {
+    padding-inline: 16px;
+  }
+
+  /* No ticks column (the buyer's view): do not leave an empty column and its gap in front of the name. */
+  .pdoc__table tbody tr:not(:has(.pdoc__c-check)) {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      'name  qty   del'
+      'code  price del'
+      'stock sum   del';
+  }
+}
