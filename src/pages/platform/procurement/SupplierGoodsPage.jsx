@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useSession } from '../../../context/SessionContext'
 import { useToast } from '../../../context/ToastContext'
@@ -461,15 +462,16 @@ export default function SupplierGoodsPage() {
         )}
       </div>
 
+      {/* Drawn in document.body: the page wrapper has `will-change: transform`, which would carry a fixed child along with
+          the content (same reason as PlatformFloatingSearch). */}
+      {createPortal(
       <div className="sgp__bar" role="region" aria-label="Выбранные товары">
         <div className="sgm__summary" aria-live="polite">
           {picked > 0 ? (
             <span>
               Выбрано: <b>{picked}</b> · <b>{formatPurchaseAmount(pickedSum)}</b>
             </span>
-          ) : (
-            <span className="sgm__summary--muted">Укажите количество у нужных товаров</span>
-          )}
+          ) : null}
           {min > 0 ? (
             <span className={shortToMin > 0 ? 'sgm__summary--warn' : ''}>
               Минимальный заказ {formatPurchaseAmount(min)}
@@ -480,7 +482,9 @@ export default function SupplierGoodsPage() {
         <button type="button" className="btn btn--primary" disabled={adding || picked === 0} onClick={() => void handleAdd()}>
           {adding ? 'Добавление…' : `Добавить в документ (${picked})`}
         </button>
-      </div>
+      </div>,
+      document.body
+      )}
     </div>
   )
 }
