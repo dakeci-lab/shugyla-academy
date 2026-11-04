@@ -67,4 +67,7 @@ ok('a pressed row (touch) gets a soft grey (--row-pressed-bg), not the green of 
 assert.match(read('src/components/suppliers/settlements/UmagSettlementsPanel.jsx'), /onClick=\{isPhoneMain \? \(\) => setSelectedId\(s\.id\) : undefined\}\s*interactive=\{isPhoneMain\}/)
 ok('phones: a row of the «Расчёты» list is one tappable row (opens the card) and gets the same soft press highlight')
 
+assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /tr:not\(\.is-done\):has\(\.pdoc__c-name:active\)\s*\{\s*background: var\(--row-pressed-bg\)/)
+ok('phones: a product row of the purchase / order document gets the same soft press highlight (a row ticked by the receiver stays green)')
+
 console.log(`\nverify:mobile-supplier-card — ${checks} checks passed`)

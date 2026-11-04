@@ -867,3 +867,18 @@
   font-size: 15px;
   color: var(--color-text, #0f172a);
 }
+
+/* Phone: the row whose name is being pressed (it opens the product sheet) gets the soft grey press highlight. */
+@media (max-width: 640px) {
+  .pdoc__c-name {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .pdoc__table tbody tr {
+    transition: background-color 0.12s ease;
+  }
+
+  .pdoc__table tbody tr:not(.is-done):has(.pdoc__c-name:active) {
+    background: var(--row-pressed-bg);
+  }
+}
