@@ -57,7 +57,9 @@ const dialog = sheet.slice(sheet.indexOf('function PayDialog('), sheet.indexOf('
 assert.doesNotMatch(dialog, /userName|Сотрудник|source\.account/)
 assert.match(sheet, /openToSettle \? \(\s*<PayDialog/)
 assert.match(sheetCss, /\.umag-op-detail__backdrop\s*\{[^}]*align-items: center/)
-ok('the payment window of an open document is a centred dialog: document, big sum, deadline, account, «Оплатить» / «Отмена»; no UMAG employee / account')
+assert.doesNotMatch(dialog, /Отмена\s*<\/button>/)
+assert.match(sheetCss, /max-width: 640px\) \{\s*\.umag-op-detail__backdrop:has\(\.umag-op-detail__pay-amount\) \{\s*align-items: flex-end;/)
+ok('the payment window of an open document: document, big sum, deadline, account, one «Оплатить» button (no «Отмена»: «×» and the background close it); a full-width sheet at the bottom on phones, centred on the web; no UMAG employee / account')
 
 assert.match(read('src/index.css'), /--row-pressed-bg: #eef1f5/)
 assert.match(read('src/components/suppliers/settlements/UmagSettlementsPanel.css'), /\.sd-op:active\s*\{\s*background: var\(--row-pressed-bg\)/)
