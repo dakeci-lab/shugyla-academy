@@ -57,3 +57,37 @@
     font-size: 16px;
   }
 }
+
+.sgm__summary--muted {
+  color: var(--color-text-muted, #6b7280);
+}
+
+/* Phone: the search and the refresh button share one row; the chips and the «Остатки» line follow. */
+@media (max-width: 640px) {
+  .sgp .sgm__top {
+    align-items: center;
+  }
+
+  .sgp .sgm__search {
+    order: 0;
+    flex: 1 1 calc(100% - 60px);
+    min-width: 0;
+  }
+
+  .sgp .sgm__top > .platform-sync-button,
+  .sgp .sgm__top > button[aria-label='Обновить остатки поставщика'] {
+    order: 1;
+    flex: none;
+  }
+
+  .sgp .sgm__toggle,
+  .sgp .sgm__top > .btn {
+    order: 2;
+  }
+
+  .sgp .sgm__synced {
+    order: 3;
+    flex: 1 1 100%;
+    font-size: 12px;
+  }
+}
