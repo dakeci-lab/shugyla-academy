@@ -78,4 +78,7 @@ assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /\
 assert.match(read('src/layouts/PlatformLayout.css'), /--page-gutter: 12px/)
 ok('phones: lists (tables, the filter row, the supplier history, the product list of a document) run edge to edge like UMAG — no block with margins and rounded corners')
 
+assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /\.pdoc__items-title \{\s*padding-inline: 16px;[\s\S]*\.pdoc__add \{\s*padding-inline: 16px;[\s\S]*tbody tr:not\(:has\(\.pdoc__c-check\)\)/)
+ok('phones: the title, the search, the button and the rows of a document product list start at one left edge (16px), no empty ticks column')
+
 console.log(`\nverify:mobile-supplier-card — ${checks} checks passed`)
