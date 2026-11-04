@@ -1166,3 +1166,24 @@
     padding-inline: 16px;
   }
 }
+
+/* Status of a document in the list: paid is quiet, unpaid is neutral, overdue is the red pill. */
+.sd-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sd-status--paid {
+  background: #e7f6ec;
+  color: #166534;
+}
+
+.sd-status--open {
+  background: #eef1f5;
+  color: var(--color-text-secondary, #475569);
+}

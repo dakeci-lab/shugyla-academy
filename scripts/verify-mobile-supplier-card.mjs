@@ -98,4 +98,12 @@ assert.match(read('src/services/supplierPaymentObligationsService.js'), /export 
 assert.match(read('src/services/supplierPaymentObligationsService.js'), /export async function updateReturnRefundAccount/)
 ok('a paid document opens as the page «Платёж» (full-screen layer on phones): only reading; the pencil opens the edit mode — the account can be changed, «Отменить оплату» (red) is only there and asks for a confirmation')
 
+assert.match(panel, /\.filter\(\(op\) => op\.kind === 'supply' \|\| op\.kind === 'return'\)/)
+assert.match(panel, /id: 'paid', label: 'Оплачено'/)
+assert.match(panel, /sd-status sd-status--paid">Оплачено</)
+assert.match(panel, /sd-status sd-status--open">Не оплачено</)
+assert.doesNotMatch(panel, /id: 'payments'/)
+assert.match(read('src/services/umagSettlementsService.js'), /if \(filter === 'paid'\)/)
+assert.doesNotMatch(read('src/components/suppliers/settlements/OperationDetailSheet.jsx'), /Получили возврат|Отменить получение/)
+ok('the history lists DOCUMENTS only (supplies and returns; no payment lines — they duplicated the paid document); each row says «Оплачено» / «Не оплачено» / the red «Просрочено на N дн.»; returns are paid the same way (money the other way); the filter opens on «Все»: Не оплачено, Просрочено, Оплачено, Приёмки, Возвраты')
 console.log(`\nverify:mobile-supplier-card — ${checks} checks passed`)

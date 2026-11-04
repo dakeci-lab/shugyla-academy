@@ -117,7 +117,8 @@ function main() {
   // 2026-10-23 redesign: one signed «Сумма» column + status/action instead of increase / decrease / running balance
   // (the running balance contradicted the card's native «К оплате»).
   assert('UI has amount and status columns', panel.includes("label: 'Сумма'") && panel.includes("label: 'Статус'"))
-  assert('UI payments filter', panel.includes("{ id: 'payments'"))
+  // 2026-11-04: the history lists DOCUMENTS only (supplies and returns); payment lines and the «Оплаты» filter are gone.
+  assert('UI lists documents only, no payments filter', !panel.includes("{ id: 'payments'") && panel.includes("op.kind === 'supply' || op.kind === 'return'"))
 
   console.log(`\nSupplier ledger verification completed (${testsPassed}/${testsRun} tests, exit 0)\n`)
 }

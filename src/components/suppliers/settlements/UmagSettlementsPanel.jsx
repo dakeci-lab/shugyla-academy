@@ -207,7 +207,7 @@ function OperationStatusCell({ op, canManage, onOpen }) {
       </button>
     )
   }
-  return <span className="umag-settlements__pending">{isPayable ? 'Не оплачено' : 'Ждём оплаты'}</span>
+  return <span className="umag-settlements__pending">Не оплачено</span>
 }
 
 /** Second line under the operation name: the document number, or who paid and from which account. */
@@ -487,22 +487,20 @@ function UmagSupplierDetail({
     setDetail(result)
   })
 
-  const operations = useMemo(() => detail?.operations || [], [detail])
-  const [opsFilter, setOpsFilter] = useState('open')
+  // The list is of DOCUMENTS only (supplies and returns): a payment line was the same fact a second time (the paid
+  // document already carries its date, account and who marked it on the page «Платёж»).
+  const operations = useMemo(
+    () => (detail?.operations || []).filter((op) => op.kind === 'supply' || op.kind === 'return'),
+    [detail]
+  )
+  const [opsFilter, setOpsFilter] = useState('all')
   const [opsFilterTouched, setOpsFilterTouched] = useState(false)
   const [opsQuery, setOpsQuery] = useState('')
-  const [draftOpsFilter, setDraftOpsFilter] = useState('open')
+  const [draftOpsFilter, setDraftOpsFilter] = useState('all')
   const [selectedOperation, setSelectedOperation] = useState(null)
   const openCount = useMemo(() => countOpenOperations(operations), [operations])
   const todayKey = useMemo(() => toAqtobeDateKey(), [])
   const overdueCount = useMemo(() => countOverdueOperations(operations, todayKey), [operations, todayKey])
-
-  // The card opens on what needs a click («Не закрытые»); with nothing open it opens on everything, and
-  // right after the last document is paid it switches to the full list so the result is visible.
-  useEffect(() => {
-    if (detailLoading || opsFilterTouched) return
-    setOpsFilter(openCount > 0 ? 'open' : 'all')
-  }, [detailLoading, openCount, opsFilterTouched])
 
   function chooseOpsFilter(id) {
     setOpsFilterTouched(true)
@@ -743,21 +741,22 @@ function UmagSupplierDetail({
     if (isPhoneList) {
       // Back to what the card opens on: what needs a click, or everything when nothing is open.
       setOpsFilterTouched(false)
-      setOpsFilter(openCount > 0 ? 'open' : 'all')
+      setOpsFilter('all')
     }
     setFilterOpen(false)
   }
 
+  // By default everything of the period is shown; the filter narrows it by the status of payment or by the kind.
   const opsFilterOptions = [
-    { id: 'open', label: 'Не закрытые', count: openCount },
-    ...(overdueCount > 0 ? [{ id: 'overdue', label: 'Просрочено', count: overdueCount, tone: 'danger' }] : []),
     { id: 'all', label: 'Все' },
+    { id: 'open', label: 'Не оплачено', count: openCount },
+    ...(overdueCount > 0 ? [{ id: 'overdue', label: 'Просрочено', count: overdueCount, tone: 'danger' }] : []),
+    { id: 'paid', label: 'Оплачено' },
     { id: 'supplies', label: 'Приёмки' },
-    { id: 'payments', label: 'Оплаты' },
     { id: 'returns', label: 'Возвраты' },
   ]
 
-  const opsFilterChanged = opsFilterTouched && opsFilter !== (openCount > 0 ? 'open' : 'all')
+  const opsFilterChanged = opsFilterTouched && opsFilter !== 'all'
   const filterCount = (filterActive ? 1 : 0) + (opsFilterChanged ? 1 : 0)
   const openFilterRef = useRef(null)
   openFilterRef.current = openFilter
@@ -1030,6 +1029,8 @@ function UmagSupplierDetail({
                   ? 'Ничего не найдено за выбранный период'
                   : opsFilter === 'open'
                     ? 'Неоплаченных документов нет'
+                    : opsFilter === 'paid'
+                      ? 'Оплаченных документов за период нет'
                     : opsFilter === 'overdue'
                       ? 'Просроченных документов нет'
                       : 'За выбранный период операций UMAG не найдено'}
@@ -1050,10 +1051,9 @@ function UmagSupplierDetail({
                         : `${op.label} № ${op.documentNumber}`
                     const settlement = op.settlement
                     const due =
-                      settlement && !settlement.settled && settlement.type === 'payable'
+                      settlement && !settlement.settled
                         ? describeDue(settlement.dueDate, todayKey)
                         : null
-                    const note = op.kind === 'payment' ? operationSubline(op) : ''
                     return (
                       <button key={op.id} type="button" className="sd-op" onClick={() => setSelectedOperation(op)}>
                         <span className="sd-op__l1">
@@ -1065,14 +1065,18 @@ function UmagSupplierDetail({
                         </span>
                         <span className="sd-op__l2">
                           <span>{formatUmagDate(op.sortAt)}</span>
-                          {note ? <span>{note}</span> : null}
-                          {due ? (
-                            due.tone === 'overdue' ? (
+                          {settlement ? (
+                            settlement.settled ? (
+                              <span className="sd-status sd-status--paid">Оплачено</span>
+                            ) : due && due.tone === 'overdue' ? (
                               <span className="sd-pill sd-pill--overdue">
                                 {due.text.charAt(0).toUpperCase() + due.text.slice(1)}
                               </span>
                             ) : (
-                              <span className={`sd-due sd-due--${due.tone}`}>{due.text}</span>
+                              <>
+                                <span className="sd-status sd-status--open">Не оплачено</span>
+                                {due ? <span className={`sd-due sd-due--${due.tone}`}>{due.text}</span> : null}
+                              </>
                             )
                           ) : null}
                         </span>
