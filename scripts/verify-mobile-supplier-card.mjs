@@ -85,4 +85,17 @@ ok('phones: the title, the search, the button and the rows of a document product
 assert.match(sheetCss, /min-height: 58dvh;[\s\S]*\.umag-op-detail__pay-actions \{\s*margin-top: auto;/)
 ok('phones: the payment sheet reaches up to the middle of the screen — the content stays together at its top, «Оплатить» is pinned to the very bottom')
 
+assert.match(sheet, /function PaymentLayer\(/)
+assert.match(sheet, /if \(settledDoc \|\| platformPayDoc\) \{/)
+const layer = sheet.slice(sheet.indexOf('function PaymentLayer('), sheet.indexOf('function PayDialog('))
+assert.match(layer, /<ConfirmDialog/)
+assert.match(layer, /\{editing \? \(\s*<section/)
+assert.match(layer, /aria-label=\{editing \? 'Закончить редактирование' : 'Редактировать'\}/)
+const beforeEdit = layer.slice(0, layer.indexOf('{editing ? ('))
+assert.doesNotMatch(beforeEdit, /Отменить оплату|Отменить получение/)
+assert.match(sheetCss, /\.umag-op-detail__backdrop--layer \{[^}]*z-index: 200;/)
+assert.match(read('src/services/supplierPaymentObligationsService.js'), /export async function updateObligationPaymentAccount/)
+assert.match(read('src/services/supplierPaymentObligationsService.js'), /export async function updateReturnRefundAccount/)
+ok('a paid document opens as the page «Платёж» (full-screen layer on phones): only reading; the pencil opens the edit mode — the account can be changed, «Отменить оплату» (red) is only there and asks for a confirmation')
+
 console.log(`\nverify:mobile-supplier-card — ${checks} checks passed`)
