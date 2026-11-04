@@ -87,7 +87,7 @@ ok('phones: the payment sheet reaches up to the middle of the screen — the con
 
 assert.match(sheet, /function PaymentLayer\(/)
 assert.match(sheet, /if \(settledDoc \|\| platformPayDoc\) \{/)
-const layer = sheet.slice(sheet.indexOf('function PaymentLayer('), sheet.indexOf('function PayDialog('))
+const layer = sheet.slice(sheet.indexOf('function PaymentLayer('), sheet.indexOf('export default function OperationDetailSheet'))
 assert.match(layer, /<ConfirmDialog/)
 assert.match(layer, /\{editing \? \(\s*<section/)
 assert.match(layer, /aria-label=\{editing \? 'Закончить редактирование' : 'Редактировать'\}/)
