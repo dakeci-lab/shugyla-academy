@@ -40,7 +40,7 @@ ok('saved orders only, cut by delivery date, newest delivery first, then supplie
 const page = read('src/pages/platform/orders/OrdersPage.jsx')
 assert.match(page, /ORDERS_PERIOD_PRESET_OPTIONS/)
 assert.doesNotMatch(page, /\+ Новый заказ|createPurchaseOrder|CreatePurchaseForm|isOrderDraft/)
-ok('quick period presets; no creation and no drafts in the receiver list')
+ok('the periods are the receiver\'s own set (in the filter); no creation and no drafts in the receiver list')
 const table = read('src/components/procurement/PurchaseTable.jsx')
 assert.doesNotMatch(table, /StatusBadge/)
 assert.match(table, /pgt__checked/)
