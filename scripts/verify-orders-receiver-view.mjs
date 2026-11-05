@@ -50,8 +50,8 @@ ok('the document shows the comment only when there is one; no «—» placeholde
 
 const list = read('src/components/procurement/PurchaseTable.jsx')
 const keys = [...list.slice(list.indexOf('const columns = ['), list.indexOf(']\n\n  return (')).matchAll(/key: '(\w+)'/g)].map((m) => m[1])
-assert.deepEqual(keys.filter((key) => key !== 'actions' && key !== 'edit'), ['delivery', 'supplier', 'items', 'amount', 'checked', 'number', 'created', 'creator'])
-ok('orders list: delivery and supplier first, created / creator last')
+assert.deepEqual(keys.filter((key) => key !== 'actions' && key !== 'edit'), ['number', 'delivery', 'supplier', 'created', 'items', 'amount', 'creator', 'comment'])
+ok('orders list (web): the columns of «Закуп» with the delivery first after the number; no «Сверено» column, no ticks')
 
 // Checklist: checkbox first, row number second, nothing persisted in the database.
 const headStart = page.indexOf('<thead>')
@@ -137,9 +137,9 @@ assert.match(detail, /Всё сверено/)
 assert.match(detail, /Снять отметку/)
 ok('the order card has «Всё сверено» / «Снять отметку» for receiving users; the mark is visible to everyone who sees the order')
 const listSrc = read('src/components/procurement/PurchaseTable.jsx')
-assert.match(listSrc, /key: 'checked', label: 'Сверено'/)
+assert.match(listSrc, /ord-row--unchecked/)
 assert.match(listSrc, /order\.checkedAt \? 'Сверено' : 'Не сверено'/)
-ok('the orders list shows the mark (column on desktop, a «Сверено» / «Не сверено» status pill in the mobile row)')
+ok('the orders list shows the mark (the look of the row on desktop, a «Сверено» / «Не сверено» status pill in the mobile row)')
 assert.ok(fs.existsSync(path.join(ROOT, 'supabase/migrations/20261023120000_orders_checked_mark.sql')))
 assert.ok(fs.existsSync(path.join(ROOT, 'docs/db/stage-22-orders-checked-mark/rollback.sql')))
 ok('stage 22 migration and docs (preflight / postcheck / rollback) are in the repo')

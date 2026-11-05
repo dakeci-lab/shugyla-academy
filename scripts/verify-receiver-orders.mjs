@@ -43,8 +43,8 @@ assert.doesNotMatch(page, /\+ Новый заказ|createPurchaseOrder|CreatePu
 ok('the periods are the receiver\'s own set (in the filter); no creation and no drafts in the receiver list')
 const table = read('src/components/procurement/PurchaseTable.jsx')
 assert.doesNotMatch(table, /StatusBadge/)
-assert.match(table, /pgt__checked/)
-ok('«Сверено» is plain green text, no status pills')
+assert.match(table, /ord-row--unchecked/)
+ok('«Сверено» is told by the look of the row (a not yet checked order looks like a draft, a checked one like a saved document), no status pills')
 
 const doc = read('src/pages/platform/procurement/PurchaseDocumentPage.jsx')
 assert.match(doc, /canViewOrders\(user\)/)
