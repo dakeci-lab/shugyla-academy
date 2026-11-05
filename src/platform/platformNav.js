@@ -7,7 +7,7 @@ export const PLATFORM_NAV = [
     label: 'Закупки',
     routeKey: ROUTE_KEYS.PROCUREMENT_GROUP,
     title: 'Закупки',
-    description: 'Закуп, заказы, поставщики и расчёты.',
+    description: 'Закуп, приёмка, поставщики и склад.',
     /**
      * Раздел целиком доступен с телефона. Ни один пункт не помечен webOnly:
      * у каждого есть своя мобильная раскладка (карточки вместо таблиц), и
@@ -25,10 +25,10 @@ export const PLATFORM_NAV = [
       {
         id: 'orders',
         path: '/platform/orders',
-        label: 'Заказы',
+        label: 'Приёмка',
         routeKey: ROUTE_KEYS.ORDERS,
-        title: 'Заказы',
-        description: 'Созданные заказы поставщикам и ожидаемые поставки.',
+        title: 'Приёмка',
+        description: 'Сверка заказов поставщикам с тем, что приехало: ожидаемые поставки и принятые заказы.',
       },
       {
         id: 'supplier-finance',
