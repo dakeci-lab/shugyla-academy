@@ -457,6 +457,7 @@ export default function PurchaseDocumentPage() {
     .filter(
       ({ item }) =>
         !tableText ||
+        (isPhone && editable) ||
         String(item.productName || '').toLowerCase().includes(tableText) ||
         String(item.barcode || '').includes(tableText)
     )
@@ -649,7 +650,8 @@ export default function PurchaseDocumentPage() {
               Сверено: {doneCount} из {items.length}
             </span>
           ) : null}
-          {itemsReady && items.length > 0 && !isPhone ? (
+          {/* On phones only where the row of «add a product» is not there (a draft already has its own search field). */}
+          {itemsReady && items.length > 0 && (!isPhone || !editable) ? (
             <input
               type="search"
               className="pdoc__table-search"

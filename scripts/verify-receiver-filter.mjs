@@ -100,5 +100,8 @@ assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /t
 ok('«Скачать» exists only for a saved document; in «Приёмка» only after the receiving is saved («Сохранить»), on the web and on the phone; the phone totals bar stays «Итого» + sum')
 assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /\.pdoc__c-check \{\s*grid-area: del;\s*justify-self: end;/)
 ok('phones: the tick of a row of the receiving view stands on the right, in the place of the «×» of the buyer\'s document (like «Закуп»)')
+assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.jsx'), /\(!isPhone \|\| !editable\)/)
+assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /\.pdoc__table-search \{\s*order: 5;\s*flex: 1 1 100%/)
+ok('phones: «Поиск по таблице» is a full-width field under «Товары (N)» / «Сверено» for read-only documents (the draft has its own add-field)')
 
 console.log(`\nverify:receiver-filter — ${checks} checks passed`)
