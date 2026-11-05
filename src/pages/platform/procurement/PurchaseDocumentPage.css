@@ -1008,3 +1008,26 @@
     display: none;
   }
 }
+
+/* Phones: «Поиск по таблице» is a full-width field on its own line under «Товары (N)» / the counter. */
+@media (max-width: 640px) {
+  .pdoc__items-head {
+    align-items: center;
+    padding-right: 16px;
+  }
+
+  .pdoc__counter {
+    font-size: 0.875rem;
+    color: var(--color-text-muted, #6b7280);
+  }
+
+  .pdoc__table-search {
+    order: 5;
+    flex: 1 1 100%;
+    max-width: none;
+    min-height: 44px;
+    margin: 4px 16px 8px 0;
+    /* 16px keeps iOS Safari from zooming the page on focus */
+    font-size: 16px;
+  }
+}
