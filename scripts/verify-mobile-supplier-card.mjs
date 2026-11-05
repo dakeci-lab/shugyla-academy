@@ -80,8 +80,8 @@ assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /\
 assert.match(read('src/layouts/PlatformLayout.css'), /--page-gutter: 12px/)
 ok('phones: lists (tables, the filter row, the supplier history, the product list of a document) run edge to edge like UMAG — no block with margins and rounded corners')
 
-assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /\.pdoc__items-title \{\s*padding-inline: 16px;[\s\S]*\.pdoc__add \{\s*padding-inline: 16px;[\s\S]*tbody tr:not\(:has\(\.pdoc__c-check\)\)/)
-ok('phones: the title, the search, the button and the rows of a document product list start at one left edge (16px), no empty ticks column')
+assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /\.pdoc__items-title \{\s*padding-inline: 16px;[\s\S]*\.pdoc__add \{\s*padding-inline: 16px;[\s\S]*tbody tr \{\s*grid-template-columns: minmax\(0, 1fr\) auto auto;/)
+ok('phones: the title, the search, the button and the rows of a document product list start at one left edge (16px), no empty column in front of the name (the tick of the receiving view stands on the right, where the «×» of the buyer\'s document is)')
 assert.match(sheetCss, /min-height: 58dvh;[\s\S]*\.umag-op-detail__pay-actions \{\s*margin-top: auto;/)
 ok('phones: the payment sheet reaches up to the middle of the screen — the content stays together at its top, «Оплатить» is pinned to the very bottom')
 
