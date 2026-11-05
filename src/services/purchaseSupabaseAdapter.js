@@ -235,20 +235,35 @@ async function syncOrderItems(orderId, items) {
 
 /**
  * Список заказов — только заголовки (один запрос). Позиции списку не нужны: ему хватает `items_count`,
- * а карточка заказа догружает свои позиции сама (`fetchOrderById`). Раньше список тянул все ~10 тыс. позиций
- * двумя десятками запросов при каждой загрузке, поэтому «Заказы» открывались заметно дольше.
+ * а карточка заказа догружает свои позиции сама (`fetchOrderById`).
+ *
+ * Не все заказы за всё время, а окно: созданные или с доставкой не раньше `fromDateKey`, плюс все черновики
+ * (список показывает их всегда). Старше окна заказы догружаются, когда в фильтре выбран более ранний период.
  */
-export async function fetchPurchasesDataCloud() {
+export async function fetchPurchasesDataCloud({ fromDateKey = null } = {}) {
   ensureClient()
 
-  const ordersResult = await supabase
-    .from('purchase_orders')
-    .select('*')
-    .order('created_at', { ascending: false })
+  let query = supabase.from('purchase_orders').select('*')
+  if (fromDateKey) {
+    query = query.or(
+      `created_at.gte.${fromDateKey}T00:00:00Z,expected_delivery_date.gte.${fromDateKey},status.eq.draft`
+    )
+  }
+  const ordersResult = await query.order('created_at', { ascending: false }).limit(5000)
 
   const orders = await throwIfError(ordersResult, 'Загрузка закупов')
 
   return { orders: (orders || []).map((row) => rowToOrder(row, [])) }
+}
+
+/** Заголовки нескольких заказов по id (событие Realtime касается только их). Отсутствующие в ответе — удалены. */
+export async function fetchPurchaseOrderHeadersByIdsCloud(ids) {
+  ensureClient()
+  const list = [...new Set(ids)].filter(Boolean)
+  if (list.length === 0) return []
+  const result = await supabase.from('purchase_orders').select('*').in('id', list)
+  const rows = await throwIfError(result, 'Загрузка закупов')
+  return (rows || []).map((row) => rowToOrder(row, []))
 }
 
 /** Создание закупа */

@@ -117,7 +117,8 @@
     "verify:native-supplier-payment-marking": "node scripts/verify-native-supplier-payment-marking.mjs",
     "verify:native-settlement-ledger-source": "node scripts/verify-native-settlement-ledger-source.mjs",
     "verify:settlements-unmark-payment": "node scripts/verify-settlements-unmark-payment.mjs",
-    "verify:suppliers-settlements-merge": "node scripts/verify-suppliers-settlements-merge.mjs"
+    "verify:suppliers-settlements-merge": "node scripts/verify-suppliers-settlements-merge.mjs",
+    "verify:orders-period-load": "node scripts/verify-orders-period-load.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",

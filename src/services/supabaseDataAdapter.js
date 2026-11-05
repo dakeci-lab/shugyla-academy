@@ -87,10 +87,15 @@ export async function fetchSuppliersModuleData() {
   return { suppliers: data.suppliers }
 }
 
-export async function fetchPurchasesModuleData() {
+export async function fetchPurchasesModuleData(options) {
   const { fetchPurchasesDataCloud } = await import('./purchaseSupabaseAdapter')
-  const data = await fetchPurchasesDataCloud()
+  const data = await fetchPurchasesDataCloud(options)
   return { purchases: data.orders }
+}
+
+export async function fetchPurchaseOrderHeadersByIds(ids) {
+  const { fetchPurchaseOrderHeadersByIdsCloud } = await import('./purchaseSupabaseAdapter')
+  return fetchPurchaseOrderHeadersByIdsCloud(ids)
 }
 
 /**

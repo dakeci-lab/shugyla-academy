@@ -195,6 +195,17 @@ export function putCloudPurchase(order) {
   store.purchases = idx >= 0 ? list.map((item, i) => (i === idx ? order : item)) : [order, ...list]
 }
 
+/** Добавить/обновить пачку заказов одним присваиванием (догрузка периода, событие Realtime). */
+export function mergeCloudPurchases(orders) {
+  if (!orders?.length) return
+  const byId = new Map(orders.map((order) => [order.id, order]))
+  const list = store.purchases || []
+  const merged = list.map((item) => (byId.has(item.id) ? byId.get(item.id) : item))
+  const known = new Set(list.map((item) => item.id))
+  const added = orders.filter((order) => !known.has(order.id))
+  store.purchases = [...added, ...merged]
+}
+
 /** Убрать заказ из кэша (после удаления). */
 export function dropCloudPurchase(orderId) {
   store.purchases = (store.purchases || []).filter((item) => item.id !== orderId)

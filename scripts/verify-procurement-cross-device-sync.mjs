@@ -82,7 +82,7 @@ function main() {
   const realtimeHook = read('src/hooks/useProcurementRealtime.js')
   const layout = read('src/layouts/PlatformLayout.jsx')
   assert('subscribes to purchase_orders', realtime.includes("'purchase_orders'"))
-  assert('subscribes to purchase_order_items', realtime.includes("'purchase_order_items'"))
+  assert('listens to the order headers only (item changes arrive as header updates from the DB triggers)', !realtime.includes("'purchase_order_items'"))
   assert('no longer subscribes to receiving tables (stage 25c)', !realtime.includes('receiving_'))
   assert('debounced sync', realtime.includes('DEBOUNCE_MS'))
   assert('no 5s polling', !/\b5000\b/.test(realtime) && !realtime.includes('setInterval'))
