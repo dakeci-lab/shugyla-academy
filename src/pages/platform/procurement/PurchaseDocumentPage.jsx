@@ -117,6 +117,8 @@ export default function PurchaseDocumentPage() {
   // Приёмщик сверяет сохранённый заказ с накладной: галочки по строкам и общая отметка «Сверено».
   const showChecklist = saved && !canEdit && canMarkChecked
   // «Скачать»: only a saved document; in «Приёмка» — only once the receiving itself is saved («Сохранить»).
+  // The tick column is only for checking: once the receiving is saved it goes away completely.
+  const showTicks = showChecklist && !order?.checkedAt
   const canDownload = saved && (!showChecklist || Boolean(order?.checkedAt))
   const readerView = !canEdit
 
@@ -670,7 +672,7 @@ export default function PurchaseDocumentPage() {
             <table className="pdoc__table">
               <thead>
                 <tr>
-                  {showChecklist ? (
+                  {showTicks ? (
                     <th className="pdoc__c-check">
                       <input
                         type="checkbox"
@@ -679,7 +681,7 @@ export default function PurchaseDocumentPage() {
                         ref={(node) => {
                           if (node) node.indeterminate = doneCount > 0 && doneCount < items.length
                         }}
-                        disabled={Boolean(order.checkedAt) || items.length === 0}
+                        disabled={items.length === 0}
                         onChange={toggleAllTicks}
                       />
                     </th>
@@ -712,14 +714,13 @@ export default function PurchaseDocumentPage() {
                   </tr>
                 ) : null}
                 {shownRows.map(({ item, index }) => (
-                  <tr key={item.id} className={showChecklist && ticks.has(item.id) ? 'is-done' : ''}>
-                    {showChecklist ? (
+                  <tr key={item.id} className={showTicks && ticks.has(item.id) ? 'is-done' : ''}>
+                    {showTicks ? (
                       <td className="pdoc__c-check">
                         <input
                           type="checkbox"
                           aria-label={`Сверено: ${item.productName}`}
                           checked={ticks.has(item.id)}
-                          disabled={Boolean(order.checkedAt)}
                           onChange={() => toggleTick(item.id)}
                         />
                       </td>
@@ -792,7 +793,7 @@ export default function PurchaseDocumentPage() {
               </tbody>
               <tfoot>
                 <tr className="pdoc__total-row">
-                  <td colSpan={(showChecklist ? 1 : 0) + 3 + (readerView ? 0 : 2)}>Итого</td>
+                  <td colSpan={(showTicks ? 1 : 0) + 3 + (readerView ? 0 : 2)}>Итого</td>
                   <td className="r num pdoc__total-qty">{totalQty.toLocaleString('ru-RU', { maximumFractionDigits: 3 })}</td>
                   <td className="pdoc__total-gap" />
                   <td className="r num">{formatPurchaseAmount(total)}</td>
