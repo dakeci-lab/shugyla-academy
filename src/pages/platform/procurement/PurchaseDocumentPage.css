@@ -897,13 +897,20 @@
     padding-inline: 16px;
   }
 
-  /* No ticks column (the buyer's view): do not leave an empty column and its gap in front of the name. */
-  .pdoc__table tbody tr:not(:has(.pdoc__c-check)) {
+  /* The last column of a row is the «×» of the buyer's document and the tick of the receiving one (the same place, like
+     in «Закуп»): no column in front of the name. */
+  .pdoc__table tbody tr {
     grid-template-columns: minmax(0, 1fr) auto auto;
     grid-template-areas:
       'name  qty   del'
       'code  price del'
       'stock sum   del';
+  }
+
+  .pdoc__c-check {
+    grid-area: del;
+    justify-self: end;
+    align-self: center;
   }
 }
 

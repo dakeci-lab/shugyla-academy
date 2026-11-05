@@ -98,5 +98,7 @@ assert.match(rdoc, /\{canDownload \? \(\s*<div className="pdoc__menu"/)
 assert.match(rdoc, /isPhone && canDownload && itemsReady/)
 assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /tfoot \.pdoc__total-qty,\s*\.pdoc__table tfoot \.pdoc__total-gap \{\s*display: none;/)
 ok('«Скачать» exists only for a saved document; in «Приёмка» only after the receiving is saved («Сохранить»), on the web and on the phone; the phone totals bar stays «Итого» + sum')
+assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /\.pdoc__c-check \{\s*grid-area: del;\s*justify-self: end;/)
+ok('phones: the tick of a row of the receiving view stands on the right, in the place of the «×» of the buyer\'s document (like «Закуп»)')
 
 console.log(`\nverify:receiver-filter — ${checks} checks passed`)
