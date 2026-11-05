@@ -38,7 +38,7 @@ assert.deepEqual(list.map((x) => x.id), ['d', 'c', 'a'])
 ok('saved orders only, cut by delivery date, newest delivery first, then supplier')
 
 const page = read('src/pages/platform/orders/OrdersPage.jsx')
-assert.match(page, /SETTLEMENTS_PERIOD_PRESET_OPTIONS/)
+assert.match(page, /ORDERS_PERIOD_PRESET_OPTIONS/)
 assert.doesNotMatch(page, /\+ Новый заказ|createPurchaseOrder|CreatePurchaseForm|isOrderDraft/)
 ok('quick period presets; no creation and no drafts in the receiver list')
 const table = read('src/components/procurement/PurchaseTable.jsx')
