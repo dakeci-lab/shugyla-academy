@@ -1,5 +1,12 @@
 import AdminModal from '../../admin/AdminModal'
-import { calcLineTotal, formatPurchaseAmount } from '../../../utils/purchaseData'
+import {
+  calcLineTotal,
+  clampDiscountPct,
+  discountedPrice,
+  formatPromo,
+  formatPurchaseAmount,
+  itemReceiveQty,
+} from '../../../utils/purchaseData'
 import './ItemDetailSheet.css'
 
 /**
@@ -12,17 +19,27 @@ export default function ItemDetailSheet({
   qtyValue,
   onQtyChange,
   onQtyCommit,
+  onPromoCommit,
+  onBonusCommit,
+  onDiscountCommit,
+  fieldValue,
+  onFieldChange,
   onRemove,
   onClose,
   busy = false,
 }) {
   function close() {
     onQtyCommit?.(item)
+    onPromoCommit?.(item)
+    onBonusCommit?.(item)
+    onDiscountCommit?.(item)
     onClose()
   }
 
   const qty = qtyValue !== undefined ? qtyValue : item.orderQty
   const unit = item.unit || 'шт.'
+  const discountText = fieldValue ? fieldValue(item.id, 'discount', item.discountPct || '') : item.discountPct || ''
+  const discount = clampDiscountPct(discountText)
 
   return (
     <AdminModal
@@ -94,13 +111,80 @@ export default function ItemDetailSheet({
             <output>{item.orderQty}</output>
           )}
         </label>
+        {editable ? (
+          <>
+            <label className="idsheet__field">
+              <span>Акция (5+1)</span>
+              <input
+                type="text"
+                inputMode="text"
+                placeholder="5+1"
+                value={fieldValue(item.id, 'promo', formatPromo(item.promoBuy, item.promoFree))}
+                onChange={(event) => onFieldChange(item.id, 'promo', event.target.value)}
+                onBlur={() => onPromoCommit?.(item)}
+              />
+            </label>
+            <label className="idsheet__field">
+              <span>Бонус, {unit}</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                placeholder="0"
+                value={fieldValue(item.id, 'bonus', item.bonusQty || '')}
+                onChange={(event) => onFieldChange(item.id, 'bonus', event.target.value)}
+                onBlur={() => onBonusCommit?.(item)}
+              />
+            </label>
+            <label className="idsheet__field">
+              <span>Скидка, %</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                max="100"
+                placeholder="0"
+                value={discountText}
+                onChange={(event) => onFieldChange(item.id, 'discount', event.target.value)}
+                onBlur={() => onDiscountCommit?.(item)}
+              />
+            </label>
+          </>
+        ) : (
+          <>
+            {item.bonusQty > 0 ? (
+              <div className="idsheet__field">
+                <span>Бонус, {unit}</span>
+                <output>+{item.bonusQty}</output>
+              </div>
+            ) : null}
+            {item.bonusQty > 0 ? (
+              <div className="idsheet__field">
+                <span>Привезут, {unit}</span>
+                <output>{itemReceiveQty(item)}</output>
+              </div>
+            ) : null}
+            {item.discountPct > 0 ? (
+              <div className="idsheet__field">
+                <span>Скидка, %</span>
+                <output>{item.discountPct}%</output>
+              </div>
+            ) : null}
+          </>
+        )}
         <div className="idsheet__field">
           <span>Цена закупочная, ₸</span>
           <output>{formatPurchaseAmount(item.purchasePrice)}</output>
         </div>
+        {discount > 0 ? (
+          <div className="idsheet__field">
+            <span>Цена со скидкой, ₸</span>
+            <output>{formatPurchaseAmount(discountedPrice(item.purchasePrice, discount))}</output>
+          </div>
+        ) : null}
         <div className="idsheet__field idsheet__field--wide">
           <span>Итого</span>
-          <output>{formatPurchaseAmount(calcLineTotal(qty, item.purchasePrice))}</output>
+          <output>{formatPurchaseAmount(calcLineTotal(qty, item.purchasePrice, discount))}</output>
         </div>
       </div>
     </AdminModal>

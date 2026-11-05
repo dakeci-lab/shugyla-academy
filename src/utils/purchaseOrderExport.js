@@ -42,6 +42,33 @@ function formatQty(n) {
   return v.toLocaleString('ru-KZ', { maximumFractionDigits: 3 })
 }
 
+/** Column titles: the bonus and discount columns appear only when the order has any (an old order looks as before). */
+function exportHeader(mapped) {
+  return [
+    L.number,
+    L.product,
+    L.barcode,
+    L.qty,
+    ...(mapped.withBonus ? ['Бонус', 'Привезут'] : []),
+    L.price,
+    ...(mapped.withDiscount ? ['Скидка, %', 'Цена со скидкой'] : []),
+    L.amount,
+  ]
+}
+
+function exportRow(mapped, item, index) {
+  return [
+    index + 1,
+    item.productName,
+    item.barcode,
+    item.orderedQty,
+    ...(mapped.withBonus ? [item.bonusQty || '', item.receiveQty] : []),
+    item.purchasePrice,
+    ...(mapped.withDiscount ? [item.discountPct || '', item.discountedPrice] : []),
+    item.lineTotal,
+  ]
+}
+
 export async function exportPurchaseOrderXlsx(order) {
   const mapped = mapPurchaseOrderForExport(order)
   const XLSX = await import('xlsx')
@@ -54,23 +81,22 @@ export async function exportPurchaseOrderXlsx(order) {
     ['', L.createdBy, mapped.createdByName],
     ['', L.comment, mapped.comment],
     [],
-    [L.number, L.product, L.barcode, L.qty, L.price, L.amount],
-    ...mapped.items.map((item, index) => [
-      index + 1,
-      item.productName,
-      item.barcode,
-      item.orderedQty,
-      item.purchasePrice,
-      item.lineTotal,
-    ]),
+    exportHeader(mapped),
+    ...mapped.items.map((item, index) => exportRow(mapped, item, index)),
     [],
     ['', L.totalItems, mapped.itemsCount],
+    ...(mapped.withDiscount
+      ? [
+          ['', 'Сумма без скидки', mapped.baseTotal],
+          ['', 'Скидка', mapped.discountTotal],
+        ]
+      : []),
     ['', L.totalAmount, mapped.totalAmount],
   ]
 
   const wb = XLSX.utils.book_new()
   const ws = XLSX.utils.aoa_to_sheet(sheetRows)
-  ws['!cols'] = [{ wch: 5 }, { wch: 40 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 14 }]
+  ws['!cols'] = [{ wch: 5 }, { wch: 40 }, { wch: 18 }, ...exportHeader(mapped).slice(3).map(() => ({ wch: 14 }))]
   XLSX.utils.book_append_sheet(wb, ws, 'Заказ')
   const filename = `zakup_${mapped.number ? `${mapped.number}_` : ''}${safeFilenamePart(mapped.supplierName)}_${mapped.purchaseDate || 'export'}.xlsx`
   const out = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
@@ -95,21 +121,17 @@ export async function exportPurchaseOrderPdf(order) {
     pdfFontsModule.vfs
   if (vfs) pdfMake.vfs = vfs
 
+  const header = exportHeader(mapped)
   const body = [
-    [
-      { text: L.number, style: 'tableHeader' },
-      { text: L.product, style: 'tableHeader' },
-      { text: L.barcode, style: 'tableHeader' },
-      { text: L.qty, style: 'tableHeader' },
-      { text: L.price, style: 'tableHeader' },
-      { text: L.amount, style: 'tableHeader' },
-    ],
+    header.map((text) => ({ text, style: 'tableHeader' })),
     ...mapped.items.map((item, index) => [
       String(index + 1),
       item.productName || '',
       item.barcode || '',
       formatQty(item.orderedQty),
+      ...(mapped.withBonus ? [item.bonusQty ? `+${formatQty(item.bonusQty)}` : '', formatQty(item.receiveQty)] : []),
       formatMoney(item.purchasePrice),
+      ...(mapped.withDiscount ? [item.discountPct ? `${item.discountPct}%` : '', formatMoney(item.discountedPrice)] : []),
       formatMoney(item.lineTotal),
     ]),
   ]
@@ -142,13 +164,13 @@ export async function exportPurchaseOrderPdf(order) {
       {
         table: {
           headerRows: 1,
-          widths: [24, '*', 90, 50, 60, 60],
+          widths: [24, '*', 90, 46, ...(mapped.withBonus ? [40, 46] : []), 56, ...(mapped.withDiscount ? [40, 56] : []), 60],
           body,
         },
         layout: 'lightHorizontalLines',
       },
       {
-        text: `${L.totalItems}: ${mapped.itemsCount} · ${L.totalAmount}: ${formatMoney(mapped.totalAmount)}`,
+        text: `${L.totalItems}: ${mapped.itemsCount} · ${mapped.withDiscount ? `Без скидки: ${formatMoney(mapped.baseTotal)} · Скидка: ${formatMoney(mapped.discountTotal)} · ` : ''}${L.totalAmount}: ${formatMoney(mapped.totalAmount)}`,
         style: 'total',
         margin: [0, 12, 0, 0],
       },

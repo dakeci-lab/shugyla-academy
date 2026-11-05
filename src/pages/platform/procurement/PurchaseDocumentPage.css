@@ -1031,3 +1031,97 @@
     font-size: 16px;
   }
 }
+
+/* Bonus and discount (stage 29): promo / bonus / discount cells, the invoice discount row, the saving line. */
+.pdoc__promo {
+  width: 56px;
+}
+
+.pdoc__c-bonus .pdoc__qty,
+.pdoc__c-disc .pdoc__qty {
+  width: 64px;
+}
+
+.pdoc__c-promo,
+.pdoc__c-bonus,
+.pdoc__c-disc {
+  width: 1%;
+}
+
+@media (min-width: 641px) {
+  .pdoc__table .pdoc__c-name {
+    min-width: 220px;
+  }
+}
+
+.pdoc__discount {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 12px;
+  margin: 0 0 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--pf-control-radius, 8px);
+  background: var(--color-white, #fff);
+}
+
+.pdoc__discount-label {
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.pdoc__discount .pdoc__qty {
+  width: 84px;
+}
+
+.pdoc__discount-hint {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.pdoc__saving {
+  margin-left: auto;
+  white-space: nowrap;
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.pdoc__c-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--color-primary, #0f9d58);
+}
+
+.pdoc__bonus-inline {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-primary, #0f9d58);
+}
+
+@media (max-width: 640px) {
+  /* Phones: the extra columns do not fit a row — bonus and discount ride in the note under the name, the editing is in the product sheet. */
+  .pdoc__c-promo,
+  .pdoc__c-bonus,
+  .pdoc__c-receive,
+  .pdoc__c-disc,
+  .pdoc__c-dprice,
+  .pdoc__total-extra {
+    display: none !important;
+  }
+
+  .pdoc__discount {
+    margin: 0 0 8px;
+    border-left: 0;
+    border-right: 0;
+    border-radius: 0;
+  }
+
+  .pdoc__saving {
+    flex: 1 1 100%;
+    margin: 0;
+    padding: 0 16px 4px;
+  }
+}
