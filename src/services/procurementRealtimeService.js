@@ -14,10 +14,13 @@ const RECONNECT_MAX_MS = 30_000
 const CHANNEL_NAME = 'procurement-sync'
 
 /** Tables that drive the procurement UI in cloudStore. */
-export const PROCUREMENT_REALTIME_TABLES = [
-  'purchase_orders',
-  'purchase_order_items',
-]
+// Only the order headers: the lists show `total_amount` / `items_count`, which the database triggers on
+// purchase_order_items keep up to date — so every item change already arrives as an update of its order.
+// Listening to the items table as well made every edited row reload the whole list on every open device.
+export const PROCUREMENT_REALTIME_TABLES = ['purchase_orders']
+
+/** More changed orders than this in one burst — just do the full soft reload. */
+export const PROCUREMENT_REALTIME_MAX_IDS = 20
 
 /**
  * @typedef {'idle' | 'subscribed' | 'reconnecting' | 'error' | 'offline'} ProcurementRealtimeStatus
@@ -46,6 +49,8 @@ export function subscribeProcurementRealtime(onSync, options = {}) {
   let queuedAfterInFlight = false
   let lastSuccessfulSyncAt = 0
   let channel = null
+  const pendingOrderIds = new Set()
+  let pendingFull = false
 
   function setStatus(status, detail) {
     if (disposed) return
@@ -71,8 +76,15 @@ export function subscribeProcurementRealtime(onSync, options = {}) {
       return
     }
 
+    const orderIds =
+      !pendingFull && pendingOrderIds.size > 0 && pendingOrderIds.size <= PROCUREMENT_REALTIME_MAX_IDS
+        ? [...pendingOrderIds]
+        : null
+    pendingOrderIds.clear()
+    pendingFull = false
+
     inFlight = Promise.resolve()
-      .then(() => onSync({ source }))
+      .then(() => onSync({ source, orderIds }))
       .then(() => {
         markSyncSuccess()
       })
@@ -95,6 +107,8 @@ export function subscribeProcurementRealtime(onSync, options = {}) {
   // N events) into one reload; a continuous stream still reloads every MAX_WAIT_MS.
   function scheduleSync(source) {
     if (disposed) return
+    // Any trigger that does not name orders (reconnect, online, ...) needs the full reload.
+    if (!source.startsWith('realtime:order')) pendingFull = true
     const now = Date.now()
     if (!burstStartedAt) burstStartedAt = now
     const waited = now - burstStartedAt
@@ -130,7 +144,15 @@ export function subscribeProcurementRealtime(onSync, options = {}) {
       nextChannel = nextChannel.on(
         'postgres_changes',
         { event: '*', schema: 'public', table },
-        () => scheduleSync(`realtime:${table}`)
+        (payload) => {
+          const id = payload?.new?.id ?? payload?.old?.id
+          if (id) {
+            pendingOrderIds.add(id)
+            scheduleSync('realtime:order')
+          } else {
+            scheduleSync(`realtime:${table}`)
+          }
+        }
       )
     }
     return nextChannel

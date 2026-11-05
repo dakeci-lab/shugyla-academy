@@ -53,7 +53,7 @@ function defaultReceiverFilter() {
 export default function OrdersPage() {
   const { user } = useSession()
   const { error: showError } = useToast()
-  const { loadError, reloadProcurement, ensureModules, version: dataVersion } = usePlatformData()
+  const { loadError, reloadProcurement, ensureModules, ensureOrdersFrom, version: dataVersion } = usePlatformData()
   // Swipe reloads just the orders (not suppliers, not employees).
   usePlatformPageRefresh(() => reloadProcurement())
   const { version } = useAdminRefresh()
@@ -81,6 +81,12 @@ export default function OrdersPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(50)
+
+  // The list holds only the recent window of orders; an earlier period in the filter fetches the older ones.
+  useEffect(() => {
+    if (!filter.dateFrom) return
+    void ensureOrdersFrom(filter.dateFrom).catch(() => {})
+  }, [filter.dateFrom, ensureOrdersFrom])
 
   useEffect(() => {
     if (!canView || !isCloudMode()) return undefined

@@ -9,9 +9,11 @@ import { PROCUREMENT_FRESH_MS } from '../lib/procurementFreshness'
  * No 5–15s polling — refresh only on postgres_changes, visibility/focus/online, or reconnect.
  */
 export function useProcurementRealtime(enabled = true) {
-  const { reloadProcurement } = usePlatformData()
+  const { reloadProcurement, reloadProcurementOrders } = usePlatformData()
   const reloadRef = useRef(reloadProcurement)
   reloadRef.current = reloadProcurement
+  const reloadOrdersRef = useRef(reloadProcurementOrders)
+  reloadOrdersRef.current = reloadProcurementOrders
   const [connectionStatus, setConnectionStatus] = useState('idle')
 
   useEffect(() => {
@@ -21,7 +23,12 @@ export function useProcurementRealtime(enabled = true) {
     }
 
     return subscribeProcurementRealtime(
-      async ({ source } = {}) => {
+      async ({ source, orderIds } = {}) => {
+        // The event named the changed orders: re-read just those headers.
+        if (orderIds?.length) {
+          await reloadOrdersRef.current(orderIds)
+          return
+        }
         // Passive triggers (focus / visibility / re-subscribe) only top up data that
         // went stale; change events and reconnects always fetch.
         const passive =

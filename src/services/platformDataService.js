@@ -2,6 +2,8 @@ import { isCloudMode, getDataModeLabel, getDataModeVariant } from '../lib/dataMo
 import {
   clearCloudStore,
   patchCloudStore,
+  mergeCloudPurchases,
+  dropCloudPurchase,
   ensureCloudStoreReady,
   getCloudStore,
   getCloudEmployees,
@@ -140,7 +142,7 @@ async function loadModule(moduleName) {
       return
     }
     case 'procurement': {
-      const data = await supabaseAdapter.fetchPurchasesModuleData()
+      const data = await supabaseAdapter.fetchPurchasesModuleData(purchasesFetchOptions())
       patchCloudStore(data)
       markModuleReady('procurement')
       return
@@ -305,13 +307,59 @@ async function withOneRetry(load, delayMs = 700) {
   }
 }
 
+// --- Окно заказов -------------------------------------------------------------------------------------------
+// Список «Закуп» / «Приёмка» не грузит заказы за всё время: только созданные или с доставкой не раньше границы
+// (по умолчанию 45 дней назад) и все черновики. Если в фильтре выбран более ранний период, граница сдвигается
+// (`ensurePurchaseOrdersFrom`) и дальше полные обновления берут уже её.
+const ORDERS_WINDOW_DAYS = 45
+const DAY_MS = 24 * 60 * 60 * 1000
+let ordersCoveredFrom = null
+
+function dateKeyDaysAgo(days) {
+  return new Date(Date.now() - days * DAY_MS).toISOString().slice(0, 10)
+}
+
+function purchasesFetchOptions() {
+  if (!ordersCoveredFrom) ordersCoveredFrom = dateKeyDaysAgo(ORDERS_WINDOW_DAYS)
+  return { fromDateKey: ordersCoveredFrom }
+}
+
+/** Догрузить заказы, если выбранный в фильтре период начинается раньше уже загруженного окна. */
+export async function ensurePurchaseOrdersFrom(dateKey) {
+  if (!isCloudMode() || !dateKey) return false
+  const covered = purchasesFetchOptions().fromDateKey
+  // На сутки раньше: дата создания хранится в UTC, период выбирают по местной дате.
+  const target = new Date(new Date(`${dateKey}T00:00:00Z`).getTime() - DAY_MS).toISOString().slice(0, 10)
+  if (target >= covered) return false
+  const data = await supabaseAdapter.fetchPurchasesModuleData({ fromDateKey: target })
+  ensureCloudStoreReady()
+  mergeCloudPurchases(data.purchases)
+  ordersCoveredFrom = target
+  notifyModulesChanged()
+  return true
+}
+
+/** Событие Realtime касается нескольких заказов: перечитываем только их заголовки, а не весь список. */
+export async function refreshPurchaseOrdersByIds(ids) {
+  if (!isCloudMode()) return null
+  const list = [...new Set(ids || [])].filter(Boolean)
+  if (list.length === 0) return null
+  const fresh = await supabaseAdapter.fetchPurchaseOrderHeadersByIds(list)
+  ensureCloudStoreReady()
+  mergeCloudPurchases(fresh)
+  const found = new Set(fresh.map((order) => order.id))
+  list.filter((id) => !found.has(id)).forEach((id) => dropCloudPurchase(id))
+  notifyModulesChanged()
+  return fresh
+}
+
 async function runProcurementRefresh() {
   markModuleLoading('procurement')
   notifyModulesChanged()
 
   let purchasesResult
   try {
-    purchasesResult = { status: 'fulfilled', value: await withOneRetry(() => supabaseAdapter.fetchPurchasesModuleData()) }
+    purchasesResult = { status: 'fulfilled', value: await withOneRetry(() => supabaseAdapter.fetchPurchasesModuleData(purchasesFetchOptions())) }
   } catch (reason) {
     purchasesResult = { status: 'rejected', reason }
   }

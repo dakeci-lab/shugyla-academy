@@ -4,6 +4,8 @@ import { isCloudMode } from '../lib/dataMode'
 import {
   initializeData,
   refreshProcurementData,
+  refreshPurchaseOrdersByIds,
+  ensurePurchaseOrdersFrom,
   refreshModules,
   ensureModulesLoaded,
   getRouteCriticalModules,
@@ -24,6 +26,8 @@ const PlatformDataContext = createContext({
   moduleStates: {},
   reload: async () => {},
   reloadProcurement: async () => {},
+  reloadProcurementOrders: async () => {},
+  ensureOrdersFrom: async () => {},
   reloadModules: async () => {},
   ensureModules: async () => {},
   notifyChange: () => {},
@@ -110,6 +114,24 @@ export function PlatformDataProvider({ children }) {
         setLoadError(null)
       }
       bumpVersion()
+    },
+    [cloudMode, bumpVersion]
+  )
+
+  // A realtime event touched a few orders: re-read only their headers (not the whole list).
+  const reloadProcurementOrders = useCallback(
+    async (ids) => {
+      if (cloudMode) await refreshPurchaseOrdersByIds(ids)
+      bumpVersion()
+    },
+    [cloudMode, bumpVersion]
+  )
+
+  // The filter period starts before the loaded window: fetch the older orders too.
+  const ensureOrdersFrom = useCallback(
+    async (dateKey) => {
+      if (!cloudMode) return
+      if (await ensurePurchaseOrdersFrom(dateKey)) bumpVersion()
     },
     [cloudMode, bumpVersion]
   )
@@ -254,6 +276,8 @@ export function PlatformDataProvider({ children }) {
         moduleStates,
         reload,
         reloadProcurement,
+        reloadProcurementOrders,
+        ensureOrdersFrom,
         reloadModules,
         ensureModules,
         notifyChange,

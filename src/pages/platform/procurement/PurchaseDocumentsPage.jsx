@@ -77,7 +77,7 @@ function defaultPeriod() {
 export default function PurchaseDocumentsPage() {
   const { user } = useSession()
   const { error: showError, success: showSuccess } = useToast()
-  const { loadError, reloadProcurement, ensureModules, version: dataVersion } = usePlatformData()
+  const { loadError, reloadProcurement, ensureModules, ensureOrdersFrom, version: dataVersion } = usePlatformData()
   // Swipe reloads just the orders (not suppliers, not employees).
   usePlatformPageRefresh(() => reloadProcurement())
   const { version } = useAdminRefresh()
@@ -114,6 +114,12 @@ export default function PurchaseDocumentsPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const selectAllRef = useRef(null)
+
+  // The list holds only the recent window of orders; an earlier period in the filter fetches the older ones.
+  useEffect(() => {
+    if (!filter.dateFrom) return
+    void ensureOrdersFrom(filter.dateFrom).catch(() => {})
+  }, [filter.dateFrom, ensureOrdersFrom])
 
   useEffect(() => {
     if (!canView || !isCloudMode()) return undefined
