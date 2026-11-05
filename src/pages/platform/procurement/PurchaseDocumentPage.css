@@ -1026,7 +1026,7 @@
     flex: 1 1 100%;
     max-width: none;
     min-height: 44px;
-    margin: 4px 16px 8px 0;
+    margin: 4px 0 8px 16px;
     /* 16px keeps iOS Safari from zooming the page on focus */
     font-size: 16px;
   }
