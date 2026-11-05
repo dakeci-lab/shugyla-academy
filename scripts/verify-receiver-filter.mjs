@@ -103,5 +103,10 @@ ok('phones: the tick of a row of the receiving view stands on the right, in the 
 assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.jsx'), /\(!isPhone \|\| !editable\)/)
 assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /\.pdoc__table-search \{\s*order: 5;\s*flex: 1 1 100%/)
 ok('phones: «Поиск по таблице» is a full-width field under «Товары (N)» / «Сверено» for read-only documents (the draft has its own add-field)')
+const docSrc = read('src/pages/platform/procurement/PurchaseDocumentPage.jsx')
+assert.match(docSrc, /const showTicks = showChecklist && !order\?\.checkedAt/)
+assert.match(docSrc, /\{showTicks \? \(\s*<th className="pdoc__c-check">/)
+assert.match(docSrc, /\{showTicks \? \(\s*<td className="pdoc__c-check">/)
+ok('after «Сохранить» the whole tick column (head and rows) is gone from the saved receiving, not just disabled')
 
 console.log(`\nverify:receiver-filter — ${checks} checks passed`)
