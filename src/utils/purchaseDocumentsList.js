@@ -83,13 +83,39 @@ export function selectPurchaseDocuments(orders, filter, itemOrderIds, { chronolo
  * Pure list logic of the receiver's «Заказы»: saved orders only, cut by the expected delivery date,
  * the nearest delivery last-to-first, then by supplier.
  */
-export function selectReceiverOrders(orders, { dateFrom, dateTo }) {
+/** Statuses of the receiver's filter: the whole document is «Сверено» (the receiver ticked it) or not yet. */
+export const RECEIVER_STATUS = Object.freeze({ CHECKED: 'checked', UNCHECKED: 'unchecked' })
+
+export const DEFAULT_RECEIVER_FILTER = Object.freeze({ supplierIds: [], status: '', q: '' })
+
+/**
+ * The receiver's list: saved orders whose DELIVERY date is in the period, narrowed by supplier, by «Сверено» / «Не сверено»
+ * and by a text (an order number, the supplier's name, or — via `itemOrderIds`, found on the server — an item's name / barcode).
+ */
+export function selectReceiverOrders(orders, filter, itemOrderIds = null) {
+  const { dateFrom, dateTo } = filter
+  const suppliers = new Set(filter.supplierIds || [])
+  const q = String(filter.q || '').trim().toLowerCase()
   return orders
     .filter(isOrderSaved)
     .filter(
       (order) =>
         order.expectedDeliveryDate && order.expectedDeliveryDate >= dateFrom && order.expectedDeliveryDate <= dateTo
     )
+    .filter((order) => !suppliers.size || suppliers.has(order.supplierId))
+    .filter((order) => {
+      if (filter.status === RECEIVER_STATUS.CHECKED) return Boolean(order.checkedAt)
+      if (filter.status === RECEIVER_STATUS.UNCHECKED) return !order.checkedAt
+      return true
+    })
+    .filter((order) => {
+      if (!q) return true
+      return (
+        String(order.number ?? '').includes(q) ||
+        (order.supplierName || '').toLowerCase().includes(q) ||
+        Boolean(itemOrderIds?.has(order.id))
+      )
+    })
     .sort(
       (a, b) =>
         (b.expectedDeliveryDate || '').localeCompare(a.expectedDeliveryDate || '') ||

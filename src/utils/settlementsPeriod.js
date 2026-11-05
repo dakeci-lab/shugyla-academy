@@ -6,6 +6,7 @@
 export const SETTLEMENTS_PERIOD_PRESET = {
   YESTERDAY: 'yesterday',
   TODAY: 'today',
+  TOMORROW: 'tomorrow',
   WEEK: 'week',
   MONTH: 'month',
   THREE_MONTHS: 'three_months',
@@ -19,6 +20,15 @@ export const SETTLEMENTS_PERIOD_PRESET_OPTIONS = [
   { id: SETTLEMENTS_PERIOD_PRESET.WEEK, label: 'Неделя', shortLabel: 'Неделя' },
   { id: SETTLEMENTS_PERIOD_PRESET.MONTH, label: 'Месяц', shortLabel: 'Месяц' },
   { id: SETTLEMENTS_PERIOD_PRESET.THREE_MONTHS, label: 'Три месяца', shortLabel: '3 мес' },
+]
+
+// The receiver's «Заказы»: what has arrived (вчера), what comes today and tomorrow, then the week and the month.
+export const ORDERS_PERIOD_PRESET_OPTIONS = [
+  { id: SETTLEMENTS_PERIOD_PRESET.YESTERDAY, label: 'Вчера', shortLabel: 'Вчера' },
+  { id: SETTLEMENTS_PERIOD_PRESET.TODAY, label: 'Сегодня', shortLabel: 'Сегодня' },
+  { id: SETTLEMENTS_PERIOD_PRESET.TOMORROW, label: 'Завтра', shortLabel: 'Завтра' },
+  { id: SETTLEMENTS_PERIOD_PRESET.WEEK, label: 'Неделя', shortLabel: 'Неделя' },
+  { id: SETTLEMENTS_PERIOD_PRESET.MONTH, label: 'Месяц', shortLabel: 'Месяц' },
 ]
 
 const MONTHS_RU = [
@@ -161,6 +171,10 @@ export function getSettlementsPeriodDates(presetId, reference = new Date()) {
   if (presetId === SETTLEMENTS_PERIOD_PRESET.TODAY) {
     return { dateFrom: today, dateTo: today }
   }
+  if (presetId === SETTLEMENTS_PERIOD_PRESET.TOMORROW) {
+    const day = addDaysToDateKey(today, 1)
+    return { dateFrom: day, dateTo: day }
+  }
   if (presetId === SETTLEMENTS_PERIOD_PRESET.WEEK) {
     const dateFrom = startOfWeekMonday(today)
     return { dateFrom, dateTo: addDaysToDateKey(dateFrom, 6) }
@@ -211,6 +225,8 @@ function isThreeMonthRange(dateFrom, dateTo) {
 export function resolveSettlementsPeriodPreset(dateFrom, dateTo, reference = new Date()) {
   const today = toSettlementsDateKey(reference)
   const yesterday = addDaysToDateKey(today, -1)
+  const tomorrow = addDaysToDateKey(today, 1)
+  if (dateFrom === tomorrow && dateTo === tomorrow) return SETTLEMENTS_PERIOD_PRESET.TOMORROW
   if (dateFrom === today && dateTo === today) return SETTLEMENTS_PERIOD_PRESET.TODAY
   if (dateFrom === yesterday && dateTo === yesterday) return SETTLEMENTS_PERIOD_PRESET.YESTERDAY
   if (isWeekRange(dateFrom, dateTo)) return SETTLEMENTS_PERIOD_PRESET.WEEK
@@ -251,6 +267,7 @@ export function shiftSettlementsPeriod(preset, dateFrom, dateTo, direction) {
   const dir = direction < 0 ? -1 : 1
   if (
     preset === SETTLEMENTS_PERIOD_PRESET.TODAY ||
+    preset === SETTLEMENTS_PERIOD_PRESET.TOMORROW ||
     preset === SETTLEMENTS_PERIOD_PRESET.YESTERDAY ||
     (preset === SETTLEMENTS_PERIOD_PRESET.CUSTOM && dateFrom === dateTo)
   ) {
@@ -336,6 +353,7 @@ export function describeSettlementsPeriod(dateFrom, dateTo, reference = new Date
   const preset = resolveSettlementsPeriodPreset(dateFrom, dateTo, reference)
   if (preset === SETTLEMENTS_PERIOD_PRESET.YESTERDAY) return 'Вчера'
   if (preset === SETTLEMENTS_PERIOD_PRESET.TODAY) return 'Сегодня'
+  if (preset === SETTLEMENTS_PERIOD_PRESET.TOMORROW) return 'Завтра'
   if (preset === SETTLEMENTS_PERIOD_PRESET.WEEK) return 'Неделя'
   if (preset === SETTLEMENTS_PERIOD_PRESET.MONTH) {
     const current = getMonthPeriodKeys(reference)

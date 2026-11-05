@@ -4,12 +4,12 @@
   gap: 1rem;
 }
 
+/* The quick periods and the filter button in one row (the phone has only the filter row, full width). */
 .orders-page__bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.25rem 1rem;
-  border-bottom: 1px solid var(--color-border, #e5e7eb);
+  align-items: center;
+  gap: 8px 10px;
 }
 
 .orders-page__tab {
@@ -30,8 +30,14 @@
 }
 
 .orders-page__filter {
-  margin-left: auto;
-  padding-bottom: 0.4rem;
+  flex: none;
+}
+
+@media (max-width: 640px) {
+  .orders-page__filter {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
 }
 
 .orders-page__error {

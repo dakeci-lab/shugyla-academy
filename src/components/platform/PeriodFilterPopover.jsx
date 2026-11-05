@@ -27,7 +27,7 @@ export {
   getSettlementsPeriodDates,
 }
 
-function PeriodFilterFields({ draft, onChange, phone = false, presetsOnly = false }) {
+function PeriodFilterFields({ draft, onChange, phone = false, presetsOnly = false, presetOptions = SETTLEMENTS_PERIOD_PRESET_OPTIONS }) {
   const navigatorLabel = phone
     ? formatSettlementsPeriodRangeLabel(draft.dateFrom, draft.dateTo)
     : formatSettlementsPeriodNavigatorLabel(draft.periodPreset, draft.dateFrom, draft.dateTo)
@@ -71,7 +71,7 @@ function PeriodFilterFields({ draft, onChange, phone = false, presetsOnly = fals
     <div className={`period-filter-popover__section${phone ? ' period-filter-popover__section--phone' : ''}`}>
       <span className="period-filter-popover__label">{phone ? 'За период' : 'Период'}</span>
       <div className="period-filter-popover__presets" role="group" aria-label="Быстрый период">
-        {SETTLEMENTS_PERIOD_PRESET_OPTIONS.map((preset) => {
+        {presetOptions.map((preset) => {
           const active = draft.periodPreset === preset.id
           return (
             <button
@@ -173,6 +173,7 @@ function computePopoverStyle(anchorEl, popoverEl) {
  * portal popover / mobile AdminModal. Used by «Поставщики» cards and «Приёмка»;
  * `getDefaults` says what «Сбросить» returns for the page (default: current month).
  * `children` are extra page-specific options shown under the period (e.g. a checkbox).
+ * `presetOptions` — the quick periods of the page (default: the settlements ones; «Заказы» have their own with «Завтра»).
  * `presetsOnly` keeps just the quick period chips (a list that has no custom range, like the receiver's «Заказы»).
  * `showPeriod={false}` turns it into a plain option popover (only `children`, e.g. the planner).
  */
@@ -187,6 +188,7 @@ export default function PeriodFilterPopover({
   getDefaults = getSettlementsPeriodDefaults,
   showPeriod = true,
   presetsOnly = false,
+  presetOptions = SETTLEMENTS_PERIOD_PRESET_OPTIONS,
   children = null,
 }) {
   const popoverRef = useRef(null)
@@ -273,7 +275,7 @@ export default function PeriodFilterPopover({
         }
       >
         <div className="period-sheet">
-          {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} phone presetsOnly={presetsOnly} /> : null}
+          {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} phone presetsOnly={presetsOnly} presetOptions={presetOptions} /> : null}
           {children}
         </div>
       </AdminModal>
@@ -300,7 +302,7 @@ export default function PeriodFilterPopover({
       <h2 id="period-filter-popover-title" className="period-filter-popover__sr-title">
         Фильтр
       </h2>
-      {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} presetsOnly={presetsOnly} /> : null}
+      {showPeriod ? <PeriodFilterFields draft={draft} onChange={onChange} presetsOnly={presetsOnly} presetOptions={presetOptions} /> : null}
       {children}
       <div className="period-filter-popover__actions">{actions}</div>
     </div>,
