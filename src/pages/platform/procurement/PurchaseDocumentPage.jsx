@@ -64,8 +64,9 @@ import './PurchaseDocumentPage.css'
  * Документ закупа — /platform/procurement/documents/:id. Черновик правится целиком и сохраняет каждое
  * изменение сразу (отдельного «сохранить как черновик» нет); «Сохранить» присваивает номер и отдаёт заказ приёмщику.
  * Сохранённый заказ только читается: «Отменить» возвращает его в черновик (номер остаётся).
- * Приёмщик (/platform/orders/:id) видит тот же документ только для чтения: галочки по строкам (помнятся в браузере)
- * и общая отметка «Сверено».
+ * Из «Заказов» (/platform/orders/:id) документ открывается ВСЕМ ролям одинаково, только для чтения (вид приёмки):
+ * цены и суммы видны, галочки по строкам (помнятся в браузере) и общая отметка «Сверено», кнопка «Скачать»;
+ * без «Отменить» и без правки — это есть только в «Закупе».
  */
 export default function PurchaseDocumentPage() {
   const { id } = useParams()
@@ -77,7 +78,11 @@ export default function PurchaseDocumentPage() {
   const { success: showSuccess, error: showError } = useToast()
 
   const canView = canViewOrders(user)
-  const canEdit = canEditPurchase(user)
+  // The view follows the ADDRESS, not the role: «Заказы» (/platform/orders/:id) is the receiving view for everyone who
+  // reaches it (the director and the buyer too) — read only, a tick per row and «Сверено»; the buyer's editing document
+  // lives under «Закуп» (/platform/procurement/documents/:id).
+  const receivingView = documentListPath(pathname) === '/platform/orders'
+  const canEdit = canEditPurchase(user) && !receivingView
   const canMarkChecked = canMarkOrderChecked(user)
   // Back goes to the list the document was opened from (by the address), not by the user's rights:
   // a director opening an order from «Заказы» must return to «Заказы», not to «Закуп».
