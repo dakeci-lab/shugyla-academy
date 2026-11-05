@@ -97,6 +97,8 @@ export default function PurchaseDocumentPage() {
   const [commentBlockOpen, setCommentBlockOpen] = useState(false)
   const [exportOpen, setExportOpen] = useState(false)
   const [ticks, setTicks] = useState(() => new Set())
+  // «Поиск по таблице» above the product table (web): by name or barcode; the numbers and the totals stay those of the whole document.
+  const [tableQuery, setTableQuery] = useState('')
   const [nomenclatureOpen, setNomenclatureOpen] = useState(false)
   const [qtyDraft, setQtyDraft] = useState({})
   const [detailId, setDetailId] = useState(null)
@@ -447,6 +449,20 @@ export default function PurchaseDocumentPage() {
   const total = documentTotal(items)
   const commentLabel = readerView ? '' : order.comment ? 'Комментарий' : editable ? 'Добавить комментарий' : ''
   const doneCount = items.filter((item) => ticks.has(item.id)).length
+  const tableText = tableQuery.trim().toLowerCase()
+  const shownRows = items
+    .map((item, index) => ({ item, index }))
+    .filter(
+      ({ item }) =>
+        !tableText ||
+        String(item.productName || '').toLowerCase().includes(tableText) ||
+        String(item.barcode || '').includes(tableText)
+    )
+  // The quantity total of the footer: what is ordered in the whole document (the draft being typed counts as typed).
+  const totalQty = items.reduce(
+    (sum, item) => sum + (Number(qtyDraft[item.id] !== undefined ? qtyDraft[item.id] : item.orderQty) || 0),
+    0
+  )
 
   return (
     <div className={`pdoc${editable ? ' pdoc--editable' : ''}${isPhone && saved && itemsReady && items.length > 0 ? ' pdoc--has-download-bar' : ''}`}>
@@ -626,6 +642,17 @@ export default function PurchaseDocumentPage() {
       <section className="pdoc__items">
         <div className="pdoc__items-head">
           <h2 className="pdoc__items-title">{itemsReady ? `Товары (${items.length})` : 'Товары'}</h2>
+          {itemsReady && items.length > 0 && !isPhone ? (
+            <input
+              type="search"
+              className="pdoc__table-search"
+              placeholder="Поиск по таблице"
+              aria-label="Поиск по таблице"
+              value={tableQuery}
+              onChange={(event) => setTableQuery(event.target.value)}
+              autoComplete="off"
+            />
+          ) : null}
           {showChecklist && !order.checkedAt ? (
             <>
               <span className="pdoc__spacer" />
@@ -676,7 +703,14 @@ export default function PurchaseDocumentPage() {
                     </td>
                   </tr>
                 ) : null}
-                {items.map((item, index) => (
+                {items.length > 0 && shownRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="pdoc__empty">
+                      Ничего не найдено.
+                    </td>
+                  </tr>
+                ) : null}
+                {shownRows.map(({ item, index }) => (
                   <tr key={item.id} className={showChecklist && ticks.has(item.id) ? 'is-done' : ''}>
                     {showChecklist ? (
                       <td className="pdoc__c-check">
@@ -757,7 +791,9 @@ export default function PurchaseDocumentPage() {
               </tbody>
               <tfoot>
                 <tr className="pdoc__total-row">
-                  <td colSpan={(showChecklist ? 1 : 0) + (readerView ? 5 : 7)}>Итого</td>
+                  <td colSpan={(showChecklist ? 1 : 0) + 3 + (readerView ? 0 : 2)}>Итого</td>
+                  <td className="r num pdoc__total-qty">{totalQty.toLocaleString('ru-RU', { maximumFractionDigits: 3 })}</td>
+                  <td />
                   <td className="r num">{formatPurchaseAmount(total)}</td>
                   {editable ? <td /> : null}
                 </tr>
