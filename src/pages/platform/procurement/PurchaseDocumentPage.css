@@ -993,3 +993,11 @@
     background: var(--color-white, #fff);
   }
 }
+
+/* Phones: the totals bar shows «Итого» and the sum only (the quantity total is a web column). */
+@media (max-width: 640px) {
+  .pdoc__table tfoot .pdoc__total-qty,
+  .pdoc__table tfoot .pdoc__total-gap {
+    display: none;
+  }
+}
