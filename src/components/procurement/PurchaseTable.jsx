@@ -18,7 +18,7 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
   const navigate = useNavigate()
 
   // Like the web table of «Закуп», with the delivery first (the receiver's main date): number (green, opens the order),
-  // delivery, supplier, created, items, sum, creator, comment. A not yet checked order looks like a draft (muted italic),
+  // delivery, supplier, created, items, sum, who accepted (blank until the order is saved as checked), comment. A not yet checked order looks like a draft (muted italic),
   // a checked one like a saved document (green number, green line under the sum). No «Сверено» column: the look says it.
   const columns = [
     { key: 'number', label: 'Номер', width: 90, mobile: 'hide' },
@@ -27,7 +27,7 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
     { key: 'created', label: 'Создан', width: 100, mobile: 'hide' },
     { key: 'items', label: 'Позиций', width: 64, align: 'end', mobile: 'hide' },
     { key: 'amount', label: 'Сумма', width: 120, align: 'end', mobile: 'end' },
-    { key: 'creator', label: 'Создал', width: 140, mobile: 'hide' },
+    { key: 'creator', label: 'Принял', width: 140, mobile: 'hide' },
     { key: 'comment', label: 'Комментарий', width: 140, mobile: 'hide' },
     { key: 'edit', label: '', width: 44, align: 'end', mobile: 'hide' },
   ]
@@ -75,7 +75,7 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
                   {formatPurchaseAmount(order.totalAmount)}
                 </span>
               ),
-              creator: <span>{order.createdByName || '—'}</span>,
+              creator: <span>{order.checkedAt ? order.checkedByName || '—' : ''}</span>,
               comment: <span className="ord-comment">{order.comment || ''}</span>,
               delivery: <span className="num">{order.expectedDeliveryDate ? formatPurchaseDate(order.expectedDeliveryDate) : '—'}</span>,
             }}

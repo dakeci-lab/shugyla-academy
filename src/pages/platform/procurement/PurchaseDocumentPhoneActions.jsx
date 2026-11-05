@@ -6,7 +6,7 @@ import './PurchaseDocumentPhoneActions.css'
  * «cancel» icon. Nothing else: the comment is its own collapsible block in the document, «Скачать» is the green
  * button of the bottom bar. The handlers are read from `handlersRef` at click time, so the header node stays stable.
  */
-export default function PurchaseDocumentPhoneActions({ handlersRef, busy, showSave, showDelete, showCancel }) {
+export default function PurchaseDocumentPhoneActions({ handlersRef, busy, showSave, showDelete, showCancel, cancelLabel = 'Отменить заказ' }) {
   const call = (name) => () => handlersRef.current?.[name]?.()
 
   return (
@@ -37,7 +37,7 @@ export default function PurchaseDocumentPhoneActions({ handlersRef, busy, showSa
         <button
           type="button"
           className="platform-mobile-header__icon-btn pdoc-phone-actions__cancel"
-          aria-label="Отменить заказ"
+          aria-label={cancelLabel}
           disabled={busy}
           onClick={call('cancel')}
         >

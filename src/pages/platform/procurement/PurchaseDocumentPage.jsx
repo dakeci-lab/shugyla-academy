@@ -212,13 +212,14 @@ export default function PurchaseDocumentPage() {
         <PurchaseDocumentPhoneActions
           handlersRef={phoneHandlersRef}
           busy={busy}
-          showSave={editable}
+          showSave={editable || Boolean(showChecklist && !order?.checkedAt)}
           showDelete={canEdit && draft}
-          showCancel={canEdit && saved}
+          showCancel={(canEdit && saved) || Boolean(showChecklist && order?.checkedAt)}
+          cancelLabel={showChecklist ? 'Отменить приёмку' : 'Отменить заказ'}
         />
       ) : null,
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [isPhone, Boolean(order), busy, editable, canEdit, draft, saved]
+    [isPhone, Boolean(order), busy, editable, canEdit, draft, saved, showChecklist, order?.checkedAt]
   )
 
   usePlatformPageTitle(getPlatformSection(pathname).title, '', {
@@ -394,7 +395,28 @@ export default function PurchaseDocumentPage() {
 
   async function handleChecked(checked) {
     const result = await run(() => setPurchaseOrderChecked(order.id, checked, user), 'Не удалось сохранить отметку.')
-    if (result?.id) setFullOrder(result)
+    if (result?.id) {
+      setFullOrder(result)
+      showSuccess(checked ? 'Приёмка сохранена.' : 'Приёмка отменена: заказ можно сверять заново.')
+    }
+  }
+
+  /** «Сохранить» of the receiving view: the order becomes checked on the name of whoever saved it; an incomplete tick list asks first. */
+  async function handleReceive() {
+    if (!showChecklist || order.checkedAt || busy) return
+    if (doneCount < items.length) {
+      setConfirm('receive')
+      return
+    }
+    await handleChecked(true)
+  }
+
+  /** The «all rows» tick of the table head: ticks everything, or clears everything when everything is ticked. */
+  function toggleAllTicks() {
+    const everything = items.length > 0 && items.every((item) => ticks.has(item.id))
+    const next = everything ? new Set() : new Set(items.map((item) => item.id))
+    saveOrderChecklist(id, next)
+    setTicks(next)
   }
 
   async function handleSaveComment() {
@@ -404,9 +426,9 @@ export default function PurchaseDocumentPage() {
 
   if (!canView) return <PlatformAccessDenied title="Нет доступа к разделу «Закуп»" />
   phoneHandlersRef.current = {
-    save: handleSave,
+    save: showChecklist ? handleReceive : handleSave,
     remove: () => setConfirm('delete'),
-    cancel: () => setConfirm('cancel'),
+    cancel: () => setConfirm(showChecklist ? 'unreceive' : 'cancel'),
     export: (kind) => void handleExport(kind),
   }
 
@@ -430,8 +452,13 @@ export default function PurchaseDocumentPage() {
     <div className={`pdoc${editable ? ' pdoc--editable' : ''}${isPhone && saved && itemsReady && items.length > 0 ? ' pdoc--has-download-bar' : ''}`}>
       <div className="pdoc__head">
         <h1 className="pdoc__title">{documentTitle(order)}</h1>
-        <span className="pdoc__meta">{order.createdByName || ''}</span>
-        <span className="pdoc__status">{draft ? 'Черновик' : 'Сохранён'}</span>
+        {/* The receiving view tells who ACCEPTED the goods (only once it is saved), not who created the order. */}
+        <span className="pdoc__meta">
+          {showChecklist ? (order.checkedAt ? order.checkedByName || '' : '') : order.createdByName || ''}
+        </span>
+        <span className="pdoc__status">
+          {showChecklist ? (order.checkedAt ? 'Принят' : 'Не сверен') : draft ? 'Черновик' : 'Сохранён'}
+        </span>
         <span className="pdoc__spacer" />
         {commentLabel && !isPhone ? (
           <button
@@ -454,6 +481,11 @@ export default function PurchaseDocumentPage() {
             Сохранить
           </button>
         ) : null}
+        {showChecklist && !order.checkedAt ? (
+          <button type="button" className="btn btn--primary pdoc__bar-save" disabled={busy} onClick={() => void handleReceive()}>
+            Сохранить
+          </button>
+        ) : null}
         <button type="button" className="btn btn--outline pdoc__bar-close" onClick={() => navigate(LIST_PATH)}>
           Закрыть
         </button>
@@ -466,6 +498,11 @@ export default function PurchaseDocumentPage() {
         {canEdit && saved ? (
           <button type="button" className="btn btn--outline pdoc__danger" disabled={busy} onClick={() => setConfirm('cancel')}>
             Отменить
+          </button>
+        ) : null}
+        {showChecklist && order.checkedAt ? (
+          <button type="button" className="btn btn--outline pdoc__danger" disabled={busy} onClick={() => setConfirm('unreceive')}>
+            Отменить приёмку
           </button>
         ) : null}
         {saved ? (
@@ -589,27 +626,12 @@ export default function PurchaseDocumentPage() {
       <section className="pdoc__items">
         <div className="pdoc__items-head">
           <h2 className="pdoc__items-title">{itemsReady ? `Товары (${items.length})` : 'Товары'}</h2>
-          {showChecklist ? (
+          {showChecklist && !order.checkedAt ? (
             <>
               <span className="pdoc__spacer" />
-              {order.checkedAt ? (
-                <span className="pdoc__checked">
-                  ✓ Сверено{order.checkedByName ? `: ${order.checkedByName}` : ''}, {formatPurchaseDateTime(order.checkedAt)}
-                </span>
-              ) : (
-                <span className="pdoc__meta">
-                  Сверено: {doneCount} из {items.length}
-                </span>
-              )}
-              {order.checkedAt ? (
-                <button type="button" className="btn btn--outline btn--sm" disabled={busy} onClick={() => void handleChecked(false)}>
-                  Снять отметку
-                </button>
-              ) : (
-                <button type="button" className="btn btn--primary btn--sm" disabled={busy} onClick={() => void handleChecked(true)}>
-                  Всё сверено
-                </button>
-              )}
+              <span className="pdoc__meta">
+                Сверено: {doneCount} из {items.length}
+              </span>
             </>
           ) : null}
         </div>
@@ -620,7 +642,20 @@ export default function PurchaseDocumentPage() {
             <table className="pdoc__table">
               <thead>
                 <tr>
-                  {showChecklist ? <th aria-label="Сверено" /> : null}
+                  {showChecklist ? (
+                    <th className="pdoc__c-check">
+                      <input
+                        type="checkbox"
+                        aria-label="Отметить все строки"
+                        checked={items.length > 0 && doneCount === items.length}
+                        ref={(node) => {
+                          if (node) node.indeterminate = doneCount > 0 && doneCount < items.length
+                        }}
+                        disabled={Boolean(order.checkedAt) || items.length === 0}
+                        onChange={toggleAllTicks}
+                      />
+                    </th>
+                  ) : null}
                   <th>№</th>
                   <th>Название товара</th>
                   <th>{ORDER_LABELS.barcode}</th>
@@ -649,6 +684,7 @@ export default function PurchaseDocumentPage() {
                           type="checkbox"
                           aria-label={`Сверено: ${item.productName}`}
                           checked={ticks.has(item.id)}
+                          disabled={Boolean(order.checkedAt)}
                           onChange={() => toggleTick(item.id)}
                         />
                       </td>
@@ -843,6 +879,33 @@ export default function PurchaseDocumentPage() {
           message="Черновик будет удалён безвозвратно."
           confirmLabel="Удалить"
           onConfirm={() => void handleDeleteDraft()}
+          onCancel={() => setConfirm(null)}
+        />
+      ) : null}
+      {confirm === 'receive' ? (
+        <ConfirmDialog
+          title="Сохранить приёмку?"
+          message={`Отмечено ${doneCount} из ${items.length} строк. Заказ будет сохранён как принятый на ваше имя.`}
+          confirmLabel="Сохранить"
+          confirmVariant="primary"
+          cancelLabel="Вернуться"
+          onConfirm={() => {
+            setConfirm(null)
+            void handleChecked(true)
+          }}
+          onCancel={() => setConfirm(null)}
+        />
+      ) : null}
+      {confirm === 'unreceive' ? (
+        <ConfirmDialog
+          title="Отменить приёмку?"
+          message="Заказ снова станет несверенным: отметки по строкам можно будет менять, а имя принявшего исчезнет, пока вы не сохраните заново."
+          confirmLabel="Отменить приёмку"
+          cancelLabel="Не отменять"
+          onConfirm={() => {
+            setConfirm(null)
+            void handleChecked(false)
+          }}
           onCancel={() => setConfirm(null)}
         />
       ) : null}
