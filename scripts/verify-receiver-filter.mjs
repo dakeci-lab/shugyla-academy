@@ -93,5 +93,10 @@ ok('a ticked row is only highlighted (green), the text is neither struck through
 assert.match(read('src/platform/platformNav.js'), /id: 'orders',\s*path: '\/platform\/orders',\s*label: 'Приёмка'/)
 assert.match(read('src/config/permissionCatalog.js'), /receiving: 'Приёмка'/)
 ok('the section is called «Приёмка» (menu, title, roles matrix); the address /platform/orders is unchanged')
+assert.match(rdoc, /const canDownload = saved && \(!showChecklist \|\| Boolean\(order\?\.checkedAt\)\)/)
+assert.match(rdoc, /\{canDownload \? \(\s*<div className="pdoc__menu"/)
+assert.match(rdoc, /isPhone && canDownload && itemsReady/)
+assert.match(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /tfoot \.pdoc__total-qty,\s*\.pdoc__table tfoot \.pdoc__total-gap \{\s*display: none;/)
+ok('«Скачать» exists only for a saved document; in «Приёмка» only after the receiving is saved («Сохранить»), on the web and on the phone; the phone totals bar stays «Итого» + sum')
 
 console.log(`\nverify:receiver-filter — ${checks} checks passed`)

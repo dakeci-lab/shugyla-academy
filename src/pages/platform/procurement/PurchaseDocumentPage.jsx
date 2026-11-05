@@ -116,6 +116,8 @@ export default function PurchaseDocumentPage() {
   const editable = canEdit && draft
   // Приёмщик сверяет сохранённый заказ с накладной: галочки по строкам и общая отметка «Сверено».
   const showChecklist = saved && !canEdit && canMarkChecked
+  // «Скачать»: only a saved document; in «Приёмка» — only once the receiving itself is saved («Сохранить»).
+  const canDownload = saved && (!showChecklist || Boolean(order?.checkedAt))
   const readerView = !canEdit
 
   useEffect(() => {
@@ -465,7 +467,7 @@ export default function PurchaseDocumentPage() {
   )
 
   return (
-    <div className={`pdoc${editable ? ' pdoc--editable' : ''}${isPhone && saved && itemsReady && items.length > 0 ? ' pdoc--has-download-bar' : ''}`}>
+    <div className={`pdoc${editable ? ' pdoc--editable' : ''}${isPhone && canDownload && itemsReady && items.length > 0 ? ' pdoc--has-download-bar' : ''}`}>
       <div className="pdoc__head">
         <h1 className="pdoc__title">{documentTitle(order)}</h1>
         {/* The receiving view tells who ACCEPTED the goods (only once it is saved), not who created the order. */}
@@ -521,7 +523,7 @@ export default function PurchaseDocumentPage() {
             Отменить приёмку
           </button>
         ) : null}
-        {saved ? (
+        {canDownload ? (
         <div className="pdoc__menu" ref={exportRef}>
           <button
             type="button"
@@ -790,7 +792,7 @@ export default function PurchaseDocumentPage() {
                 <tr className="pdoc__total-row">
                   <td colSpan={(showChecklist ? 1 : 0) + 3 + (readerView ? 0 : 2)}>Итого</td>
                   <td className="r num pdoc__total-qty">{totalQty.toLocaleString('ru-RU', { maximumFractionDigits: 3 })}</td>
-                  <td />
+                  <td className="pdoc__total-gap" />
                   <td className="r num">{formatPurchaseAmount(total)}</td>
                   {editable ? <td /> : null}
                 </tr>
@@ -817,7 +819,7 @@ export default function PurchaseDocumentPage() {
         </div>
       ) : null}
 
-      {isPhone && saved && itemsReady && items.length > 0 ? (
+      {isPhone && canDownload && itemsReady && items.length > 0 ? (
         <div className="pdoc__mbar pdoc__mbar--download">
           <div className="pdoc__mbar-total">
             <span>Итого</span>
