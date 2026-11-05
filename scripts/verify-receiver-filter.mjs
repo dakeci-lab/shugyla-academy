@@ -77,5 +77,11 @@ assert.match(rdoc, /showChecklist \? \(order\.checkedAt \? order\.checkedByName/
 assert.match(read('src/components/procurement/PurchaseTable.jsx'), /\{ key: 'creator', label: 'Принял'/)
 assert.match(read('src/components/procurement/PurchaseTable.jsx'), /order\.checkedAt \? order\.checkedByName/)
 ok('receiving: «Сохранить» next to «Закрыть» saves the order as accepted on the name of the user (an incomplete tick list asks first), «Отменить приёмку» asks for a confirmation and reopens the ticks; one tick in the table head ticks / clears all rows; the list shows «Принял» (blank until accepted) instead of «Создал»')
+const pcss = read('src/pages/platform/procurement/PurchaseDocumentPage.css')
+assert.match(rdoc, /placeholder="Поиск по таблице"/)
+assert.match(rdoc, /const totalQty = items\.reduce/)
+assert.match(rdoc, /pdoc__total-qty/)
+assert.match(pcss, /@media \(min-width: 641px\) \{\s*\.pdoc__table-wrap \{\s*overflow-x: clip;[\s\S]*\.pdoc__table tfoot td \{\s*position: sticky;\s*bottom: 0;/)
+ok('the product table of a document (web): «Поиск по таблице» (name / barcode) above it; the footer row «Итого» carries the total quantity and the total sum of the whole document and is pinned to the bottom edge of the screen while the table scrolls')
 
 console.log(`\nverify:receiver-filter — ${checks} checks passed`)
