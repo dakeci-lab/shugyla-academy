@@ -955,3 +955,51 @@
     box-shadow: 0 -2px 8px rgba(15, 23, 42, 0.06);
   }
 }
+
+/* Web, like UMAG: the toolbar of the table — the counter of the ticked rows (where UMAG has «Действие») and
+   «Поиск по таблице» — stands OUTSIDE the table, as separate blocks; the table itself is the framed block. */
+@media (min-width: 641px) {
+  .pdoc__items {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+  }
+
+  .pdoc__items-head {
+    flex-wrap: nowrap;
+    gap: 10px;
+    padding: 0 0 10px;
+  }
+
+  .pdoc__items-title {
+    padding: 0 6px 0 0;
+    white-space: nowrap;
+  }
+
+  .pdoc__counter {
+    display: inline-flex;
+    align-items: center;
+    flex: none;
+    box-sizing: border-box;
+    height: var(--pf-control-h);
+    padding: 0 var(--pf-control-px);
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: var(--pf-control-radius);
+    background: var(--color-white, #fff);
+    font-size: var(--pf-control-fs);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    color: var(--color-text, #0f172a);
+  }
+
+  .pdoc__table-search {
+    flex: 1 1 auto;
+    max-width: none;
+  }
+
+  .pdoc__table-wrap {
+    border: 1px solid var(--color-border, #e2e8f0);
+    border-radius: 6px;
+    background: var(--color-white, #fff);
+  }
+}

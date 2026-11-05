@@ -642,6 +642,11 @@ export default function PurchaseDocumentPage() {
       <section className="pdoc__items">
         <div className="pdoc__items-head">
           <h2 className="pdoc__items-title">{itemsReady ? `Товары (${items.length})` : 'Товары'}</h2>
+          {showChecklist && !order.checkedAt ? (
+            <span className="pdoc__counter" aria-live="polite">
+              Сверено: {doneCount} из {items.length}
+            </span>
+          ) : null}
           {itemsReady && items.length > 0 && !isPhone ? (
             <input
               type="search"
@@ -652,14 +657,6 @@ export default function PurchaseDocumentPage() {
               onChange={(event) => setTableQuery(event.target.value)}
               autoComplete="off"
             />
-          ) : null}
-          {showChecklist && !order.checkedAt ? (
-            <>
-              <span className="pdoc__spacer" />
-              <span className="pdoc__meta">
-                Сверено: {doneCount} из {items.length}
-              </span>
-            </>
           ) : null}
         </div>
         {!itemsReady ? (
