@@ -88,5 +88,7 @@ assert.match(rdoc, /className="pdoc__counter"/)
 assert.match(pcss2, /@media \(min-width: 641px\) \{\s*\.pdoc__items \{\s*border: 0;[\s\S]*\.pdoc__table-wrap \{\s*border: 1px solid/)
 assert.match(pcss2, /\.pdoc__table-search \{\s*flex: 1 1 auto;\s*max-width: none;/)
 ok('web, like UMAG: the counter of the ticked rows («Сверено: N из M», on the left) and «Поиск по таблице» (next to it, wide) are separate blocks OUTSIDE the table frame; the table is the framed block')
+assert.doesNotMatch(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /tr\.is-done[^{]*\{[^}]*(line-through|opacity)/)
+ok('a ticked row is only highlighted (green), the text is neither struck through nor dimmed')
 
 console.log(`\nverify:receiver-filter — ${checks} checks passed`)
