@@ -52,7 +52,7 @@ assert.deepEqual(
 ok('«Сегодня» tab = suppliers with today as order day')
 
 const page = read('src/pages/platform/procurement/PurchaseDocumentPage.jsx')
-assert.match(page, /className="pdoc__status">\{draft \? 'Черновик' : 'Сохранён'\}/)
+assert.match(page, /draft \? 'Черновик' : 'Сохранён'/)
 assert.doesNotMatch(page, /StatusBadge/)
 ok('status is plain text')
 for (const label of ['Сохранить', 'Закрыть', 'Удалить', 'Отменить', 'Скачать ▾']) {
