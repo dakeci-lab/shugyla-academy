@@ -166,3 +166,47 @@
     padding-bottom: 88px;
   }
 }
+
+/* The web table: the number is a green link like in «Закуп»; a not yet checked order looks like a draft (muted italic),
+   a checked one like a saved document (green line under the sum). The phone keeps its own compact row. */
+.ord-number {
+  color: var(--color-primary, #059669);
+  font-weight: 600;
+}
+
+.ord-comment {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (min-width: 641px) {
+  .ord-sum {
+    display: inline-block;
+    padding-bottom: 2px;
+    border-bottom: 2px solid transparent;
+  }
+
+  .ord-sum--checked {
+    border-bottom-color: #059669;
+  }
+
+  .ord-sum--unchecked {
+    border-bottom-color: #9ca3af;
+  }
+}
+
+@media (min-width: 641px) {
+  .ord-row--unchecked .pgt__row-main,
+  .ord-row--unchecked .pgt__cell {
+    color: var(--color-text-muted, #6b7280);
+    font-style: italic;
+  }
+
+  .ord-row--unchecked .pgt__title,
+  .ord-row--unchecked .pgt__money,
+  .ord-row--unchecked .ord-number {
+    color: var(--color-text-muted, #6b7280);
+  }
+}

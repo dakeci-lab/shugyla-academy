@@ -4,7 +4,6 @@ import { formatDocumentGroupLabel } from '../../utils/purchaseDocumentsList'
 import {
   formatPurchaseAmount,
   formatPurchaseDate,
-  formatPurchaseDateTime,
 } from '../../utils/purchaseData'
 import { ORDER_LABELS } from '../../config/documentLabels'
 import { PgtHead, PgtRow, PgtTable } from '../platform/PlatformGridTable'
@@ -12,23 +11,24 @@ import IconActionButton from '../admin/IconActionButton'
 import { PencilIcon } from '../icons/PlatformIcons'
 
 /**
- * Список заказов — общая таблица платформы (как «К оплате» и «Приёмка»).
- * Список приёмщика: только сохранённые заказы, «Сверено» — обычный зелёный текст, без плашек статусов.
+ * Список приёмки — общая таблица платформы, колонки как в «Закупе» (первой доставка). Только сохранённые заказы;
+ * «Не сверено» — вид черновика, «Сверено» — вид сохранённого документа. На телефоне свой компактный вид.
  */
 export default function PurchaseTable({ orders, detailPathPrefix = '/platform/orders' }) {
   const navigate = useNavigate()
-  const showChecked = orders.some((order) => order.checkedAt)
 
-  // Приёмщику важны «когда привезут» и «от кого»: доставка и поставщик — слева, служебное (кто и когда создал) — справа.
+  // Like the web table of «Закуп», with the delivery first (the receiver's main date): number (green, opens the order),
+  // delivery, supplier, created, items, sum, creator, comment. A not yet checked order looks like a draft (muted italic),
+  // a checked one like a saved document (green number, green line under the sum). No «Сверено» column: the look says it.
   const columns = [
-    { key: 'delivery', label: ORDER_LABELS.deliveryShort, width: 110, mobile: 'hide' },
-    { key: 'supplier', label: ORDER_LABELS.supplier, width: 200, flex: true, mobile: 'title' },
-    { key: 'items', label: 'Товаров', width: 80, align: 'end', mobile: 'hide' },
-    { key: 'amount', label: 'Сумма', width: 130, align: 'end', mobile: 'end' },
-    ...(showChecked ? [{ key: 'checked', label: 'Сверено', width: 150, mobile: 'hide' }] : []),
-    { key: 'number', label: ORDER_LABELS.orderNum, width: 90, mobile: 'hide' },
-    { key: 'created', label: 'Создан', width: 150, mobile: 'hide' },
-    { key: 'creator', label: 'Создал', width: 170, mobile: 'hide' },
+    { key: 'number', label: 'Номер', width: 90, mobile: 'hide' },
+    { key: 'delivery', label: ORDER_LABELS.deliveryShort, width: 100, mobile: 'hide' },
+    { key: 'supplier', label: ORDER_LABELS.supplier, width: 160, flex: true, mobile: 'title' },
+    { key: 'created', label: 'Создан', width: 100, mobile: 'hide' },
+    { key: 'items', label: 'Позиций', width: 64, align: 'end', mobile: 'hide' },
+    { key: 'amount', label: 'Сумма', width: 120, align: 'end', mobile: 'end' },
+    { key: 'creator', label: 'Создал', width: 140, mobile: 'hide' },
+    { key: 'comment', label: 'Комментарий', width: 140, mobile: 'hide' },
     { key: 'edit', label: '', width: 44, align: 'end', mobile: 'hide' },
   ]
 
@@ -50,6 +50,7 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
             ) : null}
           <PgtRow
             columns={columns}
+            className={order.checkedAt ? 'ord-row ord-row--checked' : 'ord-row ord-row--unchecked'}
             interactive
             onClick={() => navigate(path)}
             cells={{
@@ -65,18 +66,18 @@ export default function PurchaseTable({ orders, detailPathPrefix = '/platform/or
                   <PencilIcon size={16} />
                 </IconActionButton>
               ),
-              created: <span>{formatPurchaseDateTime(order.createdAt || order.date)}</span>,
+              number: <span className="num ord-number">{order.number ?? ''}</span>,
+              created: <span className="num">{formatPurchaseDate(order.createdAt || order.date)}</span>,
               supplier: <span className="pgt__title">{order.supplierName || '—'}</span>,
-              number: <span className="num">{order.number ?? ''}</span>,
-              items: <span>{order.itemsCount ?? order.items?.length ?? 0}</span>,
-              amount: <span className="pgt__money">{formatPurchaseAmount(order.totalAmount)}</span>,
-              checked: order.checkedAt ? (
-                <span className="pgt__checked" title={order.checkedByName || undefined}>
-                  ✓ {formatPurchaseDateTime(order.checkedAt)}
+              items: <span className="num">{order.itemsCount ?? order.items?.length ?? 0}</span>,
+              amount: (
+                <span className={`pgt__money ord-sum ${order.checkedAt ? 'ord-sum--checked' : 'ord-sum--unchecked'}`}>
+                  {formatPurchaseAmount(order.totalAmount)}
                 </span>
-              ) : null,
+              ),
               creator: <span>{order.createdByName || '—'}</span>,
-              delivery: <span>{formatPurchaseDate(order.expectedDeliveryDate)}</span>,
+              comment: <span className="ord-comment">{order.comment || ''}</span>,
+              delivery: <span className="num">{order.expectedDeliveryDate ? formatPurchaseDate(order.expectedDeliveryDate) : '—'}</span>,
             }}
             mobileMeta={
               // Phone row = supplier, sum and the status of the document (the day is the group header).

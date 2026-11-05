@@ -50,8 +50,8 @@ ok('the document shows the comment only when there is one; no «—» placeholde
 
 const list = read('src/components/procurement/PurchaseTable.jsx')
 const keys = [...list.slice(list.indexOf('const columns = ['), list.indexOf(']\n\n  return (')).matchAll(/key: '(\w+)'/g)].map((m) => m[1])
-assert.deepEqual(keys.filter((key) => key !== 'actions' && key !== 'edit'), ['delivery', 'supplier', 'items', 'amount', 'checked', 'number', 'created', 'creator'])
-ok('orders list: delivery and supplier first, created / creator last')
+assert.deepEqual(keys.filter((key) => key !== 'actions' && key !== 'edit'), ['number', 'delivery', 'supplier', 'created', 'items', 'amount', 'creator', 'comment'])
+ok('orders list (web): the columns of «Закуп» with the delivery first after the number; no «Сверено» column, no ticks')
 
 // Checklist: checkbox first, row number second, nothing persisted in the database.
 const headStart = page.indexOf('<thead>')
