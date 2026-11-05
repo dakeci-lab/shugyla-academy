@@ -33,7 +33,7 @@ export async function searchCatalogProducts({ search = '', platformSupplierId = 
 }
 
 /** Snapshot row → fields of a document row (quantity stays empty: the buyer fills it in). */
-export function catalogProductToItem(product, { orderQty = 0 } = {}) {
+export function catalogProductToItem(product, { orderQty = 0, discountPct = 0 } = {}) {
   return {
     productName: product.productName,
     barcode: product.barcode,
@@ -42,5 +42,7 @@ export function catalogProductToItem(product, { orderQty = 0 } = {}) {
     recommendation: product.recommendedQty,
     purchasePrice: product.purchasePrice,
     orderQty,
+    // The discount of the whole invoice is the default of a new row.
+    discountPct,
   }
 }

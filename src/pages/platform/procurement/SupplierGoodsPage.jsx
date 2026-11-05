@@ -132,7 +132,7 @@ export default function SupplierGoodsPage() {
     [order?.items]
   )
   const existingTotal = useMemo(
-    () => (order?.items || []).reduce((sum, row) => sum + calcLineTotal(row.orderQty, row.purchasePrice), 0),
+    () => (order?.items || []).reduce((sum, row) => sum + calcLineTotal(row.orderQty, row.purchasePrice, row.discountPct), 0),
     [order?.items]
   )
 
@@ -311,7 +311,7 @@ export default function SupplierGoodsPage() {
     setAdding(true)
     try {
       const payload = rows.map(({ item, qty }) => ({
-        ...catalogProductToItem(item, { orderQty: qty }),
+        ...catalogProductToItem(item, { orderQty: qty, discountPct: order?.discountPct || 0 }),
         supplierId: order.supplierId,
         supplierName: order.supplierName,
       }))
@@ -355,7 +355,7 @@ export default function SupplierGoodsPage() {
 
   const chosen = items.filter((item) => !existingBarcodes.has(item.barcode) && (Number(quantityOf(item)) || 0) > 0)
   const picked = chosen.length
-  const pickedSum = chosen.reduce((sum, item) => sum + calcLineTotal(Number(quantityOf(item)) || 0, item.purchasePrice), 0)
+  const pickedSum = chosen.reduce((sum, item) => sum + calcLineTotal(Number(quantityOf(item)) || 0, item.purchasePrice, order?.discountPct), 0)
   const min = plan?.minOrderAmount > 0 ? plan.minOrderAmount : 0
   const orderSum = existingTotal + pickedSum
   const shortToMin = min > 0 && orderSum < min ? min - orderSum : 0

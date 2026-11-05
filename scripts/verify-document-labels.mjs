@@ -45,7 +45,7 @@ assert.match(exporter, /ORDER_LABELS as L/)
 ok('PDF and Excel export, order card, planner bar and the orders list take the shared terms from the dictionary')
 
 assert.match(exporter, /\$\{L\.delivery\}: /)
-assert.match(exporter, /\[L\.number, L\.product, L\.barcode, L\.qty, L\.price, L\.amount\]/)
+assert.match(exporter, /L\.number,\s*L\.product,\s*L\.barcode,\s*L\.qty,[\s\S]*?L\.price,[\s\S]*?L\.amount,?\s*\]/)
 assert.match(exporter, /L\.comment/)
 ok('PDF and Excel print the same headers (delivery, price, amount) and both carry the comment')
 

@@ -101,6 +101,25 @@ export async function updatePurchaseOrder(orderId, updates) {
 }
 
 /**
+ * Скидка накладной в процентах: ставится заказу и строкам, у которых скидка равна прежней скидке накладной.
+ * Возвращает свежий заказ.
+ */
+export async function setPurchaseOrderDiscount(orderId, discountPct, previousPct = 0) {
+  if (isCloudMode()) {
+    await cloud.setOrderDiscountCloud(orderId, discountPct, previousPct)
+    return afterOrderChange(orderId)
+  }
+  const order = getPurchaseOrderByIdSync(orderId)
+  if (!order) throw new Error('Закуп не найден')
+  return updatePurchaseOrder(orderId, {
+    discountPct,
+    items: (order.items || []).map((item) =>
+      Number(item.discountPct || 0) === Number(previousPct || 0) ? { ...item, discountPct } : item
+    ),
+  })
+}
+
+/**
  * Приёмщик отметил заказ «Сверено» (всё сошлось с накладной). Отметка общая — её видят в списке заказов.
  * `checked = false` снимает отметку.
  */

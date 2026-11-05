@@ -40,7 +40,7 @@ assert.match(doc.validateDocumentForSave(draft, [row(0), row(0, 'B')]), /2 то�
 assert.equal(doc.validateDocumentForSave(draft, [row(3)]), '')
 assert.match(doc.validateDocumentForSave({ ...draft, status: 'saved' }, [row(3)]), /только черновик/)
 ok('save validation: items, supplier, quantity above zero, only drafts')
-assert.equal(doc.documentTotal([{ orderQty: 2, purchasePrice: 150.4 }, { orderQty: 1, purchasePrice: 99 }]), 301 + 99)
+assert.equal(doc.documentTotal([{ orderQty: 2, purchasePrice: 150.4 }, { orderQty: 1, purchasePrice: 99 }]), 300.8 + 99) // kopecks, like the database (a discount gives 3 386,75 ₸)
 ok('document total')
 assert.deepEqual(
   doc.suppliersOrderedToday(
@@ -65,7 +65,7 @@ ok('supplier is locked once the document has items')
 assert.match(page, /Добавить комментарий/)
 assert.match(page, /<AdminModal\s+title="Комментарий"/)
 ok('comment opens in a small modal')
-assert.match(page, /handleQtyCommit[\s\S]*updatePurchaseOrderItem/)
+assert.match(page, /async function patchItem[\s\S]*?updatePurchaseOrderItem\(order\.id, item\.id, patch\)[\s\S]*?async function handleQtyCommit[\s\S]*?patchItem\(item, patch/)
 assert.match(page, /saveMeta\(\{ expectedDeliveryDate: value \}\)/)
 ok('every edit is saved at once (quantity on blur, delivery date, supplier, comment)')
 assert.doesNotMatch(page, /notifyChange|refresh\(\)|reloadProcurement/)

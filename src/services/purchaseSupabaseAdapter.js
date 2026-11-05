@@ -33,6 +33,7 @@ function rowToOrder(row, items = []) {
     created_by: row.created_by,
     created_by_name: row.created_by_name,
     comment: row.comment,
+    discount_pct: row.discount_pct,
     checked_at: row.checked_at,
     checked_by_name: row.checked_by_name,
     workflow_mode: row.workflow_mode,
@@ -59,6 +60,7 @@ function orderToRow(order, extras = {}) {
     created_by_name: order.createdByName ?? null,
     comment: (order.comment ?? '').trim(),
     workflow_mode: order.workflowMode ?? PROCUREMENT_WORKFLOW_MODE.ANALYTICS,
+    discount_pct: order.discountPct ?? 0,
   }
 
   if (extras.id) row.id = extras.id
@@ -94,6 +96,7 @@ function orderPatchToRow(patch) {
   if (patch.workflowMode !== undefined) {
     row.workflow_mode = patch.workflowMode
   }
+  if (patch.discountPct !== undefined) row.discount_pct = patch.discountPct
   return row
 }
 
@@ -112,6 +115,10 @@ function rowToItem(row) {
     recommended_qty: row.recommended_qty,
     ordered_qty: row.ordered_qty,
     purchase_price: row.purchase_price,
+    bonus_qty: row.bonus_qty,
+    promo_buy: row.promo_buy,
+    promo_free: row.promo_free,
+    discount_pct: row.discount_pct,
     total_amount: row.total_amount,
     comment: row.comment,
     created_at: row.created_at,
@@ -138,7 +145,12 @@ function itemToRow(item, orderId) {
     recommended_qty: item.recommendation ?? item.recommendedQty ?? item.recommended_qty ?? 0,
     ordered_qty: orderedQty,
     purchase_price: purchasePrice,
-    total_amount: calcLineTotal(orderedQty, purchasePrice),
+    bonus_qty: item.bonusQty ?? item.bonus_qty ?? 0,
+    promo_buy: item.promoBuy ?? item.promo_buy ?? null,
+    promo_free: item.promoFree ?? item.promo_free ?? null,
+    discount_pct: item.discountPct ?? item.discount_pct ?? 0,
+    // the database trigger recalculates it (with the discount) — this is the same number
+    total_amount: calcLineTotal(orderedQty, purchasePrice, item.discountPct ?? item.discount_pct ?? 0),
     comment: item.comment ?? '',
     updated_at: now,
   }
@@ -264,6 +276,26 @@ export async function fetchPurchaseOrderHeadersByIdsCloud(ids) {
   const result = await supabase.from('purchase_orders').select('*').in('id', list)
   const rows = await throwIfError(result, 'Загрузка закупов')
   return (rows || []).map((row) => rowToOrder(row, []))
+}
+
+/**
+ * Скидка накладной: записывается в заказ и в те строки, у которых скидка была равна прежней скидке накладной
+ * (строка с собственной скидкой остаётся как есть). Суммы строк и заказа пересчитывают триггеры базы.
+ */
+export async function setOrderDiscountCloud(orderId, discountPct, previousPct = 0) {
+  ensureClient()
+  await throwIfError(
+    await supabase.from('purchase_orders').update({ discount_pct: discountPct }).eq('id', orderId),
+    'Сохранение скидки'
+  )
+  await throwIfError(
+    await supabase
+      .from('purchase_order_items')
+      .update({ discount_pct: discountPct })
+      .eq('purchase_order_id', orderId)
+      .eq('discount_pct', previousPct),
+    'Применение скидки к строкам'
+  )
 }
 
 /** Создание закупа */

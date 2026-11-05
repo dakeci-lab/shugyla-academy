@@ -1,4 +1,4 @@
-import { calcLineTotal, isOrderDraft } from './purchaseData'
+import { calcLineTotal, calcOrderBaseTotal, isOrderDraft } from './purchaseData'
 
 const WEEKDAYS_RU = ['вс', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб']
 
@@ -17,7 +17,21 @@ export function documentTitle(order) {
 }
 
 export function documentTotal(items) {
-  return (items || []).reduce((sum, item) => sum + calcLineTotal(item.orderQty, item.purchasePrice), 0)
+  return (items || []).reduce((sum, item) => sum + calcLineTotal(item.orderQty, item.purchasePrice, item.discountPct), 0)
+}
+
+/** Итоги документа: со скидкой, по базовым ценам, разница, оплачиваемое количество и бонус. */
+export function documentTotals(items) {
+  const list = items || []
+  const discounted = documentTotal(list)
+  const base = calcOrderBaseTotal(list)
+  return {
+    discounted,
+    base,
+    saved: Math.round((base - discounted) * 100) / 100,
+    qty: list.reduce((sum, item) => sum + (Number(item.orderQty) || 0), 0),
+    bonus: list.reduce((sum, item) => sum + (Number(item.bonusQty) || 0), 0),
+  }
 }
 
 /**

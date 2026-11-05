@@ -34,16 +34,29 @@ export function mapPurchaseOrderForExport(order) {
   const items = (order?.items || []).map((item) => {
     const qty = Number(item.orderQty ?? item.ordered_qty ?? item.orderedQty ?? 0)
     const price = Number(item.purchasePrice ?? item.purchase_price ?? 0)
+    const bonusQty = Math.max(0, Number(item.bonusQty ?? item.bonus_qty ?? 0) || 0)
+    const discountPct = Math.min(100, Math.max(0, Number(item.discountPct ?? item.discount_pct ?? 0) || 0))
+    const factor = 1 - discountPct / 100
     return {
       productName: item.productName ?? item.product_name ?? '',
       barcode: item.barcode ?? '',
       orderedQty: qty,
+      bonusQty,
+      receiveQty: qty + bonusQty,
       purchasePrice: price,
-      lineTotal: Math.round(qty * price * 100) / 100,
+      discountPct,
+      discountedPrice: Math.round(price * factor * 100) / 100,
+      baseTotal: Math.round(qty * price * 100) / 100,
+      lineTotal: Math.round(qty * price * factor * 100) / 100,
     }
   })
   const totalAmount = items.reduce((sum, row) => sum + row.lineTotal, 0)
+  const baseTotal = items.reduce((sum, row) => sum + row.baseTotal, 0)
   return {
+    withBonus: items.some((row) => row.bonusQty > 0),
+    withDiscount: items.some((row) => row.discountPct > 0),
+    baseTotal,
+    discountTotal: Math.round((baseTotal - totalAmount) * 100) / 100,
     number: order?.number ?? null,
     supplierName: order?.supplierName ?? order?.supplier_name ?? '',
     purchaseDate: order?.date ?? order?.purchase_date ?? '',

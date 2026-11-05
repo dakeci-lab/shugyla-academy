@@ -54,12 +54,55 @@ export function formatPurchaseDateTime(value) {
   })
 }
 
-export function calcLineTotal(qty, price) {
-  return Math.round(Number(qty || 0) * Number(price || 0))
+/** Скидка в процентах → число 0..100 (пусто и мусор — 0). */
+export function clampDiscountPct(value) {
+  const number = Number(value)
+  if (!Number.isFinite(number)) return 0
+  return Math.min(100, Math.max(0, number))
+}
+
+/** Сумма строки: заказанное количество × базовая цена со скидкой (бонус не оплачивается). Копейки — как в базе (2 знака). */
+export function calcLineTotal(qty, price, discountPct = 0) {
+  const factor = 1 - clampDiscountPct(discountPct) / 100
+  return Math.round(Number(qty || 0) * Number(price || 0) * factor * 100) / 100
+}
+
+/** Цена одной штуки со скидкой (то, что платим за штуку по счёту). */
+export function discountedPrice(price, discountPct = 0) {
+  return Math.round(Number(price || 0) * (1 - clampDiscountPct(discountPct) / 100) * 100) / 100
 }
 
 export function calcOrderTotal(items) {
+  return items.reduce((sum, item) => sum + calcLineTotal(item.orderQty, item.purchasePrice, item.discountPct), 0)
+}
+
+/** Сумма заказа по базовым ценам, без скидок. */
+export function calcOrderBaseTotal(items) {
   return items.reduce((sum, item) => sum + calcLineTotal(item.orderQty, item.purchasePrice), 0)
+}
+
+/** Акция «5+1» из текста («5+1», «5 + 1»); пусто или не по формату — null. */
+export function parsePromo(text) {
+  const match = String(text ?? '').trim().match(/^(\d+(?:[.,]\d+)?)\s*\+\s*(\d+(?:[.,]\d+)?)$/)
+  if (!match) return null
+  const buy = Number(match[1].replace(',', '.'))
+  const free = Number(match[2].replace(',', '.'))
+  return buy > 0 && free > 0 ? { buy, free } : null
+}
+
+export function formatPromo(buy, free) {
+  return buy > 0 && free > 0 ? `${buy}+${free}` : ''
+}
+
+/** Бонус по ЦЕЛОЙ части: «5+1» и заказ 12 → 2 (две полные пятёрки), заказ 4 → 0. */
+export function calcBonusFromPromo(qty, buy, free) {
+  if (!(buy > 0) || !(free > 0)) return 0
+  return Math.floor(Number(qty || 0) / buy) * free
+}
+
+/** Сколько штук приедет: заказанное плюс бонус. */
+export function itemReceiveQty(item) {
+  return Number(item?.orderQty || 0) + Number(item?.bonusQty || 0)
 }
 
 /**
@@ -85,6 +128,7 @@ export function normalizePurchaseOrder(raw) {
     supplierName: raw.supplierName ?? raw.supplier_name ?? '',
     itemsCount: raw.itemsCount ?? raw.items_count ?? items.length,
     totalAmount: raw.totalAmount ?? raw.total_amount ?? calcOrderTotal(items),
+    discountPct: clampDiscountPct(raw.discountPct ?? raw.discount_pct),
     status: raw.status ?? PURCHASE_STATUS.DRAFT,
     createdBy: raw.createdBy ?? raw.created_by ?? '',
     createdByName: raw.createdByName ?? raw.created_by_name ?? '',
@@ -106,6 +150,9 @@ export function normalizePurchaseItem(raw) {
   const orderQty =
     raw.orderQty ?? raw.order_qty ?? raw.orderedQty ?? raw.ordered_qty ?? 0
   const purchasePrice = raw.purchasePrice ?? raw.purchase_price ?? 0
+  const discountPct = clampDiscountPct(raw.discountPct ?? raw.discount_pct)
+  const promoBuy = Number(raw.promoBuy ?? raw.promo_buy) || null
+  const promoFree = Number(raw.promoFree ?? raw.promo_free) || null
   return {
     id: raw.id,
     purchaseOrderId: raw.purchaseOrderId ?? raw.purchase_order_id ?? null,
@@ -118,13 +165,17 @@ export function normalizePurchaseItem(raw) {
     salesPerDay: raw.salesPerDay ?? raw.sales_per_day ?? 0,
     recommendation: raw.recommendation ?? raw.recommendedQty ?? raw.recommended_qty ?? 0,
     orderQty,
+    bonusQty: Math.max(0, Number(raw.bonusQty ?? raw.bonus_qty) || 0),
+    promoBuy: promoBuy && promoFree ? promoBuy : null,
+    promoFree: promoBuy && promoFree ? promoFree : null,
+    discountPct,
     purchasePrice,
     lineTotal:
       raw.lineTotal ??
       raw.line_total ??
       raw.totalAmount ??
       raw.total_amount ??
-      calcLineTotal(orderQty, purchasePrice),
+      calcLineTotal(orderQty, purchasePrice, discountPct),
     comment: raw.comment ?? '',
     createdAt: raw.createdAt ?? raw.created_at ?? null,
     updatedAt: raw.updatedAt ?? raw.updated_at ?? null,
