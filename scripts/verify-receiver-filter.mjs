@@ -90,5 +90,8 @@ assert.match(pcss2, /\.pdoc__table-search \{\s*flex: 1 1 auto;\s*max-width: none
 ok('web, like UMAG: the counter of the ticked rows («Сверено: N из M», on the left) and «Поиск по таблице» (next to it, wide) are separate blocks OUTSIDE the table frame; the table is the framed block')
 assert.doesNotMatch(read('src/pages/platform/procurement/PurchaseDocumentPage.css'), /tr\.is-done[^{]*\{[^}]*(line-through|opacity)/)
 ok('a ticked row is only highlighted (green), the text is neither struck through nor dimmed')
+assert.match(read('src/platform/platformNav.js'), /id: 'orders',\s*path: '\/platform\/orders',\s*label: 'Приёмка'/)
+assert.match(read('src/config/permissionCatalog.js'), /receiving: 'Приёмка'/)
+ok('the section is called «Приёмка» (menu, title, roles matrix); the address /platform/orders is unchanged')
 
 console.log(`\nverify:receiver-filter — ${checks} checks passed`)

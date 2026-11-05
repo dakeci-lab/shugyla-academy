@@ -82,7 +82,7 @@ export const PERMISSION_MODULES = {
   employees: 'Сотрудники',
   roles: 'Роли и доступы',
   procurement: 'Закупки',
-  receiving: 'Заказы',
+  receiving: 'Приёмка',
   suppliers: 'Поставщики',
   umag: 'UMAG',
   supplier_payments: 'Оплаты поставщикам',

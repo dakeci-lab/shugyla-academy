@@ -208,7 +208,7 @@ export default function OrdersPage() {
     setFilterOpen(false)
   }
 
-  if (!canView) return <PlatformAccessDenied title="Нет доступа к разделу «Заказы»" />
+  if (!canView) return <PlatformAccessDenied title="Нет доступа к разделу «Приёмка»" />
 
   const errorMessage =
     loadErrorText ||
