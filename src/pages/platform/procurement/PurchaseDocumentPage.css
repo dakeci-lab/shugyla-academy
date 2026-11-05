@@ -421,11 +421,6 @@
   font-size: 0.875rem;
 }
 
-.pdoc__table tr.is-done td {
-  color: var(--color-text-muted, #6b7280);
-  text-decoration: line-through;
-}
-
 .pdoc__unit {
   display: none;
 }
@@ -556,11 +551,6 @@
   .pdoc__remove {
     width: 40px;
     height: 40px;
-  }
-
-  .pdoc__table tr.is-done .pdoc__c-name,
-  .pdoc__table tr.is-done .pdoc__c-qty {
-    opacity: 0.55;
   }
 
   .pdoc__table tfoot {
