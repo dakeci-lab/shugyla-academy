@@ -36,7 +36,7 @@ assert.match(page, /onBlur=\{\(\) => \{\s*if \(commentText !== \(order\.comment 
 ok('phones: «Комментарий» is a collapsible block like UMAG, closed by default; a draft saves it when the field loses focus')
 
 assert.match(page, /\{canDownload \? \(\s*<div className="pdoc__menu" ref=\{exportRef\}>/)
-assert.match(page, /isPhone && saved && itemsReady && items\.length > 0 \? \(\s*<div className="pdoc__mbar pdoc__mbar--download">/)
+assert.match(page, /isPhone && canDownload && itemsReady && items\.length > 0 \? \(\s*<div className="pdoc__mbar pdoc__mbar--download">/)
 assert.match(page, /className="btn btn--primary"[\s\S]{0,200}Скачать\s*<\/button>/)
 ok('«Скачать» exists only for a saved document: a menu in the desktop bar, the green button of the bottom bar on phones')
 
