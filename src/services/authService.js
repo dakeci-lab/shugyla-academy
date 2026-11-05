@@ -113,26 +113,11 @@ function profileRowToEmployee(row) {
 /**
  * Load academy_users row. Auth path uses columns that always exist so a
  * PostgREST schema-cache lag after migrations cannot break sign-in.
- * Employment dates are attached when the extended select succeeds.
  */
 async function loadAcademyUserRow(match) {
-  const authResult = await match(ACADEMY_AUTH_PROFILE_FIELDS)
-
-  if (authResult.error || !authResult.data) return authResult
-
-  const datesResult = await match('id, hired_at, terminated_at')
-  if (!datesResult.error && datesResult.data) {
-    return {
-      ...authResult,
-      data: {
-        ...authResult.data,
-        hired_at: datesResult.data.hired_at ?? null,
-        terminated_at: datesResult.data.terminated_at ?? null,
-      },
-    }
-  }
-
-  return authResult
+  // Employment dates (hired_at / terminated_at) are not granted to `authenticated` and the platform does not use
+  // them any more: asking for them on every profile load only produced «permission denied» errors in the DB log.
+  return match(ACADEMY_AUTH_PROFILE_FIELDS)
 }
 
 export async function loadAcademyProfileByAuthUserId(authUserId) {
