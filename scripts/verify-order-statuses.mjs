@@ -245,7 +245,7 @@ function stageListPage() {
   const src = read(LIST_PAGE)
 
   assert('the receiver list holds saved orders only (drafts belong to the buyer\'s «Закуп»)', /\.filter\(isOrderSaved\)/.test(read('src/utils/purchaseDocumentsList.js')) && /selectReceiverOrders/.test(src) && !/isOrderDraft/.test(src))
-  assert('the «Сегодня ждём…» summary is built from the list (saved orders only)', /summarizeOrders\(orders\)/.test(src))
+  assert('the web list has no «Сегодня ждём…» line any more (the filter holds the period)', !/summarizeOrders|describeOrdersSummary/.test(src))
   assert('the receiver list has no «Новый заказ» (the buyer creates documents in «Закуп»)', !src.includes('+ Новый заказ') && !/createPurchaseOrder\(/.test(src))
   assert('the list no longer loads the receiving module', !/'receiving'\]/.test(src))
   assert('the «show cancelled» filter is gone (no cancelled status any more)', !/showCancelled/.test(src))

@@ -21,16 +21,15 @@ import { toUserErrorMessage } from '../../../utils/userErrorMessage'
 import { DEFAULT_RECEIVER_FILTER, RECEIVER_STATUS, selectReceiverOrders } from '../../../utils/purchaseDocumentsList'
 import { PROCUREMENT_FRESH_MS } from '../../../lib/procurementFreshness'
 import {
-  describeSettlementsPeriod,
   getSettlementsPeriodDates,
   ORDERS_PERIOD_PRESET_OPTIONS,
   resolveSettlementsPeriodPreset,
   SETTLEMENTS_PERIOD_PRESET,
 } from '../../../utils/settlementsPeriod'
-import { describeOrdersSummary, summarizeOrders } from '../../../utils/ordersSummary'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
 import PurchaseTable from '../../../components/procurement/PurchaseTable'
 import PlatformFilterRow from '../../../components/platform/PlatformFilterRow'
+import PlatformFloatingSearch from '../../../components/platform/PlatformFloatingSearch'
 import PeriodFilterPopover from '../../../components/platform/PeriodFilterPopover'
 import PlatformFilterTrigger from '../../../components/platform/PlatformFilterTrigger'
 import FilterComboField from '../../../components/platform/FilterComboField'
@@ -78,8 +77,6 @@ export default function OrdersPage() {
   const [supplierSearch, setSupplierSearch] = useState('')
   const [itemOrderIds, setItemOrderIds] = useState(null)
   const filterButtonRef = useRef(null)
-  const preset = resolveSettlementsPeriodPreset(filter.dateFrom, filter.dateTo)
-  const period = useMemo(() => ({ dateFrom: filter.dateFrom, dateTo: filter.dateTo }), [filter.dateFrom, filter.dateTo])
   const [loadErrorText, setLoadErrorText] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const [page, setPage] = useState(1)
@@ -120,17 +117,21 @@ export default function OrdersPage() {
       return undefined
     }
     let cancelled = false
-    findPurchaseOrderIdsByItemText(text)
-      .then((ids) => {
-        if (!cancelled) setItemOrderIds(new Set(ids))
-      })
-      .catch((error) => {
-        if (cancelled) return
-        setItemOrderIds(new Set())
-        showError(toUserErrorMessage(error, 'Не удалось выполнить поиск по товарам.'))
-      })
+    // The search box types into the filter live: ask the server only when the typing pauses.
+    const timer = setTimeout(() => {
+      findPurchaseOrderIdsByItemText(text)
+        .then((ids) => {
+          if (!cancelled) setItemOrderIds(new Set(ids))
+        })
+        .catch((error) => {
+          if (cancelled) return
+          setItemOrderIds(new Set())
+          showError(toUserErrorMessage(error, 'Не удалось выполнить поиск по товарам.'))
+        })
+    }, 300)
     return () => {
       cancelled = true
+      clearTimeout(timer)
     }
   }, [filter.q, showError])
 
@@ -174,7 +175,6 @@ export default function OrdersPage() {
     if (page > totalPages) setPage(totalPages)
   }, [page, totalPages])
 
-  const isToday = preset === SETTLEMENTS_PERIOD_PRESET.TODAY
   const defaults = defaultReceiverFilter()
   const periodChanged = filter.dateFrom !== defaults.dateFrom || filter.dateTo !== defaults.dateTo
   const otherCount = (filter.supplierIds.length ? 1 : 0) + (filter.status ? 1 : 0) + (filter.q.trim() ? 1 : 0)
@@ -208,16 +208,6 @@ export default function OrdersPage() {
     setFilterOpen(false)
   }
 
-  /** A quick period button on the web: only the period changes, the rest of the filter stays. */
-  function pickPreset(id) {
-    setFilter((current) => ({ ...current, ...getSettlementsPeriodDates(id) }))
-  }
-
-  const summaryText = describeOrdersSummary(summarizeOrders(orders), {
-    periodLabel: describeSettlementsPeriod(period.dateFrom, period.dateTo),
-    isToday,
-  })
-
   if (!canView) return <PlatformAccessDenied title="Нет доступа к разделу «Заказы»" />
 
   const errorMessage =
@@ -229,21 +219,6 @@ export default function OrdersPage() {
   return (
     <div className="orders-page">
       <div className="orders-page__bar">
-        {isPhone ? null : (
-          <div className="orders-page__presets" role="group" aria-label="Период доставки">
-            {ORDERS_PERIOD_PRESET_OPTIONS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                aria-pressed={preset === option.id}
-                className={`orders-page__preset${preset === option.id ? ' is-on' : ''}`}
-                onClick={() => pickPreset(option.id)}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )}
         <div className="pf-filter-anchor orders-page__filter">
           {isPhone ? (
             <PlatformFilterRow
@@ -329,7 +304,27 @@ export default function OrdersPage() {
             </div>
           </PeriodFilterPopover>
         </div>
+        {isPhone ? null : (
+          <input
+            type="search"
+            className="orders-page__search"
+            placeholder="Поставщик, номер или товар"
+            aria-label="Поиск по заказам"
+            value={filter.q}
+            onChange={(event) => setFilter((current) => ({ ...current, q: event.target.value }))}
+            autoComplete="off"
+          />
+        )}
       </div>
+
+      {isPhone ? (
+        <PlatformFloatingSearch
+          value={filter.q}
+          onChange={(value) => setFilter((current) => ({ ...current, q: value }))}
+          placeholder="Поставщик, номер или товар"
+          label="Поиск по заказам"
+        />
+      ) : null}
 
       {errorMessage ? (
         <p className="orders-page__error" role="alert">
@@ -357,7 +352,6 @@ export default function OrdersPage() {
         <DelayedLoadingSkeleton variant="list" count={5} />
       ) : (
         <div className="procurement-list-panel">
-          {summaryText && !isPhone ? <p className="orders-page__summary">{summaryText}</p> : null}
           <PurchaseTable orders={visibleOrders} />
           {isPhone ? (
             infinite.hasMore ? <div ref={infinite.sentinelRef} className="pgt__more" aria-hidden="true" /> : null

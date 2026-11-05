@@ -109,8 +109,8 @@ assert.equal(describeOrdersSummary({ deliveries: 12, items: 120 }, { periodLabel
 assert.equal(describeOrdersSummary({ deliveries: 3, items: 9 }, { ...label, cancelled: true }), 'Отменено: 3 поставки, 9 товаров')
 assert.equal(describeOrdersSummary({ deliveries: 0, items: 0 }, label), null)
 ok('summary text: «Сегодня ждём N поставок, M товаров» with correct Russian plurals; other period and cancelled wording; nothing when empty')
-assert.match(read('src/pages/platform/orders/OrdersPage.jsx'), /summarizeOrders\(orders\)/)
-ok('the orders list shows the summary of exactly the orders on screen (after period / cancelled filters)')
+assert.doesNotMatch(read('src/pages/platform/orders/OrdersPage.jsx'), /summarizeOrders|describeOrdersSummary/)
+ok('the orders list shows no summary line any more (2026-11-05: the filter holds the period; the summary helpers stay as a tested utility)')
 
 // --- «Сверено» mark on the order (stage 22) -------------------------------------------------------
 const { normalizePurchaseOrder: norm } = await import(pathToFileURL(path.join(ROOT, 'src/utils/purchaseData.js')).href)
