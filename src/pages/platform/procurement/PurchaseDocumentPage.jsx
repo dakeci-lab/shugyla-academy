@@ -149,6 +149,11 @@ export default function PurchaseDocumentPage() {
   const order = itemsReady ? fullOrder : cachedOrder
   const items = itemsReady ? fullOrder.items ?? [] : []
   const draft = isOrderDraft(order)
+  // The discount all rows share (shown in the head of the column), or null when the rows differ.
+  const uniformDiscount =
+    items.length > 0 && items.every((row) => Number(row.discountPct || 0) === Number(items[0].discountPct || 0))
+      ? Number(items[0].discountPct || 0)
+      : null
   const saved = isOrderSaved(order)
   const editable = canEdit && draft
   // Приёмщик сверяет сохранённый заказ с накладной: галочки по строкам и общая отметка «Сверено».
@@ -418,14 +423,23 @@ export default function PurchaseDocumentPage() {
     await patchItem(item, { discountPct: next }, 'Не удалось сохранить скидку')
   }
 
-  /** The invoice discount: the order and the rows that still carry the previous invoice discount take the new one. */
+  /**
+   * The discount typed in the head of the «Скидка, %» column goes to EVERY row (and is kept as the discount of the invoice,
+   * which new rows start with); a row can be changed by itself afterwards. Cleared, it takes the discount off all rows.
+   */
   async function handleOrderDiscountCommit() {
     if (orderDiscountDraft === null) return
-    const next = clampDiscountPct(orderDiscountDraft)
+    const raw = String(orderDiscountDraft).trim()
     setOrderDiscountDraft(null)
-    const previous = Number(order.discountPct) || 0
-    if (next === previous) return
-    const fresh = await run(() => trackSave(setPurchaseOrderDiscount(order.id, next, previous)), 'Не удалось сохранить скидку накладной.')
+    let next
+    if (raw === '') {
+      if (!uniformDiscount) return
+      next = 0
+    } else {
+      next = clampDiscountPct(raw)
+    }
+    if (uniformDiscount === next && Number(order.discountPct || 0) === next) return
+    const fresh = await run(() => trackSave(setPurchaseOrderDiscount(order.id, next)), 'Не удалось сохранить скидку.')
     if (fresh?.id) setFullOrder(fresh)
   }
 
@@ -817,35 +831,30 @@ export default function PurchaseDocumentPage() {
         </div>
       </div>
 
-      {editable || order.discountPct > 0 ? (
+      {isPhone && editable ? (
+        // Phones have no table head: the same field stays a row above the list.
         <div className="pdoc__discount">
           <label className="pdoc__discount-label" htmlFor="pdoc-order-discount">
-            Скидка на накладную, %
+            Скидка на все строки, %
           </label>
-          {editable ? (
-            <input
-              id="pdoc-order-discount"
-              data-autosave="1"
-              type="number"
-              min="0"
-              max="100"
-              step="any"
-              className="pdoc__qty num"
-              placeholder="0"
-              disabled={busy || !itemsReady}
-              value={orderDiscountDraft !== null ? orderDiscountDraft : order.discountPct || ''}
-              onChange={(event) => setOrderDiscountDraft(event.target.value)}
-              onBlur={() => void handleOrderDiscountCommit()}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter') event.currentTarget.blur()
-              }}
-            />
-          ) : (
-            <b className="num">{order.discountPct}%</b>
-          )}
-          {editable ? (
-            <span className="pdoc__discount-hint">применится к строкам, у которых нет своей скидки</span>
-          ) : null}
+          <input
+            id="pdoc-order-discount"
+            data-autosave="1"
+            type="number"
+            inputMode="decimal"
+            min="0"
+            max="100"
+            step="any"
+            className="pdoc__qty num"
+            placeholder={uniformDiscount === null ? '—' : '0'}
+            disabled={busy || !itemsReady}
+            value={orderDiscountDraft !== null ? orderDiscountDraft : uniformDiscount || ''}
+            onChange={(event) => setOrderDiscountDraft(event.target.value)}
+            onBlur={() => void handleOrderDiscountCommit()}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur()
+            }}
+          />
         </div>
       ) : null}
 
@@ -952,7 +961,32 @@ export default function PurchaseDocumentPage() {
                   {showBonusCols ? <th className="r pdoc__c-bonus">Бонус</th> : null}
                   {showBonusCols && !editable ? <th className="r pdoc__c-receive">Привезут</th> : null}
                   <th className="r">Закупочная цена</th>
-                  {showDiscountCols ? <th className="r pdoc__c-disc">Скидка, %</th> : null}
+                  {showDiscountCols ? (
+                    <th className="r pdoc__c-disc">
+                      <span>Скидка, %</span>
+                      {editable ? (
+                        // The discount of the whole invoice: what is typed here goes to every row.
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="any"
+                          className="pdoc__qty pdoc__head-discount num"
+                          aria-label="Скидка на все строки, %"
+                          title="Скидка на все строки"
+                          data-autosave="1"
+                          placeholder={uniformDiscount === null ? '—' : '0'}
+                          disabled={busy || !itemsReady || items.length === 0}
+                          value={orderDiscountDraft !== null ? orderDiscountDraft : uniformDiscount || ''}
+                          onChange={(event) => setOrderDiscountDraft(event.target.value)}
+                          onBlur={() => void handleOrderDiscountCommit()}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter') event.currentTarget.blur()
+                          }}
+                        />
+                      ) : null}
+                    </th>
+                  ) : null}
                   {showDiscountCols ? <th className="r pdoc__c-dprice">Цена со скидкой</th> : null}
                   <th className="r">{ORDER_LABELS.amount}</th>
                   {editable ? <th aria-label="Удалить" /> : null}

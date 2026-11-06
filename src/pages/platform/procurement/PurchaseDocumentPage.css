@@ -1158,3 +1158,18 @@
     overflow-x: auto;
   }
 }
+
+/* The discount of the whole invoice sits in the head of the «Скидка, %» column: the label above, a small field under it. */
+.pdoc__table th.pdoc__c-disc {
+  white-space: normal;
+}
+
+.pdoc__head-discount {
+  display: block;
+  width: 100%;
+  max-width: 64px;
+  min-height: 26px;
+  margin: 4px 0 0 auto;
+  font-size: 0.8125rem;
+  font-weight: 400;
+}
