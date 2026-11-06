@@ -20,6 +20,7 @@ import {
 import { fetchAllSupabaseRows } from '../utils/supabasePagination'
 import { buildNativeSettlementPaymentRows } from '../utils/supplierPaymentObligations'
 import { ensurePaymentAccountsLoaded, getPaymentAccountName } from './paymentAccountsService'
+import { formatTenge } from '../utils/formatMoney'
 
 export const UMAG_SETTLEMENTS_ERROR_CODES = {
   VALIDATION: 'VALIDATION_ERROR',
@@ -63,10 +64,7 @@ const USER_MESSAGES = {
 export function formatUmagMoney(value) {
   const n = typeof value === 'number' ? value : Number(value)
   if (!Number.isFinite(n)) return '—'
-  return `${n.toLocaleString('ru-KZ', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })} ₸`
+  return formatTenge(n)
 }
 
 export function formatUmagDateTime(value) {

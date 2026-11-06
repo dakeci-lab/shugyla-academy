@@ -2,6 +2,7 @@ import { isCloudMode } from '../lib/dataMode'
 import { getCloudSuppliers } from '../lib/cloudStore'
 import { getLocalSuppliersBundle } from '../services/suppliersLocalAdapter'
 import { getPaymentAccountName } from '../services/paymentAccountsService'
+import { formatTenge } from './formatMoney'
 
 export const SUPPLIER_STATUS = {
   ACTIVE: 'active',
@@ -303,8 +304,7 @@ export function formatSupplierPaymentTerms(supplier) {
 }
 
 export function formatMinOrderAmount(amount) {
-  if (amount == null || Number.isNaN(amount)) return '—'
-  return `${Number(amount).toLocaleString('ru-RU')} ₸`
+  return formatTenge(amount)
 }
 
 export function filterSuppliers(suppliers, { search = '', showArchived = SUPPLIER_LIST_DEFAULT_SHOW_ARCHIVED } = {}) {

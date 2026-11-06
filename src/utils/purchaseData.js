@@ -1,4 +1,5 @@
 import { getWorkflowMode, isSimpleWorkflow } from './procurementWorkflow'
+import { formatTenge } from './formatMoney'
 
 export { PROCUREMENT_WORKFLOW_MODE, getWorkflowMode, isSimpleWorkflow } from './procurementWorkflow'
 
@@ -31,8 +32,7 @@ export function isOrderVisibleToRole(order, canEdit) {
 }
 
 export function formatPurchaseAmount(amount) {
-  if (amount == null || Number.isNaN(amount)) return '—'
-  return `${Number(amount).toLocaleString('ru-RU')} ₸`
+  return formatTenge(amount)
 }
 
 export function formatPurchaseDate(value) {
