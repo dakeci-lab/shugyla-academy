@@ -113,4 +113,10 @@ ok('the list is the «Закуп» page /platform/procurement (behind its route 
   console.log('  ✓ phones: one list by creation time (a draft can sit below a saved document); desktop keeps drafts first')
 }
 
+assert.match(
+  read('src/pages/platform/procurement/PurchaseDocumentsPage.jsx'),
+  /<span className="pgt__title pdl-nonumber">Поставщик не выбран<\/span>/
+)
+ok('«Поставщик не выбран» has the same size as a supplier name (pgt__title): a document without a supplier no longer looks bigger')
+
 console.log(`\n${checks} checks passed`)

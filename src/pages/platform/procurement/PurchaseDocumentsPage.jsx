@@ -579,7 +579,7 @@ export default function PurchaseDocumentsPage() {
                       supplier: order.supplierName ? (
                         <span className="pgt__title">{order.supplierName}</span>
                       ) : (
-                        <span className="pdl-nonumber">Поставщик не выбран</span>
+                        <span className="pgt__title pdl-nonumber">Поставщик не выбран</span>
                       ),
                       delivery: <span className="num">{order.expectedDeliveryDate ? formatPurchaseDate(order.expectedDeliveryDate) : '—'}</span>,
                       items: <span className="num">{count}</span>,
