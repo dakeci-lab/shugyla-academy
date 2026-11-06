@@ -113,4 +113,10 @@ assert.match(migration, /grant insert \(bonus_qty, promo_buy, promo_free, discou
 assert.ok(fs.existsSync(path.join(ROOT, 'docs/db/stage-29-order-bonus-discount/rollback.sql')))
 ok('stage 29: migration (columns, line trigger, «Сохранить» with the discount, «в пути» with the bonus, column grants), rollback and docs are in the repo')
 
+// A row update must not send the columns `authenticated` has no UPDATE grant for (it made every row edit fail with 403).
+assert.match(adapter, /export const ITEM_READONLY_COLUMNS = \['id', 'purchase_order_id', 'created_at'\]/)
+assert.match(adapter, /for \(const key of ITEM_READONLY_COLUMNS\) delete row\[key\][\s\S]{0,200}update\(row\)\.eq\('id', itemId\)/)
+assert.doesNotMatch(adapter, /row\.created_at = current\.created_at/)
+ok('a row edit sends only editable columns (no id / purchase_order_id / created_at): the database rejected the whole update with 403 «permission denied» before')
+
 console.log(`\n${checks} checks passed`)

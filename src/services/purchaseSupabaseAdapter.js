@@ -126,6 +126,9 @@ function rowToItem(row) {
   })
 }
 
+/** Columns of an existing item row that the app never rewrites (no UPDATE grant for `authenticated`). */
+export const ITEM_READONLY_COLUMNS = ['id', 'purchase_order_id', 'created_at']
+
 /** Доменная модель позиции → DB row */
 function itemToRow(item, orderId) {
   const orderedQty = item.orderQty ?? item.orderedQty ?? item.ordered_qty ?? 0
@@ -438,7 +441,9 @@ export async function updatePurchaseOrderItemCloud(orderId, itemId, patch) {
 
   const merged = normalizePurchaseItem({ ...rowToItem(current), ...patch })
   const row = itemToRow(merged, orderId)
-  row.created_at = current.created_at
+  // The role `authenticated` may not change `id`, `purchase_order_id` and `created_at` of an existing row (column grants):
+  // sending them made the database reject the whole update with «permission denied» (403), so no row field was ever saved.
+  for (const key of ITEM_READONLY_COLUMNS) delete row[key]
 
   await throwIfError(
     await supabase.from('purchase_order_items').update(row).eq('id', itemId),
