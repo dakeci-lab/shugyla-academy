@@ -101,21 +101,19 @@ export async function updatePurchaseOrder(orderId, updates) {
 }
 
 /**
- * Скидка накладной в процентах: ставится заказу и строкам, у которых скидка равна прежней скидке накладной.
+ * Скидка накладной в процентах (поле в заголовке колонки «Скидка, %»): ставится заказу и ВСЕМ его строкам.
  * Возвращает свежий заказ.
  */
-export async function setPurchaseOrderDiscount(orderId, discountPct, previousPct = 0) {
+export async function setPurchaseOrderDiscount(orderId, discountPct) {
   if (isCloudMode()) {
-    await cloud.setOrderDiscountCloud(orderId, discountPct, previousPct)
+    await cloud.setOrderDiscountCloud(orderId, discountPct)
     return afterOrderChange(orderId)
   }
   const order = getPurchaseOrderByIdSync(orderId)
   if (!order) throw new Error('Закуп не найден')
   return updatePurchaseOrder(orderId, {
     discountPct,
-    items: (order.items || []).map((item) =>
-      Number(item.discountPct || 0) === Number(previousPct || 0) ? { ...item, discountPct } : item
-    ),
+    items: (order.items || []).map((item) => ({ ...item, discountPct })),
   })
 }
 

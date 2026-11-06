@@ -313,21 +313,17 @@ export async function fetchPurchaseOrderHeadersByIdsCloud(ids) {
 }
 
 /**
- * Скидка накладной: записывается в заказ и в те строки, у которых скидка была равна прежней скидке накладной
- * (строка с собственной скидкой остаётся как есть). Суммы строк и заказа пересчитывают триггеры базы.
+ * Скидка накладной (поле в заголовке колонки «Скидка, %»): записывается в заказ (с ней начинаются новые строки) и во ВСЕ
+ * строки заказа; потом строку можно поправить отдельно. Суммы строк и заказа пересчитывают триггеры базы.
  */
-export async function setOrderDiscountCloud(orderId, discountPct, previousPct = 0) {
+export async function setOrderDiscountCloud(orderId, discountPct) {
   ensureClient()
   await throwIfError(
     await supabase.from('purchase_orders').update({ discount_pct: discountPct }).eq('id', orderId),
     'Сохранение скидки'
   )
   await throwIfError(
-    await supabase
-      .from('purchase_order_items')
-      .update({ discount_pct: discountPct })
-      .eq('purchase_order_id', orderId)
-      .eq('discount_pct', previousPct),
+    await supabase.from('purchase_order_items').update({ discount_pct: discountPct }).eq('purchase_order_id', orderId),
     'Применение скидки к строкам'
   )
 }
