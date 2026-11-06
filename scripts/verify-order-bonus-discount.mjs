@@ -101,14 +101,17 @@ assert.match(adapter, /export async function setOrderDiscountCloud\(orderId, dis
 assert.doesNotMatch(adapter, /previousPct/)
 ok('the Supabase adapter writes the row fields; the discount typed in the column head goes to every row of the order')
 const page = read('src/pages/platform/procurement/PurchaseDocumentPage.jsx')
-assert.match(page, /calcBonusFromPromo\(next, item\.promoBuy, item\.promoFree\)/)
-assert.match(page, /bonusQty: next, promoBuy: null, promoFree: null/)
 assert.match(page, /catalogProductToItem\(product, \{ discountPct: order\.discountPct/)
 assert.match(page, /aria-label="Скидка на все строки, %"/)
 assert.match(page, /\{isPhone && editable \? \(\s*\/\/ Phones have no table head/)
 assert.doesNotMatch(page, /Скидка на накладную, %/)
-assert.match(page, /showBonusCols = editable \|\| hasBonus/)
-ok('document: the discount field is in the head of the «Скидка, %» column (a phone keeps it as a row: no table head there); the quantity keeps the bonus of a promo row in step; a typed bonus drops the rule; new rows inherit the invoice discount; the receiver sees the columns only when the order has them')
+// «Акция» and «Бонус» are out of the interface (2026-11-06): no columns, no fields, no notes; the data stays in the database.
+for (const gone of [/Акция/, /Бонус/, /Привезут/, /handlePromoCommit|handleBonusCommit/, /showBonusCols/, /pdoc__c-promo|pdoc__c-bonus|pdoc__c-receive/, /бонус/]) {
+  assert.doesNotMatch(page, gone)
+}
+const sheetSrc = read('src/components/procurement/document/ItemDetailSheet.jsx')
+for (const gone of [/Акция/, /Бонус/, /Привезут/, /onPromoCommit|onBonusCommit/]) assert.doesNotMatch(sheetSrc, gone)
+ok('document: the discount field is in the head of the «Скидка, %» column (a phone keeps it as a row: no table head there); new rows inherit the invoice discount; the receiver sees the discount columns only when the order has a discount; «Акция» and «Бонус» are gone from the interface (columns, product sheet, notes), the data and the database columns stay')
 const migration = read('supabase/migrations/20261105230000_order_bonus_discount.sql')
 assert.match(migration, /purchase_order_items_calc_line_total/)
 assert.match(migration, /sum\(poi\.ordered_qty \+ coalesce\(poi\.bonus_qty, 0\)\)/)

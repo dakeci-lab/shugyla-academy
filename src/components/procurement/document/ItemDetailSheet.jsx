@@ -3,9 +3,7 @@ import {
   calcLineTotal,
   clampDiscountPct,
   discountedPrice,
-  formatPromo,
   formatPurchaseAmount,
-  itemReceiveQty,
 } from '../../../utils/purchaseData'
 import './ItemDetailSheet.css'
 
@@ -19,8 +17,6 @@ export default function ItemDetailSheet({
   qtyValue,
   onQtyChange,
   onQtyCommit,
-  onPromoCommit,
-  onBonusCommit,
   onDiscountCommit,
   fieldValue,
   onFieldChange,
@@ -30,8 +26,6 @@ export default function ItemDetailSheet({
 }) {
   function close() {
     onQtyCommit?.(item)
-    onPromoCommit?.(item)
-    onBonusCommit?.(item)
     onDiscountCommit?.(item)
     onClose()
   }
@@ -114,29 +108,6 @@ export default function ItemDetailSheet({
         {editable ? (
           <>
             <label className="idsheet__field">
-              <span>Акция (5+1)</span>
-              <input
-                type="text"
-                inputMode="text"
-                placeholder="5+1"
-                value={fieldValue(item.id, 'promo', formatPromo(item.promoBuy, item.promoFree))}
-                onChange={(event) => onFieldChange(item.id, 'promo', event.target.value)}
-                onBlur={() => onPromoCommit?.(item)}
-              />
-            </label>
-            <label className="idsheet__field">
-              <span>Бонус, {unit}</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                placeholder="0"
-                value={fieldValue(item.id, 'bonus', item.bonusQty || '')}
-                onChange={(event) => onFieldChange(item.id, 'bonus', event.target.value)}
-                onBlur={() => onBonusCommit?.(item)}
-              />
-            </label>
-            <label className="idsheet__field">
               <span>Скидка, %</span>
               <input
                 type="number"
@@ -152,18 +123,6 @@ export default function ItemDetailSheet({
           </>
         ) : (
           <>
-            {item.bonusQty > 0 ? (
-              <div className="idsheet__field">
-                <span>Бонус, {unit}</span>
-                <output>+{item.bonusQty}</output>
-              </div>
-            ) : null}
-            {item.bonusQty > 0 ? (
-              <div className="idsheet__field">
-                <span>Привезут, {unit}</span>
-                <output>{itemReceiveQty(item)}</output>
-              </div>
-            ) : null}
             {item.discountPct > 0 ? (
               <div className="idsheet__field">
                 <span>Скидка, %</span>
