@@ -1034,20 +1034,9 @@
   }
 }
 
-/* Bonus and discount (stage 29): promo / bonus / discount cells, the invoice discount row, the saving line. */
-.pdoc__promo {
-  width: 56px;
-}
-
-.pdoc__c-bonus .pdoc__qty,
+/* Discount (stage 29): the discount cells, the invoice discount row (phones), the saving line. «Акция» and «Бонус» are not in the interface (2026-11-06). */
 .pdoc__c-disc .pdoc__qty {
   width: 64px;
-}
-
-.pdoc__c-promo,
-.pdoc__c-bonus,
-.pdoc__c-disc {
-  width: 1%;
 }
 
 @media (min-width: 641px) {
@@ -1097,17 +1086,8 @@
   color: var(--color-primary, #0f9d58);
 }
 
-.pdoc__bonus-inline {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--color-primary, #0f9d58);
-}
-
 @media (max-width: 640px) {
-  /* Phones: the extra columns do not fit a row — bonus and discount ride in the note under the name, the editing is in the product sheet. */
-  .pdoc__c-promo,
-  .pdoc__c-bonus,
-  .pdoc__c-receive,
+  /* Phones: the extra columns do not fit a row — the discount rides in the note under the name, the editing is in the product sheet. */
   .pdoc__c-disc,
   .pdoc__c-dprice,
   .pdoc__total-extra {

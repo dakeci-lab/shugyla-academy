@@ -38,14 +38,10 @@ import {
   formatPurchaseAmount,
   formatPurchaseDateTime,
   calcLineTotal,
-  calcBonusFromPromo,
   clampDiscountPct,
   discountedPrice,
-  formatPromo,
   isOrderDraft,
   isOrderSaved,
-  itemReceiveQty,
-  parsePromo,
 } from '../../../utils/purchaseData'
 import { loadOrderChecklist, saveOrderChecklist } from '../../../utils/orderChecklistStorage'
 import {
@@ -80,9 +76,6 @@ const TABLE_COL_WIDTH = {
   stock: 60,
   sales: 80,
   qty: 96,
-  promo: 72,
-  bonus: 80,
-  receive: 80,
   price: 124,
   disc: 80,
   dprice: 104,
@@ -132,7 +125,7 @@ export default function PurchaseDocumentPage() {
   const [tableQuery, setTableQuery] = useState('')
   const [nomenclatureOpen, setNomenclatureOpen] = useState(false)
   const [qtyDraft, setQtyDraft] = useState({})
-  // Typed-but-not-saved values of the promo / bonus / discount cells and of the invoice discount.
+  // Typed-but-not-saved values of the discount cells and of the invoice discount.
   const [fieldDraft, setFieldDraft] = useState({})
   const [orderDiscountDraft, setOrderDiscountDraft] = useState(null)
   // The green line under the top menu (like UMAG): runs while a change is being saved.
@@ -358,8 +351,6 @@ export default function PurchaseDocumentPage() {
     setQtyDraft(({ [item.id]: _drop, ...rest }) => rest)
     if (next === item.orderQty) return
     const patch = { orderQty: next }
-    // A row with a promo («5+1») keeps its bonus in step with the quantity (whole parts only).
-    if (item.promoBuy) patch.bonusQty = calcBonusFromPromo(next, item.promoBuy, item.promoFree)
     await patchItem(item, patch, 'Не удалось сохранить количество')
   }
 
@@ -376,43 +367,6 @@ export default function PurchaseDocumentPage() {
   function draftField(itemId, key, fallback) {
     const value = fieldDraft[`${itemId}:${key}`]
     return value === undefined ? fallback : value
-  }
-
-  /** «Акция» text («5+1»): the bonus is recalculated by whole parts; an empty field clears the promo and the bonus. */
-  async function handlePromoCommit(item) {
-    const raw = takeDraftField(item.id, 'promo')
-    if (raw === undefined) return
-    const text = String(raw).trim()
-    if (!text) {
-      if (item.promoBuy) await patchItem(item, { promoBuy: null, promoFree: null, bonusQty: 0 }, 'Не удалось сохранить акцию')
-      return
-    }
-    const promo = parsePromo(text)
-    if (!promo) {
-      showError('Акция записывается как «5+1»: купи 5, получи 1.')
-      return
-    }
-    if (promo.buy === item.promoBuy && promo.free === item.promoFree) return
-    // The quantity typed in the same breath counts (the sheet commits the quantity and the promo together).
-    const qty = qtyDraft[item.id] !== undefined ? Math.max(0, Number(qtyDraft[item.id]) || 0) : item.orderQty
-    await patchItem(
-      item,
-      {
-        promoBuy: promo.buy,
-        promoFree: promo.free,
-        bonusQty: calcBonusFromPromo(qty, promo.buy, promo.free),
-      },
-      'Не удалось сохранить акцию'
-    )
-  }
-
-  /** The bonus typed by hand: the promo rule is dropped (it would overwrite the number at the next quantity change). */
-  async function handleBonusCommit(item) {
-    const raw = takeDraftField(item.id, 'bonus')
-    if (raw === undefined) return
-    const next = Math.max(0, Number(raw) || 0)
-    if (next === item.bonusQty) return
-    await patchItem(item, { bonusQty: next, promoBuy: null, promoFree: null }, 'Не удалось сохранить бонус')
   }
 
   async function handleDiscountCommit(item) {
@@ -523,8 +477,6 @@ export default function PurchaseDocumentPage() {
   async function flushDrafts() {
     for (const item of items) {
       if (qtyDraft[item.id] !== undefined) await handleQtyCommit(item)
-      if (fieldDraft[`${item.id}:promo`] !== undefined) await handlePromoCommit(item)
-      if (fieldDraft[`${item.id}:bonus`] !== undefined) await handleBonusCommit(item)
       if (fieldDraft[`${item.id}:discount`] !== undefined) await handleDiscountCommit(item)
     }
     if (orderDiscountDraft !== null) await handleOrderDiscountCommit()
@@ -651,10 +603,8 @@ export default function PurchaseDocumentPage() {
   })
   const totals = documentTotals(liveItems)
   const total = totals.discounted
-  const hasBonus = items.some((item) => Number(item.bonusQty) > 0)
   const hasDiscount = items.some((item) => Number(item.discountPct) > 0) || Number(order.discountPct) > 0
-  // The bonus and discount columns are always there for the buyer; the receiver sees them only when the order has any.
-  const showBonusCols = editable || hasBonus
+  // The discount columns are always there for the buyer; the receiver sees them only when the order has a discount.
   const showDiscountCols = editable || hasDiscount
   const tableCols = [
     showTicks && 'check',
@@ -664,9 +614,6 @@ export default function PurchaseDocumentPage() {
     !readerView && 'stock',
     !readerView && 'sales',
     'qty',
-    editable && 'promo',
-    showBonusCols && 'bonus',
-    showBonusCols && !editable && 'receive',
     'price',
     showDiscountCols && 'disc',
     showDiscountCols && 'dprice',
@@ -675,7 +622,7 @@ export default function PurchaseDocumentPage() {
   ].filter(Boolean)
   const tableMinWidth = tableCols.reduce((sum, key) => sum + (key === 'name' ? TABLE_NAME_MIN_WIDTH : TABLE_COL_WIDTH[key]), 0)
   const colCount =
-    (showTicks ? 1 : 0) + 6 + (readerView ? 0 : 2) + (editable ? 2 : 0) + (showBonusCols ? 1 : 0) + (showBonusCols && !editable ? 1 : 0) + (showDiscountCols ? 2 : 0)
+    (showTicks ? 1 : 0) + 6 + (readerView ? 0 : 2) + (editable ? 1 : 0) + (showDiscountCols ? 2 : 0)
   const commentLabel = readerView ? '' : order.comment ? 'Комментарий' : editable ? 'Добавить комментарий' : ''
   const doneCount = items.filter((item) => ticks.has(item.id)).length
   const tableText = tableQuery.trim().toLowerCase()
@@ -957,9 +904,6 @@ export default function PurchaseDocumentPage() {
                   {readerView ? null : <th className="r">Остаток</th>}
                   {readerView ? null : <th className="r">Продажи/день</th>}
                   <th className="r">{readerView ? 'Заказано' : 'Заказать'}</th>
-                  {editable ? <th className="r pdoc__c-promo">Акция</th> : null}
-                  {showBonusCols ? <th className="r pdoc__c-bonus">Бонус</th> : null}
-                  {showBonusCols && !editable ? <th className="r pdoc__c-receive">Привезут</th> : null}
                   <th className="r">Закупочная цена</th>
                   {showDiscountCols ? (
                     <th className="r pdoc__c-disc">
@@ -1026,12 +970,8 @@ export default function PurchaseDocumentPage() {
                       onClick={isPhone ? () => setDetailId(item.id) : undefined}
                     >
                       {item.productName}
-                      {isPhone && (item.bonusQty > 0 || item.discountPct > 0) ? (
-                        <span className="pdoc__c-note">
-                          {item.bonusQty > 0 ? `+${item.bonusQty} бонус` : ''}
-                          {item.bonusQty > 0 && item.discountPct > 0 ? ' · ' : ''}
-                          {item.discountPct > 0 ? `скидка ${item.discountPct}%` : ''}
-                        </span>
+                      {isPhone && item.discountPct > 0 ? (
+                        <span className="pdoc__c-note">скидка {item.discountPct}%</span>
                       ) : null}
                     </td>
                     <td className="num pdoc__c-code">{item.barcode}</td>
@@ -1069,53 +1009,9 @@ export default function PurchaseDocumentPage() {
                         <span className="num">
                           {item.orderQty}
                           <span className="pdoc__unit"> {item.unit || 'шт.'}</span>
-                          {isPhone && item.bonusQty > 0 ? <span className="pdoc__bonus-inline"> +{item.bonusQty}</span> : null}
                         </span>
                       )}
                     </td>
-                    {editable ? (
-                      <td className="r pdoc__c-promo">
-                        <input
-                          type="text"
-                          inputMode="text"
-                          className="pdoc__qty pdoc__promo num"
-                          aria-label="Акция"
-                          data-autosave="1"
-                          placeholder="—"
-                          value={draftField(item.id, 'promo', formatPromo(item.promoBuy, item.promoFree))}
-                          onChange={(event) => setDraftField(item.id, 'promo', event.target.value)}
-                          onBlur={() => void handlePromoCommit(item)}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter') event.currentTarget.blur()
-                          }}
-                        />
-                      </td>
-                    ) : null}
-                    {showBonusCols ? (
-                      <td className="r pdoc__c-bonus">
-                        {editable ? (
-                          <input
-                            type="number"
-                            min="0"
-                            className="pdoc__qty num"
-                            aria-label="Бонус"
-                            data-autosave="1"
-                            value={draftField(item.id, 'bonus', item.bonusQty || '')}
-                            placeholder="0"
-                            onChange={(event) => setDraftField(item.id, 'bonus', event.target.value)}
-                            onBlur={() => void handleBonusCommit(item)}
-                            onKeyDown={(event) => {
-                              if (event.key === 'Enter') event.currentTarget.blur()
-                            }}
-                          />
-                        ) : (
-                          <span className="num">{item.bonusQty > 0 ? `+${item.bonusQty}` : ''}</span>
-                        )}
-                      </td>
-                    ) : null}
-                    {showBonusCols && !editable ? (
-                      <td className="r num pdoc__c-receive">{itemReceiveQty(item)}</td>
-                    ) : null}
                     <td className="r num pdoc__c-price">
                       {formatPurchaseAmount(isPhone ? discountedPrice(item.purchasePrice, item.discountPct) : item.purchasePrice)}
                     </td>
@@ -1186,17 +1082,6 @@ export default function PurchaseDocumentPage() {
                 <tr className="pdoc__total-row">
                   <td colSpan={(showTicks ? 1 : 0) + 3 + (readerView ? 0 : 2)}>Итого</td>
                   <td className="r num pdoc__total-qty">{totalQty.toLocaleString('ru-RU', { maximumFractionDigits: 3 })}</td>
-                  {editable ? <td className="pdoc__total-extra" /> : null}
-                  {showBonusCols ? (
-                    <td className="r num pdoc__total-extra">
-                      {totals.bonus > 0 ? `+${totals.bonus.toLocaleString('ru-RU', { maximumFractionDigits: 3 })}` : ''}
-                    </td>
-                  ) : null}
-                  {showBonusCols && !editable ? (
-                    <td className="r num pdoc__total-extra">
-                      {(totalQty + totals.bonus).toLocaleString('ru-RU', { maximumFractionDigits: 3 })}
-                    </td>
-                  ) : null}
                   <td className="pdoc__total-gap" />
                   {showDiscountCols ? <td className="pdoc__total-extra" /> : null}
                   {showDiscountCols ? <td className="pdoc__total-extra" /> : null}
@@ -1265,8 +1150,6 @@ export default function PurchaseDocumentPage() {
           qtyValue={qtyDraft[detailId]}
           onQtyChange={(itemId, value) => setQtyDraft((cur) => ({ ...cur, [itemId]: value }))}
           onQtyCommit={(row) => void handleQtyCommit(row)}
-          onPromoCommit={(row) => void handlePromoCommit(row)}
-          onBonusCommit={(row) => void handleBonusCommit(row)}
           onDiscountCommit={(row) => void handleDiscountCommit(row)}
           fieldValue={draftField}
           onFieldChange={setDraftField}
