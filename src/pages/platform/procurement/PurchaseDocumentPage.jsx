@@ -7,6 +7,7 @@ import { usePlatformPageRefresh } from '../../../context/PullToRefreshContext'
 import { useToast } from '../../../context/ToastContext'
 import { useAdminRefresh } from '../../../hooks/useAdminRefresh'
 import useMediaQuery from '../../../hooks/useMediaQuery'
+import useSaveTracker from '../../../hooks/useSaveTracker'
 import PurchaseDocumentPhoneActions from './PurchaseDocumentPhoneActions'
 import { ChevronDownIcon } from '../../../components/icons/PlatformIcons'
 import { getPlatformSection } from '../../../platform/platformNav'
@@ -56,6 +57,7 @@ import {
 import { toProcurementUserMessage } from '../../../utils/procurementErrors'
 import { exportPurchaseOrderPdf, exportPurchaseOrderXlsx } from '../../../utils/purchaseOrderExport'
 import PlatformAccessDenied from '../../../components/platform/PlatformAccessDenied'
+import SaveProgressBar from '../../../components/platform/SaveProgressBar'
 import AdminModal from '../../../components/admin/AdminModal'
 import ConfirmDialog from '../../../components/admin/ConfirmDialog'
 import DocumentDateBox from '../../../components/procurement/document/DocumentDateBox'
@@ -111,6 +113,9 @@ export default function PurchaseDocumentPage() {
   // Typed-but-not-saved values of the promo / bonus / discount cells and of the invoice discount.
   const [fieldDraft, setFieldDraft] = useState({})
   const [orderDiscountDraft, setOrderDiscountDraft] = useState(null)
+  // The green line under the top menu (like UMAG): runs while a change is being saved.
+  const [saveState, trackSave] = useSaveTracker()
+  const flushRef = useRef(null)
   const [detailId, setDetailId] = useState(null)
   const [supplierDebt, setSupplierDebt] = useState(null)
   const isPhone = useMediaQuery('(max-width: 640px)')
@@ -135,6 +140,30 @@ export default function PurchaseDocumentPage() {
   useEffect(() => {
     setTicks(loadOrderChecklist(id))
   }, [id])
+
+  // Like UMAG: a tap outside a number field saves it. On a tablet a tap on an empty place does not always take the focus
+  // away from the field, and the number keypad has no Enter — so the focus is taken away here (the blur of the field saves).
+  useEffect(() => {
+    if (!editable) return undefined
+    function leaveField(event) {
+      const active = document.activeElement
+      if (!active || !active.dataset || !active.dataset.autosave) return
+      if (event.target.closest?.('input, textarea, select, [contenteditable="true"]')) return
+      active.blur()
+    }
+    // A hidden tab / a closed page must not lose the number typed in the last field.
+    function saveBeforeLeaving(event) {
+      if (document.visibilityState === 'hidden' || event.type === 'pagehide') void flushRef.current?.()
+    }
+    document.addEventListener('pointerdown', leaveField, true)
+    document.addEventListener('visibilitychange', saveBeforeLeaving)
+    window.addEventListener('pagehide', saveBeforeLeaving)
+    return () => {
+      document.removeEventListener('pointerdown', leaveField, true)
+      document.removeEventListener('visibilitychange', saveBeforeLeaving)
+      window.removeEventListener('pagehide', saveBeforeLeaving)
+    }
+  }, [editable])
 
   function toggleTick(itemId) {
     setTicks((current) => {
@@ -283,14 +312,14 @@ export default function PurchaseDocumentPage() {
   }
 
   /** One row field: the row changes at once, the server answer keeps the totals; a failure restores the document. */
-  async function patchItem(item, patch, failMessage = 'Не удалось сохранить изменения.') {
+  async function patchItem(item, patch, failMessage = 'Не удалось сохранить изменения') {
     setFullOrder((prev) =>
       prev ? { ...prev, items: prev.items.map((row) => (row.id === item.id ? { ...row, ...patch } : row)) } : prev
     )
     try {
-      await updatePurchaseOrderItem(order.id, item.id, patch)
+      await trackSave(updatePurchaseOrderItem(order.id, item.id, patch))
     } catch (error) {
-      showError(toProcurementUserMessage(error, failMessage))
+      showError(toProcurementUserMessage(error, `${failMessage} у товара «${item.productName}».`))
       await reloadOrder()
     }
   }
@@ -304,7 +333,7 @@ export default function PurchaseDocumentPage() {
     const patch = { orderQty: next }
     // A row with a promo («5+1») keeps its bonus in step with the quantity (whole parts only).
     if (item.promoBuy) patch.bonusQty = calcBonusFromPromo(next, item.promoBuy, item.promoFree)
-    await patchItem(item, patch, 'Не удалось сохранить количество.')
+    await patchItem(item, patch, 'Не удалось сохранить количество')
   }
 
   function setDraftField(itemId, key, value) {
@@ -328,7 +357,7 @@ export default function PurchaseDocumentPage() {
     if (raw === undefined) return
     const text = String(raw).trim()
     if (!text) {
-      if (item.promoBuy) await patchItem(item, { promoBuy: null, promoFree: null, bonusQty: 0 })
+      if (item.promoBuy) await patchItem(item, { promoBuy: null, promoFree: null, bonusQty: 0 }, 'Не удалось сохранить акцию')
       return
     }
     const promo = parsePromo(text)
@@ -339,11 +368,15 @@ export default function PurchaseDocumentPage() {
     if (promo.buy === item.promoBuy && promo.free === item.promoFree) return
     // The quantity typed in the same breath counts (the sheet commits the quantity and the promo together).
     const qty = qtyDraft[item.id] !== undefined ? Math.max(0, Number(qtyDraft[item.id]) || 0) : item.orderQty
-    await patchItem(item, {
-      promoBuy: promo.buy,
-      promoFree: promo.free,
-      bonusQty: calcBonusFromPromo(qty, promo.buy, promo.free),
-    })
+    await patchItem(
+      item,
+      {
+        promoBuy: promo.buy,
+        promoFree: promo.free,
+        bonusQty: calcBonusFromPromo(qty, promo.buy, promo.free),
+      },
+      'Не удалось сохранить акцию'
+    )
   }
 
   /** The bonus typed by hand: the promo rule is dropped (it would overwrite the number at the next quantity change). */
@@ -352,7 +385,7 @@ export default function PurchaseDocumentPage() {
     if (raw === undefined) return
     const next = Math.max(0, Number(raw) || 0)
     if (next === item.bonusQty) return
-    await patchItem(item, { bonusQty: next, promoBuy: null, promoFree: null })
+    await patchItem(item, { bonusQty: next, promoBuy: null, promoFree: null }, 'Не удалось сохранить бонус')
   }
 
   async function handleDiscountCommit(item) {
@@ -360,7 +393,7 @@ export default function PurchaseDocumentPage() {
     if (raw === undefined) return
     const next = clampDiscountPct(raw)
     if (next === item.discountPct) return
-    await patchItem(item, { discountPct: next }, 'Не удалось сохранить скидку.')
+    await patchItem(item, { discountPct: next }, 'Не удалось сохранить скидку')
   }
 
   /** The invoice discount: the order and the rows that still carry the previous invoice discount take the new one. */
@@ -370,7 +403,7 @@ export default function PurchaseDocumentPage() {
     setOrderDiscountDraft(null)
     const previous = Number(order.discountPct) || 0
     if (next === previous) return
-    const fresh = await run(() => setPurchaseOrderDiscount(order.id, next, previous), 'Не удалось сохранить скидку.')
+    const fresh = await run(() => trackSave(setPurchaseOrderDiscount(order.id, next, previous)), 'Не удалось сохранить скидку накладной.')
     if (fresh?.id) setFullOrder(fresh)
   }
 
@@ -444,9 +477,43 @@ export default function PurchaseDocumentPage() {
     showSuccess(`Добавлено товаров: ${payload.length}`)
   }
 
+  const hasDrafts = () =>
+    Object.keys(qtyDraft).length > 0 || Object.keys(fieldDraft).length > 0 || orderDiscountDraft !== null
+
+  /**
+   * Sends everything that is typed but not saved yet (the number stays in the field until it is left: tap outside, Enter or
+   * another field). One after another: every edit reads and writes its own columns, but the order of the messages stays clear.
+   */
+  async function flushDrafts() {
+    for (const item of items) {
+      if (qtyDraft[item.id] !== undefined) await handleQtyCommit(item)
+      if (fieldDraft[`${item.id}:promo`] !== undefined) await handlePromoCommit(item)
+      if (fieldDraft[`${item.id}:bonus`] !== undefined) await handleBonusCommit(item)
+      if (fieldDraft[`${item.id}:discount`] !== undefined) await handleDiscountCommit(item)
+    }
+    if (orderDiscountDraft !== null) await handleOrderDiscountCommit()
+  }
+  flushRef.current = hasDrafts() ? flushDrafts : null
+
+  async function handleClose() {
+    if (hasDrafts()) await flushDrafts()
+    navigate(LIST_PATH)
+  }
+
   async function handleSave() {
     if (!editable || busy) return
-    const problem = validateDocumentForSave(order, items)
+    // «Сохранить» saves what is on the screen: the number typed in the last field goes first, then the document is checked.
+    let currentOrder = order
+    let currentItems = items
+    if (hasDrafts()) {
+      await flushDrafts()
+      const fresh = await reloadOrder()
+      if (fresh) {
+        currentOrder = fresh
+        currentItems = fresh.items ?? []
+      }
+    }
+    const problem = validateDocumentForSave(currentOrder, currentItems)
     if (problem) {
       showError(problem)
       return
@@ -535,7 +602,18 @@ export default function PurchaseDocumentPage() {
     )
   }
 
-  const totals = documentTotals(items)
+  // The totals follow what is typed (quantity, discount of a row), like the sum of the row itself.
+  const liveItems = items.map((item) => {
+    const typedQty = qtyDraft[item.id]
+    const typedDiscount = fieldDraft[`${item.id}:discount`]
+    if (typedQty === undefined && typedDiscount === undefined) return item
+    return {
+      ...item,
+      orderQty: typedQty !== undefined ? Math.max(0, Number(typedQty) || 0) : item.orderQty,
+      discountPct: typedDiscount !== undefined ? clampDiscountPct(typedDiscount) : item.discountPct,
+    }
+  })
+  const totals = documentTotals(liveItems)
   const total = totals.discounted
   const hasBonus = items.some((item) => Number(item.bonusQty) > 0)
   const hasDiscount = items.some((item) => Number(item.discountPct) > 0) || Number(order.discountPct) > 0
@@ -564,6 +642,7 @@ export default function PurchaseDocumentPage() {
 
   return (
     <div className={`pdoc${editable ? ' pdoc--editable' : ''}${isPhone && canDownload && itemsReady && items.length > 0 ? ' pdoc--has-download-bar' : ''}`}>
+      <SaveProgressBar state={saveState} />
       <div className="pdoc__head">
         <h1 className="pdoc__title">{documentTitle(order)}</h1>
         {/* The receiving view tells who ACCEPTED the goods (only once it is saved), not who created the order. */}
@@ -600,7 +679,7 @@ export default function PurchaseDocumentPage() {
             Сохранить
           </button>
         ) : null}
-        <button type="button" className="btn btn--outline pdoc__bar-close" onClick={() => navigate(LIST_PATH)}>
+        <button type="button" className="btn btn--outline pdoc__bar-close" onClick={() => void handleClose()}>
           Закрыть
         </button>
         <span className="pdoc__spacer" />
@@ -706,6 +785,7 @@ export default function PurchaseDocumentPage() {
           {editable ? (
             <input
               id="pdoc-order-discount"
+              data-autosave="1"
               type="number"
               min="0"
               max="100"
@@ -896,6 +976,7 @@ export default function PurchaseDocumentPage() {
                           min="0"
                           className="pdoc__qty num"
                           aria-label="Заказать"
+                          data-autosave="1"
                           value={qtyDraft[item.id] ?? item.orderQty}
                           onChange={(event) => setQtyDraft((cur) => ({ ...cur, [item.id]: event.target.value }))}
                           onBlur={() => void handleQtyCommit(item)}
@@ -918,6 +999,7 @@ export default function PurchaseDocumentPage() {
                           inputMode="text"
                           className="pdoc__qty pdoc__promo num"
                           aria-label="Акция"
+                          data-autosave="1"
                           placeholder="—"
                           value={draftField(item.id, 'promo', formatPromo(item.promoBuy, item.promoFree))}
                           onChange={(event) => setDraftField(item.id, 'promo', event.target.value)}
@@ -936,6 +1018,7 @@ export default function PurchaseDocumentPage() {
                             min="0"
                             className="pdoc__qty num"
                             aria-label="Бонус"
+                            data-autosave="1"
                             value={draftField(item.id, 'bonus', item.bonusQty || '')}
                             placeholder="0"
                             onChange={(event) => setDraftField(item.id, 'bonus', event.target.value)}
@@ -965,6 +1048,7 @@ export default function PurchaseDocumentPage() {
                             step="any"
                             className="pdoc__qty num"
                             aria-label="Скидка, %"
+                            data-autosave="1"
                             value={draftField(item.id, 'discount', item.discountPct || '')}
                             placeholder="0"
                             onChange={(event) => setDraftField(item.id, 'discount', event.target.value)}

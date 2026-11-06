@@ -126,8 +126,39 @@ function rowToItem(row) {
   })
 }
 
-/** Columns of an existing item row that the app never rewrites (no UPDATE grant for `authenticated`). */
-export const ITEM_READONLY_COLUMNS = ['id', 'purchase_order_id', 'created_at']
+/**
+ * Domain field → column of `purchase_order_items` for a PARTIAL update: an edit writes only the fields it changes.
+ * Never `id`, `purchase_order_id`, `created_at` (the role `authenticated` has no UPDATE grant on them — sending them made the
+ * database reject the whole update with 403) and not `total_amount` (the row trigger recalculates it from quantity,
+ * price and discount). Writing only the changed columns also keeps two quick edits of one row from overwriting each other.
+ */
+export const ITEM_PATCH_COLUMNS = {
+  productName: 'product_name',
+  barcode: 'barcode',
+  unit: 'unit',
+  supplierId: 'supplier_id',
+  supplierName: 'supplier_name',
+  stock: 'stock_qty',
+  salesPerDay: 'sales_per_day',
+  recommendation: 'recommended_qty',
+  orderQty: 'ordered_qty',
+  purchasePrice: 'purchase_price',
+  bonusQty: 'bonus_qty',
+  promoBuy: 'promo_buy',
+  promoFree: 'promo_free',
+  discountPct: 'discount_pct',
+  comment: 'comment',
+}
+
+function itemPatchToRow(patch) {
+  const row = {}
+  for (const [key, column] of Object.entries(ITEM_PATCH_COLUMNS)) {
+    if (patch[key] !== undefined) row[column] = patch[key]
+  }
+  if (patch.orderedQty !== undefined) row.ordered_qty = patch.orderedQty
+  row.updated_at = new Date().toISOString()
+  return row
+}
 
 /** Доменная модель позиции → DB row */
 function itemToRow(item, orderId) {
@@ -425,33 +456,22 @@ export async function addPurchaseOrderItemsCloud(orderId, items) {
   return rows.map((row) => row.id)
 }
 
-/** Обновление позиции */
+/** Обновление позиции: пишутся только изменённые поля (см. ITEM_PATCH_COLUMNS). */
 export async function updatePurchaseOrderItemCloud(orderId, itemId, patch) {
   ensureClient()
 
-  const currentResult = await supabase
+  const result = await supabase
     .from('purchase_order_items')
-    .select('*')
+    .update(itemPatchToRow(patch))
     .eq('id', itemId)
     .eq('purchase_order_id', orderId)
-    .maybeSingle()
+    .select('id')
 
-  const current = await throwIfError(currentResult, 'Загрузка позиции закупа')
-  if (!current) throw new Error('Позиция закупа не найдена')
-
-  const merged = normalizePurchaseItem({ ...rowToItem(current), ...patch })
-  const row = itemToRow(merged, orderId)
-  // The role `authenticated` may not change `id`, `purchase_order_id` and `created_at` of an existing row (column grants):
-  // sending them made the database reject the whole update with «permission denied» (403), so no row field was ever saved.
-  for (const key of ITEM_READONLY_COLUMNS) delete row[key]
-
-  await throwIfError(
-    await supabase.from('purchase_order_items').update(row).eq('id', itemId),
-    'Обновление позиции закупа'
-  )
+  const rows = await throwIfError(result, 'Обновление позиции закупа')
+  if (!rows || rows.length === 0) throw new Error('Позиция закупа не найдена')
 
   // totals (total_amount, items_count) are kept by the database triggers on purchase_order_items
-  return merged
+  return { id: itemId, ...patch }
 }
 
 /** Удаление позиции */
