@@ -251,8 +251,10 @@
   color: var(--color-text-secondary, #64748b);
 }
 
-.pdoc__table td:nth-child(2) {
+/* The name wraps (it used to be «the second cell», but in «Приёмка» the second cell is the row number — the names stayed in one line and pushed the sum out). */
+.pdoc__table td.pdoc__c-name {
   white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .pdoc__table .r {
@@ -1123,5 +1125,36 @@
     flex: 1 1 100%;
     margin: 0;
     padding: 0 16px 4px;
+  }
+}
+
+/* Web: fixed columns (widths come from the page: TABLE_COL_WIDTH), tighter cell padding; a narrower screen scrolls the table sideways. */
+@media (min-width: 641px) {
+  .pdoc__table {
+    table-layout: fixed;
+  }
+
+  .pdoc__table th,
+  .pdoc__table td {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .pdoc__table th:first-child,
+  .pdoc__table td:first-child {
+    padding-left: 12px;
+  }
+
+  .pdoc__table th:last-child,
+  .pdoc__table td:last-child {
+    padding-right: 12px;
+  }
+}
+
+/* Below 1300px the widest table (the buyer's draft) does not fit: scroll it sideways instead of cutting the right side off
+   (the pinned totals row keeps to the table there). */
+@media (min-width: 641px) and (max-width: 1300px) {
+  .pdoc__table-wrap {
+    overflow-x: auto;
   }
 }
