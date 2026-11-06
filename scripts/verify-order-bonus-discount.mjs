@@ -134,4 +134,15 @@ assert.match(page, /<SaveProgressBar state=\{saveState\} \/>/)
 assert.match(read('src/hooks/useSaveTracker.js'), /setState\('saving'\)[\s\S]*setState\(hadError \? 'error' : 'saved'\)/)
 ok('autosave like UMAG: a tap outside a number field saves it, «Сохранить» / «Закрыть» / hiding the tab send what is typed first, totals follow the typed numbers, a green line shows the saving')
 
+// A number that grows must not push the table out of the screen: fixed column widths, names wrap in every view.
+assert.match(page, /const TABLE_COL_WIDTH = \{/)
+assert.match(page, /<colgroup>[\s\S]*TABLE_COL_WIDTH\[key\]/)
+assert.match(page, /style=\{isPhone \? undefined : \{ minWidth: tableMinWidth \}\}/)
+const pageCss = read('src/pages/platform/procurement/PurchaseDocumentPage.css')
+assert.match(pageCss, /@media \(min-width: 641px\) \{\s*\.pdoc__table \{\s*table-layout: fixed;/)
+assert.match(pageCss, /\.pdoc__table td\.pdoc__c-name \{\s*white-space: normal;/)
+assert.doesNotMatch(pageCss, /\.pdoc__table td:nth-child\(2\)/)
+assert.match(pageCss, /@media \(min-width: 641px\) and \(max-width: 1300px\) \{\s*\.pdoc__table-wrap \{\s*overflow-x: auto;/)
+ok('web table: fixed column widths (a sum with kopecks no longer widens its column and pushes the table out), names wrap in «Приёмка» too (the rule was «second cell»), a narrower screen scrolls sideways instead of cutting the sum off')
+
 console.log(`\n${checks} checks passed`)

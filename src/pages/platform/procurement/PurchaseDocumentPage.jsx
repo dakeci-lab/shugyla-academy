@@ -70,6 +70,28 @@ import './PurchaseDocumentPage.css'
 
 
 /**
+ * Widths (px) of the columns of the web table. The columns are fixed (`table-layout: fixed`): a number that grows («268 264,75 ₸»)
+ * no longer widens its column and pushes the table out of the screen; the name takes the rest and wraps.
+ */
+const TABLE_COL_WIDTH = {
+  check: 40,
+  index: 36,
+  code: 112,
+  stock: 60,
+  sales: 80,
+  qty: 96,
+  promo: 72,
+  bonus: 80,
+  receive: 80,
+  price: 124,
+  disc: 80,
+  dprice: 104,
+  sum: 120,
+  del: 44,
+}
+const TABLE_NAME_MIN_WIDTH = 220
+
+/**
  * Документ закупа — /platform/procurement/documents/:id. Черновик правится целиком и сохраняет каждое
  * изменение сразу (отдельного «сохранить как черновик» нет); «Сохранить» присваивает номер и отдаёт заказ приёмщику.
  * Сохранённый заказ только читается: «Отменить» возвращает его в черновик (номер остаётся).
@@ -620,6 +642,24 @@ export default function PurchaseDocumentPage() {
   // The bonus and discount columns are always there for the buyer; the receiver sees them only when the order has any.
   const showBonusCols = editable || hasBonus
   const showDiscountCols = editable || hasDiscount
+  const tableCols = [
+    showTicks && 'check',
+    'index',
+    'name',
+    'code',
+    !readerView && 'stock',
+    !readerView && 'sales',
+    'qty',
+    editable && 'promo',
+    showBonusCols && 'bonus',
+    showBonusCols && !editable && 'receive',
+    'price',
+    showDiscountCols && 'disc',
+    showDiscountCols && 'dprice',
+    'sum',
+    editable && 'del',
+  ].filter(Boolean)
+  const tableMinWidth = tableCols.reduce((sum, key) => sum + (key === 'name' ? TABLE_NAME_MIN_WIDTH : TABLE_COL_WIDTH[key]), 0)
   const colCount =
     (showTicks ? 1 : 0) + 6 + (readerView ? 0 : 2) + (editable ? 2 : 0) + (showBonusCols ? 1 : 0) + (showBonusCols && !editable ? 1 : 0) + (showDiscountCols ? 2 : 0)
   const commentLabel = readerView ? '' : order.comment ? 'Комментарий' : editable ? 'Добавить комментарий' : ''
@@ -878,7 +918,14 @@ export default function PurchaseDocumentPage() {
           <p className="pdoc__hint">Загрузка товаров…</p>
         ) : (
           <div className="pdoc__table-wrap">
-            <table className="pdoc__table">
+            <table className="pdoc__table" style={isPhone ? undefined : { minWidth: tableMinWidth }}>
+              {isPhone ? null : (
+                <colgroup>
+                  {tableCols.map((key) => (
+                    <col key={key} style={key === 'name' ? undefined : { width: TABLE_COL_WIDTH[key] }} />
+                  ))}
+                </colgroup>
+              )}
               <thead>
                 <tr>
                   {showTicks ? (
