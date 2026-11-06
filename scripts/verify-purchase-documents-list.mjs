@@ -119,4 +119,8 @@ assert.match(
 )
 ok('«Поставщик не выбран» has the same size as a supplier name (pgt__title): a document without a supplier no longer looks bigger')
 
+assert.match(read('src/pages/platform/procurement/PurchaseDocumentsPage.css'), /\.pdl-table \.pgt__row-main,\s*\.pdl-table \.pgt__foot \{\s*font-size: 14px;/)
+assert.match(read('src/pages/platform/orders/OrdersPage.css'), /\.ord-row \.pgt__row-main \{\s*font-size: 14px;/)
+ok('web lists «Закуп» and «Приёмка»: the whole row is 14px in every status (dates and names of people no longer inherit 16px)')
+
 console.log(`\n${checks} checks passed`)
