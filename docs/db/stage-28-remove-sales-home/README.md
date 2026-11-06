@@ -61,3 +61,6 @@ select count(*) from umag_sync_runs where entity = 'sales_facts';               
 Код — вернуть коммит. Данные продаж после `drop` не восстановить (источник — UMAG; историю можно заново выкачать функцией из git,
 если она понадобится). Миграции создания таблиц остаются в `supabase/migrations/` (`20260829120000_sales_category_month_facts.sql`,
 `20260830090000_sales_month_receipt_facts.sql`).
+
+
+**Выполнено 2026-11-06 (владелец):** SQL выполнен, `umag-sales-sync` удалена. Postcheck: таблиц 0, прав `sales.*` 0, строк `sales_facts` 0, «осиротевших» связок прав 0; остальные таблицы и журнал синка (220 строк) не затронуты; в проде осталось 8 Edge Functions.

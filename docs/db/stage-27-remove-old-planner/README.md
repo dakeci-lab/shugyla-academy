@@ -37,3 +37,6 @@ Postcheck: `select count(*) from pg_proc where proname = 'generate_procurement_o
 
 ## Откат
 Вернуть коммит из git (код) и функции из `supabase/migrations/` (последняя версия — по `verify-order-statuses`); данные не затрагивались.
+
+
+**Выполнено:** на проде функции `generate_procurement_orders_from_snapshot` нет (проверено 2026-11-06, `pg_proc` → 0).
