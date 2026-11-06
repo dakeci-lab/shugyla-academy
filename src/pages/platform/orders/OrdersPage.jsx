@@ -21,6 +21,7 @@ import { toUserErrorMessage } from '../../../utils/userErrorMessage'
 import { DEFAULT_RECEIVER_FILTER, RECEIVER_STATUS, selectReceiverOrders } from '../../../utils/purchaseDocumentsList'
 import { PROCUREMENT_FRESH_MS } from '../../../lib/procurementFreshness'
 import {
+  describeSettlementsPeriod,
   getSettlementsPeriodDates,
   ORDERS_PERIOD_PRESET_OPTIONS,
   resolveSettlementsPeriodPreset,
@@ -310,6 +311,21 @@ export default function OrdersPage() {
             </div>
           </PeriodFilterPopover>
         </div>
+        {isPhone ? null : (
+          // The chosen period next to «Фильтр», like in «Закуп»: «Сегодня», «Неделя» or the dates; × returns to today.
+          <span className="pf-filter-chip orders-page__chip">
+            {describeSettlementsPeriod(filter.dateFrom, filter.dateTo)}
+            {periodChanged ? (
+              <button
+                type="button"
+                aria-label="Показать за сегодня"
+                onClick={() => setFilter((current) => ({ ...current, ...getSettlementsPeriodDates(SETTLEMENTS_PERIOD_PRESET.TODAY) }))}
+              >
+                ×
+              </button>
+            ) : null}
+          </span>
+        )}
         {isPhone ? null : (
           <input
             type="search"

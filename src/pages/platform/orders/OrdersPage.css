@@ -217,3 +217,7 @@
     font-size: 14px;
   }
 }
+
+.orders-page__chip {
+  white-space: nowrap;
+}
