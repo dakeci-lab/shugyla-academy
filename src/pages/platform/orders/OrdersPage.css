@@ -210,3 +210,10 @@
     color: var(--color-text-muted, #6b7280);
   }
 }
+
+/* The same 14px for the whole row as in «Закуп», checked and not checked alike. */
+@media (min-width: 641px) {
+  .ord-row .pgt__row-main {
+    font-size: 14px;
+  }
+}

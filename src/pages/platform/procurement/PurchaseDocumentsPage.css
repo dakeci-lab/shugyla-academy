@@ -245,3 +245,12 @@
   overflow: visible;
   white-space: nowrap;
 }
+
+/* The whole row of the web list is one size (14px) in every status — the names and sums already were, the dates and names
+   of people used to inherit 16px. Phones keep their own compact row. */
+@media (min-width: 641px) {
+  .pdl-table .pgt__row-main,
+  .pdl-table .pgt__foot {
+    font-size: 14px;
+  }
+}
