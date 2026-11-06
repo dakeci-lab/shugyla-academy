@@ -13,8 +13,8 @@ assert.match(panel, /isPhoneMain\s*\?\s*\(\s*<PlatformFilterRow/)
 assert.match(panel, /hint="Показать, Поставщик, Удалённые"/)
 ok('phones: the same «Фильтры» row as «Закуп» and «Заказы»')
 
-assert.match(panel, /const defaultListView = isPhoneMain \? 'all' : 'debt'/)
-assert.match(panel, /matchMedia\?\.\('\(max-width: 640px\)'\)\.matches \? 'all' : 'debt'/)
+assert.match(panel, /const defaultListView = 'all'/)
+assert.match(panel, /const \[listView, setListView\] = useState\('all'\)/)
 assert.match(panel, /viewOptions=\{\[[\s\S]*'С долгом'[\s\S]*'Просрочено'[\s\S]*'Все'/)
 assert.match(panel, /<span className="period-filter-popover__label">Показать<\/span>/)
 assert.match(panel, /suppliersReady && debtsSettled && !isPhoneMain \? \(/)
@@ -52,5 +52,13 @@ for (const [file, rule] of [
   ['src/components/suppliers/settlements/UmagSettlementsPanel.css', /@media \(hover: hover\) \{\s*\.umag-settlements__op-link:hover/],
 ]) assert.match(read(file), rule, `${file} ${rule}`)
 ok('the underline / green name / row highlight appear only where there is a real mouse hover — no sticky green underline after a tap on a phone')
+
+// Web (2026-11-06): the same choice inside the filter popover, default «Все»; the top bar keeps only the search on the left.
+assert.match(panel, /<span className="pf-field__label">Показать:<\/span>/)
+assert.doesNotMatch(panel, /role="tablist" aria-label="Какие поставщики показывать"/)
+const filterCss = read('src/components/platform/FilterComboField.css')
+assert.match(filterCss, /\.spo-filter-pop \{[^}]*left: 0;/)
+assert.doesNotMatch(filterCss.match(/\.spo-filter-pop \{[^}]*\}/)[0], /right: 0/)
+ok('web «Поставщики»: «С долгом / Просрочено / Все» are inside the filter (default «Все»), the popover opens to the right of «Фильтр» (not off the screen), the bar keeps only the search')
 
 console.log(`\nverify:mobile-settlements-list — ${checks} checks passed`)
