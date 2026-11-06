@@ -113,10 +113,25 @@ assert.match(migration, /grant insert \(bonus_qty, promo_buy, promo_free, discou
 assert.ok(fs.existsSync(path.join(ROOT, 'docs/db/stage-29-order-bonus-discount/rollback.sql')))
 ok('stage 29: migration (columns, line trigger, «Сохранить» with the discount, «в пути» with the bonus, column grants), rollback and docs are in the repo')
 
-// A row update must not send the columns `authenticated` has no UPDATE grant for (it made every row edit fail with 403).
-assert.match(adapter, /export const ITEM_READONLY_COLUMNS = \['id', 'purchase_order_id', 'created_at'\]/)
-assert.match(adapter, /for \(const key of ITEM_READONLY_COLUMNS\) delete row\[key\][\s\S]{0,200}update\(row\)\.eq\('id', itemId\)/)
-assert.doesNotMatch(adapter, /row\.created_at = current\.created_at/)
-ok('a row edit sends only editable columns (no id / purchase_order_id / created_at): the database rejected the whole update with 403 «permission denied» before')
+// A row edit writes only the changed columns; never the ones `authenticated` may not update (that was a 403 for every edit).
+const patchColumns = adapter.match(/export const ITEM_PATCH_COLUMNS = \{([\s\S]*?)\n\}/)[1]
+for (const forbidden of ["'id'", "'purchase_order_id'", "'created_at'", "'total_amount'"]) {
+  assert.ok(!patchColumns.includes(forbidden), `${forbidden} must not be written by a row edit`)
+}
+assert.match(adapter, /\.update\(itemPatchToRow\(patch\)\)[\s\S]{0,200}\.select\('id'\)/)
+assert.doesNotMatch(adapter, /ITEM_READONLY_COLUMNS|row\.created_at = current\.created_at/)
+ok('a row edit writes only the changed columns (no id / purchase_order_id / created_at / total_amount): the database rejected the whole update with 403 before, and two quick edits of one row cannot overwrite each other')
+
+// --- Autosave like UMAG (2026-11-06) --------------------------------------------------------------------------------
+assert.match(page, /document\.addEventListener\('pointerdown', leaveField, true\)/)
+assert.match(page, /active\.dataset\.autosave/)
+assert.match(page, /window\.addEventListener\('pagehide', saveBeforeLeaving\)/)
+assert.match(page, /async function flushDrafts\(\)/)
+assert.match(page, /if \(hasDrafts\(\)\) \{\s*await flushDrafts\(\)\s*const fresh = await reloadOrder\(\)/)
+assert.match(page, /async function handleClose\(\) \{\s*if \(hasDrafts\(\)\) await flushDrafts\(\)/)
+assert.match(page, /const totals = documentTotals\(liveItems\)/)
+assert.match(page, /<SaveProgressBar state=\{saveState\} \/>/)
+assert.match(read('src/hooks/useSaveTracker.js'), /setState\('saving'\)[\s\S]*setState\(hadError \? 'error' : 'saved'\)/)
+ok('autosave like UMAG: a tap outside a number field saves it, «Сохранить» / «Закрыть» / hiding the tab send what is typed first, totals follow the typed numbers, a green line shows the saving')
 
 console.log(`\n${checks} checks passed`)

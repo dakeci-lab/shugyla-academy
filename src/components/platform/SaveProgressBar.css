@@ -1,0 +1,69 @@
+.spb {
+  position: fixed;
+  left: 0;
+  right: 0;
+  z-index: 3500;
+  height: 3px;
+  overflow: hidden;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+
+.spb::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  background: var(--color-primary, #059669);
+  transform: translateX(-100%);
+}
+
+.spb--saving {
+  opacity: 1;
+  transition: none;
+}
+
+.spb--saving::before {
+  width: 45%;
+  animation: spb-run 1s ease-in-out infinite;
+}
+
+.spb--saved {
+  opacity: 1;
+}
+
+.spb--saved::before {
+  transform: translateX(0);
+  transition: transform 0.25s ease-out;
+}
+
+.spb--error {
+  opacity: 1;
+}
+
+.spb--error::before {
+  background: #dc2626;
+  transform: translateX(0);
+}
+
+@keyframes spb-run {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(230%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spb--saving::before {
+    animation: none;
+    transform: translateX(0);
+    width: 100%;
+    opacity: 0.6;
+  }
+}
