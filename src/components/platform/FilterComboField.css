@@ -4,8 +4,10 @@
 .spo-filter-pop {
   position: absolute;
   top: calc(100% + 10px);
-  right: 0;
-  width: 300px;
+  /* «Фильтр» stands at the left edge of the bar: the popover opens to the right of it, not out of the screen. */
+  left: 0;
+  width: 360px;
+  max-width: calc(100vw - 32px);
   background: var(--color-white, #fff);
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: 14px;

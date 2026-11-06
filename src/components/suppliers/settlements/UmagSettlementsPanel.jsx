@@ -1567,6 +1567,36 @@ function SuppliersFilterPopover({
 
   return (
     <div ref={popoverRef} className="spo-filter-pop" role="dialog" aria-label="Фильтр">
+      {viewOptions.length ? (
+        <div className="pf-field">
+          <span className="pf-field__label">Показать:</span>
+          <div className="umag-settlements__ops-filters" role="group" aria-label="Какие поставщики показывать">
+            {viewOptions.map((option) => {
+              const active = viewDraft === option.id
+              return (
+                <button
+                  key={option.id}
+                  type="button"
+                  aria-pressed={active}
+                  className={`umag-settlements__ops-filter${active ? ' umag-settlements__ops-filter--active' : ''}`}
+                  onClick={() => onViewChange?.(option.id)}
+                >
+                  {option.label}
+                  {option.count ? (
+                    <span
+                      className={`umag-settlements__ops-filter-count${
+                        option.id === 'overdue' ? ' umag-settlements__ops-filter-count--danger' : ''
+                      }`}
+                    >
+                      {option.count}
+                    </span>
+                  ) : null}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
       {fields}
       <div className="spo-filter-pop__actions">{actions}</div>
     </div>
@@ -1645,12 +1675,10 @@ export default function UmagSettlementsPanel({
     [debtSummary]
   )
   const [listQuery, setListQuery] = useState('')
-  // Phones open on the whole list (the debt / overdue choice lives in the filter sheet); the web keeps «С долгом».
+  // The list opens on all suppliers everywhere; the «С долгом / Просрочено / Все» choice lives in the filter (sheet or popover).
   const isPhoneMain = useMediaQuery('(max-width: 640px)')
-  const defaultListView = isPhoneMain ? 'all' : 'debt'
-  const [listView, setListView] = useState(() =>
-    typeof window !== 'undefined' && window.matchMedia?.('(max-width: 640px)').matches ? 'all' : 'debt'
-  )
+  const defaultListView = 'all'
+  const [listView, setListView] = useState('all')
   const [draftListView, setDraftListView] = useState('all')
   const [debtLoading, setDebtLoading] = useState(true)
   const [debtsSettled, setDebtsSettled] = useState(false)
@@ -1954,10 +1982,8 @@ export default function UmagSettlementsPanel({
   function applyListFilter() {
     setAppliedShowArchived(draftShowArchived)
     setSupplierFilter(new Set(supplierFilterDraft))
-    if (isPhoneMain) {
-      setListQuery('')
-      setListView(draftListView)
-    }
+    setListQuery('')
+    setListView(draftListView)
     setFilterOpen(false)
   }
 
@@ -1967,10 +1993,9 @@ export default function UmagSettlementsPanel({
     setSupplierFilterDraft(new Set())
     setSupplierFilter(new Set())
     setFilterSearch('')
-    if (isPhoneMain) {
-      setListView(defaultListView)
-      setDraftListView(defaultListView)
-    }
+    setListQuery('')
+    setListView(defaultListView)
+    setDraftListView(defaultListView)
     setFilterOpen(false)
   }
 
@@ -2008,8 +2033,8 @@ export default function UmagSettlementsPanel({
   ) : (
     <PlatformFilterTrigger
       ref={filterButtonRef}
-      active={filtersActive}
-      count={supplierFilter.size + (appliedShowArchived ? 1 : 0)}
+      active={filtersActive || listView !== defaultListView}
+      count={supplierFilter.size + (appliedShowArchived ? 1 : 0) + (listView !== defaultListView ? 1 : 0)}
       open={filterOpen}
       onClick={toggleFilter}
       aria-label="Фильтр"
@@ -2044,45 +2069,10 @@ export default function UmagSettlementsPanel({
     />
   )
 
-  // Phones: no chips and no search box in the top bar — the chips are in the filter sheet, the search floats at the bottom.
+  // The chips are in the filter (sheet or popover); the web top bar keeps only the search, right after «Фильтр». Phones: the search floats at the bottom.
   const listTools =
     suppliersReady && debtsSettled && !isPhoneMain ? (
             <div className="umag-settlements__list-tools">
-        <div className="umag-settlements__ops-filters" role="tablist" aria-label="Какие поставщики показывать">
-                {[
-                  { id: 'debt', label: 'С долгом', count: withDebtCount },
-                  ...(overdueSuppliersCount > 0
-                    ? [{ id: 'overdue', label: 'Просрочено', count: overdueSuppliersCount, tone: 'danger' }]
-                    : []),
-                  { id: 'all', label: 'Все', count: 0 },
-                ].map((opt) => {
-                  const active = !searchingList && opt.id === listView
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      role="tab"
-                      aria-selected={active}
-                      className={`umag-settlements__ops-filter${active ? ' umag-settlements__ops-filter--active' : ''}`}
-                      onClick={() => {
-                        setListQuery('')
-                        setListView(opt.id)
-                      }}
-                    >
-                      {opt.label}
-                      {opt.count ? (
-                        <span
-                          className={`umag-settlements__ops-filter-count${
-                            opt.tone === 'danger' ? ' umag-settlements__ops-filter-count--danger' : ''
-                          }`}
-                        >
-                          {opt.count}
-                        </span>
-                      ) : null}
-                    </button>
-                  )
-                })}
-              </div>
               <input
                 type="search"
                 className="umag-settlements__search"
