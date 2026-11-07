@@ -120,7 +120,8 @@
     "verify:suppliers-settlements-merge": "node scripts/verify-suppliers-settlements-merge.mjs",
     "verify:orders-period-load": "node scripts/verify-orders-period-load.mjs",
     "verify:order-bonus-discount": "node scripts/verify-order-bonus-discount.mjs",
-    "verify:money-format": "node scripts/verify-money-format.mjs"
+    "verify:money-format": "node scripts/verify-money-format.mjs",
+    "verify:supplier-net-debt": "node scripts/verify-supplier-net-debt.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",
