@@ -1255,3 +1255,15 @@
   font-size: 16px;
   justify-content: center;
 }
+
+/* Net balance (receipts − unpaid returns): a negative balance means the supplier owes us — green, not grey; the split line is quiet. */
+.umag-settlements__id-balance-amount--credit,
+.umag-settlements__credit {
+  color: #047857;
+  font-weight: 600;
+}
+
+.umag-settlements__id-balance-overdue.umag-settlements__id-balance-split {
+  font-weight: 400;
+  color: var(--color-text-secondary, #64748b);
+}

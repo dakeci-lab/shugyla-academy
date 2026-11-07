@@ -293,11 +293,21 @@ function SupplierDocHeader({ supplier, canEdit, canViewFinance, debtLoading, onB
       <span className="umag-settlements__id-balance-label">К оплате</span>
       <span
         className={`umag-settlements__id-balance-amount${
-          supplier.debt > 0 ? '' : ' umag-settlements__id-balance-amount--zero'
+          supplier.debt > 0
+            ? ''
+            : supplier.debt < 0
+              ? ' umag-settlements__id-balance-amount--credit'
+              : ' umag-settlements__id-balance-amount--zero'
         }`}
       >
         {debtLoading ? '…' : formatUmagMoney(supplier.debt ?? 0)}
       </span>
+      {!debtLoading && supplier.returnsDebt > 0 ? (
+        <span className="umag-settlements__id-balance-overdue umag-settlements__id-balance-split">
+          {supplier.debt < 0 ? 'поставщик должен нам · ' : ''}приёмки {formatUmagMoney(supplier.receiptsDebt)} · возвраты −
+          {formatUmagMoney(supplier.returnsDebt)}
+        </span>
+      ) : null}
       {!debtLoading && supplier.overdueAmount > 0 ? (
         <span className="umag-settlements__id-balance-overdue">
           из них просрочено {formatUmagMoney(supplier.overdueAmount)}
@@ -335,6 +345,12 @@ function SupplierDocHeader({ supplier, canEdit, canViewFinance, debtLoading, onB
           ...(canViewFinance
             ? [
                 { key: 'debt', label: 'К оплате', value: debtLoading ? '…' : formatUmagMoney(supplier.debt ?? 0) },
+                ...(!debtLoading && supplier.returnsDebt > 0
+                  ? [
+                      { key: 'receipts', label: 'Неоплаченные приёмки', value: formatUmagMoney(supplier.receiptsDebt) },
+                      { key: 'returns', label: 'Неполученные возвраты', value: `−${formatUmagMoney(supplier.returnsDebt)}` },
+                    ]
+                  : []),
                 ...(!debtLoading && supplier.overdueAmount > 0
                   ? [{ key: 'overdue', label: 'Просрочено', value: formatUmagMoney(supplier.overdueAmount), tone: 'danger' }]
                   : []),
@@ -2096,6 +2112,8 @@ export default function UmagSettlementsPanel({
             ...selected,
             debt: debtByPlatformId.get(selected.id) ?? null,
             overdueAmount: debtSummary.get(selected.id)?.overdueAmount ?? 0,
+            receiptsDebt: debtSummary.get(selected.id)?.receiptsAmount ?? 0,
+            returnsDebt: debtSummary.get(selected.id)?.returnsAmount ?? 0,
           }}
           filterSlot={filterSlot}
           canViewFinance={canViewFinance}
@@ -2192,9 +2210,12 @@ export default function UmagSettlementsPanel({
                 const debt = debtByPlatformId.get(s.id) ?? null
                 const entry = debtSummary.get(s.id)
                 // Phones: only the number of unpaid documents (no «since» date, no overdue count).
-                const meta = isPhoneMain
+                const openDocs = isPhoneMain
                   ? describeOpenDocuments({ count: entry?.count || 0 })
                   : describeOpenDocuments(entry)
+                // Unpaid returns come off the balance: say so under the name («возвраты −12 283,06 ₸»).
+                const returnsNote = entry?.returnsAmount > 0 ? `возвраты −${formatUmagMoney(entry.returnsAmount)}` : ''
+                const meta = [openDocs, returnsNote].filter(Boolean).join(' · ')
                 return (
                   <PgtRow
                     key={s.id}
@@ -2232,7 +2253,12 @@ export default function UmagSettlementsPanel({
                         </span>
                       ),
                       balance: (
-                        <span className={`pgt__money${debt > 0 ? '' : ' umag-settlements__zero'}`}>
+                        <span
+                          className={`pgt__money${
+                            debt > 0 ? '' : debt < 0 ? ' umag-settlements__credit' : ' umag-settlements__zero'
+                          }`}
+                          title={debt < 0 ? 'Поставщик должен нам: возвраты больше долга' : undefined}
+                        >
                           {debtLoading ? '…' : formatUmagMoney(debt ?? 0)}
                         </span>
                       ),
