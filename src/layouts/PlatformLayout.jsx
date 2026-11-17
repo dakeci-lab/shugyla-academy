@@ -13,6 +13,7 @@ import { PullToRefreshProvider } from '../context/PullToRefreshContext'
 import { PlatformPageTitleProvider, usePlatformPageTitleContext } from '../context/PlatformPageTitleContext'
 import { usePlatformData } from '../context/PlatformDataContext'
 import { useProcurementRealtime } from '../hooks/useProcurementRealtime'
+import useAppUpdateGuard from '../hooks/useAppUpdateGuard'
 import useMediaQuery from '../hooks/useMediaQuery'
 import useBlockMobileBrowserBack, {
   MOBILE_BACK_BLOCK_KEY,
@@ -40,6 +41,8 @@ function PlatformLayoutShell({ onLogout }) {
   }, [user, pathname])
   // Subscription/refresh side effects stay active; connection status no longer renders a banner.
   useProcurementRealtime(procurementRealtimeEnabled)
+  // A tab left open for days reloads itself when a newer version is deployed.
+  useAppUpdateGuard()
   const navigate = useNavigate()
   const titleContext = usePlatformPageTitleContext()
   const section = useMemo(() => getPlatformSection(pathname), [pathname])

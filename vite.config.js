@@ -19,8 +19,15 @@ export default defineConfig(({ command }) => {
   const defaultBasePath = command === 'serve' ? '/' : '/shugyla-academy/'
   const base = normalizeBasePath(process.env.APP_BASE_PATH || defaultBasePath)
 
+  // The commit of this build: written to version.json and compiled into the app, so an open tab can tell that a newer
+  // version was deployed (useAppUpdateGuard). `local` for dev builds (no check there).
+  const appCommit = process.env.GITHUB_SHA || 'local'
+
   return {
     base,
+    define: {
+      __APP_COMMIT__: JSON.stringify(appCommit),
+    },
     build: {
       rollupOptions: {
         output: {
@@ -52,7 +59,7 @@ export default defineConfig(({ command }) => {
           writeFileSync(
             resolve(dist, 'version.json'),
             `${JSON.stringify({
-              commit: process.env.GITHUB_SHA || 'local',
+              commit: appCommit,
               base,
             }, null, 2)}\n`
           )
