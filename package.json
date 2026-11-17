@@ -121,7 +121,8 @@
     "verify:orders-period-load": "node scripts/verify-orders-period-load.mjs",
     "verify:order-bonus-discount": "node scripts/verify-order-bonus-discount.mjs",
     "verify:money-format": "node scripts/verify-money-format.mjs",
-    "verify:supplier-net-debt": "node scripts/verify-supplier-net-debt.mjs"
+    "verify:supplier-net-debt": "node scripts/verify-supplier-net-debt.mjs",
+    "verify:app-update-guard": "node scripts/verify-app-update-guard.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.1",
